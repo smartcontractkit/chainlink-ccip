@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/crib/ccip
+module github.com/smartcontractkit/crib/core
 
 go 1.21.7
 
@@ -12,13 +12,12 @@ require (
 	github.com/K-Phoen/sdk v0.12.4 // indirect
 	github.com/gosimple/slug v1.13.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
-	github.com/grafana/grafana-foundation-sdk/go v0.0.0-00010101000000-000000000000 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/rs/zerolog v1.32.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
 )
 
 replace (

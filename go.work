@@ -4,5 +4,6 @@ toolchain go1.21.11
 
 use (
 	ccip
+	core
 	dashboard-lib
 )

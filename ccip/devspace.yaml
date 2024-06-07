@@ -76,7 +76,7 @@ images:
         docker push $image
 hooks:
   - command: ./scripts/check_env_vars.sh
-    events: [ "before:deploy:app" ]
+    events: ["before:deploy:app"]
   - wait:
       running: true
       terminatedWithCode: 0
