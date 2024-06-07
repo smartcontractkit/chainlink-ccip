@@ -1,0 +1,8 @@
+go 1.21.7
+
+toolchain go1.21.11
+
+use (
+	ccip
+	dashboard-lib
+)
