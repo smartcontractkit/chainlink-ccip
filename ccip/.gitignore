@@ -3,3 +3,4 @@ values-profiles/*
 !values-profiles/README.md
 override.toml
 .env
+/atlas/init/output/
