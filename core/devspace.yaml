@@ -58,7 +58,7 @@ pipelines:
           --chainid=$chainId \
           --ethurl="${KEYSTONE_ETH_HTTP_URL}" \
           --accountkey=${KEYSTONE_ACCOUNT_KEY}
-     
+
         ./keystone deploy-jobspecs \
           --chainid=$chainId \
           --p2pport=6690
@@ -69,7 +69,7 @@ pipelines:
         create_deployments app --from-file="${DEVSPACE_TMPDIR}/crib-cluster-overrides.yaml" 
         kubectl delete pod -l "app=app" # restart pods to apply the new configuration changes
         kubectl wait --for=condition=ready pod -l "app=app" --timeout=2m 
-      fi  
+      fi
 
   purge:
     run: |-
@@ -105,6 +105,8 @@ images:
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
         docker push $image
 hooks:
+  - command: ../scripts/before_deploy_checks.sh
+    events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
     events: ["before:deploy:app"]
   - wait:
@@ -467,56 +469,56 @@ profiles:
       - op: replace
         path: deployments.app.helm.values.chainlink.global.toml
         value: |-
-              RootDir = './clroot'
+          RootDir = './clroot'
 
-              [Log]
-              JSONConsole = true
-              Level = 'debug'
-              [Log.File]
-              MaxSize = '0b'
+          [Log]
+          JSONConsole = true
+          Level = 'debug'
+          [Log.File]
+          MaxSize = '0b'
 
-              [WebServer]
-              AllowOrigins = '*'
-              SecureCookies = false
-              SessionTimeout = '999h0m0s'
-              HTTPPort = 6688
-              HTTPWriteTimeout = '1m'
-              [WebServer.RateLimit]
-              Authenticated = 2000
-              Unauthenticated = 1000
+          [WebServer]
+          AllowOrigins = '*'
+          SecureCookies = false
+          SessionTimeout = '999h0m0s'
+          HTTPPort = 6688
+          HTTPWriteTimeout = '1m'
+          [WebServer.RateLimit]
+          Authenticated = 2000
+          Unauthenticated = 1000
 
-              [Database]
-              MaxIdleConns = 50
-              MaxOpenConns = 50
-              MigrateOnStartup = true
+          [Database]
+          MaxIdleConns = 50
+          MaxOpenConns = 50
+          MigrateOnStartup = true
 
-              [OCR2]
-              Enabled = true
-              DefaultTransactionQueueDepth = 0
-              [OCR]
-              Enabled = false
-              DefaultTransactionQueueDepth = 0
+          [OCR2]
+          Enabled = true
+          DefaultTransactionQueueDepth = 0
+          [OCR]
+          Enabled = false
+          DefaultTransactionQueueDepth = 0
 
-              [WebServer.TLS]
-              HTTPSPort = 0
+          [WebServer.TLS]
+          HTTPSPort = 0
 
-              [Feature]
-              FeedsManager = true
-              LogPoller = true
-              UICSAKeys = true
+          [Feature]
+          FeedsManager = true
+          LogPoller = true
+          UICSAKeys = true
 
-              [P2P]
-              [P2P.V2]
-              Enabled = true
-              ListenAddresses = ['0.0.0.0:6690']
-              AnnounceAddresses = ['0.0.0.0:6690']
-              DeltaDial = '500ms'
-              DeltaReconcile = '5s'
+          [P2P]
+          [P2P.V2]
+          Enabled = true
+          ListenAddresses = ['0.0.0.0:6690']
+          AnnounceAddresses = ['0.0.0.0:6690']
+          DeltaDial = '500ms'
+          DeltaReconcile = '5s'
 
-              [[EVM]]
-              ChainID = '11155111'
+          [[EVM]]
+          ChainID = '11155111'
 
-              [[EVM.Nodes]]
-              Name = 'primary'
-              WSURL = "${KEYSTONE_ETH_WS_URL}"
-              HTTPURL = "${KEYSTONE_ETH_HTTP_URL}"
+          [[EVM.Nodes]]
+          Name = 'primary'
+          WSURL = "${KEYSTONE_ETH_WS_URL}"
+          HTTPURL = "${KEYSTONE_ETH_HTTP_URL}"

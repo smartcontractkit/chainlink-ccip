@@ -19,21 +19,25 @@ set -euo pipefail
 # environment.
 #############################
 
+# Get the root of the Git repository
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+
+# Source the shared functions file
+# shellcheck disable=SC1091
+source "${repo_root}/scripts/lib/shared_functions.sh"
+
 DEVSPACE_NAMESPACE="${1:-}"
 if [[ -z "${DEVSPACE_NAMESPACE}" ]]; then
   echo "Usage: $0 <DEVSPACE_NAMESPACE>"
   exit 1
 fi
 
-# Bail if $DEVSPACE_NAMESPACE does not begin with a crib- prefix or does not have an override set.
-if [[ ! "${DEVSPACE_NAMESPACE}" =~ ^crib- ]] && [[ -z "${CRIB_IGNORE_NAMESPACE_PREFIX:-}" ]]; then
-  echo "Error: DEVSPACE_NAMESPACE must begin with 'crib-' prefix."
+if ! check_namespace_prefix "${DEVSPACE_NAMESPACE}"; then
   exit 1
 fi
 
 # Path to the .env file
-repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-env_file="${repo_root}/core/.env"
+env_file="${repo_root}/ccip/.env"
 
 # Source .env file if it exists
 if [[ -f "${env_file}" ]]; then

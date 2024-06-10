@@ -75,6 +75,8 @@ images:
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
         docker push $image
 hooks:
+  - command: ../scripts/before_deploy_checks.sh
+    events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
     events: ["before:deploy:app"]
   - wait:
@@ -99,7 +101,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       releaseName: "app"
       chart:
         name: ${CCIP_HELM_CHART_URI}
