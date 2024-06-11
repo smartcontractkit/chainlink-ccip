@@ -51,9 +51,9 @@ pipelines:
   atlas-network-2:
     run: |-
       cd ${MONITORING_SCRIPT}
-      go run main.go  config.yaml  values-network-1.yaml
+      go run main.go  config.yaml  values-network-2.yaml
       cd ../..
-      create_deployments atlas-network-1
+      create_deployments atlas-network-2
   purge:
     run: |-
       kubectl delete ns ${DEVSPACE_NAMESPACE}
@@ -465,7 +465,7 @@ deployments:
           image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
           oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
           outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
-  atlas-network-1:
+  atlas-network-1-dev:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
@@ -479,7 +479,7 @@ deployments:
       values:
         podSecurityContext:
           fsGroup: 999
-  atlas-network-2:
+  atlas-network-2-dev:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
@@ -493,7 +493,7 @@ deployments:
       values:
         podSecurityContext:
           fsGroup: 999
-  atlas-infra:
+  atlas-infra-dev:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
@@ -503,6 +503,44 @@ deployments:
       chart:
         name: root
         path: ${MONITORING_INFRA_PATH}
+  atlas-network-1:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      upgradeArgs: [ "--timeout", "10m" ]
+      displayOutput: true
+      chart:
+        name: ${ATLAS_NETWORK_HELM_CHART_URI}
+        version: "0.0.4"
+      valuesFiles:
+        - ${MONITORING_NETWORK_1_VALUES_PATH}
+      values:
+        podSecurityContext:
+          fsGroup: 999
+  atlas-network-2:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      upgradeArgs: [ "--timeout", "10m" ]
+      displayOutput: true
+      chart:
+        name: ${ATLAS_NETWORK_HELM_CHART_URI}
+        version: "0.0.4"
+      valuesFiles:
+        - ${MONITORING_NETWORK_2_VALUES_PATH}
+      values:
+        podSecurityContext:
+          fsGroup: 999
+  atlas-infra:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: ${MONITORING_INFRA_RELEASE_NAME}
+      upgradeArgs: [ "--timeout", "10m" ]
+      displayOutput: true
+      chart:
+        name: ${ATLAS_INFRA_HELM_CHART_URI}
+        version: "0.0.4"
 profiles:
   - name: local-dev
     patches:
