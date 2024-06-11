@@ -31,6 +31,8 @@ pipelines:
         create_deployments app 
       fi
 
+      run_pipelines atlas
+      
       echo
       echo "Namespace ${DEVSPACE_NAMESPACE} will be deleted in ${NS_TTL}"
       echo "To extend the TTL for e.g. 72 hours, run:"
