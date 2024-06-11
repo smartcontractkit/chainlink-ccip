@@ -35,12 +35,6 @@ pipelines:
         create_deployments app
       fi
 
-      echo
-      echo "Namespace ${DEVSPACE_NAMESPACE} will be deleted in ${NS_TTL}"
-      echo "To extend the TTL for e.g. 72 hours, run:"
-      echo "devspace run ttl ${DEVSPACE_NAMESPACE} 72h"
-      echo
-      kubectl label namespace ${DEVSPACE_NAMESPACE} cleanup.kyverno.io/ttl=${NS_TTL} > /dev/null 2>&1 || true
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
 
       # check if profile is keystone
@@ -121,9 +115,15 @@ hooks:
 
   # Check that the ingress was created successfully, and print ingress hostnames.
   - name: "ingress-check-hook"
-    command: ./scripts/ingress_check.sh
+    command: ./../scripts/ingress_check.sh
     args: ["app"] # Ingress name.
     events: ["after:deploy:app"]
+
+  # Check that the namespace cleanup label is set successfully.
+  - name: "label-namespace-hook"
+    command: ./../scripts/label_namespace.sh
+    args: ["${DEVSPACE_NAMESPACE}", "${NS_TTL}"]
+    events: ["after:deploy:app", "error:deploy:*"]
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
