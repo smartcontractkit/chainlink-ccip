@@ -1,5 +1,5 @@
 # CRIB
-“CRIB” stands for “Chainlink Running-in-a-Box”.  CRIB is tooling that enables CLL developers to quickly spin up ephemeral development and/or testing environments that closely mimic a product’s staging environment with all the required Chainlink dependencies.
+“CRIB” stands for “Chainlink Running-in-a-Box”. CRIB is tooling that enables CLL developers to quickly spin up ephemeral development and/or testing environments that closely mimic a product’s staging environment with all the required Chainlink dependencies.
 
 This repository contains CRIB CLI configuration and tooling required to spin up CRIBs from CLI.
 To learn more about CRIB please the general documentation in Confluence:
