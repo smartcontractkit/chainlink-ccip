@@ -6,7 +6,7 @@
 .envrc
 .env*
 .dbenv
-!crib/.env.example
+!*/.env.example
 !.github/actions/setup-postgres/.env
 .direnv
 .idea
