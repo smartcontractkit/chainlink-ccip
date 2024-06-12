@@ -22,7 +22,7 @@ pipelines:
 
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
-        echo "Using user provided image: $image" 
+        echo "Using user provided image: $image"
 
         args=""
         for i in {0..5}; do
@@ -41,10 +41,10 @@ pipelines:
       if [[  "${DEVSPACE_PROFILE}" == "keystone" ]]; then
         echo "Keystone profile detected, provisioning Keystone"
         pushd ../core/scripts/keystone
-        if [ $(get_flag "clean") == "true" ]; then 
+        if [ $(get_flag "clean") == "true" ]; then
           echo "Cleaning keystone caches"
-          rm -f artefacts/deployed_contracts.json .cache/* 
-        fi 
+          rm -f artefacts/deployed_contracts.json .cache/*
+        fi
         go build -o keystone main.go
         chainId=11155111
         ./keystone deploy-contracts \
@@ -60,9 +60,9 @@ pipelines:
         ./keystone generate-crib --chainid="$chainId" --outpath="${DEVSPACE_TMPDIR}"
         popd
 
-        create_deployments app --from-file="${DEVSPACE_TMPDIR}/crib-cluster-overrides.yaml" 
+        create_deployments app --from-file="${DEVSPACE_TMPDIR}/crib-cluster-overrides.yaml"
         kubectl delete pod -l "app=app" # restart pods to apply the new configuration changes
-        kubectl wait --for=condition=ready pod -l "app=app" --timeout=2m 
+        kubectl wait --for=condition=ready pod -l "app=app" --timeout=2m
       fi
 
   purge:
@@ -70,19 +70,28 @@ pipelines:
       kubectl delete ns ${DEVSPACE_NAMESPACE}
 
 commands:
-  ingress-hosts: |-
-    kubectl get ingress -n ${DEVSPACE_NAMESPACE} \
+  ingress-hosts:
+    command: kubectl get ingress -n ${DEVSPACE_NAMESPACE} \
       -o=jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
-  connect: |-
-    sudo kubefwd svc -n $1
-  ttl: |-
-    kubectl label namespace $1 cleanup.kyverno.io/ttl=$2 --overwrite
-  workload: |-
-    cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
-  dashboard_deploy: |-
-    go run dashboard/cmd/deploy.go
-  dashboard_test: |-
-    cd dashboard/tests && npx playwright test || cd -
+    description: List Kubernetes ingress hostnames in the namespace.
+  connect:
+    command: sudo kubefwd svc -n $1
+    description: Expose Kubernetes services for local development.
+  ttl:
+    command: kubectl label namespace $1 cleanup.kyverno.io/ttl=$2 --overwrite
+    description: Configure TTL for devspace resource cleanup. Default is 72h.
+  workload:
+    command: cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
+    description: Run workload
+  dashboard-deploy:
+    command: go run dashboard/cmd/deploy.go
+    description: Deploy dashboards
+  dashboard-test:
+    command: cd dashboard/tests && npx playwright test || cd -
+    description: Run tests
+  man:
+    command: ../scripts/man.sh $1
+    description: Display man pages
 
 images:
   app:
@@ -124,6 +133,10 @@ hooks:
     command: ./../scripts/label_namespace.sh
     args: ["${DEVSPACE_NAMESPACE}", "${NS_TTL}"]
     events: ["after:deploy:app", "error:deploy:*"]
+
+  # Prints man pages about available commands
+  - command: ../scripts/man.sh
+    events: ["after:deploy"]
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
