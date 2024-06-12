@@ -140,7 +140,7 @@ deployments:
       releaseName: "app"
       chart:
         name: ${CCIP_HELM_CHART_URI}
-        version: "1.2.0"
+        version: "1.x"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
