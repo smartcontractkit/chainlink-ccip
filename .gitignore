@@ -18,3 +18,4 @@ debug.env
 
 # Ignore DevSpace cache and log folder
 .devspace/
+/ccip/atlas/init/output/*
