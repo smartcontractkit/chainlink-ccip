@@ -51,7 +51,7 @@ pipelines:
   atlas-network-2:
     run: |-
       cd ${MONITORING_SCRIPT}
-      go run main.go  config.yaml  values-network-2.yaml
+      go run main.go  config-2.yaml  values-network-2.yaml
       cd ../..
       create_deployments atlas-network-2
   purge:
@@ -507,6 +507,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
+      releaseName: atlas-network-1
       upgradeArgs: [ "--timeout", "10m" ]
       displayOutput: true
       chart:
@@ -521,6 +522,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
+      releaseName: atlas-network-2
       upgradeArgs: [ "--timeout", "10m" ]
       displayOutput: true
       chart:

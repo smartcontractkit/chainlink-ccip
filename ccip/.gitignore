@@ -2,4 +2,3 @@ values-profiles/*
 !values-profiles/values-dev.yaml.example
 !values-profiles/README.md
 override.toml
-/atlas/init/output/*
