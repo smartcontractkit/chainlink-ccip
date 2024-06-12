@@ -18,7 +18,7 @@ pipelines:
 
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
-        echo "Using user provided image: $image" 
+        echo "Using user provided image: $image"
 
         args=""
         for i in {0..5}; do
@@ -28,7 +28,7 @@ pipelines:
         create_deployments app $args
       else
         build_images --all
-        create_deployments app 
+        create_deployments app
       fi
 
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
@@ -38,21 +38,31 @@ pipelines:
       kubectl delete ns ${DEVSPACE_NAMESPACE}
 
 commands:
-  ingress-hosts: |-
-    kubectl get ingress -n ${DEVSPACE_NAMESPACE} \
-      -o=jsonpath="{range .items[*].spec.rules[*]}{.host}{'\n'}{end}"
-  connect: |-
-    sudo kubefwd svc -n $1
-  ttl: |-
-    kubectl label namespace $1 cleanup.kyverno.io/ttl=$2 --overwrite
-  workload: |-
-    cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
-  dashboard_deploy: |-
-    go run dashboard/cmd/deploy.go
-  dashboard_test: |-
-    cd dashboard/tests && npx playwright test || cd -
-  get_test_input: |-
-    aws s3 cp s3://${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}/${DEVSPACE_NAMESPACE}-testInput.toml override.toml
+  ingress-hosts:
+    command: kubectl get ingress -n ${DEVSPACE_NAMESPACE} \
+      -o=jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
+    description: List Kubernetes ingress hostnames in the namespace.
+  connect:
+    command: sudo kubefwd svc -n $1
+    description: Expose Kubernetes services for local development.
+  ttl:
+    command: kubectl label namespace $1 cleanup.kyverno.io/ttl=$2 --overwrite
+    description: Configure TTL for devspace resource cleanup. Default is 72h.
+  workload:
+    command: cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
+    description: Run workload
+  dashboard-deploy:
+    command: go run dashboard/cmd/deploy.go
+    description: Deploy dashboards
+  dashboard-test:
+    command: cd dashboard/tests && npx playwright test || cd -
+    description: Run tests
+  get_test_input:
+    command: aws s3 cp s3://${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}/${DEVSPACE_NAMESPACE}-testInput.toml override.toml
+    description: Download the testInput.toml file from the S3 bucket
+  man:
+    command: ../scripts/man.sh $1
+    description: Display man pages
 
 images:
   app:
@@ -94,6 +104,10 @@ hooks:
     command: ./../scripts/label_namespace.sh
     args: ["${DEVSPACE_NAMESPACE}", "${NS_TTL}"]
     events: ["after:deploy:app", "error:deploy:*"]
+
+  # Prints man pages about available commands
+  - command: ../scripts/man.sh
+    events: ["after:deploy:app"]
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
