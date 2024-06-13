@@ -71,8 +71,8 @@ pipelines:
 
 commands:
   ingress-hosts:
-    command: kubectl get ingress -n ${DEVSPACE_NAMESPACE} \
-      -o=jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
+    command: |-
+      kubectl get ingress -n ${DEVSPACE_NAMESPACE} -o=jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
     description: List Kubernetes ingress hostnames in the namespace.
   connect:
     command: sudo kubefwd svc -n $1
