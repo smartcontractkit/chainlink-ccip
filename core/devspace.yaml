@@ -265,14 +265,11 @@ deployments:
             node5:
               image: ${runtime.images.app}
 
-        # each CL node have a dedicated PostgreSQL 11.15
-        # use StatefulSet by setting:
-        #
-        # stateful: true
-        # capacity 10Gi
-        #
-        # if you are running long tests
         db:
+          statefulSet:
+            enabled: false
+            capacity: 2Gi
+            storageClassName: gp2
           securityContext:
             capabilities:
               drop:
@@ -281,7 +278,6 @@ deployments:
             runAsNonRoot: true
             runAsUser: 999
             runAsGroup: 999
-          stateful: false
           resources:
             requests:
               cpu: 1
