@@ -269,7 +269,7 @@ deployments:
           statefulSet:
             enabled: false
             capacity: 2Gi
-            storageClassName: gp2
+            storageClassName: gp3
           securityContext:
             capabilities:
               drop:
