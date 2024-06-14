@@ -144,7 +144,7 @@ hooks:
   # Check that the namespace cleanup label is set successfully.
   - name: "label-namespace-hook"
     command: ./../scripts/label_namespace.sh
-    args: ["${DEVSPACE_NAMESPACE}", "${NS_TTL}"]
+    args: ["${NS_TTL}"]
     events: ["after:deploy:app", "error:deploy:*"]
 
   # Prints man pages about available commands
@@ -532,7 +532,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: root
@@ -571,7 +571,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: ${ATLAS_INFRA_HELM_CHART_URI}
