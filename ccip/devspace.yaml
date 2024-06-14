@@ -32,7 +32,7 @@ pipelines:
       fi
 
       run_pipelines atlas
-     
+
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
 
   atlas:
@@ -67,7 +67,7 @@ commands:
     command: sudo kubefwd svc -n $1
     description: Expose Kubernetes services for local development.
   ttl:
-    command: kubectl label namespace $1 cleanup.kyverno.io/ttl=$2 --overwrite
+    command: ./../scripts/label_namespace.sh $1 --overwrite
     description: Configure TTL for devspace resource cleanup. Default is 72h.
   workload:
     command: cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
@@ -483,7 +483,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: root
@@ -497,7 +497,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: root
@@ -512,7 +512,7 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: ${MONITORING_INFRA_RELEASE_NAME}
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: root
@@ -522,7 +522,7 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: atlas-network-1
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: ${ATLAS_NETWORK_HELM_CHART_URI}
@@ -537,7 +537,7 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: atlas-network-2
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: ${ATLAS_NETWORK_HELM_CHART_URI}
@@ -552,7 +552,7 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: ${MONITORING_INFRA_RELEASE_NAME}
-      upgradeArgs: [ "--timeout", "10m" ]
+      upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
         name: ${ATLAS_INFRA_HELM_CHART_URI}
