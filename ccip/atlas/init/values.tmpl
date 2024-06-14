@@ -5,14 +5,16 @@ atlas-core:
     image:
       tag: {{ .atlas.image.tag }}
     envFromSecrets:
-      - crib-secrets
+      - postgres-credentials-url
+      - kafka-urls
+      - schema-registry-url
 
   evm-blocks:
     <<: *base
     topologySpreadConstraints: []
-    name: crib-evm-blocks-{{  .network }}
+    name: atlas-evm-blocks-{{  .network }}
     envVars:
-      APP_NAME: crib-evm-blocks-{{  .network }}
+      APP_NAME: atlas-evm-blocks-{{  .network }}
       BLOCKS_CHANNEL_LENGTH: "100"
       BLOCKS_KAFKA_BACKFILL_TOPIC: {{  .network }}_blocks_state
       BLOCKS_KAFKA_BLOCK_HEADERS_TOPIC: {{  .network }}_block_headers
@@ -35,9 +37,9 @@ atlas-core:
   evm-logs:
     <<: *base
     topologySpreadConstraints: []
-    name: crib-evm-logs-{{  .network }}
+    name: atlas-evm-logs-{{  .network }}
     envVars:
-      APP_NAME: crib-evm-logs-{{  .network }}
+      APP_NAME: atlas-evm-logs-{{  .network }}
       CHAIN_ID: {{  .chainId }}
       FAILED_MESSAGES_MAX_RETRY_COUNT: "10"
       KAFKA_BLOCK_HEADERS_TOPIC: {{  .network }}_block_headers
@@ -58,12 +60,12 @@ atlas-core:
   evm-receipts:
     <<: *base
     topologySpreadConstraints: []
-    name: crib-evm-receipts-{{  .network }}
+    name: atlas-evm-receipts-{{  .network }}
     envVars:
       KAFKA_CONSUMER_MAX_POLL_INTERVAL_MS: "1m"
       RECEIPTS_ENABLE_PARALLEL_BATCH: "false"
       RECEIPTS_MAX_RETRY_DURATION: "45s"
-      APP_NAME: crib-evm-receipts-{{  .network }}
+      APP_NAME: atlas-evm-receipts-{{  .network }}
       CHAIN_ID: {{  .chainId }}
       KAFKA_CLIENT_ID: atlas-evm-receipts-{{  .network }}
       KAFKA_COMPRESSION_TYPE: zstd
@@ -84,7 +86,7 @@ atlas-core:
 
   evm-logs-abi-decoder:
     <<: *base
-    name: crib-evm-logs-abi-decoder-{{  .network }}
+    name: atlas-evm-logs-abi-decoder-{{  .network }}
     topologySpreadConstraints: []
     envVars:
       KAFKA_ABI_DECODED_LOGS_DLQ_TOPIC: atlas_{{  .network }}_events_dlq
@@ -118,7 +120,7 @@ atlas-evm-ccip-exporter:
   topologySpreadConstraints: []
   name: atlas-evm-ccip-exporter-{{  .network }}
   envVars:
-    APP_NAME: crib-evm-ccip-exporter-{{  .network }}-ccip-exporter
+    APP_NAME: atlas-evm-ccip-exporter-{{  .network }}-ccip-exporter
     CHAIN_ID: {{  .chainId }}
     NATIVE_SYMBOL: AVAX
     NETWORK_NAME: {{  .network }}
@@ -147,9 +149,9 @@ atlas-evm-ccip-exporter:
 atlas-evm-ccip:
   <<: *base
   topologySpreadConstraints: []
-  name: crib-evm-ccip-{{  .network }}
+  name: atlas-evm-ccip-{{  .network }}
   envVars:
-    APP_NAME: crib-evm-ccip-network-{{  .network }}
+    APP_NAME: atlas-evm-ccip-network-{{  .network }}
     BLOCKS_KAFKA_BLOCK_HEADERS_TOPIC: {{  .network }}-ccip-network-1
     CHAIN_ID: {{  .chainId }}
     KAFKA_CLIENT_ID: atlas-evm-{{  .network }}-ccip-network-1-ccip
