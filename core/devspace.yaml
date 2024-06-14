@@ -292,10 +292,6 @@ deployments:
               image: ${runtime.images.app}
 
         db:
-          statefulSet:
-            enabled: false
-            capacity: 2Gi
-            storageClassName: gp3
           securityContext:
             capabilities:
               drop:
