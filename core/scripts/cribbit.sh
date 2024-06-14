@@ -37,7 +37,7 @@ if ! check_namespace_prefix "${DEVSPACE_NAMESPACE}"; then
 fi
 
 # Path to the .env file
-env_file="${repo_root}/ccip/.env"
+env_file="${repo_root}/core/.env"
 
 # Source .env file if it exists
 if [[ -f "${env_file}" ]]; then

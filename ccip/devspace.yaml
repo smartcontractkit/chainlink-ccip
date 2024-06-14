@@ -4,6 +4,74 @@ name: chainlink
 vars:
   DEVSPACE_ENV_FILE: .env
 
+  # The list of default ENV Vars for CRIB, you can override any of them in the .env file
+  # The image that will be used for the Chainlink nodes.
+  DEVSPACE_IMAGE:
+    source: env
+    default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
+  # This is a comma separated list of CIDR blocks that will be allowed to access the ingress.
+  DEVSPACE_INGRESS_CIDRS:
+    source: env
+    default: "0.0.0.0/0"
+  # This is the base domain in AWS Route 53 that our ingress subdomains will use.
+  DEVSPACE_INGRESS_BASE_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
+  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
+  DEVSPACE_INGRESS_CERT_ARN:
+    source: env
+    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
+  # Time to wait for pods to be in `Ready` condition
+  DEVSPACE_K8S_POD_WAIT_TIMEOUT:
+    source: env
+    default: 1200s
+  # Helm repo URI for the crib-ccip helm chart
+  CCIP_HELM_CHART_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-ccip"
+
+  # Env Vars Required for ccip-scripts based contracts and jobs deployment
+  # Image URI required for deploying CCIP Contracts and Jobs
+  DEVSPACE_CCIP_SCRIPTS_IMAGE:
+    source: env
+    default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
+  # AWS Role ARN required for uploading deploy job output to s3
+  DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
+    source: env
+    default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
+  # AWS S3 bucket name required for uploading deploy job output to s3
+  DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
+    source: env
+    default: "cl-stage-ccip-scripts-deploy-output"
+
+  # Env vars required for Atlas Monitoring
+  ATLAS_NETWORK_HELM_CHART_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-atlas-core"
+  ATLAS_INFRA_HELM_CHART_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-atlas-infra"
+  ## CHANGE-ME PATH for your infra charts (change to your infra-charts dir)
+  MONITORING_INFRA_CHARTS_PATH:
+    source: env
+    default: "${CHAINLINK_CODE_DIR}/infra-charts"
+  ## Paths for all the required elements.
+  MONITORING_INFRA_PATH:
+    source: env
+    default: "${MONITORING_INFRA_CHARTS_PATH}/crib-atlas-infra"
+  MONITORING_NETWORK_PATH:
+    source: env
+    default: "${MONITORING_INFRA_CHARTS_PATH}/crib-atlas-core/"
+  MONITORING_SCRIPT:
+    source: env
+    default: "./atlas/init"
+  MONITORING_NETWORK_2_VALUES_PATH:
+    source: env
+    default: "${MONITORING_SCRIPT}/output/values-network-2.yaml"
+  MONITORING_NETWORK_1_VALUES_PATH:
+    source: env
+    default: "${MONITORING_SCRIPT}/output/values-network-1.yaml"
+
 pipelines:
   deploy:
     flags:
