@@ -48,6 +48,10 @@ vars:
   ATLAS_NETWORK_HELM_CHART_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-atlas-core"
+  # Enables or disables Atlas components/pipeline
+  ATLAS_ENABLED:
+    source: env
+    default: false
   ATLAS_INFRA_HELM_CHART_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-atlas-infra"
@@ -99,7 +103,13 @@ pipelines:
         create_deployments app
       fi
 
-      run_pipelines atlas
+      # Check if ATLAS_ENABLED is set and equals "true"
+      if [ "${ATLAS_ENABLED}" = "true" ]; then
+          # Execute the command
+          run_pipelines atlas
+      else
+          echo "Deployment of Atlas components is disabled. In order to enable it set the ATLAS_ENABLED ENV value to true"
+      fi
 
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
 

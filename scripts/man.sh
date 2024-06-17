@@ -149,6 +149,11 @@ echo -e "${BLUE}
         echo -e "\n     -> ${RED}devspace run <COMMAND-NAME> ${NC}\n"
         echo -e "${GREEN}To get more details about a specific command, display man pages by executing:${NC}"
         echo -e "\n     -> ${RED}devspace run man <COMMAND-NAME>${NC}\n"
+
+        echo -e "\n${BLUE}Default environment variables are configured in the devspace.yaml file under the vars value."
+        echo -e "${BLUE}You should use an .env file to create overrides if needed. The full list of environment"
+        echo -e "${BLUE}variables with their values can be displayed using the following command:\n"
+        echo -e "\n     -> ${RED}devspace list vars${NC}\n"
         ;;
     *)
         echo -e "\n${RED}   A man page for provided command not found, available commands:${NC}\n"
