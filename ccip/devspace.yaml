@@ -25,10 +25,9 @@ vars:
   DEVSPACE_K8S_POD_WAIT_TIMEOUT:
     source: env
     default: 1200s
-  # Helm repo URI for the crib-ccip helm chart
-  CCIP_HELM_CHART_URI:
+  CHAINLINK_HELM_REGISTRY_URI:
     source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-ccip"
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
 
   # Env Vars Required for ccip-scripts based contracts and jobs deployment
   # Image URI required for deploying CCIP Contracts and Jobs
@@ -45,27 +44,10 @@ vars:
     default: "cl-stage-ccip-scripts-deploy-output"
 
   # Env vars required for Atlas Monitoring
-  ATLAS_NETWORK_HELM_CHART_URI:
-    source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-atlas-core"
   # Enables or disables Atlas components/pipeline
   ATLAS_ENABLED:
     source: env
     default: false
-  ATLAS_INFRA_HELM_CHART_URI:
-    source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-atlas-infra"
-  ## CHANGE-ME PATH for your infra charts (change to your infra-charts dir)
-  MONITORING_INFRA_CHARTS_PATH:
-    source: env
-    default: "${CHAINLINK_CODE_DIR}/infra-charts"
-  ## Paths for all the required elements.
-  MONITORING_INFRA_PATH:
-    source: env
-    default: "${MONITORING_INFRA_CHARTS_PATH}/crib-atlas-infra"
-  MONITORING_NETWORK_PATH:
-    source: env
-    default: "${MONITORING_INFRA_CHARTS_PATH}/crib-atlas-core/"
   MONITORING_SCRIPT:
     source: env
     default: "./atlas/init"
@@ -238,7 +220,7 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       releaseName: "app"
       chart:
-        name: ${CCIP_HELM_CHART_URI}
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip
         version: "1.x"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
@@ -570,43 +552,6 @@ deployments:
           image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
           oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
           outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
-  atlas-network-1-dev:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: root
-        path: ${MONITORING_NETWORK_PATH}
-      valuesFiles:
-        - ${MONITORING_NETWORK_1_VALUES_PATH}
-      values:
-        podSecurityContext:
-          fsGroup: 999
-  atlas-network-2-dev:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: root
-        path: ${MONITORING_NETWORK_PATH}
-      valuesFiles:
-        - ${MONITORING_NETWORK_2_VALUES_PATH}
-      values:
-        podSecurityContext:
-          fsGroup: 999
-  atlas-infra-dev:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: root
-        path: ${MONITORING_INFRA_PATH}
   atlas-network-1:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
@@ -615,7 +560,7 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
-        name: ${ATLAS_NETWORK_HELM_CHART_URI}
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
         version: "0.0.4"
       valuesFiles:
         - ${MONITORING_NETWORK_1_VALUES_PATH}
@@ -630,7 +575,7 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
-        name: ${ATLAS_NETWORK_HELM_CHART_URI}
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
         version: "0.0.4"
       valuesFiles:
         - ${MONITORING_NETWORK_2_VALUES_PATH}
@@ -644,7 +589,7 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       displayOutput: true
       chart:
-        name: ${ATLAS_INFRA_HELM_CHART_URI}
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-infra
         version: "0.0.5"
 profiles:
   - name: local-dev
@@ -659,3 +604,32 @@ profiles:
       - op: replace
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
+  # Resolve local chart versions for development
+  - name: local-charts
+    merge:
+      deployments:
+        app:
+          helm:
+            chart:
+              name: crib-ccip
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip
+              version: null
+        atlas-infra:
+          helm:
+            chart:
+              name: atlas-infra
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-infra
+              version: null
+        atlas-network-1:
+          helm:
+            chart:
+              name: network-1
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
+              version: null
+        atlas-network-2:
+          helm:
+            chart:
+              name: network-2
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
+              version: null
+
