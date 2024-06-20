@@ -597,7 +597,7 @@ profiles:
       # Remove the global overridesToml field.
       # This will be configured via a values file.
       - op: remove
-        path: deployments.app.helm.values.chainlink-cluster.chainlink.global.overridesToml
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
         value: ["./values-profiles/values-dev.yaml"]
@@ -632,4 +632,3 @@ profiles:
               name: network-2
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
               version: null
-
