@@ -57,7 +57,24 @@ vars:
   MONITORING_NETWORK_1_VALUES_PATH:
     source: env
     default: "${MONITORING_SCRIPT}/output/values-network-1.yaml"
-
+  NETWORK_1:
+    source: env
+    default: simulated-network-1
+  NETWORK_1_CHAINID:
+    source: env
+    default: 1337
+  NETWORK_1_RPC:
+    source: env
+    default: http://geth-1337:8544
+  NETWORK_2:
+    source: env
+    default: simulated-network-2
+  NETWORK_2_CHAINID:
+    source: env
+    default: 2337
+  NETWORK_2_RPC:
+    source: env
+    default: http://geth-2337:8544
 pipelines:
   deploy:
     flags:
@@ -99,41 +116,24 @@ pipelines:
     run: |-
       run_pipelines atlas-infra
       run_pipelines atlas-network-1 atlas-network-2
+
   atlas-infra:
     run: |-
       create_deployments atlas-infra
+
   atlas-network-1:
     run: |-
       cd ${MONITORING_SCRIPT}
-      go run main.go config.yaml  values-network-1.yaml
+      go run main.go ${NETWORK_1}  ${NETWORK_1_CHAINID}  ${NETWORK_1_RPC}  values-network-1.yaml
       cd ../..
       create_deployments atlas-network-1
+
   atlas-network-2:
     run: |-
       cd ${MONITORING_SCRIPT}
-      go run main.go  config-2.yaml  values-network-2.yaml
+      go run main.go  ${NETWORK_2}  ${NETWORK_2_CHAINID}  ${NETWORK_2_RPC}  values-network-2.yaml
       cd ../..
       create_deployments atlas-network-2
-
-  atlas-dev:
-    run: |-
-      run_pipelines atlas-infra-dev
-      run_pipelines atlas-network-1-dev atlas-network-2-dev
-  atlas-infra-dev:
-    run: |-
-      create_deployments atlas-infra-dev
-  atlas-network-1-dev:
-    run: |-
-      cd ${MONITORING_SCRIPT}
-      go run main.go config.yaml  values-network-1.yaml
-      cd ../..
-      create_deployments atlas-network-1-dev
-  atlas-network-2-dev:
-    run: |-
-      cd ${MONITORING_SCRIPT}
-      go run main.go  config-2.yaml  values-network-2.yaml
-      cd ../..
-      create_deployments atlas-network-2-dev
 
   purge:
     run: |-
@@ -591,6 +591,13 @@ deployments:
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-infra
         version: "0.0.6"
+      values:
+        postgres-migration:
+          envVars:
+            NETWORKS: "${NETWORK_1},${NETWORK_2}"
+        atlasSetupJob:
+          networks: "${NETWORK_1},${NETWORK_2}"
+
 profiles:
   - name: local-dev
     patches:
