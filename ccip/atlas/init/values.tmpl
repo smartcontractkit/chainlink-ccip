@@ -87,8 +87,8 @@ atlas-core:
     name: atlas-evm-logs-abi-decoder-{{  .network }}
     topologySpreadConstraints: []
     envVars:
-      KAFKA_ABI_DECODED_LOGS_DLQ_TOPIC: atlas_{{  .network }}_events_dlq
-      KAFKA_ABI_DECODED_LOGS_TOPIC: atlas_{{  .network }}_events
+      KAFKA_ABI_DECODED_LOGS_DLQ_TOPIC: {{  .network }}_abi_decoded_logs_dlq
+      KAFKA_ABI_DECODED_LOGS_TOPIC: {{  .network }}_abi_decoded_logs
       KAFKA_CLIENT_ID: atlas-evm-logs-abi-decoder-{{  .network }}
       KAFKA_GROUP_ID: atlas-evm-logs-abi-decoder-{{  .network }}
       KAFKA_LOGS_TOPIC: {{  .network }}_logs
@@ -150,13 +150,14 @@ atlas-evm-ccip:
   name: atlas-evm-ccip-{{  .network }}
   envVars:
     APP_NAME: atlas-evm-ccip-network-{{  .network }}
-    BLOCKS_KAFKA_BLOCK_HEADERS_TOPIC: {{  .network }}-ccip-network-1
+    BLOCKS_KAFKA_BLOCK_HEADERS_TOPIC: {{  .network }}_block_headers
     CHAIN_ID: {{  .chainId }}
     KAFKA_CLIENT_ID: atlas-evm-{{  .network }}-ccip-network-1-ccip
     KAFKA_GROUP_ID: atlas-evm-{{  .network }}-ccip-network-1-ccip
     KAFKA_LOGS_TOPIC: {{  .network }}_logs
+    SOURCE_KAFKA_TOPIC_LOGS: {{  .network }}_logs
     NETWORK_NAME: {{  .network }}
-    RECEIPTS_KAFKA_RECEIPTS_TOPIC: {{  .network }}-ccip-network-1
+    RECEIPTS_KAFKA_RECEIPTS_TOPIC: {{  .network }}_transactions_with_receipts
     RPC_ENDPOINTS: {{  .rpcEndpoint }}
     LOG_LEVEL: info
     BENTHOS_CHECKPOINT_LIMIT: "3000"

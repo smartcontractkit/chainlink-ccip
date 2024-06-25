@@ -590,7 +590,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-infra
-        version: "0.0.6"
+        version: "0.0.8"
       values:
         postgres-migration:
           envVars:
