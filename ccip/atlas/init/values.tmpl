@@ -2,8 +2,6 @@ atlas-core:
   base: &base
     labels:
       chain.link/team: crib
-    image:
-      tag: {{ .atlas.image.tag }}
     envFromSecrets:
       - postgres-credentials-url
       - kafka-urls

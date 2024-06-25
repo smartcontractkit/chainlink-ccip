@@ -1,6 +1,0 @@
-network: 'avalanche-mainnet'
-chainId: '2337'
-rpcEndpoint: 'http://geth-2337:8544'
-atlas:
-  image:
-    tag: '3ad88f9f227762a96a73a0b7837ec5405c2d37bf'

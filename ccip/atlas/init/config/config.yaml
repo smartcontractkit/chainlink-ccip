@@ -1,6 +1,0 @@
-network: 'ethereum-mainnet'
-chainId: '1337'
-rpcEndpoint: 'http://geth-1337:8544'
-atlas:
-  image:
-    tag: '3ad88f9f227762a96a73a0b7837ec5405c2d37bf'
