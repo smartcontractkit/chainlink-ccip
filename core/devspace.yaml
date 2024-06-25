@@ -2,8 +2,8 @@ version: v2beta1
 name: chainlink
 
 vars:
+  CHAINLINK_REPO_DIR: "${CHAINLINK_CODE_DIR}/chainlink"
   DEVSPACE_ENV_FILE: .env
-
   # The list of default ENV Vars for CRIB, you can override any of them in the .env file
   # The image that will be used for the Chainlink nodes.
   DEVSPACE_IMAGE:
@@ -66,7 +66,7 @@ pipelines:
       # check if profile is keystone
       if [[  "${DEVSPACE_PROFILE}" == "keystone" ]]; then
         echo "Keystone profile detected, provisioning Keystone"
-        pushd ../core/scripts/keystone
+        pushd ${CHAINLINK_REPO_DIR}/core/scripts/keystone
         if [ $(get_flag "clean") == "true" ]; then
           echo "Cleaning keystone caches"
           rm -f artefacts/deployed_contracts.json .cache/*
@@ -127,8 +127,7 @@ images:
     custom:
       skipImageArg: true
       command: |-
-        GIT_ROOT=$CHAINLINK_CODE_DIR/chainlink
-        cd $GIT_ROOT
+        cd ${CHAINLINK_REPO_DIR} 
 
         image=${runtime.images.app}
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
