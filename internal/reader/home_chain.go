@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -40,6 +41,7 @@ type state struct {
 }
 
 type homeChainPoller struct {
+	wg              sync.WaitGroup
 	stopCh          services.StopChan
 	sync            services.StateMachine
 	homeChainReader types.ContractReader
@@ -77,12 +79,14 @@ func (r *homeChainPoller) Start(ctx context.Context) error {
 	}
 	r.lggr.Infow("Start Polling ChainConfig")
 	return r.sync.StartOnce(r.Name(), func() error {
+		r.wg.Add(1)
 		go r.poll()
 		return nil
 	})
 }
 
 func (r *homeChainPoller) poll() {
+	defer r.wg.Done()
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
 	ticker := time.NewTicker(r.pollingDuration)
@@ -90,11 +94,13 @@ func (r *homeChainPoller) poll() {
 	for {
 		select {
 		case <-ctx.Done():
+			fmt.Println("ctx.Done()")
 			r.mutex.Lock()
 			r.failedPolls = 0
 			r.mutex.Unlock()
 			return
 		case <-ticker.C:
+			fmt.Println("ticker.C")
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
 				r.mutex.Lock()
 				r.failedPolls++
@@ -200,6 +206,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 
 func (r *homeChainPoller) Close() error {
 	err := r.sync.StopOnce(r.Name(), func() error {
+		defer r.wg.Wait()
 		close(r.stopCh)
 		return nil
 	})
@@ -207,16 +214,19 @@ func (r *homeChainPoller) Close() error {
 		return fmt.Errorf("failed to stop %s: %w", r.Name(), err)
 	}
 	// give it twice the polling duration to ensure the poller is caught up and stopped
-	ticker := time.NewTicker(r.pollingDuration * 10)
-	defer ticker.Stop()
+	//ticker := time.NewTicker(r.pollingDuration * 10)
+	//defer ticker.Stop()
+	timeout := time.After(r.pollingDuration * 10)
 	for {
 		// Make sure it's closed gracefully (Ready returns an error once it's not ready)
-		err := r.Ready()
-		if err != nil {
+		state := r.sync.State()
+		fmt.Println(state)
+		isStopped := state == "Stopped"
+		if isStopped {
 			return nil
 		}
 		select {
-		case <-ticker.C:
+		case <-timeout:
 			return fmt.Errorf("HomeChainReader did not close gracefully")
 		default:
 		}
