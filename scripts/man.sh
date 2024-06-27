@@ -33,7 +33,7 @@ EOF
         Exposes Kubernetes services for local development. In order to use this command you would need
         to install https://github.com/txn2/kubefwd tool. You can install it by running the following command:
 
-            -> "brew install fwd"
+            -> "brew install txn2/tap/kubefwd"
 
 SYNOPSIS
         -> devspace run connect
