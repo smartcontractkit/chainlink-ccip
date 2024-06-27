@@ -99,6 +99,7 @@ func (r *homeChainPoller) poll() {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
+				//r.lggr.Errorw("failed to fetch chain configs", "err", err)
 			}
 		}
 	}

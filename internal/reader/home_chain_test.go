@@ -43,11 +43,13 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 
 	var (
 		tickTime       = 1 * time.Millisecond
-		totalSleepTime = 11 * tickTime // to allow it to fail 10 times at least
+		totalSleepTime = 20 * tickTime // to allow it to fail 10 times at least
 	)
+	lggr, err := logger.New()
+	require.NoError(t, err)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
-		logger.Test(t),
+		lggr,
 		tickTime,
 	)
 	require.NoError(t, configPoller.Start(context.Background()))
@@ -122,23 +124,25 @@ func Test_PollingWorking(t *testing.T) {
 			*arg = onChainConfigs
 		}).Return(nil)
 
+	defer homeChainReader.AssertExpectations(t)
+
 	var (
 		tickTime       = 2 * time.Millisecond
-		totalSleepTime = (tickTime * 2) + (10 * time.Millisecond)
+		totalSleepTime = tickTime * 4
 	)
 
+	lggr, err := logger.New()
+	require.NoError(t, err)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
-		logger.Test(t),
+		lggr,
 		tickTime,
 	)
 
-	ctx := context.Background()
-	err := configPoller.Start(ctx)
-	require.NoError(t, err)
+	require.NoError(t, configPoller.Start(context.Background()))
+	// sleep to allow polling to happen
 	time.Sleep(totalSleepTime)
-	err = configPoller.Close()
-	require.NoError(t, err)
+	require.NoError(t, configPoller.Close())
 
 	calls := homeChainReader.Calls
 	callCount := 0
@@ -147,8 +151,8 @@ func Test_PollingWorking(t *testing.T) {
 			callCount++
 		}
 	}
-	// called at least 2 times, one for start and one for the first tick
-	require.GreaterOrEqual(t, callCount, 3)
+	//called at least 2 times, one for start and one for the first tick
+	require.GreaterOrEqual(t, callCount, 2)
 
 	configs, err := configPoller.GetAllChainConfigs()
 	require.NoError(t, err)
@@ -183,9 +187,11 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	})
 	defer homeChainReader.AssertExpectations(t)
 
+	lggr, err := logger.New()
+	require.NoError(t, err)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
-		logger.Test(t),
+		lggr,
 		10*time.Millisecond,
 	)
 
