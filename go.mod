@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/ccipocr3
+module github.com/smartcontractkit/chainlink-ccip
 
 go 1.21.7
 

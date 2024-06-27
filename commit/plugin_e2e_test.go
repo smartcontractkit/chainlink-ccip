@@ -13,9 +13,9 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/testhelpers"
-	"github.com/smartcontractkit/ccipocr3/internal/mocks"
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"

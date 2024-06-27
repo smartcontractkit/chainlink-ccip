@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
