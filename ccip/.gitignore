@@ -1,4 +1,5 @@
 values-profiles/*
 !values-profiles/values-dev.yaml.example
+!values-profiles/values-dev-ccip.yaml.example
 !values-profiles/README.md
 override.toml
