@@ -1,0 +1,266 @@
+crib-chainlink-cluster:
+  # Disable geth if using existing testnets.
+  geth:
+    enabled: false
+  ccipScriptsDeployment:
+    enabled: false
+  db:
+    statefulSet:
+      enabled: true
+      capacity: 30Gi
+    resources:
+      requests:
+        cpu: 2
+        memory: 8Gi
+      limits:
+        cpu: 2
+        memory: 8Gi
+  chainlink:
+    nodes:
+      node1:
+        resources:
+          requests:
+            cpu: 4
+            memory: 12Gi
+          limits:
+            cpu: 4
+            memory: 12Gi
+      node2:
+        resources:
+          requests:
+            cpu: 4
+            memory: 12Gi
+          limits:
+            cpu: 4
+            memory: 12Gi
+      node3:
+        resources:
+          requests:
+            cpu: 4
+            memory: 12Gi
+          limits:
+            cpu: 4
+            memory: 12Gi
+      node4:
+        resources:
+          requests:
+            cpu: 4
+            memory: 12Gi
+          limits:
+            cpu: 4
+            memory: 12Gi
+      node5:
+        resources:
+          requests:
+            cpu: 4
+            memory: 12Gi
+          limits:
+            cpu: 4
+            memory: 12Gi
+    global:
+      toml: |-
+        RootDir = './clroot'
+        [Log]
+        JSONConsole = true
+        Level = 'debug'
+        [WebServer]
+        AllowOrigins = '*'
+        SecureCookies = false
+        SessionTimeout = '999h0m0s'
+        [Feature]
+        FeedsManager = true
+        LogPoller = true
+        UICSAKeys = true
+        [OCR]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
+        [[EVM]]
+        # Avax Fuji Testnet
+        ChainID = "43113"
+        MinContractPayment = '0'
+        AutoCreateKey = true
+        FinalityDepth = 1
+        [[EVM.Nodes]]
+        Name = 'avax-fuji-testnet-official'
+        WSURL = 'wss://api.avax-test.network/ext/bc/C/ws'
+        HTTPURL = 'https://api.avax-test.network/ext/bc/C/rpc'
+        [[EVM]]
+        # BSC Testnet
+        ChainID = "97"
+        MinContractPayment = '0'
+        AutoCreateKey = true
+        FinalityDepth = 1
+        [[EVM.Nodes]]
+        Name = 'bsc-testnet-official'
+        HTTPURL = 'https://data-seed-prebsc-1-s.bnbchain.org:8545'
+        WSURL = 'wss://data-seed-prebsc-1-s1.binance.org:8545/'
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+      overridesToml: |-
+        [Feature]
+        FeedsManager = true
+        LogPoller = true
+        UICSAKeys = true
+
+        [Database]
+        MaxIdleConns = 20
+        MaxOpenConns = 40
+        MigrateOnStartup = true
+          
+        [Log]
+        Level = 'debug'
+        JSONConsole = true
+
+        [Log.File]
+        MaxSize = '0b'
+
+        [WebServer]
+        AllowOrigins = '*'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [WebServer.TLS]
+        HTTPSPort = 0
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 150
+        SimulateTransactions = false
+
+        [OCR]
+        Enabled = false
+        DefaultTransactionQueueDepth = 0
+
+        [P2P]
+        TraceLogging = true
+        
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
+        
+        [[EVM]]
+        ChainID = '11155111'
+        
+        [EVM.GasEstimator]
+        PriceMax = '1 micro'
+        LimitDefault = 8000000
+        FeeCapDefault = '1 micro'
+        
+        [EVM.GasEstimator.BlockHistory]
+        BlockHistorySize = 200
+        EIP1559FeeCapBufferBlocks = 0
+        
+        [EVM.NodePool]
+        PollFailureThreshold = 2
+        PollInterval = '3s'
+        
+        [[EVM.Nodes]]
+        Name = '11155111_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '11155111_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '11155111_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '11155111_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM]]
+        ChainID = '43113'
+        
+        [EVM.GasEstimator]
+        PriceMax = '5 micro'
+        LimitDefault = 8000000
+        BumpThreshold = 60
+        FeeCapDefault = '5 micro'
+        
+        [EVM.GasEstimator.BlockHistory]
+        BlockHistorySize = 200
+        
+        [EVM.NodePool]
+        PollFailureThreshold = 2
+        PollInterval = '3s'
+        
+        [[EVM.Nodes]]
+        Name = '43113_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '43113_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '43113_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM]]
+        ChainID = '97'
+        
+        [EVM.GasEstimator]
+        PriceMax = '1 micro'
+        LimitDefault = 8000000
+        FeeCapDefault = '1 micro'
+        
+        [EVM.NodePool]
+        PollFailureThreshold = 2
+        PollInterval = '3s'
+        
+        [[EVM.Nodes]]
+        Name = '97_primary_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '97_primary_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '97_primary_<rpc provider name>'
+        WSURL = 'wss://.....'
+        HTTPURL = 'https://.....'
+        SendOnly = false
+        
+        [[EVM.Nodes]]
+        Name = '97_primary_<rpc provider name>'
+        WSURL = 'wss://...../testnet/'
+        HTTPURL = 'https://...../testnet/'
+        SendOnly = false
+        
