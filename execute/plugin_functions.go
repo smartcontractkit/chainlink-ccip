@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/ccipocr3/execute/internal/validation"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/validation"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.

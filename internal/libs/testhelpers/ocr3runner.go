@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
 
 var (
