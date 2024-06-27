@@ -144,12 +144,7 @@ func Test_PollingWorking(t *testing.T) {
 	// sleep to allow polling to happen
 	time.Sleep(totalSleepTime)
 	require.NoError(t, configPoller.Close())
-	fmt.Println("Closing")
-	err = configPoller.Close()
-	fmt.Println("Close called.")
-	require.NoError(t, err)
 
-	fmt.Println("Calls")
 	calls := homeChainReader.Calls
 	callCount := 0
 	for _, call := range calls {

@@ -94,13 +94,11 @@ func (r *homeChainPoller) poll() {
 	for {
 		select {
 		case <-ctx.Done():
-			fmt.Println("ctx.Done()")
 			r.mutex.Lock()
 			r.failedPolls = 0
 			r.mutex.Unlock()
 			return
 		case <-ticker.C:
-			fmt.Println("ticker.C")
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
 				r.mutex.Lock()
 				r.failedPolls++
@@ -220,7 +218,6 @@ func (r *homeChainPoller) Close() error {
 	for {
 		// Make sure it's closed gracefully (Ready returns an error once it's not ready)
 		state := r.sync.State()
-		fmt.Println(state)
 		isStopped := state == "Stopped"
 		if isStopped {
 			return nil
