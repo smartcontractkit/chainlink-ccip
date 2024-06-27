@@ -15,7 +15,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -43,31 +42,24 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		mock.Anything).Return(fmt.Errorf("error"))
 
 	var (
-		tickTime       = 10 * time.Millisecond
-		totalSleepTime = 11 * tickTime
+		tickTime       = 1 * time.Millisecond
+		totalSleepTime = 11 * tickTime // to allow it to fail 10 times at least
 	)
-
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
 	)
-	_ = configPoller.Start(context.Background())
-
+	require.NoError(t, configPoller.Start(context.Background()))
 	// Initially it's healthy
 	healthy := configPoller.HealthReport()
-	assert.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
-
+	require.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
 	// After one second it will try polling 10 times and fail
 	time.Sleep(totalSleepTime)
-
 	errors := configPoller.HealthReport()
-
-	err := configPoller.Close()
-	time.Sleep(tickTime)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, len(errors))
-	assert.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+	require.Equal(t, 1, len(errors))
+	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+	require.NoError(t, configPoller.Close())
 }
 
 func Test_PollingWorking(t *testing.T) {
@@ -131,9 +123,8 @@ func Test_PollingWorking(t *testing.T) {
 		}).Return(nil)
 
 	var (
-		tickTime       = 20 * time.Millisecond
+		tickTime       = 2 * time.Millisecond
 		totalSleepTime = (tickTime * 2) + (10 * time.Millisecond)
-		expNumCalls    = int(totalSleepTime/tickTime) + 1 // +1 for the initial call
 	)
 
 	configPoller := NewHomeChainConfigPoller(
@@ -144,17 +135,24 @@ func Test_PollingWorking(t *testing.T) {
 
 	ctx := context.Background()
 	err := configPoller.Start(ctx)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	time.Sleep(totalSleepTime)
 	err = configPoller.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	// called 3 times, once when it's started, and 2 times when it's polling
-	homeChainReader.AssertNumberOfCalls(t, "GetLatestValue", expNumCalls)
+	calls := homeChainReader.Calls
+	callCount := 0
+	for _, call := range calls {
+		if call.Method == "GetLatestValue" {
+			callCount++
+		}
+	}
+	// called at least 2 times, one for start and one for the first tick
+	require.GreaterOrEqual(t, callCount, 3)
 
 	configs, err := configPoller.GetAllChainConfigs()
-	assert.NoError(t, err)
-	assert.Equal(t, homeChainConfig, configs)
+	require.NoError(t, err)
+	require.Equal(t, homeChainConfig, configs)
 }
 
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {

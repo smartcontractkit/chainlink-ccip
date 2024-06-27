@@ -99,7 +99,6 @@ func (r *homeChainPoller) poll() {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
-				r.lggr.Errorw("fetching and setting configs failed", "failedPolls", r.failedPolls, "err", err)
 			}
 		}
 	}
@@ -111,7 +110,6 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfos,
 	)
 	if err != nil {
-		r.lggr.Errorw("fetching on-chain configs failed", "err", err)
 		return err
 	}
 	if len(chainConfigInfos) == 0 {
@@ -124,7 +122,6 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
 		return err
 	}
-	r.lggr.Infow("Setting ChainConfig")
 	r.setState(homeChainConfigs)
 	return nil
 }
@@ -201,10 +198,29 @@ func (r *homeChainPoller) GetOCRConfigs(
 }
 
 func (r *homeChainPoller) Close() error {
-	return r.sync.StopOnce(r.Name(), func() error {
+	err := r.sync.StopOnce(r.Name(), func() error {
 		close(r.stopCh)
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to stop %s: %w", r.Name(), err)
+	}
+	// give it twice the polling duration to ensure the poller is caught up and stopped
+	ticker := time.NewTicker(r.pollingDuration * 10)
+	defer ticker.Stop()
+	for {
+		// Make sure it's closed gracefully (Ready returns an error once it's not ready)
+		err := r.Ready()
+		if err != nil {
+			println("HomeChainReader closed gracefully")
+			return nil
+		}
+		select {
+		case <-ticker.C:
+			return fmt.Errorf("HomeChainReader did not close gracefully")
+		default:
+		}
+	}
 }
 
 func (r *homeChainPoller) Ready() error {
