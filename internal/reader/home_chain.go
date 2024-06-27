@@ -212,7 +212,6 @@ func (r *homeChainPoller) Close() error {
 		// Make sure it's closed gracefully (Ready returns an error once it's not ready)
 		err := r.Ready()
 		if err != nil {
-			println("HomeChainReader closed gracefully")
 			return nil
 		}
 		select {
