@@ -11,8 +11,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/ccipocr3/internal/libs/slicelib"
-	"github.com/smartcontractkit/ccipocr3/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"

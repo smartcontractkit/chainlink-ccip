@@ -4,7 +4,7 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/smartcontractkit/ccipocr3/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
 	"google.golang.org/grpc"
 

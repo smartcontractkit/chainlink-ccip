@@ -19,7 +19,7 @@ linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
   goimports:
-    local-prefixes: "github.com/smartcontractkit/ccipocr3"
+    local-prefixes: "github.com/smartcontractkit/chainlink-ccip"
   gosec:
     excludes:
   errorlint:
