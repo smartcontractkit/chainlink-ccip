@@ -35,7 +35,7 @@ func (p PluginFactoryConstructor) NewReportingPluginFactory(
 	keyValueStore core.KeyValueStore,
 	relayerSet core.RelayerSet,
 ) (core.OCR3ReportingPluginFactory, error) {
-	return NewPluginFactory(), nil
+	return nil, nil
 }
 
 func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
