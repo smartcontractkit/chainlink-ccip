@@ -103,7 +103,6 @@ func (r *homeChainPoller) poll() {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
-				//r.lggr.Errorw("failed to fetch chain configs", "err", err)
 			}
 		}
 	}
@@ -203,31 +202,11 @@ func (r *homeChainPoller) GetOCRConfigs(
 }
 
 func (r *homeChainPoller) Close() error {
-	err := r.sync.StopOnce(r.Name(), func() error {
+	return r.sync.StopOnce(r.Name(), func() error {
 		defer r.wg.Wait()
 		close(r.stopCh)
 		return nil
 	})
-	if err != nil {
-		return fmt.Errorf("failed to stop %s: %w", r.Name(), err)
-	}
-	// give it twice the polling duration to ensure the poller is caught up and stopped
-	//ticker := time.NewTicker(r.pollingDuration * 10)
-	//defer ticker.Stop()
-	timeout := time.After(r.pollingDuration * 10)
-	for {
-		// Make sure it's closed gracefully (Ready returns an error once it's not ready)
-		state := r.sync.State()
-		isStopped := state == "Stopped"
-		if isStopped {
-			return nil
-		}
-		select {
-		case <-timeout:
-			return fmt.Errorf("HomeChainReader did not close gracefully")
-		default:
-		}
-	}
 }
 
 func (r *homeChainPoller) Ready() error {

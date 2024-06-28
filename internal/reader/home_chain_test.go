@@ -46,11 +46,9 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		tickTime       = 1 * time.Millisecond
 		totalSleepTime = 20 * tickTime // to allow it to fail 10 times at least
 	)
-	lggr, err := logger.New()
-	require.NoError(t, err)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
-		lggr,
+		logger.Test(t),
 		tickTime,
 	)
 	require.NoError(t, configPoller.Start(context.Background()))
@@ -132,11 +130,9 @@ func Test_PollingWorking(t *testing.T) {
 		totalSleepTime = tickTime * 4
 	)
 
-	lggr, err := logger.New()
-	require.NoError(t, err)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
-		lggr,
+		logger.Test(t),
 		tickTime,
 	)
 
@@ -188,11 +184,9 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	})
 	defer homeChainReader.AssertExpectations(t)
 
-	lggr, err := logger.New()
-	require.NoError(t, err)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
-		lggr,
+		logger.Test(t),
 		10*time.Millisecond,
 	)
 
