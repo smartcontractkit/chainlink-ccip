@@ -127,7 +127,7 @@ images:
     custom:
       skipImageArg: true
       command: |-
-        cd ${CHAINLINK_REPO_DIR} 
+        cd ${CHAINLINK_REPO_DIR}
 
         image=${runtime.images.app}
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
@@ -136,6 +136,10 @@ hooks:
   - command: ../scripts/before_deploy_checks.sh
     events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
+    events: ["before:deploy:app"]
+  - command: |-
+      kubectl get namespace ${DEVSPACE_NAMESPACE} >/dev/null 2>&1 ||
+        kubectl create namespace ${DEVSPACE_NAMESPACE} && sleep 5
     events: ["before:deploy:app"]
   - wait:
       running: true

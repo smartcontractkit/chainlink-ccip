@@ -185,6 +185,10 @@ hooks:
     events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
     events: ["before:deploy:app"]
+  - command: |-
+      kubectl get namespace ${DEVSPACE_NAMESPACE} >/dev/null 2>&1 ||
+        kubectl create namespace ${DEVSPACE_NAMESPACE} && sleep 5
+    events: ["before:deploy:app", "before:deploy:atlas"]
   - wait:
       running: true
       terminatedWithCode: 0
