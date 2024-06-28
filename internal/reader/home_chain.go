@@ -72,11 +72,6 @@ func NewHomeChainConfigPoller(
 }
 
 func (r *homeChainPoller) Start(ctx context.Context) error {
-	err := r.fetchAndSetConfigs(ctx)
-	if err != nil {
-		// Just log, don't return error as we want to keep polling
-		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
-	}
 	r.lggr.Infow("Start Polling ChainConfig")
 	return r.sync.StartOnce(r.Name(), func() error {
 		r.wg.Add(1)
@@ -86,9 +81,16 @@ func (r *homeChainPoller) Start(ctx context.Context) error {
 }
 
 func (r *homeChainPoller) poll() {
+
 	defer r.wg.Done()
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
+	// Initial fetch once poll is called before any ticks
+	if err := r.fetchAndSetConfigs(ctx); err != nil {
+		// Just log, don't return error as we want to keep polling
+		r.lggr.Errorw("Initial fetch of on-chain configs failed", "err", err)
+	}
+
 	ticker := time.NewTicker(r.pollingDuration)
 	defer ticker.Stop()
 	for {
