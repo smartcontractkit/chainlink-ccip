@@ -104,7 +104,7 @@ commands:
     command: sudo kubefwd svc -n $1
     description: Expose Kubernetes services for local development.
   ttl:
-    command: ./../scripts/label_namespace.sh $1 --overwrite
+    command: ./../scripts/manage_namespace.sh label $1 --overwrite
     description: Configure TTL for devspace resource cleanup. Default is 72h.
   workload:
     command: cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
@@ -137,9 +137,7 @@ hooks:
     events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
     events: ["before:deploy:app"]
-  - command: |-
-      kubectl get namespace ${DEVSPACE_NAMESPACE} >/dev/null 2>&1 ||
-        kubectl create namespace ${DEVSPACE_NAMESPACE} && sleep 5
+  - command: ./../scripts/manage_namespace.sh create
     events: ["before:deploy:app"]
   - wait:
       running: true
@@ -159,7 +157,7 @@ hooks:
 
   # Check that the namespace cleanup label is set successfully.
   - name: "label-namespace-hook"
-    command: ./../scripts/label_namespace.sh
+    command: ./../scripts/manage_namespace.sh label
     args: ["${NS_TTL}"]
     events: ["after:deploy:app", "error:deploy:*"]
 
