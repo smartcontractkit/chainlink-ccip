@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Check if the namespace name is provided in the environment variable
 namespace="${DEVSPACE_NAMESPACE:-}"
-if [ -z "$namespace" ]; then
+if [[ -z "$namespace" ]]; then
     echo "Error: ENV variable DEVSPACE_NAMESPACE is not set."
     exit 1
 fi
@@ -62,7 +62,7 @@ create_namespace() {
 label_namespace() {
     # Determine if overwrite is required
     local overwrite_flag=""
-    if [ "$overwrite" == "--overwrite" ]; then
+    if [[ "$overwrite" == "--overwrite" ]]; then
         overwrite_flag="--overwrite"
     fi
 
@@ -79,7 +79,7 @@ label_namespace() {
 }
 
 # Main script logic to call create or label based on the first argument
-if [ $# -lt 1 ]; then
+if [[ $# -lt 1 ]]; then
     echo "Usage: $0 {create|label} [ttl] [--overwrite]"
     exit 1
 fi
