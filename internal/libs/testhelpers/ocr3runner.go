@@ -2,15 +2,16 @@ package testhelpers
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/exp/rand"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
@@ -170,7 +171,15 @@ func (r *OCR3Runner[RI]) selectLeader() ocr3types.ReportingPlugin[RI] {
 	if numNodes == 0 {
 		return nil
 	}
-	return r.nodes[rand.Intn(numNodes)]
+
+	idx, err := rand.Int(rand.Reader, big.NewInt(int64(numNodes)))
+	if err != nil {
+		panic(err)
+	}
+	if !idx.IsInt64() {
+		panic("index is not int64")
+	}
+	return r.nodes[idx.Int64()]
 }
 
 type RoundResult[RI any] struct {
