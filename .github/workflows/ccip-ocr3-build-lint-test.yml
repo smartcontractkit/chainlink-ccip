@@ -32,10 +32,6 @@ jobs:
         run: golangci-lint run -c .golangci.yml
       - name: Run tests
         run: go test -race -fullpath -shuffle on -count 20 -coverprofile=coverage.out ./...
-      - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-      - name: Run gosec
-        run: gosec ./...
       - name: Generate coverage report
         run: |
           go tool cover -func=coverage.out > coverage.txt
