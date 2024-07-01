@@ -33,7 +33,10 @@ jobs:
       - name: Run tests
         run: go test -race -fullpath -shuffle on -count 20 -coverprofile=coverage.out ./...
       - name: Generate coverage report
-        run: go tool cover -func=coverage.out > coverage.txt
+        run: |
+          go tool cover -func=coverage.out > coverage.txt
+          total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
+          echo "coverage=$total" >> $GITHUB_ENV
       - name: Remove previous coverage comments
         uses: actions/github-script@v6
         with:
@@ -60,13 +63,12 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs');
-            const coverageReport = fs.readFileSync('coverage.txt', 'utf8');
+            const coverage = process.env.coverage;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### Go Coverage Report\n\`\`\`\n${coverageReport}\n\`\`\``
+              body: `### Go Coverage Report\n\`\`\`\n${coverage}\n\`\`\``
             });
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
