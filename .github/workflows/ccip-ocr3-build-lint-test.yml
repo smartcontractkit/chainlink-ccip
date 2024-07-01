@@ -60,7 +60,7 @@ jobs:
               repo,
               issue_number
             });
-            const coverageCommentPrefix = "### Go Coverage Report";
+            const coverageCommentPrefix = "### Test Coverage";
             for (const comment of comments.data) {
               if (comment.body.startsWith(coverageCommentPrefix)) {
                 await github.rest.issues.deleteComment({
@@ -81,5 +81,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### Go Coverage Report\nThis branch:${coverage}\nTarget branch:${coverage_target}`
+              body: `### Test Coverage\n\n| Branch          | Coverage        |\n|-----------------|-----------------|\n| ${{ process.env.branch_name }}  | ${coverage}           |\n| ${{ github.base_ref }}   | ${coverage_target}           |`
             });
