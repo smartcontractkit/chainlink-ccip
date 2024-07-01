@@ -247,10 +247,7 @@ func (p *Plugin) Outcome(
 	}
 	p.lggr.Debugw("new messages consensus", "merkleRoots", merkleRoots)
 
-	tokenPrices, err := tokenPricesConsensus(decodedObservations, fChainDest)
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("token prices consensus: %w", err)
-	}
+	tokenPrices := tokenPricesConsensus(decodedObservations, fChainDest)
 
 	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
 	p.lggr.Debugw("gas prices consensus", "gasPrices", gasPrices)

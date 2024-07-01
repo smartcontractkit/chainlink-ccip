@@ -8,11 +8,12 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 type HomeChain interface {
@@ -123,12 +124,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	homeChainConfigs, err := convertOnChainConfigToHomeChainConfig(chainConfigInfos)
-	if err != nil {
-		r.lggr.Errorw("error converting OnChainConfigs to ChainConfig", "err", err)
-		return err
-	}
-	r.setState(homeChainConfigs)
+	r.setState(convertOnChainConfigToHomeChainConfig(chainConfigInfos))
 	return nil
 }
 
@@ -255,18 +251,16 @@ func createNodesSupportedChains(
 			if _, ok := nodeSupportedChains[p2pID]; !ok {
 				nodeSupportedChains[p2pID] = mapset.NewSet[cciptypes.ChainSelector]()
 			}
-			//add chain to SupportedChains
+			// add chain to SupportedChains
 			nodeSupportedChains[p2pID].Add(chainSelector)
 		}
 	}
 	return nodeSupportedChains
 }
 
-func convertOnChainConfigToHomeChainConfig(
-	capabilityConfigs []ChainConfigInfo,
-) (map[cciptypes.ChainSelector]ChainConfig, error) {
+func convertOnChainConfigToHomeChainConfig(capabilityCfgs []ChainConfigInfo) map[cciptypes.ChainSelector]ChainConfig {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
-	for _, capabilityConfig := range capabilityConfigs {
+	for _, capabilityConfig := range capabilityCfgs {
 		chainSelector := capabilityConfig.ChainSelector
 		config := capabilityConfig.ChainConfig
 
@@ -275,7 +269,7 @@ func convertOnChainConfigToHomeChainConfig(
 			SupportedNodes: mapset.NewSet(config.Readers...),
 		}
 	}
-	return chainConfigs, nil
+	return chainConfigs
 }
 
 // HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make

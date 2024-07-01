@@ -383,10 +383,7 @@ func maxSeqNumsConsensus(
 }
 
 // tokenPricesConsensus returns the median price for tokens that have at least 2f_chain+1 observations.
-func tokenPricesConsensus(
-	observations []cciptypes.CommitPluginObservation,
-	fChain int,
-) ([]cciptypes.TokenPrice, error) {
+func tokenPricesConsensus(observations []cciptypes.CommitPluginObservation, fChain int) []cciptypes.TokenPrice {
 	pricesPerToken := make(map[types.Account][]cciptypes.BigInt)
 	for _, obs := range observations {
 		for _, price := range obs.TokenPrices {
@@ -407,7 +404,7 @@ func tokenPricesConsensus(
 	}
 
 	sort.Slice(consensusPrices, func(i, j int) bool { return consensusPrices[i].TokenID < consensusPrices[j].TokenID })
-	return consensusPrices, nil
+	return consensusPrices
 }
 
 func gasPricesConsensus(

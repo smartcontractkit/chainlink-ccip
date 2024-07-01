@@ -16,6 +16,7 @@ linters:
     - depguard
     - lll
     - gosec
+    - unparam
 linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
