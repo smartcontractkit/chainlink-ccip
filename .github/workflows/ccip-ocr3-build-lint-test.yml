@@ -81,5 +81,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### Test Coverage\n\n| Branch          | Coverage        |\n|-----------------|-----------------|\n| ${{ process.env.branch_name }}  | ${coverage}           |\n| ${{ github.base_ref }}   | ${coverage_target}           |`
+              body: `### Test Coverage\n\n| Branch          | Coverage        |\n|-----------------|-----------------|\n| ${{ github.head_ref }}  | ${coverage}           |\n| ${{ github.base_ref }}   | ${coverage_target}           |`
             });
