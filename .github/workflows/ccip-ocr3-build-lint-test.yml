@@ -32,11 +32,23 @@ jobs:
         run: golangci-lint run -c .golangci.yml
       - name: Run tests
         run: go test -race -fullpath -shuffle on -count 20 -coverprofile=coverage.out ./...
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: Run gosec
+        run: gosec ./...
       - name: Generate coverage report
         run: |
           go tool cover -func=coverage.out > coverage.txt
           total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
           echo "coverage=$total" >> $GITHUB_ENV
+      - name: Coverage on target branch
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout ${{ github.base_ref }}
+          go test -coverprofile=coverage_target.out ./...
+          go tool cover -func=coverage_target.out > coverage_target.txt
+          total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
+          echo "coverage_target=$total" >> $GITHUB_ENV
       - name: Remove previous coverage comments
         uses: actions/github-script@v6
         with:
@@ -64,13 +76,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const coverage = process.env.coverage;
+            const coverage_target = process.env.coverage_target;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### Go Coverage Report\n\`\`\`\n${coverage}\n\`\`\``
+              body: `### Go Coverage Report\nThis branch:${coverage}\nTarget branch:${coverage_target}`
             });
-      - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-      - name: Run gosec
-        run: gosec ./...
