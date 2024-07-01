@@ -33,11 +33,13 @@ jobs:
       - name: Run tests
         run: go test -race -fullpath -shuffle on -count 20 -coverprofile=coverage.out ./...
       - name: Generate coverage report
+        if: github.event_name == 'pull_request'
         run: |
           go tool cover -func=coverage.out > coverage.txt
           total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
           echo "coverage=$total" >> $GITHUB_ENV
       - name: Coverage on target branch
+        if: github.event_name == 'pull_request'
         run: |
           git fetch origin ${{ github.base_ref }}
           git checkout ${{ github.base_ref }}
@@ -47,6 +49,7 @@ jobs:
           echo "coverage_target=$total" >> $GITHUB_ENV
       - name: Remove previous coverage comments
         uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -68,6 +71,7 @@ jobs:
             }
       - name: Display coverage in PR comment
         uses: actions/github-script@v6
+        if: github.event_name == 'pull_request'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
