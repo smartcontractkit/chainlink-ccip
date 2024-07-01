@@ -61,7 +61,7 @@ create_namespace() {
 # Function to label the namespace
 label_namespace() {
     # Determine if overwrite is required
-    overwrite_flag=""
+    local overwrite_flag=""
     if [ "$overwrite" == "--overwrite" ]; then
         overwrite_flag="--overwrite"
     fi
