@@ -37,7 +37,7 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		"CCIPCapabilityConfiguration",
+		"CCIPConfig",
 		"getAllChainConfigs",
 		mock.Anything,
 		mock.Anything).Return(fmt.Errorf("error"))
@@ -116,7 +116,7 @@ func Test_PollingWorking(t *testing.T) {
 
 	homeChainReader := mocks.NewContractReaderMock()
 	homeChainReader.On(
-		"GetLatestValue", mock.Anything, "CCIPCapabilityConfiguration", "getAllChainConfigs", mock.Anything, mock.Anything,
+		"GetLatestValue", mock.Anything, "CCIPConfig", "getAllChainConfigs", mock.Anything, mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(4).(*[]ChainConfigInfo)
@@ -163,7 +163,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		"CCIPCapabilityConfiguration",
+		"CCIPConfig",
 		"getOCRConfig",
 		map[string]any{
 			"donId":      donID,

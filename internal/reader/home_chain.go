@@ -113,7 +113,7 @@ func (r *homeChainPoller) poll() {
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var chainConfigInfos []ChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(
-		ctx, "CCIPCapabilityConfiguration", "getAllChainConfigs", nil, &chainConfigInfos,
+		ctx, "CCIPConfig", "getAllChainConfigs", nil, &chainConfigInfos,
 	)
 	if err != nil {
 		return err
@@ -192,7 +192,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
-	err := r.homeChainReader.GetLatestValue(ctx, "CCIPCapabilityConfiguration", "getOCRConfig", map[string]any{
+	err := r.homeChainReader.GetLatestValue(ctx, "CCIPConfig", "getOCRConfig", map[string]any{
 		"donId":      donID,
 		"pluginType": pluginType,
 	}, &ocrConfigs)
@@ -290,7 +290,7 @@ type HomeChainConfigMapper struct {
 // se/deserializing easier
 type ChainConfigInfo struct {
 	// nolint:lll // don't split up the long url
-	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPCapabilityConfiguration.sol#L140
+	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPConfig.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
@@ -306,7 +306,7 @@ type ChainConfig struct {
 	Config []byte `json:"config"`
 }
 
-// OCR3Config mirrors CCIPCapabilityConfiguration.sol's OCR3Config struct
+// OCR3Config mirrors CCIPConfig.sol's OCR3Config struct
 type OCR3Config struct {
 	PluginType            uint8                   `json:"pluginType"`
 	ChainSelector         cciptypes.ChainSelector `json:"chainSelector"`
@@ -320,7 +320,7 @@ type OCR3Config struct {
 	OffchainConfig        []byte                  `json:"offchainConfig"`
 }
 
-// OCR3ConfigWithmeta mirrors CCIPCapabilityConfiguration.sol's OCR3ConfigWithMeta struct
+// OCR3ConfigWithmeta mirrors CCIPConfig.sol's OCR3ConfigWithMeta struct
 type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
 	ConfigCount  uint64     `json:"configCount"`
