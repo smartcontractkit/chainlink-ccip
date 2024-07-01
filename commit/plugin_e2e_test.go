@@ -447,8 +447,8 @@ type nodeSetup struct {
 }
 
 func newNode(
-	ctx context.Context,
-	t *testing.T,
+	_ context.Context,
+	_ *testing.T,
 	lggr logger.Logger,
 	id int,
 	cfg cciptypes.CommitPluginConfig,

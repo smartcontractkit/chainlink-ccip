@@ -15,13 +15,13 @@ linters:
     - noctx
     - depguard
     - lll
+    - gosec
+    - unparam
 linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
   goimports:
     local-prefixes: "github.com/smartcontractkit/chainlink-ccip"
-  gosec:
-    excludes:
   errorlint:
     errorf: true # Disallow formatting of errors without %w
   revive:

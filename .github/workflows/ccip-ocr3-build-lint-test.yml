@@ -31,4 +31,51 @@ jobs:
       - name: Run linter
         run: golangci-lint run -c .golangci.yml
       - name: Run tests
-        run: go test -race -fullpath -shuffle on -count 20 ./...
+        run: go test -race -fullpath -shuffle on -count 20 -coverprofile=coverage.out ./...
+      - name: Generate coverage report
+        run: |
+          go tool cover -func=coverage.out > coverage.txt
+          total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
+          echo "coverage=$total" >> $GITHUB_ENV
+      - name: Coverage on target branch
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout ${{ github.base_ref }}
+          go test -coverprofile=coverage_target.out ./...
+          go tool cover -func=coverage_target.out > coverage_target.txt
+          total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
+          echo "coverage_target=$total" >> $GITHUB_ENV
+      - name: Remove previous coverage comments
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo, number: issue_number } = context.issue;
+            const comments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number
+            });
+            const coverageCommentPrefix = "### Test Coverage";
+            for (const comment of comments.data) {
+              if (comment.body.startsWith(coverageCommentPrefix)) {
+                await github.rest.issues.deleteComment({
+                  owner,
+                  repo,
+                  comment_id: comment.id
+                });
+              }
+            }
+      - name: Display coverage in PR comment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const coverage = process.env.coverage;
+            const coverage_target = process.env.coverage_target;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `### Test Coverage\n\n| Branch          | Coverage        |\n|-----------------|-----------------|\n| ${{ github.head_ref }}  | ${coverage}           |\n| ${{ github.base_ref }}   | ${coverage_target}           |`
+            });

@@ -14,10 +14,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -1015,14 +1016,12 @@ func Test_tokenPricesConsensus(t *testing.T) {
 		observations []cciptypes.CommitPluginObservation
 		fChain       int
 		expPrices    []cciptypes.TokenPrice
-		expErr       bool
 	}{
 		{
 			name:         "empty",
 			observations: make([]cciptypes.CommitPluginObservation, 0),
 			fChain:       2,
 			expPrices:    make([]cciptypes.TokenPrice, 0),
-			expErr:       false,
 		},
 		{
 			name: "happy flow",
@@ -1063,7 +1062,6 @@ func Test_tokenPricesConsensus(t *testing.T) {
 				cciptypes.NewTokenPrice("0x1", big.NewInt(11)),
 				cciptypes.NewTokenPrice("0x2", big.NewInt(21)),
 			},
-			expErr: false,
 		},
 		{
 			name: "not enough observations for some token",
@@ -1102,18 +1100,12 @@ func Test_tokenPricesConsensus(t *testing.T) {
 			expPrices: []cciptypes.TokenPrice{
 				cciptypes.NewTokenPrice("0x2", big.NewInt(21)),
 			},
-			expErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			prices, err := tokenPricesConsensus(tc.observations, tc.fChain)
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
+			prices := tokenPricesConsensus(tc.observations, tc.fChain)
 			assert.Equal(t, tc.expPrices, prices)
 		})
 	}
