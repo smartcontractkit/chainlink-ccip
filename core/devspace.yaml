@@ -137,7 +137,8 @@ hooks:
     events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
     events: ["before:deploy:app"]
-  - command: ./../scripts/manage_namespace.sh create
+  - command: ./../scripts/manage_namespace.shg
+    args: ["create"]
     events: ["before:deploy:app"]
   - wait:
       running: true
@@ -157,8 +158,8 @@ hooks:
 
   # Check that the namespace cleanup label is set successfully.
   - name: "label-namespace-hook"
-    command: ./../scripts/manage_namespace.sh label
-    args: ["${NS_TTL}"]
+    command: ./../scripts/manage_namespace.sh
+    args: ["label", "${NS_TTL}"]
     events: ["after:deploy:app", "error:deploy:*"]
 
   # Prints man pages about available commands
