@@ -276,7 +276,7 @@ func buildSingleChainReportMaxSize(
 		return cciptypes.ExecutePluginReportSingleChain{},
 			0,
 			cciptypes.ExecutePluginCommitDataWithMessages{},
-			errNothingExecuted
+			errEmptyReport
 	}
 
 	report = markNewMessagesExecuted(finalReport, report)
@@ -421,7 +421,7 @@ func selectReport(
 			buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
 				report, maxReportSizeBytes-accumulatedSize)
 		// No messages fit into the report, stop adding more reports.
-		if errors.Is(err, errNothingExecuted) {
+		if errors.Is(err, errEmptyReport) {
 			break
 		}
 		if err != nil {

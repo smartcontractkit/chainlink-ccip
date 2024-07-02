@@ -2,4 +2,4 @@ package execute
 
 import "errors"
 
-var errNothingExecuted = errors.New("no reports were executed")
+var errEmptyReport = errors.New("no messages can fit in the report")

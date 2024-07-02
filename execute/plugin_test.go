@@ -174,25 +174,24 @@ func mustRandID() string {
 	return hex.EncodeToString(bytes)[:32]
 }
 
+// breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
 func breakCommitReport(
 	commitReport cciptypes.ExecutePluginCommitDataWithMessages,
 ) cciptypes.ExecutePluginCommitDataWithMessages {
-	commitReport.Messages = append(commitReport.Messages, cciptypes.CCIPMsg{
-		CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-			ID:          mustRandID(),
-			SourceChain: cciptypes.ChainSelector(1),
-			SeqNum:      cciptypes.SeqNum(999),
-			MsgHash:     cciptypes.Bytes32{},
-		},
-	})
+	commitReport.Messages = append(commitReport.Messages, cciptypes.CCIPMsg{})
 	return commitReport
 }
 
+// makeTestCommitReport creates a basic commit report with messages given different parameters. This function
+// will panic if the input parameters are inconsistent.
 func makeTestCommitReport(
 	numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum,
 ) cciptypes.ExecutePluginCommitDataWithMessages {
+	sequenceNumberRange :=
+		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
+
 	for _, e := range executed {
-		if e < cciptypes.SeqNum(firstSeqNum) || e > cciptypes.SeqNum(firstSeqNum+numMessages-1) {
+		if !sequenceNumberRange.Contains(e) {
 			panic("executed message out of range")
 		}
 	}
@@ -209,8 +208,6 @@ func makeTestCommitReport(
 		})
 	}
 
-	sequenceNumberRange :=
-		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
 	return cciptypes.ExecutePluginCommitDataWithMessages{
 		ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
 			SourceChain:         cciptypes.ChainSelector(srcChain),
@@ -244,7 +241,7 @@ func assertMerkleRoot(
 	require.NoError(t, err)
 	merkleRoot := tree.Root()
 
-	// Generate merkle root from exec report messages and proofj
+	// Generate merkle root from exec report messages and proof
 	ctx := context.Background()
 	var leaves [][32]byte
 	for _, msg := range execReport.Messages {
