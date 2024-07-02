@@ -559,7 +559,7 @@ func validateObserverReadingEligibility(
 	return nil
 }
 
-func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
+func ValidateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	tokensWithPrice := mapset.NewSet[types.Account]()
 	for _, t := range tokenPrices {
 		if tokensWithPrice.Contains(t.TokenID) {
@@ -575,7 +575,7 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	return nil
 }
 
-func validateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
+func ValidateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
 	// Duplicate gas prices must not appear for the same chain and must not be empty.
 	gasPriceChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for _, g := range gasPrices {

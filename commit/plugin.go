@@ -226,11 +226,11 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
-	if err := validateObservedTokenPrices(obs.TokenPrices); err != nil {
+	if err := ValidateObservedTokenPrices(obs.TokenPrices); err != nil {
 		return fmt.Errorf("validate token prices: %w", err)
 	}
 
-	if err := validateObservedGasPrices(obs.GasPrices); err != nil {
+	if err := ValidateObservedGasPrices(obs.GasPrices); err != nil {
 		return fmt.Errorf("validate gas prices: %w", err)
 	}
 

@@ -647,7 +647,7 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedTokenPrices(tc.tokenPrices)
+			err := ValidateObservedTokenPrices(tc.tokenPrices)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -700,7 +700,7 @@ func Test_validateObservedGasPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedGasPrices(tc.gasPrices)
+			err := ValidateObservedGasPrices(tc.gasPrices)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
