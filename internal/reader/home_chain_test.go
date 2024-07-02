@@ -7,14 +7,14 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 
 	var (
 		tickTime       = 1 * time.Millisecond
-		totalSleepTime = 20 * tickTime // to allow it to fail 10 times at least
+		totalSleepTime = 50 * time.Millisecond // give enough time for 10 ticks
 	)
 	configPoller := NewHomeChainConfigPoller(
 		homeChainReader,
@@ -148,7 +148,7 @@ func Test_PollingWorking(t *testing.T) {
 			callCount++
 		}
 	}
-	//called at least 2 times, one for start and one for the first tick
+	// called at least 2 times, one for start and one for the first tick
 	require.GreaterOrEqual(t, callCount, 2)
 
 	configs, err := configPoller.GetAllChainConfigs()

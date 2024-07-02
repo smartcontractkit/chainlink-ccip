@@ -82,7 +82,6 @@ func (r *homeChainPoller) Start(ctx context.Context) error {
 }
 
 func (r *homeChainPoller) poll() {
-
 	defer r.wg.Done()
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
