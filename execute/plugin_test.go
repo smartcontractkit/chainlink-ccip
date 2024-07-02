@@ -171,7 +171,7 @@ func mustRandID() string {
 	if _, err := rand.Read(bytes); err != nil {
 		panic(err)
 	}
-	return hex.EncodeToString(bytes)[:32]
+	return hex.EncodeToString(bytes)
 }
 
 // breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
@@ -296,7 +296,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2200,
+				maxReportSize: 2600,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 				},
@@ -334,7 +334,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "one and half reports",
 			args: args{
-				maxReportSize: 8000,
+				maxReportSize: 8500,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
@@ -348,7 +348,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "exactly one report",
 			args: args{
-				maxReportSize: 3900,
+				maxReportSize: 4200,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
@@ -374,7 +374,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2000,
+				maxReportSize: 2050,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
@@ -387,7 +387,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "execute remainder of sparsely executed report",
 			args: args{
-				maxReportSize: 2500,
+				maxReportSize: 3500,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
@@ -399,7 +399,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
-				maxReportSize: 2000,
+				maxReportSize: 2050,
 				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
