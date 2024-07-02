@@ -185,7 +185,12 @@ func breakCommitReport(
 // makeTestCommitReport creates a basic commit report with messages given different parameters. This function
 // will panic if the input parameters are inconsistent.
 func makeTestCommitReport(
-	numMessages, srcChain, firstSeqNum, block int, timestamp int64, executed []cciptypes.SeqNum,
+	numMessages,
+	srcChain,
+	firstSeqNum,
+	block int,
+	timestamp int64,
+	executed []cciptypes.SeqNum,
 ) cciptypes.ExecutePluginCommitDataWithMessages {
 	sequenceNumberRange :=
 		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
@@ -208,8 +213,14 @@ func makeTestCommitReport(
 		})
 	}
 
+	root, err := cciptypes.NewBytes32FromString(SentinelRoot)
+	if err != nil {
+		panic(fmt.Sprintf("invalid sentinel root: %s", err))
+	}
+
 	return cciptypes.ExecutePluginCommitDataWithMessages{
 		ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+			MerkleRoot:          root,
 			SourceChain:         cciptypes.ChainSelector(srcChain),
 			SequenceNumberRange: sequenceNumberRange,
 			Timestamp:           time.UnixMilli(timestamp),
