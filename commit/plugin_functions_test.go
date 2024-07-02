@@ -1180,3 +1180,80 @@ func Test_gasPricesConsensus(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateMerkleRootsState(t *testing.T) {
+	testCases := []struct {
+		name           string
+		reportSeqNums  []cciptypes.SeqNumChain
+		onchainSeqNums []cciptypes.SeqNum
+		expValid       bool
+		expErr         bool
+	}{
+		{
+			name: "happy path",
+			reportSeqNums: []cciptypes.SeqNumChain{
+				cciptypes.NewSeqNumChain(10, 100),
+				cciptypes.NewSeqNumChain(20, 200),
+			},
+			onchainSeqNums: []cciptypes.SeqNum{99, 199},
+			expValid:       true,
+			expErr:         false,
+		},
+		{
+			name: "one root is stale",
+			reportSeqNums: []cciptypes.SeqNumChain{
+				cciptypes.NewSeqNumChain(10, 100),
+				cciptypes.NewSeqNumChain(20, 200),
+			},
+			onchainSeqNums: []cciptypes.SeqNum{99, 200}, // <- 200 is already on chain
+			expValid:       false,
+			expErr:         false,
+		},
+		{
+			name: "one root has gap",
+			reportSeqNums: []cciptypes.SeqNumChain{
+				cciptypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
+				cciptypes.NewSeqNumChain(20, 200),
+			},
+			onchainSeqNums: []cciptypes.SeqNum{99, 199},
+			expValid:       false,
+			expErr:         false,
+		},
+		{
+			name: "reader returned wrong number of seq nums",
+			reportSeqNums: []cciptypes.SeqNumChain{
+				cciptypes.NewSeqNumChain(10, 100),
+				cciptypes.NewSeqNumChain(20, 200),
+			},
+			onchainSeqNums: []cciptypes.SeqNum{99, 199, 299},
+			expValid:       false,
+			expErr:         true,
+		},
+	}
+
+	ctx := context.Background()
+	lggr := logger.Test(t)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := mocks.NewCCIPReader()
+			rep := cciptypes.CommitPluginReport{}
+			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
+			for _, snc := range tc.reportSeqNums {
+				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
+					ChainSel:     snc.ChainSel,
+					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+				})
+				chains = append(chains, snc.ChainSel)
+			}
+			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainSeqNums, nil)
+			valid, err := validateMerkleRootsState(ctx, lggr, rep, reader)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expValid, valid)
+		})
+	}
+}

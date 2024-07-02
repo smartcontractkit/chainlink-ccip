@@ -360,6 +360,10 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
 			Return([]cciptypes.SeqNum{10, 20}, nil)
+
+		// transmission phase root staleness check passes
+		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
+			Return([]cciptypes.SeqNum{20}, nil)
 	}
 
 	// No need to keep it running in the background anymore for this test
@@ -560,7 +564,8 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
 			Return([]cciptypes.SeqNum{10, 20}, nil)
-
+		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
+			Return([]cciptypes.SeqNum{20}, nil)
 	}
 
 	// No need to keep it running in the background anymore for this test
