@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -120,10 +121,12 @@ func (p *Plugin) Observation(
 	}
 
 	// Find the gas prices for each source chain.
-	var gasPrices []cciptypes.GasPriceChain
-	gasPrices, err = observeGasPrices(ctx, p.ccipReader, p.knownSourceChainsSlice())
+	gasPrices, err := observeGasPrices(ctx, p.ccipReader, p.knownSourceChainsSlice())
 	if err != nil {
-		return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
+		if !errors.Is(err, reader.ErrContractWriterNotFound) {
+			return types.Observation{}, fmt.Errorf("observe gas prices: %w", err)
+		}
+		p.lggr.Warnw("gas price observation skipped, contract writer does not exist")
 	}
 
 	fChain, err := p.homeChain.GetFChain()

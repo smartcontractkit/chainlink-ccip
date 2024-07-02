@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strconv"
 	"testing"
@@ -112,6 +113,42 @@ func TestPlugin(t *testing.T) {
 							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
 							{ChainSel: chainB, GasPrice: cciptypes.NewBigIntFromInt64(20_000)},
 						},
+					},
+				},
+			},
+			initialOutcome: cciptypes.CommitPluginOutcome{
+				MaxSeqNums: []cciptypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				MerkleRoots: []cciptypes.MerkleRootChain{},
+				TokenPrices: []cciptypes.TokenPrice{},
+				GasPrices:   []cciptypes.GasPriceChain{},
+			},
+		},
+		{
+			name:        "NodesDoNotReportGasPrices",
+			description: "Nodes that don't have access to a contract writer do not submit gas price updates",
+			nodes:       setupNodesDoNotReportGasPrices(ctx, t, lggr),
+			expOutcome: cciptypes.CommitPluginOutcome{
+				MaxSeqNums: []cciptypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				MerkleRoots: []cciptypes.MerkleRootChain{
+					{ChainSel: chainB, MerkleRoot: cciptypes.Bytes32{}, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
+				},
+				TokenPrices: []cciptypes.TokenPrice{},
+				GasPrices:   []cciptypes.GasPriceChain{},
+			},
+			expTransmittedReports: []cciptypes.CommitPluginReport{
+				{
+					MerkleRoots: []cciptypes.MerkleRootChain{
+						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
+					},
+					PriceUpdates: cciptypes.PriceUpdates{
+						TokenPriceUpdates: []cciptypes.TokenPrice{},
+						GasPriceUpdates:   []cciptypes.GasPriceChain{},
 					},
 				},
 			},
@@ -430,6 +467,104 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 				cciptypes.NewBigIntFromInt64(1000),
 				cciptypes.NewBigIntFromInt64(20_000),
 			}, nil)
+	}
+
+	// No need to keep it running in the background anymore for this test
+	err = homeChain.Close()
+	if err != nil {
+		return nil
+	}
+
+	return nodes
+}
+
+func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
+	cfg := cciptypes.CommitPluginConfig{
+		DestChain:           chainC,
+		PricedTokens:        []types.Account{tokenX},
+		TokenPricesObserver: false,
+		NewMsgScanBatchSize: 256,
+	}
+
+	chainConfigInfos := []reader.ChainConfigInfo{
+		{
+			ChainSelector: chainA,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: []byte{0},
+			},
+		},
+		{
+			ChainSelector: chainB,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: []byte{0},
+			},
+		},
+		{
+			ChainSelector: chainC,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: []byte{0},
+			},
+		},
+	}
+
+	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
+	err := homeChain.Start(ctx)
+	if err != nil {
+		return nil
+	}
+	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
+	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
+	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
+	nodes := []nodeSetup{n1, n2, n3}
+
+	for _, n := range nodes {
+		// then they fetch new msgs, there is nothing new on chainA
+		n.ccipReader.On(
+			"MsgsBetweenSeqNums",
+			ctx,
+			chainA,
+			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
+		).Return([]cciptypes.CCIPMsg{}, nil)
+
+		// and there are two new message on chainB
+		n.ccipReader.On(
+			"MsgsBetweenSeqNums",
+			ctx,
+			chainB,
+			cciptypes.NewSeqNumRange(21, cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize)),
+		).Return([]cciptypes.CCIPMsg{
+			{
+				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+					MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: chainB, SeqNum: 21,
+				},
+			},
+			{
+				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
+					MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: chainB, SeqNum: 22,
+				},
+			},
+		}, nil)
+
+		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
+			Return([]cciptypes.BigInt{}, fmt.Errorf("no gas prices available: %w", reader.ErrContractWriterNotFound))
+
+		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
+			Return([]cciptypes.SeqNum{10, 20}, nil)
+
 	}
 
 	// No need to keep it running in the background anymore for this test

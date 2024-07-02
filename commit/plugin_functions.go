@@ -142,16 +142,16 @@ func observeGasPrices(
 	chains []cciptypes.ChainSelector,
 ) ([]cciptypes.GasPriceChain, error) {
 	if len(chains) == 0 {
-		return nil, nil
+		return []cciptypes.GasPriceChain{}, nil
 	}
 
 	gasPrices, err := ccipReader.GasPrices(ctx, chains)
 	if err != nil {
-		return nil, fmt.Errorf("get gas prices: %w", err)
+		return []cciptypes.GasPriceChain{}, fmt.Errorf("get gas prices: %w", err)
 	}
 
 	if len(gasPrices) != len(chains) {
-		return nil, fmt.Errorf("internal critical error gas prices length mismatch: got %d, want %d",
+		return []cciptypes.GasPriceChain{}, fmt.Errorf("internal critical error gas prices length mismatch: got %d, want %d",
 			len(gasPrices), len(chains))
 	}
 
