@@ -47,9 +47,11 @@ func (p PluginFactory) NewReportingPlugin(
 	config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	return NewPlugin(
-		context.Background(),
 		config,
 		cciptypes.ExecutePluginConfig{},
+		nil,
+		nil,
+		nil,
 		nil,
 	), ocr3types.ReportingPluginInfo{}, nil
 }
