@@ -603,16 +603,15 @@ func validateMerkleRootsState(
 		return true, nil
 	}
 
-	onchainSeqNums, err := reader.NextSeqNum(ctx, reportChains)
+	onchainCommittedSeqNums, err := reader.NextSeqNum(ctx, reportChains)
 	if err != nil {
 		return false, fmt.Errorf("get next sequence numbers: %w", err)
 	}
+	if len(onchainCommittedSeqNums) != len(reportChains) {
+		return false, fmt.Errorf("critical error: onchainSeqNums length mismatch")
+	}
 
-	for i, onchainSeqNum := range onchainSeqNums {
-		if i >= len(reportChains) {
-			return false, fmt.Errorf("critical error: onchainSeqNums length mismatch")
-		}
-
+	for i, onchainSeqNum := range onchainCommittedSeqNums {
 		chain := reportChains[i]
 		reportMinSeqNum, ok := reportMinSeqNums[chain]
 		if !ok {
