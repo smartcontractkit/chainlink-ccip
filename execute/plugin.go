@@ -311,7 +311,7 @@ func buildSingleChainReport(
 	lggr.Debugw(
 		"constructing merkle tree",
 		"sourceChain", report.SourceChain,
-		"expected-root", report.MerkleRoot.String(),
+		"expectedRoot", report.MerkleRoot.String(),
 		"treeLeaves", len(report.Messages))
 
 	tree, err := constructMerkleTree(ctx, hasher, report)
@@ -339,8 +339,8 @@ func buildSingleChainReport(
 				//       that might mean moving the token data reading out of the loop.
 				lggr.Infow(
 					"unable to read token data",
-					"source-chain", report.SourceChain,
-					"seq-num", msg.SeqNum,
+					"sourceChain", report.SourceChain,
+					"seqNum", msg.SeqNum,
 					"error", err)
 				return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
 					"unable to read token data for message %d: %w", msg.SeqNum, err)
@@ -348,8 +348,8 @@ func buildSingleChainReport(
 
 			lggr.Infow(
 				"read token data",
-				"source-chain", report.SourceChain,
-				"seq-num", msg.SeqNum,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.SeqNum,
 				"data", tokenData)
 			offchainTokenData = append(offchainTokenData, tokenData)
 			toExecute = append(toExecute, i)
