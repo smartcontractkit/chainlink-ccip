@@ -305,15 +305,17 @@ func buildSingleChainReport(
 		maxMessages = len(report.Messages)
 	}
 
+	lggr.Debugw(
+		"constructing merkle tree",
+		"sourceChain", report.SourceChain,
+		"expected-root", report.MerkleRoot.String(),
+		"treeLeaves", len(report.Messages))
+
 	tree, err := constructMerkleTree(ctx, hasher, report)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("unable to construct merkle tree from messages: %w", err)
 	}
-	lggr.Debugw(
-		"constructing merkle tree",
-		"sourceChain", report.SourceChain,
-		"treeLeaves", len(report.Messages))
 	numMsgs := len(report.Messages)
 
 	// Iterate sequence range and executed messages to select messages to execute.
@@ -341,7 +343,7 @@ func buildSingleChainReport(
 					"unable to read token data for message %d: %w", msg.SeqNum, err)
 			}
 
-			lggr.Debugw(
+			lggr.Infow(
 				"read token data",
 				"source-chain", report.SourceChain,
 				"seq-num", msg.SeqNum,
