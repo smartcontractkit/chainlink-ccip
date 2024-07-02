@@ -318,13 +318,19 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
+	isValid, err := validateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
+	if !isValid {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("validate merkle roots state: %w", err)
+	}
+
 	p.lggr.Debugw("transmitting report",
 		"roots", len(decodedReport.MerkleRoots),
 		"tokenPriceUpdates", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
-
-	// todo: if report is stale -> do not transmit (check the spec for the exact condition)
 	return true, nil
 }
 

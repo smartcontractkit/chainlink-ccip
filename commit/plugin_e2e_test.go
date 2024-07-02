@@ -324,6 +324,9 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
 			Return([]cciptypes.SeqNum{10, 20}, nil)
 
+		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
+			Return([]cciptypes.SeqNum{20}, nil)
 	}
 
 	// No need to keep it running in the background anymore for this test

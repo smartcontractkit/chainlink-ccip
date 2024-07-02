@@ -585,6 +585,50 @@ func validateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
 	return nil
 }
 
+// validateMerkleRootsState merkle roots seq nums validation by comparing with on-chain state.
+func validateMerkleRootsState(
+	ctx context.Context,
+	lggr logger.Logger,
+	report cciptypes.CommitPluginReport,
+	reader cciptypes.CCIPReader,
+) (bool, error) {
+	reportChains := make([]cciptypes.ChainSelector, 0)
+	reportMinSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+	for _, mr := range report.MerkleRoots {
+		reportChains = append(reportChains, mr.ChainSel)
+		reportMinSeqNums[mr.ChainSel] = mr.SeqNumsRange.Start()
+	}
+
+	if len(reportChains) == 0 {
+		return true, nil
+	}
+
+	onchainSeqNums, err := reader.NextSeqNum(ctx, reportChains)
+	if err != nil {
+		return false, fmt.Errorf("get next sequence numbers: %w", err)
+	}
+
+	for i, onchainSeqNum := range onchainSeqNums {
+		if i >= len(reportChains) {
+			return false, fmt.Errorf("critical error: onchainSeqNums length mismatch")
+		}
+
+		chain := reportChains[i]
+		reportMinSeqNum, ok := reportMinSeqNums[chain]
+		if !ok {
+			return false, fmt.Errorf("critical error: reportSeqNum not found for chain %d", chain)
+		}
+
+		if reportMinSeqNum != onchainSeqNum+1 {
+			lggr.Infow("report not valid, onchain seq num is %d, report min seq num is %d (chain=%s)",
+				onchainSeqNum, reportMinSeqNums, chain)
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 type observedMsgsConsensus struct {
 	seqNumRange cciptypes.SeqNumRange
 	merkleRoot  [32]byte
