@@ -6,23 +6,23 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"sync/atomic"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
 
 // maxReportSizeBytes that should be returned as an execution report payload.
@@ -31,24 +31,29 @@ const SentinelRoot = "0x289502ebf164ea87871e19cd9c8734016e954539fffc8c789ac4dadc
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	reportingCfg    ocr3types.ReportingPluginConfig
-	cfg             pluginconfig.ExecutePluginConfig
-	ccipReader      reader.CCIP
-	reportCodec     cciptypes.ExecutePluginCodec
-	msgHasher       cciptypes.MessageHasher
+	reportingCfg ocr3types.ReportingPluginConfig
+	cfg          pluginconfig.ExecutePluginConfig
+
+	// providers
+	ccipReader  reader.CCIP
+	reportCodec cciptypes.ExecutePluginCodec
+	msgHasher   cciptypes.MessageHasher
+	homeChain   reader.HomeChain
+
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataReader TokenDataReader
-
-	lastReportTS *atomic.Int64
-
-	lggr logger.Logger
+	lastReportTS    *atomic.Int64
+	lggr            logger.Logger
 }
 
 func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg pluginconfig.ExecutePluginConfig,
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader reader.CCIP,
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
+	homeChain reader.HomeChain,
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
@@ -57,13 +62,15 @@ func NewPlugin(
 	// TODO: initialize tokenDataReader.
 
 	return &Plugin{
-		reportingCfg: reportingCfg,
-		cfg:          cfg,
-		ccipReader:   ccipReader,
-		reportCodec:  reportCodec,
-		msgHasher:    msgHasher,
-		lastReportTS: lastReportTS,
-		lggr:         lggr,
+		reportingCfg:    reportingCfg,
+		cfg:             cfg,
+		oracleIDToP2pID: oracleIDToP2pID,
+		ccipReader:      ccipReader,
+		reportCodec:     reportCodec,
+		msgHasher:       msgHasher,
+		homeChain:       homeChain,
+		lastReportTS:    lastReportTS,
+		lggr:            lggr,
 	}
 }
 
@@ -144,9 +151,12 @@ func (p *Plugin) Observation(
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
-	ownConfig := p.cfg.ObserverInfo[p.reportingCfg.OracleID]
-	var groupedCommits plugintypes.ExecutePluginCommitObservations
-	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
+	var groupedCommits cciptypes.ExecutePluginCommitObservations
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+	}
+	if supportsDest {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
 			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
@@ -574,6 +584,28 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 func (p *Plugin) Close() error {
 	panic("implement me")
+}
+
+func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) {
+	p2pID, exists := p.oracleIDToP2pID[p.reportingCfg.OracleID]
+	if !exists {
+		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.reportingCfg.OracleID)
+	}
+	supportedChains, err := p.homeChain.GetSupportedChainsForPeer(p2pID)
+	if err != nil {
+		p.lggr.Warnw("error getting supported chains", err)
+		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
+	}
+
+	return supportedChains, nil
+}
+
+func (p *Plugin) supportsDestChain() (bool, error) {
+	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
+	if err != nil {
+		return false, fmt.Errorf("get chain config: %w", err)
+	}
+	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.reportingCfg.OracleID]), nil
 }
 
 // Interface compatibility checks.

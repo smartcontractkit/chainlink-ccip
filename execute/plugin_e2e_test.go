@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -46,7 +47,6 @@ func TestPlugin(t *testing.T) {
 
 type nodeSetup struct {
 	node        *Plugin
-	ccipReader  *mocks.CCIPReader
 	priceReader *mocks.TokenPricesReader
 	reportCodec *mocks.ExecutePluginJSONReportCodec
 	msgHasher   *mocks.MessageHasher
@@ -74,7 +74,7 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 }
 
 func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, selector cciptypes.ChainSelector) []nodeSetup {
-	cfg := cciptypes.ExecutePluginConfig{}
+	cfg := pluginconfig.ExecutePluginConfig{}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: selector,
@@ -94,19 +94,17 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, sele
 		return nil
 	}
 
-	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, 1, 1),
-		newNode(ctx, t, lggr, cfg, 2, 1),
-		newNode(ctx, t, lggr, cfg, 3, 1),
+	ccipReader := mocks.InMemoryCCIPReader{
+		Reports:  nil,
+		Messages: nil,
+		Dest:     0,
 	}
 
-	for _, n := range nodes {
-		// All nodes have issue reading the latest sequence number, should lead to empty outcomes
-		n.ccipReader.On(
-			"NextSeqNum",
-			ctx,
-			mock.Anything,
-		).Return([]cciptypes.SeqNum{}, nil)
+	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	nodes := []nodeSetup{
+		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -120,11 +118,13 @@ func newNode(
 	_ context.Context,
 	_ *testing.T,
 	lggr logger.Logger,
-	cfg cciptypes.ExecutePluginConfig,
+	cfg pluginconfig.ExecutePluginConfig,
+	ccipReader reader.CCIP,
+	homeChain reader.HomeChain,
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
 ) nodeSetup {
-	ccipReader := mocks.NewCCIPReader()
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
@@ -137,14 +137,15 @@ func newNode(
 	node1 := NewPlugin(
 		rCfg,
 		cfg,
+		oracleIDToP2pID,
 		ccipReader,
 		reportCodec,
 		msgHasher,
+		homeChain,
 		lggr)
 
 	return nodeSetup{
 		node:        node1,
-		ccipReader:  ccipReader,
 		priceReader: priceReader,
 		reportCodec: reportCodec,
 		msgHasher:   msgHasher,

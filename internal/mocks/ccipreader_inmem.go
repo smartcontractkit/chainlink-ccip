@@ -4,19 +4,22 @@ import (
 	"context"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type MessagesWithMetadata struct {
-	cciptypes.CCIPMsg
+	cciptypes.Message
 	Executed    bool
 	Destination cciptypes.ChainSelector
 }
 
 type InMemoryCCIPReader struct {
 	// Reports that may be returned.
-	Reports []cciptypes.CommitPluginReportWithMeta
+	Reports []plugintypes.CommitPluginReportWithMeta
 
 	// Messages that may be returned.
 	Messages map[cciptypes.ChainSelector][]MessagesWithMetadata
@@ -27,8 +30,8 @@ type InMemoryCCIPReader struct {
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
-	results := slicelib.Filter(r.Reports, func(report cciptypes.CommitPluginReportWithMeta) bool {
+) ([]plugintypes.CommitPluginReportWithMeta, error) {
+	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
 	if len(results) > limit {
@@ -46,22 +49,22 @@ func (r InMemoryCCIPReader) ExecutedMessageRanges(
 		return nil, nil
 	}
 	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		return seqNumRange.Contains(msg.SeqNum) && msg.Destination == dest && msg.Executed
+		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == dest && msg.Executed
 	})
 
 	// Build executed ranges
 	var ranges []cciptypes.SeqNumRange
 	var currentRange *cciptypes.SeqNumRange
 	for _, msg := range filtered {
-		if currentRange != nil && currentRange.End()+1 == msg.SeqNum {
+		if currentRange != nil && currentRange.End()+1 == msg.Header.SequenceNumber {
 			// expand current range
-			currentRange.SetEnd(msg.SeqNum)
+			currentRange.SetEnd(msg.Header.SequenceNumber)
 		} else {
 			if currentRange != nil {
 				ranges = append(ranges, *currentRange)
 			}
 			// initialize new range and add it to the list
-			newRange := cciptypes.NewSeqNumRange(msg.SeqNum, msg.SeqNum)
+			newRange := cciptypes.NewSeqNumRange(msg.Header.SequenceNumber, msg.Header.SequenceNumber)
 			currentRange = &newRange
 		}
 	}
@@ -73,7 +76,7 @@ func (r InMemoryCCIPReader) ExecutedMessageRanges(
 
 func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 	_ context.Context, chain cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
-) ([]cciptypes.CCIPMsg, error) {
+) ([]cciptypes.Message, error) {
 	msgs, ok := r.Messages[chain]
 	if !ok {
 		// no messages for chain
@@ -81,10 +84,10 @@ func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 	}
 
 	filtered := slicelib.Filter(msgs, func(msg MessagesWithMetadata) bool {
-		return seqNumRange.Contains(msg.SeqNum) && msg.Destination == r.Dest
+		return seqNumRange.Contains(msg.Header.SequenceNumber) && msg.Destination == r.Dest
 	})
-	return slicelib.Map(filtered, func(msg MessagesWithMetadata) cciptypes.CCIPMsg {
-		return msg.CCIPMsg
+	return slicelib.Map(filtered, func(msg MessagesWithMetadata) cciptypes.Message {
+		return msg.Message
 	}), nil
 }
 
@@ -104,5 +107,11 @@ func (r InMemoryCCIPReader) Close(ctx context.Context) error {
 	return nil
 }
 
+// Sync can be used to perform frequent syncing operations inside the reader implementation.
+// Returns a bool indicating whether something was updated.
+func (r InMemoryCCIPReader) Sync(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
 // Interface compatibility check.
-var _ cciptypes.CCIPReader = InMemoryCCIPReader{}
+var _ reader.CCIP = InMemoryCCIPReader{}
