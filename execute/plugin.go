@@ -79,12 +79,6 @@ func getPendingExecutedReports(
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	// TODO: this could be more efficient. reports is also traversed in 'filterOutExecutedMessages' function.
-	for _, report := range commitReports {
-		if report.Timestamp.After(latestReportTS) {
-			latestReportTS = report.Timestamp
-		}
-	}
 
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
@@ -137,9 +131,15 @@ func getPendingExecutedReports(
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
-	previousOutcome, err := plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
-	if err != nil {
-		return types.Observation{}, err
+	var err error
+	var previousOutcome plugintypes.ExecutePluginOutcome
+
+	if outctx.PreviousOutcome != nil {
+		previousOutcome, err = cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+		previousOutcome, err := plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+		if err != nil {
+			return types.Observation{}, err
+		}
 	}
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
@@ -325,9 +325,20 @@ func buildSingleChainReport(
 		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
 	}
-	numMsgs := len(report.Messages)
+
+	// Verify merkle root.
+	hash := tree.Root()
+	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
+		// For testing purposees, we allow a sentinel root to be used.
+		if report.MerkleRoot.String() != SentinelRoot {
+			actualStr := "0x" + hex.EncodeToString(hash[:])
+			return cciptypes.ExecutePluginReportSingleChain{}, 0,
+				fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
+		}
+	}
 
 	// Iterate sequence range and executed messages to select messages to execute.
+	numMsgs := len(report.Messages)
 	var toExecute []int
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.Message
@@ -360,16 +371,6 @@ func buildSingleChainReport(
 			offchainTokenData = append(offchainTokenData, tokenData)
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
-		}
-	}
-
-	hash := tree.Root()
-	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
-		// For testing purposees, we allow a sentinel root to be used.
-		if report.MerkleRoot.String() != SentinelRoot {
-			actualStr := "0x" + hex.EncodeToString(hash[:])
-			return cciptypes.ExecutePluginReportSingleChain{}, 0,
-				fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 		}
 	}
 
