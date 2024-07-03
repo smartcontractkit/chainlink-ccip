@@ -51,6 +51,11 @@ func (r CCIPReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelec
 	return args.Get(0).([]cciptypes.BigInt), args.Error(1)
 }
 
+func (r CCIPReader) Sync(ctx context.Context) (bool, error) {
+	args := r.Called(ctx)
+	return args.Bool(0), args.Error(1)
+}
+
 func (r CCIPReader) Close(ctx context.Context) error {
 	args := r.Called(ctx)
 	return args.Error(0)

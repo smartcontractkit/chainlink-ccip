@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -626,6 +628,40 @@ func validateMerkleRootsState(
 	}
 
 	return true, nil
+}
+
+func backgroundReaderSync(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	lggr logger.Logger,
+	reader cciptypes.CCIPReader,
+	syncTimeout time.Duration,
+	ticker <-chan time.Time,
+) {
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				wg.Done()
+				return
+			case <-ticker:
+				timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
+				updated, err := reader.Sync(timeoutCtx)
+				if err != nil {
+					lggr.Errorw("error syncing reader", "err", err)
+					cf()
+					continue
+				}
+
+				if !updated {
+					lggr.Debug("no updates found after trying to sync")
+				} else {
+					lggr.Info("ccip reader sync success")
+				}
+				cf()
+			}
+		}
+	}()
 }
 
 type observedMsgsConsensus struct {
