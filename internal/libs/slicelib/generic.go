@@ -41,3 +41,11 @@ func Filter[T any](slice []T, valid func(T) bool) []T {
 	}
 	return res
 }
+
+func Map[T any, T2 any](slice []T, mapper func(T) T2) []T2 {
+	res := make([]T2, len(slice))
+	for i, item := range slice {
+		res[i] = mapper(item)
+	}
+	return res
+}
