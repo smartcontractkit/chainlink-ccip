@@ -10,5 +10,5 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 source "${repo_root}/scripts/lib/shared_functions.sh"
 
 if ! check_namespace_prefix "${DEVSPACE_NAMESPACE}"; then
-  exit 1
+	exit 1
 fi
