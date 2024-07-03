@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -23,7 +24,7 @@ func TestPlugin(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 
-	nodeSetups := setupSimpleTest(ctx, t, lggr, 1)
+	nodeSetups := setupSimpleTest(ctx, t, lggr, 1, 2)
 	//runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, o)
 
 	nodesSetup := nodeSetups
@@ -67,17 +68,71 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 		lggr,
 		// to prevent linting error because of logging after finishing tests, we close the poller after each test, having
 		// lower polling interval make it catch up faster
-		10*time.Millisecond,
+		time.Minute,
 	)
 
 	return homeChain
 }
 
-func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, selector cciptypes.ChainSelector) []nodeSetup {
-	cfg := pluginconfig.ExecutePluginConfig{}
+func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed bool) mocks.MessagesWithMetadata {
+	return mocks.MessagesWithMetadata{
+		Message: cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				SequenceNumber: seqNum,
+			},
+		},
+		Destination: dest,
+		Executed:    executed,
+	}
+}
+
+func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) []nodeSetup {
+	// Initialize reader with some data
+	ccipReader := mocks.InMemoryCCIPReader{
+		Dest: dstSelector,
+		Reports: []plugintypes.CommitPluginReportWithMeta{
+			{
+				Report: cciptypes.CommitPluginReport{
+					MerkleRoots: []cciptypes.MerkleRootChain{
+						{
+							ChainSel:     srcSelector,
+							SeqNumsRange: cciptypes.NewSeqNumRange(100, 105),
+							//MerkleRoot:   [],
+						},
+					},
+				},
+				BlockNum:  1000,
+				Timestamp: time.Now().Add(-4 * time.Hour),
+			},
+		},
+		Messages: map[cciptypes.ChainSelector][]mocks.MessagesWithMetadata{
+			srcSelector: {
+				makeMsg(100, dstSelector, true),
+				makeMsg(101, dstSelector, true),
+				makeMsg(102, dstSelector, false),
+				makeMsg(103, dstSelector, false),
+				makeMsg(104, dstSelector, false),
+				makeMsg(105, dstSelector, false),
+			},
+		},
+	}
+
+	cfg := pluginconfig.ExecutePluginConfig{
+		MessageVisibilityInterval: 8 * time.Hour,
+		DestChain:                 dstSelector,
+	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
-			ChainSelector: selector,
+			ChainSelector: srcSelector,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: []byte{0},
+			},
+		}, {
+			ChainSelector: dstSelector,
 			ChainConfig: reader.HomeChainConfigMapper{
 				FChain: 1,
 				Readers: []libocrtypes.PeerID{
@@ -92,12 +147,6 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, sele
 	err := homeChain.Start(ctx)
 	if err != nil {
 		return nil
-	}
-
-	ccipReader := mocks.InMemoryCCIPReader{
-		Reports:  nil,
-		Messages: nil,
-		Dest:     0,
 	}
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
