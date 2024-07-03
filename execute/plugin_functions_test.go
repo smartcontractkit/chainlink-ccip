@@ -4,82 +4,57 @@ import (
 	"fmt"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/assert"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	tests := []struct {
-		name         string
-		observer     commontypes.OracleID
-		observerCfg  map[commontypes.OracleID]pluginconfig.ObserverInfo
+		name string
+		//observerCfg  map[commontypes.OracleID]cciptypes.ObserverInfo
+		observerCfg  mapset.Set[cciptypes.ChainSelector]
 		observedMsgs plugintypes.ExecutePluginMessageObservations
 		expErr       string
 	}{
 		{
-			name:     "ValidObserverAndMessages",
-			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
-				1: {Reads: []cciptypes.ChainSelector{1, 2}},
-			},
+			name:        "ValidObserverAndMessages",
+			observerCfg: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {1: {}, 2: {}},
 				2: {},
 			},
 		},
 		{
-			name:     "ObserverNotFound",
-			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
-				2: {Reads: []cciptypes.ChainSelector{1, 2}},
-			},
-			observedMsgs: plugintypes.ExecutePluginMessageObservations{
-				1: {1: {}, 2: {}},
-			},
-			expErr: "observer not found in config",
-		},
-		{
-			name:     "ObserverNotAllowedToReadChain",
-			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
-				1: {Reads: []cciptypes.ChainSelector{1}},
-			},
+			name:        "ObserverNotAllowedToReadChain",
+			observerCfg: mapset.NewSet(cciptypes.ChainSelector(1)),
 			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				2: {1: {}},
 			},
 			expErr: "observer not allowed to read from chain 2",
 		},
 		{
-			name:     "NoMessagesObserved",
-			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
-				1: {Reads: []cciptypes.ChainSelector{1, 2}},
-			},
+			name:         "NoMessagesObserved",
+			observerCfg:  mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 			observedMsgs: plugintypes.ExecutePluginMessageObservations{},
 		},
 		{
-			name:     "EmptyMessagesInChain",
-			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
-				1: {Reads: []cciptypes.ChainSelector{1, 2}},
-			},
+			name:        "EmptyMessagesInChain",
+			observerCfg: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {},
 				2: {1: {}, 2: {}},
 			},
 		},
 		{
-			name:     "AllMessagesEmpty",
-			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
-				1: {Reads: []cciptypes.ChainSelector{1, 2}},
-			},
+			name:        "AllMessagesEmpty",
+			observerCfg: mapset.NewSet(cciptypes.ChainSelector(1), cciptypes.ChainSelector(2)),
 			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {},
 				2: {},
@@ -89,7 +64,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObserverReadingEligibility(tc.observer, tc.observerCfg, tc.observedMsgs)
+			err := validateObserverReadingEligibility(tc.observerCfg, tc.observedMsgs)
 			if len(tc.expErr) != 0 {
 				assert.Error(t, err)
 				assert.ErrorContains(t, err, tc.expErr)

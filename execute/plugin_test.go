@@ -231,7 +231,6 @@ func makeTestCommitReport(
 		},
 		Messages: messages,
 	}
-
 }
 
 // assertMerkleRoot computes the source messages merkle root, then computes a verification with the proof, then compares

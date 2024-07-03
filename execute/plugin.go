@@ -142,8 +142,7 @@ func (p *Plugin) Observation(
 	var previousOutcome plugintypes.ExecutePluginOutcome
 
 	if outctx.PreviousOutcome != nil {
-		previousOutcome, err = cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
-		previousOutcome, err := plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+		previousOutcome, err = plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
 		if err != nil {
 			return types.Observation{}, err
 		}
@@ -151,7 +150,7 @@ func (p *Plugin) Observation(
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
-	var groupedCommits cciptypes.ExecutePluginCommitObservations
+	var groupedCommits plugintypes.ExecutePluginCommitObservations
 	supportsDest, err := p.supportsDestChain()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
@@ -164,7 +163,9 @@ func (p *Plugin) Observation(
 			return types.Observation{}, err
 		}
 		// Update timestamp to the last report.
-		p.lastReportTS.Store(latestReportTS.UnixMilli())
+		if len(groupedCommits) > 0 {
+			p.lastReportTS.Store(latestReportTS.UnixMilli())
+		}
 
 		// TODO: truncate grouped commits to a maximum observation size.
 		//       Cache everything which is not executed.
@@ -218,7 +219,12 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("decode observation: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(p.reportingCfg.OracleID, p.cfg.ObserverInfo, decodedObservation.Messages)
+	supportedChains, err := p.supportedChainsForOracle(ao.Observer)
+	if err != nil {
+		return fmt.Errorf("error finding supported chains by node: %w", err)
+	}
+
+	err = validateObserverReadingEligibility(supportedChains, decodedObservation.Messages)
 	if err != nil {
 		return fmt.Errorf("validate observer reading eligibility: %w", err)
 	}
@@ -502,12 +508,17 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
 
-	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, p.cfg.FChain)
+	fChain, err := p.homeChain.GetFChain()
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
+	}
+
+	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
-	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, p.cfg.FChain)
+	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
@@ -587,7 +598,11 @@ func (p *Plugin) Close() error {
 }
 
 func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) {
-	p2pID, exists := p.oracleIDToP2pID[p.reportingCfg.OracleID]
+	return p.supportedChainsForOracle(p.reportingCfg.OracleID)
+}
+
+func (p *Plugin) supportedChainsForOracle(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
+	p2pID, exists := p.oracleIDToP2pID[id]
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.reportingCfg.OracleID)
 	}
