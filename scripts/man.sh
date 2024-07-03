@@ -10,129 +10,129 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 case "${1:-}" in
-    ingress-hosts)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       ingress-hosts${NC} - List Kubernetes ingress hostnames in the namespace"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+ingress-hosts)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       ingress-hosts${NC} - List Kubernetes ingress hostnames in the namespace"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-        This command lists the Kubernetes ingress hostnames in the specified CRIB environment/namespace.
-        Please note that these hostnames are accessible only over VPN.
+		        This command lists the Kubernetes ingress hostnames in the specified CRIB environment/namespace.
+		        Please note that these hostnames are accessible only over VPN.
 
-SYNOPSIS
-        -> devspace run ingress-hosts
+		SYNOPSIS
+		        -> devspace run ingress-hosts
 
-EOF
-        ;;
-    connect)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       connect${NC} - Expose Kubernetes services for local development"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+connect)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       connect${NC} - Expose Kubernetes services for local development"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-        Exposes Kubernetes services for local development. In order to use this command you would need
-        to install https://github.com/txn2/kubefwd tool. You can install it by running the following command:
+		        Exposes Kubernetes services for local development. In order to use this command you would need
+		        to install https://github.com/txn2/kubefwd tool. You can install it by running the following command:
 
-            -> "brew install txn2/tap/kubefwd"
+		            -> "brew install txn2/tap/kubefwd"
 
-SYNOPSIS
-        -> devspace run connect
+		SYNOPSIS
+		        -> devspace run connect
 
-EOF
-        ;;
-    ttl)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       ttl${NC} - Configure TTL for devspace resource cleanup"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+ttl)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       ttl${NC} - Configure TTL for devspace resource cleanup"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-        This command configures the TTL for devspace resource cleanup in the specified namespace. The default TTL is 72 hours.
+		        This command configures the TTL for devspace resource cleanup in the specified namespace. The default TTL is 72 hours.
 
-SYNOPSIS
-        -> devspace run ttl <NAMESPACE-NAME> <TTL>
+		SYNOPSIS
+		        -> devspace run ttl <NAMESPACE-NAME> <TTL>
 
-        Example:
-            -> devspace run ttl crib-test 48h
+		        Example:
+		            -> devspace run ttl crib-test 48h
 
-EOF
-        ;;
-    workload)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       workload${NC} - Run workload"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+workload)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       workload${NC} - Run workload"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-       This command runs the workload.
+		       This command runs the workload.
 
-SYNOPSIS
-        -> devspace runworkload
+		SYNOPSIS
+		        -> devspace runworkload
 
-EOF
-        ;;
-    dashboard-deploy)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       dashboard-deploy${NC} - Deploy dashboards"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+dashboard-deploy)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       dashboard-deploy${NC} - Deploy dashboards"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-       This command deploys dashboards.
+		       This command deploys dashboards.
 
-SYNOPSIS
-        -> devspace run dashboard-deploy
+		SYNOPSIS
+		        -> devspace run dashboard-deploy
 
-EOF
-        ;;
-    dashboard-test)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       dashboard-test${NC} - Run tests"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+dashboard-test)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       dashboard-test${NC} - Run tests"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-SYNOPSIS
-        -> devspace run dashboard-test
+		SYNOPSIS
+		        -> devspace run dashboard-test
 
-EOF
-        ;;
-    get_test_input)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       get_test_input${NC} - Download the testInput.toml file from the S3 bucket"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+get_test_input)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       get_test_input${NC} - Download the testInput.toml file from the S3 bucket"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-        This command downloads the testInput.toml file from the S3 bucket, which is generated by
-        https://github.com/smartcontractkit/ccip-scripts jobs. It uses the CRIB namespace as the
-        S3 object path to prevent overwriting input files between users.
+		        This command downloads the testInput.toml file from the S3 bucket, which is generated by
+		        https://github.com/smartcontractkit/ccip-scripts jobs. It uses the CRIB namespace as the
+		        S3 object path to prevent overwriting input files between users.
 
-        The file containing test data can be fetched from AWS using the devspace command::
+		        The file containing test data can be fetched from AWS using the devspace command::
 
-            -> devspace run get_test_input
+		            -> devspace run get_test_input
 
-        Now you are all set to run the tests. You can use the make commands in the ccip repo to run them.
-        For the full list of available commands, please see the Makefile:
-        https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/Makefile
+		        Now you are all set to run the tests. You can use the make commands in the ccip repo to run them.
+		        For the full list of available commands, please see the Makefile:
+		        https://github.com/smartcontractkit/ccip/blob/ccip-develop/integration-tests/ccip-tests/Makefile
 
-SYNOPSIS
-        -> devspace run get_test_input
+		SYNOPSIS
+		        -> devspace run get_test_input
 
-EOF
-        ;;
-    man)
-        echo -e "\n${GREEN}NAME${NC}"
-        echo -e "${RED}       man${NC} - Display man pages"
-        echo -e "\n${YELLOW}DESCRIPTION${NC}"
-        cat <<-EOF
+	EOF
+	;;
+man)
+	echo -e "\n${GREEN}NAME${NC}"
+	echo -e "${RED}       man${NC} - Display man pages"
+	echo -e "\n${YELLOW}DESCRIPTION${NC}"
+	cat <<-EOF
 
-        This command displays man pages.
+		        This command displays man pages.
 
-SYNOPSIS
-        -> devspace run man
+		SYNOPSIS
+		        -> devspace run man
 
-EOF
-        ;;
-    "")
+	EOF
+	;;
+"")
 
-# Print useful output for user
-echo -e "${BLUE}
+	# Print useful output for user
+	echo -e "${BLUE}
      %########%
      %###########%       ____                 _____
          %#########%    |  _ \   ___ __   __ / ___/  ____    ____   ____ ___
@@ -142,21 +142,21 @@ echo -e "${BLUE}
  %###############%                                  |_|
  %###########%${NC}"
 
-        echo -e "\n${GREEN}The table below shows all available commands in the namespace::${NC}\n"
-        devspace list commands
+	echo -e "\n${GREEN}The table below shows all available commands in the namespace::${NC}\n"
+	devspace list commands
 
-        echo -e "${BLUE} All devspace commands can be executed by running: ${NC}"
-        echo -e "\n     -> ${RED}devspace run <COMMAND-NAME> ${NC}\n"
-        echo -e "${GREEN}To get more details about a specific command, display man pages by executing:${NC}"
-        echo -e "\n     -> ${RED}devspace run man <COMMAND-NAME>${NC}\n"
+	echo -e "${BLUE} All devspace commands can be executed by running: ${NC}"
+	echo -e "\n     -> ${RED}devspace run <COMMAND-NAME> ${NC}\n"
+	echo -e "${GREEN}To get more details about a specific command, display man pages by executing:${NC}"
+	echo -e "\n     -> ${RED}devspace run man <COMMAND-NAME>${NC}\n"
 
-        echo -e "\n${BLUE}Default environment variables are configured in the devspace.yaml file under the vars value."
-        echo -e "${BLUE}You should use an .env file to create overrides if needed. The full list of environment"
-        echo -e "${BLUE}variables with their values can be displayed using the following command:\n"
-        echo -e "\n     -> ${RED}devspace list vars${NC}\n"
-        ;;
-    *)
-        echo -e "\n${RED}   A man page for provided command not found, available commands:${NC}\n"
-        devspace list commands
-        ;;
+	echo -e "\n${BLUE}Default environment variables are configured in the devspace.yaml file under the vars value."
+	echo -e "${BLUE}You should use an .env file to create overrides if needed. The full list of environment"
+	echo -e "${BLUE}variables with their values can be displayed using the following command:\n"
+	echo -e "\n     -> ${RED}devspace list vars${NC}\n"
+	;;
+*)
+	echo -e "\n${RED}   A man page for provided command not found, available commands:${NC}\n"
+	devspace list commands
+	;;
 esac

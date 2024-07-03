@@ -1,5 +1,5 @@
 #!/bin/bash
-set +e  # Continue on errors
+set +e # Continue on errors
 
 COLOR_BLUE="\033[0;94m"
 COLOR_GREEN="\033[0;92m"
