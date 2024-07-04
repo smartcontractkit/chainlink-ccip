@@ -8,6 +8,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
@@ -35,7 +37,7 @@ func (p PluginFactoryConstructor) NewReportingPluginFactory(
 	keyValueStore core.KeyValueStore,
 	relayerSet core.RelayerSet,
 ) (core.OCR3ReportingPluginFactory, error) {
-	return NewPluginFactory(), nil
+	return nil, nil
 }
 
 func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
@@ -43,33 +45,63 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 }
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
-type PluginFactory struct{}
+type PluginFactory struct {
+	lggr            logger.Logger
+	ocrConfig       reader.OCR3ConfigWithMeta
+	commitCodec     cciptypes.CommitPluginCodec
+	msgHasher       cciptypes.MessageHasher
+	homeChainReader reader.HomeChain
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+}
 
-func NewPluginFactory() *PluginFactory {
-	return &PluginFactory{}
+func NewPluginFactory(
+	lggr logger.Logger,
+	ocrConfig reader.OCR3ConfigWithMeta,
+	commitCodec cciptypes.CommitPluginCodec,
+	msgHasher cciptypes.MessageHasher,
+	homeChainReader reader.HomeChain,
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+) *PluginFactory {
+	return &PluginFactory{
+		lggr:            lggr,
+		ocrConfig:       ocrConfig,
+		commitCodec:     commitCodec,
+		msgHasher:       msgHasher,
+		homeChainReader: homeChainReader,
+		contractReaders: contractReaders,
+	}
 }
 
 func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	// TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON
-	var oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
+	var oracleIDToP2pID = make(map[commontypes.OracleID]libocrtypes.PeerID)
+	for i, p2pID := range p.ocrConfig.Config.P2PIds {
+		oracleIDToP2pID[commontypes.OracleID(i)] = p2pID
+	}
+
 	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
 		reader.TokenPriceConfig{ // TODO: Inject config
 			StaticPrices: map[ocr2types.Account]big.Int{},
 		},
 		nil, // TODO: Inject this
 	)
+	ccipReader := reader.NewCCIPChainReader(
+		p.contractReaders,
+		map[cciptypes.ChainSelector]types.ChainWriter{}, // TODO: pass in chain writers
+		p.ocrConfig.Config.ChainSelector,
+	)
 	return NewPlugin(
 		context.Background(),
 		config.OracleID,
 		oracleIDToP2pID,
 		cciptypes.CommitPluginConfig{},
-		nil, //ccipReader
+		ccipReader,
 		onChainTokenPricesReader,
-		nil, //reportCodec
-		nil, //msgHasher
-		nil, // lggr
-		nil, //homeChain
+		p.commitCodec,
+		p.msgHasher,
+		p.lggr,
+		p.homeChainReader,
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 
