@@ -14,6 +14,7 @@ chainlink:
       AllowOrigins = '*'
       SecureCookies = false
       SessionTimeout = '999h0m0s'
+      HTTPWriteTimeout = '1m'
       [Feature]
       FeedsManager = true
       LogPoller = true
@@ -36,33 +37,12 @@ chainlink:
       Name = 'geth'
       WSURL = 'ws://geth-1337:8546'
       HTTPURL = 'http://geth-1337:8544'
-      [WebServer.TLS]
-      HTTPSPort = 0
-
-    overridesToml: |-
-
-      [WebServer]
-      AllowOrigins = '*'
-      HTTPPort = 6688
-      SecureCookies = false
-      HTTPWriteTimeout = '1m'
-
       [WebServer.RateLimit]
       Authenticated = 2000
       Unauthenticated = 1000
-
       [WebServer.TLS]
       HTTPSPort = 0
-
       [Database]
       MaxIdleConns = 50
       MaxOpenConns = 50
       MigrateOnStartup = true
-
-      [P2P]
-      [P2P.V2]
-      Enabled = true
-      ListenAddresses = ['0.0.0.0:6690']
-      AnnounceAddresses = ['0.0.0.0:6690']
-      DeltaDial = '500ms'
-      DeltaReconcile = '5s'

@@ -4,3 +4,4 @@ Store helm values files for different [DevSpace profiles](https://www.devspace.s
 
 ## list of presets
 `values-dev-simulated-core-ocr1.yaml` - 1+4 minimal cluster with OCRv1 (p2pV2) settings
+`values-dev-core-ocr2-external-network.yaml` - OCRv2 (p2pV2) for external network, no default Geth deployment
