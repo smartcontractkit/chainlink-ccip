@@ -408,8 +408,11 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 		mock.Anything,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetAllChainConfigs,
-		mock.Anything,
-		mock.Anything,
+		mock.MatchedBy(func(input map[string]interface{}) bool {
+			_, pageIndexExists := input["pageIndex"]
+			_, pageSizeExists := input["pageSize"]
+			return pageIndexExists && pageSizeExists
+		}),
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {

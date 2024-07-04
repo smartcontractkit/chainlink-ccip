@@ -115,24 +115,39 @@ func (r *homeChainPoller) poll() {
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	var chainConfigInfos []ChainConfigInfo
-	err := r.homeChainReader.GetLatestValue(
-		ctx,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
-		primitives.Unconfirmed,
-		nil,
-		&chainConfigInfos,
-	)
-	if err != nil {
-		return err
+	var allChainConfigInfos []ChainConfigInfo
+	pageIndex := uint64(0)
+	pageSize := uint64(500)
+
+	for {
+		var chainConfigInfos []ChainConfigInfo
+		err := r.homeChainReader.GetLatestValue(
+			ctx,
+			"CCIPConfig",
+			"getAllChainConfigs",
+			primitives.Unconfirmed,
+			map[string]interface{}{
+				"pageIndex": pageIndex,
+				"pageSize":  pageSize,
+			},
+			&chainConfigInfos,
+		)
+		if err != nil {
+			return err
+		}
+		if len(chainConfigInfos) == 0 {
+			break
+		}
+		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
+		pageIndex++
 	}
-	if len(chainConfigInfos) == 0 {
+
+	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	r.setState(convertOnChainConfigToHomeChainConfig(chainConfigInfos))
+	r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
 	return nil
 }
 
