@@ -14,7 +14,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	helpers "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
@@ -43,7 +43,7 @@ func TestPlugin(t *testing.T) {
 			name:        "EmptyOutcome",
 			description: "Empty observations are returned by all nodes which leads to an empty outcome.",
 			nodes:       setupEmptyOutcome(ctx, t, lggr),
-			expErr:      func(t *testing.T, err error) { assert.Equal(t, testhelpers.ErrEmptyOutcome, err) },
+			expErr:      func(t *testing.T, err error) { assert.Equal(t, helpers.ErrEmptyOutcome, err) },
 		},
 		{
 			name: "AllNodesReadAllChains",
@@ -183,7 +183,7 @@ func TestPlugin(t *testing.T) {
 			}
 			o, err := tc.initialOutcome.Encode()
 			require.NoError(t, err)
-			runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, o)
+			runner := helpers.NewOCR3Runner(nodes, nodeIDs, o)
 
 			res, err := runner.RunRound(ctx)
 			if tc.expErr != nil {
@@ -222,33 +222,14 @@ func TestPlugin(t *testing.T) {
 }
 
 func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainC, pIDs_1_2_3, fChainOne, cfgC),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, homeChain.Start(ctx))
 
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodes := []nodeSetup{
 		newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID),
 		newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID),
@@ -264,66 +245,26 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		).Return([]cciptypes.SeqNum{}, nil)
 	}
 
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
 func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainA,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainB,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainA, pIDs_1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs_1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(chainC, pIDs_1_2_3, fChainOne, cfgC),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
-	nodes := []nodeSetup{n1, n2, n3}
+	require.NoError(t, homeChain.Start(ctx))
 
-	for _, n := range nodes {
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
+
+	var nodes []nodeSetup
+	for i := 1; i <= 3; i++ {
+		n := newNode(ctx, t, lggr, i, cfg, homeChain, oracleIDToP2pID)
+		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
 		n.ccipReader.On(
 			"MsgsBetweenSeqNums",
@@ -365,69 +306,25 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
 			Return([]cciptypes.SeqNum{20}, nil)
 	}
-
-	// No need to keep it running in the background anymore for this test
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
-
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
 func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainA,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainB,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainA, pIDs_1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs_1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(chainC, pIDs_1_2_3, fChainOne, cfgB),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
-	nodes := []nodeSetup{n1, n2, n3}
+	require.NoError(t, homeChain.Start(ctx))
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
 
-	for i, n := range nodes {
+	var nodes []nodeSetup
+	for i := 1; i <= 3; i++ {
+		n := newNode(ctx, t, lggr, i, cfg, homeChain, oracleIDToP2pID)
+		nodes = append(nodes, n)
 		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
 			Return([]cciptypes.SeqNum{10, 20}, nil)
@@ -469,68 +366,26 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 			}, nil)
 	}
 
-	// No need to keep it running in the background anymore for this test
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
-
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
 func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainA,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainB,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainA, pIDs_1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs_1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(chainC, pIDs_1_2_3, fChainOne, cfgB),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
-	nodes := []nodeSetup{n1, n2, n3}
+	require.NoError(t, homeChain.Start(ctx))
 
-	for _, n := range nodes {
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
+
+	var nodes []nodeSetup
+	for i := 1; i <= 3; i++ {
+		n := newNode(ctx, t, lggr, i, cfg, homeChain, oracleIDToP2pID)
+		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
 		n.ccipReader.On(
 			"MsgsBetweenSeqNums",
@@ -568,12 +423,7 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 			Return([]cciptypes.SeqNum{20}, nil)
 	}
 
-	// No need to keep it running in the background anymore for this test
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
-
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
@@ -641,18 +491,24 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 
 	return homeChain
 }
-func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
-	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
-	for _, id := range ids {
-		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
-	}
-	return res
-}
 
 var (
-	chainA = cciptypes.ChainSelector(1)
-	chainB = cciptypes.ChainSelector(2)
-	chainC = cciptypes.ChainSelector(3)
+	chainA    = cciptypes.ChainSelector(1)
+	chainB    = cciptypes.ChainSelector(2)
+	chainC    = cciptypes.ChainSelector(3)
+	cfgA      = []byte("ChainA")
+	cfgB      = []byte("ChainB")
+	cfgC      = []byte("ChainC")
+	fChainOne = uint8(1)
 
-	tokenX = types.Account("tk_xxx")
+	pIDs_1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
+	pIDs_1_2   = []libocrtypes.PeerID{{1}, {2}}
+	pID_1      = []libocrtypes.PeerID{{1}}
+	tokenX     = types.Account("tk_xxx")
+	cfg        = cciptypes.CommitPluginConfig{
+		DestChain:           chainC,
+		PricedTokens:        []types.Account{tokenX},
+		TokenPricesObserver: false,
+		NewMsgScanBatchSize: 256,
+	}
 )
