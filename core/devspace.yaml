@@ -137,7 +137,7 @@ hooks:
     events: ["before:deploy:app"]
   - command: ./scripts/check_env_vars.sh
     events: ["before:deploy:app"]
-  - command: ./../scripts/manage_namespace.shg
+  - command: ./../scripts/manage_namespace.sh
     args: ["create"]
     events: ["before:deploy:app"]
   - wait:
