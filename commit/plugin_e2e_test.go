@@ -223,7 +223,7 @@ func TestPlugin(t *testing.T) {
 
 func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	chainConfigInfos := []reader.ChainConfigInfo{
-		helpers.SetupConfigInfo(destChain, pIDs_1_2_3, fChainOne, cfgC),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgC),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
@@ -251,9 +251,9 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 
 func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	chainConfigInfos := []reader.ChainConfigInfo{
-		helpers.SetupConfigInfo(chainA, pIDs_1_2_3, fChainOne, cfgA),
-		helpers.SetupConfigInfo(chainB, pIDs_1_2_3, fChainOne, cfgB),
-		helpers.SetupConfigInfo(destChain, pIDs_1_2_3, fChainOne, cfgC),
+		helpers.SetupConfigInfo(chainA, pIDs1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgC),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
@@ -286,9 +286,9 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 
 func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	chainConfigInfos := []reader.ChainConfigInfo{
-		helpers.SetupConfigInfo(chainA, pIDs_1_2_3, fChainOne, cfgA),
-		helpers.SetupConfigInfo(chainB, pIDs_1_2_3, fChainOne, cfgB),
-		helpers.SetupConfigInfo(destChain, pIDs_1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(chainA, pIDs1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgB),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
@@ -323,9 +323,9 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 
 func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
 	chainConfigInfos := []reader.ChainConfigInfo{
-		helpers.SetupConfigInfo(chainA, pIDs_1_2_3, fChainOne, cfgA),
-		helpers.SetupConfigInfo(chainB, pIDs_1_2_3, fChainOne, cfgB),
-		helpers.SetupConfigInfo(destChain, pIDs_1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(chainA, pIDs1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgB),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
@@ -470,10 +470,10 @@ var (
 	cfgC      = []byte("destChain")
 	fChainOne = uint8(1)
 
-	pIDs_1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
-	pIDs_1_2   = []libocrtypes.PeerID{{1}, {2}}
-	pIDs_1     = []libocrtypes.PeerID{{1}}
-	tokenX     = types.Account("tk_xxx")
+	pIDs1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
+	pIDs1_2   = []libocrtypes.PeerID{{1}, {2}}
+	pIDs1     = []libocrtypes.PeerID{{1}}
+	tokenX    = types.Account("tk_xxx")
 
 	destCfg = cciptypes.CommitPluginConfig{
 		DestChain:           destChain,
