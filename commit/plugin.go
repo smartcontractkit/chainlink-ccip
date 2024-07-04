@@ -39,6 +39,7 @@ type Plugin struct {
 
 	homeChain        reader.HomeChain
 	bgSyncCancelFunc context.CancelFunc
+	bgSyncWG         *sync.WaitGroup
 }
 
 func NewPlugin(
@@ -67,11 +68,11 @@ func NewPlugin(
 
 	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
 	p.bgSyncCancelFunc = bgSyncCf
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
+	p.bgSyncWG = &sync.WaitGroup{}
+	p.bgSyncWG.Add(1)
 	backgroundReaderSync(
 		bgSyncCtx,
-		wg,
+		p.bgSyncWG,
 		lggr,
 		ccipReader,
 		syncTimeout(cfg.SyncTimeout),
@@ -364,6 +365,7 @@ func (p *Plugin) Close() error {
 	}
 
 	p.bgSyncCancelFunc()
+	p.bgSyncWG.Wait()
 	return nil
 }
 

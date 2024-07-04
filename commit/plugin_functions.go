@@ -640,29 +640,42 @@ func backgroundReaderSync(
 	ticker <-chan time.Time,
 ) {
 	go func() {
+		defer wg.Done()
+
 		for {
 			select {
 			case <-ctx.Done():
-				wg.Done()
 				return
 			case <-ticker:
-				timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
-				updated, err := reader.Sync(timeoutCtx)
-				if err != nil {
-					lggr.Errorw("error syncing reader", "err", err)
-					cf()
-					continue
+				if err := syncReader(ctx, lggr, reader, syncTimeout); err != nil {
+					lggr.Errorw("runBackgroundReaderSync failed", "err", err)
 				}
-
-				if !updated {
-					lggr.Debug("no updates found after trying to sync")
-				} else {
-					lggr.Info("ccip reader sync success")
-				}
-				cf()
 			}
 		}
 	}()
+}
+
+func syncReader(
+	ctx context.Context,
+	lggr logger.Logger,
+	reader cciptypes.CCIPReader,
+	syncTimeout time.Duration,
+) error {
+	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
+	defer cf()
+
+	updated, err := reader.Sync(timeoutCtx)
+	if err != nil {
+		return err
+	}
+
+	if !updated {
+		lggr.Debug("no updates found after trying to sync")
+	} else {
+		lggr.Info("ccip reader sync success")
+	}
+
+	return nil
 }
 
 type observedMsgsConsensus struct {
