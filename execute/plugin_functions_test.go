@@ -4,27 +4,27 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	tests := []struct {
 		name         string
 		observer     commontypes.OracleID
-		observerCfg  map[commontypes.OracleID]cciptypes.ObserverInfo
+		observerCfg  map[commontypes.OracleID]pluginconfig.ObserverInfo
 		observedMsgs cciptypes.ExecutePluginMessageObservations
 		expErr       string
 	}{
 		{
 			name:     "ValidObserverAndMessages",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
 			observedMsgs: cciptypes.ExecutePluginMessageObservations{
@@ -35,7 +35,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "ObserverNotFound",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				2: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
 			observedMsgs: cciptypes.ExecutePluginMessageObservations{
@@ -46,7 +46,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "ObserverNotAllowedToReadChain",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1}},
 			},
 			observedMsgs: cciptypes.ExecutePluginMessageObservations{
@@ -57,7 +57,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "NoMessagesObserved",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
 			observedMsgs: cciptypes.ExecutePluginMessageObservations{},
@@ -65,7 +65,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "EmptyMessagesInChain",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
 			observedMsgs: cciptypes.ExecutePluginMessageObservations{
@@ -76,7 +76,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "AllMessagesEmpty",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
 			observedMsgs: cciptypes.ExecutePluginMessageObservations{

@@ -10,6 +10,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -29,7 +30,7 @@ import (
 type Plugin struct {
 	nodeID            commontypes.OracleID
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	cfg               cciptypes.CommitPluginConfig
+	cfg               pluginconfig.CommitPluginConfig
 	ccipReader        reader.CCIP
 	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
@@ -43,7 +44,7 @@ func NewPlugin(
 	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg cciptypes.CommitPluginConfig,
+	cfg pluginconfig.CommitPluginConfig,
 	ccipReader reader.CCIP,
 	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,

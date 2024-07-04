@@ -9,19 +9,21 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/crypto/sha3"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/validation"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
 	observer commontypes.OracleID,
-	observerCfg map[commontypes.OracleID]cciptypes.ObserverInfo,
+	observerCfg map[commontypes.OracleID]pluginconfig.ObserverInfo,
 	observedMsgs cciptypes.ExecutePluginMessageObservations,
 ) error {
 	observerInfo, exists := observerCfg[observer]

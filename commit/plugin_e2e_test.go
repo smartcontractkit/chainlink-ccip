@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -222,7 +223,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
+	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
@@ -272,7 +273,7 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 }
 
 func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
+	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
@@ -376,7 +377,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 }
 
 func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
+	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
@@ -479,7 +480,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 }
 
 func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
+	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:           chainC,
 		PricedTokens:        []types.Account{tokenX},
 		TokenPricesObserver: false,
@@ -590,7 +591,7 @@ func newNode(
 	_ *testing.T,
 	lggr logger.Logger,
 	id int,
-	cfg cciptypes.CommitPluginConfig,
+	cfg pluginconfig.CommitPluginConfig,
 	homeChain reader.HomeChain,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 ) nodeSetup {

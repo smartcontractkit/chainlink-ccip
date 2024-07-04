@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -30,7 +31,7 @@ const SentinelRoot = "0x289502ebf164ea87871e19cd9c8734016e954539fffc8c789ac4dadc
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	reportingCfg    ocr3types.ReportingPluginConfig
-	cfg             cciptypes.ExecutePluginConfig
+	cfg             pluginconfig.ExecutePluginConfig
 	ccipReader      reader.CCIP
 	reportCodec     cciptypes.ExecutePluginCodec
 	msgHasher       cciptypes.MessageHasher
@@ -43,7 +44,7 @@ type Plugin struct {
 
 func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
-	cfg cciptypes.ExecutePluginConfig,
+	cfg pluginconfig.ExecutePluginConfig,
 	ccipReader reader.CCIP,
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
