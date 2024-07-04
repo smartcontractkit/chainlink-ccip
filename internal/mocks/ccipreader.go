@@ -60,6 +60,3 @@ func (r CCIPReader) Close(ctx context.Context) error {
 	args := r.Called(ctx)
 	return args.Error(0)
 }
-
-// Interface compatibility check.
-var _ cciptypes.CCIPReader = (*CCIPReader)(nil)

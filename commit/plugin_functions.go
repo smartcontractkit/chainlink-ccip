@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -25,7 +26,7 @@ import (
 func observeLatestCommittedSeqNums(
 	ctx context.Context,
 	lggr logger.Logger,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 	knownSourceChains []cciptypes.ChainSelector,
@@ -55,7 +56,7 @@ func observeLatestCommittedSeqNums(
 func observeNewMsgs(
 	ctx context.Context,
 	lggr logger.Logger,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	msgHasher cciptypes.MessageHasher,
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	latestCommittedSeqNums []cciptypes.SeqNumChain,
@@ -140,7 +141,7 @@ func observeTokenPrices(
 
 func observeGasPrices(
 	ctx context.Context,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	chains []cciptypes.ChainSelector,
 ) ([]cciptypes.GasPriceChain, error) {
 	if len(chains) == 0 {
@@ -592,7 +593,7 @@ func validateMerkleRootsState(
 	ctx context.Context,
 	lggr logger.Logger,
 	report cciptypes.CommitPluginReport,
-	reader cciptypes.CCIPReader,
+	reader reader.CCIP,
 ) (bool, error) {
 	reportChains := make([]cciptypes.ChainSelector, 0)
 	reportMinSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
