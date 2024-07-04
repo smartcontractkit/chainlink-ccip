@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -23,7 +26,7 @@ import (
 func observeLatestCommittedSeqNums(
 	ctx context.Context,
 	lggr logger.Logger,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 	knownSourceChains []cciptypes.ChainSelector,
@@ -53,7 +56,7 @@ func observeLatestCommittedSeqNums(
 func observeNewMsgs(
 	ctx context.Context,
 	lggr logger.Logger,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	msgHasher cciptypes.MessageHasher,
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	latestCommittedSeqNums []cciptypes.SeqNumChain,
@@ -138,7 +141,7 @@ func observeTokenPrices(
 
 func observeGasPrices(
 	ctx context.Context,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	chains []cciptypes.ChainSelector,
 ) ([]cciptypes.GasPriceChain, error) {
 	if len(chains) == 0 {
@@ -590,7 +593,7 @@ func validateMerkleRootsState(
 	ctx context.Context,
 	lggr logger.Logger,
 	report cciptypes.CommitPluginReport,
-	reader cciptypes.CCIPReader,
+	reader reader.CCIP,
 ) (bool, error) {
 	reportChains := make([]cciptypes.ChainSelector, 0)
 	reportMinSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
@@ -626,6 +629,53 @@ func validateMerkleRootsState(
 	}
 
 	return true, nil
+}
+
+func backgroundReaderSync(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	lggr logger.Logger,
+	reader cciptypes.CCIPReader,
+	syncTimeout time.Duration,
+	ticker <-chan time.Time,
+) {
+	go func() {
+		defer wg.Done()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker:
+				if err := syncReader(ctx, lggr, reader, syncTimeout); err != nil {
+					lggr.Errorw("runBackgroundReaderSync failed", "err", err)
+				}
+			}
+		}
+	}()
+}
+
+func syncReader(
+	ctx context.Context,
+	lggr logger.Logger,
+	reader cciptypes.CCIPReader,
+	syncTimeout time.Duration,
+) error {
+	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
+	defer cf()
+
+	updated, err := reader.Sync(timeoutCtx)
+	if err != nil {
+		return err
+	}
+
+	if !updated {
+		lggr.Debug("no updates found after trying to sync")
+	} else {
+		lggr.Info("ccip reader sync success")
+	}
+
+	return nil
 }
 
 type observedMsgsConsensus struct {

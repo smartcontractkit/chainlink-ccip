@@ -6,12 +6,56 @@ import (
 	"fmt"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-	"golang.org/x/sync/errgroup"
 )
+
+type CCIP interface {
+	// CommitReportsGTETimestamp reads the requested chain starting at a given timestamp
+	// and finds all ReportAccepted up to the provided limit.
+	CommitReportsGTETimestamp(
+		ctx context.Context,
+		dest cciptypes.ChainSelector,
+		ts time.Time,
+		limit int,
+	) ([]cciptypes.CommitPluginReportWithMeta, error)
+
+	// ExecutedMessageRanges reads the destination chain and finds which messages are executed.
+	// A slice of sequence number ranges is returned to express which messages are executed.
+	ExecutedMessageRanges(
+		ctx context.Context,
+		source, dest cciptypes.ChainSelector,
+		seqNumRange cciptypes.SeqNumRange,
+	) ([]cciptypes.SeqNumRange, error)
+
+	// MsgsBetweenSeqNums reads the provided chains.
+	// Finds and returns ccip messages submitted between the provided sequence numbers.
+	// Messages are sorted ascending based on their timestamp and limited up to the provided limit.
+	MsgsBetweenSeqNums(
+		ctx context.Context,
+		chain cciptypes.ChainSelector,
+		seqNumRange cciptypes.SeqNumRange,
+	) ([]cciptypes.CCIPMsg, error)
+
+	// NextSeqNum reads the destination chain.
+	// Returns the next expected sequence number for each one of the provided chains.
+	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
+	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
+
+	// GasPrices reads the provided chains gas prices.
+	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)
+
+	// Sync can be used to perform frequent syncing operations inside the reader implementation.
+	// Returns a bool indicating whether something was updated.
+	Sync(ctx context.Context) (bool, error)
+
+	// Close closes any open resources.
+	Close(ctx context.Context) error
+}
 
 var (
 	ErrContractReaderNotFound = errors.New("contract reader not found")
@@ -169,6 +213,10 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 	return gasPrices, nil
 }
 
+func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
+	return false, nil
+}
+
 func (r *CCIPChainReader) Close(ctx context.Context) error {
 	return nil
 }
@@ -192,3 +240,6 @@ func (r *CCIPChainReader) validateWriterExistence(chains ...cciptypes.ChainSelec
 	}
 	return nil
 }
+
+// Interface compliance check
+var _ CCIP = (*CCIPChainReader)(nil)
