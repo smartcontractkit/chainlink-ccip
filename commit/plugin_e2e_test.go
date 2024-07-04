@@ -270,11 +270,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		// and there are two new message on chainB
 		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainB, seqNumB, chainBDefaultMsgs)
 
-		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.BigInt{
-				cciptypes.NewBigIntFromInt64(1000),
-				cciptypes.NewBigIntFromInt64(20_000),
-			}, nil)
+		mockGasPrices(n.ccipReader, ctx, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
 
 		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
@@ -318,11 +314,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		otherChainBMsgs[1].SeqNum = 22 + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
 		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainB, seqNumB, otherChainBMsgs)
 
-		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.BigInt{
-				cciptypes.NewBigIntFromInt64(1000),
-				cciptypes.NewBigIntFromInt64(20_000),
-			}, nil)
+		mockGasPrices(n.ccipReader, ctx, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
 	}
 
 	require.NoError(t, homeChain.Close())
@@ -429,6 +421,17 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 	return homeChain
 }
 
+// mockGasPrices mocks the gas prices for the given chains
+// the gas prices are returned in the same order as the chains
+func mockGasPrices(ccipReader *mocks.CCIPReader, ctx context.Context, chains []cciptypes.ChainSelector, gasPrices []int64) {
+	gasPricesBigInt := make([]cciptypes.BigInt, len(gasPrices))
+	for i, gp := range gasPrices {
+		gasPricesBigInt[i] = cciptypes.NewBigIntFromInt64(gp)
+	}
+
+	ccipReader.On("GasPrices", ctx, chains).
+		Return(gasPricesBigInt, nil)
+}
 func mockMsgsBetweenSeqNums(ccipReader *mocks.CCIPReader, ctx context.Context, chain cciptypes.ChainSelector, seqNum cciptypes.SeqNum, msgs []cciptypes.CCIPMsg) {
 	ccipReader.On(
 		"MsgsBetweenSeqNums",
@@ -469,7 +472,7 @@ var (
 
 	pIDs_1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
 	pIDs_1_2   = []libocrtypes.PeerID{{1}, {2}}
-	pID_1      = []libocrtypes.PeerID{{1}}
+	pIDs_1     = []libocrtypes.PeerID{{1}}
 	tokenX     = types.Account("tk_xxx")
 
 	destCfg = cciptypes.CommitPluginConfig{
