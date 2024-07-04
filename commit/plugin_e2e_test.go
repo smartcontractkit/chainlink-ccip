@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -36,9 +37,9 @@ func TestPlugin(t *testing.T) {
 		description           string
 		nodes                 []nodeSetup
 		expErr                func(*testing.T, error)
-		expOutcome            cciptypes.CommitPluginOutcome
+		expOutcome            plugintypes.CommitPluginOutcome
 		expTransmittedReports []cciptypes.CommitPluginReport
-		initialOutcome        cciptypes.CommitPluginOutcome
+		initialOutcome        plugintypes.CommitPluginOutcome
 	}{
 		{
 			name:        "EmptyOutcome",
@@ -51,8 +52,8 @@ func TestPlugin(t *testing.T) {
 			description: "Nodes observe the latest sequence numbers and new messages after those sequence numbers. " +
 				"They also observe gas prices. In this setup all nodes can read all chains.",
 			nodes: setupAllNodesReadAllChains(ctx, t, lggr),
-			expOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			expOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
@@ -79,8 +80,8 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			initialOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			initialOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
@@ -93,8 +94,8 @@ func TestPlugin(t *testing.T) {
 			name:        "NodesDoNotAgreeOnMsgs",
 			description: "Nodes do not agree on messages which leads to an outcome with empty merkle roots.",
 			nodes:       setupNodesDoNotAgreeOnMsgs(ctx, t, lggr),
-			expOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			expOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
@@ -117,8 +118,8 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			initialOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			initialOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
@@ -131,8 +132,8 @@ func TestPlugin(t *testing.T) {
 			name:        "NodesDoNotReportGasPrices",
 			description: "Nodes that don't have access to a contract writer do not submit gas price updates",
 			nodes:       setupNodesDoNotReportGasPrices(ctx, t, lggr),
-			expOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			expOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
@@ -153,8 +154,8 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			initialOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			initialOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: chainA, SeqNum: 10},
 					{ChainSel: chainB, SeqNum: 20},
 				},
@@ -193,8 +194,8 @@ func TestPlugin(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			if !reflect.DeepEqual(tc.expOutcome, cciptypes.CommitPluginOutcome{}) {
-				outcome, err := cciptypes.DecodeCommitPluginOutcome(res.Outcome)
+			if !reflect.DeepEqual(tc.expOutcome, plugintypes.CommitPluginOutcome{}) {
+				outcome, err := plugintypes.DecodeCommitPluginOutcome(res.Outcome)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expOutcome.TokenPrices, outcome.TokenPrices)
 				assert.Equal(t, tc.expOutcome.MaxSeqNums, outcome.MaxSeqNums)

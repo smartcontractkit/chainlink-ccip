@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -72,7 +73,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 func getPendingExecutedReports(
 	ctx context.Context, ccipReader reader.CCIP, dest cciptypes.ChainSelector, ts time.Time,
-) (cciptypes.ExecutePluginCommitObservations, time.Time, error) {
+) (plugintypes.ExecutePluginCommitObservations, time.Time, error) {
 	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
@@ -136,7 +137,7 @@ func getPendingExecutedReports(
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
-	previousOutcome, err := cciptypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+	previousOutcome, err := plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return types.Observation{}, err
 	}
@@ -144,7 +145,7 @@ func (p *Plugin) Observation(
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
 	ownConfig := p.cfg.ObserverInfo[p.reportingCfg.OracleID]
-	var groupedCommits cciptypes.ExecutePluginCommitObservations
+	var groupedCommits plugintypes.ExecutePluginCommitObservations
 	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
@@ -160,13 +161,13 @@ func (p *Plugin) Observation(
 	}
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
-	messages := make(cciptypes.ExecutePluginMessageObservations)
+	messages := make(plugintypes.ExecutePluginMessageObservations)
 	if len(previousOutcome.PendingCommitReports) == 0 {
 		fmt.Println("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages)
+		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
 		}
@@ -196,13 +197,13 @@ func (p *Plugin) Observation(
 
 	// TODO: Fire off messages for an attestation check service.
 
-	return cciptypes.NewExecutePluginObservation(groupedCommits, messages).Encode()
+	return plugintypes.NewExecutePluginObservation(groupedCommits, messages).Encode()
 }
 
 func (p *Plugin) ValidateObservation(
 	outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
-	decodedObservation, err := cciptypes.DecodeExecutePluginObservation(ao.Observation)
+	decodedObservation, err := plugintypes.DecodeExecutePluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode observation: %w", err)
 	}
@@ -238,15 +239,15 @@ func buildSingleChainReportMaxSize(
 	hasher cciptypes.MessageHasher,
 	tokenDataReader TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
-	report cciptypes.ExecutePluginCommitDataWithMessages,
+	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxSizeBytes int,
-) (cciptypes.ExecutePluginReportSingleChain, int, cciptypes.ExecutePluginCommitDataWithMessages, error) {
+) (cciptypes.ExecutePluginReportSingleChain, int, plugintypes.ExecutePluginCommitDataWithMessages, error) {
 	finalReport, encodedSize, err :=
 		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, 0)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			0,
-			cciptypes.ExecutePluginCommitDataWithMessages{},
+			plugintypes.ExecutePluginCommitDataWithMessages{},
 			fmt.Errorf("unable to build a single chain report (max): %w", err)
 	}
 
@@ -276,14 +277,14 @@ func buildSingleChainReportMaxSize(
 		return true // full
 	})
 	if searchErr != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, cciptypes.ExecutePluginCommitDataWithMessages{}, searchErr
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, plugintypes.ExecutePluginCommitDataWithMessages{}, searchErr
 	}
 
 	// No messages fit into the report.
 	if idx <= 0 {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			0,
-			cciptypes.ExecutePluginCommitDataWithMessages{},
+			plugintypes.ExecutePluginCommitDataWithMessages{},
 			errEmptyReport
 	}
 
@@ -304,7 +305,7 @@ func buildSingleChainReport(
 	hasher cciptypes.MessageHasher,
 	tokenDataReader TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
-	report cciptypes.ExecutePluginCommitDataWithMessages,
+	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxMessages int,
 ) (cciptypes.ExecutePluginReportSingleChain, int, error) {
 	// TODO: maxMessages selects messages in FIFO order which may not yield the optimal message size. One message with a
@@ -426,9 +427,9 @@ func selectReport(
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
 	tokenDataReader TokenDataReader,
-	reports []cciptypes.ExecutePluginCommitDataWithMessages,
+	reports []plugintypes.ExecutePluginCommitDataWithMessages,
 	maxReportSizeBytes int,
-) ([]cciptypes.ExecutePluginReportSingleChain, []cciptypes.ExecutePluginCommitDataWithMessages, error) {
+) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitDataWithMessages, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
@@ -500,12 +501,12 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, err
 	}
 
-	observation := cciptypes.NewExecutePluginObservation(
+	observation := plugintypes.NewExecutePluginObservation(
 		mergedCommitObservations,
 		mergedMessageObservations)
 
 	// flatten commit reports and sort by timestamp.
-	var commitReports []cciptypes.ExecutePluginCommitDataWithMessages
+	var commitReports []plugintypes.ExecutePluginCommitDataWithMessages
 	for _, report := range observation.CommitReports {
 		commitReports = append(commitReports, report...)
 	}
@@ -535,11 +536,11 @@ func (p *Plugin) Outcome(
 		ChainReports: outcomeReports,
 	}
 
-	return cciptypes.NewExecutePluginOutcome(commitReports, execReport).Encode()
+	return plugintypes.NewExecutePluginOutcome(commitReports, execReport).Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
-	decodedOutcome, err := cciptypes.DecodeExecutePluginOutcome(outcome)
+	decodedOutcome, err := plugintypes.DecodeExecutePluginOutcome(outcome)
 	if err != nil {
 		return nil, err
 	}

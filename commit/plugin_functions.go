@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -28,9 +29,9 @@ func observeLatestCommittedSeqNums(
 	readableChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 	knownSourceChains []cciptypes.ChainSelector,
-) ([]cciptypes.SeqNumChain, error) {
+) ([]plugintypes.SeqNumChain, error) {
 	sort.Slice(knownSourceChains, func(i, j int) bool { return knownSourceChains[i] < knownSourceChains[j] })
-	latestCommittedSeqNumsObservation := make([]cciptypes.SeqNumChain, 0)
+	latestCommittedSeqNumsObservation := make([]plugintypes.SeqNumChain, 0)
 	if readableChains.Contains(destChain) {
 		lggr.Debugw("reading latest committed sequence from destination")
 		onChainLatestCommittedSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
@@ -42,7 +43,7 @@ func observeLatestCommittedSeqNums(
 		for i, ch := range knownSourceChains {
 			latestCommittedSeqNumsObservation = append(
 				latestCommittedSeqNumsObservation,
-				cciptypes.NewSeqNumChain(ch, onChainLatestCommittedSeqNums[i]),
+				plugintypes.NewSeqNumChain(ch, onChainLatestCommittedSeqNums[i]),
 			)
 		}
 	}
@@ -57,7 +58,7 @@ func observeNewMsgs(
 	ccipReader reader.CCIP,
 	msgHasher cciptypes.MessageHasher,
 	readableChains mapset.Set[cciptypes.ChainSelector],
-	latestCommittedSeqNums []cciptypes.SeqNumChain,
+	latestCommittedSeqNums []plugintypes.SeqNumChain,
 	msgScanBatchSize int,
 ) ([]cciptypes.CCIPMsg, error) {
 	// Find the new msgs for each supported chain based on the discovered max sequence numbers.
@@ -168,8 +169,8 @@ func observeGasPrices(
 // for each source chain based on the consensus on the messages.
 func newMsgsConsensus(
 	lggr logger.Logger,
-	maxSeqNums []cciptypes.SeqNumChain,
-	observations []cciptypes.CommitPluginObservation,
+	maxSeqNums []plugintypes.SeqNumChain,
+	observations []plugintypes.CommitPluginObservation,
 	fChainCfg map[cciptypes.ChainSelector]int,
 ) ([]cciptypes.MerkleRootChain, error) {
 	maxSeqNumsPerChain := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
@@ -355,8 +356,8 @@ func newMsgsConsensusForChain(
 //   - We minimize the risk of naturally hitting the error condition minSeqNum > maxSeqNum due to oracles
 //     delayed views of the chain (would be an issue with taking sorted_mins[-f])
 func maxSeqNumsConsensus(
-	lggr logger.Logger, fChain int, observations []cciptypes.CommitPluginObservation,
-) []cciptypes.SeqNumChain {
+	lggr logger.Logger, fChain int, observations []plugintypes.CommitPluginObservation,
+) []plugintypes.SeqNumChain {
 	observedSeqNumsPerChain := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 	for _, obs := range observations {
 		for _, maxSeqNum := range obs.MaxSeqNums {
@@ -368,7 +369,7 @@ func maxSeqNumsConsensus(
 		}
 	}
 
-	seqNums := make([]cciptypes.SeqNumChain, 0, len(observedSeqNumsPerChain))
+	seqNums := make([]plugintypes.SeqNumChain, 0, len(observedSeqNumsPerChain))
 	for ch, observedSeqNums := range observedSeqNumsPerChain {
 		if len(observedSeqNums) < 2*fChain+1 {
 			lggr.Warnw("not enough observations for chain", "chain", ch, "observedSeqNums", observedSeqNums)
@@ -376,7 +377,7 @@ func maxSeqNumsConsensus(
 		}
 
 		sort.Slice(observedSeqNums, func(i, j int) bool { return observedSeqNums[i] < observedSeqNums[j] })
-		seqNums = append(seqNums, cciptypes.NewSeqNumChain(ch, observedSeqNums[fChain]))
+		seqNums = append(seqNums, plugintypes.NewSeqNumChain(ch, observedSeqNums[fChain]))
 	}
 
 	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i].ChainSel < seqNums[j].ChainSel })
@@ -384,7 +385,7 @@ func maxSeqNumsConsensus(
 }
 
 // tokenPricesConsensus returns the median price for tokens that have at least 2f_chain+1 observations.
-func tokenPricesConsensus(observations []cciptypes.CommitPluginObservation, fChain int) []cciptypes.TokenPrice {
+func tokenPricesConsensus(observations []plugintypes.CommitPluginObservation, fChain int) []cciptypes.TokenPrice {
 	pricesPerToken := make(map[types.Account][]cciptypes.BigInt)
 	for _, obs := range observations {
 		for _, price := range obs.TokenPrices {
@@ -409,7 +410,7 @@ func tokenPricesConsensus(observations []cciptypes.CommitPluginObservation, fCha
 }
 
 func gasPricesConsensus(
-	lggr logger.Logger, observations []cciptypes.CommitPluginObservation, fChain int,
+	lggr logger.Logger, observations []plugintypes.CommitPluginObservation, fChain int,
 ) []cciptypes.GasPriceChain {
 	// Group the observed gas prices by chain.
 	gasPricePerChain := make(map[cciptypes.ChainSelector][]cciptypes.BigInt)
@@ -446,7 +447,7 @@ func gasPricesConsensus(
 // fChainConsensus comes to consensus on the plugin config based on the observations.
 // We cannot trust the state of a single follower, so we need to come to consensus on the config.
 func fChainConsensus(
-	observations []cciptypes.CommitPluginObservation, // observations from all followers
+	observations []plugintypes.CommitPluginObservation, // observations from all followers
 ) map[cciptypes.ChainSelector]int {
 	// Come to consensus on fChain.
 	// Use the fChain observed by most followers for each chain.
@@ -475,7 +476,7 @@ func fChainConsensus(
 
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain and
 // that they match the observed max sequence numbers.
-func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeqNums []cciptypes.SeqNumChain) error {
+func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeqNums []plugintypes.SeqNumChain) error {
 	// If the observer did not include sequence numbers it means that it's not a destination chain reader.
 	// In that case we cannot do any msg sequence number validations.
 	if len(maxSeqNums) == 0 {
@@ -531,7 +532,7 @@ func validateObservedSequenceNumbers(msgs []cciptypes.CCIPMsgBaseDetails, maxSeq
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
 	msgs []cciptypes.CCIPMsgBaseDetails,
-	seqNums []cciptypes.SeqNumChain,
+	seqNums []plugintypes.SeqNumChain,
 	nodeSupportedChains mapset.Set[cciptypes.ChainSelector],
 	destChain cciptypes.ChainSelector,
 ) error {

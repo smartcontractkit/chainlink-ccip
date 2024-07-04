@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
@@ -26,13 +27,13 @@ import (
 func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 	testCases := []struct {
 		name             string
-		prevOutcome      cciptypes.CommitPluginOutcome
+		prevOutcome      plugintypes.CommitPluginOutcome
 		onChainSeqNums   map[cciptypes.ChainSelector]cciptypes.SeqNum
 		readChains       []cciptypes.ChainSelector
 		destChain        cciptypes.ChainSelector
 		expErr           bool
 		expSeqNumsInSync bool
-		expMaxSeqNums    []cciptypes.SeqNumChain
+		expMaxSeqNums    []plugintypes.SeqNumChain
 	}{
 		{
 			name: "report on chain seq num and can read dest",
@@ -43,15 +44,15 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 			readChains: []cciptypes.ChainSelector{1, 2, 3},
 			destChain:  3,
 			expErr:     false,
-			expMaxSeqNums: []cciptypes.SeqNumChain{
+			expMaxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
 		},
 		{
 			name: "cannot read dest",
-			prevOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
+			prevOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: 1, SeqNum: 11}, // for chain 1 previous outcome is higher than on-chain state
 					{ChainSel: 2, SeqNum: 19}, // for chain 2 previous outcome is behind on-chain state
 				},
@@ -63,7 +64,7 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 			readChains:    []cciptypes.ChainSelector{1, 2},
 			destChain:     3,
 			expErr:        false,
-			expMaxSeqNums: []cciptypes.SeqNumChain{},
+			expMaxSeqNums: []plugintypes.SeqNumChain{},
 		},
 	}
 
@@ -109,7 +110,7 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 func Test_observeNewMsgs(t *testing.T) {
 	testCases := []struct {
 		name               string
-		maxSeqNumsPerChain []cciptypes.SeqNumChain
+		maxSeqNumsPerChain []plugintypes.SeqNumChain
 		readChains         []cciptypes.ChainSelector
 		destChain          cciptypes.ChainSelector
 		msgScanBatchSize   int
@@ -119,7 +120,7 @@ func Test_observeNewMsgs(t *testing.T) {
 	}{
 		{
 			name: "no new messages",
-			maxSeqNumsPerChain: []cciptypes.SeqNumChain{
+			maxSeqNumsPerChain: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -134,7 +135,7 @@ func Test_observeNewMsgs(t *testing.T) {
 		},
 		{
 			name: "new messages",
-			maxSeqNumsPerChain: []cciptypes.SeqNumChain{
+			maxSeqNumsPerChain: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -158,7 +159,7 @@ func Test_observeNewMsgs(t *testing.T) {
 		},
 		{
 			name: "new messages but one chain is not readable",
-			maxSeqNumsPerChain: []cciptypes.SeqNumChain{
+			maxSeqNumsPerChain: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -230,10 +231,10 @@ func Benchmark_observeNewMsgs(b *testing.B) {
 	)
 
 	readChains := make([]cciptypes.ChainSelector, numChains)
-	maxSeqNumsPerChain := make([]cciptypes.SeqNumChain, numChains)
+	maxSeqNumsPerChain := make([]plugintypes.SeqNumChain, numChains)
 	for i := 0; i < numChains; i++ {
 		readChains[i] = cciptypes.ChainSelector(i + 1)
-		maxSeqNumsPerChain[i] = cciptypes.SeqNumChain{ChainSel: cciptypes.ChainSelector(i + 1), SeqNum: cciptypes.SeqNum(1)}
+		maxSeqNumsPerChain[i] = plugintypes.SeqNumChain{ChainSel: cciptypes.ChainSelector(i + 1), SeqNum: cciptypes.SeqNum(1)}
 	}
 
 	for i := 0; i < b.N; i++ {
@@ -352,7 +353,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name       string
 		msgs       []cciptypes.CCIPMsgBaseDetails
-		maxSeqNums []cciptypes.SeqNumChain
+		maxSeqNums []plugintypes.SeqNumChain
 		expErr     bool
 	}{
 		{
@@ -364,7 +365,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "dup seq num observation",
 			msgs: nil,
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 				{ChainSel: 1, SeqNum: 10},
@@ -374,7 +375,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "seq nums ok",
 			msgs: nil,
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -388,7 +389,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				{ID: "1", SourceChain: 1, SeqNum: 14},
 				{ID: "1", SourceChain: 1, SeqNum: 13}, // dup
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -402,7 +403,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				{MsgHash: cciptypes.Bytes32{3}, ID: "1", SourceChain: 1, SeqNum: 14},
 				{MsgHash: cciptypes.Bytes32{4}, ID: "1", SourceChain: 2, SeqNum: 21},
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -416,7 +417,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				{ID: "1", SourceChain: 1, SeqNum: 10}, // max seq num is already 10
 				{ID: "1", SourceChain: 2, SeqNum: 21},
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
@@ -430,7 +431,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				{ID: "1", SourceChain: 1, SeqNum: 14},
 				{ID: "1", SourceChain: 2, SeqNum: 21}, // max seq num not reported
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 			},
 			expErr: true,
@@ -442,7 +443,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				{MsgHash: cciptypes.Bytes32{99}, ID: "1", SourceChain: 1, SeqNum: 13},
 				{MsgHash: cciptypes.Bytes32{12}, ID: "1", SourceChain: 300, SeqNum: 23},
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 				{ChainSel: 300, SeqNum: 22},
@@ -456,7 +457,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				{MsgHash: cciptypes.Bytes32{99}, ID: "1", SourceChain: 1, SeqNum: 13},
 				{MsgHash: cciptypes.Bytes32{123}, ID: "1", SourceChain: 300, SeqNum: 23}, // dup hash
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 				{ChainSel: 300, SeqNum: 22},
@@ -482,7 +483,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		name                string
 		observer            libocrtypes.PeerID
 		msgs                []cciptypes.CCIPMsgBaseDetails
-		seqNums             []cciptypes.SeqNumChain
+		seqNums             []plugintypes.SeqNumChain
 		nodeSupportedChains mapset.Set[cciptypes.ChainSelector]
 		destChain           cciptypes.ChainSelector
 		expErr              bool
@@ -504,7 +505,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			name:     "observer is a writer so can observe seq nums",
 			observer: libocrtypes.PeerID{10},
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
-			seqNums: []cciptypes.SeqNumChain{
+			seqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
 			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 3),
@@ -515,7 +516,7 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			name:     "observer is not a writer so cannot observe seq nums",
 			observer: libocrtypes.PeerID{10},
 			msgs:     []cciptypes.CCIPMsgBaseDetails{},
-			seqNums: []cciptypes.SeqNumChain{
+			seqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 12},
 			},
 			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](3),
@@ -667,15 +668,15 @@ func Test_validateObservedGasPrices(t *testing.T) {
 func Test_newMsgsConsensusForChain(t *testing.T) {
 	testCases := []struct {
 		name           string
-		maxSeqNums     []cciptypes.SeqNumChain
-		observations   []cciptypes.CommitPluginObservation
+		maxSeqNums     []plugintypes.SeqNumChain
+		observations   []plugintypes.CommitPluginObservation
 		expMerkleRoots []cciptypes.MerkleRootChain
 		fChain         map[cciptypes.ChainSelector]int
 		expErr         bool
 	}{
 		{
 			name:           "empty",
-			maxSeqNums:     []cciptypes.SeqNumChain{},
+			maxSeqNums:     []plugintypes.SeqNumChain{},
 			observations:   nil,
 			expMerkleRoots: []cciptypes.MerkleRootChain{},
 			expErr:         false,
@@ -685,10 +686,10 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			fChain: map[cciptypes.ChainSelector]int{
 				1: 2,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 			},
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
@@ -701,10 +702,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			fChain: map[cciptypes.ChainSelector]int{
 				1: 2,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
-				{ChainSel: 1, SeqNum: 10},
-			},
-			observations: []cciptypes.CommitPluginObservation{
+			maxSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
@@ -724,10 +723,10 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			fChain: map[cciptypes.ChainSelector]int{
 				1: 2,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 			},
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
@@ -757,10 +756,10 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			fChain: map[cciptypes.ChainSelector]int{
 				1: 2,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 			},
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 10}}},
@@ -790,10 +789,10 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			fChain: map[cciptypes.ChainSelector]int{
 				1: 2,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 			},
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
@@ -821,11 +820,11 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				1: 2,
 				2: 1,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 				{ChainSel: 2, SeqNum: 20},
 			},
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
@@ -855,10 +854,10 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			fChain: map[cciptypes.ChainSelector]int{
 				1: 2,
 			},
-			maxSeqNums: []cciptypes.SeqNumChain{
+			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
 			},
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
 				{NewMsgs: []cciptypes.CCIPMsgBaseDetails{{ID: "1", SourceChain: 1, SeqNum: 11}}},
@@ -906,21 +905,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 func Test_maxSeqNumsConsensus(t *testing.T) {
 	testCases := []struct {
 		name         string
-		observations []cciptypes.CommitPluginObservation
+		observations []plugintypes.CommitPluginObservation
 		fChain       int
-		expSeqNums   []cciptypes.SeqNumChain
+		expSeqNums   []plugintypes.SeqNumChain
 	}{
 		{
 			name:         "empty observations",
-			observations: []cciptypes.CommitPluginObservation{},
+			observations: []plugintypes.CommitPluginObservation{},
 			fChain:       2,
-			expSeqNums:   []cciptypes.SeqNumChain{},
+			expSeqNums:   []plugintypes.SeqNumChain{},
 		},
 		{
 			name: "one chain all followers agree",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{
-					MaxSeqNums: []cciptypes.SeqNumChain{
+					MaxSeqNums: []plugintypes.SeqNumChain{
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 20},
@@ -932,15 +931,15 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 				},
 			},
 			fChain: 2,
-			expSeqNums: []cciptypes.SeqNumChain{
+			expSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 			},
 		},
 		{
 			name: "one chain all followers agree but not enough observations",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{
-					MaxSeqNums: []cciptypes.SeqNumChain{
+					MaxSeqNums: []plugintypes.SeqNumChain{
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 20},
@@ -950,13 +949,13 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 				},
 			},
 			fChain:     3,
-			expSeqNums: []cciptypes.SeqNumChain{},
+			expSeqNums: []plugintypes.SeqNumChain{},
 		},
 		{
 			name: "one chain 3 followers not in sync, 4 in sync",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{
-					MaxSeqNums: []cciptypes.SeqNumChain{
+					MaxSeqNums: []plugintypes.SeqNumChain{
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 19},
 						{ChainSel: 2, SeqNum: 20},
@@ -968,15 +967,15 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 				},
 			},
 			fChain: 3,
-			expSeqNums: []cciptypes.SeqNumChain{
+			expSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 			},
 		},
 		{
 			name: "two chains",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{
-					MaxSeqNums: []cciptypes.SeqNumChain{
+					MaxSeqNums: []plugintypes.SeqNumChain{
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 20},
 						{ChainSel: 2, SeqNum: 20},
@@ -994,7 +993,7 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 				},
 			},
 			fChain: 2,
-			expSeqNums: []cciptypes.SeqNumChain{
+			expSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 2, SeqNum: 20},
 				{ChainSel: 3, SeqNum: 30},
 			},
@@ -1013,19 +1012,19 @@ func Test_maxSeqNumsConsensus(t *testing.T) {
 func Test_tokenPricesConsensus(t *testing.T) {
 	testCases := []struct {
 		name         string
-		observations []cciptypes.CommitPluginObservation
+		observations []plugintypes.CommitPluginObservation
 		fChain       int
 		expPrices    []cciptypes.TokenPrice
 	}{
 		{
 			name:         "empty",
-			observations: make([]cciptypes.CommitPluginObservation, 0),
+			observations: make([]plugintypes.CommitPluginObservation, 0),
 			fChain:       2,
 			expPrices:    make([]cciptypes.TokenPrice, 0),
 		},
 		{
 			name: "happy flow",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{
 					TokenPrices: []cciptypes.TokenPrice{
 						cciptypes.NewTokenPrice("0x1", big.NewInt(10)),
@@ -1065,7 +1064,7 @@ func Test_tokenPricesConsensus(t *testing.T) {
 		},
 		{
 			name: "not enough observations for some token",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{
 					TokenPrices: []cciptypes.TokenPrice{
 						cciptypes.NewTokenPrice("0x2", big.NewInt(20)),
@@ -1114,19 +1113,19 @@ func Test_tokenPricesConsensus(t *testing.T) {
 func Test_gasPricesConsensus(t *testing.T) {
 	testCases := []struct {
 		name         string
-		observations []cciptypes.CommitPluginObservation
+		observations []plugintypes.CommitPluginObservation
 		fChain       int
 		expPrices    []cciptypes.GasPriceChain
 	}{
 		{
 			name:         "empty",
-			observations: make([]cciptypes.CommitPluginObservation, 0),
+			observations: make([]plugintypes.CommitPluginObservation, 0),
 			fChain:       2,
 			expPrices:    make([]cciptypes.GasPriceChain, 0),
 		},
 		{
 			name: "one chain happy path",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(20), 1)}},
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(10), 1)}},
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(10), 1)}},
@@ -1140,7 +1139,7 @@ func Test_gasPricesConsensus(t *testing.T) {
 		},
 		{
 			name: "one chain no consensus",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(20), 1)}},
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(10), 1)}},
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(10), 1)}},
@@ -1152,7 +1151,7 @@ func Test_gasPricesConsensus(t *testing.T) {
 		},
 		{
 			name: "two chains determinism check",
-			observations: []cciptypes.CommitPluginObservation{
+			observations: []plugintypes.CommitPluginObservation{
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(20), 1)}},
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(10), 1)}},
 				{GasPrices: []cciptypes.GasPriceChain{cciptypes.NewGasPriceChain(big.NewInt(10), 1)}},
@@ -1184,16 +1183,16 @@ func Test_gasPricesConsensus(t *testing.T) {
 func Test_validateMerkleRootsState(t *testing.T) {
 	testCases := []struct {
 		name           string
-		reportSeqNums  []cciptypes.SeqNumChain
+		reportSeqNums  []plugintypes.SeqNumChain
 		onchainSeqNums []cciptypes.SeqNum
 		expValid       bool
 		expErr         bool
 	}{
 		{
 			name: "happy path",
-			reportSeqNums: []cciptypes.SeqNumChain{
-				cciptypes.NewSeqNumChain(10, 100),
-				cciptypes.NewSeqNumChain(20, 200),
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
 			},
 			onchainSeqNums: []cciptypes.SeqNum{99, 199},
 			expValid:       true,
@@ -1201,9 +1200,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 		},
 		{
 			name: "one root is stale",
-			reportSeqNums: []cciptypes.SeqNumChain{
-				cciptypes.NewSeqNumChain(10, 100),
-				cciptypes.NewSeqNumChain(20, 200),
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
 			},
 			onchainSeqNums: []cciptypes.SeqNum{99, 200}, // <- 200 is already on chain
 			expValid:       false,
@@ -1211,9 +1210,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 		},
 		{
 			name: "one root has gap",
-			reportSeqNums: []cciptypes.SeqNumChain{
-				cciptypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
-				cciptypes.NewSeqNumChain(20, 200),
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
+				plugintypes.NewSeqNumChain(20, 200),
 			},
 			onchainSeqNums: []cciptypes.SeqNum{99, 199},
 			expValid:       false,
@@ -1221,9 +1220,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 		},
 		{
 			name: "reader returned wrong number of seq nums",
-			reportSeqNums: []cciptypes.SeqNumChain{
-				cciptypes.NewSeqNumChain(10, 100),
-				cciptypes.NewSeqNumChain(20, 200),
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
 			},
 			onchainSeqNums: []cciptypes.SeqNum{99, 199, 299},
 			expValid:       false,
