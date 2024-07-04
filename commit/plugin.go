@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -38,7 +39,9 @@ type Plugin struct {
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
-	homeChain reader.HomeChain
+	homeChain        reader.HomeChain
+	bgSyncCancelFunc context.CancelFunc
+	bgSyncWG         *sync.WaitGroup
 }
 
 func NewPlugin(
@@ -53,7 +56,7 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 ) *Plugin {
-	return &Plugin{
+	p := &Plugin{
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		cfg:               cfg,
@@ -64,6 +67,21 @@ func NewPlugin(
 		lggr:              lggr,
 		homeChain:         homeChain,
 	}
+
+	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
+	p.bgSyncCancelFunc = bgSyncCf
+	p.bgSyncWG = &sync.WaitGroup{}
+	p.bgSyncWG.Add(1)
+	backgroundReaderSync(
+		bgSyncCtx,
+		p.bgSyncWG,
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
+	)
+
+	return p
 }
 
 // Query phase is not used.
@@ -347,6 +365,9 @@ func (p *Plugin) Close() error {
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
+
+	p.bgSyncCancelFunc()
+	p.bgSyncWG.Wait()
 	return nil
 }
 
@@ -384,6 +405,20 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
+}
+
+func syncFrequency(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 10 * time.Second
+	}
+	return configuredValue
+}
+
+func syncTimeout(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 3 * time.Second
+	}
+	return configuredValue
 }
 
 // Interface compatibility checks.
