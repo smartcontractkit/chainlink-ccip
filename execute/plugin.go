@@ -11,10 +11,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
@@ -27,7 +31,7 @@ const SentinelRoot = "0x289502ebf164ea87871e19cd9c8734016e954539fffc8c789ac4dadc
 type Plugin struct {
 	reportingCfg    ocr3types.ReportingPluginConfig
 	cfg             cciptypes.ExecutePluginConfig
-	ccipReader      cciptypes.CCIPReader
+	ccipReader      reader.CCIP
 	reportCodec     cciptypes.ExecutePluginCodec
 	msgHasher       cciptypes.MessageHasher
 	tokenDataReader TokenDataReader
@@ -40,7 +44,7 @@ type Plugin struct {
 func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg cciptypes.ExecutePluginConfig,
-	ccipReader cciptypes.CCIPReader,
+	ccipReader reader.CCIP,
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
@@ -66,7 +70,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func getPendingExecutedReports(
-	ctx context.Context, ccipReader cciptypes.CCIPReader, dest cciptypes.ChainSelector, ts time.Time,
+	ctx context.Context, ccipReader reader.CCIP, dest cciptypes.ChainSelector, ts time.Time,
 ) (cciptypes.ExecutePluginCommitObservations, time.Time, error) {
 	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
