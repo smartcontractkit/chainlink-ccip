@@ -116,7 +116,7 @@ func observeNewMsgs(
 
 func observeTokenPrices(
 	ctx context.Context,
-	tokenPricesReader cciptypes.TokenPricesReader,
+	tokenPricesReader reader.TokenPrices,
 	tokens []types.Account,
 ) ([]cciptypes.TokenPrice, error) {
 	tokenPrices, err := tokenPricesReader.GetTokenPricesUSD(ctx, tokens)

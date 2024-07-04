@@ -31,7 +31,7 @@ type Plugin struct {
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	cfg               cciptypes.CommitPluginConfig
 	ccipReader        reader.CCIP
-	tokenPricesReader cciptypes.TokenPricesReader
+	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
@@ -45,7 +45,7 @@ func NewPlugin(
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg cciptypes.CommitPluginConfig,
 	ccipReader reader.CCIP,
-	tokenPricesReader cciptypes.TokenPricesReader,
+	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
