@@ -4,14 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/crconsts"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -109,21 +112,15 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
-	const (
-		contractName       = "OnRamp"
-		eventName          = "CCIPSendRequested"
-		eventAttributeName = "SequenceNumber"
-	)
-
 	seq, err := r.contractReaders[chain].QueryKey(
 		ctx,
-		contractName,
+		crconsts.ContractNameOnRamp,
 		query.KeyFilter{
-			Key: eventName,
+			Key: crconsts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
 				{
 					Primitive: &primitives.Comparator{
-						Name: eventAttributeName,
+						Name: crconsts.EventAttributeSequenceNumber,
 						ValueComparators: []primitives.ValueComparator{
 							{
 								Value:    seqNumRange.Start().String(),
@@ -168,26 +165,24 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 func (r *CCIPChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) ([]cciptypes.SeqNum, error) {
-	if err := r.validateReaderExistence(r.destChain); err != nil {
-		return nil, err
+	cfgs, err := r.getSourceChainsConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
 
-	const (
-		contractName = "OffRamp"
-		funcName     = "getExpectedNextSequenceNumbers"
-	)
+	res := make([]cciptypes.SeqNum, 0, len(chains))
+	for _, chain := range chains {
+		cfg, exists := cfgs[chain]
+		if !exists {
+			return nil, fmt.Errorf("source chain config not found for chain %d", chain)
+		}
+		if cfg.MinSeqNr == 0 {
+			return nil, fmt.Errorf("minSeqNr not found for chain %d", chain)
+		}
+		res = append(res, cciptypes.SeqNum(cfg.MinSeqNr))
+	}
 
-	seqNums := make([]cciptypes.SeqNum, 0)
-	err := r.contractReaders[r.destChain].GetLatestValue(
-		ctx,
-		contractName,
-		funcName,
-		map[string]any{
-			"chains": chains,
-		},
-		&seqNums,
-	)
-	return seqNums, err
+	return res, err
 }
 
 func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
@@ -216,11 +211,81 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
-	return false, nil
+	sourceConfigs, err := r.getSourceChainsConfig(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get onramps: %w", err)
+	}
+
+	for chain, cfg := range sourceConfigs {
+		if cfg.OnRamp == "" {
+			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
+		}
+
+		// Bind the onRamp contract address to the reader.
+		// If the same address exists -> no-op
+		// If the address is changed -> updates the address, overwrites the existing one
+		// If the contract not binded -> binds to the new address
+		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
+			{
+				Address: cfg.OnRamp,
+				Name:    crconsts.ContractNameOnRamp,
+				Pending: false,
+			},
+		}); err != nil {
+			return false, fmt.Errorf("bind onRamp: %w", err)
+		}
+	}
+
+	return true, nil
 }
 
 func (r *CCIPChainReader) Close(ctx context.Context) error {
 	return nil
+}
+
+// getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
+func (r *CCIPChainReader) getSourceChainsConfig(
+	ctx context.Context) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	if err := r.validateReaderExistence(r.destChain); err != nil {
+		return nil, err
+	}
+
+	res := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	mu := new(sync.Mutex)
+
+	eg := new(errgroup.Group)
+	for chainSel := range r.contractReaders {
+		chainSel := chainSel
+		eg.Go(func() error {
+			resp := sourceChainConfig{}
+			err := r.contractReaders[r.destChain].GetLatestValue(
+				ctx,
+				crconsts.ContractNameOffRamp,
+				crconsts.FunctionNameGetSourceChainConfig,
+				map[string]any{
+					"sourceChainSelector": chainSel,
+				},
+				&resp,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to get source chain config: %w", err)
+			}
+			mu.Lock()
+			res[chainSel] = resp
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+type sourceChainConfig struct {
+	OnRamp   string `json:"onRamp"`
+	MinSeqNr uint64 `json:"minSeqNr"`
 }
 
 func (r *CCIPChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
