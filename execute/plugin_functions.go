@@ -238,12 +238,12 @@ func mergeMessageObservations(
 	aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int,
 ) (plugintypes.ExecutePluginMessageObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.CCIPMsg])
-	idFunc := func(data cciptypes.CCIPMsg) [32]byte {
+	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.Message])
+	idFunc := func(data cciptypes.Message) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
 	for selector, f := range fChain {
-		validators[selector] = validation.NewMinObservationValidator[cciptypes.CCIPMsg](f+1, idFunc)
+		validators[selector] = validation.NewMinObservationValidator[cciptypes.Message](f+1, idFunc)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -269,10 +269,10 @@ func mergeMessageObservations(
 			return plugintypes.ExecutePluginMessageObservations{}, err
 		}
 		if _, ok := results[selector]; !ok {
-			results[selector] = make(map[cciptypes.SeqNum]cciptypes.CCIPMsg)
+			results[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		}
 		for _, msg := range msgs {
-			results[selector][msg.SeqNum] = msg
+			results[selector][msg.Header.SequenceNumber] = msg
 		}
 	}
 
@@ -331,7 +331,7 @@ func markNewMessagesExecuted(
 	// Mark new messages executed.
 	for i := 0; i < len(execReport.Messages); i++ {
 		report.ExecutedMessages =
-			append(report.ExecutedMessages, execReport.Messages[i].SeqNum)
+			append(report.ExecutedMessages, execReport.Messages[i].Header.SequenceNumber)
 	}
 	sort.Slice(
 		report.ExecutedMessages,
@@ -356,18 +356,18 @@ func constructMerkleTree(
 
 	treeLeaves := make([][32]byte, 0)
 	for _, msg := range report.Messages {
-		if !report.SequenceNumberRange.Contains(msg.SeqNum) {
+		if !report.SequenceNumberRange.Contains(msg.Header.SequenceNumber) {
 			return nil, fmt.Errorf(
 				"malformed report, message %s sequence number %d outside of report range %s",
-				report.MerkleRoot.String(), msg.SeqNum, report.SequenceNumberRange)
+				report.MerkleRoot.String(), msg.Header.SequenceNumber, report.SequenceNumberRange)
 		}
-		if report.SourceChain != msg.SourceChain {
+		if report.SourceChain != msg.Header.SourceChainSelector {
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
-				report.MerkleRoot.String(), report.SourceChain, msg.SourceChain)
+				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}
 		leaf, err := hasher.Hash(ctx, msg)
 		if err != nil {
-			return nil, fmt.Errorf("unable to hash message (%d, %d): %w", msg.SourceChain, msg.SeqNum, err)
+			return nil, fmt.Errorf("unable to hash message (%d, %d): %w", msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
 		}
 		treeLeaves = append(treeLeaves, leaf)
 	}

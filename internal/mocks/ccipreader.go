@@ -37,9 +37,9 @@ func (r CCIPReader) ExecutedMessageRanges(
 
 func (r CCIPReader) MsgsBetweenSeqNums(
 	ctx context.Context, chain cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
-) ([]cciptypes.CCIPMsg, error) {
+) ([]cciptypes.Message, error) {
 	args := r.Called(ctx, chain, seqNumRange)
-	return args.Get(0).([]cciptypes.CCIPMsg), args.Error(1)
+	return args.Get(0).([]cciptypes.Message), args.Error(1)
 }
 
 func (r CCIPReader) NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (

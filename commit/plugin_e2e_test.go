@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -332,7 +331,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 			ctx,
 			chainA,
 			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{}, nil)
+		).Return([]cciptypes.Message{}, nil)
 
 		// and there are two new message on chainB
 		n.ccipReader.On(
@@ -340,15 +339,15 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 			ctx,
 			chainB,
 			cciptypes.NewSeqNumRange(21, cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{
+		).Return([]cciptypes.Message{
 			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: chainB, SeqNum: 21,
+				Header: cciptypes.RampMessageHeader{
+					MsgHash: cciptypes.Bytes32{1}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: chainB, SequenceNumber: 21,
 				},
 			},
 			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: chainB, SeqNum: 22,
+				Header: cciptypes.RampMessageHeader{
+					MsgHash: cciptypes.Bytes32{2}, MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: chainB, SequenceNumber: 22,
 				},
 			},
 		}, nil)
@@ -440,7 +439,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 			ctx,
 			chainA,
 			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{}, nil)
+		).Return([]cciptypes.Message{}, nil)
 
 		// and there are two new message on chainB
 		n.ccipReader.On(
@@ -451,17 +450,17 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 				21,
 				cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize),
 			),
-		).Return([]cciptypes.CCIPMsg{
-			{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				MsgHash:     cciptypes.Bytes32{1},
-				ID:          "1" + strconv.Itoa(i),
-				SourceChain: chainB,
-				SeqNum:      21 + cciptypes.SeqNum(i*10)}},
-			{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				MsgHash:     cciptypes.Bytes32{2},
-				ID:          "2" + strconv.Itoa(i),
-				SourceChain: chainB,
-				SeqNum:      22 + cciptypes.SeqNum(i*20)}},
+		).Return([]cciptypes.Message{
+			{Header: cciptypes.RampMessageHeader{
+				MsgHash:             cciptypes.Bytes32{1},
+				MessageID:           messageIDFromInt(i + 1),
+				SourceChainSelector: chainB,
+				SequenceNumber:      21 + cciptypes.SeqNum(i*10)}},
+			{Header: cciptypes.RampMessageHeader{
+				MsgHash:             cciptypes.Bytes32{2},
+				MessageID:           messageIDFromInt(i + 2),
+				SourceChainSelector: chainB,
+				SequenceNumber:      22 + cciptypes.SeqNum(i*20)}},
 		}, nil)
 
 		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
@@ -539,7 +538,7 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 			ctx,
 			chainA,
 			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{}, nil)
+		).Return([]cciptypes.Message{}, nil)
 
 		// and there are two new message on chainB
 		n.ccipReader.On(
@@ -547,15 +546,15 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 			ctx,
 			chainB,
 			cciptypes.NewSeqNumRange(21, cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{
+		).Return([]cciptypes.Message{
 			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: chainB, SeqNum: 21,
+				Header: cciptypes.RampMessageHeader{
+					MsgHash: cciptypes.Bytes32{1}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: chainB, SequenceNumber: 21,
 				},
 			},
 			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: chainB, SeqNum: 22,
+				Header: cciptypes.RampMessageHeader{
+					MsgHash: cciptypes.Bytes32{2}, MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: chainB, SequenceNumber: 22,
 				},
 			},
 		}, nil)
@@ -643,6 +642,7 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 
 	return homeChain
 }
+
 func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
 	for _, id := range ids {

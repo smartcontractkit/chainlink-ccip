@@ -41,7 +41,7 @@ type CCIP interface {
 		ctx context.Context,
 		chain cciptypes.ChainSelector,
 		seqNumRange cciptypes.SeqNumRange,
-	) ([]cciptypes.CCIPMsg, error)
+	) ([]cciptypes.Message, error)
 
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
@@ -104,7 +104,7 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 
 func (r *CCIPChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, chain cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
-) ([]cciptypes.CCIPMsg, error) {
+) ([]cciptypes.Message, error) {
 	if err := r.validateReaderExistence(chain); err != nil {
 		return nil, err
 	}
@@ -147,17 +147,17 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
-		&cciptypes.CCIPMsg{},
+		&cciptypes.Message{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	msgs := make([]cciptypes.CCIPMsg, 0)
+	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(cciptypes.CCIPMsg)
+		msg, ok := item.Data.(cciptypes.Message)
 		if !ok {
-			return nil, fmt.Errorf("failed to cast %v to CCIPMsg", item.Data)
+			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 		msgs = append(msgs, msg)
 	}

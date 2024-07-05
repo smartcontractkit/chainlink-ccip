@@ -7,15 +7,36 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCommitPluginObservation_EncodeAndDecode(t *testing.T) {
 	obs := NewCommitPluginObservation(
-		[]cciptypes.CCIPMsgBaseDetails{
-			{MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: math.MaxUint64, SeqNum: 123},
-			{MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: 321, SeqNum: math.MaxUint64},
+		[]cciptypes.RampMessageHeader{
+			{
+				MessageID:           mustNewBytes32(t, "0x01"),
+				SourceChainSelector: math.MaxUint64,
+				DestChainSelector:   cciptypes.ChainSelector(123),
+				SequenceNumber:      123,
+				Nonce:               1,
+
+				MsgHash: cciptypes.Bytes32{1},
+				OnRamp:  mustNewBytes(t, "0x010203"),
+			},
+			{
+				MessageID:           mustNewBytes32(t, "0x02"),
+				SourceChainSelector: 321,
+				DestChainSelector:   cciptypes.ChainSelector(456),
+				SequenceNumber:      math.MaxUint64,
+				Nonce:               0,
+
+				MsgHash: cciptypes.Bytes32{2},
+				OnRamp:  mustNewBytes(t, "0x040506"),
+			},
 		},
-		[]cciptypes.GasPriceChain{}, // todo: populate this
+		[]cciptypes.GasPriceChain{
+			cciptypes.NewGasPriceChain(big.NewInt(1234), cciptypes.ChainSelector(math.MaxUint64)),
+		},
 		[]cciptypes.TokenPrice{},
 		[]SeqNumChain{},
 		map[cciptypes.ChainSelector]int{},
@@ -24,7 +45,7 @@ func TestCommitPluginObservation_EncodeAndDecode(t *testing.T) {
 	b, err := obs.Encode()
 	assert.NoError(t, err)
 	// nolint:lll
-	assert.Equal(t, `{"newMsgs":[{"id":"1","sourceChain":"18446744073709551615","seqNum":"123","msgHash":"0x0100000000000000000000000000000000000000000000000000000000000000"},{"id":"2","sourceChain":"321","seqNum":"18446744073709551615","msgHash":"0x0200000000000000000000000000000000000000000000000000000000000000"}],"gasPrices":[],"tokenPrices":[],"maxSeqNums":[],"fChain":{}}`, string(b))
+	assert.Equal(t, `{"newMsgs":[{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"18446744073709551615","destChainSelector":"123","seqNum":"123","nonce":1,"msgHash":"0x0100000000000000000000000000000000000000000000000000000000000000","onRamp":"0x010203"},{"messageId":"0x0200000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"321","destChainSelector":"456","seqNum":"18446744073709551615","nonce":0,"msgHash":"0x0200000000000000000000000000000000000000000000000000000000000000","onRamp":"0x040506"}],"gasPrices":[{"gasPrice":"1234","chainSel":18446744073709551615}],"tokenPrices":[],"maxSeqNums":[],"fChain":{}}`, string(b))
 
 	obs2, err := DecodeCommitPluginObservation(b)
 	assert.NoError(t, err)
@@ -84,4 +105,16 @@ func TestCommitPluginOutcome_IsEmpty(t *testing.T) {
 	o = NewCommitPluginOutcome([]SeqNumChain{
 		NewSeqNumChain(cciptypes.ChainSelector(1), cciptypes.SeqNum(1))}, nil, nil, nil)
 	assert.False(t, o.IsEmpty())
+}
+
+func mustNewBytes32(t *testing.T, s string) cciptypes.Bytes32 {
+	b, err := cciptypes.NewBytes32FromString(s)
+	require.NoError(t, err)
+	return b
+}
+
+func mustNewBytes(t *testing.T, s string) cciptypes.Bytes {
+	b, err := cciptypes.NewBytesFromString(s)
+	require.NoError(t, err)
+	return b
 }
