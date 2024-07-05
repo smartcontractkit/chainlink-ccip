@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type CCIPReader struct {
@@ -21,9 +23,9 @@ func NewCCIPReader() *CCIPReader {
 
 func (r CCIPReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
+) ([]plugintypes.CommitPluginReportWithMeta, error) {
 	args := r.Called(ctx, dest, ts, limit)
-	return args.Get(0).([]cciptypes.CommitPluginReportWithMeta), args.Error(1)
+	return args.Get(0).([]plugintypes.CommitPluginReportWithMeta), args.Error(1)
 }
 
 func (r CCIPReader) ExecutedMessageRanges(
