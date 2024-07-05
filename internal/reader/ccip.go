@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -250,9 +251,11 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 	}
 
 	res := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	mu := new(sync.Mutex)
 
 	eg := new(errgroup.Group)
 	for chainSel := range r.contractReaders {
+		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].GetLatestValue(
@@ -267,7 +270,9 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 			if err != nil {
 				return fmt.Errorf("failed to get source chain config: %w", err)
 			}
+			mu.Lock()
 			res[chainSel] = resp
+			mu.Unlock()
 			return nil
 		})
 	}
