@@ -636,7 +636,7 @@ func backgroundReaderSync(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	lggr logger.Logger,
-	reader cciptypes.CCIPReader,
+	reader reader.CCIP,
 	syncTimeout time.Duration,
 	ticker <-chan time.Time,
 ) {
@@ -659,7 +659,7 @@ func backgroundReaderSync(
 func syncReader(
 	ctx context.Context,
 	lggr logger.Logger,
-	reader cciptypes.CCIPReader,
+	reader reader.CCIP,
 	syncTimeout time.Duration,
 ) error {
 	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)

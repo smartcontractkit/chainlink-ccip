@@ -2,6 +2,7 @@ package pluginconfig
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -20,6 +21,12 @@ type CommitPluginConfig struct {
 
 	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
 	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
+
+	// SyncTimeout is the timeout for syncing the commit plugin reader.
+	SyncTimeout time.Duration `json:"syncTimeout"`
+
+	// SyncFrequency is the frequency at which the commit plugin reader should sync.
+	SyncFrequency time.Duration `json:"syncFrequency"`
 }
 
 func (c CommitPluginConfig) Validate() error {
