@@ -473,8 +473,6 @@ var (
 	fChainOne = uint8(1)
 
 	pIDs1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
-	pIDs1_2   = []libocrtypes.PeerID{{1}, {2}}
-	pIDs1     = []libocrtypes.PeerID{{1}}
 	tokenX    = types.Account("tk_xxx")
 
 	destCfg = pluginconfig.CommitPluginConfig{
