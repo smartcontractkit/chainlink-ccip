@@ -455,6 +455,11 @@ func selectReport(
 	accumulatedSize := 0
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
+		// Reports at the end may not have messages yet.
+		if len(report.Messages) == 0 {
+			break
+		}
+
 		execReport, encodedSize, updatedReport, err :=
 			buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
 				report, maxReportSizeBytes-accumulatedSize)
@@ -584,13 +589,41 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	panic("implement me")
+	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	if len(decodedReport.ChainReports) == 0 {
+		p.lggr.Infow("skipping empty report")
+		return false, nil
+	}
+	return true, nil
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	panic("implement me")
+	isWriter, err := p.supportsDestChain()
+	if err != nil {
+		return false, fmt.Errorf("can't know if it's a writer: %w", err)
+	}
+	if !isWriter {
+		p.lggr.Debugw("not a writer, skipping report transmission")
+		return false, nil
+	}
+
+	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	// TODO: Final vlaidation?
+
+	p.lggr.Debugw("transmitting report",
+		"reports", len(decodedReport.ChainReports),
+	)
+	return true, nil
 }
 
 func (p *Plugin) Close() error {
