@@ -11,6 +11,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -30,9 +32,9 @@ import (
 type Plugin struct {
 	nodeID            commontypes.OracleID
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	cfg               cciptypes.CommitPluginConfig
+	cfg               pluginconfig.CommitPluginConfig
 	ccipReader        reader.CCIP
-	tokenPricesReader cciptypes.TokenPricesReader
+	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
@@ -46,9 +48,9 @@ func NewPlugin(
 	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg cciptypes.CommitPluginConfig,
+	cfg pluginconfig.CommitPluginConfig,
 	ccipReader reader.CCIP,
-	tokenPricesReader cciptypes.TokenPricesReader,
+	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
@@ -156,12 +158,12 @@ func (p *Plugin) Observation(
 	// and on the next round we use those to look for messages.
 	if outctx.PreviousOutcome == nil {
 		p.lggr.Debugw("first round ever, can't observe new messages yet")
-		return cciptypes.NewCommitPluginObservation(
+		return plugintypes.NewCommitPluginObservation(
 			msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
 		).Encode()
 	}
 
-	prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
+	prevOutcome, err := plugintypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
 	}
@@ -192,14 +194,14 @@ func (p *Plugin) Observation(
 		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
 	}
 
-	return cciptypes.NewCommitPluginObservation(
+	return plugintypes.NewCommitPluginObservation(
 		msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
 	).Encode()
 
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
-	obs, err := cciptypes.DecodeCommitPluginObservation(ao.Observation)
+	obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
@@ -243,9 +245,9 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 func (p *Plugin) Outcome(
 	_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	decodedObservations := make([]cciptypes.CommitPluginObservation, 0)
+	decodedObservations := make([]plugintypes.CommitPluginObservation, 0)
 	for _, ao := range aos {
-		obs, err := cciptypes.DecodeCommitPluginObservation(ao.Observation)
+		obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
@@ -273,7 +275,7 @@ func (p *Plugin) Outcome(
 	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
 	p.lggr.Debugw("gas prices consensus", "gasPrices", gasPrices)
 
-	outcome := cciptypes.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
+	outcome := plugintypes.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
 	if outcome.IsEmpty() {
 		p.lggr.Debugw("empty outcome")
 		return ocr3types.Outcome{}, nil
@@ -284,7 +286,7 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
-	outc, err := cciptypes.DecodeCommitPluginOutcome(outcome)
+	outc, err := plugintypes.DecodeCommitPluginOutcome(outcome)
 	if err != nil {
 		p.lggr.Errorw("decode commit plugin outcome", "outcome", outcome, "err", err)
 		return nil, fmt.Errorf("decode commit plugin outcome: %w", err)

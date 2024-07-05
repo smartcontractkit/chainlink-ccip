@@ -3,9 +3,10 @@ package mocks
 import (
 	"context"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/stretchr/testify/mock"
 )
 
 type ContractReaderMock struct {

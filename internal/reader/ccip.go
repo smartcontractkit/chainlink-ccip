@@ -12,6 +12,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type CCIP interface {
@@ -22,7 +24,7 @@ type CCIP interface {
 		dest cciptypes.ChainSelector,
 		ts time.Time,
 		limit int,
-	) ([]cciptypes.CommitPluginReportWithMeta, error)
+	) ([]plugintypes.CommitPluginReportWithMeta, error)
 
 	// ExecutedMessageRanges reads the destination chain and finds which messages are executed.
 	// A slice of sequence number ranges is returned to express which messages are executed.
@@ -84,7 +86,7 @@ func NewCCIPChainReader(
 
 func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]cciptypes.CommitPluginReportWithMeta, error) {
+) ([]plugintypes.CommitPluginReportWithMeta, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}

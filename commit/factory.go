@@ -5,10 +5,10 @@ import (
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"google.golang.org/grpc"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -63,13 +63,13 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 		context.Background(),
 		config.OracleID,
 		oracleIDToP2pID,
-		cciptypes.CommitPluginConfig{},
-		nil, //ccipReader
+		pluginconfig.CommitPluginConfig{},
+		nil, // ccipReader
 		onChainTokenPricesReader,
-		nil, //reportCodec
-		nil, //msgHasher
+		nil, // reportCodec
+		nil, // msgHasher
 		nil, // lggr
-		nil, //homeChain
+		nil, // homeChain
 	), ocr3types.ReportingPluginInfo{}, nil
 }
 
