@@ -4,30 +4,31 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	tests := []struct {
 		name         string
 		observer     commontypes.OracleID
-		observerCfg  map[commontypes.OracleID]cciptypes.ObserverInfo
-		observedMsgs cciptypes.ExecutePluginMessageObservations
+		observerCfg  map[commontypes.OracleID]pluginconfig.ObserverInfo
+		observedMsgs plugintypes.ExecutePluginMessageObservations
 		expErr       string
 	}{
 		{
 			name:     "ValidObserverAndMessages",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
-			observedMsgs: cciptypes.ExecutePluginMessageObservations{
+			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {1: {}, 2: {}},
 				2: {},
 			},
@@ -35,10 +36,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "ObserverNotFound",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				2: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
-			observedMsgs: cciptypes.ExecutePluginMessageObservations{
+			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {1: {}, 2: {}},
 			},
 			expErr: "observer not found in config",
@@ -46,10 +47,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "ObserverNotAllowedToReadChain",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1}},
 			},
-			observedMsgs: cciptypes.ExecutePluginMessageObservations{
+			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				2: {1: {}},
 			},
 			expErr: "observer not allowed to read from chain 2",
@@ -57,18 +58,18 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "NoMessagesObserved",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
-			observedMsgs: cciptypes.ExecutePluginMessageObservations{},
+			observedMsgs: plugintypes.ExecutePluginMessageObservations{},
 		},
 		{
 			name:     "EmptyMessagesInChain",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
-			observedMsgs: cciptypes.ExecutePluginMessageObservations{
+			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {},
 				2: {1: {}, 2: {}},
 			},
@@ -76,10 +77,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 		{
 			name:     "AllMessagesEmpty",
 			observer: commontypes.OracleID(1),
-			observerCfg: map[commontypes.OracleID]cciptypes.ObserverInfo{
+			observerCfg: map[commontypes.OracleID]pluginconfig.ObserverInfo{
 				1: {Reads: []cciptypes.ChainSelector{1, 2}},
 			},
-			observedMsgs: cciptypes.ExecutePluginMessageObservations{
+			observedMsgs: plugintypes.ExecutePluginMessageObservations{
 				1: {},
 				2: {},
 			},
@@ -102,15 +103,15 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 func Test_validateObservedSequenceNumbers(t *testing.T) {
 	testCases := []struct {
 		name         string
-		observedData map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages
+		observedData map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages
 		expErr       bool
 	}{
 		{
 			name: "ValidData",
-			observedData: map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages{
+			observedData: map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
 				1: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 							ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
@@ -119,7 +120,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 				},
 				2: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{2},
 							SequenceNumberRange: cciptypes.SeqNumRange{11, 20},
 							ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
@@ -130,17 +131,17 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		},
 		{
 			name: "DuplicateMerkleRoot",
-			observedData: map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages{
+			observedData: map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
 				1: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 							ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.SeqNumRange{11, 20},
 							ExecutedMessages:    []cciptypes.SeqNum{11, 12, 13},
@@ -152,17 +153,17 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		},
 		{
 			name: "OverlappingSequenceNumberRange",
-			observedData: map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages{
+			observedData: map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
 				1: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 							ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3},
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{2},
 							SequenceNumberRange: cciptypes.SeqNumRange{5, 15},
 							ExecutedMessages:    []cciptypes.SeqNum{6, 7, 8},
@@ -174,10 +175,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		},
 		{
 			name: "ExecutedMessageOutsideObservedRange",
-			observedData: map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages{
+			observedData: map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
 				1: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.SeqNumRange{1, 10},
 							ExecutedMessages:    []cciptypes.SeqNum{1, 2, 11},
@@ -189,13 +190,13 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		},
 		{
 			name: "NoCommitData",
-			observedData: map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages{
+			observedData: map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
 				1: {},
 			},
 		},
 		{
 			name:         "EmptyObservedData",
-			observedData: map[cciptypes.ChainSelector][]cciptypes.ExecutePluginCommitDataWithMessages{},
+			observedData: map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{},
 		},
 	}
 
@@ -213,7 +214,7 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 
 func Test_computeRanges(t *testing.T) {
 	type args struct {
-		reports []cciptypes.ExecutePluginCommitDataWithMessages
+		reports []plugintypes.ExecutePluginCommitDataWithMessages
 	}
 
 	tests := []struct {
@@ -224,19 +225,19 @@ func Test_computeRanges(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{}},
+			args: args{reports: []plugintypes.ExecutePluginCommitDataWithMessages{}},
 			want: nil,
 		},
 		{
 			name: "overlapping ranges",
-			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+			args: args{reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(15, 25),
 					},
 				},
@@ -246,19 +247,19 @@ func Test_computeRanges(t *testing.T) {
 		},
 		{
 			name: "simple ranges collapsed",
-			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+			args: args{reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(21, 40),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(41, 60),
 					},
 				},
@@ -268,19 +269,19 @@ func Test_computeRanges(t *testing.T) {
 		},
 		{
 			name: "non-contiguous ranges",
-			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+			args: args{reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 				},
 			},
@@ -289,19 +290,19 @@ func Test_computeRanges(t *testing.T) {
 		},
 		{
 			name: "contiguous and non-contiguous ranges",
-			args: args{reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+			args: args{reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(21, 40),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					},
 				},
@@ -327,30 +328,30 @@ func Test_computeRanges(t *testing.T) {
 
 func Test_groupByChainSelector(t *testing.T) {
 	type args struct {
-		reports []cciptypes.CommitPluginReportWithMeta
+		reports []plugintypes.CommitPluginReportWithMeta
 	}
 	tests := []struct {
 		name string
 		args args
-		want cciptypes.ExecutePluginCommitObservations
+		want plugintypes.ExecutePluginCommitObservations
 	}{
 		{
 			name: "empty",
-			args: args{reports: []cciptypes.CommitPluginReportWithMeta{}},
-			want: cciptypes.ExecutePluginCommitObservations{},
+			args: args{reports: []plugintypes.CommitPluginReportWithMeta{}},
+			want: plugintypes.ExecutePluginCommitObservations{},
 		},
 		{
 			name: "reports",
-			args: args{reports: []cciptypes.CommitPluginReportWithMeta{{
+			args: args{reports: []plugintypes.CommitPluginReportWithMeta{{
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
 						{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
 					}}}}},
-			want: cciptypes.ExecutePluginCommitObservations{
+			want: plugintypes.ExecutePluginCommitObservations{
 				1: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SourceChain:         1,
 							MerkleRoot:          cciptypes.Bytes32{1},
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
@@ -360,7 +361,7 @@ func Test_groupByChainSelector(t *testing.T) {
 				},
 				2: {
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SourceChain:         2,
 							MerkleRoot:          cciptypes.Bytes32{2},
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
@@ -382,13 +383,13 @@ func Test_groupByChainSelector(t *testing.T) {
 
 func Test_filterOutFullyExecutedMessages(t *testing.T) {
 	type args struct {
-		reports          []cciptypes.ExecutePluginCommitDataWithMessages
+		reports          []plugintypes.ExecutePluginCommitDataWithMessages
 		executedMessages []cciptypes.SeqNumRange
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    []cciptypes.ExecutePluginCommitDataWithMessages
+		want    []plugintypes.ExecutePluginCommitDataWithMessages
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
@@ -403,43 +404,43 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "empty2",
 			args: args{
-				reports:          []cciptypes.ExecutePluginCommitDataWithMessages{},
+				reports:          []plugintypes.ExecutePluginCommitDataWithMessages{},
 				executedMessages: nil,
 			},
-			want:    []cciptypes.ExecutePluginCommitDataWithMessages{},
+			want:    []plugintypes.ExecutePluginCommitDataWithMessages{},
 			wantErr: assert.NoError,
 		},
 		{
 			name: "no executed messages",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						},
 					},
 				},
 				executedMessages: nil,
 			},
-			want: []cciptypes.ExecutePluginCommitDataWithMessages{
+			want: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)}},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)}},
 			},
 			wantErr: assert.NoError,
@@ -447,15 +448,15 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "executed messages",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)}},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)}},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)}},
 				},
 				executedMessages: []cciptypes.SeqNumRange{
@@ -468,17 +469,17 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "2 partially executed",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20)},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40)},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60)},
 					},
 				},
@@ -486,21 +487,21 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(15, 35),
 				},
 			},
-			want: []cciptypes.ExecutePluginCommitDataWithMessages{
+			want: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						ExecutedMessages:    []cciptypes.SeqNum{15, 16, 17, 18, 19, 20},
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						ExecutedMessages:    []cciptypes.SeqNum{30, 31, 32, 33, 34, 35},
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					},
 				},
@@ -510,19 +511,19 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "2 partially executed 1 fully executed",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						},
 					},
@@ -531,15 +532,15 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(15, 55),
 				},
 			},
-			want: []cciptypes.ExecutePluginCommitDataWithMessages{
+			want: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						ExecutedMessages:    []cciptypes.SeqNum{15, 16, 17, 18, 19, 20},
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						ExecutedMessages:    []cciptypes.SeqNum{50, 51, 52, 53, 54, 55},
 					},
@@ -550,19 +551,19 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "first report executed",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						},
 					},
@@ -571,14 +572,14 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(10, 20),
 				},
 			},
-			want: []cciptypes.ExecutePluginCommitDataWithMessages{
+			want: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					},
 				},
@@ -588,19 +589,19 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "last report executed",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						},
 					},
@@ -609,14 +610,14 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 					cciptypes.NewSeqNumRange(50, 60),
 				},
 			},
-			want: []cciptypes.ExecutePluginCommitDataWithMessages{
+			want: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 					},
 				},
@@ -626,38 +627,38 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "sort-report",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						},
 					},
 				},
 				executedMessages: nil,
 			},
-			want: []cciptypes.ExecutePluginCommitDataWithMessages{
+			want: []plugintypes.ExecutePluginCommitDataWithMessages{
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 					},
 				},
 				{
-					ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 					},
 				},
@@ -667,19 +668,19 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 		{
 			name: "sort-executed",
 			args: args{
-				reports: []cciptypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(10, 20),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(30, 40),
 						},
 					},
 					{
-						ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{
+						ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 							SequenceNumberRange: cciptypes.NewSeqNumRange(50, 60),
 						},
 					},
@@ -707,7 +708,7 @@ func Test_filterOutFullyExecutedMessages(t *testing.T) {
 }
 
 func Test_decodeAttributedObservations(t *testing.T) {
-	mustEncode := func(obs cciptypes.ExecutePluginObservation) []byte {
+	mustEncode := func(obs plugintypes.ExecutePluginObservation) []byte {
 		enc, err := obs.Encode()
 		if err != nil {
 			t.Fatal("Unable to encode")
@@ -732,9 +733,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 			args: []types.AttributedObservation{
 				{
 					Observer: commontypes.OracleID(1),
-					Observation: mustEncode(cciptypes.ExecutePluginObservation{
-						CommitReports: cciptypes.ExecutePluginCommitObservations{
-							1: {{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
+					Observation: mustEncode(plugintypes.ExecutePluginObservation{
+						CommitReports: plugintypes.ExecutePluginCommitObservations{
+							1: {{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
 						},
 					}),
 				},
@@ -742,9 +743,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 			want: []decodedAttributedObservation{
 				{
 					Observer: commontypes.OracleID(1),
-					Observation: cciptypes.ExecutePluginObservation{
-						CommitReports: cciptypes.ExecutePluginCommitObservations{
-							1: {{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
+					Observation: plugintypes.ExecutePluginObservation{
+						CommitReports: plugintypes.ExecutePluginCommitObservations{
+							1: {{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
 						},
 					},
 				},
@@ -756,17 +757,17 @@ func Test_decodeAttributedObservations(t *testing.T) {
 			args: []types.AttributedObservation{
 				{
 					Observer: commontypes.OracleID(1),
-					Observation: mustEncode(cciptypes.ExecutePluginObservation{
-						CommitReports: cciptypes.ExecutePluginCommitObservations{
-							1: {{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
+					Observation: mustEncode(plugintypes.ExecutePluginObservation{
+						CommitReports: plugintypes.ExecutePluginCommitObservations{
+							1: {{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
 						},
 					}),
 				},
 				{
 					Observer: commontypes.OracleID(2),
-					Observation: mustEncode(cciptypes.ExecutePluginObservation{
-						CommitReports: cciptypes.ExecutePluginCommitObservations{
-							2: {{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{2}}}},
+					Observation: mustEncode(plugintypes.ExecutePluginObservation{
+						CommitReports: plugintypes.ExecutePluginCommitObservations{
+							2: {{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{2}}}},
 						},
 					}),
 				},
@@ -774,17 +775,17 @@ func Test_decodeAttributedObservations(t *testing.T) {
 			want: []decodedAttributedObservation{
 				{
 					Observer: commontypes.OracleID(1),
-					Observation: cciptypes.ExecutePluginObservation{
-						CommitReports: cciptypes.ExecutePluginCommitObservations{
-							1: {{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
+					Observation: plugintypes.ExecutePluginObservation{
+						CommitReports: plugintypes.ExecutePluginCommitObservations{
+							1: {{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{1}}}},
 						},
 					},
 				},
 				{
 					Observer: commontypes.OracleID(2),
-					Observation: cciptypes.ExecutePluginObservation{
-						CommitReports: cciptypes.ExecutePluginCommitObservations{
-							2: {{ExecutePluginCommitData: cciptypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{2}}}},
+					Observation: plugintypes.ExecutePluginObservation{
+						CommitReports: plugintypes.ExecutePluginCommitObservations{
+							2: {{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{MerkleRoot: cciptypes.Bytes32{2}}}},
 						},
 					},
 				},

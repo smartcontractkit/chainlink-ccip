@@ -5,10 +5,17 @@ import (
 	"fmt"
 	"math/big"
 
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
+
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 )
+
+type TokenPrices interface {
+	// GetTokenPricesUSD returns the prices of the provided tokens in USD.
+	// The order of the returned prices corresponds to the order of the provided tokens.
+	GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+}
 
 type TokenPriceConfig struct {
 	// This is mainly used for inputTokens on testnet to give them a price
@@ -68,3 +75,6 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 
 	return prices, nil
 }
+
+// Ensure OnchainTokenPricesReader implements TokenPrices
+var _ TokenPrices = (*OnchainTokenPricesReader)(nil)
