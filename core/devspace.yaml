@@ -490,7 +490,16 @@ profiles:
         path: deployments.app.helm.values.chainlink.nodes
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev.yaml"]
+        value: [ "./values-profiles/values-dev-core-ocr2-external-network.yaml" ]
+  - name: local-dev-simulated-core-ocr1
+    patches:
+      - op: remove
+        path: deployments.app.helm.values.chainlink.global.overridesToml
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value: ["./values-profiles/values-dev-simulated-core-ocr1.yaml"]
   - name: keystone
     patches:
       - op: remove
