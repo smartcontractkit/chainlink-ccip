@@ -268,11 +268,11 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
 		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
-		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainA, seqNumA, emptyMsgs)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 		// and there are two new message on chainB
-		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainB, seqNumB, chainBDefaultMsgs)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, chainBDefaultMsgs)
 
-		mockGasPrices(n.ccipReader, ctx, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
+		mockGasPrices(ctx, n.ccipReader, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
 
 		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
@@ -306,7 +306,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
 
 		// then they fetch new msgs, there is nothing new on chainA
-		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainA, seqNumA, emptyMsgs)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 
 		var otherChainBMsgs = make([]cciptypes.CCIPMsg, len(chainBDefaultMsgs))
 		copy(otherChainBMsgs[:], chainBDefaultMsgs[:])
@@ -314,9 +314,9 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		otherChainBMsgs[0].SeqNum = seqNumB + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
 		otherChainBMsgs[1].ID = "2" + strconv.Itoa(i)
 		otherChainBMsgs[1].SeqNum = 22 + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
-		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainB, seqNumB, otherChainBMsgs)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, otherChainBMsgs)
 
-		mockGasPrices(n.ccipReader, ctx, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
+		mockGasPrices(ctx, n.ccipReader, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
 	}
 
 	require.NoError(t, homeChain.Close())
@@ -340,9 +340,9 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
 		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
-		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainA, seqNumA, emptyMsgs)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 		// and there are two new message on chainB
-		mockMsgsBetweenSeqNums(n.ccipReader, ctx, chainB, seqNumB, chainBDefaultMsgs)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, chainBDefaultMsgs)
 
 		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
 			Return([]cciptypes.BigInt{}, fmt.Errorf("no gas prices available: %w", reader.ErrContractWriterNotFound))
@@ -425,7 +425,11 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 
 // mockGasPrices mocks the gas prices for the given chains
 // the gas prices are returned in the same order as the chains
-func mockGasPrices(ccipReader *mocks.CCIPReader, ctx context.Context, chains []cciptypes.ChainSelector, gasPrices []int64) {
+func mockGasPrices(
+	ctx context.Context,
+	ccipReader *mocks.CCIPReader,
+	chains []cciptypes.ChainSelector,
+	gasPrices []int64) {
 	gasPricesBigInt := make([]cciptypes.BigInt, len(gasPrices))
 	for i, gp := range gasPrices {
 		gasPricesBigInt[i] = cciptypes.NewBigIntFromInt64(gp)
@@ -434,7 +438,12 @@ func mockGasPrices(ccipReader *mocks.CCIPReader, ctx context.Context, chains []c
 	ccipReader.On("GasPrices", ctx, chains).
 		Return(gasPricesBigInt, nil)
 }
-func mockMsgsBetweenSeqNums(ccipReader *mocks.CCIPReader, ctx context.Context, chain cciptypes.ChainSelector, seqNum cciptypes.SeqNum, msgs []cciptypes.CCIPMsg) {
+func mockMsgsBetweenSeqNums(
+	ctx context.Context,
+	ccipReader *mocks.CCIPReader,
+	chain cciptypes.ChainSelector,
+	seqNum cciptypes.SeqNum,
+	msgs []cciptypes.CCIPMsg) {
 	ccipReader.On(
 		"MsgsBetweenSeqNums",
 		ctx,
