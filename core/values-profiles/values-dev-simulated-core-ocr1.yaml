@@ -43,6 +43,4 @@ chainlink:
       [WebServer.TLS]
       HTTPSPort = 0
       [Database]
-      MaxIdleConns = 50
-      MaxOpenConns = 50
       MigrateOnStartup = true
