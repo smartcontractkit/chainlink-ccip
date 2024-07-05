@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -146,17 +145,17 @@ func Test_observeNewMsgs(t *testing.T) {
 			msgScanBatchSize: 256,
 			newMsgs: map[cciptypes.ChainSelector][]cciptypes.Message{
 				1: {
-					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}},
+					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}},
 				},
 				2: {
-					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
-					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
+					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
+					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
 				},
 			},
 			expMsgs: []cciptypes.Message{
-				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}},
-				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
-				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
+				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}},
+				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
+				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
 			},
 			expErr: false,
 		},
@@ -170,13 +169,13 @@ func Test_observeNewMsgs(t *testing.T) {
 			msgScanBatchSize: 256,
 			newMsgs: map[cciptypes.ChainSelector][]cciptypes.Message{
 				2: {
-					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
-					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
+					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
+					{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
 				},
 			},
 			expMsgs: []cciptypes.Message{
-				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
-				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
+				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 2, SequenceNumber: 21}},
+				{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 22}},
 			},
 			expErr: false,
 		},
@@ -387,10 +386,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "dup msg seq num",
 			msgs: []cciptypes.RampMessageHeader{
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 14},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13}, // dup
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 14},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13}, // dup
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -401,10 +400,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "msg seq nums ok",
 			msgs: []cciptypes.RampMessageHeader{
-				{MsgHash: cciptypes.Bytes32{1}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MsgHash: cciptypes.Bytes32{2}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13},
-				{MsgHash: cciptypes.Bytes32{3}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 14},
-				{MsgHash: cciptypes.Bytes32{4}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 2, SequenceNumber: 21},
+				{MsgHash: cciptypes.Bytes32{1}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MsgHash: cciptypes.Bytes32{2}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13},
+				{MsgHash: cciptypes.Bytes32{3}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 14},
+				{MsgHash: cciptypes.Bytes32{4}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 2, SequenceNumber: 21},
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -415,10 +414,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "msg seq nums does not match observed max seq num",
 			msgs: []cciptypes.RampMessageHeader{
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 10}, // max seq num is already 10
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 2, SequenceNumber: 21},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 10}, // max seq num is already 10
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 2, SequenceNumber: 21},
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -429,10 +428,10 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "max seq num not found",
 			msgs: []cciptypes.RampMessageHeader{
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 14},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 2, SequenceNumber: 21}, // max seq num not reported
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 14},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 2, SequenceNumber: 21}, // max seq num not reported
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -442,9 +441,9 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "msg hashes ok",
 			msgs: []cciptypes.RampMessageHeader{
-				{MsgHash: cciptypes.Bytes32{123}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MsgHash: cciptypes.Bytes32{99}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13},
-				{MsgHash: cciptypes.Bytes32{12}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 300, SequenceNumber: 23},
+				{MsgHash: cciptypes.Bytes32{123}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MsgHash: cciptypes.Bytes32{99}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13},
+				{MsgHash: cciptypes.Bytes32{12}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 300, SequenceNumber: 23},
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -456,9 +455,9 @@ func Test_validateObservedSequenceNumbers(t *testing.T) {
 		{
 			name: "dup msg hashes",
 			msgs: []cciptypes.RampMessageHeader{
-				{MsgHash: cciptypes.Bytes32{123}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MsgHash: cciptypes.Bytes32{99}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 13},
-				{MsgHash: cciptypes.Bytes32{123}, MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 300, SequenceNumber: 23}, // dup hash
+				{MsgHash: cciptypes.Bytes32{123}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MsgHash: cciptypes.Bytes32{99}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 13},
+				{MsgHash: cciptypes.Bytes32{123}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: 300, SequenceNumber: 23}, // dup hash
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{
 				{ChainSel: 1, SeqNum: 10},
@@ -495,10 +494,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			name:     "observer can read all chains",
 			observer: libocrtypes.PeerID{10},
 			msgs: []cciptypes.RampMessageHeader{
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 3, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 3, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 3, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 3, SequenceNumber: 12},
 			},
 			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2, 3),
 			destChain:           1,
@@ -530,10 +529,10 @@ func Test_validateObserverReadingEligibility(t *testing.T) {
 			name:     "observer cfg not found",
 			observer: libocrtypes.PeerID{10},
 			msgs: []cciptypes.RampMessageHeader{
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 3, SequenceNumber: 12},
-				{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 3, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 3, SequenceNumber: 12},
+				{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 3, SequenceNumber: 12},
 			},
 			nodeSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 3), // observer 10 not found
 			destChain:           1,
@@ -693,9 +692,9 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{},
 			expErr:         false,
@@ -707,11 +706,11 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			maxSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -730,21 +729,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -763,21 +762,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 10}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -796,18 +795,18 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 12}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 13}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -828,17 +827,17 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 2, SeqNum: 20},
 			},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 21}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 21}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 2, SequenceNumber: 21}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x04"), SourceChainSelector: 2, SequenceNumber: 22}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x04"), SourceChainSelector: 2, SequenceNumber: 22}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x04"), SourceChainSelector: 2, SequenceNumber: 22}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 21}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 21}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 2, SequenceNumber: 21}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x04"), SourceChainSelector: 2, SequenceNumber: 22}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x04"), SourceChainSelector: 2, SequenceNumber: 22}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x04"), SourceChainSelector: 2, SequenceNumber: 22}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -861,21 +860,21 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 				{ChainSel: 1, SeqNum: 10},
 			},
 			observations: []plugintypes.CommitPluginObservation{
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x10"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x10"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x1101"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x1101"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x03"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
-				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID(t, "0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x01"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x10"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x10"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x1101"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x1101"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x03"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
+				{NewMsgs: []cciptypes.RampMessageHeader{{MessageID: mustNewMessageID("0x02"), SourceChainSelector: 1, SequenceNumber: 11}}},
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
@@ -1304,9 +1303,11 @@ func Test_validateMerkleRootsState(t *testing.T) {
 	}
 }
 
-func mustNewMessageID(t *testing.T, msgIDHex string) cciptypes.Bytes32 {
+func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
 	msgID, err := cciptypes.NewBytes32FromString(msgIDHex)
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 	return msgID
 }
 

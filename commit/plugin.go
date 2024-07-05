@@ -115,7 +115,7 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
-	supportedChains, err := p.supportedChains()
+	supportedChains, err := p.supportedChains(p.nodeID)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
@@ -210,12 +210,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	destSupportedChains, err := p.supportedChains()
+	observerSupportedChains, err := p.supportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, destSupportedChains, p.cfg.DestChain)
+	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, observerSupportedChains, p.cfg.DestChain)
 	if err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
@@ -385,8 +385,8 @@ func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
 
-func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) {
-	p2pID, exists := p.oracleIDToP2pID[p.nodeID]
+func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
+	p2pID, exists := p.oracleIDToP2pID[oracleID]
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
@@ -399,6 +399,7 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	return supportedChains, nil
 }
 
+// If current node is a writer for the destination chain.
 func (p *Plugin) supportsDestChain() (bool, error) {
 	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
 	if err != nil {
