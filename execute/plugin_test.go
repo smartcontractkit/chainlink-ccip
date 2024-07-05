@@ -344,34 +344,37 @@ func Test_selectReport(t *testing.T) {
 			expectedCommitReports: 0,
 			expectedExecThings:    []int{10, 20},
 		},
-		// {
-		// 	name: "one and half reports",
-		// 	args: args{
-		// 		maxReportSize: 8500,
-		// 		reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-		// 			makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
-		// 			makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
-		// 		},
-		// 	},
-		// 	expectedExecReports:   2,
-		// 	expectedCommitReports: 1,
-		// 	expectedExecThings:    []int{10, 10},
-		// 	lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
-		// },
-		// {
-		// 	name: "exactly one report",
-		// 	args: args{
-		// 		maxReportSize: 4200,
-		// 		reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-		// 			makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
-		// 			makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
-		// 		},
-		// 	},
-		// 	expectedExecReports:   1,
-		// 	expectedCommitReports: 1,
-		// 	expectedExecThings:    []int{10},
-		// 	lastReportExecuted:    []cciptypes.SeqNum{},
-		// },
+		{
+			name: "one and half reports",
+			args: args{
+				maxReportSize: 8500,
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
+				},
+			},
+			expectedExecReports:   2,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{10, 19},
+			lastReportExecuted: []cciptypes.SeqNum{
+				100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+				110, 111, 112, 113, 114, 115, 116, 117, 118,
+			},
+		},
+		{
+			name: "exactly one report",
+			args: args{
+				maxReportSize: 3200,
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{10},
+			lastReportExecuted:    []cciptypes.SeqNum{},
+		},
 		{
 			name: "execute remainder of partially executed report",
 			args: args{
@@ -384,19 +387,19 @@ func Test_selectReport(t *testing.T) {
 			expectedCommitReports: 0,
 			expectedExecThings:    []int{5},
 		},
-		// {
-		// 	name: "partially execute remainder of partially executed report",
-		// 	args: args{
-		// 		maxReportSize: 2050,
-		// 		reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-		// 			makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
-		// 		},
-		// 	},
-		// 	expectedExecReports:   1,
-		// 	expectedCommitReports: 1,
-		// 	expectedExecThings:    []int{4},
-		// 	lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
-		// },
+		{
+			name: "partially execute remainder of partially executed report",
+			args: args{
+				maxReportSize: 1550,
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{4},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
+		},
 		{
 			name: "execute remainder of sparsely executed report",
 			args: args{
@@ -409,19 +412,19 @@ func Test_selectReport(t *testing.T) {
 			expectedCommitReports: 0,
 			expectedExecThings:    []int{5},
 		},
-		// {
-		// 	name: "partially execute remainder of partially executed sparse report",
-		// 	args: args{
-		// 		maxReportSize: 2050,
-		// 		reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-		// 			makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
-		// 		},
-		// 	},
-		// 	expectedExecReports:   1,
-		// 	expectedCommitReports: 1,
-		// 	expectedExecThings:    []int{4},
-		// 	lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
-		// },
+		{
+			name: "partially execute remainder of partially executed sparse report",
+			args: args{
+				maxReportSize: 1550,
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{4},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108},
+		},
 		{
 			name: "broken report",
 			args: args{
@@ -448,15 +451,15 @@ func Test_selectReport(t *testing.T) {
 			require.Len(t, execReports, tt.expectedExecReports)
 			require.Len(t, commitReports, tt.expectedCommitReports)
 			for i, execReport := range execReports {
-				assert.Len(t, execReport.Messages, tt.expectedExecThings[i])
-				assert.Len(t, execReport.OffchainTokenData, tt.expectedExecThings[i])
-				assert.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
+				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i], "Unexpected number of messages, iter %d", i)
+				require.Lenf(t, execReport.OffchainTokenData, tt.expectedExecThings[i], "Unexpected number of token data, iter %d", i)
+				require.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
 				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
 			}
 			// If the last report is partially executed, the executed messages can be checked.
 			if len(execReports) > 0 && len(tt.lastReportExecuted) > 0 {
 				lastReport := commitReports[len(commitReports)-1]
-				assert.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
+				require.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
 			}
 		})
 	}
