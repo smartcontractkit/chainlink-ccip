@@ -467,12 +467,18 @@ var (
 	chainBDefaultMsgs = []cciptypes.Message{
 		{
 			Header: cciptypes.RampMessageHeader{
-				MsgHash: cciptypes.Bytes32{1}, MessageID: mustNewMessageID("0x01"), SourceChainSelector: chainB, SequenceNumber: seqNumB,
+				MsgHash:             cciptypes.Bytes32{1},
+				MessageID:           mustNewMessageID("0x01"),
+				SourceChainSelector: chainB,
+				SequenceNumber:      seqNumB,
 			},
 		},
 		{
 			Header: cciptypes.RampMessageHeader{
-				MsgHash: cciptypes.Bytes32{2}, MessageID: mustNewMessageID("0x02"), SourceChainSelector: chainB, SequenceNumber: 22,
+				MsgHash:             cciptypes.Bytes32{2},
+				MessageID:           mustNewMessageID("0x02"),
+				SourceChainSelector: chainB,
+				SequenceNumber:      22,
 			},
 		},
 	}

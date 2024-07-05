@@ -451,8 +451,10 @@ func Test_selectReport(t *testing.T) {
 			require.Len(t, execReports, tt.expectedExecReports)
 			require.Len(t, commitReports, tt.expectedCommitReports)
 			for i, execReport := range execReports {
-				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i], "Unexpected number of messages, iter %d", i)
-				require.Lenf(t, execReport.OffchainTokenData, tt.expectedExecThings[i], "Unexpected number of token data, iter %d", i)
+				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i],
+					"Unexpected number of messages, iter %d", i)
+				require.Lenf(t, execReport.OffchainTokenData, tt.expectedExecThings[i],
+					"Unexpected number of token data, iter %d", i)
 				require.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
 				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
 			}

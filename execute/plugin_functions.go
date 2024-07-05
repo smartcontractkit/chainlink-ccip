@@ -367,7 +367,9 @@ func constructMerkleTree(
 		}
 		leaf, err := hasher.Hash(ctx, msg)
 		if err != nil {
-			return nil, fmt.Errorf("unable to hash message (%d, %d): %w", msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
+			return nil, fmt.Errorf(
+				"unable to hash message (%d, %d): %w",
+				msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
 		}
 		treeLeaves = append(treeLeaves, leaf)
 	}
