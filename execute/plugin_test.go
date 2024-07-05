@@ -309,15 +309,15 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2600,
+				maxReportSize: 2300,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 				},
 			},
 			expectedExecReports:   1,
 			expectedCommitReports: 1,
-			expectedExecThings:    []int{8},
-			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107},
+			expectedExecThings:    []int{5},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104},
 		},
 		{
 			name: "full report",
@@ -355,16 +355,13 @@ func Test_selectReport(t *testing.T) {
 			},
 			expectedExecReports:   2,
 			expectedCommitReports: 1,
-			expectedExecThings:    []int{10, 19},
-			lastReportExecuted: []cciptypes.SeqNum{
-				100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
-				110, 111, 112, 113, 114, 115, 116, 117, 118,
-			},
+			expectedExecThings:    []int{10, 10},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 105, 106, 107, 108, 109},
 		},
 		{
 			name: "exactly one report",
 			args: args{
-				maxReportSize: 3200,
+				maxReportSize: 4200,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
@@ -390,7 +387,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 1550,
+				maxReportSize: 2050,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
@@ -415,7 +412,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
-				maxReportSize: 1550,
+				maxReportSize: 2050,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},

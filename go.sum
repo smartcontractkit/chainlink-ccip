@@ -59,6 +59,10 @@ github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705081543-49649c97546
 github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705081543-49649c975466/go.mod h1:fh9eBbrReCmv31bfz52ENCAMa7nTKQbdhb2B3+S2VGo=
 github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705104354-fd870ba27159 h1:tLeyrqR4m8aDwGE3wAn/AP3Wj1JUnOP1WCtx73YI8p8=
 github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705104354-fd870ba27159/go.mod h1:fh9eBbrReCmv31bfz52ENCAMa7nTKQbdhb2B3+S2VGo=
+github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705143754-e9f096cef1b3 h1:IvwpEib2LiutHZdzHAPyqjmm+UEEmNeWSaiYlyvuD7E=
+github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705143754-e9f096cef1b3/go.mod h1:fh9eBbrReCmv31bfz52ENCAMa7nTKQbdhb2B3+S2VGo=
+github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705152327-91b39e47607a h1:5jIa3o2rLJ8BUsttLj8lTrZr57gIVX6hFhFc1RTVSbc=
+github.com/smartcontractkit/chainlink-common v0.1.7-0.20240705152327-91b39e47607a/go.mod h1:fh9eBbrReCmv31bfz52ENCAMa7nTKQbdhb2B3+S2VGo=
 github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c h1:lIyMbTaF2H0Q71vkwZHX/Ew4KF2BxiKhqEXwF8rn+KI=
 github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c/go.mod h1:fb1ZDVXACvu4frX3APHZaEBp0xi1DIm34DcA0CwTsZM=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
