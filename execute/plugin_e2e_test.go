@@ -2,12 +2,15 @@ package execute
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -21,6 +24,16 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
+
+var sentinelBytes cciptypes.Bytes32
+
+func init() {
+	data, err := hex.DecodeString(SentinelRoot[2:])
+	if err != nil {
+		panic(fmt.Sprintf("unable to read sentinal bytes: %s", err))
+	}
+	copy(sentinelBytes[:], data)
+}
 
 func TestPlugin(t *testing.T) {
 	ctx := context.Background()
@@ -41,14 +54,30 @@ func TestPlugin(t *testing.T) {
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
 	res, err := runner.RunRound(ctx)
-	fmt.Println(res, err)
+	require.NoError(t, err)
+	outcome, err := plugintypes.DecodeExecutePluginOutcome(res.Outcome)
+	require.NoError(t, err)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.PendingCommitReports, 1)
+
+	res, err = runner.RunRound(ctx)
+
+	outcome, err = plugintypes.DecodeExecutePluginOutcome(res.Outcome)
+	require.NoError(t, err)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	require.Len(t, outcome.PendingCommitReports, 0)
+
+	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
+		return m.Header.SequenceNumber
+	})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
 
 type nodeSetup struct {
-	node        *Plugin
-	priceReader *mocks.TokenPricesReader
-	reportCodec *mocks.ExecutePluginJSONReportCodec
-	msgHasher   *mocks.MessageHasher
+	node            *Plugin
+	reportCodec     *mocks.ExecutePluginJSONReportCodec
+	msgHasher       *mocks.MessageHasher
+	TokenDataReader *mocks.TokenDataReader
 }
 
 func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
@@ -72,11 +101,12 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 	return homeChain
 }
 
-func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed bool) inmem.MessagesWithMetadata {
+func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool) inmem.MessagesWithMetadata {
 	return inmem.MessagesWithMetadata{
 		Message: cciptypes.Message{
 			Header: cciptypes.RampMessageHeader{
-				SequenceNumber: seqNum,
+				SourceChainSelector: src,
+				SequenceNumber:      seqNum,
 			},
 		},
 		Destination: dest,
@@ -97,7 +127,7 @@ func setupSimpleTest(
 						{
 							ChainSel:     srcSelector,
 							SeqNumsRange: cciptypes.NewSeqNumRange(100, 105),
-							//MerkleRoot:   [],
+							MerkleRoot:   sentinelBytes,
 						},
 					},
 				},
@@ -107,12 +137,12 @@ func setupSimpleTest(
 		},
 		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
 			srcSelector: {
-				makeMsg(100, dstSelector, true),
-				makeMsg(101, dstSelector, true),
-				makeMsg(102, dstSelector, false),
-				makeMsg(103, dstSelector, false),
-				makeMsg(104, dstSelector, false),
-				makeMsg(105, dstSelector, false),
+				makeMsg(100, srcSelector, dstSelector, true),
+				makeMsg(101, srcSelector, dstSelector, true),
+				makeMsg(102, srcSelector, dstSelector, false),
+				makeMsg(103, srcSelector, dstSelector, false),
+				makeMsg(104, srcSelector, dstSelector, false),
+				makeMsg(105, srcSelector, dstSelector, false),
 			},
 		},
 	}
@@ -149,11 +179,14 @@ func setupSimpleTest(
 		return nil
 	}
 
+	tokenDataReader := mocks.NewTokenDataReader(t)
+	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
+
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -165,16 +198,16 @@ func setupSimpleTest(
 
 func newNode(
 	_ context.Context,
-	_ *testing.T,
+	t *testing.T,
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
+	tokenDataReader TokenDataReader,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
 ) nodeSetup {
-	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 
@@ -191,11 +224,11 @@ func newNode(
 		reportCodec,
 		msgHasher,
 		homeChain,
+		tokenDataReader,
 		lggr)
 
 	return nodeSetup{
 		node:        node1,
-		priceReader: priceReader,
 		reportCodec: reportCodec,
 		msgHasher:   msgHasher,
 	}
