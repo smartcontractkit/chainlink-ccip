@@ -618,7 +618,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	// TODO: Final vlaidation?
+	// TODO: Final validation?
 
 	p.lggr.Debugw("transmitting report",
 		"reports", len(decodedReport.ChainReports),
