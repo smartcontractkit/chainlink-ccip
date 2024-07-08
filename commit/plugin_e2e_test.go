@@ -438,16 +438,6 @@ func mockGasPrices(
 		Return(gasPricesBigInt, nil)
 }
 
-func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
-	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
-	for _, id := range ids {
-		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
-	}
-
-	ccipReader.On("GasPrices", ctx, chains).
-		Return(gasPricesBigInt, nil)
-}
-
 func mockMsgsBetweenSeqNums(
 	ctx context.Context,
 	ccipReader *mocks.CCIPReader,

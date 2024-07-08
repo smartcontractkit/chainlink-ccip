@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -74,8 +75,8 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 	return homeChain
 }
 
-func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed bool) mocks.MessagesWithMetadata {
-	return mocks.MessagesWithMetadata{
+func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed bool) inmem.MessagesWithMetadata {
+	return inmem.MessagesWithMetadata{
 		Message: cciptypes.Message{
 			Header: cciptypes.RampMessageHeader{
 				SequenceNumber: seqNum,
@@ -88,7 +89,7 @@ func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed boo
 
 func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) []nodeSetup {
 	// Initialize reader with some data
-	ccipReader := mocks.InMemoryCCIPReader{
+	ccipReader := inmem.InMemoryCCIPReader{
 		Dest: dstSelector,
 		Reports: []plugintypes.CommitPluginReportWithMeta{
 			{
@@ -105,7 +106,7 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 				Timestamp: time.Now().Add(-4 * time.Hour),
 			},
 		},
-		Messages: map[cciptypes.ChainSelector][]mocks.MessagesWithMetadata{
+		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
 			srcSelector: {
 				makeMsg(100, dstSelector, true),
 				makeMsg(101, dstSelector, true),

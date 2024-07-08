@@ -1,4 +1,4 @@
-package mocks
+package inmem
 
 import (
 	"context"
@@ -9,12 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 	type fields struct {
-		Reports []cciptypes.CommitPluginReportWithMeta
+		Reports []plugintypes.CommitPluginReportWithMeta
 	}
 	type args struct {
 		ts    time.Time
@@ -43,7 +44,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				limit: 1000,
 			},
 			fields: fields{
-				Reports: []cciptypes.CommitPluginReportWithMeta{
+				Reports: []plugintypes.CommitPluginReportWithMeta{
 					{
 						Timestamp: time.UnixMicro(100000000),
 						BlockNum:  1000,
@@ -68,7 +69,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				limit: 1,
 			},
 			fields: fields{
-				Reports: []cciptypes.CommitPluginReportWithMeta{
+				Reports: []plugintypes.CommitPluginReportWithMeta{
 					{
 						Timestamp: time.UnixMicro(100000000),
 						BlockNum:  1000,
@@ -99,7 +100,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				t.Errorf("CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)
 				return
 			}
-			gotBlocks := slicelib.Map(got, func(report cciptypes.CommitPluginReportWithMeta) expected {
+			gotBlocks := slicelib.Map(got, func(report plugintypes.CommitPluginReportWithMeta) expected {
 				return expected{block: report.BlockNum}
 			})
 			require.ElementsMatchf(t, gotBlocks, tt.want, "CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)
@@ -109,9 +110,9 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 
 func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed bool) MessagesWithMetadata {
 	return MessagesWithMetadata{
-		CCIPMsg: cciptypes.CCIPMsg{
-			CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				SeqNum: seqNum,
+		Message: cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				SequenceNumber: seqNum,
 			},
 		},
 		Destination: dest,
@@ -242,7 +243,7 @@ func TestInMemoryCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		want    []cciptypes.CCIPMsg
+		want    []cciptypes.Message
 		wantErr bool
 	}{
 		{
@@ -266,8 +267,8 @@ func TestInMemoryCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 					},
 				},
 			},
-			want: []cciptypes.CCIPMsg{
-				makeMsg(51, 2, false).CCIPMsg,
+			want: []cciptypes.Message{
+				makeMsg(51, 2, false).Message,
 			},
 		},
 		{
@@ -286,10 +287,10 @@ func TestInMemoryCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 					},
 				},
 			},
-			want: []cciptypes.CCIPMsg{
-				makeMsg(50, 2, false).CCIPMsg,
-				makeMsg(51, 2, false).CCIPMsg,
-				makeMsg(52, 2, false).CCIPMsg,
+			want: []cciptypes.Message{
+				makeMsg(50, 2, false).Message,
+				makeMsg(51, 2, false).Message,
+				makeMsg(52, 2, false).Message,
 			},
 		},
 		{
