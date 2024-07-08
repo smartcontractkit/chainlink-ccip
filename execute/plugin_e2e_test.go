@@ -8,17 +8,18 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 func TestPlugin(t *testing.T) {
@@ -87,7 +88,9 @@ func makeMsg(seqNum cciptypes.SeqNum, dest cciptypes.ChainSelector, executed boo
 	}
 }
 
-func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) []nodeSetup {
+func setupSimpleTest(
+	ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector,
+) []nodeSetup {
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
 		Dest: dstSelector,

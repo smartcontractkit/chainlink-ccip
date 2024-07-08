@@ -8,9 +8,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {

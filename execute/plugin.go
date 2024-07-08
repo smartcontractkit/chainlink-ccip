@@ -219,7 +219,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("decode observation: %w", err)
 	}
 
-	supportedChains, err := p.supportedChainsForOracle(ao.Observer)
+	supportedChains, err := p.supportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
@@ -630,11 +630,7 @@ func (p *Plugin) Close() error {
 	panic("implement me")
 }
 
-func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) {
-	return p.supportedChainsForOracle(p.reportingCfg.OracleID)
-}
-
-func (p *Plugin) supportedChainsForOracle(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
+func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
 	p2pID, exists := p.oracleIDToP2pID[id]
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.reportingCfg.OracleID)
