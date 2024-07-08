@@ -17,8 +17,7 @@ import (
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
 	tests := []struct {
-		name string
-		//observerCfg  map[commontypes.OracleID]cciptypes.ObserverInfo
+		name         string
 		observerCfg  mapset.Set[cciptypes.ChainSelector]
 		observedMsgs plugintypes.ExecutePluginMessageObservations
 		expErr       string
@@ -696,7 +695,6 @@ func Test_decodeAttributedObservations(t *testing.T) {
 		want    []decodedAttributedObservation
 		wantErr assert.ErrorAssertionFunc
 	}{
-		// TODO: Add test cases.
 		{
 			name:    "empty",
 			args:    nil,
