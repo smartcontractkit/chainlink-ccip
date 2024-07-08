@@ -3,8 +3,8 @@ name: Lint and Format Shell Scripts
 on:
   pull_request:
     paths:
-      - '**/*.sh'
-      - '**/*.bash'
+      - "**/*.sh"
+      - "**/*.bash"
 
 jobs:
   sh-checker:

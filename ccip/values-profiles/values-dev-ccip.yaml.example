@@ -114,7 +114,7 @@ crib-chainlink-cluster:
         MaxIdleConns = 20
         MaxOpenConns = 40
         MigrateOnStartup = true
-          
+
         [Log]
         Level = 'debug'
         JSONConsole = true
@@ -146,121 +146,120 @@ crib-chainlink-cluster:
 
         [P2P]
         TraceLogging = true
-        
+
         [P2P.V2]
         Enabled = true
         ListenAddresses = ['0.0.0.0:6690']
         AnnounceAddresses = ['0.0.0.0:6690']
         DeltaDial = '500ms'
         DeltaReconcile = '5s'
-        
+
         [[EVM]]
         ChainID = '11155111'
-        
+
         [EVM.GasEstimator]
         PriceMax = '1 micro'
         LimitDefault = 8000000
         FeeCapDefault = '1 micro'
-        
+
         [EVM.GasEstimator.BlockHistory]
         BlockHistorySize = 200
         EIP1559FeeCapBufferBlocks = 0
-        
+
         [EVM.NodePool]
         PollFailureThreshold = 2
         PollInterval = '3s'
-        
+
         [[EVM.Nodes]]
         Name = '11155111_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '11155111_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '11155111_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '11155111_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM]]
         ChainID = '43113'
-        
+
         [EVM.GasEstimator]
         PriceMax = '5 micro'
         LimitDefault = 8000000
         BumpThreshold = 60
         FeeCapDefault = '5 micro'
-        
+
         [EVM.GasEstimator.BlockHistory]
         BlockHistorySize = 200
-        
+
         [EVM.NodePool]
         PollFailureThreshold = 2
         PollInterval = '3s'
-        
+
         [[EVM.Nodes]]
         Name = '43113_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '43113_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '43113_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM]]
         ChainID = '97'
-        
+
         [EVM.GasEstimator]
         PriceMax = '1 micro'
         LimitDefault = 8000000
         FeeCapDefault = '1 micro'
-        
+
         [EVM.NodePool]
         PollFailureThreshold = 2
         PollInterval = '3s'
-        
+
         [[EVM.Nodes]]
         Name = '97_primary_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '97_primary_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '97_primary_<rpc provider name>'
         WSURL = 'wss://.....'
         HTTPURL = 'https://.....'
         SendOnly = false
-        
+
         [[EVM.Nodes]]
         Name = '97_primary_<rpc provider name>'
         WSURL = 'wss://...../testnet/'
         HTTPURL = 'https://...../testnet/'
         SendOnly = false
-        
