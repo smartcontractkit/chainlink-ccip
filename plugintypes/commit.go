@@ -11,7 +11,7 @@ import (
 // ---[ Observation ]-----------------------------------------------------------
 
 type CommitPluginObservation struct {
-	NewMsgs     []cciptypes.CCIPMsgBaseDetails  `json:"newMsgs"`
+	NewMsgs     []cciptypes.RampMessageHeader   `json:"newMsgs"`
 	GasPrices   []cciptypes.GasPriceChain       `json:"gasPrices"`
 	TokenPrices []cciptypes.TokenPrice          `json:"tokenPrices"`
 	MaxSeqNums  []SeqNumChain                   `json:"maxSeqNums"`
@@ -19,7 +19,7 @@ type CommitPluginObservation struct {
 }
 
 func NewCommitPluginObservation(
-	newMsgs []cciptypes.CCIPMsgBaseDetails,
+	newMsgs []cciptypes.RampMessageHeader,
 	gasPrices []cciptypes.GasPriceChain,
 	tokenPrices []cciptypes.TokenPrice,
 	maxSeqNums []SeqNumChain,

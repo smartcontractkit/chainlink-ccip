@@ -120,7 +120,7 @@ func (p *Plugin) Observation(
 		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
+	msgBaseDetails := make([]cciptypes.RampMessageHeader, 0)
 	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(
 		ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice(),
 	)
@@ -191,7 +191,7 @@ func (p *Plugin) Observation(
 		"fChain", fChain)
 
 	for _, msg := range newMsgs {
-		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
+		msgBaseDetails = append(msgBaseDetails, msg.Header)
 	}
 
 	return plugintypes.NewCommitPluginObservation(

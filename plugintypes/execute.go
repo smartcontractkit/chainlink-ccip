@@ -14,7 +14,7 @@ import (
 
 type ExecutePluginCommitDataWithMessages struct {
 	ExecutePluginCommitData
-	Messages []cciptypes.CCIPMsg `json:"messages"`
+	Messages []cciptypes.Message `json:"messages"`
 }
 
 // ExecutePluginCommitData is the data that is committed to the chain.
@@ -34,7 +34,7 @@ type ExecutePluginCommitData struct {
 }
 
 type ExecutePluginCommitObservations map[cciptypes.ChainSelector][]ExecutePluginCommitDataWithMessages
-type ExecutePluginMessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.CCIPMsg
+type ExecutePluginMessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
 // ExecutePluginObservation is the observation of the ExecutePlugin.
 // TODO: revisit observation types. The maps used here are more space efficient and easier to work

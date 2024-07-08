@@ -3,7 +3,6 @@ package execute
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
@@ -167,19 +166,21 @@ func (t tdr) ReadTokenData(
 }
 
 // mustRandID generates a random hex ID value.
-func mustRandID() string {
+func mustRandID() cciptypes.Bytes32 {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
 		panic(err)
 	}
-	return hex.EncodeToString(bytes)
+	var id [32]byte
+	copy(id[:], bytes)
+	return id
 }
 
 // breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
 func breakCommitReport(
 	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
 ) plugintypes.ExecutePluginCommitDataWithMessages {
-	commitReport.Messages = append(commitReport.Messages, cciptypes.CCIPMsg{})
+	commitReport.Messages = append(commitReport.Messages, cciptypes.Message{})
 	return commitReport
 }
 
@@ -201,16 +202,16 @@ func makeTestCommitReport(
 			panic("executed message out of range")
 		}
 	}
-	var messages []cciptypes.CCIPMsg
+	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		messages = append(messages, cciptypes.CCIPMsg{
-			CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				ID:          mustRandID(),
-				SourceChain: cciptypes.ChainSelector(srcChain),
-				SeqNum:      cciptypes.SeqNum(i + firstSeqNum),
-				MsgHash:     cciptypes.Bytes32{},
+		messages = append(messages, cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				MessageID:           mustRandID(),
+				SourceChainSelector: cciptypes.ChainSelector(srcChain),
+				SequenceNumber:      cciptypes.SeqNum(i + firstSeqNum),
+				MsgHash:             cciptypes.Bytes32{},
+				Nonce:               uint64(i),
 			},
-			Nonce: uint64(i),
 		})
 	}
 
@@ -308,7 +309,7 @@ func Test_selectReport(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2600,
+				maxReportSize: 2300,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
 					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
 				},
@@ -447,15 +448,17 @@ func Test_selectReport(t *testing.T) {
 			require.Len(t, execReports, tt.expectedExecReports)
 			require.Len(t, commitReports, tt.expectedCommitReports)
 			for i, execReport := range execReports {
-				assert.Len(t, execReport.Messages, tt.expectedExecThings[i])
-				assert.Len(t, execReport.OffchainTokenData, tt.expectedExecThings[i])
-				assert.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
+				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i],
+					"Unexpected number of messages, iter %d", i)
+				require.Lenf(t, execReport.OffchainTokenData, tt.expectedExecThings[i],
+					"Unexpected number of token data, iter %d", i)
+				require.NotEmptyf(t, execReport.Proofs, "Proof should not be empty.")
 				assertMerkleRoot(t, hasher, execReport, tt.args.reports[i])
 			}
 			// If the last report is partially executed, the executed messages can be checked.
 			if len(execReports) > 0 && len(tt.lastReportExecuted) > 0 {
 				lastReport := commitReports[len(commitReports)-1]
-				assert.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
+				require.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
 			}
 		})
 	}
@@ -463,7 +466,7 @@ func Test_selectReport(t *testing.T) {
 
 type badHasher struct{}
 
-func (bh badHasher) Hash(context.Context, cciptypes.CCIPMsg) (cciptypes.Bytes32, error) {
+func (bh badHasher) Hash(context.Context, cciptypes.Message) (cciptypes.Bytes32, error) {
 	return cciptypes.Bytes32{}, fmt.Errorf("bad hasher")
 }
 
@@ -508,9 +511,9 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					},
-					Messages: []cciptypes.CCIPMsg{
-						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{}},
-						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{}},
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{}},
+						{Header: cciptypes.RampMessageHeader{}},
 					},
 				},
 			},
@@ -523,15 +526,15 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
 						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					},
-					Messages: []cciptypes.CCIPMsg{
+					Messages: []cciptypes.Message{
 						{
-							CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-								SeqNum: cciptypes.SeqNum(100),
+							Header: cciptypes.RampMessageHeader{
+								SequenceNumber: cciptypes.SeqNum(100),
 							},
 						},
 						{
-							CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-								SeqNum: cciptypes.SeqNum(102),
+							Header: cciptypes.RampMessageHeader{
+								SequenceNumber: cciptypes.SeqNum(102),
 							},
 						},
 					},
@@ -547,10 +550,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						SourceChain:         1111,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					},
-					Messages: []cciptypes.CCIPMsg{
-						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-							SourceChain: 2222,
-							SeqNum:      cciptypes.SeqNum(100),
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{
+							SourceChainSelector: 2222,
+							SequenceNumber:      cciptypes.SeqNum(100),
 						}},
 					},
 				},
@@ -566,10 +569,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						SourceChain:         1234567,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					},
-					Messages: []cciptypes.CCIPMsg{
-						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-							SourceChain: 1234567,
-							SeqNum:      cciptypes.SeqNum(100),
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{
+							SourceChainSelector: 1234567,
+							SequenceNumber:      cciptypes.SeqNum(100),
 						}},
 					},
 				},
@@ -585,10 +588,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						SourceChain:         1234567,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					},
-					Messages: []cciptypes.CCIPMsg{
-						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-							SourceChain: 1234567,
-							SeqNum:      cciptypes.SeqNum(100),
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{
+							SourceChainSelector: 1234567,
+							SequenceNumber:      cciptypes.SeqNum(100),
 						}},
 					},
 				},
@@ -604,10 +607,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						SourceChain:         1234567,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					},
-					Messages: []cciptypes.CCIPMsg{
-						{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-							SourceChain: 1234567,
-							SeqNum:      cciptypes.SeqNum(100),
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{
+							SourceChainSelector: 1234567,
+							SequenceNumber:      cciptypes.SeqNum(100),
 						}},
 					},
 				},

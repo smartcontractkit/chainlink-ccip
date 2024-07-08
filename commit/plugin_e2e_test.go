@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -191,12 +190,12 @@ func TestPlugin(t *testing.T) {
 			if tc.expErr != nil {
 				tc.expErr(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoErrorf(t, err, "failed to run round, testcase %s", tc.name)
 			}
 
 			if !reflect.DeepEqual(tc.expOutcome, plugintypes.CommitPluginOutcome{}) {
 				outcome, err := plugintypes.DecodeCommitPluginOutcome(res.Outcome)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expOutcome.TokenPrices, outcome.TokenPrices)
 				assert.Equal(t, tc.expOutcome.MaxSeqNums, outcome.MaxSeqNums)
 				assert.Equal(t, tc.expOutcome.GasPrices, outcome.GasPrices)
@@ -308,12 +307,12 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		// then they fetch new msgs, there is nothing new on chainA
 		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 
-		var otherChainBMsgs = make([]cciptypes.CCIPMsg, len(chainBDefaultMsgs))
+		var otherChainBMsgs = make([]cciptypes.Message, len(chainBDefaultMsgs))
 		copy(otherChainBMsgs[:], chainBDefaultMsgs[:])
-		otherChainBMsgs[0].ID = "1" + strconv.Itoa(i)
-		otherChainBMsgs[0].SeqNum = seqNumB + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
-		otherChainBMsgs[1].ID = "2" + strconv.Itoa(i)
-		otherChainBMsgs[1].SeqNum = 22 + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
+		otherChainBMsgs[0].Header.MessageID = messageIDFromInt(i + 1)
+		otherChainBMsgs[0].Header.SequenceNumber = seqNumB + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
+		otherChainBMsgs[1].Header.MessageID = messageIDFromInt(i + 2)
+		otherChainBMsgs[1].Header.SequenceNumber = 22 + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
 		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, otherChainBMsgs)
 
 		mockGasPrices(ctx, n.ccipReader, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
@@ -438,12 +437,13 @@ func mockGasPrices(
 	ccipReader.On("GasPrices", ctx, chains).
 		Return(gasPricesBigInt, nil)
 }
+
 func mockMsgsBetweenSeqNums(
 	ctx context.Context,
 	ccipReader *mocks.CCIPReader,
 	chain cciptypes.ChainSelector,
 	seqNum cciptypes.SeqNum,
-	msgs []cciptypes.CCIPMsg) {
+	msgs []cciptypes.Message) {
 	ccipReader.On(
 		"MsgsBetweenSeqNums",
 		ctx,
@@ -462,17 +462,23 @@ var (
 	lastCommittedSeqNumB = cciptypes.SeqNum(20)
 	seqNumB              = cciptypes.SeqNum(21)
 
-	emptyMsgs = []cciptypes.CCIPMsg{}
+	emptyMsgs = []cciptypes.Message{}
 
-	chainBDefaultMsgs = []cciptypes.CCIPMsg{
+	chainBDefaultMsgs = []cciptypes.Message{
 		{
-			CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: chainB, SeqNum: seqNumB,
+			Header: cciptypes.RampMessageHeader{
+				MsgHash:             cciptypes.Bytes32{1},
+				MessageID:           mustNewMessageID("0x01"),
+				SourceChainSelector: chainB,
+				SequenceNumber:      seqNumB,
 			},
 		},
 		{
-			CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: chainB, SeqNum: 22,
+			Header: cciptypes.RampMessageHeader{
+				MsgHash:             cciptypes.Bytes32{2},
+				MessageID:           mustNewMessageID("0x02"),
+				SourceChainSelector: chainB,
+				SequenceNumber:      22,
 			},
 		},
 	}
