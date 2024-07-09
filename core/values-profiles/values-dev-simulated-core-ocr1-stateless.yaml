@@ -1,8 +1,5 @@
 geth:
   enabled: true
-db:
-  statefulSet:
-    enabled: true
 chainlink:
   global:
     toml: |-
