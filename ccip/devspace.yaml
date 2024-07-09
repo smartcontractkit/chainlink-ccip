@@ -214,6 +214,11 @@ hooks:
   - command: ../scripts/man.sh
     events: ["after:deploy:app"]
 
+  # Prints man pages about build errors
+  - command: ../scripts/man.sh
+    args: ["build-error"]
+    events: ["error:build:*"]
+
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
   app:
