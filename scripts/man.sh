@@ -93,6 +93,20 @@ dashboard-test)
 
 	EOF
 	;;
+build-error)
+	echo -e "\n${RED}###############################${NC}\n"
+	echo -e "${RED}#         BUILD ERROR         #${NC}"
+	echo -e "\n${RED}###############################${NC}\n"
+	cat <<-EOF
+		It seems that a build error occurred. Please ensure you are using the latest versions of CRIB,
+		CCIP, and Chainlink repos, depending on the product you are deploying. If the issue persists,
+		please reach out to the following Slack channels for assistance:
+
+		    #team-core - for CRIB Core build issues
+		    #team-ccip - for CRIB CCIP build issues
+	EOF
+	echo -e "\n${YELLOW}If you are unsure whether this is a build or CRIB issue, please reach out to us on the #project-crib Slack channel.${NC}\n"
+	;;
 get_test_input)
 	echo -e "\n${GREEN}NAME${NC}"
 	echo -e "${RED}       get_test_input${NC} - Download the testInput.toml file from the S3 bucket"
