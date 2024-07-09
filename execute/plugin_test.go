@@ -836,3 +836,25 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validate observed sequence numbers: duplicate merkle root")
 }
+
+func TestPlugin_Observation_BadPreviousOutcome(t *testing.T) {
+	p := &Plugin{}
+	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{
+		PreviousOutcome: []byte("not a valid observation"),
+	}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to decode previous outcome: invalid character")
+}
+
+func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
+	lggr := logger.Test(t)
+	p := &Plugin{
+		homeChain:       setupHomeChainPoller(lggr, []reader.ChainConfigInfo{}),
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
+	}
+
+	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{}, nil)
+	require.Error(t, err)
+	// nolint:lll // error message
+	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
+}

@@ -143,7 +143,7 @@ func (p *Plugin) Observation(
 	if outctx.PreviousOutcome != nil {
 		previousOutcome, err = plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
 		if err != nil {
-			return types.Observation{}, err
+			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 		}
 	}
 
