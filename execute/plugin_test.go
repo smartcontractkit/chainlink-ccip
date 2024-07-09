@@ -51,6 +51,7 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 
 // mustParseByteStr parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
 // random byte array.
+// nolint:unparam // surly this will be useful at some point...
 func mustParseByteStr(byteStr string) cciptypes.Bytes32 {
 	if byteStr == "" {
 		var randomBytes cciptypes.Bytes32
