@@ -903,3 +903,71 @@ func TestPlugin_Outcome_HomeChainError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to get FChain: test error")
 }
+
+func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
+	homeChain := mocks2.NewHomeChain(t)
+	fChainMap := map[cciptypes.ChainSelector]int{
+		10: 20,
+	}
+	homeChain.On("GetFChain", mock.Anything).Return(fChainMap, nil)
+
+	p := &Plugin{
+		homeChain: homeChain,
+	}
+
+	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
+		1: {
+			{
+				ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+					MerkleRoot: mustParseByteStr(""),
+				},
+			},
+			{
+				ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+					MerkleRoot: mustParseByteStr(""),
+				},
+			},
+		},
+	}
+	observation, err := plugintypes.NewExecutePluginObservation(commitReports, nil).Encode()
+	require.NoError(t, err)
+	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{
+			Observation: observation,
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to merge commit report observations: no validator")
+}
+
+func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
+	homeChain := mocks2.NewHomeChain(t)
+	fChainMap := map[cciptypes.ChainSelector]int{
+		10: 20,
+	}
+	homeChain.On("GetFChain", mock.Anything).Return(fChainMap, nil)
+
+	p := &Plugin{
+		homeChain: homeChain,
+	}
+
+	//map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
+	messages := map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
+		1: {
+			1: {
+				Header: cciptypes.RampMessageHeader{
+					SourceChainSelector: 1,
+				},
+			},
+		},
+	}
+	observation, err := plugintypes.NewExecutePluginObservation(nil, messages).Encode()
+	require.NoError(t, err)
+	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{
+			Observation: observation,
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to merge message observations: no validator")
+}

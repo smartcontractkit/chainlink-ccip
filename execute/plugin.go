@@ -516,12 +516,12 @@ func (p *Plugin) Outcome(
 
 	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, fChain)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		return ocr3types.Outcome{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
 
 	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		return ocr3types.Outcome{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
 
 	observation := plugintypes.NewExecutePluginObservation(
