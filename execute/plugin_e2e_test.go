@@ -2,7 +2,6 @@ package execute
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"testing"
 	"time"
@@ -24,16 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
-
-var sentinelBytes cciptypes.Bytes32
-
-func init() {
-	data, err := hex.DecodeString(SentinelRoot[2:])
-	if err != nil {
-		panic(fmt.Sprintf("unable to read sentinal bytes: %s", err))
-	}
-	copy(sentinelBytes[:], data)
-}
 
 func TestPlugin(t *testing.T) {
 	ctx := context.Background()
@@ -76,7 +65,7 @@ func TestPlugin(t *testing.T) {
 type nodeSetup struct {
 	node            *Plugin
 	reportCodec     *mocks.ExecutePluginJSONReportCodec
-	msgHasher       *mocks.MessageHasher
+	msgHasher       cciptypes.MessageHasher
 	TokenDataReader *mocks.TokenDataReader
 }
 
@@ -117,6 +106,30 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 func setupSimpleTest(
 	ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector,
 ) []nodeSetup {
+	msgHasher := mocks.NewMessageHasher()
+
+	messages := []inmem.MessagesWithMetadata{
+		makeMsg(100, srcSelector, dstSelector, true),
+		makeMsg(101, srcSelector, dstSelector, true),
+		makeMsg(102, srcSelector, dstSelector, false),
+		makeMsg(103, srcSelector, dstSelector, false),
+		makeMsg(104, srcSelector, dstSelector, false),
+		makeMsg(105, srcSelector, dstSelector, false),
+	}
+
+	reportData := plugintypes.ExecutePluginCommitDataWithMessages{
+		ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+			SourceChain:         srcSelector,
+			SequenceNumberRange: cciptypes.NewSeqNumRange(100, 105),
+		},
+		Messages: slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message }),
+	}
+
+	tree, err := constructMerkleTree(context.Background(), msgHasher, reportData)
+	if err != nil {
+		panic(fmt.Sprintf("failed to construct merkle tree: %v", err))
+	}
+
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
 		Dest: dstSelector,
@@ -125,9 +138,9 @@ func setupSimpleTest(
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{
-							ChainSel:     srcSelector,
-							SeqNumsRange: cciptypes.NewSeqNumRange(100, 105),
-							MerkleRoot:   sentinelBytes,
+							ChainSel:     reportData.SourceChain,
+							SeqNumsRange: reportData.SequenceNumberRange,
+							MerkleRoot:   tree.Root(),
 						},
 					},
 				},
@@ -174,9 +187,9 @@ func setupSimpleTest(
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
+	err = homeChain.Start(ctx)
 	if err != nil {
-		return nil
+		panic(fmt.Sprintf("failed to start home chain poller: %v", err))
 	}
 
 	tokenDataReader := mocks.NewTokenDataReader(t)
@@ -184,9 +197,9 @@ func setupSimpleTest(
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -201,6 +214,7 @@ func newNode(
 	t *testing.T,
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
+	msgHasher cciptypes.MessageHasher,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
 	tokenDataReader TokenDataReader,
@@ -209,7 +223,6 @@ func newNode(
 	N int,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
-	msgHasher := mocks.NewMessageHasher()
 
 	rCfg := ocr3types.ReportingPluginConfig{
 		N:        N,
