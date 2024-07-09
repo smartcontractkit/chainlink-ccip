@@ -15,9 +15,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -731,4 +736,103 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			fmt.Println(execReport, size, err)
 		})
 	}
+}
+
+func TestPlugin_ObservationQuorum(t *testing.T) {
+	p := &Plugin{}
+	got, err := p.ObservationQuorum(ocr3types.OutcomeContext{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, ocr3types.QuorumFPlusOne, got)
+}
+
+func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
+	p := &Plugin{}
+	err := p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: []byte("not a valid observation"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to decode observation")
+}
+
+func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
+	p := &Plugin{}
+	err := p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: []byte(`{"oracleID": "0xdeadbeef"}`),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error finding supported chains by node: oracle ID 0 not found in oracleIDToP2pID")
+}
+
+func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
+	lggr := logger.Test(t)
+
+	p := &Plugin{
+		homeChain: setupHomeChainPoller(lggr, []reader.ChainConfigInfo{
+			{
+				ChainSelector: 0,
+				ChainConfig:   reader.HomeChainConfigMapper{},
+			},
+		}),
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+	}
+
+	observation := plugintypes.NewExecutePluginObservation(nil, plugintypes.ExecutePluginMessageObservations{
+		0: map[cciptypes.SeqNum]cciptypes.Message{
+			1: {
+				Header: cciptypes.RampMessageHeader{
+					SourceChainSelector: 1,
+				},
+			},
+		},
+	})
+	encoded, err := observation.Encode()
+	require.NoError(t, err)
+	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: encoded,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validate observer reading eligibility: observer not allowed to read from chain 0")
+}
+
+func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
+	lggr := logger.Test(t)
+
+	p := &Plugin{
+		homeChain: setupHomeChainPoller(lggr, []reader.ChainConfigInfo{
+			{
+				ChainSelector: 1,
+				ChainConfig:   reader.HomeChainConfigMapper{},
+			},
+		}),
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			0: {},
+		},
+	}
+
+	// Reports with duplicate roots.
+	root := mustParseByteStr("")
+	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
+		1: {
+			{
+				ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+					MerkleRoot: root,
+				},
+			},
+			{
+				ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+					MerkleRoot: root,
+				},
+			},
+		},
+	}
+	observation := plugintypes.NewExecutePluginObservation(commitReports, nil)
+	encoded, err := observation.Encode()
+	require.NoError(t, err)
+	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+		Observation: encoded,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "validate observed sequence numbers: duplicate merkle root")
 }

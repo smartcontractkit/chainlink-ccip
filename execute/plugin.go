@@ -215,7 +215,7 @@ func (p *Plugin) ValidateObservation(
 ) error {
 	decodedObservation, err := plugintypes.DecodeExecutePluginObservation(ao.Observation)
 	if err != nil {
-		return fmt.Errorf("decode observation: %w", err)
+		return fmt.Errorf("unable to decode observation: %w", err)
 	}
 
 	supportedChains, err := p.supportedChains(ao.Observer)
@@ -565,13 +565,13 @@ func (p *Plugin) Outcome(
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	decodedOutcome, err := plugintypes.DecodeExecutePluginOutcome(outcome)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
 	// TODO: this function should be pure, a context should not be needed.
 	encoded, err := p.reportCodec.Encode(context.Background(), decodedOutcome.Report)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
 	report := []ocr3types.ReportWithInfo[[]byte]{{
