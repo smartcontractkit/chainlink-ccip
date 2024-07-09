@@ -6,49 +6,53 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"sync/atomic"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
 
 // maxReportSizeBytes that should be returned as an execution report payload.
 const maxReportSizeBytes = 250_000
-const SentinelRoot = "0x289502ebf164ea87871e19cd9c8734016e954539fffc8c789ac4dadc7efcd933"
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	reportingCfg    ocr3types.ReportingPluginConfig
-	cfg             pluginconfig.ExecutePluginConfig
-	ccipReader      reader.CCIP
-	reportCodec     cciptypes.ExecutePluginCodec
-	msgHasher       cciptypes.MessageHasher
+	reportingCfg ocr3types.ReportingPluginConfig
+	cfg          pluginconfig.ExecutePluginConfig
+
+	// providers
+	ccipReader  reader.CCIP
+	reportCodec cciptypes.ExecutePluginCodec
+	msgHasher   cciptypes.MessageHasher
+	homeChain   reader.HomeChain
+
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataReader TokenDataReader
-
-	lastReportTS *atomic.Int64
-
-	lggr logger.Logger
+	lastReportTS    *atomic.Int64
+	lggr            logger.Logger
 }
 
 func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg pluginconfig.ExecutePluginConfig,
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader reader.CCIP,
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
+	homeChain reader.HomeChain,
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
@@ -57,13 +61,15 @@ func NewPlugin(
 	// TODO: initialize tokenDataReader.
 
 	return &Plugin{
-		reportingCfg: reportingCfg,
-		cfg:          cfg,
-		ccipReader:   ccipReader,
-		reportCodec:  reportCodec,
-		msgHasher:    msgHasher,
-		lastReportTS: lastReportTS,
-		lggr:         lggr,
+		reportingCfg:    reportingCfg,
+		cfg:             cfg,
+		oracleIDToP2pID: oracleIDToP2pID,
+		ccipReader:      ccipReader,
+		reportCodec:     reportCodec,
+		msgHasher:       msgHasher,
+		homeChain:       homeChain,
+		lastReportTS:    lastReportTS,
+		lggr:            lggr,
 	}
 }
 
@@ -78,12 +84,6 @@ func getPendingExecutedReports(
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
-	}
-	// TODO: this could be more efficient. reports is also traversed in 'filterOutExecutedMessages' function.
-	for _, report := range commitReports {
-		if report.Timestamp.After(latestReportTS) {
-			latestReportTS = report.Timestamp
-		}
 	}
 
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
@@ -137,16 +137,24 @@ func getPendingExecutedReports(
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
-	previousOutcome, err := plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
-	if err != nil {
-		return types.Observation{}, err
+	var err error
+	var previousOutcome plugintypes.ExecutePluginOutcome
+
+	if outctx.PreviousOutcome != nil {
+		previousOutcome, err = plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+		if err != nil {
+			return types.Observation{}, err
+		}
 	}
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
-	ownConfig := p.cfg.ObserverInfo[p.reportingCfg.OracleID]
 	var groupedCommits plugintypes.ExecutePluginCommitObservations
-	if slices.Contains(ownConfig.Reads, p.cfg.DestChain) {
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+	}
+	if supportsDest {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
 			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
@@ -154,7 +162,9 @@ func (p *Plugin) Observation(
 			return types.Observation{}, err
 		}
 		// Update timestamp to the last report.
-		p.lastReportTS.Store(latestReportTS.UnixMilli())
+		if len(groupedCommits) > 0 {
+			p.lastReportTS.Store(latestReportTS.UnixMilli())
+		}
 
 		// TODO: truncate grouped commits to a maximum observation size.
 		//       Cache everything which is not executed.
@@ -208,7 +218,12 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("decode observation: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(p.reportingCfg.OracleID, p.cfg.ObserverInfo, decodedObservation.Messages)
+	supportedChains, err := p.supportedChains(ao.Observer)
+	if err != nil {
+		return fmt.Errorf("error finding supported chains by node: %w", err)
+	}
+
+	err = validateObserverReadingEligibility(supportedChains, decodedObservation.Messages)
 	if err != nil {
 		return fmt.Errorf("validate observer reading eligibility: %w", err)
 	}
@@ -325,9 +340,17 @@ func buildSingleChainReport(
 		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
 	}
-	numMsgs := len(report.Messages)
+
+	// Verify merkle root.
+	hash := tree.Root()
+	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
+		actualStr := "0x" + hex.EncodeToString(hash[:])
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
+	}
 
 	// Iterate sequence range and executed messages to select messages to execute.
+	numMsgs := len(report.Messages)
 	var toExecute []int
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.Message
@@ -360,16 +383,6 @@ func buildSingleChainReport(
 			offchainTokenData = append(offchainTokenData, tokenData)
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
-		}
-	}
-
-	hash := tree.Root()
-	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
-		// For testing purposees, we allow a sentinel root to be used.
-		if report.MerkleRoot.String() != SentinelRoot {
-			actualStr := "0x" + hex.EncodeToString(hash[:])
-			return cciptypes.ExecutePluginReportSingleChain{}, 0,
-				fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 		}
 	}
 
@@ -438,6 +451,11 @@ func selectReport(
 	accumulatedSize := 0
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
+		// Reports at the end may not have messages yet.
+		if len(report.Messages) == 0 {
+			break
+		}
+
 		execReport, encodedSize, updatedReport, err :=
 			buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
 				report, maxReportSizeBytes-accumulatedSize)
@@ -491,12 +509,17 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
 
-	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, p.cfg.FChain)
+	fChain, err := p.homeChain.GetFChain()
+	if err != nil {
+		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
+	}
+
+	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
-	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, p.cfg.FChain)
+	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
@@ -562,17 +585,67 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	panic("implement me")
+	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	if len(decodedReport.ChainReports) == 0 {
+		p.lggr.Infow("skipping empty report")
+		return false, nil
+	}
+	return true, nil
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	panic("implement me")
+	isWriter, err := p.supportsDestChain()
+	if err != nil {
+		return false, fmt.Errorf("can't know if it's a writer: %w", err)
+	}
+	if !isWriter {
+		p.lggr.Debugw("not a writer, skipping report transmission")
+		return false, nil
+	}
+
+	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	// TODO: Final validation?
+
+	p.lggr.Debugw("transmitting report",
+		"reports", len(decodedReport.ChainReports),
+	)
+	return true, nil
 }
 
 func (p *Plugin) Close() error {
 	panic("implement me")
+}
+
+func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
+	p2pID, exists := p.oracleIDToP2pID[id]
+	if !exists {
+		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.reportingCfg.OracleID)
+	}
+	supportedChains, err := p.homeChain.GetSupportedChainsForPeer(p2pID)
+	if err != nil {
+		p.lggr.Warnw("error getting supported chains", err)
+		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
+	}
+
+	return supportedChains, nil
+}
+
+func (p *Plugin) supportsDestChain() (bool, error) {
+	chains, err := p.supportedChains(p.reportingCfg.OracleID)
+	if err != nil {
+		return false, fmt.Errorf("error getting supported chains: %w", err)
+	}
+	return chains.Contains(p.cfg.DestChain), nil
 }
 
 // Interface compatibility checks.

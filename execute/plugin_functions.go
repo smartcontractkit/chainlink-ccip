@@ -17,29 +17,20 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/validation"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
 func validateObserverReadingEligibility(
-	observer commontypes.OracleID,
-	observerCfg map[commontypes.OracleID]pluginconfig.ObserverInfo,
+	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs plugintypes.ExecutePluginMessageObservations,
 ) error {
-	observerInfo, exists := observerCfg[observer]
-	if !exists {
-		return fmt.Errorf("observer not found in config")
-	}
-
-	observerReadChains := mapset.NewSet(observerInfo.Reads...)
-
 	for chainSel, msgs := range observedMsgs {
 		if len(msgs) == 0 {
 			continue
 		}
 
-		if !observerReadChains.Contains(chainSel) {
+		if !supportedChains.Contains(chainSel) {
 			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
 		}
 	}
