@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -14,9 +13,11 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	helpers "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -35,25 +36,25 @@ func TestPlugin(t *testing.T) {
 		description           string
 		nodes                 []nodeSetup
 		expErr                func(*testing.T, error)
-		expOutcome            cciptypes.CommitPluginOutcome
+		expOutcome            plugintypes.CommitPluginOutcome
 		expTransmittedReports []cciptypes.CommitPluginReport
-		initialOutcome        cciptypes.CommitPluginOutcome
+		initialOutcome        plugintypes.CommitPluginOutcome
 	}{
 		{
 			name:        "EmptyOutcome",
 			description: "Empty observations are returned by all nodes which leads to an empty outcome.",
 			nodes:       setupEmptyOutcome(ctx, t, lggr),
-			expErr:      func(t *testing.T, err error) { assert.Equal(t, testhelpers.ErrEmptyOutcome, err) },
+			expErr:      func(t *testing.T, err error) { assert.Equal(t, helpers.ErrEmptyOutcome, err) },
 		},
 		{
 			name: "AllNodesReadAllChains",
 			description: "Nodes observe the latest sequence numbers and new messages after those sequence numbers. " +
 				"They also observe gas prices. In this setup all nodes can read all chains.",
 			nodes: setupAllNodesReadAllChains(ctx, t, lggr),
-			expOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
-					{ChainSel: chainA, SeqNum: 10},
-					{ChainSel: chainB, SeqNum: 20},
+			expOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: lastCommittedSeqNumA},
+					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{
 					{ChainSel: chainB, MerkleRoot: cciptypes.Bytes32{}, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
@@ -78,10 +79,10 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			initialOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
-					{ChainSel: chainA, SeqNum: 10},
-					{ChainSel: chainB, SeqNum: 20},
+			initialOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: lastCommittedSeqNumA},
+					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{},
 				TokenPrices: []cciptypes.TokenPrice{},
@@ -92,10 +93,10 @@ func TestPlugin(t *testing.T) {
 			name:        "NodesDoNotAgreeOnMsgs",
 			description: "Nodes do not agree on messages which leads to an outcome with empty merkle roots.",
 			nodes:       setupNodesDoNotAgreeOnMsgs(ctx, t, lggr),
-			expOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
-					{ChainSel: chainA, SeqNum: 10},
-					{ChainSel: chainB, SeqNum: 20},
+			expOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: lastCommittedSeqNumA},
+					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{},
 				TokenPrices: []cciptypes.TokenPrice{},
@@ -116,10 +117,10 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			initialOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
-					{ChainSel: chainA, SeqNum: 10},
-					{ChainSel: chainB, SeqNum: 20},
+			initialOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: lastCommittedSeqNumA},
+					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{},
 				TokenPrices: []cciptypes.TokenPrice{},
@@ -130,13 +131,13 @@ func TestPlugin(t *testing.T) {
 			name:        "NodesDoNotReportGasPrices",
 			description: "Nodes that don't have access to a contract writer do not submit gas price updates",
 			nodes:       setupNodesDoNotReportGasPrices(ctx, t, lggr),
-			expOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
-					{ChainSel: chainA, SeqNum: 10},
-					{ChainSel: chainB, SeqNum: 20},
+			expOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: lastCommittedSeqNumA},
+					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{
-					{ChainSel: chainB, MerkleRoot: cciptypes.Bytes32{}, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
+					{ChainSel: chainB, MerkleRoot: cciptypes.Bytes32{}, SeqNumsRange: cciptypes.NewSeqNumRange(seqNumB, 22)},
 				},
 				TokenPrices: []cciptypes.TokenPrice{},
 				GasPrices:   []cciptypes.GasPriceChain{},
@@ -144,7 +145,7 @@ func TestPlugin(t *testing.T) {
 			expTransmittedReports: []cciptypes.CommitPluginReport{
 				{
 					MerkleRoots: []cciptypes.MerkleRootChain{
-						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
+						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(seqNumB, 22)},
 					},
 					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
@@ -152,10 +153,10 @@ func TestPlugin(t *testing.T) {
 					},
 				},
 			},
-			initialOutcome: cciptypes.CommitPluginOutcome{
-				MaxSeqNums: []cciptypes.SeqNumChain{
-					{ChainSel: chainA, SeqNum: 10},
-					{ChainSel: chainB, SeqNum: 20},
+			initialOutcome: plugintypes.CommitPluginOutcome{
+				MaxSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: lastCommittedSeqNumA},
+					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{},
 				TokenPrices: []cciptypes.TokenPrice{},
@@ -183,18 +184,18 @@ func TestPlugin(t *testing.T) {
 			}
 			o, err := tc.initialOutcome.Encode()
 			require.NoError(t, err)
-			runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, o)
+			runner := helpers.NewOCR3Runner(nodes, nodeIDs, o)
 
 			res, err := runner.RunRound(ctx)
 			if tc.expErr != nil {
 				tc.expErr(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoErrorf(t, err, "failed to run round, testcase %s", tc.name)
 			}
 
-			if !reflect.DeepEqual(tc.expOutcome, cciptypes.CommitPluginOutcome{}) {
-				outcome, err := cciptypes.DecodeCommitPluginOutcome(res.Outcome)
-				assert.NoError(t, err)
+			if !reflect.DeepEqual(tc.expOutcome, plugintypes.CommitPluginOutcome{}) {
+				outcome, err := plugintypes.DecodeCommitPluginOutcome(res.Outcome)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expOutcome.TokenPrices, outcome.TokenPrices)
 				assert.Equal(t, tc.expOutcome.MaxSeqNums, outcome.MaxSeqNums)
 				assert.Equal(t, tc.expOutcome.GasPrices, outcome.GasPrices)
@@ -222,37 +223,18 @@ func TestPlugin(t *testing.T) {
 }
 
 func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgC),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, homeChain.Start(ctx))
 
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID),
-		newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID),
-		newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 1, destCfg, homeChain, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 2, destCfg, homeChain, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 3, destCfg, homeChain, oracleIDToP2pID),
 	}
 
 	for _, n := range nodes {
@@ -264,316 +246,114 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 		).Return([]cciptypes.SeqNum{}, nil)
 	}
 
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
 func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainA,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainB,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainA, pIDs1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgC),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
-	nodes := []nodeSetup{n1, n2, n3}
+	require.NoError(t, homeChain.Start(ctx))
 
-	for _, n := range nodes {
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
+
+	var nodes []nodeSetup
+	for i := 1; i <= 3; i++ {
+		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
+		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
-		n.ccipReader.On(
-			"MsgsBetweenSeqNums",
-			ctx,
-			chainA,
-			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{}, nil)
-
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 		// and there are two new message on chainB
-		n.ccipReader.On(
-			"MsgsBetweenSeqNums",
-			ctx,
-			chainB,
-			cciptypes.NewSeqNumRange(21, cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{
-			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: chainB, SeqNum: 21,
-				},
-			},
-			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: chainB, SeqNum: 22,
-				},
-			},
-		}, nil)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, chainBDefaultMsgs)
 
-		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.BigInt{
-				cciptypes.NewBigIntFromInt64(1000),
-				cciptypes.NewBigIntFromInt64(20_000),
-			}, nil)
+		mockGasPrices(ctx, n.ccipReader, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
 
-		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{10, 20}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
 
 		// transmission phase root staleness check passes
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
-			Return([]cciptypes.SeqNum{20}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumB}, nil)
 	}
-
-	// No need to keep it running in the background anymore for this test
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
-
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
 func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainA,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainB,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainA, pIDs1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgB),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
-	nodes := []nodeSetup{n1, n2, n3}
+	require.NoError(t, homeChain.Start(ctx))
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
 
-	for i, n := range nodes {
-		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+	var nodes []nodeSetup
+	for i := 1; i <= 3; i++ {
+		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
+		nodes = append(nodes, n)
+		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{10, 20}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
 
 		// then they fetch new msgs, there is nothing new on chainA
-		n.ccipReader.On(
-			"MsgsBetweenSeqNums",
-			ctx,
-			chainA,
-			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{}, nil)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 
-		// and there are two new message on chainB
-		n.ccipReader.On(
-			"MsgsBetweenSeqNums",
-			ctx,
-			chainB,
-			cciptypes.NewSeqNumRange(
-				21,
-				cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize),
-			),
-		).Return([]cciptypes.CCIPMsg{
-			{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				MsgHash:     cciptypes.Bytes32{1},
-				ID:          "1" + strconv.Itoa(i),
-				SourceChain: chainB,
-				SeqNum:      21 + cciptypes.SeqNum(i*10)}},
-			{CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-				MsgHash:     cciptypes.Bytes32{2},
-				ID:          "2" + strconv.Itoa(i),
-				SourceChain: chainB,
-				SeqNum:      22 + cciptypes.SeqNum(i*20)}},
-		}, nil)
+		var otherChainBMsgs = make([]cciptypes.Message, len(chainBDefaultMsgs))
+		copy(otherChainBMsgs[:], chainBDefaultMsgs[:])
+		otherChainBMsgs[0].Header.MessageID = messageIDFromInt(i + 1)
+		otherChainBMsgs[0].Header.SequenceNumber = seqNumB + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
+		otherChainBMsgs[1].Header.MessageID = messageIDFromInt(i + 2)
+		otherChainBMsgs[1].Header.SequenceNumber = 22 + +cciptypes.SeqNum(i*int(lastCommittedSeqNumA))
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, otherChainBMsgs)
 
-		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.BigInt{
-				cciptypes.NewBigIntFromInt64(1000),
-				cciptypes.NewBigIntFromInt64(20_000),
-			}, nil)
+		mockGasPrices(ctx, n.ccipReader, []cciptypes.ChainSelector{chainA, chainB}, []int64{1000, 20_000})
 	}
 
-	// No need to keep it running in the background anymore for this test
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
-
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
 func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logger.Logger) []nodeSetup {
-	cfg := cciptypes.CommitPluginConfig{
-		DestChain:           chainC,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
-		NewMsgScanBatchSize: 256,
-	}
-
 	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: chainA,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainB,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
-		{
-			ChainSelector: chainC,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: []byte{0},
-			},
-		},
+		helpers.SetupConfigInfo(chainA, pIDs1_2_3, fChainOne, cfgA),
+		helpers.SetupConfigInfo(chainB, pIDs1_2_3, fChainOne, cfgB),
+		helpers.SetupConfigInfo(destChain, pIDs1_2_3, fChainOne, cfgB),
 	}
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	if err != nil {
-		return nil
-	}
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
-	n1 := newNode(ctx, t, lggr, 1, cfg, homeChain, oracleIDToP2pID)
-	n2 := newNode(ctx, t, lggr, 2, cfg, homeChain, oracleIDToP2pID)
-	n3 := newNode(ctx, t, lggr, 3, cfg, homeChain, oracleIDToP2pID)
-	nodes := []nodeSetup{n1, n2, n3}
+	require.NoError(t, homeChain.Start(ctx))
 
-	for _, n := range nodes {
+	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
+
+	var nodes []nodeSetup
+	for i := 1; i <= 3; i++ {
+		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
+		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
-		n.ccipReader.On(
-			"MsgsBetweenSeqNums",
-			ctx,
-			chainA,
-			cciptypes.NewSeqNumRange(11, cciptypes.SeqNum(11+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{}, nil)
-
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
 		// and there are two new message on chainB
-		n.ccipReader.On(
-			"MsgsBetweenSeqNums",
-			ctx,
-			chainB,
-			cciptypes.NewSeqNumRange(21, cciptypes.SeqNum(21+cfg.NewMsgScanBatchSize)),
-		).Return([]cciptypes.CCIPMsg{
-			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{1}, ID: "1", SourceChain: chainB, SeqNum: 21,
-				},
-			},
-			{
-				CCIPMsgBaseDetails: cciptypes.CCIPMsgBaseDetails{
-					MsgHash: cciptypes.Bytes32{2}, ID: "2", SourceChain: chainB, SeqNum: 22,
-				},
-			},
-		}, nil)
+		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainB, seqNumB, chainBDefaultMsgs)
 
 		n.ccipReader.On("GasPrices", ctx, []cciptypes.ChainSelector{chainA, chainB}).
 			Return([]cciptypes.BigInt{}, fmt.Errorf("no gas prices available: %w", reader.ErrContractWriterNotFound))
 
-		// all nodes observe the same sequence numbers 10 for chainA and 20 for chainB
+		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{10, 20}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
-			Return([]cciptypes.SeqNum{20}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumB}, nil)
 	}
 
-	// No need to keep it running in the background anymore for this test
-	err = homeChain.Close()
-	if err != nil {
-		return nil
-	}
-
+	require.NoError(t, homeChain.Close())
 	return nodes
 }
 
@@ -590,7 +370,7 @@ func newNode(
 	_ *testing.T,
 	lggr logger.Logger,
 	id int,
-	cfg cciptypes.CommitPluginConfig,
+	cfg pluginconfig.CommitPluginConfig,
 	homeChain reader.HomeChain,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 ) nodeSetup {
@@ -641,18 +421,79 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 
 	return homeChain
 }
-func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
-	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
-	for _, id := range ids {
-		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
+
+// mockGasPrices mocks the gas prices for the given chains
+// the gas prices are returned in the same order as the chains
+func mockGasPrices(
+	ctx context.Context,
+	ccipReader *mocks.CCIPReader,
+	chains []cciptypes.ChainSelector,
+	gasPrices []int64) {
+	gasPricesBigInt := make([]cciptypes.BigInt, len(gasPrices))
+	for i, gp := range gasPrices {
+		gasPricesBigInt[i] = cciptypes.NewBigIntFromInt64(gp)
 	}
-	return res
+
+	ccipReader.On("GasPrices", ctx, chains).
+		Return(gasPricesBigInt, nil)
+}
+
+func mockMsgsBetweenSeqNums(
+	ctx context.Context,
+	ccipReader *mocks.CCIPReader,
+	chain cciptypes.ChainSelector,
+	seqNum cciptypes.SeqNum,
+	msgs []cciptypes.Message) {
+	ccipReader.On(
+		"MsgsBetweenSeqNums",
+		ctx,
+		chain,
+		cciptypes.NewSeqNumRange(seqNum, cciptypes.SeqNum(int(seqNum)+destCfg.NewMsgScanBatchSize)),
+	).Return(msgs, nil)
 }
 
 var (
-	chainA = cciptypes.ChainSelector(1)
-	chainB = cciptypes.ChainSelector(2)
-	chainC = cciptypes.ChainSelector(3)
+	chainA               = cciptypes.ChainSelector(1)
+	cfgA                 = []byte("ChainA")
+	lastCommittedSeqNumA = cciptypes.SeqNum(10)
+	seqNumA              = cciptypes.SeqNum(11)
+	chainB               = cciptypes.ChainSelector(2)
+	cfgB                 = []byte("ChainB")
+	lastCommittedSeqNumB = cciptypes.SeqNum(20)
+	seqNumB              = cciptypes.SeqNum(21)
 
-	tokenX = types.Account("tk_xxx")
+	emptyMsgs = []cciptypes.Message{}
+
+	chainBDefaultMsgs = []cciptypes.Message{
+		{
+			Header: cciptypes.RampMessageHeader{
+				MsgHash:             cciptypes.Bytes32{1},
+				MessageID:           mustNewMessageID("0x01"),
+				SourceChainSelector: chainB,
+				SequenceNumber:      seqNumB,
+			},
+		},
+		{
+			Header: cciptypes.RampMessageHeader{
+				MsgHash:             cciptypes.Bytes32{2},
+				MessageID:           mustNewMessageID("0x02"),
+				SourceChainSelector: chainB,
+				SequenceNumber:      22,
+			},
+		},
+	}
+
+	destChain = cciptypes.ChainSelector(3)
+	cfgC      = []byte("destChain")
+	fChainOne = uint8(1)
+
+	pIDs1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
+	tokenX    = types.Account("tk_xxx")
+
+	destCfg = pluginconfig.CommitPluginConfig{
+		DestChain:           destChain,
+		PricedTokens:        []types.Account{tokenX},
+		TokenPricesObserver: false,
+		NewMsgScanBatchSize: 256,
+	}
 )

@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -29,29 +32,31 @@ import (
 type Plugin struct {
 	nodeID            commontypes.OracleID
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	cfg               cciptypes.CommitPluginConfig
-	ccipReader        cciptypes.CCIPReader
-	tokenPricesReader cciptypes.TokenPricesReader
+	cfg               pluginconfig.CommitPluginConfig
+	ccipReader        reader.CCIP
+	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
-	homeChain reader.HomeChain
+	homeChain        reader.HomeChain
+	bgSyncCancelFunc context.CancelFunc
+	bgSyncWG         *sync.WaitGroup
 }
 
 func NewPlugin(
 	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg cciptypes.CommitPluginConfig,
-	ccipReader cciptypes.CCIPReader,
-	tokenPricesReader cciptypes.TokenPricesReader,
+	cfg pluginconfig.CommitPluginConfig,
+	ccipReader reader.CCIP,
+	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 ) *Plugin {
-	return &Plugin{
+	p := &Plugin{
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		cfg:               cfg,
@@ -62,6 +67,21 @@ func NewPlugin(
 		lggr:              lggr,
 		homeChain:         homeChain,
 	}
+
+	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
+	p.bgSyncCancelFunc = bgSyncCf
+	p.bgSyncWG = &sync.WaitGroup{}
+	p.bgSyncWG.Add(1)
+	backgroundReaderSync(
+		bgSyncCtx,
+		p.bgSyncWG,
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
+	)
+
+	return p
 }
 
 // Query phase is not used.
@@ -95,12 +115,12 @@ func (p *Plugin) Query(_ context.Context, _ ocr3types.OutcomeContext) (types.Que
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
-	supportedChains, err := p.supportedChains()
+	supportedChains, err := p.supportedChains(p.nodeID)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	msgBaseDetails := make([]cciptypes.CCIPMsgBaseDetails, 0)
+	msgBaseDetails := make([]cciptypes.RampMessageHeader, 0)
 	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(
 		ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice(),
 	)
@@ -138,12 +158,12 @@ func (p *Plugin) Observation(
 	// and on the next round we use those to look for messages.
 	if outctx.PreviousOutcome == nil {
 		p.lggr.Debugw("first round ever, can't observe new messages yet")
-		return cciptypes.NewCommitPluginObservation(
+		return plugintypes.NewCommitPluginObservation(
 			msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
 		).Encode()
 	}
 
-	prevOutcome, err := cciptypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
+	prevOutcome, err := plugintypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
 	}
@@ -171,17 +191,17 @@ func (p *Plugin) Observation(
 		"fChain", fChain)
 
 	for _, msg := range newMsgs {
-		msgBaseDetails = append(msgBaseDetails, msg.CCIPMsgBaseDetails)
+		msgBaseDetails = append(msgBaseDetails, msg.Header)
 	}
 
-	return cciptypes.NewCommitPluginObservation(
+	return plugintypes.NewCommitPluginObservation(
 		msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
 	).Encode()
 
 }
 
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
-	obs, err := cciptypes.DecodeCommitPluginObservation(ao.Observation)
+	obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
@@ -190,12 +210,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate sequence numbers: %w", err)
 	}
 
-	destSupportedChains, err := p.supportedChains()
+	observerSupportedChains, err := p.supportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, destSupportedChains, p.cfg.DestChain)
+	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, observerSupportedChains, p.cfg.DestChain)
 	if err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
@@ -225,9 +245,9 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 func (p *Plugin) Outcome(
 	_ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	decodedObservations := make([]cciptypes.CommitPluginObservation, 0)
+	decodedObservations := make([]plugintypes.CommitPluginObservation, 0)
 	for _, ao := range aos {
-		obs, err := cciptypes.DecodeCommitPluginObservation(ao.Observation)
+		obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("decode commit plugin observation: %w", err)
 		}
@@ -255,7 +275,7 @@ func (p *Plugin) Outcome(
 	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
 	p.lggr.Debugw("gas prices consensus", "gasPrices", gasPrices)
 
-	outcome := cciptypes.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
+	outcome := plugintypes.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
 	if outcome.IsEmpty() {
 		p.lggr.Debugw("empty outcome")
 		return ocr3types.Outcome{}, nil
@@ -266,7 +286,7 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
-	outc, err := cciptypes.DecodeCommitPluginOutcome(outcome)
+	outc, err := plugintypes.DecodeCommitPluginOutcome(outcome)
 	if err != nil {
 		p.lggr.Errorw("decode commit plugin outcome", "outcome", outcome, "err", err)
 		return nil, fmt.Errorf("decode commit plugin outcome: %w", err)
@@ -345,6 +365,9 @@ func (p *Plugin) Close() error {
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
+
+	p.bgSyncCancelFunc()
+	p.bgSyncWG.Wait()
 	return nil
 }
 
@@ -362,8 +385,8 @@ func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
 
-func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) {
-	p2pID, exists := p.oracleIDToP2pID[p.nodeID]
+func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
+	p2pID, exists := p.oracleIDToP2pID[oracleID]
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", p.nodeID)
 	}
@@ -376,12 +399,27 @@ func (p *Plugin) supportedChains() (mapset.Set[cciptypes.ChainSelector], error) 
 	return supportedChains, nil
 }
 
+// If current node is a writer for the destination chain.
 func (p *Plugin) supportsDestChain() (bool, error) {
 	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
 	if err != nil {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
+}
+
+func syncFrequency(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 10 * time.Second
+	}
+	return configuredValue
+}
+
+func syncTimeout(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 3 * time.Second
+	}
+	return configuredValue
 }
 
 // Interface compatibility checks.
