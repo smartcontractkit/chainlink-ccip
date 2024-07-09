@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
@@ -42,20 +42,24 @@ func TestPlugin(t *testing.T) {
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
+	// In the first round there is a pending commit report only.
+	// Two of the messages are executed which should be indicated in the Outcome.
 	res, err := runner.RunRound(ctx)
 	require.NoError(t, err)
 	outcome, err := plugintypes.DecodeExecutePluginOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
+	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
+	// In the second round there is an exec report and the pending commit report is removed.
+	// The exec report should indicate the following messages are executed: 102, 103, 104, 105.
 	res, err = runner.RunRound(ctx)
-
+	require.NoError(t, err)
 	outcome, err = plugintypes.DecodeExecutePluginOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Len(t, outcome.Report.ChainReports, 1)
 	require.Len(t, outcome.PendingCommitReports, 0)
-
 	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
@@ -211,7 +215,7 @@ func setupSimpleTest(
 
 func newNode(
 	_ context.Context,
-	t *testing.T,
+	_ *testing.T,
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
 	msgHasher cciptypes.MessageHasher,
