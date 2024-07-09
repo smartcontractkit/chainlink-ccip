@@ -740,6 +740,11 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	}
 }
 
+func TestPlugin_Close(t *testing.T) {
+	p := &Plugin{}
+	require.NoError(t, p.Close())
+}
+
 func TestPlugin_Query(t *testing.T) {
 	p := &Plugin{}
 	q, err := p.Query(context.Background(), ocr3types.OutcomeContext{})
@@ -990,5 +995,5 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 
 	_, err = p.Reports(0, report)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "unable to decode report: test error")
+	assert.Contains(t, err.Error(), "unable to encode report: test error")
 }
