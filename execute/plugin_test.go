@@ -997,3 +997,45 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to encode report: test error")
 }
+
+func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
+	codec := mocks.NewExecutePluginCodec(t)
+	codec.On("Decode", mock.Anything, mock.Anything).
+		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
+	p := &Plugin{
+		reportCodec: codec,
+	}
+	_, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "decode commit plugin report: test error")
+}
+
+func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
+	codec := mocks.NewExecutePluginCodec(t)
+	codec.On("Decode", mock.Anything, mock.Anything).
+		Return(cciptypes.ExecutePluginReport{}, nil)
+	p := &Plugin{
+		lggr:        logger.Test(t),
+		reportCodec: codec,
+	}
+	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
+	require.NoError(t, err)
+	require.False(t, result)
+}
+
+func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
+	codec := mocks.NewExecutePluginCodec(t)
+	codec.On("Decode", mock.Anything, mock.Anything).
+		Return(cciptypes.ExecutePluginReport{
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+				{},
+			},
+		}, nil)
+	p := &Plugin{
+		lggr:        logger.Test(t),
+		reportCodec: codec,
+	}
+	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
+	require.NoError(t, err)
+	require.True(t, result)
+}
