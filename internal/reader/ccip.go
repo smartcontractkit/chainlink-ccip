@@ -7,8 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"

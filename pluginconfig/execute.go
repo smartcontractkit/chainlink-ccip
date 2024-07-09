@@ -17,9 +17,6 @@ type ExecutePluginConfig struct {
 
 	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
 	MessageVisibilityInterval time.Duration `json:"messageVisibilityInterval"`
-
-	// FChain defines the FChain value for each chain. FChain is used while forming consensus based on the observations.
-	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
 type ObserverInfo struct {
