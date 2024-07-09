@@ -645,11 +645,11 @@ func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.
 }
 
 func (p *Plugin) supportsDestChain() (bool, error) {
-	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
+	chains, err := p.supportedChains(p.reportingCfg.OracleID)
 	if err != nil {
-		return false, fmt.Errorf("get chain config: %w", err)
+		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.reportingCfg.OracleID]), nil
+	return chains.Contains(p.cfg.DestChain), nil
 }
 
 // Interface compatibility checks.

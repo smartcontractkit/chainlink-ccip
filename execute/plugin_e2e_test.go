@@ -26,10 +26,8 @@ func TestPlugin(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 
-	nodeSetups := setupSimpleTest(ctx, t, lggr, 1, 2)
-	//runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, o)
+	nodesSetup := setupSimpleTest(ctx, t, lggr, 1, 2)
 
-	nodesSetup := nodeSetups
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], 0, len(nodesSetup))
 	for _, n := range nodesSetup {
 		nodes = append(nodes, n.node)
@@ -40,8 +38,6 @@ func TestPlugin(t *testing.T) {
 		nodeIDs = append(nodeIDs, n.node.reportingCfg.OracleID)
 	}
 
-	//o, err := tc.initialOutcome.Encode()
-	//require.NoError(t, err)
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
 	res, err := runner.RunRound(ctx)
@@ -212,5 +208,3 @@ func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 	}
 	return res
 }
-
-var ()
