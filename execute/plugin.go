@@ -27,7 +27,6 @@ import (
 
 // maxReportSizeBytes that should be returned as an execution report payload.
 const maxReportSizeBytes = 250_000
-const SentinelRoot = "0x289502ebf164ea87871e19cd9c8734016e954539fffc8c789ac4dadc7efcd933"
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
@@ -345,12 +344,9 @@ func buildSingleChainReport(
 	// Verify merkle root.
 	hash := tree.Root()
 	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
-		// For testing purposees, we allow a sentinel root to be used.
-		if report.MerkleRoot.String() != SentinelRoot {
-			actualStr := "0x" + hex.EncodeToString(hash[:])
-			return cciptypes.ExecutePluginReportSingleChain{}, 0,
-				fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
-		}
+		actualStr := "0x" + hex.EncodeToString(hash[:])
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
 
 	// Iterate sequence range and executed messages to select messages to execute.

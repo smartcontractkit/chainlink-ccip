@@ -2,8 +2,8 @@ package execute
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -20,6 +20,40 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
+
+// makeMessage creates a message deterministically derived from the given inputs.
+func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64) cciptypes.Message {
+	var placeholderID cciptypes.Bytes32
+	n, err := rand.New(rand.NewSource(int64(src) * int64(num) * int64(nonce))).Read(placeholderID[:])
+	if n != 32 {
+		panic(fmt.Sprintf("Unexpected number of bytes read for placeholder id: want 32, got %d", n))
+	}
+	if err != nil {
+		panic(fmt.Sprintf("Error reading random bytes: %v", err))
+	}
+
+	return cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			MessageID:           placeholderID,
+			SourceChainSelector: src,
+			SequenceNumber:      num,
+			MsgHash:             cciptypes.Bytes32{},
+			Nonce:               nonce,
+		},
+	}
+}
+
+// mustParseByteStr parses a given string into a byte array, any error causes a panic.
+func mustParseByteStr(byteStr string) cciptypes.Bytes32 {
+	if byteStr == "" {
+		return cciptypes.Bytes32{}
+	}
+	b, err := cciptypes.NewBytes32FromString(byteStr)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
 
 func Test_getPendingExecutedReports(t *testing.T) {
 	tests := []struct {
@@ -165,17 +199,6 @@ func (t tdr) ReadTokenData(
 	return nil, nil
 }
 
-// mustRandID generates a random hex ID value.
-func mustRandID() cciptypes.Bytes32 {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		panic(err)
-	}
-	var id [32]byte
-	copy(id[:], bytes)
-	return id
-}
-
 // breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
 func breakCommitReport(
 	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
@@ -192,6 +215,7 @@ func makeTestCommitReport(
 	firstSeqNum,
 	block int,
 	timestamp int64,
+	root cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
 ) plugintypes.ExecutePluginCommitDataWithMessages {
 	sequenceNumberRange :=
@@ -204,20 +228,10 @@ func makeTestCommitReport(
 	}
 	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		messages = append(messages, cciptypes.Message{
-			Header: cciptypes.RampMessageHeader{
-				MessageID:           mustRandID(),
-				SourceChainSelector: cciptypes.ChainSelector(srcChain),
-				SequenceNumber:      cciptypes.SeqNum(i + firstSeqNum),
-				MsgHash:             cciptypes.Bytes32{},
-				Nonce:               uint64(i),
-			},
-		})
-	}
-
-	root, err := cciptypes.NewBytes32FromString(SentinelRoot)
-	if err != nil {
-		panic(fmt.Sprintf("invalid sentinel root: %s", err))
+		messages = append(messages, makeMessage(
+			cciptypes.ChainSelector(srcChain),
+			cciptypes.SeqNum(i+firstSeqNum),
+			uint64(i)))
 	}
 
 	return plugintypes.ExecutePluginCommitDataWithMessages{
@@ -310,7 +324,9 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2300,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						nil),
 				},
 			},
 			expectedExecReports:   1,
@@ -323,7 +339,9 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						nil),
 				},
 			},
 			expectedExecReports:   1,
@@ -335,8 +353,12 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 15000,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
-					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101,
+						mustParseByteStr("0x1eabe2d30cfceab3def1eca19d44023ab720cc7bcd436dd860414754394cac2b"),
+						nil),
 				},
 			},
 			expectedExecReports:   2,
@@ -348,8 +370,12 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 8500,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
-					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101,
+						mustParseByteStr("0x1eabe2d30cfceab3def1eca19d44023ab720cc7bcd436dd860414754394cac2b"),
+						nil),
 				},
 			},
 			expectedExecReports:   2,
@@ -362,8 +388,12 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 4200,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, nil),
-					makeTestCommitReport(20, 2, 100, 999, 10101010101, nil),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						nil),
+					makeTestCommitReport(20, 2, 100, 999, 10101010101,
+						mustParseByteStr("0x1eabe2d30cfceab3def1eca19d44023ab720cc7bcd436dd860414754394cac2b"),
+						nil),
 				},
 			},
 			expectedExecReports:   1,
@@ -376,7 +406,9 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2500,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
 			},
 			expectedExecReports:   1,
@@ -388,7 +420,9 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2050,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 101, 102, 103, 104}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
 			},
 			expectedExecReports:   1,
@@ -401,7 +435,9 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 3500,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
 			},
 			expectedExecReports:   1,
@@ -413,7 +449,9 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 2050,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					makeTestCommitReport(10, 1, 100, 999, 10101010101, []cciptypes.SeqNum{100, 102, 104, 106, 108}),
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						mustParseByteStr("0x13843f24a6d031f81378b9e88ad40a1095d193a68d3099d55b22507a321e464e"),
+						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
 			},
 			expectedExecReports:   1,
@@ -426,10 +464,23 @@ func Test_selectReport(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
-					breakCommitReport(makeTestCommitReport(10, 1, 101, 1000, 10101010102, nil)),
+					breakCommitReport(makeTestCommitReport(10, 1, 101, 1000, 10101010102,
+						mustParseByteStr(""),
+						nil)),
 				},
 			},
 			wantErr: "unable to build a single chain report",
+		},
+		{
+			name: "invalid merkle root",
+			args: args{
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					makeTestCommitReport(10, 1, 100, 999, 10101010101,
+						cciptypes.Bytes32{},
+						nil),
+				},
+			},
+			wantErr: "merkle root mismatch: expected 0x00000000000000000",
 		},
 	}
 	for _, tt := range tests {
