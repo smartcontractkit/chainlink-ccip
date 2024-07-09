@@ -738,6 +738,13 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	}
 }
 
+func TestPlugin_Query(t *testing.T) {
+	p := &Plugin{}
+	q, err := p.Query(context.Background(), ocr3types.OutcomeContext{})
+	require.NoError(t, err)
+	require.Equal(t, types.Query{}, q)
+}
+
 func TestPlugin_ObservationQuorum(t *testing.T) {
 	p := &Plugin{}
 	got, err := p.ObservationQuorum(ocr3types.OutcomeContext{}, nil)
@@ -857,4 +864,41 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	require.Error(t, err)
 	// nolint:lll // error message
 	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
+}
+
+func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
+	p := &Plugin{}
+	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
+		[]types.AttributedObservation{
+			{
+				Observation: []byte("not a valid observation"),
+				Observer:    0,
+			},
+		})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to decode observations: invalid character")
+}
+
+func TestPlugin_Outcome_BelowF(t *testing.T) {
+	p := &Plugin{
+		reportingCfg: ocr3types.ReportingPluginConfig{
+			F: 1,
+		},
+	}
+	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
+		[]types.AttributedObservation{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "below F threshold")
+}
+
+func TestPlugin_Outcome_HomeChainError(t *testing.T) {
+	homeChain := mocks.NewHomeChain(t)
+	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
+
+	p := &Plugin{
+		homeChain: homeChain,
+	}
+	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to get FChain: test error")
 }

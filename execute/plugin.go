@@ -502,7 +502,7 @@ func (p *Plugin) Outcome(
 ) (ocr3types.Outcome, error) {
 	decodedObservations, err := decodeAttributedObservations(aos)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
 
 	}
 	if len(decodedObservations) < p.reportingCfg.F {
