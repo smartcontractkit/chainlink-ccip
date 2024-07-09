@@ -13,8 +13,8 @@ type counter[T any] struct {
 // some piece of data have occurred. It maintains an internal cache and provides a list
 // of valid or invalid data points.
 type MinObservationFilter[T any] interface {
-	Add(data T) error
-	GetValid() ([]T, error)
+	Add(data T)
+	GetValid() []T
 }
 
 // minObservationValidator is a helper object to validate reports for a single chain.
@@ -36,17 +36,17 @@ func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) MinObse
 	}
 }
 
-func (cv *minObservationValidator[T]) Add(data T) error {
+func (cv *minObservationValidator[T]) Add(data T) {
 	id := cv.idFunc(data)
 	if _, ok := cv.cache[id]; ok {
 		cv.cache[id].count++
 	} else {
 		cv.cache[id] = &counter[T]{data: data, count: 1}
 	}
-	return nil
+	return
 }
 
-func (cv *minObservationValidator[T]) GetValid() ([]T, error) {
+func (cv *minObservationValidator[T]) GetValid() []T {
 	var validated []T
 	for _, rc := range cv.cache {
 		if rc.count >= cv.minObservation {
@@ -54,5 +54,5 @@ func (cv *minObservationValidator[T]) GetValid() ([]T, error) {
 			validated = append(validated, rc.data)
 		}
 	}
-	return validated, nil
+	return validated
 }
