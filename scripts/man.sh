@@ -30,9 +30,7 @@ connect)
 	echo -e "\n${YELLOW}DESCRIPTION${NC}"
 	cat <<-EOF
 
-		        Expose all Kubernetes services from CRIB namespace for local development.
-		        In order to use this command you would need to install https://github.com/txn2/kubefwd tool.
-						You can install it by running the following command:
+		        Expose all Kubernetes services from CRIB namespace for local development. In order to use this command you would need to install https://github.com/txn2/kubefwd tool. You can install it by running the following command:
 
 		            -> "brew install txn2/tap/kubefwd"
 
