@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	mocks2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -892,7 +893,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 }
 
 func TestPlugin_Outcome_HomeChainError(t *testing.T) {
-	homeChain := mocks.NewHomeChain(t)
+	homeChain := mocks2.NewHomeChain(t)
 	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
 
 	p := &Plugin{

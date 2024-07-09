@@ -43,7 +43,6 @@ func (cv *minObservationValidator[T]) Add(data T) {
 	} else {
 		cv.cache[id] = &counter[T]{data: data, count: 1}
 	}
-	return
 }
 
 func (cv *minObservationValidator[T]) GetValid() []T {
