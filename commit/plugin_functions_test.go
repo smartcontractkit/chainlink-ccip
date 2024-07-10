@@ -28,20 +28,20 @@ import (
 
 func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 	testCases := []struct {
-		name             string
-		prevOutcome      plugintypes.CommitPluginOutcome
-		onChainSeqNums   map[cciptypes.ChainSelector]cciptypes.SeqNum
-		readChains       []cciptypes.ChainSelector
-		destChain        cciptypes.ChainSelector
-		expErr           bool
-		expSeqNumsInSync bool
-		expMaxSeqNums    []plugintypes.SeqNumChain
+		name               string
+		prevOutcome        plugintypes.CommitPluginOutcome
+		onChainNextSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
+		readChains         []cciptypes.ChainSelector
+		destChain          cciptypes.ChainSelector
+		expErr             bool
+		expSeqNumsInSync   bool
+		expMaxSeqNums      []plugintypes.SeqNumChain
 	}{
 		{
 			name: "report on chain seq num and can read dest",
-			onChainSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				1: 10,
-				2: 20,
+			onChainNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1: 11,
+				2: 21,
 			},
 			readChains: []cciptypes.ChainSelector{1, 2, 3},
 			destChain:  3,
@@ -59,9 +59,9 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 					{ChainSel: 2, SeqNum: 19}, // for chain 2 previous outcome is behind on-chain state
 				},
 			},
-			onChainSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
-				1: 10,
-				2: 20,
+			onChainNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
+				1: 11,
+				2: 21,
 			},
 			readChains:    []cciptypes.ChainSelector{1, 2},
 			destChain:     3,
@@ -82,7 +82,7 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 
 			onChainSeqNums := make([]cciptypes.SeqNum, 0)
 			for _, chain := range knownSourceChains {
-				if v, ok := tc.onChainSeqNums[chain]; !ok {
+				if v, ok := tc.onChainNextSeqNums[chain]; !ok {
 					t.Fatalf("invalid test case missing on chain seq num expectation for %d", chain)
 				} else {
 					onChainSeqNums = append(onChainSeqNums, v)
@@ -1528,11 +1528,11 @@ func Test_backgroundReaderSync(t *testing.T) {
 
 func Test_validateMerkleRootsState(t *testing.T) {
 	testCases := []struct {
-		name           string
-		reportSeqNums  []plugintypes.SeqNumChain
-		onchainSeqNums []cciptypes.SeqNum
-		expValid       bool
-		expErr         bool
+		name               string
+		reportSeqNums      []plugintypes.SeqNumChain
+		onchainNextSeqNums []cciptypes.SeqNum
+		expValid           bool
+		expErr             bool
 	}{
 		{
 			name: "happy path",
@@ -1540,9 +1540,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainSeqNums: []cciptypes.SeqNum{99, 199},
-			expValid:       true,
-			expErr:         false,
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
+			expValid:           true,
+			expErr:             false,
 		},
 		{
 			name: "one root is stale",
@@ -1550,9 +1550,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainSeqNums: []cciptypes.SeqNum{99, 200}, // <- 200 is already on chain
-			expValid:       false,
-			expErr:         false,
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
+			expValid:           false,
+			expErr:             false,
 		},
 		{
 			name: "one root has gap",
@@ -1560,9 +1560,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainSeqNums: []cciptypes.SeqNum{99, 199},
-			expValid:       false,
-			expErr:         false,
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
+			expValid:           false,
+			expErr:             false,
 		},
 		{
 			name: "reader returned wrong number of seq nums",
@@ -1570,9 +1570,9 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainSeqNums: []cciptypes.SeqNum{99, 199, 299},
-			expValid:       false,
-			expErr:         true,
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 200, 300},
+			expValid:           false,
+			expErr:             true,
 		},
 	}
 
@@ -1591,7 +1591,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				})
 				chains = append(chains, snc.ChainSel)
 			}
-			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainSeqNums, nil)
+			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainNextSeqNums, nil)
 			valid, err := validateMerkleRootsState(ctx, lggr, rep, reader)
 			if tc.expErr {
 				assert.Error(t, err)

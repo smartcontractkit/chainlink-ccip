@@ -35,17 +35,18 @@ func observeLatestCommittedSeqNums(
 	sort.Slice(knownSourceChains, func(i, j int) bool { return knownSourceChains[i] < knownSourceChains[j] })
 	latestCommittedSeqNumsObservation := make([]plugintypes.SeqNumChain, 0)
 	if readableChains.Contains(destChain) {
-		lggr.Debugw("reading latest committed sequence from destination")
-		onChainLatestCommittedSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
+		lggr.Debugw("reading sequence numbers", "chains", knownSourceChains)
+		onChainNextSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
 		if err != nil {
 			return latestCommittedSeqNumsObservation, fmt.Errorf("get next seq nums: %w", err)
 		}
-		lggr.Debugw("observed latest committed sequence numbers on destination",
-			"latestCommittedSeqNumsObservation", onChainLatestCommittedSeqNums)
+		lggr.Debugw("observing latest committed sequence numbers", "onChainNextSeqNums", onChainNextSeqNums)
 		for i, ch := range knownSourceChains {
+			committedSeqNum := onChainNextSeqNums[i] - 1
+
 			latestCommittedSeqNumsObservation = append(
 				latestCommittedSeqNumsObservation,
-				plugintypes.NewSeqNumChain(ch, onChainLatestCommittedSeqNums[i]),
+				plugintypes.NewSeqNumChain(ch, committedSeqNum),
 			)
 		}
 	}
@@ -607,24 +608,24 @@ func validateMerkleRootsState(
 		return true, nil
 	}
 
-	onchainCommittedSeqNums, err := reader.NextSeqNum(ctx, reportChains)
+	onchainNextSeqNums, err := reader.NextSeqNum(ctx, reportChains)
 	if err != nil {
 		return false, fmt.Errorf("get next sequence numbers: %w", err)
 	}
-	if len(onchainCommittedSeqNums) != len(reportChains) {
+	if len(onchainNextSeqNums) != len(reportChains) {
 		return false, fmt.Errorf("critical error: onchainSeqNums length mismatch")
 	}
 
-	for i, onchainSeqNum := range onchainCommittedSeqNums {
+	for i, nextSeqNum := range onchainNextSeqNums {
 		chain := reportChains[i]
 		reportMinSeqNum, ok := reportMinSeqNums[chain]
 		if !ok {
 			return false, fmt.Errorf("critical error: reportSeqNum not found for chain %d", chain)
 		}
 
-		if reportMinSeqNum != onchainSeqNum+1 {
-			lggr.Infow("report not valid, onchain seq num is %d, report min seq num is %d (chain=%s)",
-				onchainSeqNum, reportMinSeqNums, chain)
+		if reportMinSeqNum != nextSeqNum {
+			lggr.Warnw("report is not valid due to seq num mismatch",
+				"chain", chain, "reportMinSeqNum", reportMinSeqNum, "onchainNextSeqNum", nextSeqNum)
 			return false, nil
 		}
 	}
