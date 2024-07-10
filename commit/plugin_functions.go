@@ -35,14 +35,15 @@ func observeLatestCommittedSeqNums(
 	sort.Slice(knownSourceChains, func(i, j int) bool { return knownSourceChains[i] < knownSourceChains[j] })
 	latestCommittedSeqNumsObservation := make([]plugintypes.SeqNumChain, 0)
 	if readableChains.Contains(destChain) {
-		lggr.Debugw("reading sequence numbers", "chains", knownSourceChains)
-		onChainNextSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
+		lggr.Debugw("reading sequence numbers", "chains", knownSourceChains, "destChain", destChain)
+		expectedNextSeqNums, err := ccipReader.NextSeqNum(ctx, knownSourceChains)
 		if err != nil {
 			return latestCommittedSeqNumsObservation, fmt.Errorf("get next seq nums: %w", err)
 		}
-		lggr.Debugw("observing latest committed sequence numbers", "onChainNextSeqNums", onChainNextSeqNums)
+		lggr.Debugw("observing latest committed sequence numbers",
+			"onChainNextSeqNums", expectedNextSeqNums, "destChain", destChain)
 		for i, ch := range knownSourceChains {
-			committedSeqNum := onChainNextSeqNums[i] - 1
+			committedSeqNum := expectedNextSeqNums[i] - 1
 
 			latestCommittedSeqNumsObservation = append(
 				latestCommittedSeqNumsObservation,
