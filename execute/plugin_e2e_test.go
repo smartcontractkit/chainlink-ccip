@@ -2,7 +2,6 @@ package execute
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -130,9 +129,7 @@ func setupSimpleTest(
 	}
 
 	tree, err := constructMerkleTree(context.Background(), msgHasher, reportData)
-	if err != nil {
-		panic(fmt.Sprintf("failed to construct merkle tree: %v", err))
-	}
+	require.NoError(t, err, "failed to construct merkle tree")
 
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
@@ -192,9 +189,7 @@ func setupSimpleTest(
 
 	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
 	err = homeChain.Start(ctx)
-	if err != nil {
-		panic(fmt.Sprintf("failed to start home chain poller: %v", err))
-	}
+	require.NoError(t, err, "failed to start home chain poller")
 
 	tokenDataReader := mocks.NewTokenDataReader(t)
 	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
