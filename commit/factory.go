@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -53,6 +53,7 @@ type PluginFactory struct {
 	msgHasher       cciptypes.MessageHasher
 	homeChainReader reader.HomeChain
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
@@ -62,6 +63,7 @@ func NewPluginFactory(
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:            lggr,
@@ -70,13 +72,13 @@ func NewPluginFactory(
 		msgHasher:       msgHasher,
 		homeChainReader: homeChainReader,
 		contractReaders: contractReaders,
+		chainWriters:    chainWriters,
 	}
 }
 
-func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
+func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	// TODO: Get this from ocr config, it's the mapping of the oracleId index in the DON
-	var oracleIDToP2pID = make(map[commontypes.OracleID]libocrtypes.PeerID)
+	var oracleIDToP2pID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for i, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2pID[commontypes.OracleID(i)] = p2pID
 	}
@@ -89,21 +91,31 @@ func (p PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig
 	)
 	ccipReader := reader.NewCCIPChainReader(
 		p.contractReaders,
-		map[cciptypes.ChainSelector]types.ChainWriter{}, // TODO: pass in chain writers
+		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 	)
 	return NewPlugin(
-		context.Background(),
-		config.OracleID,
-		oracleIDToP2pID,
-		pluginconfig.CommitPluginConfig{},
-		ccipReader,
-		onChainTokenPricesReader,
-		p.commitCodec,
-		p.msgHasher,
-		p.lggr,
-		p.homeChainReader,
-	), ocr3types.ReportingPluginInfo{}, nil
+			context.Background(),
+			config.OracleID,
+			oracleIDToP2pID,
+			pluginconfig.CommitPluginConfig{},
+			ccipReader,
+			onChainTokenPricesReader,
+			p.commitCodec,
+			p.msgHasher,
+			p.lggr,
+			p.homeChainReader,
+		), ocr3types.ReportingPluginInfo{
+			Name: "CCIPRoleCommit",
+			Limits: ocr3types.ReportingPluginLimits{
+				// No query for this commit implementation.
+				MaxQueryLength:       0,
+				MaxObservationLength: 20_000, // 20kB
+				MaxOutcomeLength:     10_000, // 10kB
+				MaxReportLength:      10_000, // 10kB
+				MaxReportCount:       10,
+			},
+		}, nil
 }
 
 func (p PluginFactory) Name() string {
