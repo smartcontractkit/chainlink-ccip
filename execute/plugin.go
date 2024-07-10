@@ -602,10 +602,10 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	isWriter, err := p.supportsDestChain()
 	if err != nil {
-		return false, fmt.Errorf("can't know if it's a writer: %w", err)
+		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Debugw("not a writer, skipping report transmission")
+		p.lggr.Debugw("not a destination writer, skipping report transmission")
 		return false, nil
 	}
 

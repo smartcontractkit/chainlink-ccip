@@ -7,9 +7,12 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -24,6 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	mocks2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -1038,4 +1042,91 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
 	require.NoError(t, err)
 	require.True(t, result)
+}
+
+func TestPlugin_ShouldTransmitAcceptReport_ElegibilityCheckFailure(t *testing.T) {
+	lggr := logger.Test(t)
+	p := &Plugin{
+		homeChain:       setupHomeChainPoller(lggr, []reader.ChainConfigInfo{}),
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
+	}
+
+	_, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{})
+	require.Error(t, err)
+	// nolint:lll // error message
+	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
+}
+
+func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
+	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+	p := &Plugin{
+		lggr:         lggr,
+		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
+		homeChain:    setupHomeChainPoller(lggr, []reader.ChainConfigInfo{}),
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			2: {},
+		},
+	}
+
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{})
+	require.NoError(t, err)
+	require.False(t, shouldTransmit)
+
+	messages := slicelib.Map(logs.All(), func(e observer.LoggedEntry) string {
+		return e.Message
+	})
+	require.ElementsMatch(t, messages, []string{"not a destination writer, skipping report transmission"})
+}
+
+func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
+	homeChain := mocks2.NewHomeChain(t)
+	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	codec := mocks.NewExecutePluginCodec(t)
+	codec.On("Decode", mock.Anything, mock.Anything).
+		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
+
+	p := &Plugin{
+		lggr:         logger.Test(t),
+		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
+		reportCodec:  codec,
+		homeChain:    homeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			2: {1},
+		},
+	}
+
+	_, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "decode commit plugin report: test error")
+}
+
+func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
+	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+	homeChain := mocks2.NewHomeChain(t)
+	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	codec := mocks.NewExecutePluginCodec(t)
+	codec.On("Decode", mock.Anything, mock.Anything).
+		Return(cciptypes.ExecutePluginReport{}, nil)
+
+	p := &Plugin{
+		lggr:         lggr,
+		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
+		reportCodec:  codec,
+		homeChain:    homeChain,
+		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
+			2: {1},
+		},
+	}
+
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{})
+	require.NoError(t, err)
+	require.True(t, shouldTransmit)
+
+	messages := slicelib.Map(logs.All(), func(e observer.LoggedEntry) string {
+		return e.Message
+	})
+	require.ElementsMatch(t, messages, []string{"transmitting report"})
 }

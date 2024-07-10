@@ -180,9 +180,7 @@ func TestFilter(t *testing.T) {
 
 func TestMap(t *testing.T) {
 	type person struct {
-		id   string
 		name string
-		age  int
 	}
 
 	testCases := []struct {
