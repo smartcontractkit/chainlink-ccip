@@ -2,10 +2,8 @@ package commit
 
 import (
 	"context"
+	"errors"
 	"math/big"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"google.golang.org/grpc"
 
@@ -13,11 +11,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -38,7 +38,7 @@ func (p PluginFactoryConstructor) NewReportingPluginFactory(
 	keyValueStore core.KeyValueStore,
 	relayerSet core.RelayerSet,
 ) (core.OCR3ReportingPluginFactory, error) {
-	return nil, nil
+	return nil, errors.New("unimplemented")
 }
 
 func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
