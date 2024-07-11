@@ -176,7 +176,7 @@ func (p *Plugin) Observation(
 		p.ccipReader,
 		p.msgHasher,
 		supportedChains,
-		prevOutcome.MaxSeqNums, // TODO: Chainlink common PR to rename.
+		prevOutcome.MaxSeqNums,
 		p.cfg.NewMsgScanBatchSize,
 	)
 	if err != nil {
