@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -104,7 +105,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			Expressions: []query.Expression{
 				{
 					Primitive: &primitives.Timestamp{
-						Timestamp: uint64(ts.UnixMilli()),
+						Timestamp: uint64(ts.Unix()),
 						Operator:  primitives.Gte,
 					},
 				},
@@ -127,10 +128,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
 
+		blockNum, _ := strconv.ParseUint(item.Head.Identifier, 10, 64)
+
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
 			Report:    report,
-			Timestamp: time.UnixMilli(int64(item.Timestamp)),
-			BlockNum:  uint64(0), // <-- todo: waiting for CR team to reply
+			Timestamp: time.Unix(int64(item.Timestamp), 0),
+			BlockNum:  blockNum, // might be zero
 		})
 	}
 
