@@ -15,7 +15,8 @@ const (
 
 // Event Names
 const (
-	EventNameCCIPSendRequested = "CCIPSendRequested"
+	EventNameCCIPSendRequested    = "CCIPSendRequested"
+	EventNameCommitReportAccepted = "CommitReportAccepted"
 )
 
 // Event Attributes

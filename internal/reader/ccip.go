@@ -94,7 +94,47 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}
-	panic("implement me")
+
+	dataTyp := cciptypes.CommitPluginReport{}
+	iter, err := r.contractReaders[dest].QueryKey(
+		ctx,
+		crconsts.ContractNameOffRamp,
+		query.KeyFilter{
+			Key: crconsts.EventNameCommitReportAccepted,
+			Expressions: []query.Expression{
+				{
+					Primitive: &primitives.Timestamp{
+						Timestamp: uint64(ts.UnixMilli()),
+						Operator:  primitives.Gte,
+					},
+				},
+			},
+		},
+		query.LimitAndSort{
+			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			Limit:  query.Limit{Count: uint64(limit)},
+		},
+		&dataTyp,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
+	for _, item := range iter {
+		report, is := (item.Data).(cciptypes.CommitPluginReport)
+		if !is {
+			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
+		}
+
+		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
+			Report:    report,
+			Timestamp: time.UnixMilli(int64(item.Timestamp)),
+			BlockNum:  uint64(0), // <-- todo: waiting for CR team to reply
+		})
+	}
+
+	return reports, nil
 }
 
 func (r *CCIPChainReader) ExecutedMessageRanges(
