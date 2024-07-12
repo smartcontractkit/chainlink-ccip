@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/crconsts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -115,13 +115,13 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 
 	seq, err := r.contractReaders[chain].QueryKey(
 		ctx,
-		crconsts.ContractNameOnRamp,
+		consts.ContractNameOnRamp,
 		query.KeyFilter{
-			Key: crconsts.EventNameCCIPSendRequested,
+			Key: consts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
 				{
 					Primitive: &primitives.Comparator{
-						Name: crconsts.EventAttributeSequenceNumber,
+						Name: consts.EventAttributeSequenceNumber,
 						ValueComparators: []primitives.ValueComparator{
 							{
 								Value:    seqNumRange.Start().String(),
@@ -229,7 +229,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
 			{
 				Address: cfg.OnRamp,
-				Name:    crconsts.ContractNameOnRamp,
+				Name:    consts.ContractNameOnRamp,
 				Pending: false,
 			},
 		}); err != nil {
@@ -261,8 +261,8 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].GetLatestValue(
 				ctx,
-				crconsts.ContractNameOffRamp,
-				crconsts.FunctionNameGetSourceChainConfig,
+				consts.ContractNameOffRamp,
+				consts.MethodNameGetSourceChainConfig,
 				map[string]any{
 					"sourceChainSelector": chainSel,
 				},

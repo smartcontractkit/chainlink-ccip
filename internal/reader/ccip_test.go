@@ -12,7 +12,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/crconsts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
@@ -26,8 +26,8 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	destCR.On(
 		"GetLatestValue",
 		mock.Anything,
-		crconsts.ContractNameOffRamp,
-		crconsts.FunctionNameGetSourceChainConfig,
+		consts.ContractNameOffRamp,
+		consts.MethodNameGetSourceChainConfig,
 		mock.Anything,
 		mock.Anything,
 	).Run(func(args mock.Arguments) {
