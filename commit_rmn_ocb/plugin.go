@@ -77,7 +77,6 @@ func (p *Plugin) sourceChains() []cciptypes.ChainSelector {
 }
 
 // TODO: doc
-// source chains only supported by the calling node?
 func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
 	p2pID, exists := p.oracleIDToP2pID[oracleID]
 	if !exists {
