@@ -13,8 +13,8 @@ const (
 const (
 	// Offramp methods
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
-	MethodNameOfframpGetDynamicConfig      = "GetDynamicConfig"
-	MethodNameOfframpGetStaticConfig       = "GetStaticConfig"
+	MethodNameOfframpGetDynamicConfig      = "OfframpGetDynamicConfig"
+	MethodNameOfframpGetStaticConfig       = "OfframpGetStaticConfig"
 	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                    = "IsBlessed"
 	MethodNameGetMerkleRoot                = "GetMerkleRoot"
@@ -22,8 +22,8 @@ const (
 
 	// Onramp methods
 	MethodNameGetDestChainConfig            = "GetDestChainConfig"
-	MethodNameOnrampGetDynamicConfig        = "GetDynamicConfig"
-	MethodNameOnrampGetStaticConfig         = "GetStaticConfig"
+	MethodNameOnrampGetDynamicConfig        = "OnrampGetDynamicConfig"
+	MethodNameOnrampGetStaticConfig         = "OnrampGetStaticConfig"
 	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
