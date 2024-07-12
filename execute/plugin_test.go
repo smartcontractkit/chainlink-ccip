@@ -26,7 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	mocks2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/mocks"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/internal/reader/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -903,7 +903,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 }
 
 func TestPlugin_Outcome_HomeChainError(t *testing.T) {
-	homeChain := mocks2.NewHomeChain(t)
+	homeChain := reader_mock.NewHomeChain(t)
 	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
 
 	p := &Plugin{
@@ -915,7 +915,7 @@ func TestPlugin_Outcome_HomeChainError(t *testing.T) {
 }
 
 func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
-	homeChain := mocks2.NewHomeChain(t)
+	homeChain := reader_mock.NewHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 	}
@@ -951,7 +951,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 }
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
-	homeChain := mocks2.NewHomeChain(t)
+	homeChain := reader_mock.NewHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 	}
@@ -1080,7 +1080,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
-	homeChain := mocks2.NewHomeChain(t)
+	homeChain := reader_mock.NewHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
 	codec := mocks.NewExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
@@ -1104,7 +1104,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 
 func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
-	homeChain := mocks2.NewHomeChain(t)
+	homeChain := reader_mock.NewHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
 	codec := mocks.NewExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
