@@ -115,35 +115,228 @@ func seqNumChainArrayToMap(seqNumChains []plugintypes.SeqNumChain) map[cciptypes
 }
 
 // TODO: doc
-func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (ConsensusObservation, error) {
+func (p *Plugin) getConsensusObservation2(aos []types.AttributedObservation) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
-	fChains := p.getFChainConsensus(aggObs.FChain)
+	fChains := consensus(p.log, aggObs.FChain, p.fChainConsensus)
+	// TODO: doc, fix
+	var fTokenChain int
+	var fDestChain int
+
+	merkleRootConsensusFn := func(chain cciptypes.ChainSelector, roots []cciptypes.Bytes32) (cciptypes.Bytes32, error) {
+		return p.merkleRootConsensus(chain, roots, fChains)
+	}
+
+	gasPricesConsensusFn := func(chain cciptypes.ChainSelector, prices []cciptypes.BigInt) (cciptypes.BigInt, error) {
+		return p.gasPriceConsensus(chain, prices, fChains)
+	}
+
+	tokenPricesConsensusFn := func(tokenID types.Account, prices []cciptypes.BigInt) (cciptypes.BigInt, error) {
+		return p.tokenPriceConsensus(tokenID, prices, fTokenChain)
+	}
+
+	onRampMaxSeqNumsConsensusFn := func(chain cciptypes.ChainSelector, seqNums []cciptypes.SeqNum) (cciptypes.SeqNum, error) {
+		return p.onRampMaxSeqNumsConsensus(chain, seqNums, fChains)
+	}
+
+	offRampMaxSeqNumsConsensusFn := func(chain cciptypes.ChainSelector, seqNums []cciptypes.SeqNum) (cciptypes.SeqNum, error) {
+		return p.offRampMaxSeqNumsConsensus(chain, seqNums, fDestChain)
+	}
 
 	consensusObs := ConsensusObservation{
-		MerkleRoots: p.getMerkleRootConsensus(aggObs.MerkleRoots, fChains),
+		MerkleRoots:       consensus(p.log, aggObs.MerkleRoots, merkleRootConsensusFn),
+		GasPrices:         consensus(p.log, aggObs.GasPrices, gasPricesConsensusFn),
+		TokenPrices:       consensus(p.log, aggObs.TokenPrices, tokenPricesConsensusFn),
+		OnRampMaxSeqNums:  consensus(p.log, aggObs.OnRampMaxSeqNums, onRampMaxSeqNumsConsensusFn),
+		OffRampMaxSeqNums: consensus(p.log, aggObs.OffRampMaxSeqNums, offRampMaxSeqNumsConsensusFn),
+		FChain:            fChains,
 	}
 
 	return consensusObs, nil
 }
 
-// getMerkleRootConsensus TODO: doc
-func (p *Plugin) getMerkleRootConsensus(
-	merkleRoots map[cciptypes.ChainSelector][]cciptypes.Bytes32,
-	fChains map[cciptypes.ChainSelector]int,
-) map[cciptypes.ChainSelector]cciptypes.Bytes32 {
-	merkleRootConsensus := make(map[cciptypes.ChainSelector]cciptypes.Bytes32)
+func (p *Plugin) offRampMaxSeqNumsConsensus(
+	chain cciptypes.ChainSelector,
+	offRampMaxSeqNums []cciptypes.SeqNum,
+	fDestChain int,
+) (cciptypes.SeqNum, error) {
+	seqNum, count := mostFrequentElem(offRampMaxSeqNums)
+	if count <= fDestChain {
+		return 0, fmt.Errorf("could not reach consensus on offRampMaxSeqNums for chain %d "+
+			"because we did not receive a sequence number that was observed by at least f (%d) oracles, "+
+			"offRampMaxSeqNums: %v", chain, fDestChain, offRampMaxSeqNums)
+	}
 
-	for chainSelector, roots := range merkleRoots {
-		if f, exists := fChains[chainSelector]; exists {
-			consensusRoot, err := onlyValueWithMoreThanFOccurences(roots, f)
-			if err != nil {
-				continue
-			}
-			merkleRootConsensus[chainSelector] = consensusRoot
+	return seqNum, nil
+}
+
+func (p *Plugin) onRampMaxSeqNumsConsensus(
+	chain cciptypes.ChainSelector,
+	onRampMaxSeqNums []cciptypes.SeqNum,
+	fChains map[cciptypes.ChainSelector]int,
+) (cciptypes.SeqNum, error) {
+	if f, exists := fChains[chain]; exists {
+		if len(onRampMaxSeqNums) < 2*f+1 {
+			return 0, fmt.Errorf("could not reach consensus on onRampMaxSeqNums for chain %d "+
+				"because we did not receive more than 2f+1 observed sequence numbers, 2f+1: %d, "+
+				"len(onRampMaxSeqNums): %d, onRampMaxSeqNums: %v",
+				chain, 2*f+1, len(onRampMaxSeqNums), onRampMaxSeqNums)
+		}
+
+		sort.Slice(onRampMaxSeqNums, func(i, j int) bool { return i > j })
+		return onRampMaxSeqNums[f], nil
+	} else {
+		return 0, fmt.Errorf("could not reach consensus on onRampMaxSeqNums for chain %d "+
+			"because there was no consensus f value for this chain", chain)
+	}
+}
+
+func (p *Plugin) merkleRootConsensus(
+	chain cciptypes.ChainSelector,
+	roots []cciptypes.Bytes32,
+	fChains map[cciptypes.ChainSelector]int,
+) (cciptypes.Bytes32, error) {
+	if f, exists := fChains[chain]; exists {
+		root, count := mostFrequentElem(roots)
+
+		if count <= f {
+			return cciptypes.Bytes32{}, fmt.Errorf("failed to reach consensus on a merkle root for chain %d "+
+				"because no single merkle root was observed more than the expected %d times, found merkle root %d "+
+				"observed by only %d oracles, observed merkle roots: %v",
+				chain, f, root, count, roots)
+		}
+
+		return root, nil
+	} else {
+		return cciptypes.Bytes32{}, fmt.Errorf("merkleRootConsensus: fChain not found for chain %d", chain)
+	}
+}
+
+func (p *Plugin) tokenPriceConsensus(
+	tokenID types.Account,
+	prices []cciptypes.BigInt,
+	fTokenChain int,
+) (cciptypes.BigInt, error) {
+	if len(prices) < 2*fTokenChain+1 {
+		return cciptypes.BigInt{}, fmt.Errorf("could not reach consensus on token prices for token %s because "+
+			"we did not receive more than 2f+1 observed prices, 2f+1: %d, len(prices): %d, prices: %v",
+			tokenID, 2*fTokenChain+1, len(prices), prices)
+	}
+
+	return slicelib.BigIntSortedMiddle(prices), nil
+}
+
+func (p *Plugin) gasPriceConsensus(
+	chain cciptypes.ChainSelector,
+	prices []cciptypes.BigInt,
+	fChains map[cciptypes.ChainSelector]int,
+) (cciptypes.BigInt, error) {
+	if f, exists := fChains[chain]; exists {
+		if len(prices) < 2*f+1 {
+			return cciptypes.BigInt{}, fmt.Errorf("could not reach consensus on gas prices for chain %d "+
+				"because we did not receive more than 2f+1 observed prices, 2f+1: %d, len(prices): %d, prices: %v",
+				chain, 2*f+1, len(prices), prices)
+		}
+
+		return slicelib.BigIntSortedMiddle(prices), nil
+	} else {
+		return cciptypes.BigInt{}, fmt.Errorf("could not reach consensus on gas prices for chain %d because "+
+			"there was no consensus f value for this chain", chain)
+	}
+}
+
+// fChainConsensus TODO: doc
+func (p *Plugin) fChainConsensus(chain cciptypes.ChainSelector, fValues []int) (int, error) {
+	f, count := mostFrequentElem(fValues)
+
+	if count < p.reportingCfg.F {
+		return 0, fmt.Errorf("failed to reach consensus on fChain values for chain %d because no single f "+
+			"value was observed more than the expected %d times, found f value %d observed by only %d oracles, "+
+			"f values: %v",
+			chain, p.reportingCfg.F, f, count, fValues)
+	}
+
+	return f, nil
+}
+
+// mostFrequentElem TODO: doc
+func mostFrequentElem[T comparable](elems []T) (T, int) {
+	var mostFrequentElem T
+
+	counts := counts(elems)
+	maxCount := 0
+
+	for elem, count := range counts {
+		if count > maxCount {
+			mostFrequentElem = elem
+			maxCount = count
 		}
 	}
 
-	return merkleRootConsensus
+	return mostFrequentElem, maxCount
+}
+
+// consensus TODO: doc, rename
+func consensus[V, K comparable](log logger.Logger, elems map[K][]V, consensus func(K, []V) (V, error)) map[K]V {
+	consensusMap := make(map[K]V)
+	for key, values := range elems {
+		consensusValue, err := consensus(key, values)
+		if err != nil {
+			log.Warnw("consensus error", "err", err)
+			continue
+		}
+		consensusMap[key] = consensusValue
+	}
+
+	return consensusMap
+}
+
+func majorityConsensus[V, K comparable](f func(K) (int, error)) func(K, []V) (V, error) {
+	return func(key K, values []V) (V, error) {
+		counts := counts(values)
+
+		var candidate V
+		candidateAssigned := false
+		n, err := f(key)
+		if err != nil {
+			return candidate, err
+		}
+		for elem, count := range counts {
+			if count > n {
+				if candidateAssigned {
+					return candidate, fmt.Errorf("found multiple elems with more than f occurrences")
+				}
+
+				candidate = elem
+				candidateAssigned = true
+			}
+		}
+
+		if candidateAssigned {
+			return candidate, nil
+		}
+
+		return candidate, fmt.Errorf("did not find an elem with more than f occurrences")
+	}
+}
+
+// TODO: doc
+func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (ConsensusObservation, error) {
+	aggObs := aggregateObservations(aos)
+	fChains := p.getFChainConsensus(aggObs.FChain)
+	// TODO: doc, fix
+	var fTokenChain int
+	var fDestChain int
+
+	consensusObs := ConsensusObservation{
+		MerkleRoots:       p.getMerkleRootConsensus(aggObs.MerkleRoots, fChains),
+		GasPrices:         p.getGasPricesConsensus(aggObs.GasPrices, fChains),
+		TokenPrices:       p.getTokenPricesConsensus(aggObs.TokenPrices, fTokenChain),
+		OnRampMaxSeqNums:  p.getOnRampMaxSeqNumsConsensus(aggObs.OffRampMaxSeqNums, fChains),
+		OffRampMaxSeqNums: p.getOffRampMaxSeqNumsConsensus(aggObs.OffRampMaxSeqNums, fDestChain),
+		FChain:            fChains,
+	}
+
+	return consensusObs, nil
 }
 
 // getFChainConsensus TODO: doc
@@ -161,6 +354,158 @@ func (p *Plugin) getFChainConsensus(aggFChains map[cciptypes.ChainSelector][]int
 	return fChainConsensus
 }
 
+// getMerkleRootConsensus TODO: doc
+func (p *Plugin) getMerkleRootConsensus(
+	merkleRoots map[cciptypes.ChainSelector][]cciptypes.Bytes32,
+	fChains map[cciptypes.ChainSelector]int,
+) map[cciptypes.ChainSelector]cciptypes.Bytes32 {
+	merkleRootConsensus := make(map[cciptypes.ChainSelector]cciptypes.Bytes32)
+
+	for chainSelector, roots := range merkleRoots {
+		if f, exists := fChains[chainSelector]; exists {
+			consensusRoot, err := onlyValueWithMoreThanFOccurences(roots, f)
+			if err != nil {
+				// TODO: log error
+				continue
+			}
+			merkleRootConsensus[chainSelector] = consensusRoot
+		}
+	}
+
+	return merkleRootConsensus
+}
+
+// getGasPricesConsensus TODO: doc
+// Explain why we use the f value we do
+func (p *Plugin) getGasPricesConsensus(
+	gasPrices map[cciptypes.ChainSelector][]cciptypes.BigInt,
+	fChains map[cciptypes.ChainSelector]int,
+) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	gasPricesConsensus := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
+
+	for chainSelector, prices := range gasPrices {
+		if f, exists := fChains[chainSelector]; exists {
+			if len(prices) < 2*f+1 {
+				p.log.Warnw(
+					"not enough gas price observations",
+					"chainSelector", chainSelector,
+					"prices", prices,
+					"expected", 2*f+1,
+					"got", len(prices),
+				)
+				continue
+			}
+
+			gasPricesConsensus[chainSelector] = slicelib.BigIntSortedMiddle(prices)
+		} else {
+			// TODO: log
+		}
+	}
+
+	return gasPricesConsensus
+}
+
+// getTokenPricesConsensus TODO: doc
+// Explain why we use the f value we do
+func (p *Plugin) getTokenPricesConsensus(
+	tokenPrices map[types.Account][]cciptypes.BigInt,
+	fTokenChain int,
+) map[types.Account]cciptypes.BigInt {
+	tokenPricesConsensus := make(map[types.Account]cciptypes.BigInt)
+
+	for tokenId, prices := range tokenPrices {
+		if len(prices) < 2*fTokenChain+1 {
+			p.log.Warnw(
+				"not enough token price observations",
+				"tokenId", tokenId,
+				"prices", prices,
+				"expected", 2*fTokenChain+1,
+				"got", len(prices),
+			)
+			continue
+		}
+
+		tokenPricesConsensus[tokenId] = slicelib.BigIntSortedMiddle(prices)
+	}
+
+	return tokenPricesConsensus
+}
+
+// getOnRampMaxSeqNumsConsensus TODO: doc
+// Explain why we use the f value we do
+func (p *Plugin) getOnRampMaxSeqNumsConsensus(
+	onRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+	fChains map[cciptypes.ChainSelector]int,
+) map[cciptypes.ChainSelector]cciptypes.SeqNum {
+	onRampMaxSeqNumsConsensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+
+	for chainSelector, onRampMaxSeqNums := range onRampMaxSeqNumsByChain {
+		if f, exists := fChains[chainSelector]; exists {
+			if len(onRampMaxSeqNums) < 2*f+1 {
+				p.log.Warnw(
+					"not enough onRampMaxSeqNums observations",
+					"chainSelector", chainSelector,
+					"onRampMaxSeqNums", onRampMaxSeqNums,
+					"expected", 2*f+1,
+					"got", len(onRampMaxSeqNums),
+				)
+				continue
+			}
+
+			sort.Slice(onRampMaxSeqNums, func(i, j int) bool { return i > j })
+			onRampMaxSeqNumsConsensus[chainSelector] = onRampMaxSeqNums[f]
+		} else {
+			// TODO: log
+		}
+	}
+
+	return onRampMaxSeqNumsConsensus
+}
+
+// getOffRampMaxSeqNumsConsensus TODO: doc
+// Explain why we use the f value we do
+func (p *Plugin) getOffRampMaxSeqNumsConsensus(
+	offRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
+	fDestChain int,
+) map[cciptypes.ChainSelector]cciptypes.SeqNum {
+	offRampMaxSeqNumsConsensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+
+	for chainSelector, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
+		consensusSeqNum, err := onlyValueWithMoreThanFOccurences(offRampMaxSeqNums, fDestChain)
+		if err != nil {
+			// TODO: log
+			continue
+		}
+
+		offRampMaxSeqNumsConsensus[chainSelector] = consensusSeqNum
+	}
+
+	return offRampMaxSeqNumsConsensus
+}
+
+func onlyValueWithMoreThanFOccurencesWithTag[T comparable](tag string, elems []T, f int) (T, error) {
+	counts := counts(elems)
+	var candidate T
+	candidateAssigned := false
+	for elem, count := range counts {
+		if count > f {
+			if candidateAssigned {
+				return candidate, fmt.Errorf("%s: found multiple elems with more than f (%d) occurrences", tag, f)
+			}
+
+			candidate = elem
+			candidateAssigned = true
+		}
+	}
+
+	if candidateAssigned {
+		return candidate, nil
+	}
+
+	return candidate, fmt.Errorf("%s: did not find an elem with more than f (%d) occurrences", tag, f)
+}
+
+// onlyValueWithMoreThanFOccurences TODO: doc
 func onlyValueWithMoreThanFOccurences[T comparable](elems []T, f int) (T, error) {
 	counts := counts(elems)
 	var candidate T
@@ -183,6 +528,7 @@ func onlyValueWithMoreThanFOccurences[T comparable](elems []T, f int) (T, error)
 	return candidate, fmt.Errorf("did not find an elem with more than f occurrences")
 }
 
+// counts TODO: doc
 func counts[T comparable](elems []T) map[T]int {
 	m := make(map[T]int)
 	for _, elem := range elems {
@@ -402,13 +748,4 @@ func OffRampMaxSeqNumsConsensus(
 
 	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i].ChainSel < seqNums[j].ChainSel })
 	return seqNums
-}
-
-// TODO: doc
-func merkleRootConsensus(
-	lggr logger.Logger,
-	fChains map[cciptypes.ChainSelector]int,
-	observations []CommitPluginObservation,
-) []MerkleRootAndChain {
-	return nil
 }
