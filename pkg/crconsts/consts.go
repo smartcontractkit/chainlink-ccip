@@ -15,11 +15,14 @@ const (
 
 // Event Names
 const (
-	EventNameCCIPSendRequested    = "CCIPSendRequested"
-	EventNameCommitReportAccepted = "CommitReportAccepted"
+	EventNameCCIPSendRequested     = "CCIPSendRequested"
+	EventNameCommitReportAccepted  = "CommitReportAccepted"
+	EventNameExecutionStateChanged = "ExecutionStateChanged"
 )
 
 // Event Attributes
 const (
 	EventAttributeSequenceNumber = "SequenceNumber"
+	EventAttributeSourceChain    = "SourceChain"
+	EventAttributeDestChain      = "DestChain"
 )

@@ -11,7 +11,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -109,6 +108,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 						Operator:  primitives.Gte,
 					},
 				},
+				query.Confidence(primitives.Finalized),
 			},
 		},
 		query.LimitAndSort{
@@ -128,12 +128,15 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
 
-		blockNum, _ := strconv.ParseUint(item.Head.Identifier, 10, 64)
+		blockNum, err := strconv.ParseUint(item.Head.Identifier, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Identifier, err)
+		}
 
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
 			Report:    report,
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
-			BlockNum:  blockNum, // might be zero
+			BlockNum:  blockNum,
 		})
 	}
 
@@ -143,10 +146,80 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 func (r *CCIPChainReader) ExecutedMessageRanges(
 	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNumRange, error) {
-	if err := r.validateReaderExistence(source, dest); err != nil {
+	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}
-	panic("implement me")
+
+	type executionStateChangedEvent struct {
+		sourceChainSelector cciptypes.ChainSelector
+		sequenceNumber      cciptypes.SeqNum
+		state               uint8
+	}
+
+	dataTyp := executionStateChangedEvent{}
+
+	iter, err := r.contractReaders[dest].QueryKey(
+		ctx,
+		crconsts.ContractNameOffRamp,
+		query.KeyFilter{
+			Key: crconsts.EventNameExecutionStateChanged,
+			Expressions: []query.Expression{
+				{
+					// sequence numbers inside the range
+					Primitive: &primitives.Comparator{
+						Name: crconsts.EventAttributeSequenceNumber,
+						ValueComparators: []primitives.ValueComparator{
+							{
+								Value:    seqNumRange.Start().String(),
+								Operator: primitives.Gte,
+							},
+							{
+								Value:    seqNumRange.End().String(),
+								Operator: primitives.Lte,
+							},
+						},
+					},
+				},
+				{
+					// source chain
+					Primitive: &primitives.Comparator{
+						Name: crconsts.EventAttributeSourceChain,
+						ValueComparators: []primitives.ValueComparator{
+							{
+								Value:    source.String(),
+								Operator: primitives.Eq,
+							},
+						},
+					},
+				},
+				query.Confidence(primitives.Finalized),
+			},
+		},
+		query.LimitAndSort{
+			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+		},
+		&dataTyp,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query offRamp: %w", err)
+	}
+
+	executed := make([]cciptypes.SeqNumRange, 0)
+	for _, item := range iter {
+		stateChange, ok := item.Data.(*executionStateChangedEvent)
+		if !ok {
+			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
+		}
+		if stateChange.sourceChainSelector != source {
+			return nil, fmt.Errorf("wrong cr query, unexpected source chain %d", stateChange.sourceChainSelector)
+		}
+		if stateChange.sequenceNumber < seqNumRange.Start() || stateChange.sequenceNumber > seqNumRange.End() {
+			return nil, fmt.Errorf("wrong cr query, unexpected sequence number %d", stateChange.sequenceNumber)
+		}
+		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.sequenceNumber, stateChange.sequenceNumber))
+	}
+
+	return executed, nil
 }
 
 func (r *CCIPChainReader) MsgsBetweenSeqNums(
@@ -176,8 +249,8 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 							},
 						},
 					},
-					BoolExpression: query.BoolExpression{},
 				},
+				query.Confidence(primitives.Finalized),
 			},
 		},
 		query.LimitAndSort{
