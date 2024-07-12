@@ -49,7 +49,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 
 // validateMerkleRoots TODO: doc
 // No duplicate chains, only contains chainSelector that the owner can read
-func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRootAndChain, observer commontypes.OracleID) error {
+func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRoot, observer commontypes.OracleID) error {
 	if merkleRoots == nil || len(merkleRoots) == 0 {
 		return nil
 	}

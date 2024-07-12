@@ -18,6 +18,9 @@ type CommitPluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
 	DestChain cciptypes.ChainSelector `json:"destChain"`
 
+	// TokenPriceChain is the ccip destination chain where token prices are read from
+	TokenPriceChain cciptypes.ChainSelector `json:"tokenPriceChain"`
+
 	// PricedTokens is a list of tokens that we want to submit price updates for.
 	PricedTokens []types.Account `json:"pricedTokens"`
 
@@ -26,6 +29,9 @@ type CommitPluginConfig struct {
 
 	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
 	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
+
+	// The maximum number of times to check if the previous report has been transmitted
+	MaxReportTransmissionCheckAttempts uint
 }
 
 type RmnSig struct {
@@ -33,10 +39,12 @@ type RmnSig struct {
 }
 
 type SignedMerkleRoot struct {
-	ChainSel    cciptypes.ChainSelector `json:"chain"`
-	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
-	MerkleRoot  cciptypes.Bytes32       `json:"merkleRoot"`
-	RmnSigs     []RmnSig                `json:"rmnSigs"`
+	MerkleRoot MerkleRoot `json:"merkleRoot"`
+	RmnSigs    []RmnSig   `json:"rmnSigs"`
+}
+
+func (s SignedMerkleRoot) chain() cciptypes.ChainSelector {
+	return s.MerkleRoot.ChainSel
 }
 
 type CommitQuery struct {
@@ -66,8 +74,14 @@ type MerkleRootAndChain struct {
 	ChainSel   cciptypes.ChainSelector `json:"chain"`
 }
 
+type MerkleRoot struct {
+	ChainSel    cciptypes.ChainSelector `json:"chain"`
+	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
+	RootHash    cciptypes.Bytes32       `json:"rootHash"`
+}
+
 type CommitPluginObservation struct {
-	MerkleRoots       []MerkleRootAndChain            `json:"merkleRoots"`
+	MerkleRoots       []MerkleRoot                    `json:"merkleRoots"`
 	GasPrices         []cciptypes.GasPriceChain       `json:"gasPrices"`
 	TokenPrices       []cciptypes.TokenPrice          `json:"tokenPrices"`
 	OnRampMaxSeqNums  []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
@@ -93,7 +107,7 @@ func DecodeCommitPluginObservation(encodedObservation []byte) (CommitPluginObser
 // AggregatedObservation TODO: doc
 type AggregatedObservation struct {
 	// A map from chain selectors to the list of merkle roots observed for each chain
-	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.Bytes32
+	MerkleRoots map[cciptypes.ChainSelector][]MerkleRoot
 
 	// A map from chain selectors to the list of gas prices observed for each chain
 	GasPrices map[cciptypes.ChainSelector][]cciptypes.BigInt
@@ -123,8 +137,8 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 		}
 
 		// MerkleRoots
-		for _, rootAndChain := range obs.MerkleRoots {
-			AppendToMap(aggObs.MerkleRoots, rootAndChain.ChainSel, rootAndChain.MerkleRoot)
+		for _, merkleRoot := range obs.MerkleRoots {
+			AppendToMap(aggObs.MerkleRoots, merkleRoot.ChainSel, merkleRoot)
 		}
 
 		// GasPrices
@@ -168,7 +182,7 @@ func AppendToMap[K comparable, V any](m map[K][]V, k K, v V) {
 // ConsensusObservation TODO: doc
 type ConsensusObservation struct {
 	// A map from chain selectors to each chain's consensus merkle root
-	MerkleRoots map[cciptypes.ChainSelector]cciptypes.Bytes32
+	MerkleRoots map[cciptypes.ChainSelector]MerkleRoot
 
 	// A map from chain selectors to each chain's consensus gas prices
 	GasPrices map[cciptypes.ChainSelector]cciptypes.BigInt
@@ -198,15 +212,16 @@ const (
 )
 
 type CommitPluginOutcome struct {
-	OutcomeType             CommitPluginOutcomeType
-	RangesSelectedForReport []ChainRange
-	SignedRootsToReport     []SignedMerkleRoot
-	MaxOffRampSeqNums       []plugintypes.SeqNumChain
-	TokenPrices             []cciptypes.TokenPrice    `json:"tokenPrices"`
-	GasPrices               []cciptypes.GasPriceChain `json:"gasPrices"`
+	OutcomeType                     CommitPluginOutcomeType
+	RangesSelectedForReport         []ChainRange
+	SignedRootsToReport             []SignedMerkleRoot
+	OffRampMaxSeqNums               []plugintypes.SeqNumChain
+	TokenPrices                     []cciptypes.TokenPrice    `json:"tokenPrices"`
+	GasPrices                       []cciptypes.GasPriceChain `json:"gasPrices"`
+	ReportTransmissionCheckAttempts uint                      `json:"reportTransmissionCheckAttempts"`
 }
 
-func (o *CommitPluginOutcome) Encode() ([]byte, error) {
+func (o CommitPluginOutcome) Encode() ([]byte, error) {
 	encodedOutcome, err := json.Marshal(o)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode CommitPluginOutcome: %w", err)
@@ -222,7 +237,7 @@ func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {
 }
 
 // NextState TODO: doc
-func (o *CommitPluginOutcome) NextState() CommitPluginState {
+func (o CommitPluginOutcome) NextState() CommitPluginState {
 	switch o.OutcomeType {
 	case ReportIntervalsSelected:
 		return BuildingReport
@@ -259,10 +274,13 @@ type ChainRange struct {
 type Rmn interface {
 	RequestMaxSeqNums(chains []cciptypes.ChainSelector) ([]plugintypes.SeqNumChain, error)
 	RequestSignedIntervals(chainRanges []ChainRange) ([]SignedMerkleRoot, error)
+	VerifySignedMerkleRoot(merkleRoot SignedMerkleRoot) error
+	// ChainThreshold returns how many RMN signatures are required for the given chain
+	ChainThreshold(chain cciptypes.ChainSelector) uint
 }
 
 type OnChain interface {
 	GetOnRampMaxSeqNums() ([]plugintypes.SeqNumChain, error)
 	GetOffRampMaxSeqNums() ([]plugintypes.SeqNumChain, error)
-	GetMerkleRoots([]ChainRange) ([]MerkleRootAndChain, error)
+	GetMerkleRoots([]ChainRange) ([]MerkleRoot, error)
 }

@@ -73,7 +73,7 @@ func (p *Plugin) ObserveOffRampMaxSeqNums() []plugintypes.SeqNumChain {
 
 // ObserveMerkleRoots TODO: doc
 // Return empty array on error
-func (p *Plugin) ObserveMerkleRoots(ranges []ChainRange) []MerkleRootAndChain {
+func (p *Plugin) ObserveMerkleRoots(ranges []ChainRange) []MerkleRoot {
 	roots, err := p.onChain.GetMerkleRoots(ranges)
 	if err != nil {
 		p.log.Warnw("call to GetMerkleRoots failed", "err", err)
