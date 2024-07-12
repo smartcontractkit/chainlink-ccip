@@ -4,13 +4,29 @@ package consts
 
 // Contract Names
 const (
-	ContractNameOffRamp = "OffRamp"
-	ContractNameOnRamp  = "OnRamp"
+	ContractNameOffRamp       = "OffRamp"
+	ContractNameOnRamp        = "OnRamp"
+	ContractNamePriceRegistry = "PriceRegistry"
 )
 
-// Function Names
+// Method Names
 const (
-	MethodNameGetSourceChainConfig = "GetSourceChainConfig"
+	// Offramp methods
+	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
+	MethodNameOfframpGetDynamicConfig      = "GetDynamicConfig"
+	MethodNameOfframpGetStaticConfig       = "GetStaticConfig"
+	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
+	MethodNameIsBlessed                    = "IsBlessed"
+	MethodNameGetMerkleRoot                = "GetMerkleRoot"
+	MethodNameGetExecutionState            = "GetExecutionState"
+
+	// Onramp methods
+	MethodNameGetDestChainConfig            = "GetDestChainConfig"
+	MethodNameOnrampGetDynamicConfig        = "GetDynamicConfig"
+	MethodNameOnrampGetStaticConfig         = "GetStaticConfig"
+	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
+	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
+	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
 
 	/*
 		// On EVM:
@@ -22,16 +38,18 @@ const (
 			    bytes32 rawVs // signatures
 			  ) external
 	*/
-	MethodCommit = "commit"
+	MethodCommit = "Commit"
 
 	// On EVM:
 	// function execute(bytes32[3] calldata reportContext, bytes calldata report) external
-	MethodExecute = "execute"
+	MethodExecute = "Execute"
 )
 
 // Event Names
 const (
-	EventNameCCIPSendRequested = "CCIPSendRequested"
+	EventNameCCIPSendRequested     = "CCIPSendRequested"
+	EventNameExecutionStateChanged = "ExecutionStateChanged"
+	EventNameCommitReportAccepted  = "CommitReportAccepted"
 )
 
 // Event Attributes
