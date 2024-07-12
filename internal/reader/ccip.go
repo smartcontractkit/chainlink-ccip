@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -71,17 +72,20 @@ var (
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
 // can be generated.
 type CCIPChainReader struct {
+	lggr            logger.Logger
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
 	destChain       cciptypes.ChainSelector
 }
 
 func NewCCIPChainReader(
+	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 ) *CCIPChainReader {
 	return &CCIPChainReader{
+		lggr:            lggr,
 		contractReaders: contractReaders,
 		contractWriters: contractWriters,
 		destChain:       destChain,
@@ -216,6 +220,12 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		if stateChange.sequenceNumber < seqNumRange.Start() || stateChange.sequenceNumber > seqNumRange.End() {
 			return nil, fmt.Errorf("wrong cr query, unexpected sequence number %d", stateChange.sequenceNumber)
 		}
+		if stateChange.state <= 1 {
+			r.lggr.Debugw("execution state change status is %d, skipped",
+				"seqNum", stateChange.sequenceNumber, "state", stateChange.state)
+			continue
+		}
+
 		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.sequenceNumber, stateChange.sequenceNumber))
 	}
 
