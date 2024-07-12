@@ -20,6 +20,10 @@ import (
 )
 
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
+const (
+	PageSize = uint64(500)
+)
+
 type HomeChain interface {
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
@@ -117,7 +121,6 @@ func (r *homeChainPoller) poll() {
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var allChainConfigInfos []ChainConfigInfo
 	pageIndex := uint64(0)
-	pageSize := uint64(500)
 
 	for {
 		var chainConfigInfos []ChainConfigInfo
@@ -128,7 +131,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			primitives.Unconfirmed,
 			map[string]interface{}{
 				"pageIndex": pageIndex,
-				"pageSize":  pageSize,
+				"pageSize":  PageSize,
 			},
 			&chainConfigInfos,
 		)
@@ -217,9 +220,9 @@ func (r *homeChainPoller) GetOCRConfigs(
 		consts.MethodNameGetOCRConfig,
 		primitives.Unconfirmed,
 		map[string]any{
-			"donId":      donID,
-			"pluginType": pluginType,
-		}, &ocrConfigs)
+		"donId":      donID,
+		"pluginType": pluginType,
+	}, &ocrConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
