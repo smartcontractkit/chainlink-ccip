@@ -183,7 +183,7 @@ type ConsensusObservation struct {
 	OffRampMaxSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
-	FChain map[cciptypes.ChainSelector][]int
+	FChain map[cciptypes.ChainSelector]int
 }
 
 type CommitPluginOutcomeType int
