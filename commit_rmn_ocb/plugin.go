@@ -1,7 +1,10 @@
 package commitrmnocb
 
 import (
+	"context"
 	"fmt"
+	"sync"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -10,6 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -25,6 +30,8 @@ type Plugin struct {
 	tokenPricesReader reader.TokenPrices
 	ccipReader        reader.CCIP
 	homeChain         reader.HomeChain
+	bgSyncCancelFunc  context.CancelFunc
+	bgSyncWG          *sync.WaitGroup
 }
 
 func NewPlugin(
@@ -39,7 +46,7 @@ func NewPlugin(
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
 ) *Plugin {
-	return &Plugin{
+	p := &Plugin{
 		reportingCfg:      reportingCfg,
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
@@ -51,13 +58,42 @@ func NewPlugin(
 		ccipReader:        ccipReader,
 		homeChain:         homeChain,
 	}
+
+	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
+	p.bgSyncCancelFunc = bgSyncCf
+	p.bgSyncWG = &sync.WaitGroup{}
+	p.bgSyncWG.Add(1)
+	commit.BackgroundReaderSync(
+		bgSyncCtx,
+		p.bgSyncWG,
+		log,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
+	)
+
+	return p
+}
+
+func (p *Plugin) Close() error {
+	timeout := 10 * time.Second
+	ctx, cf := context.WithTimeout(context.Background(), timeout)
+	defer cf()
+
+	if err := p.ccipReader.Close(ctx); err != nil {
+		return fmt.Errorf("close ccip reader: %w", err)
+	}
+
+	p.bgSyncCancelFunc()
+	p.bgSyncWG.Wait()
+	return nil
 }
 
 // TODO: doc
 // SelectingRangesForReport doesn't depend on the previous outcome, explain how this is resilient (to being unable
 // to parse previous outcome)
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, CommitPluginState) {
-	if outcome == nil || len(outcome) == 0 {
+	if len(outcome) == 0 {
 		return CommitPluginOutcome{}, SelectingRangesForReport
 	}
 
@@ -99,3 +135,20 @@ func (p *Plugin) supportsDestChain(oracle commontypes.OracleID) (bool, error) {
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[oracle]), nil
 }
+
+func syncFrequency(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 10 * time.Second
+	}
+	return configuredValue
+}
+
+func syncTimeout(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 3 * time.Second
+	}
+	return configuredValue
+}
+
+// Interface compatibility checks.
+var _ ocr3types.ReportingPlugin[[]byte] = &Plugin{}
