@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/sha3"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -19,12 +18,10 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 		min     int
 		reports []plugintypes.ExecutePluginCommitData
 		valid   []plugintypes.ExecutePluginCommitData
-		wantErr assert.ErrorAssertionFunc
 	}{
 		{
-			name:    "empty",
-			valid:   nil,
-			wantErr: assert.NoError,
+			name:  "empty",
+			valid: nil,
 		},
 		{
 			name: "single report, enough observations",
@@ -35,7 +32,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			valid: []plugintypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "single report, not enough observations",
@@ -43,8 +39,7 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			reports: []plugintypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}},
 			},
-			valid:   nil,
-			wantErr: assert.NoError,
+			valid: nil,
 		},
 		{
 			name: "multiple reports, partial observations",
@@ -60,7 +55,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 				{MerkleRoot: [32]byte{1}},
 				{MerkleRoot: [32]byte{2}},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "multiple reports for same root",
@@ -75,7 +69,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			valid: []plugintypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}, BlockNum: 1},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "different executed messages same root",
@@ -91,7 +84,6 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			valid: []plugintypes.ExecutePluginCommitData{
 				{MerkleRoot: [32]byte{1}, ExecutedMessages: []cciptypes.SeqNum{1, 2}},
 			},
-			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -105,15 +97,11 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			}
 			validator := NewMinObservationValidator[plugintypes.ExecutePluginCommitData](tt.min, idFunc)
 			for _, report := range tt.reports {
-				err := validator.Add(report)
-				require.NoError(t, err)
+				validator.Add(report)
 			}
 
 			// Test the results
-			got, err := validator.GetValid()
-			if !tt.wantErr(t, err, "GetValid()") {
-				return
-			}
+			got := validator.GetValid()
 			if !assert.ElementsMatch(t, got, tt.valid) {
 				t.Errorf("GetValid() = %v, valid %v", got, tt.valid)
 			}
@@ -135,18 +123,14 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 	wantValue := Generic{number: 1}
 	otherValue := Generic{number: 2}
 
-	err := validator.Add(wantValue)
-	require.NoError(t, err)
-	err = validator.Add(wantValue)
-	require.NoError(t, err)
-	err = validator.Add(otherValue)
-	require.NoError(t, err)
+	validator.Add(wantValue)
+	validator.Add(wantValue)
+	validator.Add(otherValue)
 
 	// Test the results
 
 	wantValid := []Generic{wantValue}
-	got, err := validator.GetValid()
-	require.NoError(t, err)
+	got := validator.GetValid()
 	if !assert.ElementsMatch(t, got, wantValid) {
 		t.Errorf("GetValid() = %v, valid %v", got, wantValid)
 	}

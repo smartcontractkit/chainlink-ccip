@@ -145,7 +145,7 @@ func (p *Plugin) Observation(
 	if outctx.PreviousOutcome != nil {
 		previousOutcome, err = plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
 		if err != nil {
-			return types.Observation{}, err
+			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 		}
 	}
 
@@ -220,7 +220,7 @@ func (p *Plugin) ValidateObservation(
 ) error {
 	decodedObservation, err := plugintypes.DecodeExecutePluginObservation(ao.Observation)
 	if err != nil {
-		return fmt.Errorf("decode observation: %w", err)
+		return fmt.Errorf("unable to decode observation: %w", err)
 	}
 
 	supportedChains, err := p.supportedChains(ao.Observer)
@@ -509,7 +509,7 @@ func (p *Plugin) Outcome(
 ) (ocr3types.Outcome, error) {
 	decodedObservations, err := decodeAttributedObservations(aos)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
 
 	}
 	if len(decodedObservations) < p.reportingCfg.F {
@@ -523,12 +523,12 @@ func (p *Plugin) Outcome(
 
 	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, fChain)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		return ocr3types.Outcome{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
 
 	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		return ocr3types.Outcome{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
 
 	observation := plugintypes.NewExecutePluginObservation(
@@ -573,13 +573,13 @@ func (p *Plugin) Outcome(
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	decodedOutcome, err := plugintypes.DecodeExecutePluginOutcome(outcome)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
 	// TODO: this function should be pure, a context should not be needed.
 	encoded, err := p.reportCodec.Encode(context.Background(), decodedOutcome.Report)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
 	report := []ocr3types.ReportWithInfo[[]byte]{{
@@ -610,10 +610,10 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	isWriter, err := p.supportsDestChain()
 	if err != nil {
-		return false, fmt.Errorf("can't know if it's a writer: %w", err)
+		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Debugw("not a writer, skipping report transmission")
+		p.lggr.Debugw("not a destination writer, skipping report transmission")
 		return false, nil
 	}
 
@@ -631,7 +631,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) Close() error {
-	panic("implement me")
+	return nil
 }
 
 func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
