@@ -90,6 +90,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		nil, // TODO: Inject this
 	)
 	ccipReader := reader.NewCCIPChainReader(
+		p.lggr,
 		p.contractReaders,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,

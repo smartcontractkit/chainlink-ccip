@@ -83,6 +83,7 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	ccipReader := reader.NewCCIPChainReader(
+		p.lggr,
 		p.contractReaders,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,

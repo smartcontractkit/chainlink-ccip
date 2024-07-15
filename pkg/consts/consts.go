@@ -66,4 +66,6 @@ const (
 // Event Attributes
 const (
 	EventAttributeSequenceNumber = "SequenceNumber"
+	EventAttributeSourceChain    = "SourceChain"
+	EventAttributeDestChain      = "DestChain"
 )

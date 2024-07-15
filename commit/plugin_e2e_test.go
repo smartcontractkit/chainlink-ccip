@@ -275,11 +275,11 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 
 		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumA + 1, lastCommittedSeqNumB + 1}, nil)
 
 		// transmission phase root staleness check passes
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
-			Return([]cciptypes.SeqNum{lastCommittedSeqNumB}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumB + 1}, nil)
 	}
 	require.NoError(t, homeChain.Close())
 	return nodes
@@ -302,7 +302,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 		nodes = append(nodes, n)
 		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumA + 1, lastCommittedSeqNumB + 1}, nil)
 
 		// then they fetch new msgs, there is nothing new on chainA
 		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
@@ -348,9 +348,9 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 
 		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
-			Return([]cciptypes.SeqNum{lastCommittedSeqNumA, lastCommittedSeqNumB}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumA + 1, lastCommittedSeqNumB + 1}, nil)
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainB}).
-			Return([]cciptypes.SeqNum{lastCommittedSeqNumB}, nil)
+			Return([]cciptypes.SeqNum{lastCommittedSeqNumB + 1}, nil)
 	}
 
 	require.NoError(t, homeChain.Close())
