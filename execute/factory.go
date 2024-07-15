@@ -3,8 +3,9 @@ package execute
 import (
 	"context"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"google.golang.org/grpc"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
@@ -49,6 +50,7 @@ func (p PluginFactory) NewReportingPlugin(
 	return NewPlugin(
 		config,
 		pluginconfig.ExecutePluginConfig{},
+		nil,
 		nil,
 		nil,
 		nil,
