@@ -53,6 +53,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
+	tokenDataReader TokenDataReader,
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
@@ -69,6 +70,7 @@ func NewPlugin(
 		msgHasher:       msgHasher,
 		homeChain:       homeChain,
 		lastReportTS:    lastReportTS,
+		tokenDataReader: tokenDataReader,
 		lggr:            lggr,
 	}
 }
@@ -199,6 +201,9 @@ func (p *Plugin) Observation(
 					return nil, err
 				}
 				for _, msg := range msgs {
+					if _, ok := messages[selector]; !ok {
+						messages[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
+					}
 					messages[selector][msg.Header.SequenceNumber] = msg
 				}
 			}
@@ -242,6 +247,8 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 
 // TokenDataReader is an interface for reading extra token data from an async process.
 // TODO: Build a token data reading process.
+//
+//go:generate mockery --quiet --name TokenDataReader --output ../internal/mocks --case=underscore
 type TokenDataReader interface {
 	ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error)
 }
@@ -538,13 +545,14 @@ func (p *Plugin) Outcome(
 	})
 
 	// add messages to their commitReports.
-	for _, report := range commitReports {
+	for i, report := range commitReports {
 		report.Messages = nil
 		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
 			if msg, ok := observation.Messages[report.SourceChain][i]; ok {
 				report.Messages = append(report.Messages, msg)
 			}
 		}
+		commitReports[i].Messages = report.Messages
 	}
 
 	// TODO: this function should be pure, a context should not be needed.
