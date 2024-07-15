@@ -50,7 +50,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 // validateMerkleRoots TODO: doc
 // No duplicate chains, only contains chainSelector that the owner can read
 func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRoot, observer commontypes.OracleID) error {
-	if merkleRoots == nil || len(merkleRoots) == 0 {
+	if len(merkleRoots) == 0 {
 		return nil
 	}
 
@@ -81,7 +81,7 @@ func (p *Plugin) validateObservedOnRampMaxSeqNums(
 	onRampMaxSeqNums []plugintypes.SeqNumChain,
 	observer commontypes.OracleID,
 ) error {
-	if onRampMaxSeqNums == nil || len(onRampMaxSeqNums) == 0 {
+	if len(onRampMaxSeqNums) == 0 {
 		return nil
 	}
 
@@ -112,7 +112,7 @@ func (p *Plugin) validateObservedOffRampMaxSeqNums(
 	offRampMaxSeqNums []plugintypes.SeqNumChain,
 	observer commontypes.OracleID,
 ) error {
-	if offRampMaxSeqNums == nil || len(offRampMaxSeqNums) == 0 {
+	if len(offRampMaxSeqNums) == 0 {
 		return nil
 	}
 
@@ -139,7 +139,7 @@ func (p *Plugin) validateObservedOffRampMaxSeqNums(
 // validateFChains TODO: doc
 // FChain must not be empty
 func (p *Plugin) validateFChain(fchain map[cciptypes.ChainSelector]int) error {
-	if fchain == nil || len(fchain) == 0 {
+	if len(fchain) == 0 {
 		return fmt.Errorf("fchain map is empty")
 	}
 

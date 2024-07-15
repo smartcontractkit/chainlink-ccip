@@ -3,6 +3,8 @@ package commitrmnocb
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -32,6 +34,12 @@ type CommitPluginConfig struct {
 
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint
+
+	// SyncTimeout is the timeout for syncing the commit plugin reader.
+	SyncTimeout time.Duration `json:"syncTimeout"`
+
+	// SyncFrequency is the frequency at which the commit plugin reader should sync.
+	SyncFrequency time.Duration `json:"syncFrequency"`
 }
 
 type RmnSig struct {
@@ -138,45 +146,41 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 
 		// MerkleRoots
 		for _, merkleRoot := range obs.MerkleRoots {
-			AppendToMap(aggObs.MerkleRoots, merkleRoot.ChainSel, merkleRoot)
+			aggObs.MerkleRoots[merkleRoot.ChainSel] =
+				append(aggObs.MerkleRoots[merkleRoot.ChainSel], merkleRoot)
 		}
 
 		// GasPrices
 		for _, gasPriceChain := range obs.GasPrices {
-			AppendToMap(aggObs.GasPrices, gasPriceChain.ChainSel, gasPriceChain.GasPrice)
+			aggObs.GasPrices[gasPriceChain.ChainSel] =
+				append(aggObs.GasPrices[gasPriceChain.ChainSel], gasPriceChain.GasPrice)
 		}
 
 		// TokenPrices
 		for _, tokenPrice := range obs.TokenPrices {
-			AppendToMap(aggObs.TokenPrices, tokenPrice.TokenID, tokenPrice.Price)
+			aggObs.TokenPrices[tokenPrice.TokenID] =
+				append(aggObs.TokenPrices[tokenPrice.TokenID], tokenPrice.Price)
 		}
 
 		// OnRampMaxSeqNums
 		for _, seqNumChain := range obs.OnRampMaxSeqNums {
-			AppendToMap(aggObs.OnRampMaxSeqNums, seqNumChain.ChainSel, seqNumChain.SeqNum)
+			aggObs.OnRampMaxSeqNums[seqNumChain.ChainSel] =
+				append(aggObs.OnRampMaxSeqNums[seqNumChain.ChainSel], seqNumChain.SeqNum)
 		}
 
 		// OffRampMaxSeqNums
 		for _, seqNumChain := range obs.OffRampMaxSeqNums {
-			AppendToMap(aggObs.OffRampMaxSeqNums, seqNumChain.ChainSel, seqNumChain.SeqNum)
+			aggObs.OffRampMaxSeqNums[seqNumChain.ChainSel] =
+				append(aggObs.OffRampMaxSeqNums[seqNumChain.ChainSel], seqNumChain.SeqNum)
 		}
 
 		// FChain
 		for chainSel, f := range obs.FChain {
-			AppendToMap(aggObs.FChain, chainSel, f)
+			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
 		}
 	}
 
 	return aggObs
-}
-
-// AppendToMap TODO: doc
-func AppendToMap[K comparable, V any](m map[K][]V, k K, v V) {
-	if _, exists := m[k]; exists {
-		m[k] = append(m[k], v)
-	} else {
-		m[k] = []V{v}
-	}
 }
 
 // ConsensusObservation TODO: doc
@@ -198,6 +202,36 @@ type ConsensusObservation struct {
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
+}
+
+// GasPricesSortedArray TODO: doc
+func (co ConsensusObservation) GasPricesSortedArray() []cciptypes.GasPriceChain {
+	gasPrices := make([]cciptypes.GasPriceChain, 0, len(co.GasPrices))
+	for chain, gasPrice := range co.GasPrices {
+		gasPrices = append(gasPrices, cciptypes.NewGasPriceChain(gasPrice.Int, chain))
+	}
+
+	// TODO: explain this
+	sort.Slice(gasPrices, func(i, j int) bool {
+		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
+	})
+
+	return gasPrices
+}
+
+// TokenPricesSortedArray TODO: doc
+func (co ConsensusObservation) TokenPricesSortedArray() []cciptypes.TokenPrice {
+	tokenPrices := make([]cciptypes.TokenPrice, 0, len(co.TokenPrices))
+	for tokenID, tokenPrice := range co.TokenPrices {
+		tokenPrices = append(tokenPrices, cciptypes.NewTokenPrice(tokenID, tokenPrice.Int))
+	}
+
+	// TODO: explain this
+	sort.Slice(tokenPrices, func(i, j int) bool {
+		return tokenPrices[i].TokenID < tokenPrices[j].TokenID
+	})
+
+	return tokenPrices
 }
 
 type CommitPluginOutcomeType int
@@ -283,4 +317,29 @@ type OnChain interface {
 	GetOnRampMaxSeqNums() ([]plugintypes.SeqNumChain, error)
 	GetOffRampMaxSeqNums() ([]plugintypes.SeqNumChain, error)
 	GetMerkleRoots([]ChainRange) ([]MerkleRoot, error)
+}
+
+type CommitPluginReport struct {
+	SignedRoots []SignedMerkleRoot
+	TokenPrices []cciptypes.TokenPrice    `json:"tokenPrices"`
+	GasPrices   []cciptypes.GasPriceChain `json:"gasPrices"`
+}
+
+func (r CommitPluginReport) IsEmpty() bool {
+	return len(r.SignedRoots) == 0 && len(r.TokenPrices) == 0 && len(r.GasPrices) == 0
+}
+
+func (r CommitPluginReport) Encode() ([]byte, error) {
+	encodedReport, err := json.Marshal(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode CommitPluginReport: %w", err)
+	}
+
+	return encodedReport, nil
+}
+
+func DecodeCommitPluginReport(b []byte) (CommitPluginReport, error) {
+	r := CommitPluginReport{}
+	err := json.Unmarshal(b, &r)
+	return r, err
 }
