@@ -4,9 +4,11 @@ package consts
 
 // Contract Names
 const (
-	ContractNameOffRamp       = "OffRamp"
-	ContractNameOnRamp        = "OnRamp"
-	ContractNamePriceRegistry = "PriceRegistry"
+	ContractNameOffRamp              = "OffRamp"
+	ContractNameOnRamp               = "OnRamp"
+	ContractNamePriceRegistry        = "PriceRegistry"
+	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
+	ContractNameCCIPConfig           = "CCIPConfig"
 )
 
 // Method Names
@@ -43,6 +45,15 @@ const (
 	// On EVM:
 	// function execute(bytes32[3] calldata reportContext, bytes calldata report) external
 	MethodExecute = "Execute"
+
+	// Capability registry methods.
+	// Used by the home chain reader.
+	MethodNameGetCapability = "GetCapability"
+
+	// CCIPConfig.sol methods.
+	// Used by the home chain reader.
+	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
+	MethodNameGetOCRConfig       = "GetOCRConfig"
 )
 
 // Event Names
