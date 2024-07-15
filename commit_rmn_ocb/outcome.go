@@ -73,10 +73,9 @@ func (p *Plugin) ReportRangesOutcome(
 				"offRampMaxSeqNum", offRampMaxSeqNum,
 				"onRampMaxSeqNum", onRampMaxSeqNum,
 				"chainSelector", chainSel)
-			continue
-		} else if offRampMaxSeqNum == onRampMaxSeqNum {
-			continue
-		} else {
+		}
+
+		if offRampMaxSeqNum < onRampMaxSeqNum {
 			chainRange := ChainRange{
 				ChainSel:    chainSel,
 				SeqNumRange: [2]cciptypes.SeqNum{offRampMaxSeqNum, onRampMaxSeqNum},
@@ -85,6 +84,7 @@ func (p *Plugin) ReportRangesOutcome(
 		}
 	}
 
+	// TODO: explain this
 	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
 
 	outcome := CommitPluginOutcome{
@@ -95,20 +95,55 @@ func (p *Plugin) ReportRangesOutcome(
 	return outcome.Encode()
 }
 
-// TODO: doc
+// TODO: doc, break apart
 func (p *Plugin) buildReport(
 	query CommitQuery,
 	consensusObservation ConsensusObservation,
 ) (ocr3types.Outcome, error) {
-	if query.SignedMerkleRoots == nil || len(query.SignedMerkleRoots) == 0 {
-		// TODO: metrics
-		return ocr3types.Outcome{}, fmt.Errorf("buildReport: query.SignedMerkleRoots is empty")
+	verifiedSignedRoots := p.verifySignedRoots(query.SignedMerkleRoots, consensusObservation.MerkleRoots)
+
+	chainsToExclude := make([]cciptypes.ChainSelector, 0)
+	for chain := range verifiedSignedRoots {
+		if _, exists := consensusObservation.GasPrices[chain]; !exists {
+			// TODO: metrics
+			p.log.Warnw(
+				"did not find a consensus gas price for chain %d, excluding it from the report", chain)
+			chainsToExclude = append(chainsToExclude, chain)
+		}
 	}
 
-	observedMerkleRoots := consensusObservation.MerkleRoots
+	for _, chainSelector := range chainsToExclude {
+		delete(verifiedSignedRoots, chainSelector)
+	}
 
+	// TODO: token prices validation
+	// exclude merkle roots if expected token prices don't exist
+
+	verifiedSignedRootsArray := make([]SignedMerkleRoot, 0, len(verifiedSignedRoots))
+	for _, signedRoot := range verifiedSignedRoots {
+		verifiedSignedRootsArray = append(verifiedSignedRootsArray, signedRoot)
+	}
+
+	// TODO: explain this
+	sort.Slice(verifiedSignedRootsArray, func(i, j int) bool {
+		return verifiedSignedRootsArray[i].chain() < verifiedSignedRootsArray[j].chain()
+	})
+
+	return CommitPluginOutcome{
+		OutcomeType:         ReportGenerated,
+		SignedRootsToReport: verifiedSignedRootsArray,
+		GasPrices:           consensusObservation.GasPricesSortedArray(),
+		TokenPrices:         consensusObservation.TokenPricesSortedArray(),
+	}.Encode()
+}
+
+// TODO: doc, break apart
+func (p *Plugin) verifySignedRoots(
+	rmnSignedRoots []SignedMerkleRoot,
+	observedRoots map[cciptypes.ChainSelector]MerkleRoot,
+) map[cciptypes.ChainSelector]SignedMerkleRoot {
 	verifiedSignedRoots := make(map[cciptypes.ChainSelector]SignedMerkleRoot)
-	for _, signedRoot := range query.SignedMerkleRoots {
+	for _, signedRoot := range rmnSignedRoots {
 		if err := p.rmn.VerifySignedMerkleRoot(signedRoot); err != nil {
 			// TODO: metrics
 			p.log.Warnw("failed to verify signed merkle root",
@@ -117,16 +152,14 @@ func (p *Plugin) buildReport(
 			continue
 		}
 
-		if observedMerkleRoot, exists := observedMerkleRoots[signedRoot.chain()]; exists {
-			// check merkle root equality
-			if observedMerkleRoot != signedRoot.MerkleRoot {
+		if observedMerkleRoot, exists := observedRoots[signedRoot.chain()]; exists {
+			if observedMerkleRoot == signedRoot.MerkleRoot {
+				verifiedSignedRoots[signedRoot.chain()] = signedRoot
+			} else {
 				// TODO: metrics
 				p.log.Warnw("observed merkle root does not match merkle root received from RMN",
 					"rmnSignedRoot", signedRoot,
 					"observedMerkleRoot", observedMerkleRoot)
-				continue
-			} else {
-
 			}
 		} else {
 			// TODO: metrics
@@ -134,13 +167,11 @@ func (p *Plugin) buildReport(
 				"received a signed merkle root from RMN for a chain, but did not observe a merkle root for "+
 					"this chain",
 				"rmnSignedRoot", signedRoot)
-			continue
 		}
-
-		verifiedSignedRoots[signedRoot.chain()] = signedRoot
 	}
 
-	for chain, observedMerkleRoot := range observedMerkleRoots {
+	// TODO: explain this
+	for chain, observedMerkleRoot := range observedRoots {
 		if _, exists := verifiedSignedRoots[chain]; !exists {
 			if p.rmn.ChainThreshold(chain) == 0 {
 				verifiedSignedRoots[chain] = SignedMerkleRoot{
@@ -156,23 +187,7 @@ func (p *Plugin) buildReport(
 		}
 	}
 
-	chainsToExclude := make([]cciptypes.ChainSelector, 0)
-	for chain, _ := range verifiedSignedRoots {
-		if _, exists := consensusObservation.GasPrices[chain]; !exists {
-			// TODO: metrics
-			p.log.Warnw(
-				"did not find a consensus gas price for chain %d, excluding it from the report", chain)
-			chainsToExclude = append(chainsToExclude, chain)
-		}
-	}
-
-	for _, chainSelector := range chainsToExclude {
-		delete(verifiedSignedRoots, chainSelector)
-	}
-
-	// TODO: token prices validation
-
-	return nil, nil
+	return verifiedSignedRoots
 }
 
 // TODO: doc
@@ -193,21 +208,21 @@ func (p *Plugin) checkForReportTransmission(
 
 	if offRampUpdated {
 		return CommitPluginOutcome{
-			OutcomeType: CommitPluginOutcomeType(ReportGenerated),
+			OutcomeType: ReportGenerated,
 		}.Encode()
-	} else {
-		if previousOutcome.ReportTransmissionCheckAttempts+1 >= p.cfg.MaxReportTransmissionCheckAttempts {
-			return CommitPluginOutcome{
-				OutcomeType: CommitPluginOutcomeType(ReportNotTransmitted),
-			}.Encode()
-		} else {
-			return CommitPluginOutcome{
-				OutcomeType:                     CommitPluginOutcomeType(ReportNotYetTransmitted),
-				OffRampMaxSeqNums:               previousOutcome.OffRampMaxSeqNums,
-				ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
-			}.Encode()
-		}
 	}
+
+	if previousOutcome.ReportTransmissionCheckAttempts+1 >= p.cfg.MaxReportTransmissionCheckAttempts {
+		return CommitPluginOutcome{
+			OutcomeType: ReportNotTransmitted,
+		}.Encode()
+	}
+
+	return CommitPluginOutcome{
+		OutcomeType:                     ReportNotYetTransmitted,
+		OffRampMaxSeqNums:               previousOutcome.OffRampMaxSeqNums,
+		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
+	}.Encode()
 }
 
 // getConsensusObservation TODO: doc
@@ -401,11 +416,7 @@ func mostFrequentElem[T comparable](elems []T) (T, int) {
 func counts[T comparable](elems []T) map[T]int {
 	m := make(map[T]int)
 	for _, elem := range elems {
-		if _, exists := m[elem]; exists {
-			m[elem]++
-		} else {
-			m[elem] = 1
-		}
+		m[elem]++
 	}
 
 	return m
