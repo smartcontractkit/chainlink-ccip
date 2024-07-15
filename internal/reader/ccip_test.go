@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -37,6 +38,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	}).Return(nil)
 
 	ccipReader := NewCCIPChainReader(
+		logger.Test(t),
 		map[cciptypes.ChainSelector]types.ContractReader{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
