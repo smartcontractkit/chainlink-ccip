@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"errors"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -91,7 +92,10 @@ func (p PluginFactory) NewReportingPlugin(
 
 	return NewPlugin(
 			config,
-			pluginconfig.ExecutePluginConfig{},
+			pluginconfig.ExecutePluginConfig{
+				DestChain:                 p.ocrConfig.Config.ChainSelector,
+				MessageVisibilityInterval: 8 * time.Hour,
+			},
 			oracleIDToP2pID,
 			ccipReader,
 			p.execCodec,

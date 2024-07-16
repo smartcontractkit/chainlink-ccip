@@ -99,7 +99,10 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			context.Background(),
 			config.OracleID,
 			oracleIDToP2pID,
-			pluginconfig.CommitPluginConfig{},
+			pluginconfig.CommitPluginConfig{
+				DestChain:           p.ocrConfig.Config.ChainSelector,
+				NewMsgScanBatchSize: 256,
+			},
 			ccipReader,
 			onChainTokenPricesReader,
 			p.commitCodec,
