@@ -8,6 +8,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -113,7 +114,7 @@ func (r *homeChainPoller) poll() {
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var chainConfigInfos []ChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(
-		ctx, "CCIPConfig", "getAllChainConfigs", nil, &chainConfigInfos,
+		ctx, consts.ContractNameCCIPConfig, consts.MethodNameGetAllChainConfigs, nil, &chainConfigInfos,
 	)
 	if err != nil {
 		return err
@@ -187,7 +188,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
-	err := r.homeChainReader.GetLatestValue(ctx, "CCIPConfig", "getOCRConfig", map[string]any{
+	err := r.homeChainReader.GetLatestValue(ctx, consts.ContractNameCCIPConfig, consts.MethodNameGetOCRConfig, map[string]any{
 		"donId":      donID,
 		"pluginType": pluginType,
 	}, &ocrConfigs)

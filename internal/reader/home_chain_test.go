@@ -10,6 +10,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
@@ -37,8 +38,8 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		"CCIPConfig",
-		"getAllChainConfigs",
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetAllChainConfigs,
 		mock.Anything,
 		mock.Anything).Return(fmt.Errorf("error"))
 
@@ -116,7 +117,7 @@ func Test_PollingWorking(t *testing.T) {
 
 	homeChainReader := mocks.NewContractReaderMock()
 	homeChainReader.On(
-		"GetLatestValue", mock.Anything, "CCIPConfig", "getAllChainConfigs", mock.Anything, mock.Anything,
+		"GetLatestValue", mock.Anything, consts.ContractNameCCIPConfig, consts.MethodNameGetAllChainConfigs, mock.Anything, mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(4).(*[]ChainConfigInfo)
@@ -163,8 +164,8 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		"CCIPConfig",
-		"getOCRConfig",
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetOCRConfig,
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
