@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -343,8 +344,16 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("get onramps: %w", err)
 	}
 
+	r.lggr.Infow("got source chain configs", "onramps", func() []string {
+		var r []string
+		for _, scc := range sourceConfigs {
+			r = append(r, "0x"+hex.EncodeToString(scc.OnRamp))
+		}
+		return r
+	}())
+
 	for chain, cfg := range sourceConfigs {
-		if cfg.OnRamp == "" {
+		if len(cfg.OnRamp) == 0 {
 			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
 		}
 
@@ -354,7 +363,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 		// If the contract not binded -> binds to the new address
 		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
 			{
-				Address: cfg.OnRamp,
+				Address: "0x" + hex.EncodeToString(cfg.OnRamp),
 				Name:    consts.ContractNameOnRamp,
 				Pending: false,
 			},
@@ -411,7 +420,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 }
 
 type sourceChainConfig struct {
-	OnRamp   string `json:"onRamp"`
+	OnRamp   []byte `json:"onRamp"`
 	MinSeqNr uint64 `json:"minSeqNr"`
 }
 
