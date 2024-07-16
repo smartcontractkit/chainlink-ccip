@@ -363,6 +363,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 		// If the contract not binded -> binds to the new address
 		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
 			{
+				// TODO: revisit, this is EVM specific.
 				Address: "0x" + hex.EncodeToString(cfg.OnRamp),
 				Name:    consts.ContractNameOnRamp,
 				Pending: false,
