@@ -17,6 +17,9 @@ type ExecutePluginConfig struct {
 
 	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
 	MessageVisibilityInterval time.Duration `json:"messageVisibilityInterval"`
+
+	// BatchGasLimit is the maximum sum of user callback gas we permit in one execution report.
+	BatchGasLimit uint32
 }
 
 type ObserverInfo struct {
