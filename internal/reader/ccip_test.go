@@ -49,8 +49,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	ctx := context.Background()
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx)
 	assert.NoError(t, err)
-	assert.Len(t, cfgs, 3)
+	assert.Len(t, cfgs, 2)
 	assert.Equal(t, []byte("onramp-1"), cfgs[chainA].OnRamp)
 	assert.Equal(t, []byte("onramp-2"), cfgs[chainB].OnRamp)
-	assert.Equal(t, []byte("onramp-3"), cfgs[chainC].OnRamp)
 }

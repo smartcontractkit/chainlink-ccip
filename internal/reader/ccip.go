@@ -391,6 +391,10 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 
 	eg := new(errgroup.Group)
 	for chainSel := range r.contractReaders {
+		if chainSel == r.destChain {
+			continue
+		}
+
 		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
