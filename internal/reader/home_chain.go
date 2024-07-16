@@ -145,12 +145,16 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		pageIndex++
 	}
 
+	if len(allChainConfigInfos) >= 0 {
+		r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
+	}
+
 	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
+
 	return nil
 }
 
