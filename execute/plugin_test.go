@@ -731,8 +731,12 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			execReport, size, err := buildSingleChainReport(
-				ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, tt.args.maxMessages)
+			msgs := make(map[int]struct{})
+			for i := 0; i < len(tt.args.report.Messages); i++ {
+				msgs[i] = struct{}{}
+			}
+			execReport, size, _, err := buildSingleChainReport(
+				ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, msgs)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

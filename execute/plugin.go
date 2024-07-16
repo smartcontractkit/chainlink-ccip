@@ -263,10 +263,9 @@ func buildSingleChainReportMaxSize(
 	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxSizeBytes int,
-	maxSizeGas int32,
 ) (cciptypes.ExecutePluginReportSingleChain, int, plugintypes.ExecutePluginCommitDataWithMessages, error) {
-	finalReport, encodedSize, gasCost, err :=
-		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, 0)
+	finalReport, encodedSize, _, err :=
+		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, nil)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			0,
@@ -285,8 +284,12 @@ func buildSingleChainReportMaxSize(
 		if searchErr != nil {
 			return false
 		}
-		finalReport2, encodedSize2, gasCost2, err :=
-			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, mid)
+		msgs := make(map[int]struct{})
+		for i := 0; i < mid; i++ {
+			msgs[i] = struct{}{}
+		}
+		finalReport2, encodedSize2, _, err :=
+			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, msgs)
 		if searchErr != nil {
 			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
 		}
@@ -320,8 +323,9 @@ func buildSingleChainReportMaxSize(
 //
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 //
-// The maxMessages argument is used to limit the number of messages that are included in the report. If maxMessages is
-// set to 0, all messages will be included. This allows the caller to create smaller reports if needed.
+// The messages argument indicates which messages should be included in the report. If messages is empty
+// all messages will be included. This allows the caller to create smaller reports if needed. Executed messages
+// are skipped automatically.
 func buildSingleChainReport(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -329,12 +333,15 @@ func buildSingleChainReport(
 	tokenDataReader TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
-	maxMessages int,
-) (cciptypes.ExecutePluginReportSingleChain, int, int32, error) {
-	// TODO: maxMessages selects messages in FIFO order which may not yield the optimal message size. One message with a
-	//       maximum data size could push the report over a size limit even if several smaller messages could have fit.
-	if maxMessages == 0 {
-		maxMessages = len(report.Messages)
+	messages map[int]struct{},
+) (cciptypes.ExecutePluginReportSingleChain, int, uint64, error) {
+	if len(messages) == 0 {
+		if messages == nil {
+			messages = make(map[int]struct{})
+		}
+		for i := 0; i < len(report.Messages); i++ {
+			messages[i] = struct{}{}
+		}
 	}
 
 	lggr.Debugw(
@@ -363,13 +370,12 @@ func buildSingleChainReport(
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.Message
 	executedIdx := 0
-	for i := 0; i < numMsgs && len(toExecute) <= maxMessages; i++ {
+	for i, msg := range report.Messages {
 		seqNum := report.SequenceNumberRange.Start() + cciptypes.SeqNum(i)
 		// Skip messages which are already executed
 		if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
 			executedIdx++
-		} else {
-			msg := report.Messages[i]
+		} else if _, ok := messages[i]; ok {
 			tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
 			if err != nil {
 				// TODO: skip message instead of failing the whole thing.
@@ -452,7 +458,6 @@ func selectReport(
 	tokenDataReader TokenDataReader,
 	reports []plugintypes.ExecutePluginCommitDataWithMessages,
 	maxReportSizeBytes int,
-	maxGasLimit int32,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitDataWithMessages, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
@@ -460,7 +465,7 @@ func selectReport(
 	// count number of fully executed reports so that they can be removed after iterating the reports.
 	fullyExecuted := 0
 	accumulatedSize := 0
-	accumulatedGas := uint32(0)
+	//accumulatedGas := uint64(0)
 	var finalReports []cciptypes.ExecutePluginReportSingleChain
 	for reportIdx, report := range reports {
 		// Reports at the end may not have messages yet.
@@ -471,8 +476,7 @@ func selectReport(
 		execReport, encodedSize, updatedReport, err :=
 			buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
 				report,
-				maxReportSizeBytes-accumulatedSize,
-				maxGasLimit-accumulatedGas)
+				maxReportSizeBytes-accumulatedSize)
 		// No messages fit into the report, stop adding more reports.
 		if errors.Is(err, errEmptyReport) {
 			break
@@ -565,7 +569,7 @@ func (p *Plugin) Outcome(
 	// TODO: this function should be pure, a context should not be needed.
 	outcomeReports, commitReports, err :=
 		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader,
-			commitReports, maxReportSizeBytes, p.cfg.BatchGasLimit)
+			commitReports, maxReportSizeBytes) //, p.cfg.BatchGasLimit)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
