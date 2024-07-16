@@ -7,7 +7,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-// Query TODO: doc
+// Query Depending on the current state, queries RMN for sequence numbers or signed roots
 func (p *Plugin) Query(_ context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 
@@ -23,9 +23,9 @@ func (p *Plugin) Query(_ context.Context, outCtx ocr3types.OutcomeContext) (type
 	}
 }
 
-// BuildRmnSeqNumsQuery TODO: doc
+// BuildRmnSeqNumsQuery builds a Query that contains OnRamp max seq nums from RMN
 func (p *Plugin) BuildRmnSeqNumsQuery() (types.Query, error) {
-	rmnMaxSourceSeqNums, err := p.rmn.RequestMaxSeqNums(p.cfg.AllSourceChains)
+	rmnMaxSourceSeqNums, err := p.rmn.RequestOnRampMaxSeqNums(p.cfg.AllSourceChains)
 	if err != nil {
 		return types.Query{}, err
 	}
@@ -38,7 +38,7 @@ func (p *Plugin) BuildRmnSeqNumsQuery() (types.Query, error) {
 	return encodedQuery, nil
 }
 
-// BuildSignedRootsQuery TODO: doc
+// BuildSignedRootsQuery builds a Query that contains RMN signed roots
 func (p *Plugin) BuildSignedRootsQuery(previousOutcome CommitPluginOutcome) (types.Query, error) {
 	signedRoots, err := p.rmn.RequestSignedIntervals(previousOutcome.RangesSelectedForReport)
 	if err != nil {

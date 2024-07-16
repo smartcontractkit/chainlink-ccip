@@ -89,9 +89,6 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-// TODO: doc
-// SelectingRangesForReport doesn't depend on the previous outcome, explain how this is resilient (to being unable
-// to parse previous outcome)
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, CommitPluginState) {
 	if len(outcome) == 0 {
 		return CommitPluginOutcome{}, SelectingRangesForReport
@@ -112,7 +109,7 @@ func (p *Plugin) sourceChains() []cciptypes.ChainSelector {
 	return []cciptypes.ChainSelector{}
 }
 
-// TODO: doc
+// Return the set of chains that the given Oracle is configured to access
 func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
 	p2pID, exists := p.oracleIDToP2pID[oracleID]
 	if !exists {
