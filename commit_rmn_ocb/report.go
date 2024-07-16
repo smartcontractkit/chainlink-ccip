@@ -7,7 +7,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 )
 
-// Reports TODO: doc, metrics
 func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	outcome, err := DecodeCommitPluginOutcome(outcomeBytes)
 	if err != nil {
@@ -22,7 +21,9 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		TokenPrices: outcome.TokenPrices,
 	}
 
-	// TODO: log, metrics
+	p.log.Infof("Generated report: %v", report)
+
+	// TODO: metrics
 
 	encodedReport, err := report.Encode()
 	if err != nil {

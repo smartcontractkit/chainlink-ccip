@@ -17,7 +17,6 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 	return ocr3types.QuorumTwoFPlusOne, nil
 }
 
-// Observation TODO: doc
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
@@ -72,7 +71,6 @@ func (p *Plugin) ObserveOffRampMaxSeqNums() []plugintypes.SeqNumChain {
 }
 
 // ObserveMerkleRoots TODO: doc
-// Return empty array on error
 func (p *Plugin) ObserveMerkleRoots(ranges []ChainRange) []MerkleRoot {
 	roots, err := p.onChain.GetMerkleRoots(ranges)
 	if err != nil {
@@ -84,7 +82,6 @@ func (p *Plugin) ObserveMerkleRoots(ranges []ChainRange) []MerkleRoot {
 }
 
 // ObserveGasPrices TODO: doc
-// Return empty array on error
 func (p *Plugin) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain {
 	// TODO: Should this be sourceChains or supportedChains?
 	chains := p.sourceChains()
@@ -116,7 +113,6 @@ func (p *Plugin) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain
 }
 
 // ObserveTokenPrices TODO: doc
-// Return empty array on error
 func (p *Plugin) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
 	tokenPrices, err := p.observeTokenPricesHelper(ctx)
 	if err != nil {
@@ -126,7 +122,6 @@ func (p *Plugin) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice 
 }
 
 // ObserveTokenPricesHelper TODO: doc
-// Return empty array on error
 func (p *Plugin) observeTokenPricesHelper(ctx context.Context) ([]cciptypes.TokenPrice, error) {
 	if p.cfg.TokenPricesObserver {
 		tokenPrices, err := p.tokenPricesReader.GetTokenPricesUSD(ctx, p.cfg.PricedTokens)
@@ -150,8 +145,6 @@ func (p *Plugin) observeTokenPricesHelper(ctx context.Context) ([]cciptypes.Toke
 	return nil, nil
 }
 
-// ObserveFChain TODO: doc
-// Return empty array on error
 func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {

@@ -13,7 +13,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-// ValidateObservation TODO: doc
+// ValidateObservation validates an observation to ensure it is well-formed
 func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
 	obs, err := DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
@@ -47,8 +47,6 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 	return nil
 }
 
-// validateMerkleRoots TODO: doc
-// No duplicate chains, only contains chainSelector that the owner can read
 func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRoot, observer commontypes.OracleID) error {
 	if len(merkleRoots) == 0 {
 		return nil
@@ -76,7 +74,6 @@ func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRoot, observer 
 	return nil
 }
 
-// validateObservedOnRampMaxSeqNums TODO: doc
 func (p *Plugin) validateObservedOnRampMaxSeqNums(
 	onRampMaxSeqNums []plugintypes.SeqNumChain,
 	observer commontypes.OracleID,
@@ -107,7 +104,6 @@ func (p *Plugin) validateObservedOnRampMaxSeqNums(
 	return nil
 }
 
-// validateObservedOffRampMaxSeqNums TODO: doc
 func (p *Plugin) validateObservedOffRampMaxSeqNums(
 	offRampMaxSeqNums []plugintypes.SeqNumChain,
 	observer commontypes.OracleID,
@@ -136,8 +132,6 @@ func (p *Plugin) validateObservedOffRampMaxSeqNums(
 	return nil
 }
 
-// validateFChains TODO: doc
-// FChain must not be empty
 func (p *Plugin) validateFChain(fchain map[cciptypes.ChainSelector]int) error {
 	if len(fchain) == 0 {
 		return fmt.Errorf("fchain map is empty")

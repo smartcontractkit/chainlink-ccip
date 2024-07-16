@@ -12,7 +12,10 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-// Outcome TODO: doc
+// Outcome depending on the current state, either:
+// - chooses the seq num ranges for the next round
+// - builds a report
+// - checks for the transmission of a previous report
 func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
@@ -42,7 +45,7 @@ func (p *Plugin) Outcome(
 	}
 }
 
-// ReportRangesOutcome TODO: doc
+// ReportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 func (p *Plugin) ReportRangesOutcome(
 	query CommitQuery,
 	consensusObservation ConsensusObservation,
@@ -84,7 +87,7 @@ func (p *Plugin) ReportRangesOutcome(
 		}
 	}
 
-	// TODO: explain this
+	// We sort here so that Outcome serializes deterministically
 	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
 
 	outcome := CommitPluginOutcome{
@@ -95,13 +98,16 @@ func (p *Plugin) ReportRangesOutcome(
 	return outcome.Encode()
 }
 
-// TODO: doc, break apart
+// Given a set of observed merkle roots, gas prices and token prices, and signed roots from RMN, construct a report
+// to transmit on-chain
 func (p *Plugin) buildReport(
 	query CommitQuery,
 	consensusObservation ConsensusObservation,
 ) (ocr3types.Outcome, error) {
 	verifiedSignedRoots := p.verifySignedRoots(query.SignedMerkleRoots, consensusObservation.MerkleRoots)
 
+	// Only include chains in the report that have gas prices
+	// TODO: is this correct?
 	chainsToExclude := make([]cciptypes.ChainSelector, 0)
 	for chain := range verifiedSignedRoots {
 		if _, exists := consensusObservation.GasPrices[chain]; !exists {
@@ -117,14 +123,14 @@ func (p *Plugin) buildReport(
 	}
 
 	// TODO: token prices validation
-	// exclude merkle roots if expected token prices don't exist
+	// exclude merkle roots if expected token prices don't exist?
 
 	verifiedSignedRootsArray := make([]SignedMerkleRoot, 0, len(verifiedSignedRoots))
 	for _, signedRoot := range verifiedSignedRoots {
 		verifiedSignedRootsArray = append(verifiedSignedRootsArray, signedRoot)
 	}
 
-	// TODO: explain this
+	// We sort here so that Outcome serializes deterministically
 	sort.Slice(verifiedSignedRootsArray, func(i, j int) bool {
 		return verifiedSignedRootsArray[i].chain() < verifiedSignedRootsArray[j].chain()
 	})
@@ -137,7 +143,13 @@ func (p *Plugin) buildReport(
 	}.Encode()
 }
 
-// TODO: doc, break apart
+// Given a list of signed roots from RMN and observed roots, return the list of signed roots that should be included
+// in the next report.
+//
+// A merkle root will be excluded if:
+// - it was signed by RMN but one of these signatures is invalid or there are not enough signatures
+// - the root from RMN differs from the observed root for a given chain
+// - RMN returned a merkle root, but we did not observe a root for the given chain
 func (p *Plugin) verifySignedRoots(
 	rmnSignedRoots []SignedMerkleRoot,
 	observedRoots map[cciptypes.ChainSelector]MerkleRoot,
@@ -190,7 +202,13 @@ func (p *Plugin) verifySignedRoots(
 	return verifiedSignedRoots
 }
 
-// TODO: doc
+// checkForReportTransmission checks if the OffRamp has an updated set of max seq nums compared to the seq nums that
+// were observed when the most recent report was generated. If an update to these max seq sums is detected, it means
+// that the previous report has been transmitted, and we output ReportTransmitted to dictate that a new report
+// generation phase should begin. If no update is detected, and we've exhausted our check attempts, output
+// ReportNotTransmitted to signify we stop checking for updates and start a new report generation phase. If no update
+// is detected, and we haven't exhausted our check attempts, output ReportNotYetTransmitted to signify that we should
+// check again next round.
 func (p *Plugin) checkForReportTransmission(
 	previousOutcome CommitPluginOutcome,
 	consensusObservation ConsensusObservation,
@@ -208,7 +226,7 @@ func (p *Plugin) checkForReportTransmission(
 
 	if offRampUpdated {
 		return CommitPluginOutcome{
-			OutcomeType: ReportGenerated,
+			OutcomeType: ReportTransmitted,
 		}.Encode()
 	}
 
@@ -225,19 +243,21 @@ func (p *Plugin) checkForReportTransmission(
 	}.Encode()
 }
 
-// getConsensusObservation TODO: doc
+// getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 	fChains := p.fChainConsensus(aggObs.FChain)
 
 	fDestChain, exists := fChains[p.cfg.DestChain]
 	if !exists {
-		return ConsensusObservation{}, fmt.Errorf("no consensus value for fDestChain, DestChain: %d", p.cfg.DestChain)
+		return ConsensusObservation{},
+			fmt.Errorf("no consensus value for fDestChain, DestChain: %d", p.cfg.DestChain)
 	}
 
 	fTokenChain, exists := fChains[p.cfg.TokenPriceChain]
 	if !exists {
-		return ConsensusObservation{}, fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d", p.cfg.TokenPriceChain)
+		return ConsensusObservation{},
+			fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d", p.cfg.TokenPriceChain)
 	}
 
 	consensusObs := ConsensusObservation{
@@ -252,6 +272,9 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 	return consensusObs, nil
 }
 
+// Given a mapping from chains to a list of merkle roots, return a mapping from chains to a single consensus merkle
+// root. The consensus merkle root for a given chain is the merkle root with the most observations that was observed at
+// least fChain times.
 func (p *Plugin) merkleRootConsensus(
 	rootsByChain map[cciptypes.ChainSelector][]MerkleRoot,
 	fChains map[cciptypes.ChainSelector]int,
@@ -280,6 +303,9 @@ func (p *Plugin) merkleRootConsensus(
 	return consensus
 }
 
+// Given a mapping from chains to a list of gas prices, return a mapping from chains to a single consensus gas price.
+// The consensus gas price for a given chain is the median gas price if the number of gas price observations is
+// greater or equal than 2f+1, where f is the FChain of the corresponding source chain.
 func (p *Plugin) gasPriceConsensus(
 	pricesByChain map[cciptypes.ChainSelector][]cciptypes.BigInt,
 	fChains map[cciptypes.ChainSelector]int,
@@ -306,6 +332,10 @@ func (p *Plugin) gasPriceConsensus(
 	return consensus
 }
 
+// Given a mapping from token IDs to a list of token prices, return a mapping from token IDs to a single consensus
+// token price. The consensus token price for a given token ID is the median token price if the number of token price
+// observations is greater or equal than 2f+1, where f is the FChain of the chain that token prices were retrieved
+// from.
 func (p *Plugin) tokenPriceConsensus(
 	pricesByToken map[types.Account][]cciptypes.BigInt,
 	fTokenChain int,
@@ -326,6 +356,9 @@ func (p *Plugin) tokenPriceConsensus(
 	return consensus
 }
 
+// Given a mapping from chains to a list of max seq nums on their corresponding OnRamp, return a mapping from chains
+// to a single max seq num. The consensus max seq num for a given chain is the f'th lowest max seq num if the number
+// of max seq num observations is greater or equal than 2f+1, where f is the FChain of the corresponding source chain.
 func (p *Plugin) onRampMaxSeqNumsConsensus(
 	onRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
 	fChains map[cciptypes.ChainSelector]int,
@@ -354,6 +387,9 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 	return consensus
 }
 
+// Given a mapping from chains to a list of max seq nums on the OffRamp, return a mapping from chains
+// to a single max seq num. The consensus max seq num for a given chain is the max seq num with the most observations
+// that was observed at least f times, where f is the FChain of the dest chain.
 func (p *Plugin) offRampMaxSeqNumsConsensus(
 	offRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
 	fDestChain int,
@@ -375,7 +411,9 @@ func (p *Plugin) offRampMaxSeqNumsConsensus(
 	return consensus
 }
 
-// fChainConsensus TODO: doc
+// Given a mapping from chains to a list of FChain values for each chain, return a mapping from chains
+// to a single FChain. The consensus FChain for a given chain is the FChain with the most observations
+// that was observed at least f times, where f is the F of the DON (p.reportingCfg.F).
 func (p *Plugin) fChainConsensus(fChainValues map[cciptypes.ChainSelector][]int) map[cciptypes.ChainSelector]int {
 	consensus := make(map[cciptypes.ChainSelector]int)
 
@@ -395,7 +433,7 @@ func (p *Plugin) fChainConsensus(fChainValues map[cciptypes.ChainSelector][]int)
 	return consensus
 }
 
-// mostFrequentElem TODO: doc
+// Given a list of elems, return the elem that occurs most frequently and how often it occurs
 func mostFrequentElem[T comparable](elems []T) (T, int) {
 	var mostFrequentElem T
 
@@ -412,7 +450,7 @@ func mostFrequentElem[T comparable](elems []T) (T, int) {
 	return mostFrequentElem, maxCount
 }
 
-// counts TODO: doc
+// Given a list of elems, return a map from elems to how often they occur in the given list
 func counts[T comparable](elems []T) map[T]int {
 	m := make(map[T]int)
 	for _, elem := range elems {
