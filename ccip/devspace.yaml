@@ -2,6 +2,11 @@ version: v2beta1
 name: chainlink
 
 vars:
+  # Enables or disables 1Pass integration
+  ONEPASS_ENABLED:
+    source: env
+    default: false
+
   DEVSPACE_ENV_FILE: .env
 
   # The list of default ENV Vars for CRIB, you can override any of them in the .env file
