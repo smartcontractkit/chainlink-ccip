@@ -270,7 +270,8 @@ func selectReport(
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
 		if len(report.Messages) == 0 {
-			break
+			stillPendingReports = append(stillPendingReports, report)
+			continue
 		}
 
 		/*
