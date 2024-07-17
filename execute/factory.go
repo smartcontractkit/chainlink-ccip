@@ -10,9 +10,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -101,6 +102,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.execCodec,
 			p.msgHasher,
 			p.homeChainReader,
+			nil, // TODO: token data reader
 			p.lggr,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",

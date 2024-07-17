@@ -177,3 +177,49 @@ func TestFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestMap(t *testing.T) {
+	type person struct {
+		name string
+	}
+
+	testCases := []struct {
+		name       string
+		items      []person
+		valid      func(person) string
+		expResults []string
+	}{
+		{
+			name:       "empty slice",
+			items:      []person{},
+			valid:      func(p person) string { return p.name },
+			expResults: []string{},
+		},
+		{
+			name: "no valid item",
+			items: []person{
+				{name: "Alice"},
+				{name: "Bob"},
+				{name: "Charlie"},
+			},
+			valid:      func(p person) string { return p.name },
+			expResults: []string{"Alice", "Bob", "Charlie"},
+		},
+		{
+			name: "with nonsense",
+			items: []person{
+				{name: "Alice"},
+				{name: "Bob"},
+				{name: "Charlie"},
+			},
+			valid:      func(p person) string { return "nonsense" },
+			expResults: []string{"nonsense", "nonsense", "nonsense"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.expResults, Map(tc.items, tc.valid))
+		})
+	}
+}

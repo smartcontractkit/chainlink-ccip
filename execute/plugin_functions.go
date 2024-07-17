@@ -246,19 +246,14 @@ func mergeMessageObservations(
 			}
 			// Add reports
 			for _, msg := range messages {
-				if err := validator.Add(msg); err != nil {
-					return plugintypes.ExecutePluginMessageObservations{}, err
-				}
+				validator.Add(msg)
 			}
 		}
 	}
 
 	results := make(plugintypes.ExecutePluginMessageObservations)
 	for selector, validator := range validators {
-		msgs, err := validator.GetValid()
-		if err != nil {
-			return plugintypes.ExecutePluginMessageObservations{}, err
-		}
+		msgs := validator.GetValid()
 		if _, ok := results[selector]; !ok {
 			results[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		}
@@ -295,20 +290,14 @@ func mergeCommitObservations(
 			}
 			// Add reports
 			for _, commitReport := range commitReports {
-				if err := validator.Add(commitReport); err != nil {
-					return plugintypes.ExecutePluginCommitObservations{}, err
-				}
+				validator.Add(commitReport)
 			}
 		}
 	}
 
 	results := make(plugintypes.ExecutePluginCommitObservations)
 	for selector, validator := range validators {
-		var err error
-		results[selector], err = validator.GetValid()
-		if err != nil {
-			return plugintypes.ExecutePluginCommitObservations{}, err
-		}
+		results[selector] = validator.GetValid()
 	}
 
 	return results, nil
