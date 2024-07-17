@@ -32,10 +32,15 @@ func buildSingleChainReport(
 	tokenDataReader types.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
-	maxMessages int,
+	messages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, int, error) {
-	if maxMessages == 0 {
-		maxMessages = len(report.Messages)
+	if len(messages) == 0 {
+		if messages == nil {
+			messages = make(map[int]struct{})
+		}
+		for i := 0; i < len(report.Messages); i++ {
+			messages[i] = struct{}{}
+		}
 	}
 
 	lggr.Debugw(
@@ -64,13 +69,12 @@ func buildSingleChainReport(
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.Message
 	executedIdx := 0
-	for i := 0; i < numMsgs && len(toExecute) <= maxMessages; i++ {
+	for i, msg := range report.Messages {
 		seqNum := report.SequenceNumberRange.Start() + cciptypes.SeqNum(i)
 		// Skip messages which are already executed
 		if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
 			executedIdx++
-		} else {
-			msg := report.Messages[i]
+		} else if _, ok := messages[i]; ok {
 			tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
 			if err != nil {
 				// TODO: skip message instead of failing the whole thing.
@@ -150,7 +154,7 @@ func buildSingleChainReportMaxSize(
 	maxSizeBytes int,
 ) (cciptypes.ExecutePluginReportSingleChain, int, plugintypes.ExecutePluginCommitDataWithMessages, error) {
 	finalReport, encodedSize, err :=
-		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, 0)
+		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, nil)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			0,
@@ -169,8 +173,12 @@ func buildSingleChainReportMaxSize(
 		if searchErr != nil {
 			return false
 		}
+		msgs := make(map[int]struct{})
+		for i := 0; i < mid; i++ {
+			msgs[i] = struct{}{}
+		}
 		finalReport2, encodedSize2, err :=
-			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, mid)
+			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, msgs)
 		if searchErr != nil {
 			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
 		}
