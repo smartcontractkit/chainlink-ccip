@@ -303,7 +303,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 func (r *CCIPChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) ([]cciptypes.SeqNum, error) {
-	cfgs, err := r.getSourceChainsConfig(ctx)
+	cfgs, err := r.getSourceChainsConfig(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -349,7 +349,12 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
-	sourceConfigs, err := r.getSourceChainsConfig(ctx)
+	sourceChains := make([]cciptypes.ChainSelector, 0, len(r.contractReaders))
+	for chain := range r.contractReaders {
+		sourceChains = append(sourceChains, chain)
+	}
+
+	sourceConfigs, err := r.getSourceChainsConfig(ctx, sourceChains)
 	if err != nil {
 		return false, fmt.Errorf("get onramps: %w", err)
 	}
@@ -390,8 +395,8 @@ func (r *CCIPChainReader) Close(ctx context.Context) error {
 }
 
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
-func (r *CCIPChainReader) getSourceChainsConfig(
-	ctx context.Context) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+func (r *CCIPChainReader) getSourceChainsConfig(ctx context.Context, chains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
 	if err := r.validateReaderExistence(r.destChain); err != nil {
 		return nil, err
 	}
@@ -400,12 +405,9 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 	mu := new(sync.Mutex)
 
 	eg := new(errgroup.Group)
-	for chainSel := range r.contractReaders {
-		if chainSel == r.destChain {
-			continue
-		}
 
-		chainSel := chainSel
+	for _, ch := range chains {
+		chainSel := ch
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].GetLatestValue(
