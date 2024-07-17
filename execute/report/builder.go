@@ -55,7 +55,8 @@ type execReportBuilder struct {
 
 	// State
 	reportSizeBytes uint64
-	gas             uint64
+	// TODO: gas limit
+	//gas             uint64
 
 	// Result
 	execReports []cciptypes.ExecutePluginReportSingleChain

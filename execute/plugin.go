@@ -345,7 +345,7 @@ func (p *Plugin) Outcome(
 	// TODO: this function should be pure, a context should not be needed.
 	outcomeReports, commitReports, err :=
 		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader,
-			commitReports, maxReportSizeBytes) //, p.cfg.BatchGasLimit)
+			commitReports, maxReportSizeBytes)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}

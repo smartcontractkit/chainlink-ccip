@@ -53,7 +53,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 
 	type args struct {
 		report          plugintypes.ExecutePluginCommitDataWithMessages
-		maxMessages     int
 		hasher          cciptypes.MessageHasher
 		tokenDataReader temp.TokenDataReader
 		codec           cciptypes.ExecutePluginCodec
@@ -208,7 +207,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			execReport, size, _, err := buildSingleChainReport(
+			execReport, size, err := buildSingleChainReport(
 				ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, 0)
 			if tt.wantErr != "" {
 				require.Error(t, err)

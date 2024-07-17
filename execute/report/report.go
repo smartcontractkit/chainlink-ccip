@@ -31,7 +31,7 @@ func buildSingleChainReport(
 	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxMessages int,
-) (cciptypes.ExecutePluginReportSingleChain, int, uint64, error) {
+) (cciptypes.ExecutePluginReportSingleChain, int, error) {
 	if maxMessages == 0 {
 		maxMessages = len(report.Messages)
 	}
@@ -44,7 +44,7 @@ func buildSingleChainReport(
 
 	tree, err := ConstructMerkleTree(ctx, hasher, report)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, 0,
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
 	}
 
@@ -52,7 +52,7 @@ func buildSingleChainReport(
 	hash := tree.Root()
 	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
 		actualStr := "0x" + hex.EncodeToString(hash[:])
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, 0,
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
 
@@ -78,7 +78,7 @@ func buildSingleChainReport(
 					"sourceChain", report.SourceChain,
 					"seqNum", msg.Header.SequenceNumber,
 					"error", err)
-				return cciptypes.ExecutePluginReportSingleChain{}, 0, 0,
+				return cciptypes.ExecutePluginReportSingleChain{}, 0,
 					fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
 			}
 
@@ -101,7 +101,7 @@ func buildSingleChainReport(
 		"toExecute", len(toExecute))
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, 0,
+		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
 	}
 
@@ -130,10 +130,10 @@ func buildSingleChainReport(
 	)
 	if err != nil {
 		lggr.Errorw("unable to encode report", "err", err, "report", finalReport)
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, 0, fmt.Errorf("unable to encode report: %w", err)
+		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	return finalReport, len(encoded), 0, nil
+	return finalReport, len(encoded), nil
 }
 
 // buildSingleChainReportMaxSize generates the largest report which fits into maxSizeBytes.
@@ -147,7 +147,7 @@ func buildSingleChainReportMaxSize(
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxSizeBytes int,
 ) (cciptypes.ExecutePluginReportSingleChain, int, plugintypes.ExecutePluginCommitDataWithMessages, error) {
-	finalReport, encodedSize, _, err :=
+	finalReport, encodedSize, err :=
 		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, 0)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
@@ -167,7 +167,7 @@ func buildSingleChainReportMaxSize(
 		if searchErr != nil {
 			return false
 		}
-		finalReport2, encodedSize2, _, err :=
+		finalReport2, encodedSize2, err :=
 			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, mid)
 		if searchErr != nil {
 			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
