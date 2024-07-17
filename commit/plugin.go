@@ -157,7 +157,7 @@ func (p *Plugin) Observation(
 	// If there's no previous outcome (first round ever), we only observe the latest committed sequence numbers.
 	// and on the next round we use those to look for messages.
 	if outctx.PreviousOutcome == nil {
-		p.lggr.Debugw("first round ever, can't observe new messages yet")
+		p.lggr.Infow("first round ever, can't observe new messages yet")
 		return plugintypes.NewCommitPluginObservation(
 			msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
 		).Encode()
@@ -167,7 +167,7 @@ func (p *Plugin) Observation(
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("decode commit plugin previous outcome: %w", err)
 	}
-	p.lggr.Debugw("previous outcome decoded", "outcome", prevOutcome.String())
+	p.lggr.Infow("previous outcome decoded", "outcome", prevOutcome.String())
 
 	// Always observe based on previous outcome. We'll filter out stale messages in the outcome phase.
 	newMsgs, err := observeNewMsgs(
@@ -262,25 +262,25 @@ func (p *Plugin) Outcome(
 	}
 
 	maxSeqNums := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
-	p.lggr.Debugw("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNums)
+	p.lggr.Infow("max sequence numbers consensus", "maxSeqNumsConsensus", maxSeqNums)
 
 	merkleRoots, err := newMsgsConsensus(p.lggr, maxSeqNums, decodedObservations, fChains)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("new messages consensus: %w", err)
 	}
-	p.lggr.Debugw("new messages consensus", "merkleRoots", merkleRoots)
+	p.lggr.Infow("new messages consensus", "merkleRoots", merkleRoots)
 
 	tokenPrices := tokenPricesConsensus(decodedObservations, fChainDest)
 
 	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
-	p.lggr.Debugw("gas prices consensus", "gasPrices", gasPrices)
+	p.lggr.Infow("gas prices consensus", "gasPrices", gasPrices)
 
 	outcome := plugintypes.NewCommitPluginOutcome(maxSeqNums, merkleRoots, tokenPrices, gasPrices)
 	if outcome.IsEmpty() {
-		p.lggr.Debugw("empty outcome")
+		p.lggr.Infow("empty outcome")
 		return ocr3types.Outcome{}, nil
 	}
-	p.lggr.Debugw("sending outcome", "outcome", outcome)
+	p.lggr.Infow("sending outcome", "outcome", outcome)
 
 	return outcome.Encode()
 }
@@ -332,7 +332,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("can't know if it's a writer: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Debugw("not a writer, skipping report transmission")
+		p.lggr.Infow("not a writer, skipping report transmission")
 		return false, nil
 	}
 
@@ -349,7 +349,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("validate merkle roots state: %w", err)
 	}
 
-	p.lggr.Debugw("transmitting report",
+	p.lggr.Infow("transmitting report",
 		"roots", len(decodedReport.MerkleRoots),
 		"tokenPriceUpdates", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),

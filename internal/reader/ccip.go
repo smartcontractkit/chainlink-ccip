@@ -234,13 +234,13 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 }
 
 func (r *CCIPChainReader) MsgsBetweenSeqNums(
-	ctx context.Context, chain cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
+	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	if err := r.validateReaderExistence(chain); err != nil {
+	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
 		return nil, err
 	}
 
-	seq, err := r.contractReaders[chain].QueryKey(
+	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
@@ -277,6 +277,12 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
 	}
+
+	r.lggr.Infow("queried messages between sequence numbers",
+		"numMsgs", len(seq),
+		"sourceChainSelector", sourceChainSelector,
+		"seqNumRange", seqNumRange.String(),
+	)
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
