@@ -294,6 +294,10 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		msgs = append(msgs, *msg)
 	}
 
+	r.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
+		"sourceChainSelector", sourceChainSelector,
+		"seqNumRange", seqNumRange.String())
+
 	return msgs, nil
 }
 
