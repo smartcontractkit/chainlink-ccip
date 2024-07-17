@@ -8,12 +8,15 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -134,7 +137,7 @@ func setupSimpleTest(
 		Messages: slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message }),
 	}
 
-	tree, err := constructMerkleTree(context.Background(), msgHasher, reportData)
+	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData)
 	require.NoError(t, err, "failed to construct merkle tree")
 
 	// Initialize reader with some data
@@ -222,7 +225,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
-	tokenDataReader TokenDataReader,
+	tokenDataReader types.TokenDataReader,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
