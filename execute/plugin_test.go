@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -578,7 +579,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		report          plugintypes.ExecutePluginCommitDataWithMessages
 		maxMessages     int
 		hasher          cciptypes.MessageHasher
-		tokenDataReader TokenDataReader
+		tokenDataReader temp.TokenDataReader
 		codec           cciptypes.ExecutePluginCodec
 	}
 	tests := []struct {
@@ -715,7 +716,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			}
 
 			// Select token data reader mock.
-			var resolvedTokenDataReader TokenDataReader
+			var resolvedTokenDataReader temp.TokenDataReader
 			if tt.args.tokenDataReader != nil {
 				resolvedTokenDataReader = tt.args.tokenDataReader
 			} else {

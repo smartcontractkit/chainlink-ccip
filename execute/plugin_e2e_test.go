@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -216,7 +217,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
-	tokenDataReader TokenDataReader,
+	tokenDataReader temp.TokenDataReader,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
