@@ -261,11 +261,6 @@ func selectReport(
 	//       different selection algorithms can be used.
 
 	builder := report.NewBuilder(ctx, lggr, hasher, tokenDataReader, encoder, uint64(maxReportSizeBytes), 99)
-	// count number of fully executed reports so that they can be removed after iterating the reports.
-	//fullyExecuted := 0
-	//accumulatedSize := 0
-	//accumulatedGas := uint64(0)
-	//var finalReports []cciptypes.ExecutePluginReportSingleChain
 	var stillPendingReports []plugintypes.ExecutePluginCommitDataWithMessages
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
@@ -274,30 +269,6 @@ func selectReport(
 			continue
 		}
 
-		/*
-			execReport, encodedSize, updatedReport, err :=
-				buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
-					report,
-					maxReportSizeBytes-accumulatedSize)
-
-			// No messages fit into the report, stop adding more reports.
-			if errors.Is(err, errEmptyReport) {
-				break
-			}
-			if err != nil {
-				return nil, nil, fmt.Errorf("unable to build single chain report: %w", err)
-			}
-			reports[reportIdx] = updatedReport
-			accumulatedSize += encodedSize
-			finalReports = append(finalReports, execReport)
-
-			// partially executed report detected, stop adding more reports.
-			// TODO: do not break if messages were intentionally skipped.
-			if len(updatedReport.Messages) != len(updatedReport.ExecutedMessages) {
-				break
-			}
-			fullyExecuted++
-		*/
 		var err error
 		commitReports[i], err = builder.Add(report)
 		if err != nil {
@@ -309,25 +280,12 @@ func selectReport(
 		}
 	}
 
-	// Remove reports that are about to be executed.
-	/*
-		if fullyExecuted == len(commitReports) {
-			commitReports = nil
-		} else {
-			commitReports = reports[fullyExecuted:]
-		}
-	*/
-
-	// TODO: Move this into build
-	/*
-		lggr.Infow(
-			"selected commit reports for execution report",
-			"numReports", len(finalReports),
-			"size", accumulatedSize,
-			"incompleteReports", len(reports),
-			"maxSize", maxReportSizeBytes)
-	*/
 	execReports, err := builder.Build()
+
+	lggr.Infow(
+		"reports have been selected",
+		"numReports", len(execReports),
+		"numPendingReports", len(stillPendingReports))
 	return execReports, stillPendingReports, err
 }
 

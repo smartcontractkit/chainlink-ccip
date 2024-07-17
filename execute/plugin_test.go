@@ -516,6 +516,7 @@ func Test_selectReport(t *testing.T) {
 			},
 			wantErr: "merkle root mismatch: expected 0x00000000000000000",
 		},
+		// TODO: A test that requires skipping over a large message because only a smaller message fits in the report.
 	}
 	for _, tt := range tests {
 		tt := tt
