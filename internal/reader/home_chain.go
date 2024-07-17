@@ -8,13 +8,14 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
@@ -189,10 +190,14 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
-	err := r.homeChainReader.GetLatestValue(ctx, consts.ContractNameCCIPConfig, consts.MethodNameGetOCRConfig, map[string]any{
-		"donId":      donID,
-		"pluginType": pluginType,
-	}, &ocrConfigs)
+	err := r.homeChainReader.GetLatestValue(
+		ctx,
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetOCRConfig,
+		map[string]any{
+			"donId":      donID,
+			"pluginType": pluginType,
+		}, &ocrConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
 	}

@@ -117,7 +117,12 @@ func Test_PollingWorking(t *testing.T) {
 
 	homeChainReader := mocks.NewContractReaderMock()
 	homeChainReader.On(
-		"GetLatestValue", mock.Anything, consts.ContractNameCCIPConfig, consts.MethodNameGetAllChainConfigs, mock.Anything, mock.Anything,
+		"GetLatestValue",
+		mock.Anything,
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetAllChainConfigs,
+		mock.Anything,
+		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(4).(*[]ChainConfigInfo)
