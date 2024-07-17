@@ -266,6 +266,7 @@ func selectReport(
 	//accumulatedSize := 0
 	//accumulatedGas := uint64(0)
 	//var finalReports []cciptypes.ExecutePluginReportSingleChain
+	var stillPendingReports []plugintypes.ExecutePluginCommitDataWithMessages
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
 		if len(report.Messages) == 0 {
@@ -301,6 +302,10 @@ func selectReport(
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
 		}
+		// If the report has not been fully executed, keep it for the next round.
+		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
+			stillPendingReports = append(stillPendingReports, commitReports[i])
+		}
 	}
 
 	// Remove reports that are about to be executed.
@@ -322,7 +327,7 @@ func selectReport(
 			"maxSize", maxReportSizeBytes)
 	*/
 	execReports, err := builder.Build()
-	return execReports, commitReports, err
+	return execReports, stillPendingReports, err
 }
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully

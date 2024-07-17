@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// constructMerkleTree creates the merkle tree object from the messages in the report.
-func constructMerkleTree(
+// ConstructMerkleTree creates the merkle tree object from the messages in the report.
+func ConstructMerkleTree(
 	ctx context.Context,
 	hasher cciptypes.MessageHasher,
 	report plugintypes.ExecutePluginCommitDataWithMessages,

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -129,7 +130,7 @@ func setupSimpleTest(
 		Messages: slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message }),
 	}
 
-	tree, err := constructMerkleTree(context.Background(), msgHasher, reportData)
+	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData)
 	require.NoError(t, err, "failed to construct merkle tree")
 
 	// Initialize reader with some data
