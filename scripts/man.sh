@@ -129,6 +129,34 @@ get_test_input)
 
 	EOF
 	;;
+1pass)
+	echo -e "\n${GREEN}In order to use 1Password integration with CRIB, you need to install the 1Password UI application.${NC}"
+	echo -e "${GREEN}This can be done using the 'Self Service' app or simply by running 'brew install 1password'.${NC}"
+	echo -e "\n${YELLOW}  Once installed, open the 1Password app and log in using SSO. Then, configure the following settings:${NC}"
+
+	echo -e "\n${YELLOW}    Set up Touch ID:${NC}\n"
+	echo -e "${YELLOW}        1. Open and unlock the 1Password app.${NC}"
+	echo -e "${YELLOW}        2. Click your account or collection at the top of the sidebar and choose Settings.${NC}"
+	echo -e "${YELLOW}        3. Click Security, then turn on Touch ID.${NC}"
+	echo -e "${YELLOW}        4. Click your account or collection at the top of the sidebar and choose Lock.${NC}"
+	echo -e "${YELLOW}        5. Enter your account password to unlock the app.${NC}\n"
+
+	echo -e "${BLUE}        For more details: https://support.1password.com/touch-id-mac/${NC}"
+
+	echo -e "\n${YELLOW}    Enable 1Password CLI integration:${NC}\n"
+	echo -e "${YELLOW}        1. Open and unlock the 1Password app.${NC}"
+	echo -e "${YELLOW}        2. Click your account or collection at the top of the sidebar.${NC}"
+	echo -e "${YELLOW}        3. Navigate to Settings > Developer.${NC}"
+	echo -e "${YELLOW}        4. Select Integrate with 1Password CLI.${NC}"
+	echo -e "${YELLOW}        5. If you want to authenticate 1Password CLI with your fingerprint, turn on Touch ID in the app.${NC}\n"
+
+	echo -e "${BLUE}        For more details: https://developer.1password.com/docs/cli/app-integration/#step-1-turn-on-the-app-integration${NC}"
+
+	echo -e "\n${RED}  There is also a dedicated section in the CRIB documentation related to configuring 1Password integration.${NC}"
+	echo -e "${RED}  For more detailed documentation with step-by-step instructions, please see:${NC}"
+	echo -e "\n${RED}  https://smartcontract-it.atlassian.net/wiki/spaces/TT/pages/597197209/CORE+CRIB+-+Deploy+Access+Instructions#Configure-1Password-integration${NC}\n"
+
+	;;
 man)
 	echo -e "\n${GREEN}NAME${NC}"
 	echo -e "${RED}       man${NC} - Display man pages"

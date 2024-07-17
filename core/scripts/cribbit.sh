@@ -193,6 +193,39 @@ else
 		helm registry login "$helm_registry_uri" --username AWS --password-stdin
 fi
 
+# Check if 1Pass integration is enabled
+# Default to false if ONEPASS_ENABLED is not set
+ONEPASS_ENABLED="${ONEPASS_ENABLED:-false}"
+if [ "${ONEPASS_ENABLED}" = "true" ]; then
+
+	##
+	# Validate 1Password integration and access to the CRIB vault
+	##
+
+	# Set default values for environment variables if not already set
+	DEVSPACE_VAULT_NAME_1PASS="${DEVSPACE_VAULT_NAME_1PASS:-CRIB}"
+
+	# Check if any accounts are configured with `op account list`
+	if [ -z "$(op account list 2>/dev/null)" ]; then
+		echo "Error: 1Password CLI integration isn't configured."
+		../scripts/man.sh 1pass
+		exit 1
+	else
+		echo "Info: 1Password CLI integration successfully validated"
+	fi
+
+	# Check access to the CRIB vault
+	if op item list --vault "${DEVSPACE_VAULT_NAME_1PASS}" >/dev/null 2>&1; then
+		echo "Info: Access to the CRIB vault successfully validated"
+	else
+		echo "Error: Unable to access the CRIB vault. Please reach out to the #project-crib Slack channel."
+		exit 1
+	fi
+else
+	echo "Info: 1Password integration is disabled. To enable it, set the ENV variable ONEPASS_ENABLED to 'true'."
+
+fi
+
 ##
 # Setup DevSpace
 ##
