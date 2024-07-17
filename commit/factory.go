@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -18,13 +19,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-)
-
-const (
-	// defaultMsgScanBatchSize is the default batch size for sequence number range queries.
-	// Since 256 messages is the limit for a merkle root, this is set to 256.
-	// NOTE: maybe we can also set this in the OCR config, offchainConfig.
-	defaultMsgScanBatchSize = 256
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -108,7 +102,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{
 				DestChain:           p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize: defaultMsgScanBatchSize,
+				NewMsgScanBatchSize: merklemulti.MaxNumberTreeLeaves,
 			},
 			ccipReader,
 			onChainTokenPricesReader,
