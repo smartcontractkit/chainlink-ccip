@@ -245,21 +245,21 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		query.KeyFilter{
 			Key: crconsts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
-				{
-					Primitive: &primitives.Comparator{
-						Name: crconsts.EventAttributeSequenceNumber,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    seqNumRange.Start().String(),
-								Operator: primitives.Gte,
-							},
-							{
-								Value:    seqNumRange.End().String(),
-								Operator: primitives.Lte,
-							},
-						},
-					},
-				},
+				// {
+				// 	Primitive: &primitives.Comparator{
+				// 		Name: crconsts.EventAttributeSequenceNumber,
+				// 		ValueComparators: []primitives.ValueComparator{
+				// 			{
+				// 				Value:    seqNumRange.Start().String(),
+				// 				Operator: primitives.Gte,
+				// 			},
+				// 			{
+				// 				Value:    seqNumRange.End().String(),
+				// 				Operator: primitives.Lte,
+				// 			},
+				// 		},
+				// 	},
+				// },
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -283,7 +283,16 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
-		msgs = append(msgs, msg)
+
+		// todo: filter via the query
+		valid := msg.Header.SourceChainSelector == chain &&
+			msg.Header.DestChainSelector == r.destChain &&
+			msg.Header.SequenceNumber >= seqNumRange.Start() &&
+			msg.Header.SequenceNumber <= seqNumRange.End()
+
+		if valid {
+			msgs = append(msgs, msg)
+		}
 	}
 
 	return msgs, nil
