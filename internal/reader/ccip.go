@@ -16,8 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/crconsts"
-
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -344,7 +344,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 	}
 
 	for chain, cfg := range sourceConfigs {
-		if cfg.OnRamp == "" {
+		if cfg.OnRampAddress == nil {
 			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
 		}
 
@@ -354,7 +354,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 		// If the contract not binded -> binds to the new address
 		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
 			{
-				Address: cfg.OnRamp,
+				Address: typconv.AddressBytesToString(cfg.OnRampAddress),
 				Name:    crconsts.ContractNameOnRamp,
 				Pending: false,
 			},
@@ -411,8 +411,8 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 }
 
 type sourceChainConfig struct {
-	OnRamp   string `json:"onRamp"`
-	MinSeqNr uint64 `json:"minSeqNr"`
+	OnRampAddress []byte `json:"onRamp"`
+	MinSeqNr      uint64 `json:"minSeqNr"`
 }
 
 func (r *CCIPChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
