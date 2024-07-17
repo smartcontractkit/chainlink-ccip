@@ -138,9 +138,11 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
 		if len(chainConfigInfos) == 0 {
 			break
 		}
+
 		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
 		pageIndex++
 	}
