@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
+	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -27,7 +27,7 @@ func buildSingleChainReport(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader temp.TokenDataReader,
+	tokenDataReader types.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxMessages int,
@@ -142,7 +142,7 @@ func buildSingleChainReportMaxSize(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader temp.TokenDataReader,
+	tokenDataReader types.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 	maxSizeBytes int,

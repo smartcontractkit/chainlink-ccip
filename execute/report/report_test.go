@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
+	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -55,7 +55,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	type args struct {
 		report          plugintypes.ExecutePluginCommitDataWithMessages
 		hasher          cciptypes.MessageHasher
-		tokenDataReader temp.TokenDataReader
+		tokenDataReader types.TokenDataReader
 		codec           cciptypes.ExecutePluginCodec
 	}
 	tests := []struct {
@@ -192,7 +192,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			}
 
 			// Select token data reader mock.
-			var resolvedTokenDataReader temp.TokenDataReader
+			var resolvedTokenDataReader types.TokenDataReader
 			if tt.args.tokenDataReader != nil {
 				resolvedTokenDataReader = tt.args.tokenDataReader
 			} else {

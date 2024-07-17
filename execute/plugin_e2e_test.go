@@ -16,7 +16,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
+	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -219,7 +219,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
-	tokenDataReader temp.TokenDataReader,
+	tokenDataReader types.TokenDataReader,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,

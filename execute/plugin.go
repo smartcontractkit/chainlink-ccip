@@ -17,7 +17,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
+	types2 "github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -38,7 +38,7 @@ type Plugin struct {
 	homeChain   reader.HomeChain
 
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader temp.TokenDataReader
+	tokenDataReader types2.TokenDataReader
 	lastReportTS    *atomic.Int64
 	lggr            logger.Logger
 }
@@ -51,7 +51,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataReader temp.TokenDataReader,
+	tokenDataReader types2.TokenDataReader,
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
@@ -253,7 +253,7 @@ func selectReport(
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
-	tokenDataReader temp.TokenDataReader,
+	tokenDataReader types2.TokenDataReader,
 	commitReports []plugintypes.ExecutePluginCommitDataWithMessages,
 	maxReportSizeBytes int,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitDataWithMessages, error) {

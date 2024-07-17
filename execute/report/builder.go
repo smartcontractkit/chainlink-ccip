@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
+	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -23,7 +23,7 @@ func NewBuilder(
 	ctx context.Context,
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader temp.TokenDataReader,
+	tokenDataReader types.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
@@ -46,7 +46,7 @@ type execReportBuilder struct {
 	lggr logger.Logger
 
 	// Providers
-	tokenDataReader temp.TokenDataReader
+	tokenDataReader types.TokenDataReader
 	encoder         cciptypes.ExecutePluginCodec
 	hasher          cciptypes.MessageHasher
 
