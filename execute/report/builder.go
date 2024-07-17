@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/temp"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 var _ ExecReportBuilder = &execReportBuilder{}
@@ -62,7 +63,9 @@ type execReportBuilder struct {
 	execReports []cciptypes.ExecutePluginReportSingleChain
 }
 
-func (b *execReportBuilder) Add(commitReport plugintypes.ExecutePluginCommitDataWithMessages) (plugintypes.ExecutePluginCommitDataWithMessages, error) {
+func (b *execReportBuilder) Add(
+	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
+) (plugintypes.ExecutePluginCommitDataWithMessages, error) {
 	// TODO: buildSingleChainReportMaxSize needs to be part of the builder in order to access state.
 	execReport, encodedSize, updatedReport, err :=
 		buildSingleChainReportMaxSize(b.ctx, b.lggr, b.hasher, b.tokenDataReader, b.encoder,
