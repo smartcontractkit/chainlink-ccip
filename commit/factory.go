@@ -20,6 +20,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+const (
+	// defaultMsgScanBatchSize is the default batch size for sequence number range queries.
+	// Since 256 messages is the limit for a merkle root, this is set to 256.
+	// NOTE: maybe we can also set this in the OCR config, offchainConfig.
+	defaultMsgScanBatchSize = 256
+)
+
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
 type PluginFactoryConstructor struct{}
@@ -78,9 +85,9 @@ func NewPluginFactory(
 
 func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	var oracleIDToP2pID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
-	for i, p2pID := range p.ocrConfig.Config.P2PIds {
-		oracleIDToP2pID[commontypes.OracleID(i)] = p2pID
+	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
+	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
+		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
 	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
@@ -98,10 +105,10 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	return NewPlugin(
 			context.Background(),
 			config.OracleID,
-			oracleIDToP2pID,
+			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{
 				DestChain:           p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize: 256,
+				NewMsgScanBatchSize: defaultMsgScanBatchSize,
 			},
 			ccipReader,
 			onChainTokenPricesReader,

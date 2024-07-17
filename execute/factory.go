@@ -79,9 +79,9 @@ func NewPluginFactory(
 func (p PluginFactory) NewReportingPlugin(
 	config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	var oracleIDToP2pID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
-	for i, p2pID := range p.ocrConfig.Config.P2PIds {
-		oracleIDToP2pID[commontypes.OracleID(i)] = p2pID
+	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
+	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
+		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
 	ccipReader := reader.NewCCIPChainReader(
@@ -97,7 +97,7 @@ func (p PluginFactory) NewReportingPlugin(
 				DestChain:                 p.ocrConfig.Config.ChainSelector,
 				MessageVisibilityInterval: 8 * time.Hour,
 			},
-			oracleIDToP2pID,
+			oracleIDToP2PID,
 			ccipReader,
 			p.execCodec,
 			p.msgHasher,

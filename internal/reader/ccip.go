@@ -2,7 +2,6 @@ package reader
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -17,8 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -357,8 +356,8 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 
 	r.lggr.Infow("got source chain configs", "onramps", func() []string {
 		var r []string
-		for _, scc := range sourceConfigs {
-			r = append(r, "0x"+hex.EncodeToString(scc.OnRamp))
+		for chainSelector, scc := range sourceConfigs {
+			r = append(r, typeconv.AddressBytesToString(scc.OnRamp, uint64(chainSelector)))
 		}
 		return r
 	}())
@@ -374,8 +373,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 		// If the contract not binded -> binds to the new address
 		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
 			{
-				// TODO: revisit, this is EVM specific.
-				Address: "0x" + hex.EncodeToString(cfg.OnRamp),
+				Address: typeconv.AddressBytesToString(cfg.OnRamp, uint64(chain)),
 				Name:    consts.ContractNameOnRamp,
 				Pending: false,
 			},
