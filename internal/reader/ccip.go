@@ -279,7 +279,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(cciptypes.Message)
+		msg, ok := item.Data.(*cciptypes.Message)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
@@ -291,7 +291,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			msg.Header.SequenceNumber <= seqNumRange.End()
 
 		if valid {
-			msgs = append(msgs, msg)
+			msgs = append(msgs, *msg)
 		}
 	}
 
