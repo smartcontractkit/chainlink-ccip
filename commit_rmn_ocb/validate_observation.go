@@ -20,19 +20,29 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("failed to decode commit plugin observation: %w", err)
 	}
 
-	if err := p.validateFChain(obs.FChain); err != nil {
+	if err := validateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	if err := p.validateObservedMerkleRoots(obs.MerkleRoots, ao.Observer); err != nil {
+	observerSupportedChains, err := p.supportedChains(ao.Observer)
+	if err != nil {
+		return fmt.Errorf("failed to get supported chains: %w", err)
+	}
+
+	supportsDestChain, err := p.supportsDestChain(ao.Observer)
+	if err != nil {
+		return fmt.Errorf("call to supportsDestChain failed: %w", err)
+	}
+
+	if err := validateObservedMerkleRoots(obs.MerkleRoots, ao.Observer, observerSupportedChains); err != nil {
 		return fmt.Errorf("failed to validate MerkleRoots: %w", err)
 	}
 
-	if err := p.validateObservedOnRampMaxSeqNums(obs.OnRampMaxSeqNums, ao.Observer); err != nil {
+	if err := validateObservedOnRampMaxSeqNums(obs.OnRampMaxSeqNums, ao.Observer, observerSupportedChains); err != nil {
 		return fmt.Errorf("failed to validate OnRampMaxSeqNums: %w", err)
 	}
 
-	if err := p.validateObservedOffRampMaxSeqNums(obs.OffRampMaxSeqNums, ao.Observer); err != nil {
+	if err := validateObservedOffRampMaxSeqNums(obs.OffRampMaxSeqNums, ao.Observer, supportsDestChain); err != nil {
 		return fmt.Errorf("failed to validate OffRampMaxSeqNums: %w", err)
 	}
 
@@ -47,15 +57,13 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 	return nil
 }
 
-func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRoot, observer commontypes.OracleID) error {
+func validateObservedMerkleRoots(
+	merkleRoots []MerkleRoot,
+	observer commontypes.OracleID,
+	observerSupportedChains mapset.Set[cciptypes.ChainSelector],
+) error {
 	if len(merkleRoots) == 0 {
 		return nil
-	}
-
-	observerSupportedChains, err := p.supportedChains(observer)
-
-	if err != nil {
-		return fmt.Errorf("call to supportedChains failed: %w", err)
 	}
 
 	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
@@ -74,18 +82,13 @@ func (p *Plugin) validateObservedMerkleRoots(merkleRoots []MerkleRoot, observer 
 	return nil
 }
 
-func (p *Plugin) validateObservedOnRampMaxSeqNums(
+func validateObservedOnRampMaxSeqNums(
 	onRampMaxSeqNums []plugintypes.SeqNumChain,
 	observer commontypes.OracleID,
+	observerSupportedChains mapset.Set[cciptypes.ChainSelector],
 ) error {
 	if len(onRampMaxSeqNums) == 0 {
 		return nil
-	}
-
-	observerSupportedChains, err := p.supportedChains(observer)
-
-	if err != nil {
-		return fmt.Errorf("call to supportedChains failed: %w", err)
 	}
 
 	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
@@ -104,21 +107,18 @@ func (p *Plugin) validateObservedOnRampMaxSeqNums(
 	return nil
 }
 
-func (p *Plugin) validateObservedOffRampMaxSeqNums(
+func validateObservedOffRampMaxSeqNums(
 	offRampMaxSeqNums []plugintypes.SeqNumChain,
 	observer commontypes.OracleID,
+	supportsDestChain bool,
 ) error {
 	if len(offRampMaxSeqNums) == 0 {
 		return nil
 	}
 
-	supportsDestChain, err := p.supportsDestChain(observer)
-	if err != nil {
-		return fmt.Errorf("call to supportsDestChain failed: %w", err)
-	}
-
 	if !supportsDestChain {
-		return fmt.Errorf("observer %d does not support dest chain, but has observed offRampMaxSeqNums", observer)
+		return fmt.Errorf("observer %d does not support dest chain, but has observed %d offRampMaxSeqNums",
+			observer, len(offRampMaxSeqNums))
 	}
 
 	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
@@ -132,22 +132,11 @@ func (p *Plugin) validateObservedOffRampMaxSeqNums(
 	return nil
 }
 
-func (p *Plugin) validateFChain(fchain map[cciptypes.ChainSelector]int) error {
-	if len(fchain) == 0 {
-		return fmt.Errorf("fchain map is empty")
-	}
-
-	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for chainSel, f := range fchain {
-		if seenChains.Contains(chainSel) {
-			return fmt.Errorf("duplicate fChain for chain %d", chainSel)
-		}
-
+func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
+	for _, f := range fChain {
 		if f < 0 {
 			return fmt.Errorf("fChain %d is negative", f)
 		}
-
-		seenChains.Add(chainSel)
 	}
 
 	return nil
