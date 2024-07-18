@@ -411,7 +411,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 				ctx,
 				consts.ContractNameOffRamp,
 				consts.MethodNameGetSourceChainConfig,
-				primitives.Finalized,
+				primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": chainSel,
 				},

@@ -120,7 +120,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		ctx,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetAllChainConfigs,
-		primitives.Finalized,
+		primitives.Unconfirmed,
 		nil,
 		&chainConfigInfos,
 	)
@@ -200,7 +200,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 		ctx,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetOCRConfig,
-		primitives.Finalized,
+		primitives.Unconfirmed,
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
