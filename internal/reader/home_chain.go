@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
@@ -116,7 +117,12 @@ func (r *homeChainPoller) poll() {
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var chainConfigInfos []ChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(
-		ctx, consts.ContractNameCCIPConfig, consts.MethodNameGetAllChainConfigs, nil, &chainConfigInfos,
+		ctx,
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetAllChainConfigs,
+		primitives.Unconfirmed,
+		nil,
+		&chainConfigInfos,
 	)
 	if err != nil {
 		return err
@@ -194,6 +200,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 		ctx,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetOCRConfig,
+		primitives.Unconfirmed,
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,

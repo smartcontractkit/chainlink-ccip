@@ -375,7 +375,6 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 			{
 				Address: typeconv.AddressBytesToString(cfg.OnRamp, uint64(chain)),
 				Name:    consts.ContractNameOnRamp,
-				Pending: false,
 			},
 		}); err != nil {
 			return false, fmt.Errorf("bind onRamp: %w", err)
@@ -412,6 +411,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 				ctx,
 				consts.ContractNameOffRamp,
 				consts.MethodNameGetSourceChainConfig,
+				primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": chainSel,
 				},
