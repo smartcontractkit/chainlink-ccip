@@ -28,7 +28,8 @@ func (cr *ContractReaderMock) GetLatestValue(
 	return args.Error(0)
 }
 
-func (cr *ContractReaderMock) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+func (cr *ContractReaderMock) BatchGetLatestValues(
+	ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
 	args := cr.Called(ctx, request)
 	return args.Get(0).(types.BatchGetLatestValuesResult), args.Error(1)
 }
