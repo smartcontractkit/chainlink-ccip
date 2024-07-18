@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -125,6 +125,40 @@ func buildSingleChainReport(
 	return finalReport, nil
 }
 
+type messageStatus string
+
+const (
+	ReadyToExecute  messageStatus = "ready_to_execute"
+	AlreadyExecuted messageStatus = "already_executed"
+	/*
+		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
+		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
+		InsufficientRemainingBatchDataLength messageStatus = "insufficient_remaining_batch_data_length"
+		InsufficientRemainingBatchGas        messageStatus = "insufficient_remaining_batch_gas"
+		MissingNonce                         messageStatus = "missing_nonce"
+		InvalidNonce                         messageStatus = "invalid_nonce"
+		AggregateTokenValueComputeError      messageStatus = "aggregate_token_value_compute_error"
+		AggregateTokenLimitExceeded          messageStatus = "aggregate_token_limit_exceeded"
+		TokenDataNotReady                    messageStatus = "token_data_not_ready"
+		TokenDataFetchError                  messageStatus = "token_data_fetch_error"
+		TokenNotInDestTokenPrices            messageStatus = "token_not_in_dest_token_prices"
+		TokenNotInSrcTokenPrices             messageStatus = "token_not_in_src_token_prices"
+		InsufficientRemainingFee             messageStatus = "insufficient_remaining_fee"
+		AddedToBatch                         messageStatus = "added_to_batch"
+	*/
+)
+
+func (b *execReportBuilder) checkMessage(
+	_ context.Context, idx int, execReport plugintypes.ExecutePluginCommitDataWithMessages,
+	// TODO: get rid of the nolint when the error is used
+) (messageStatus, error) { // nolint this will use the error eventually
+	if slices.Contains(execReport.ExecutedMessages, execReport.Messages[idx].Header.SequenceNumber) {
+		return AlreadyExecuted, nil
+	}
+
+	return ReadyToExecute, nil
+}
+
 func (b *execReportBuilder) verifyReport(
 	ctx context.Context, execReport cciptypes.ExecutePluginReportSingleChain,
 ) (bool, validationMetadata, error) {
@@ -186,42 +220,45 @@ func (b *execReportBuilder) buildSingleChainReportMaxSize(
 		return finalize(finalReport, report, meta)
 	}
 
-	var searchErr error
-	idx := sort.Search(len(report.Messages), func(mid int) bool {
-		if searchErr != nil {
-			return false
+	finalReport = cciptypes.ExecutePluginReportSingleChain{}
+	msgs := make(map[int]struct{})
+	for i := range report.Messages {
+		status, err := b.checkMessage(ctx, i, report)
+		if err != nil {
+			return cciptypes.ExecutePluginReportSingleChain{},
+				plugintypes.ExecutePluginCommitDataWithMessages{},
+				fmt.Errorf("unable to check message: %w", err)
 		}
-		msgs := make(map[int]struct{})
-		for i := 0; i < mid; i++ {
-			msgs[i] = struct{}{}
+		if status != ReadyToExecute {
+			continue
 		}
+
+		msgs[i] = struct{}{}
+
 		finalReport2, err :=
 			buildSingleChainReport(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, msgs)
-		if searchErr != nil {
-			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
-			return false
+		if err != nil {
+			return cciptypes.ExecutePluginReportSingleChain{},
+				plugintypes.ExecutePluginCommitDataWithMessages{},
+				fmt.Errorf("unable to build a single chain report (messages %d): %w", len(msgs), err)
 		}
 
 		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
 		if err != nil {
-			searchErr = fmt.Errorf("unable to verify report: %w", err)
-			return false
+			return cciptypes.ExecutePluginReportSingleChain{},
+				plugintypes.ExecutePluginCommitDataWithMessages{},
+				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
 			finalReport = finalReport2
 			meta = meta2
+		} else {
+			// this message didn't work, continue to the next one
+			delete(msgs, i)
 		}
-
-		return !validReport // full
-	})
-	if searchErr != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, plugintypes.ExecutePluginCommitDataWithMessages{}, searchErr
 	}
 
-	// No messages fit into the report.
-	if idx <= 0 {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			plugintypes.ExecutePluginCommitDataWithMessages{},
-			ErrEmptyReport
+	if len(msgs) == 0 {
+		return cciptypes.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
 	}
 
 	return finalize(finalReport, report, meta)
