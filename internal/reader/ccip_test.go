@@ -31,6 +31,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		crconsts.FunctionNameGetSourceChainConfig,
 		mock.Anything,
 		mock.Anything,
+		mock.Anything,
 	).Run(func(args mock.Arguments) {
 		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := args.Get(4).(*sourceChainConfig)

@@ -356,7 +356,6 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 			{
 				Address: cfg.OnRamp,
 				Name:    crconsts.ContractNameOnRamp,
-				Pending: false,
 			},
 		}); err != nil {
 			return false, fmt.Errorf("bind onRamp: %w", err)
@@ -389,6 +388,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 				ctx,
 				crconsts.ContractNameOffRamp,
 				crconsts.FunctionNameGetSourceChainConfig,
+				primitives.Finalized,
 				map[string]any{
 					"sourceChainSelector": chainSel,
 				},
