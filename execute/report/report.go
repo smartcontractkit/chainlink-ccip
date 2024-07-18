@@ -3,10 +3,9 @@ package report
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sort"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -30,10 +29,9 @@ func buildSingleChainReport(
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	tokenDataReader types.TokenDataReader,
-	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 	messages map[int]struct{},
-) (cciptypes.ExecutePluginReportSingleChain, int, error) {
+) (cciptypes.ExecutePluginReportSingleChain, error) {
 	if len(messages) == 0 {
 		if messages == nil {
 			messages = make(map[int]struct{})
@@ -51,15 +49,15 @@ func buildSingleChainReport(
 
 	tree, err := ConstructMerkleTree(ctx, hasher, report)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
 	}
 
 	// Verify merkle root.
 	hash := tree.Root()
 	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
-		actualStr := typconv.HexEncode(hash[:])
-		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+		actualStr := "0x" + hex.EncodeToString(hash[:])
+		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
 
@@ -84,7 +82,7 @@ func buildSingleChainReport(
 					"sourceChain", report.SourceChain,
 					"seqNum", msg.Header.SequenceNumber,
 					"error", err)
-				return cciptypes.ExecutePluginReportSingleChain{}, 0,
+				return cciptypes.ExecutePluginReportSingleChain{},
 					fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
 			}
 
@@ -107,7 +105,7 @@ func buildSingleChainReport(
 		"toExecute", len(toExecute))
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0,
+		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
 	}
 
@@ -124,48 +122,68 @@ func buildSingleChainReport(
 		ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 	}
 
+	return finalReport, nil
+}
+
+func (b *execReportBuilder) verifyReport(
+	ctx context.Context, execReport cciptypes.ExecutePluginReportSingleChain,
+) (bool, validationMetadata, error) {
+	// Compute the size of the encoded report.
 	// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
 	//       does not add any additional overhead to the size being computed here.
-
-	// Compute the size of the encoded report.
-	encoded, err := encoder.Encode(
+	encoded, err := b.encoder.Encode(
 		ctx,
 		cciptypes.ExecutePluginReport{
-			ChainReports: []cciptypes.ExecutePluginReportSingleChain{finalReport},
+			ChainReports: []cciptypes.ExecutePluginReportSingleChain{execReport},
 		},
 	)
 	if err != nil {
-		lggr.Errorw("unable to encode report", "err", err, "report", finalReport)
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to encode report: %w", err)
+		b.lggr.Errorw("unable to encode report", "err", err, "report", execReport)
+		return false, validationMetadata{}, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	return finalReport, len(encoded), nil
+	maxSizeBytes := int(b.maxReportSizeBytes - b.accumulated.encodedSizeBytes)
+	if len(encoded) > maxSizeBytes {
+		b.lggr.Debugw("invalid report, report size exceeds limit", "size", len(encoded), "maxSize", maxSizeBytes)
+		return false, validationMetadata{}, nil
+	}
+
+	return true, validationMetadata{
+		encodedSizeBytes: uint64(len(encoded)),
+	}, nil
 }
 
 // buildSingleChainReportMaxSize generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
-func buildSingleChainReportMaxSize(
+func (b *execReportBuilder) buildSingleChainReportMaxSize(
 	ctx context.Context,
-	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
-	tokenDataReader types.TokenDataReader,
-	encoder cciptypes.ExecutePluginCodec,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
-	maxSizeBytes int,
-) (cciptypes.ExecutePluginReportSingleChain, int, plugintypes.ExecutePluginCommitDataWithMessages, error) {
-	finalReport, encodedSize, err :=
-		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, nil)
+) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitDataWithMessages, error) {
+	finalize := func(
+		execReport cciptypes.ExecutePluginReportSingleChain,
+		commitReport plugintypes.ExecutePluginCommitDataWithMessages,
+		meta validationMetadata,
+	) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitDataWithMessages, error) {
+		b.accumulated.encodedSizeBytes += meta.encodedSizeBytes
+		commitReport = markNewMessagesExecuted(execReport, commitReport)
+		return execReport, commitReport, nil
+	}
+	// Attempt to include all messages in the report.
+	finalReport, err :=
+		buildSingleChainReport(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, nil)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			0,
 			plugintypes.ExecutePluginCommitDataWithMessages{},
 			fmt.Errorf("unable to build a single chain report (max): %w", err)
 	}
 
-	// return fully executed report
-	if encodedSize <= maxSizeBytes {
-		report = markNewMessagesExecuted(finalReport, report)
-		return finalReport, encodedSize, report, nil
+	validReport, meta, err := b.verifyReport(ctx, finalReport)
+	if err != nil {
+		return cciptypes.ExecutePluginReportSingleChain{},
+			plugintypes.ExecutePluginCommitDataWithMessages{},
+			fmt.Errorf("unable to verify report: %w", err)
+	} else if validReport {
+		return finalize(finalReport, report, meta)
 	}
 
 	var searchErr error
@@ -177,32 +195,34 @@ func buildSingleChainReportMaxSize(
 		for i := 0; i < mid; i++ {
 			msgs[i] = struct{}{}
 		}
-		finalReport2, encodedSize2, err :=
-			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, msgs)
+		finalReport2, err :=
+			buildSingleChainReport(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, msgs)
 		if searchErr != nil {
 			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
+			return false
 		}
 
-		if (encodedSize2) <= maxSizeBytes {
-			// mid is a valid report size, try something bigger next iteration.
+		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
+		if err != nil {
+			searchErr = fmt.Errorf("unable to verify report: %w", err)
+			return false
+		} else if validReport {
 			finalReport = finalReport2
-			encodedSize = encodedSize2
-			return false // not full
+			meta = meta2
 		}
-		return true // full
+
+		return !validReport // full
 	})
 	if searchErr != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, plugintypes.ExecutePluginCommitDataWithMessages{}, searchErr
+		return cciptypes.ExecutePluginReportSingleChain{}, plugintypes.ExecutePluginCommitDataWithMessages{}, searchErr
 	}
 
 	// No messages fit into the report.
 	if idx <= 0 {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			0,
 			plugintypes.ExecutePluginCommitDataWithMessages{},
 			ErrEmptyReport
 	}
 
-	report = markNewMessagesExecuted(finalReport, report)
-	return finalReport, encodedSize, report, nil
+	return finalize(finalReport, report, meta)
 }

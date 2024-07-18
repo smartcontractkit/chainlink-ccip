@@ -39,6 +39,8 @@ func (btdr badTokenDataReader) ReadTokenData(
 	return nil, fmt.Errorf("bad token data reader")
 }
 
+/*
+// TODO: Use this to test the verifyReport function.
 type badCodec struct{}
 
 func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
@@ -48,6 +50,7 @@ func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginRep
 func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
 	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
 }
+*/
 
 func Test_buildSingleChainReport_Errors(t *testing.T) {
 	lggr := logger.Test(t)
@@ -56,7 +59,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		report          plugintypes.ExecutePluginCommitDataWithMessages
 		hasher          cciptypes.MessageHasher
 		tokenDataReader types.TokenDataReader
-		codec           cciptypes.ExecutePluginCodec
 	}
 	tests := []struct {
 		name    string
@@ -158,25 +160,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 				tokenDataReader: badTokenDataReader{},
 			},
 		},
-		{
-			name:    "bad codec",
-			wantErr: "unable to encode report: bad codec",
-			args: args{
-				report: plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SourceChain:         1234567,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					},
-					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 1234567,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
-					},
-				},
-				codec: badCodec{},
-			},
-		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -199,28 +182,15 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 				resolvedTokenDataReader = tdr{}
 			}
 
-			// Select codec mock.
-			var resolvedCodec cciptypes.ExecutePluginCodec
-			if tt.args.codec != nil {
-				resolvedCodec = tt.args.codec
-			} else {
-				resolvedCodec = mocks.NewExecutePluginJSONReportCodec()
-			}
-
 			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
-			execReport, size, err := buildSingleChainReport(
-				ctx, lggr, resolvedHasher, resolvedTokenDataReader, resolvedCodec, tt.args.report, msgs)
-			if tt.wantErr != "" {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.wantErr)
-				return
-			}
-			require.NoError(t, err)
-			fmt.Println(execReport, size, err)
+			_, err := buildSingleChainReport(
+				ctx, lggr, resolvedHasher, resolvedTokenDataReader, tt.args.report, msgs)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
 		})
 	}
 }
