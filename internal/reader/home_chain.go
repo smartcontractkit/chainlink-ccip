@@ -15,6 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
@@ -115,7 +117,12 @@ func (r *homeChainPoller) poll() {
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var chainConfigInfos []ChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(
-		ctx, "CCIPConfig", "getAllChainConfigs", primitives.Finalized, nil, &chainConfigInfos,
+		ctx,
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetAllChainConfigs,
+		primitives.Finalized,
+		nil,
+		&chainConfigInfos,
 	)
 	if err != nil {
 		return err
@@ -189,10 +196,15 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
-	err := r.homeChainReader.GetLatestValue(ctx, "CCIPConfig", "getOCRConfig", primitives.Finalized, map[string]any{
-		"donId":      donID,
-		"pluginType": pluginType,
-	}, &ocrConfigs)
+	err := r.homeChainReader.GetLatestValue(
+		ctx,
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetOCRConfig,
+		primitives.Finalized,
+		map[string]any{
+			"donId":      donID,
+			"pluginType": pluginType,
+		}, &ocrConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
 	}

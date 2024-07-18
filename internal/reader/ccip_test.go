@@ -13,7 +13,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/crconsts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
@@ -27,15 +27,15 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	destCR.On(
 		"GetLatestValue",
 		mock.Anything,
-		crconsts.ContractNameOffRamp,
-		crconsts.FunctionNameGetSourceChainConfig,
+		consts.ContractNameOffRamp,
+		consts.MethodNameGetSourceChainConfig,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Run(func(args mock.Arguments) {
 		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := args.Get(4).(*sourceChainConfig)
-		v.OnRamp = fmt.Sprintf("onramp-%d", sourceChain)
+		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 
 	ccipReader := NewCCIPChainReader(
@@ -50,8 +50,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	ctx := context.Background()
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx)
 	assert.NoError(t, err)
-	assert.Len(t, cfgs, 3)
-	assert.Equal(t, "onramp-1", cfgs[chainA].OnRamp)
-	assert.Equal(t, "onramp-2", cfgs[chainB].OnRamp)
-	assert.Equal(t, "onramp-3", cfgs[chainC].OnRamp)
+	assert.Len(t, cfgs, 2)
+	assert.Equal(t, []byte("onramp-1"), cfgs[chainA].OnRamp)
+	assert.Equal(t, []byte("onramp-2"), cfgs[chainB].OnRamp)
 }
