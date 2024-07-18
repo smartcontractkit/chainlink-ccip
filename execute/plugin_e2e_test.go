@@ -88,7 +88,7 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]reader.ChainConfigInfo)
+			arg := args.Get(5).(*[]reader.ChainConfigInfo)
 			*arg = chainConfigInfos
 		}).Return(nil)
 

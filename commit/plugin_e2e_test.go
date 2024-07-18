@@ -22,6 +22,7 @@ import (
 	helpers "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -405,14 +406,14 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		"CCIPConfig",
-		"getAllChainConfigs",
+		consts.ContractNameCCIPConfig,
+		consts.MethodNameGetAllChainConfigs,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]reader.ChainConfigInfo)
+			arg := args.Get(5).(*[]reader.ChainConfigInfo)
 			*arg = chainConfigInfos
 		}).Return(nil)
 
