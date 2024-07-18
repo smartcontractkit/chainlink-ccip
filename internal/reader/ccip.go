@@ -239,6 +239,11 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
+	type SendRequestedEvent struct {
+		DestChainSelector cciptypes.ChainSelector
+		Message           cciptypes.Message
+	}
+
 	seq, err := r.contractReaders[chain].QueryKey(
 		ctx,
 		crconsts.ContractNameOnRamp,
@@ -271,7 +276,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
-		&cciptypes.Message{},
+		&SendRequestedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
@@ -279,11 +284,12 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(*cciptypes.Message)
+		event, ok := item.Data.(*SendRequestedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
+		msg := event.Message
 		// todo: filter via the query
 		valid := msg.Header.SourceChainSelector == chain &&
 			msg.Header.DestChainSelector == r.destChain &&
@@ -291,7 +297,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			msg.Header.SequenceNumber <= seqNumRange.End()
 
 		if valid {
-			msgs = append(msgs, *msg)
+			msgs = append(msgs, msg)
 		}
 	}
 
