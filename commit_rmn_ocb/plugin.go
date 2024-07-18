@@ -3,7 +3,6 @@ package commitrmnocb
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -11,10 +10,9 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/commit"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -30,8 +28,7 @@ type Plugin struct {
 	tokenPricesReader reader.TokenPrices
 	ccipReader        reader.CCIP
 	homeChain         reader.HomeChain
-	bgSyncCancelFunc  context.CancelFunc
-	bgSyncWG          *sync.WaitGroup
+	readerSyncer      *plugincommon.BackgroundReaderSyncer
 }
 
 func NewPlugin(
@@ -46,7 +43,17 @@ func NewPlugin(
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
 ) *Plugin {
-	p := &Plugin{
+	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
+		log,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		syncFrequency(cfg.SyncFrequency),
+	)
+	if err := readerSyncer.Start(context.Background()); err != nil {
+		log.Errorw("error starting background reader syncer", "err", err)
+	}
+
+	return &Plugin{
 		reportingCfg:      reportingCfg,
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
@@ -57,22 +64,8 @@ func NewPlugin(
 		tokenPricesReader: tokenPricesReader,
 		ccipReader:        ccipReader,
 		homeChain:         homeChain,
+		readerSyncer:      readerSyncer,
 	}
-
-	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
-	p.bgSyncCancelFunc = bgSyncCf
-	p.bgSyncWG = &sync.WaitGroup{}
-	p.bgSyncWG.Add(1)
-	commit.BackgroundReaderSync(
-		bgSyncCtx,
-		p.bgSyncWG,
-		log,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
-	)
-
-	return p
 }
 
 func (p *Plugin) Close() error {
@@ -80,12 +73,14 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
+	if err := p.readerSyncer.Close(); err != nil {
+		p.log.Errorw("error closing reader syncer", "err", err)
+	}
+
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
-
-	p.bgSyncCancelFunc()
-	p.bgSyncWG.Wait()
+	
 	return nil
 }
 
