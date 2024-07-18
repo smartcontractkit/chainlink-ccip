@@ -250,21 +250,6 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		query.KeyFilter{
 			Key: consts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
-				{
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSequenceNumber,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    seqNumRange.Start().String(),
-								Operator: primitives.Gte,
-							},
-							{
-								Value:    seqNumRange.End().String(),
-								Operator: primitives.Lte,
-							},
-						},
-					},
-				},
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -295,7 +280,8 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		msgs = append(msgs, event.Message)
+		msg := event.Message
+		msgs = append(msgs, msg)
 	}
 
 	r.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
