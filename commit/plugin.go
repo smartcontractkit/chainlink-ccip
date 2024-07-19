@@ -192,6 +192,15 @@ func (p *Plugin) Observation(
 
 	for _, msg := range newMsgs {
 		msgBaseDetails = append(msgBaseDetails, msg.Header)
+		p.lggr.Infow("observed new message header",
+			"msg id", msg.Header.MessageID,
+			"msg hash", msg.Header.MsgHash,
+			"source chain", msg.Header.SourceChainSelector,
+			"dest chain", msg.Header.DestChainSelector,
+			"seq num", msg.Header.SequenceNumber,
+			"nonce", msg.Header.Nonce,
+			"on ramp", msg.Header.OnRamp,
+		)
 	}
 
 	return plugintypes.NewCommitPluginObservation(
@@ -254,6 +263,12 @@ func (p *Plugin) Outcome(
 		decodedObservations = append(decodedObservations, obs)
 	}
 
+	for _, do := range decodedObservations {
+		p.lggr.Infow("OUTCOME PHASE decoded observation",
+			"observedNewMsgs length", len(do.NewMsgs),
+		)
+
+	}
 	fChains := fChainConsensus(decodedObservations)
 
 	fChainDest, ok := fChains[p.cfg.DestChain]
