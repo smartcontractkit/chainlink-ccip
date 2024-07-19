@@ -106,12 +106,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		query.KeyFilter{
 			Key: crconsts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
-				{
-					Primitive: &primitives.Timestamp{
-						Timestamp: uint64(ts.Unix()),
-						Operator:  primitives.Gte,
-					},
-				},
+				// {
+				// 	Primitive: &primitives.Timestamp{
+				// 		Timestamp: uint64(ts.Unix()),
+				// 		Operator:  primitives.Gte,
+				// 	},
+				// },
 				query.Confidence(primitives.Finalized),
 			},
 		},
