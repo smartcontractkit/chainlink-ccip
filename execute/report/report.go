@@ -187,9 +187,9 @@ func (b *execReportBuilder) verifyReport(
 	}, nil
 }
 
-// buildSingleChainReportMaxSize generates the largest report which fits into maxSizeBytes.
+// buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
-func (b *execReportBuilder) buildSingleChainReportMaxSize(
+func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	report plugintypes.ExecutePluginCommitDataWithMessages,
 ) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitDataWithMessages, error) {

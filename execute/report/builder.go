@@ -72,7 +72,7 @@ type execReportBuilder struct {
 func (b *execReportBuilder) Add(
 	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
 ) (plugintypes.ExecutePluginCommitDataWithMessages, error) {
-	execReport, updatedReport, err := b.buildSingleChainReportMaxSize(b.ctx, commitReport)
+	execReport, updatedReport, err := b.buildSingleChainReport(b.ctx, commitReport)
 
 	// No messages fit into the report, move to next report
 	if errors.Is(err, ErrEmptyReport) {
