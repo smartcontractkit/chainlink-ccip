@@ -446,8 +446,9 @@ func (r *CCIPChainReader) getSourceChainsConfig(ctx context.Context, chains []cc
 }
 
 type sourceChainConfig struct {
-	OnRampAddress []byte `json:"onRamp"`
+	IsEnabled     bool   `json:"isEnabled"`
 	MinSeqNr      uint64 `json:"minSeqNr"`
+	OnRampAddress []byte `json:"onRamp"`
 }
 
 func (r *CCIPChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
