@@ -15,7 +15,7 @@ import (
 func ConstructMerkleTree(
 	ctx context.Context,
 	hasher cciptypes.MessageHasher,
-	report plugintypes.ExecutePluginCommitDataWithMessages,
+	report plugintypes.ExecutePluginCommitData,
 ) (*merklemulti.Tree[[32]byte], error) {
 	// Ensure we have the expected number of messages
 	numMsgs := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)

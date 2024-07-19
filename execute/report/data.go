@@ -11,8 +11,8 @@ import (
 // markNewMessagesExecuted compares an execute plugin report with the commit report metadata and marks the new messages
 // as executed.
 func markNewMessagesExecuted(
-	execReport cciptypes.ExecutePluginReportSingleChain, report plugintypes.ExecutePluginCommitDataWithMessages,
-) plugintypes.ExecutePluginCommitDataWithMessages {
+	execReport cciptypes.ExecutePluginReportSingleChain, report plugintypes.ExecutePluginCommitData,
+) plugintypes.ExecutePluginCommitData {
 	// Mark new messages executed.
 	for i := 0; i < len(execReport.Messages); i++ {
 		report.ExecutedMessages =

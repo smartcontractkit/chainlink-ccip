@@ -29,7 +29,7 @@ func buildSingleChainReportHelper(
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	tokenDataReader types.TokenDataReader,
-	report plugintypes.ExecutePluginCommitDataWithMessages,
+	report plugintypes.ExecutePluginCommitData,
 	messages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, error) {
 	if len(messages) == 0 {
@@ -149,7 +149,7 @@ const (
 )
 
 func (b *execReportBuilder) checkMessage(
-	_ context.Context, idx int, execReport plugintypes.ExecutePluginCommitDataWithMessages,
+	_ context.Context, idx int, execReport plugintypes.ExecutePluginCommitData,
 	// TODO: get rid of the nolint when the error is used
 ) (messageStatus, error) { // nolint this will use the error eventually
 	if slices.Contains(execReport.ExecutedMessages, execReport.Messages[idx].Header.SequenceNumber) {
@@ -191,13 +191,13 @@ func (b *execReportBuilder) verifyReport(
 // See buildSingleChainReport for more details about how a report is built.
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
-	report plugintypes.ExecutePluginCommitDataWithMessages,
-) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitDataWithMessages, error) {
+	report plugintypes.ExecutePluginCommitData,
+) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitData, error) {
 	finalize := func(
 		execReport cciptypes.ExecutePluginReportSingleChain,
-		commitReport plugintypes.ExecutePluginCommitDataWithMessages,
+		commitReport plugintypes.ExecutePluginCommitData,
 		meta validationMetadata,
-	) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitDataWithMessages, error) {
+	) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitData, error) {
 		b.accumulated.encodedSizeBytes += meta.encodedSizeBytes
 		commitReport = markNewMessagesExecuted(execReport, commitReport)
 		return execReport, commitReport, nil
@@ -207,14 +207,14 @@ func (b *execReportBuilder) buildSingleChainReport(
 		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, nil)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			plugintypes.ExecutePluginCommitDataWithMessages{},
+			plugintypes.ExecutePluginCommitData{},
 			fmt.Errorf("unable to build a single chain report (max): %w", err)
 	}
 
 	validReport, meta, err := b.verifyReport(ctx, finalReport)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			plugintypes.ExecutePluginCommitDataWithMessages{},
+			plugintypes.ExecutePluginCommitData{},
 			fmt.Errorf("unable to verify report: %w", err)
 	} else if validReport {
 		return finalize(finalReport, report, meta)
@@ -226,7 +226,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 		status, err := b.checkMessage(ctx, i, report)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitDataWithMessages{},
+				plugintypes.ExecutePluginCommitData{},
 				fmt.Errorf("unable to check message: %w", err)
 		}
 		if status != ReadyToExecute {
@@ -239,14 +239,14 @@ func (b *execReportBuilder) buildSingleChainReport(
 			buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitDataWithMessages{},
+				plugintypes.ExecutePluginCommitData{},
 				fmt.Errorf("unable to build a single chain report (messages %d): %w", len(msgs), err)
 		}
 
 		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitDataWithMessages{},
+				plugintypes.ExecutePluginCommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
 			finalReport = finalReport2

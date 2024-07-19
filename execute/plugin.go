@@ -191,7 +191,7 @@ func (p *Plugin) Observation(
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages)
+		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
 		}
@@ -268,14 +268,14 @@ func selectReport(
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
 	tokenDataReader types2.TokenDataReader,
-	commitReports []plugintypes.ExecutePluginCommitDataWithMessages,
+	commitReports []plugintypes.ExecutePluginCommitData,
 	maxReportSizeBytes int,
-) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitDataWithMessages, error) {
+) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
 	builder := report.NewBuilder(ctx, lggr, hasher, tokenDataReader, encoder, uint64(maxReportSizeBytes), 99)
-	var stillPendingReports []plugintypes.ExecutePluginCommitDataWithMessages
+	var stillPendingReports []plugintypes.ExecutePluginCommitData
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
 		if len(report.Messages) == 0 {
@@ -337,7 +337,7 @@ func (p *Plugin) Outcome(
 		mergedMessageObservations)
 
 	// flatten commit reports and sort by timestamp.
-	var commitReports []plugintypes.ExecutePluginCommitDataWithMessages
+	var commitReports []plugintypes.ExecutePluginCommitData
 	for _, report := range observation.CommitReports {
 		commitReports = append(commitReports, report...)
 	}
