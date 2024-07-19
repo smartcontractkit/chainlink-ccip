@@ -127,7 +127,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(cciptypes.CommitPluginReport)
+		report, is := (item.Data).(*cciptypes.CommitPluginReport)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
