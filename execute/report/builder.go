@@ -79,7 +79,7 @@ func (b *execReportBuilder) Add(
 		return commitReport, nil
 	}
 	if err != nil {
-		return commitReport, fmt.Errorf("unable to build single chain report: %w", err)
+		return commitReport, fmt.Errorf("unable to add a single chain report: %w", err)
 	}
 
 	b.execReports = append(b.execReports, execReport)
