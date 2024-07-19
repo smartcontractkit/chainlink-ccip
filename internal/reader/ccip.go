@@ -132,6 +132,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
 
+		valid := item.Timestamp >= uint64(ts.Unix())
+		if !valid {
+			r.lggr.Debugw("skipping invalid commit report", "report", report)
+			continue
+		}
+
 		blockNum, err := strconv.ParseUint(item.Head.Identifier, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Identifier, err)
