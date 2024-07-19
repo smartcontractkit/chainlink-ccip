@@ -139,7 +139,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		}
 
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
-			Report:    report,
+			Report:    *report,
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
 		})
