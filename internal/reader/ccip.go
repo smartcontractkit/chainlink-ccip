@@ -239,27 +239,17 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
+	type SendRequestedEvent struct {
+		DestChainSelector cciptypes.ChainSelector
+		Message           cciptypes.Message
+	}
+
 	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
-				{
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSequenceNumber,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    seqNumRange.Start().String(),
-								Operator: primitives.Gte,
-							},
-							{
-								Value:    seqNumRange.End().String(),
-								Operator: primitives.Lte,
-							},
-						},
-					},
-				},
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -271,7 +261,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
-		&cciptypes.Message{},
+		&SendRequestedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
@@ -285,12 +275,21 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(*cciptypes.Message)
+		event, ok := item.Data.(*SendRequestedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		msgs = append(msgs, *msg)
+		msg := event.Message
+		// todo: filter via the query
+		valid := msg.Header.SourceChainSelector == sourceChainSelector &&
+			msg.Header.DestChainSelector == r.destChain &&
+			msg.Header.SequenceNumber >= seqNumRange.Start() &&
+			msg.Header.SequenceNumber <= seqNumRange.End()
+
+		if valid {
+			msgs = append(msgs, msg)
+		}
 	}
 
 	r.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
@@ -411,7 +410,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 				ctx,
 				consts.ContractNameOffRamp,
 				consts.MethodNameGetSourceChainConfig,
-				primitives.Unconfirmed,
+				//primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": chainSel,
 				},
