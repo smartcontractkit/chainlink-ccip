@@ -101,7 +101,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	type CommitReportAcceptedEvent struct {
 		PriceUpdates cciptypes.PriceUpdates
-		MerkleRoots  cciptypes.MerkleRootChain
+		MerkleRoots  []cciptypes.MerkleRootChain
 	}
 	ev := CommitReportAcceptedEvent{}
 
@@ -132,7 +132,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(*cciptypes.CommitPluginReport)
+		report, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
@@ -149,7 +149,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		}
 
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
-			Report:    *report,
+			Report: cciptypes.CommitPluginReport{
+				MerkleRoots:  report.MerkleRoots,
+				PriceUpdates: report.PriceUpdates,
+			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
 		})
