@@ -99,9 +99,20 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		return nil, err
 	}
 
+	type Interval struct {
+		Min uint64
+		Max uint64
+	}
+
+	type MerkleRoot struct {
+		SourceChainSelector uint64
+		Interval            Interval
+		MerkleRoot          cciptypes.Bytes32
+	}
+
 	type CommitReportAcceptedEvent struct {
 		PriceUpdates cciptypes.PriceUpdates
-		MerkleRoots  []cciptypes.MerkleRootChain
+		MerkleRoots  []MerkleRoot
 	}
 	ev := CommitReportAcceptedEvent{}
 
@@ -148,9 +159,21 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Identifier, err)
 		}
 
+		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(report.MerkleRoots))
+		for _, mr := range report.MerkleRoots {
+			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
+				SeqNumsRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(mr.Interval.Min),
+					cciptypes.SeqNum(mr.Interval.Max),
+				),
+				MerkleRoot: mr.MerkleRoot,
+			})
+		}
+
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
-				MerkleRoots:  report.MerkleRoots,
+				MerkleRoots:  merkleRoots,
 				PriceUpdates: report.PriceUpdates,
 			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
