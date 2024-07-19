@@ -67,14 +67,13 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				1: nil,
 			},
 			want: plugintypes.ExecutePluginCommitObservations{
-				1: []plugintypes.ExecutePluginCommitDataWithMessages{
-					{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+				1: []plugintypes.ExecutePluginCommitData{
+					{
 						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
-						ExecutedMessages:    nil,
 						Timestamp:           time.UnixMilli(10101010101),
 						BlockNum:            999,
-					}},
+					},
 				},
 			},
 			want1:   time.UnixMilli(10101010101),
@@ -103,14 +102,14 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				},
 			},
 			want: plugintypes.ExecutePluginCommitObservations{
-				1: []plugintypes.ExecutePluginCommitDataWithMessages{
-					{ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
+				1: []plugintypes.ExecutePluginCommitData{
+					{
 						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
 						Timestamp:           time.UnixMilli(10101010101),
 						BlockNum:            999,
 						ExecutedMessages:    []cciptypes.SeqNum{1, 2, 3, 7, 8},
-					}},
+					},
 				},
 			},
 			want1:   time.UnixMilli(10101010101),
@@ -256,18 +255,10 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 
 	// Reports with duplicate roots.
 	root := cciptypes.Bytes32{}
-	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
+	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData{
 		1: {
-			{
-				ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-					MerkleRoot: root,
-				},
-			},
-			{
-				ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-					MerkleRoot: root,
-				},
-			},
+			{MerkleRoot: root},
+			{MerkleRoot: root},
 		},
 	}
 	observation := plugintypes.NewExecutePluginObservation(commitReports, nil)
@@ -352,7 +343,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 		lggr:      logger.Test(t),
 	}
 
-	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
+	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData{
 		1: {},
 	}
 	observation, err := plugintypes.NewExecutePluginObservation(commitReports, nil).Encode()

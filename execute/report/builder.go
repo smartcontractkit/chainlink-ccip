@@ -15,7 +15,7 @@ import (
 var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
-	Add(report plugintypes.ExecutePluginCommitDataWithMessages) (plugintypes.ExecutePluginCommitDataWithMessages, error)
+	Add(report plugintypes.ExecutePluginCommitData) (plugintypes.ExecutePluginCommitData, error)
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
@@ -70,8 +70,8 @@ type execReportBuilder struct {
 }
 
 func (b *execReportBuilder) Add(
-	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
-) (plugintypes.ExecutePluginCommitDataWithMessages, error) {
+	commitReport plugintypes.ExecutePluginCommitData,
+) (plugintypes.ExecutePluginCommitData, error) {
 	execReport, updatedReport, err := b.buildSingleChainReport(b.ctx, commitReport)
 
 	// No messages fit into the report, move to next report
