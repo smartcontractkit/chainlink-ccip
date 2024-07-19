@@ -432,6 +432,9 @@ func (r *CCIPChainReader) getSourceChainsConfig(ctx context.Context, chains []cc
 			mu.Lock()
 			res[chainSel] = resp
 			mu.Unlock()
+			r.lggr.Infow("got source chain config",
+				"sourceChainSelector", chainSel,
+				"config", resp)
 			return nil
 		})
 	}
