@@ -191,7 +191,16 @@ func (p *Plugin) Observation(
 		"fChain", fChain)
 
 	for _, msg := range newMsgs {
-		msgBaseDetails = append(msgBaseDetails, msg.Header)
+		h := msg.Header
+		msgBaseDetails = append(msgBaseDetails, h)
+		p.lggr.Infow("msgBaseDetails: ",
+			"msgHash", h.MsgHash,
+			"msgId", h.MessageID,
+			"sourceChain", h.SourceChainSelector,
+			"destChain", h.DestChainSelector,
+			"seqNum", h.SequenceNumber,
+			"nonce", h.Nonce,
+			"onRamp", h.OnRamp)
 	}
 
 	return plugintypes.NewCommitPluginObservation(
@@ -228,6 +237,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("validate gas prices: %w", err)
 	}
 
+	p.lggr.Infow("observation validated")
 	return nil
 }
 
@@ -253,6 +263,8 @@ func (p *Plugin) Outcome(
 		}
 		decodedObservations = append(decodedObservations, obs)
 	}
+
+	p.lggr.Infow("decoded observations", "observations", decodedObservations)
 
 	fChains := fChainConsensus(decodedObservations)
 

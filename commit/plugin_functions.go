@@ -189,7 +189,7 @@ func newMsgsConsensus(
 	for _, obs := range observations {
 		msgsFromObservations = append(msgsFromObservations, obs.NewMsgs...)
 	}
-	lggr.Debugw("total observed messages across all followers", "msgs", len(msgsFromObservations))
+	lggr.Infow("total observed messages across all followers", "msgs", len(msgsFromObservations))
 
 	// Filter out messages less than or equal to the max sequence numbers.
 	msgsFromObservations = slicelib.Filter(msgsFromObservations, func(msg cciptypes.RampMessageHeader) bool {
@@ -199,7 +199,7 @@ func newMsgsConsensus(
 		}
 		return msg.SequenceNumber > maxSeqNum
 	})
-	lggr.Debugw("observed messages after filtering", "msgs", len(msgsFromObservations))
+	lggr.Infow("observed messages after filtering", "msgs", len(msgsFromObservations))
 
 	// Group messages by source chain.
 	sourceChains, groupedMsgs := slicelib.GroupBy(
@@ -221,11 +221,11 @@ func newMsgsConsensus(
 		}
 
 		if msgsConsensus.isEmpty() {
-			lggr.Debugw("no consensus on observed messages", "sourceChain", sourceChain)
+			lggr.Infow("no consensus on observed messages", "sourceChain", sourceChain)
 			continue
 		}
 		consensusBySourceChain[sourceChain] = msgsConsensus
-		lggr.Debugw("observed messages consensus", "sourceChain", sourceChain, "consensus", msgsConsensus)
+		lggr.Infow("observed messages consensus", "sourceChain", sourceChain, "consensus", msgsConsensus)
 	}
 
 	merkleRoots := make([]cciptypes.MerkleRootChain, 0)
