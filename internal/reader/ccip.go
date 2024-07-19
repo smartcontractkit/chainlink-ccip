@@ -100,7 +100,11 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		return nil, err
 	}
 
-	dataTyp := cciptypes.CommitPluginReport{}
+	type CommitReportAcceptedEvent struct {
+		PriceUpdates cciptypes.PriceUpdates
+		MerkleRoots  cciptypes.MerkleRootChain
+	}
+
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -120,7 +124,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
 			Limit:  query.Limit{Count: uint64(limit)},
 		},
-		&dataTyp,
+		&CommitReportAcceptedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
