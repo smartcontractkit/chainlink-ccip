@@ -231,8 +231,8 @@ func breakCommitReport(
 	return commitReport
 }
 
-// SetMessageData at the given index to the given size. This function will panic if the index is out of range.
-func SetMessageData(
+// setMessageData at the given index to the given size. This function will panic if the index is out of range.
+func setMessageData(
 	idx int, size uint64, commitReport plugintypes.ExecutePluginCommitDataWithMessages,
 ) plugintypes.ExecutePluginCommitDataWithMessages {
 	if len(commitReport.Messages) < idx {
@@ -611,7 +611,39 @@ func Test_Builder_Build(t *testing.T) {
 			},
 			wantErr: "merkle root mismatch: expected 0x00000000000000000",
 		},
-		// TODO: A test that requires skipping over a large message because only a smaller message fits in the report.
+		{
+			name: "skip over one large messages",
+			args: args{
+				maxReportSize: 10000,
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					setMessageData(5, 20000,
+						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+							cciptypes.Bytes32{}, // generate a correct root.
+							nil)),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{9},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 108, 109},
+		},
+		{
+			name: "skip over two large messages",
+			args: args{
+				maxReportSize: 10000,
+				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+					setMessageData(8, 20000,
+						setMessageData(5, 20000,
+							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+								cciptypes.Bytes32{}, // generate a correct root.
+								nil))),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{8},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 109},
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
