@@ -12,6 +12,7 @@ const (
 )
 
 // Method Names
+// TODO: these should be better organized, maybe separate packages.
 const (
 	// Offramp methods
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
@@ -23,12 +24,19 @@ const (
 	MethodNameGetExecutionState            = "GetExecutionState"
 
 	// Onramp methods
-	MethodNameGetDestChainConfig            = "GetDestChainConfig"
 	MethodNameOnrampGetDynamicConfig        = "OnrampGetDynamicConfig"
 	MethodNameOnrampGetStaticConfig         = "OnrampGetStaticConfig"
 	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
+
+	// Price registry view/pure methods
+	MethodNamePriceRegistryGetStaticConfig  = "GetStaticConfig"
+	MethodNameGetDestChainConfig            = "GetDestChainConfig"
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
+	MethodNameProcessMessageArgs            = "ProcessMessageArgs"
+	MethodNameValidatePoolReturnData        = "ValidatePoolReturnData"
+	MethodNameGetValidatedTokenPrice        = "GetValidatedTokenPrice"
+	MethodNameGetFeeTokens                  = "GetFeeTokens"
 
 	/*
 		// On EVM:
