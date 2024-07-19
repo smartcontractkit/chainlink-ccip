@@ -94,7 +94,8 @@ func (p PluginFactory) NewReportingPlugin(
 	return NewPlugin(
 			config,
 			pluginconfig.ExecutePluginConfig{
-				DestChain:                 p.ocrConfig.Config.ChainSelector,
+				DestChain: p.ocrConfig.Config.ChainSelector,
+				// TODO: get from OCR offchainConfig.
 				MessageVisibilityInterval: 8 * time.Hour,
 			},
 			oracleIDToP2PID,
