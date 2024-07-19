@@ -169,34 +169,6 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		query.KeyFilter{
 			Key: consts.EventNameExecutionStateChanged,
 			Expressions: []query.Expression{
-				{
-					// sequence numbers inside the range
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSequenceNumber,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    seqNumRange.Start().String(),
-								Operator: primitives.Gte,
-							},
-							{
-								Value:    seqNumRange.End().String(),
-								Operator: primitives.Lte,
-							},
-						},
-					},
-				},
-				{
-					// source chain
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSourceChain,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    source.String(),
-								Operator: primitives.Eq,
-							},
-						},
-					},
-				},
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -215,18 +187,17 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
-		if stateChange.sourceChainSelector != source {
-			return nil, fmt.Errorf("wrong cr query, unexpected source chain %d", stateChange.sourceChainSelector)
-		}
-		if stateChange.sequenceNumber < seqNumRange.Start() || stateChange.sequenceNumber > seqNumRange.End() {
-			return nil, fmt.Errorf("wrong cr query, unexpected sequence number %d", stateChange.sequenceNumber)
-		}
-		if stateChange.state <= 1 {
-			r.lggr.Debugw("execution state change status is %d, skipped",
-				"seqNum", stateChange.sequenceNumber, "state", stateChange.state)
+
+		// todo: filter via the query
+		valid := stateChange.sourceChainSelector == source &&
+			stateChange.sequenceNumber >= seqNumRange.Start() &&
+			stateChange.sequenceNumber <= seqNumRange.End() &&
+			stateChange.state > 1
+
+		if !valid {
+			r.lggr.Debugw("skipping invalid state change", "stateChange", stateChange)
 			continue
 		}
-
 		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.sequenceNumber, stateChange.sequenceNumber))
 	}
 
