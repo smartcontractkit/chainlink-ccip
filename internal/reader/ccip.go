@@ -374,13 +374,18 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
 		}
 
+		bindAddress := typeconv.AddressBytesToString(cfg.OnRampAddress, uint64(chain))
+		r.lggr.Infow("binding onRamp contract",
+			"onRampAddress", cfg.OnRampAddress,
+			"onRampBindAddress", bindAddress)
+
 		// Bind the onRamp contract address to the reader.
 		// If the same address exists -> no-op
 		// If the address is changed -> updates the address, overwrites the existing one
 		// If the contract not binded -> binds to the new address
 		if err := r.contractReaders[chain].Bind(ctx, []types.BoundContract{
 			{
-				Address: typeconv.AddressBytesToString(cfg.OnRampAddress, uint64(chain)),
+				Address: bindAddress,
 				Name:    consts.ContractNameOnRamp,
 				Pending: false,
 			},
