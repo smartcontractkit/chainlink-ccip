@@ -34,7 +34,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	).Run(func(args mock.Arguments) {
 		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := args.Get(4).(*sourceChainConfig)
-		v.OnRampAddress = []byte(fmt.Sprintf("onramp-%d", sourceChain))
+		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 
 	ccipReader := NewCCIPChainReader(
@@ -48,6 +48,6 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 2)
-	assert.Equal(t, "onramp-1", string(cfgs[chainA].OnRampAddress))
-	assert.Equal(t, "onramp-2", string(cfgs[chainB].OnRampAddress))
+	assert.Equal(t, "onramp-1", string(cfgs[chainA].OnRamp))
+	assert.Equal(t, "onramp-2", string(cfgs[chainB].OnRamp))
 }
