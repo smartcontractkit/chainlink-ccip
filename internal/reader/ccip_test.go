@@ -31,10 +31,9 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		consts.MethodNameGetSourceChainConfig,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
 	).Run(func(args mock.Arguments) {
-		sourceChain := args.Get(4).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := args.Get(5).(*sourceChainConfig)
+		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
+		v := args.Get(4).(*sourceChainConfig)
 		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 

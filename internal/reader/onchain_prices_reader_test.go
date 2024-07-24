@@ -97,15 +97,15 @@ func createMockReader(
 	for _, acc := range errorAccounts {
 		acc := acc
 		reader.On(
-			"GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", mock.Anything, acc, mock.Anything,
+			"GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", acc, mock.Anything,
 		).Return(fmt.Errorf("error"))
 	}
 	for acc, price := range mockPrices {
 		acc := acc
 		price := price
-		reader.On("GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", mock.Anything, acc, mock.Anything).Run(
+		reader.On("GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", acc, mock.Anything).Run(
 			func(args mock.Arguments) {
-				arg := args.Get(5).(*big.Int)
+				arg := args.Get(4).(*big.Int)
 				arg.Set(price)
 			}).Return(nil)
 	}

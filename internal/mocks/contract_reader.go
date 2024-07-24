@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 )
 
 type ContractReaderMock struct {
@@ -22,16 +21,10 @@ func NewContractReaderMock() *ContractReaderMock {
 
 // GetLatestValue Returns given configs at initialization
 func (cr *ContractReaderMock) GetLatestValue(
-	ctx context.Context, contractName, method string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any,
+	ctx context.Context, contractName, method string, params, returnVal any,
 ) error {
-	args := cr.Called(ctx, contractName, method, confidenceLevel, params, returnVal)
+	args := cr.Called(ctx, contractName, method, params, returnVal)
 	return args.Error(0)
-}
-
-func (cr *ContractReaderMock) BatchGetLatestValues(
-	ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
-	args := cr.Called(ctx, request)
-	return args.Get(0).(types.BatchGetLatestValuesResult), args.Error(1)
 }
 
 func (cr *ContractReaderMock) Bind(ctx context.Context, bindings []types.BoundContract) error {

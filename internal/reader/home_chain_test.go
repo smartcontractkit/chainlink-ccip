@@ -41,7 +41,6 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetAllChainConfigs,
 		mock.Anything,
-		mock.Anything,
 		mock.Anything).Return(fmt.Errorf("error"))
 
 	var (
@@ -124,10 +123,9 @@ func Test_PollingWorking(t *testing.T) {
 		consts.MethodNameGetAllChainConfigs,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(5).(*[]ChainConfigInfo)
+			arg := args.Get(4).(*[]ChainConfigInfo)
 			*arg = onChainConfigs
 		}).Return(nil)
 
@@ -173,14 +171,13 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 		mock.Anything,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetOCRConfig,
-		mock.Anything,
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
 		},
 		mock.AnythingOfType("*[]reader.OCR3ConfigWithMeta"),
 	).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(5).(*[]OCR3ConfigWithMeta)
+		arg := args.Get(4).(*[]OCR3ConfigWithMeta)
 		*arg = append(*arg, OCR3ConfigWithMeta{
 			ConfigCount: 1,
 			Config: OCR3Config{
