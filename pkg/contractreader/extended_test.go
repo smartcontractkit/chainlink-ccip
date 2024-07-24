@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 

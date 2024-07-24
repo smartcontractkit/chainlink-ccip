@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
