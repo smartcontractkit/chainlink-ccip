@@ -148,9 +148,9 @@ func setupSimpleTest(
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{
-							ChainSel:     reportData.SourceChain,
-							SeqNumsRange: reportData.SequenceNumberRange,
-							MerkleRoot:   tree.Root(),
+							SourceChainSelector: reportData.SourceChain,
+							Interval:            reportData.SequenceNumberRange,
+							MerkleRoot:          tree.Root(),
 						},
 					},
 				},

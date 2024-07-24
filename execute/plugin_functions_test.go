@@ -319,8 +319,8 @@ func Test_groupByChainSelector(t *testing.T) {
 			args: args{reports: []plugintypes.CommitPluginReportWithMeta{{
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
-						{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
-						{ChainSel: 2, SeqNumsRange: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
+						{SourceChainSelector: 1, Interval: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
+						{SourceChainSelector: 2, Interval: cciptypes.NewSeqNumRange(30, 40), MerkleRoot: cciptypes.Bytes32{2}},
 					}}}}},
 			want: plugintypes.ExecutePluginCommitObservations{
 				1: {

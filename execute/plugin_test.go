@@ -103,8 +103,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					Report: cciptypes.CommitPluginReport{
 						MerkleRoots: []cciptypes.MerkleRootChain{
 							{
-								ChainSel:     1,
-								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								SourceChainSelector: 1,
+								Interval:            cciptypes.NewSeqNumRange(1, 10),
 							},
 						},
 					},
@@ -136,8 +136,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					Report: cciptypes.CommitPluginReport{
 						MerkleRoots: []cciptypes.MerkleRootChain{
 							{
-								ChainSel:     1,
-								SeqNumsRange: cciptypes.NewSeqNumRange(1, 10),
+								SourceChainSelector: 1,
+								Interval:            cciptypes.NewSeqNumRange(1, 10),
 							},
 						},
 					},

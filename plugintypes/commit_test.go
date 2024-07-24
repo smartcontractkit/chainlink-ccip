@@ -45,7 +45,7 @@ func TestCommitPluginObservation_EncodeAndDecode(t *testing.T) {
 	b, err := obs.Encode()
 	assert.NoError(t, err)
 	// nolint:lll
-	assert.Equal(t, `{"newMsgs":[{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"18446744073709551615","destChainSelector":"123","seqNum":"123","nonce":1,"msgHash":"0x0100000000000000000000000000000000000000000000000000000000000000","onRamp":"0x010203"},{"messageId":"0x0200000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"321","destChainSelector":"456","seqNum":"18446744073709551615","nonce":0,"msgHash":"0x0200000000000000000000000000000000000000000000000000000000000000","onRamp":"0x040506"}],"gasPrices":[{"gasPrice":"1234","chainSel":18446744073709551615}],"tokenPrices":[],"maxSeqNums":[],"fChain":{}}`, string(b))
+	assert.Equal(t, `{"newMsgs":[{"messageId":"0x0100000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"18446744073709551615","destChainSelector":"123","seqNum":"123","nonce":1,"msgHash":"0x0100000000000000000000000000000000000000000000000000000000000000","onRamp":"0x010203"},{"messageId":"0x0200000000000000000000000000000000000000000000000000000000000000","sourceChainSelector":"321","destChainSelector":"456","seqNum":"18446744073709551615","nonce":0,"msgHash":"0x0200000000000000000000000000000000000000000000000000000000000000","onRamp":"0x040506"}],"gasPrices":[{"UsdPerUnitGas":"1234","DestChainSelector":18446744073709551615}],"tokenPrices":[],"maxSeqNums":[],"fChain":{}}`, string(b))
 
 	obs2, err := DecodeCommitPluginObservation(b)
 	assert.NoError(t, err)
@@ -76,7 +76,7 @@ func TestCommitPluginOutcome_EncodeAndDecode(t *testing.T) {
 	b, err := o.Encode()
 	assert.NoError(t, err)
 	// nolint:lll
-	assert.Equal(t, `{"maxSeqNums":[{"chainSel":1,"seqNum":20},{"chainSel":2,"seqNum":25}],"merkleRoots":[{"chain":1,"seqNumsRange":[21,22],"merkleRoot":"0x0100000000000000000000000000000000000000000000000000000000000000"},{"chain":2,"seqNumsRange":[25,35],"merkleRoot":"0x0200000000000000000000000000000000000000000000000000000000000000"}],"tokenPrices":[{"tokenID":"0x123","price":"1234"},{"tokenID":"0x125","price":"999999999998000000000001"}],"gasPrices":[{"gasPrice":"1234","chainSel":1},{"gasPrice":"999999999998000000000001","chainSel":2}]}`, string(b))
+	assert.Equal(t, `{"maxSeqNums":[{"chainSel":1,"seqNum":20},{"chainSel":2,"seqNum":25}],"merkleRoots":[{"SourceChainSelector":1,"Interval":{"Min":21,"Max":22},"MerkleRoot":"0x0100000000000000000000000000000000000000000000000000000000000000"},{"SourceChainSelector":2,"Interval":{"Min":25,"Max":35},"MerkleRoot":"0x0200000000000000000000000000000000000000000000000000000000000000"}],"tokenPrices":[{"SourceToken":"0x123","UsdPerToken":"1234"},{"SourceToken":"0x125","UsdPerToken":"999999999998000000000001"}],"gasPrices":[{"UsdPerUnitGas":"1234","DestChainSelector":1},{"UsdPerUnitGas":"999999999998000000000001","DestChainSelector":2}]}`, string(b))
 
 	o2, err := DecodeCommitPluginOutcome(b)
 	assert.NoError(t, err)
