@@ -242,6 +242,15 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
+	cfgs, err := r.getSourceChainsConfig(ctx, []cciptypes.ChainSelector{sourceChainSelector})
+	if err != nil {
+		return nil, fmt.Errorf("get source chains config: %w", err)
+	}
+	var onRamp = cfgs[sourceChainSelector].OnRamp
+	if onRamp == nil {
+		return nil, fmt.Errorf("onRamp address not found for chain %d", sourceChainSelector)
+	}
+
 	type SendRequestedEvent struct {
 		DestChainSelector cciptypes.ChainSelector
 		Message           cciptypes.Message
@@ -289,6 +298,8 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			msg.Header.DestChainSelector == r.destChain &&
 			msg.Header.SequenceNumber >= seqNumRange.Start() &&
 			msg.Header.SequenceNumber <= seqNumRange.End()
+
+		msg.Header.OnRamp = onRamp
 
 		if valid {
 			msgs = append(msgs, msg)
@@ -364,19 +375,19 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 	r.lggr.Infow("got source chain configs", "onramps", func() []string {
 		var r []string
 		for chainSelector, scc := range sourceConfigs {
-			r = append(r, typeconv.AddressBytesToString(scc.OnRampAddress, uint64(chainSelector)))
+			r = append(r, typeconv.AddressBytesToString(scc.OnRamp, uint64(chainSelector)))
 		}
 		return r
 	}())
 
 	for chain, cfg := range sourceConfigs {
-		if cfg.OnRampAddress == nil {
+		if cfg.OnRamp == nil {
 			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
 		}
 
-		bindAddress := typeconv.AddressBytesToString(cfg.OnRampAddress, uint64(chain))
+		bindAddress := typeconv.AddressBytesToString(cfg.OnRamp, uint64(chain))
 		r.lggr.Infow("binding onRamp contract",
-			"onRampAddress", cfg.OnRampAddress,
+			"onRampAddress", cfg.OnRamp,
 			"onRampBindAddress", bindAddress)
 
 		// Bind the onRamp contract address to the reader.
@@ -415,6 +426,9 @@ func (r *CCIPChainReader) getSourceChainsConfig(ctx context.Context, chains []cc
 
 	for _, ch := range chains {
 		chainSel := ch
+		if chainSel == r.destChain {
+			continue
+		}
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].GetLatestValue(
@@ -445,10 +459,12 @@ func (r *CCIPChainReader) getSourceChainsConfig(ctx context.Context, chains []cc
 	return res, nil
 }
 
+// NOTE: the struct field names MUST match the ABI.
+// This may be an unintentional chain reader implementation detail.
 type sourceChainConfig struct {
-	IsEnabled     bool   `json:"isEnabled"`
-	MinSeqNr      uint64 `json:"minSeqNr"`
-	OnRampAddress []byte `json:"onRamp"`
+	IsEnabled bool
+	MinSeqNr  uint64
+	OnRamp    []byte
 }
 
 func (r *CCIPChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
