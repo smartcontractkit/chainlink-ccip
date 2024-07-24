@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
@@ -55,7 +54,7 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 			if staticPrice, exists := pr.TokenPriceConfig.StaticPrices[token]; exists {
 				price.Set(&staticPrice)
 			} else {
-				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, primitives.Finalized, token, price); err != nil {
+				if err := pr.ContractReader.GetLatestValue(ctx, contractName, functionName, token, price); err != nil {
 					return fmt.Errorf("failed to get token price for %s: %w", token, err)
 				}
 			}
