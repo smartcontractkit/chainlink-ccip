@@ -112,14 +112,14 @@ func groupByChainSelector(
 	commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages)
 	for _, report := range reports {
 		for _, singleReport := range report.Report.MerkleRoots {
-			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
+			commitReportCache[singleReport.SourceChainSelector] = append(commitReportCache[singleReport.SourceChainSelector],
 				plugintypes.ExecutePluginCommitDataWithMessages{
 					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SourceChain:         singleReport.ChainSel,
+						SourceChain:         singleReport.SourceChainSelector,
 						Timestamp:           report.Timestamp,
 						BlockNum:            report.BlockNum,
 						MerkleRoot:          singleReport.MerkleRoot,
-						SequenceNumberRange: singleReport.SeqNumsRange,
+						SequenceNumberRange: singleReport.Interval,
 						ExecutedMessages:    nil,
 					}})
 		}
