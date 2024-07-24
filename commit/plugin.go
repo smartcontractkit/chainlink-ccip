@@ -209,7 +209,8 @@ func (p *Plugin) Observation(
 
 }
 
-func (p *Plugin) ValidateObservation(outCtx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
+func (p *Plugin) ValidateObservation(
+	outCtx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
 	obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode commit plugin observation: %w", err)
