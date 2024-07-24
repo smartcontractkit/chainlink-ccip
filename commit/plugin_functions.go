@@ -236,7 +236,7 @@ func newMsgsConsensus(
 		)
 	}
 
-	sort.Slice(merkleRoots, func(i, j int) bool { return merkleRoots[i].ChainSel < merkleRoots[j].ChainSel })
+	sort.Slice(merkleRoots, func(i, j int) bool { return merkleRoots[i].SourceChainSelector < merkleRoots[j].SourceChainSelector })
 	return merkleRoots, nil
 }
 
@@ -395,10 +395,10 @@ func tokenPricesConsensus(observations []plugintypes.CommitPluginObservation, fC
 	pricesPerToken := make(map[types.Account][]cciptypes.BigInt)
 	for _, obs := range observations {
 		for _, price := range obs.TokenPrices {
-			if _, exists := pricesPerToken[price.TokenID]; !exists {
-				pricesPerToken[price.TokenID] = make([]cciptypes.BigInt, 0)
+			if _, exists := pricesPerToken[price.SourceToken]; !exists {
+				pricesPerToken[price.SourceToken] = make([]cciptypes.BigInt, 0)
 			}
-			pricesPerToken[price.TokenID] = append(pricesPerToken[price.TokenID], price.Price)
+			pricesPerToken[price.SourceToken] = append(pricesPerToken[price.SourceToken], price.UsdPerToken)
 		}
 	}
 
@@ -411,7 +411,7 @@ func tokenPricesConsensus(observations []plugintypes.CommitPluginObservation, fC
 		consensusPrices = append(consensusPrices, cciptypes.NewTokenPrice(token, slicelib.BigIntSortedMiddle(prices).Int))
 	}
 
-	sort.Slice(consensusPrices, func(i, j int) bool { return consensusPrices[i].TokenID < consensusPrices[j].TokenID })
+	sort.Slice(consensusPrices, func(i, j int) bool { return consensusPrices[i].SourceToken < consensusPrices[j].SourceToken })
 	return consensusPrices
 }
 
@@ -422,10 +422,10 @@ func gasPricesConsensus(
 	gasPricePerChain := make(map[cciptypes.ChainSelector][]cciptypes.BigInt)
 	for _, obs := range observations {
 		for _, gasPrice := range obs.GasPrices {
-			if _, exists := gasPricePerChain[gasPrice.ChainSel]; !exists {
-				gasPricePerChain[gasPrice.ChainSel] = make([]cciptypes.BigInt, 0)
+			if _, exists := gasPricePerChain[gasPrice.DestChainSelector]; !exists {
+				gasPricePerChain[gasPrice.DestChainSelector] = make([]cciptypes.BigInt, 0)
 			}
-			gasPricePerChain[gasPrice.ChainSel] = append(gasPricePerChain[gasPrice.ChainSel], gasPrice.GasPrice)
+			gasPricePerChain[gasPrice.DestChainSelector] = append(gasPricePerChain[gasPrice.DestChainSelector], gasPrice.UsdPerUnitGas)
 		}
 	}
 
@@ -445,7 +445,9 @@ func gasPricesConsensus(
 
 	sort.Slice(
 		consensusGasPrices,
-		func(i, j int) bool { return consensusGasPrices[i].ChainSel < consensusGasPrices[j].ChainSel },
+		func(i, j int) bool {
+			return consensusGasPrices[i].DestChainSelector < consensusGasPrices[j].DestChainSelector
+		},
 	)
 	return consensusGasPrices
 }
@@ -564,12 +566,12 @@ func validateObserverReadingEligibility(
 func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	tokensWithPrice := mapset.NewSet[types.Account]()
 	for _, t := range tokenPrices {
-		if tokensWithPrice.Contains(t.TokenID) {
-			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)
+		if tokensWithPrice.Contains(t.SourceToken) {
+			return fmt.Errorf("duplicate token price for token: %s", t.SourceToken)
 		}
-		tokensWithPrice.Add(t.TokenID)
+		tokensWithPrice.Add(t.SourceToken)
 
-		if t.Price.IsEmpty() {
+		if t.UsdPerToken.IsEmpty() {
 			return fmt.Errorf("token price must not be empty")
 		}
 	}
@@ -581,11 +583,11 @@ func validateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
 	// Duplicate gas prices must not appear for the same chain and must not be empty.
 	gasPriceChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for _, g := range gasPrices {
-		if gasPriceChains.Contains(g.ChainSel) {
-			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
+		if gasPriceChains.Contains(g.DestChainSelector) {
+			return fmt.Errorf("duplicate gas price for chain %d", g.DestChainSelector)
 		}
-		gasPriceChains.Add(g.ChainSel)
-		if g.GasPrice.IsEmpty() {
+		gasPriceChains.Add(g.DestChainSelector)
+		if g.UsdPerUnitGas.IsEmpty() {
 			return fmt.Errorf("gas price must not be empty")
 		}
 	}
@@ -603,8 +605,8 @@ func validateMerkleRootsState(
 	reportChains := make([]cciptypes.ChainSelector, 0)
 	reportMinSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	for _, mr := range report.MerkleRoots {
-		reportChains = append(reportChains, mr.ChainSel)
-		reportMinSeqNums[mr.ChainSel] = mr.SeqNumsRange.Start()
+		reportChains = append(reportChains, mr.SourceChainSelector)
+		reportMinSeqNums[mr.SourceChainSelector] = mr.Interval.Start()
 	}
 
 	if len(reportChains) == 0 {

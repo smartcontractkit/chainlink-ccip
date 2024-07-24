@@ -56,24 +56,24 @@ func TestPlugin(t *testing.T) {
 					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{
-					{ChainSel: chainB, MerkleRoot: cciptypes.Bytes32{}, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
+					{SourceChainSelector: chainB, MerkleRoot: cciptypes.Bytes32{}, Interval: cciptypes.NewSeqNumRange(21, 22)},
 				},
 				TokenPrices: []cciptypes.TokenPrice{},
 				GasPrices: []cciptypes.GasPriceChain{
-					{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
-					{ChainSel: chainB, GasPrice: cciptypes.NewBigIntFromInt64(20_000)},
+					{DestChainSelector: chainA, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(1000)},
+					{DestChainSelector: chainB, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(20_000)},
 				},
 			},
 			expTransmittedReports: []cciptypes.CommitPluginReport{
 				{
 					MerkleRoots: []cciptypes.MerkleRootChain{
-						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(21, 22)},
+						{SourceChainSelector: chainB, Interval: cciptypes.NewSeqNumRange(21, 22)},
 					},
 					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
 						GasPriceUpdates: []cciptypes.GasPriceChain{
-							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
-							{ChainSel: chainB, GasPrice: cciptypes.NewBigIntFromInt64(20_000)},
+							{DestChainSelector: chainA, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(1000)},
+							{DestChainSelector: chainB, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(20_000)},
 						},
 					},
 				},
@@ -100,8 +100,8 @@ func TestPlugin(t *testing.T) {
 				MerkleRoots: []cciptypes.MerkleRootChain{},
 				TokenPrices: []cciptypes.TokenPrice{},
 				GasPrices: []cciptypes.GasPriceChain{
-					{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
-					{ChainSel: chainB, GasPrice: cciptypes.NewBigIntFromInt64(20_000)},
+					{DestChainSelector: chainA, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(1000)},
+					{DestChainSelector: chainB, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(20_000)},
 				},
 			},
 			expTransmittedReports: []cciptypes.CommitPluginReport{
@@ -110,8 +110,8 @@ func TestPlugin(t *testing.T) {
 					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
 						GasPriceUpdates: []cciptypes.GasPriceChain{
-							{ChainSel: chainA, GasPrice: cciptypes.NewBigIntFromInt64(1000)},
-							{ChainSel: chainB, GasPrice: cciptypes.NewBigIntFromInt64(20_000)},
+							{DestChainSelector: chainA, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(1000)},
+							{DestChainSelector: chainB, UsdPerUnitGas: cciptypes.NewBigIntFromInt64(20_000)},
 						},
 					},
 				},
@@ -136,7 +136,7 @@ func TestPlugin(t *testing.T) {
 					{ChainSel: chainB, SeqNum: lastCommittedSeqNumB},
 				},
 				MerkleRoots: []cciptypes.MerkleRootChain{
-					{ChainSel: chainB, MerkleRoot: cciptypes.Bytes32{}, SeqNumsRange: cciptypes.NewSeqNumRange(seqNumB, 22)},
+					{SourceChainSelector: chainB, MerkleRoot: cciptypes.Bytes32{}, Interval: cciptypes.NewSeqNumRange(seqNumB, 22)},
 				},
 				TokenPrices: []cciptypes.TokenPrice{},
 				GasPrices:   []cciptypes.GasPriceChain{},
@@ -144,7 +144,7 @@ func TestPlugin(t *testing.T) {
 			expTransmittedReports: []cciptypes.CommitPluginReport{
 				{
 					MerkleRoots: []cciptypes.MerkleRootChain{
-						{ChainSel: chainB, SeqNumsRange: cciptypes.NewSeqNumRange(seqNumB, 22)},
+						{SourceChainSelector: chainB, Interval: cciptypes.NewSeqNumRange(seqNumB, 22)},
 					},
 					PriceUpdates: cciptypes.PriceUpdates{
 						TokenPriceUpdates: []cciptypes.TokenPrice{},
@@ -201,8 +201,8 @@ func TestPlugin(t *testing.T) {
 
 				assert.Equal(t, len(tc.expOutcome.MerkleRoots), len(outcome.MerkleRoots))
 				for i, exp := range tc.expOutcome.MerkleRoots {
-					assert.Equal(t, exp.ChainSel, outcome.MerkleRoots[i].ChainSel)
-					assert.Equal(t, exp.SeqNumsRange, outcome.MerkleRoots[i].SeqNumsRange)
+					assert.Equal(t, exp.SourceChainSelector, outcome.MerkleRoots[i].SourceChainSelector)
+					assert.Equal(t, exp.Interval, outcome.MerkleRoots[i].Interval)
 				}
 			}
 
@@ -213,8 +213,8 @@ func TestPlugin(t *testing.T) {
 				assert.Equal(t, exp.PriceUpdates, actual.PriceUpdates)
 				assert.Equal(t, len(exp.MerkleRoots), len(actual.MerkleRoots))
 				for j, expRoot := range exp.MerkleRoots {
-					assert.Equal(t, expRoot.ChainSel, actual.MerkleRoots[j].ChainSel)
-					assert.Equal(t, expRoot.SeqNumsRange, actual.MerkleRoots[j].SeqNumsRange)
+					assert.Equal(t, expRoot.SourceChainSelector, actual.MerkleRoots[j].SourceChainSelector)
+					assert.Equal(t, expRoot.Interval, actual.MerkleRoots[j].Interval)
 				}
 			}
 		})

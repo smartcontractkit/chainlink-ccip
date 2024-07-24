@@ -157,8 +157,8 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(report.MerkleRoots))
 		for _, mr := range report.MerkleRoots {
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
-				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
-				SeqNumsRange: cciptypes.NewSeqNumRange(
+				SourceChainSelector: cciptypes.ChainSelector(mr.SourceChainSelector),
+				Interval: cciptypes.NewSeqNumRange(
 					cciptypes.SeqNum(mr.Interval.Min),
 					cciptypes.SeqNum(mr.Interval.Max),
 				),
@@ -398,7 +398,6 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 			{
 				Address: bindAddress,
 				Name:    consts.ContractNameOnRamp,
-				Pending: false,
 			},
 		}); err != nil {
 			return false, fmt.Errorf("bind onRamp: %w", err)
@@ -435,6 +434,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(ctx context.Context, chains []cc
 				ctx,
 				consts.ContractNameOffRamp,
 				consts.MethodNameGetSourceChainConfig,
+				primitives.Finalized,
 				map[string]any{
 					"sourceChainSelector": chainSel,
 				},

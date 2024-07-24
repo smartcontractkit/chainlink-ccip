@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
@@ -116,7 +117,11 @@ func (r *homeChainPoller) poll() {
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var chainConfigInfos []ChainConfigInfo
 	err := r.homeChainReader.GetLatestValue(
-		ctx, consts.ContractNameCCIPConfig, consts.MethodNameGetAllChainConfigs, nil, &chainConfigInfos,
+		ctx, consts.ContractNameCCIPConfig,
+		consts.MethodNameGetAllChainConfigs,
+		primitives.Finalized,
+		nil,
+		&chainConfigInfos,
 	)
 	if err != nil {
 		return err
@@ -194,6 +199,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 		ctx,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetOCRConfig,
+		primitives.Finalized,
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,

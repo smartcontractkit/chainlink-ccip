@@ -3,6 +3,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -13,6 +14,11 @@ type ContractReaderMock struct {
 	*mock.Mock
 }
 
+func (cr *ContractReaderMock) BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func NewContractReaderMock() *ContractReaderMock {
 	return &ContractReaderMock{
 		Mock: &mock.Mock{},
@@ -21,7 +27,7 @@ func NewContractReaderMock() *ContractReaderMock {
 
 // GetLatestValue Returns given configs at initialization
 func (cr *ContractReaderMock) GetLatestValue(
-	ctx context.Context, contractName, method string, params, returnVal any,
+	ctx context.Context, contractName, method string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any,
 ) error {
 	args := cr.Called(ctx, contractName, method, params, returnVal)
 	return args.Error(0)

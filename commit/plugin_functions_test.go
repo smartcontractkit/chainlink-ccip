@@ -780,8 +780,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					ChainSel:     1,
-					SeqNumsRange: cciptypes.NewSeqNumRange(11, 11),
+					SourceChainSelector: 1,
+					Interval:            cciptypes.NewSeqNumRange(11, 11),
 				},
 			},
 			expErr: false,
@@ -858,8 +858,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					ChainSel:     1,
-					SeqNumsRange: cciptypes.NewSeqNumRange(11, 13),
+					SourceChainSelector: 1,
+					Interval:            cciptypes.NewSeqNumRange(11, 13),
 				},
 			},
 			expErr: false,
@@ -936,8 +936,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					ChainSel:     1,
-					SeqNumsRange: cciptypes.NewSeqNumRange(12, 13),
+					SourceChainSelector: 1,
+					Interval:            cciptypes.NewSeqNumRange(12, 13),
 				},
 			},
 			expErr: false,
@@ -1002,8 +1002,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					ChainSel:     1,
-					SeqNumsRange: cciptypes.NewSeqNumRange(11, 11), // we stop at 11 because there is a gap for going to 13
+					SourceChainSelector: 1,
+					Interval:            cciptypes.NewSeqNumRange(11, 11), // we stop at 11 because there is a gap for going to 13
 				},
 			},
 			expErr: false,
@@ -1066,12 +1066,12 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					ChainSel:     1,
-					SeqNumsRange: cciptypes.NewSeqNumRange(11, 11), // we stop at 11 because there is a gap for going to 13
+					SourceChainSelector: 1,
+					Interval:            cciptypes.NewSeqNumRange(11, 11), // we stop at 11 because there is a gap for going to 13
 				},
 				{
-					ChainSel:     2,
-					SeqNumsRange: cciptypes.NewSeqNumRange(21, 22), // we stop at 11 because there is a gap for going to 13
+					SourceChainSelector: 2,
+					Interval:            cciptypes.NewSeqNumRange(21, 22), // we stop at 11 because there is a gap for going to 13
 				},
 			},
 			expErr: false,
@@ -1178,8 +1178,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			},
 			expMerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					ChainSel:     1,
-					SeqNumsRange: cciptypes.NewSeqNumRange(11, 11),
+					SourceChainSelector: 1,
+					Interval:            cciptypes.NewSeqNumRange(11, 11),
 				},
 			},
 			expErr: false,
@@ -1197,8 +1197,8 @@ func Test_newMsgsConsensusForChain(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, len(tc.expMerkleRoots), len(merkleRoots))
 			for i, exp := range tc.expMerkleRoots {
-				assert.Equal(t, exp.ChainSel, merkleRoots[i].ChainSel)
-				assert.Equal(t, exp.SeqNumsRange, merkleRoots[i].SeqNumsRange)
+				assert.Equal(t, exp.SourceChainSelector, merkleRoots[i].SourceChainSelector)
+				assert.Equal(t, exp.Interval, merkleRoots[i].Interval)
 			}
 		})
 	}
@@ -1586,8 +1586,8 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
 			for _, snc := range tc.reportSeqNums {
 				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
-					ChainSel:     snc.ChainSel,
-					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+					SourceChainSelector: snc.ChainSel,
+					Interval:            cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
 				})
 				chains = append(chains, snc.ChainSel)
 			}

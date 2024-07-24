@@ -4,9 +4,10 @@ go 1.21.7
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/smartcontractkit/chainlink-common v0.1.7-0.20240708093742-683c10b045f7
+	github.com/smartcontractkit/chainlink-common v0.2.1-0.20240724105851-fc66051bcb6e
 	github.com/smartcontractkit/libocr v0.0.0-20240419185742-fd3cab206b2c
 	github.com/stretchr/testify v1.9.0
+	go.uber.org/zap v1.26.0
 	golang.org/x/crypto v0.24.0
 	golang.org/x/sync v0.7.0
 	google.golang.org/grpc v1.64.0
@@ -38,7 +39,6 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
