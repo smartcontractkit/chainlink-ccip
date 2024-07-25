@@ -206,17 +206,22 @@ func (p *Plugin) Observation(
 	return plugintypes.NewCommitPluginObservation(
 		msgBaseDetails, gasPrices, tokenPrices, latestCommittedSeqNumsObservation, fChain,
 	).Encode()
-
 }
 
-func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
+func (p *Plugin) ValidateObservation(outctx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
 	obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(obs.NewMsgs, obs.MaxSeqNums); err != nil {
-		return fmt.Errorf("validate sequence numbers: %w", err)
+	if outctx.PreviousOutcome != nil {
+		prevOutcome, err := plugintypes.DecodeCommitPluginOutcome(outctx.PreviousOutcome)
+		if err != nil {
+			return fmt.Errorf("validate observation: decode commit plugin previous outcome: %w", err)
+		}
+		if err := validateObservedSequenceNumbers(obs.NewMsgs, prevOutcome.MaxSeqNums); err != nil {
+			return fmt.Errorf("validate sequence numbers: %w", err)
+		}
 	}
 
 	observerSupportedChains, err := p.supportedChains(ao.Observer)
