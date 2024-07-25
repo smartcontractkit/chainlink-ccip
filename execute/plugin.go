@@ -101,7 +101,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 	return types.Query{}, nil
 }
 
-func (p *Plugin) getPendingExecutedReports(
+func getPendingExecutedReports(
 	ctx context.Context, ccipReader reader.CCIP, dest cciptypes.ChainSelector, ts time.Time,
 ) (plugintypes.ExecutePluginCommitObservations, time.Time, error) {
 	latestReportTS := time.Time{}
@@ -109,10 +109,8 @@ func (p *Plugin) getPendingExecutedReports(
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	p.lggr.Infof("Number of fetched pending executed reports %d", len(commitReports))
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
-		p.lggr.Infof("fetched pending executed report %+v", report)
 		if report.Timestamp.After(latestReportTS) {
 			latestReportTS = report.Timestamp
 		}
@@ -182,7 +180,7 @@ func (p *Plugin) Observation(
 	if supportsDest {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
-			p.getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
 		if err != nil {
 			return types.Observation{}, err
 		}
