@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -236,7 +234,9 @@ func newMsgsConsensus(
 		)
 	}
 
-	sort.Slice(merkleRoots, func(i, j int) bool { return merkleRoots[i].SourceChainSelector < merkleRoots[j].SourceChainSelector })
+	sort.Slice(merkleRoots, func(i, j int) bool {
+		return merkleRoots[i].SourceChainSelector < merkleRoots[j].SourceChainSelector
+	})
 	return merkleRoots, nil
 }
 
@@ -408,7 +408,10 @@ func tokenPricesConsensus(observations []plugintypes.CommitPluginObservation, fC
 		if len(prices) < 2*fChain+1 {
 			continue
 		}
-		consensusPrices = append(consensusPrices, cciptypes.NewTokenPrice(token, slicelib.BigIntSortedMiddle(prices).Int))
+		consensusPrices = append(
+			consensusPrices,
+			cciptypes.NewTokenPrice(token, slicelib.BigIntSortedMiddle(prices).Int),
+		)
 	}
 
 	sort.Slice(consensusPrices, func(i, j int) bool { return consensusPrices[i].SourceToken < consensusPrices[j].SourceToken })
@@ -636,53 +639,6 @@ func validateMerkleRootsState(
 	}
 
 	return true, nil
-}
-
-func backgroundReaderSync(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	lggr logger.Logger,
-	reader reader.CCIP,
-	syncTimeout time.Duration,
-	ticker <-chan time.Time,
-) {
-	go func() {
-		defer wg.Done()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker:
-				if err := syncReader(ctx, lggr, reader, syncTimeout); err != nil {
-					lggr.Errorw("runBackgroundReaderSync failed", "err", err)
-				}
-			}
-		}
-	}()
-}
-
-func syncReader(
-	ctx context.Context,
-	lggr logger.Logger,
-	reader reader.CCIP,
-	syncTimeout time.Duration,
-) error {
-	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
-	defer cf()
-
-	updated, err := reader.Sync(timeoutCtx)
-	if err != nil {
-		return err
-	}
-
-	if !updated {
-		lggr.Debug("no updates found after trying to sync")
-	} else {
-		lggr.Info("ccip reader sync success")
-	}
-
-	return nil
 }
 
 type observedMsgsConsensus struct {

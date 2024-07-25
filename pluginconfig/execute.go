@@ -17,6 +17,12 @@ type ExecutePluginConfig struct {
 
 	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
 	MessageVisibilityInterval time.Duration `json:"messageVisibilityInterval"`
+
+	// SyncTimeout is the timeout for syncing the commit plugin reader.
+	SyncTimeout time.Duration `json:"syncTimeout"`
+
+	// SyncFrequency is the frequency at which the commit plugin reader should sync.
+	SyncFrequency time.Duration `json:"syncFrequency"`
 }
 
 type ObserverInfo struct {

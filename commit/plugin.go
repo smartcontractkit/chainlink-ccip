@@ -10,6 +10,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -72,7 +73,7 @@ func NewPlugin(
 	p.bgSyncCancelFunc = bgSyncCf
 	p.bgSyncWG = &sync.WaitGroup{}
 	p.bgSyncWG.Add(1)
-	backgroundReaderSync(
+	plugincommon.BackgroundReaderSync(
 		bgSyncCtx,
 		p.bgSyncWG,
 		lggr,
@@ -379,7 +380,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) Close() error {
-	timeout := 10 * time.Second
+	timeout := 10 * time.Second // todo: cfg
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
