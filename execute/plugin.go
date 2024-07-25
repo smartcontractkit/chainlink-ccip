@@ -4,17 +4,21 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	types2 "github.com/smartcontractkit/chainlink-ccip/execute/types"
@@ -41,6 +45,9 @@ type Plugin struct {
 	tokenDataReader types2.TokenDataReader
 	lastReportTS    *atomic.Int64
 	lggr            logger.Logger
+
+	bgSyncCancelFunc context.CancelFunc
+	bgSyncWG         *sync.WaitGroup
 }
 
 func NewPlugin(
@@ -55,11 +62,13 @@ func NewPlugin(
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
-	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
+	// lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
+	// TODO: Temporary while figuring out the best way to inject it in tests.
+	lastReportTS.Store(time.Unix(0, 0).UnixMilli())
 
 	// TODO: initialize tokenDataReader.
 
-	return &Plugin{
+	p := &Plugin{
 		reportingCfg:    reportingCfg,
 		cfg:             cfg,
 		oracleIDToP2pID: oracleIDToP2pID,
@@ -71,13 +80,28 @@ func NewPlugin(
 		tokenDataReader: tokenDataReader,
 		lggr:            lggr,
 	}
+
+	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
+	p.bgSyncCancelFunc = bgSyncCf
+	p.bgSyncWG = &sync.WaitGroup{}
+	p.bgSyncWG.Add(1)
+	plugincommon.BackgroundReaderSync(
+		bgSyncCtx,
+		p.bgSyncWG,
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
+	)
+
+	return p
 }
 
 func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (types.Query, error) {
 	return types.Query{}, nil
 }
 
-func getPendingExecutedReports(
+func (p *Plugin) getPendingExecutedReports(
 	ctx context.Context, ccipReader reader.CCIP, dest cciptypes.ChainSelector, ts time.Time,
 ) (plugintypes.ExecutePluginCommitObservations, time.Time, error) {
 	latestReportTS := time.Time{}
@@ -85,9 +109,10 @@ func getPendingExecutedReports(
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-
+	p.lggr.Infof("Number of fetched pending executed reports %d", len(commitReports))
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
+		p.lggr.Infof("fetched pending executed report %+v", report)
 		if report.Timestamp.After(latestReportTS) {
 			latestReportTS = report.Timestamp
 		}
@@ -157,7 +182,7 @@ func (p *Plugin) Observation(
 	if supportsDest {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
-			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+			p.getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
 		if err != nil {
 			return types.Observation{}, err
 		}
@@ -418,6 +443,19 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) Close() error {
+	timeout := 10 * time.Second // todo: cfg
+	ctx, cf := context.WithTimeout(context.Background(), timeout)
+	defer cf()
+
+	if err := p.ccipReader.Close(ctx); err != nil {
+		return fmt.Errorf("close ccip reader: %w", err)
+	}
+
+	if p.bgSyncCancelFunc != nil {
+		p.bgSyncCancelFunc()
+		p.bgSyncWG.Wait()
+	}
+
 	return nil
 }
 
@@ -441,6 +479,20 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
 	return chains.Contains(p.cfg.DestChain), nil
+}
+
+func syncFrequency(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 10 * time.Second
+	}
+	return configuredValue
+}
+
+func syncTimeout(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 3 * time.Second
+	}
+	return configuredValue
 }
 
 // Interface compatibility checks.

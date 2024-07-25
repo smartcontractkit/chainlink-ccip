@@ -201,8 +201,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-
-			got, got1, err := getPendingExecutedReports(context.Background(), mockReader, 123, time.Now())
+			p := Plugin{ccipReader: mockReader, lggr: logger.Test(t)}
+			got, got1, err := p.getPendingExecutedReports(context.Background(), mockReader, 123, time.Now())
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
@@ -259,7 +259,7 @@ func makeTestCommitReport(
 
 	commitReport := plugintypes.ExecutePluginCommitDataWithMessages{
 		ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-			//MerkleRoot:          root,
+			// MerkleRoot:          root,
 			SourceChain:         cciptypes.ChainSelector(srcChain),
 			SequenceNumberRange: sequenceNumberRange,
 			Timestamp:           time.UnixMilli(timestamp),
@@ -551,7 +551,9 @@ func Test_selectReport(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	p := &Plugin{}
+	mockReader := mocks.NewCCIPReader()
+	mockReader.On("Close", mock.Anything).Return(nil)
+	p := &Plugin{lggr: logger.Test(t), ccipReader: mockReader}
 	require.NoError(t, p.Close())
 }
 
@@ -684,7 +686,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
-	p := &Plugin{}
+	p := &Plugin{lggr: logger.Test(t)}
 	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{
 			{
@@ -701,6 +703,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			F: 1,
 		},
+		lggr: logger.Test(t),
 	}
 	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{})
@@ -729,6 +732,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 
 	p := &Plugin{
 		homeChain: homeChain,
+		lggr:      logger.Test(t),
 	}
 
 	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages{
@@ -767,7 +771,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 		homeChain: homeChain,
 	}
 
-	//map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
+	// map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 	messages := map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
 		1: {
 			1: {
