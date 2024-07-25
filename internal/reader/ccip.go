@@ -142,6 +142,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
 
+	r.lggr.Infow("CommitReportsGTETimestamp queried commit reports", "numReports", len(iter))
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		report, is := (item.Data).(*CommitReportAcceptedEvent)
