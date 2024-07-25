@@ -218,17 +218,6 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
-		if stateChange.sourceChainSelector != source {
-			return nil, fmt.Errorf("wrong cr query, unexpected source chain %d", stateChange.sourceChainSelector)
-		}
-		if stateChange.sequenceNumber < seqNumRange.Start() || stateChange.sequenceNumber > seqNumRange.End() {
-			return nil, fmt.Errorf("wrong cr query, unexpected sequence number %d", stateChange.sequenceNumber)
-		}
-		if stateChange.state <= 1 {
-			r.lggr.Debugw("execution state change status is %d, skipped",
-				"seqNum", stateChange.sequenceNumber, "state", stateChange.state)
-			continue
-		}
 
 		// todo: filter via the query
 		valid := stateChange.sourceChainSelector == source &&
