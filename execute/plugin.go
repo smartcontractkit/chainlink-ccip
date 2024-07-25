@@ -381,6 +381,8 @@ func (p *Plugin) Outcome(
 		ChainReports: outcomeReports,
 	}
 
+	p.lggr.Infow("building outcome", "numChainReports", len(execReport.ChainReports))
+
 	return plugintypes.NewExecutePluginOutcome(commitReports, execReport).Encode()
 }
 
@@ -390,18 +392,22 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
+	if len(decodedOutcome.Report.ChainReports) == 0 {
+		p.lggr.Infow("skipping empty exec report")
+		return nil, nil
+	}
+	p.lggr.Infow("building reports", "numReports", len(decodedOutcome.Report.ChainReports))
+
 	// TODO: this function should be pure, a context should not be needed.
 	encoded, err := p.reportCodec.Encode(context.Background(), decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	report := []ocr3types.ReportWithInfo[[]byte]{{
+	return []ocr3types.ReportWithInfo[[]byte]{{
 		Report: encoded,
 		Info:   nil,
-	}}
-
-	return report, nil
+	}}, nil
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(

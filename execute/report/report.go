@@ -69,25 +69,29 @@ func buildSingleChainReport(
 			executedIdx++
 		} else {
 			msg := report.Messages[i]
-			tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
-			if err != nil {
-				// TODO: skip message instead of failing the whole thing.
-				//       that might mean moving the token data reading out of the loop.
+
+			if tokenDataReader != nil { // todo: remove this if cond
+				tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
+				if err != nil {
+					// TODO: skip message instead of failing the whole thing.
+					//       that might mean moving the token data reading out of the loop.
+					lggr.Infow(
+						"unable to read token data",
+						"sourceChain", report.SourceChain,
+						"seqNum", msg.Header.SequenceNumber,
+						"error", err)
+					return cciptypes.ExecutePluginReportSingleChain{}, 0,
+						fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
+				}
+
 				lggr.Infow(
-					"unable to read token data",
+					"read token data",
 					"sourceChain", report.SourceChain,
 					"seqNum", msg.Header.SequenceNumber,
-					"error", err)
-				return cciptypes.ExecutePluginReportSingleChain{}, 0,
-					fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
+					"data", tokenData)
+				offchainTokenData = append(offchainTokenData, tokenData)
 			}
 
-			lggr.Infow(
-				"read token data",
-				"sourceChain", report.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"data", tokenData)
-			offchainTokenData = append(offchainTokenData, tokenData)
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
 		}
