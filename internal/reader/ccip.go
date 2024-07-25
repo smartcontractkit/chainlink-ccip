@@ -100,22 +100,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		return nil, err
 	}
 
-	type Interval struct {
-		Min uint64
-		Max uint64
+	type CommitReport struct {
+		Report cciptypes.CommitPluginReport
 	}
-
-	type MerkleRoot struct {
-		SourceChainSelector uint64
-		Interval            Interval
-		MerkleRoot          cciptypes.Bytes32
-	}
-
-	type CommitReportAcceptedEvent struct {
-		PriceUpdates cciptypes.PriceUpdates
-		MerkleRoots  []MerkleRoot
-	}
-	ev := CommitReportAcceptedEvent{}
+	ev := CommitReport{}
 
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
@@ -145,33 +133,19 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	r.lggr.Infow("CommitReportsGTETimestamp queried commit reports", "numReports", len(iter))
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(*CommitReportAcceptedEvent)
+		report, is := (item.Data).(*CommitReport)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
+		r.lggr.Infof("CommitReportsGTETimestamp found report: %v", report)
 
 		blockNum, err := strconv.ParseUint(item.Head.Identifier, 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Identifier, err)
 		}
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(report.MerkleRoots))
-		for _, mr := range report.MerkleRoots {
-			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
-				SourceChainSelector: cciptypes.ChainSelector(mr.SourceChainSelector),
-				Interval: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(mr.Interval.Min),
-					cciptypes.SeqNum(mr.Interval.Max),
-				),
-				MerkleRoot: mr.MerkleRoot,
-			})
-		}
-
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
-			Report: cciptypes.CommitPluginReport{
-				MerkleRoots:  merkleRoots,
-				PriceUpdates: report.PriceUpdates,
-			},
+			Report:    report.Report,
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
 		})

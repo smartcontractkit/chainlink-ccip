@@ -55,7 +55,9 @@ func NewPlugin(
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
-	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
+	//lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
+	//TODO: Temporary while figuring out the best way to inject it in tests.
+	lastReportTS.Store(time.Unix(0, 0).UnixMilli())
 
 	// TODO: initialize tokenDataReader.
 
@@ -85,7 +87,7 @@ func (p *Plugin) getPendingExecutedReports(
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	p.lggr.Infow("fetched pending executed reports", "numReports", len(commitReports))
+	p.lggr.Infof("Number of fetched pending executed reports %d", len(commitReports))
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
 		p.lggr.Infof("fetched pending executed report %+v", report)
@@ -156,7 +158,6 @@ func (p *Plugin) Observation(
 		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if supportsDest {
-		p.lggr.Infow("fetching pending executed reports")
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
 			p.getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
@@ -175,10 +176,11 @@ func (p *Plugin) Observation(
 	// Phase 2: Gather messages from the source chains and build the execution report.
 	messages := make(plugintypes.ExecutePluginMessageObservations)
 	if len(previousOutcome.PendingCommitReports) == 0 {
-		fmt.Println("TODO: No reports to execute. This is expected after a cold start.")
+		p.lggr.Infow("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
+		p.lggr.Infow("Building execution report")
 		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
@@ -194,9 +196,11 @@ func (p *Plugin) Observation(
 				return types.Observation{}, err
 			}
 
+			p.lggr.Infof("Computed ranges %+v", ranges)
 			// Read messages for each range.
 			for _, seqRange := range ranges {
 				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, selector, seqRange)
+				p.lggr.Infof("Read messages for range %+v %+v", seqRange, msgs)
 				if err != nil {
 					return nil, err
 				}
@@ -297,6 +301,7 @@ func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	decodedObservations, err := decodeAttributedObservations(aos)
+	p.lggr.Infof("Decoded observations %+v", decodedObservations)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
 
