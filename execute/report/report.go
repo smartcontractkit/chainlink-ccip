@@ -16,15 +16,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// buildSingleChainReport converts the on-chain event data stored in cciptypes.ExecutePluginCommitDataWithMessages into
-// the final on-chain report format.
+// buildSingleChainReportHelper converts the on-chain event data stored in
+// cciptypes.ExecutePluginCommitDataWithMessages into the final on-chain report format.
 //
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 //
 // The messages argument indicates which messages should be included in the report. If messages is empty
 // all messages will be included. This allows the caller to create smaller reports if needed. Executed messages
 // are skipped automatically.
-func buildSingleChainReport(
+func buildSingleChainReportHelper(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
@@ -204,7 +204,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 	// Attempt to include all messages in the report.
 	finalReport, err :=
-		buildSingleChainReport(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, nil)
+		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, nil)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			plugintypes.ExecutePluginCommitDataWithMessages{},
@@ -236,7 +236,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 		msgs[i] = struct{}{}
 
 		finalReport2, err :=
-			buildSingleChainReport(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, msgs)
+			buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
 				plugintypes.ExecutePluginCommitDataWithMessages{},
