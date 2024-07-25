@@ -110,12 +110,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		MerkleRoot          cciptypes.Bytes32
 	}
 
-	type CommitReportAcceptedEvent struct {
+	type CommitReportAccepted struct {
 		PriceUpdates cciptypes.PriceUpdates
 		MerkleRoots  []MerkleRoot
 	}
 
-	ev := CommitReportAcceptedEvent{}
+	ev := CommitReportAccepted{}
 
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
@@ -138,7 +138,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(*CommitReportAcceptedEvent)
+		report, is := (item.Data).(*CommitReportAccepted)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
