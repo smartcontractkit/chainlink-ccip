@@ -99,19 +99,30 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		return nil, err
 	}
 
-	dataTyp := cciptypes.CommitPluginReport{}
+	type Interval struct {
+		Min uint64
+		Max uint64
+	}
+
+	type MerkleRoot struct {
+		SourceChainSelector uint64
+		Interval            Interval
+		MerkleRoot          cciptypes.Bytes32
+	}
+
+	type CommitReportAcceptedEvent struct {
+		PriceUpdates cciptypes.PriceUpdates
+		MerkleRoots  []MerkleRoot
+	}
+
+	ev := CommitReportAcceptedEvent{}
+
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
 		consts.ContractNameOffRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
-				{
-					Primitive: &primitives.Timestamp{
-						Timestamp: uint64(ts.Unix()),
-						Operator:  primitives.Gte,
-					},
-				},
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -119,7 +130,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
 			Limit:  query.Limit{Count: uint64(limit)},
 		},
-		&dataTyp,
+		&ev,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
@@ -127,9 +138,27 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(cciptypes.CommitPluginReport)
+		report, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
+		}
+
+		valid := item.Timestamp >= uint64(ts.Unix())
+		if !valid {
+			r.lggr.Debugw("skipping invalid commit report", "report", report)
+			continue
+		}
+
+		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(report.MerkleRoots))
+		for _, mr := range report.MerkleRoots {
+			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
+				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
+				SeqNumsRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(mr.Interval.Min),
+					cciptypes.SeqNum(mr.Interval.Max),
+				),
+				MerkleRoot: mr.MerkleRoot,
+			})
 		}
 
 		blockNum, err := strconv.ParseUint(item.Head.Identifier, 10, 64)
@@ -138,7 +167,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		}
 
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
-			Report:    report,
+			Report: cciptypes.CommitPluginReport{
+				MerkleRoots:  merkleRoots,
+				PriceUpdates: report.PriceUpdates,
+			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
 		})
@@ -168,34 +200,6 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		query.KeyFilter{
 			Key: consts.EventNameExecutionStateChanged,
 			Expressions: []query.Expression{
-				{
-					// sequence numbers inside the range
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSequenceNumber,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    seqNumRange.Start().String(),
-								Operator: primitives.Gte,
-							},
-							{
-								Value:    seqNumRange.End().String(),
-								Operator: primitives.Lte,
-							},
-						},
-					},
-				},
-				{
-					// source chain
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSourceChain,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    source.String(),
-								Operator: primitives.Eq,
-							},
-						},
-					},
-				},
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -226,6 +230,16 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 			continue
 		}
 
+		// todo: filter via the query
+		valid := stateChange.sourceChainSelector == source &&
+			stateChange.sequenceNumber >= seqNumRange.Start() &&
+			stateChange.sequenceNumber <= seqNumRange.End() &&
+			stateChange.state > 1
+		if !valid {
+			r.lggr.Debugw("skipping invalid state change", "stateChange", stateChange)
+			continue
+		}
+
 		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.sequenceNumber, stateChange.sequenceNumber))
 	}
 
@@ -239,27 +253,17 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
+	type SendRequestedEvent struct {
+		DestChainSelector cciptypes.ChainSelector
+		Message           cciptypes.Message
+	}
+
 	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
-				{
-					Primitive: &primitives.Comparator{
-						Name: consts.EventAttributeSequenceNumber,
-						ValueComparators: []primitives.ValueComparator{
-							{
-								Value:    seqNumRange.Start().String(),
-								Operator: primitives.Gte,
-							},
-							{
-								Value:    seqNumRange.End().String(),
-								Operator: primitives.Lte,
-							},
-						},
-					},
-				},
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -271,7 +275,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
-		&cciptypes.Message{},
+		&SendRequestedEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
@@ -285,12 +289,20 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 
 	msgs := make([]cciptypes.Message, 0)
 	for _, item := range seq {
-		msg, ok := item.Data.(*cciptypes.Message)
+		msg, ok := item.Data.(*SendRequestedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		msgs = append(msgs, *msg)
+		// todo: filter via the query
+		valid := msg.Message.Header.SourceChainSelector == sourceChainSelector &&
+			msg.Message.Header.DestChainSelector == r.destChain &&
+			msg.Message.Header.SequenceNumber >= seqNumRange.Start() &&
+			msg.Message.Header.SequenceNumber <= seqNumRange.End()
+
+		if valid {
+			msgs = append(msgs, msg.Message)
+		}
 	}
 
 	r.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
@@ -303,7 +315,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 func (r *CCIPChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) ([]cciptypes.SeqNum, error) {
-	cfgs, err := r.getSourceChainsConfig(ctx)
+	cfgs, err := r.getSourceChainsConfig(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
@@ -349,7 +361,11 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
-	sourceConfigs, err := r.getSourceChainsConfig(ctx)
+	chains := make([]cciptypes.ChainSelector, 0, len(r.contractReaders))
+	for chain := range r.contractReaders {
+		chains = append(chains, chain)
+	}
+	sourceConfigs, err := r.getSourceChainsConfig(ctx, chains)
 	if err != nil {
 		return false, fmt.Errorf("get onramps: %w", err)
 	}
@@ -390,7 +406,7 @@ func (r *CCIPChainReader) Close(ctx context.Context) error {
 
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
 func (r *CCIPChainReader) getSourceChainsConfig(
-	ctx context.Context) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
 	if err := r.validateReaderExistence(r.destChain); err != nil {
 		return nil, err
 	}
@@ -399,7 +415,7 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 	mu := new(sync.Mutex)
 
 	eg := new(errgroup.Group)
-	for chainSel := range r.contractReaders {
+	for _, chainSel := range chains {
 		if chainSel == r.destChain {
 			continue
 		}

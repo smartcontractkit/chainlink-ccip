@@ -3,11 +3,13 @@ package report
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sort"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/types"
@@ -51,7 +53,7 @@ func buildSingleChainReport(
 	// Verify merkle root.
 	hash := tree.Root()
 	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
-		actualStr := "0x" + hex.EncodeToString(hash[:])
+		actualStr := typconv.HexEncode(hash[:])
 		return cciptypes.ExecutePluginReportSingleChain{}, 0,
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
