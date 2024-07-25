@@ -1,10 +1,7 @@
 package execute
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"sort"
 	"sync/atomic"
@@ -12,14 +9,16 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	types2 "github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -40,7 +39,7 @@ type Plugin struct {
 	homeChain   reader.HomeChain
 
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader TokenDataReader
+	tokenDataReader types2.TokenDataReader
 	lastReportTS    *atomic.Int64
 	lggr            logger.Logger
 }
@@ -53,7 +52,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataReader TokenDataReader,
+	tokenDataReader types2.TokenDataReader,
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
@@ -245,197 +244,6 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 	return ocr3types.QuorumFPlusOne, nil
 }
 
-// TokenDataReader is an interface for reading extra token data from an async process.
-// TODO: Build a token data reading process.
-//
-//go:generate mockery --quiet --name TokenDataReader --output ../internal/mocks --case=underscore
-type TokenDataReader interface {
-	ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error)
-}
-
-// buildSingleChainReportMaxSize generates the largest report which fits into maxSizeBytes.
-// See buildSingleChainReport for more details about how a report is built.
-func buildSingleChainReportMaxSize(
-	ctx context.Context,
-	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
-	tokenDataReader TokenDataReader,
-	encoder cciptypes.ExecutePluginCodec,
-	report plugintypes.ExecutePluginCommitDataWithMessages,
-	maxSizeBytes int,
-) (cciptypes.ExecutePluginReportSingleChain, int, plugintypes.ExecutePluginCommitDataWithMessages, error) {
-	finalReport, encodedSize, err :=
-		buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, 0)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			0,
-			plugintypes.ExecutePluginCommitDataWithMessages{},
-			fmt.Errorf("unable to build a single chain report (max): %w", err)
-	}
-
-	// return fully executed report
-	if encodedSize <= maxSizeBytes {
-		report = markNewMessagesExecuted(finalReport, report)
-		return finalReport, encodedSize, report, nil
-	}
-
-	var searchErr error
-	idx := sort.Search(len(report.Messages), func(mid int) bool {
-		if searchErr != nil {
-			return false
-		}
-		finalReport2, encodedSize2, err :=
-			buildSingleChainReport(ctx, lggr, hasher, tokenDataReader, encoder, report, mid)
-		if searchErr != nil {
-			searchErr = fmt.Errorf("unable to build a single chain report (messages %d): %w", mid, err)
-		}
-
-		if (encodedSize2) <= maxSizeBytes {
-			// mid is a valid report size, try something bigger next iteration.
-			finalReport = finalReport2
-			encodedSize = encodedSize2
-			return false // not full
-		}
-		return true // full
-	})
-	if searchErr != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, plugintypes.ExecutePluginCommitDataWithMessages{}, searchErr
-	}
-
-	// No messages fit into the report.
-	if idx <= 0 {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			0,
-			plugintypes.ExecutePluginCommitDataWithMessages{},
-			errEmptyReport
-	}
-
-	report = markNewMessagesExecuted(finalReport, report)
-	return finalReport, encodedSize, report, nil
-}
-
-// buildSingleChainReport converts the on-chain event data stored in cciptypes.ExecutePluginCommitDataWithMessages into
-// the final on-chain report format.
-//
-// The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
-//
-// The maxMessages argument is used to limit the number of messages that are included in the report. If maxMessages is
-// set to 0, all messages will be included. This allows the caller to create smaller reports if needed.
-func buildSingleChainReport(
-	ctx context.Context,
-	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
-	tokenDataReader TokenDataReader,
-	encoder cciptypes.ExecutePluginCodec,
-	report plugintypes.ExecutePluginCommitDataWithMessages,
-	maxMessages int,
-) (cciptypes.ExecutePluginReportSingleChain, int, error) {
-	// TODO: maxMessages selects messages in FIFO order which may not yield the optimal message size. One message with a
-	//       maximum data size could push the report over a size limit even if several smaller messages could have fit.
-	if maxMessages == 0 {
-		maxMessages = len(report.Messages)
-	}
-
-	lggr.Debugw(
-		"constructing merkle tree",
-		"sourceChain", report.SourceChain,
-		"expectedRoot", report.MerkleRoot.String(),
-		"treeLeaves", len(report.Messages))
-
-	tree, err := constructMerkleTree(ctx, hasher, report)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0,
-			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
-	}
-
-	// Verify merkle root.
-	hash := tree.Root()
-	if !bytes.Equal(hash[:], report.MerkleRoot[:]) {
-		actualStr := "0x" + hex.EncodeToString(hash[:])
-		return cciptypes.ExecutePluginReportSingleChain{}, 0,
-			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
-	}
-
-	// Iterate sequence range and executed messages to select messages to execute.
-	numMsgs := len(report.Messages)
-	var toExecute []int
-	var offchainTokenData [][][]byte
-	var msgInRoot []cciptypes.Message
-	executedIdx := 0
-	for i := 0; i < numMsgs && len(toExecute) <= maxMessages; i++ {
-		seqNum := report.SequenceNumberRange.Start() + cciptypes.SeqNum(i)
-		// Skip messages which are already executed
-		if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
-			executedIdx++
-		} else {
-			msg := report.Messages[i]
-			tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
-			if err != nil {
-				// TODO: skip message instead of failing the whole thing.
-				//       that might mean moving the token data reading out of the loop.
-				lggr.Infow(
-					"unable to read token data",
-					"sourceChain", report.SourceChain,
-					"seqNum", msg.Header.SequenceNumber,
-					"error", err)
-				return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf(
-					"unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
-			}
-
-			lggr.Infow(
-				"read token data",
-				"sourceChain", report.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"data", tokenData)
-			offchainTokenData = append(offchainTokenData, tokenData)
-			toExecute = append(toExecute, i)
-			msgInRoot = append(msgInRoot, msg)
-		}
-	}
-
-	lggr.Infow(
-		"selected messages from commit report for execution",
-		"sourceChain", report.SourceChain,
-		"commitRoot", report.MerkleRoot.String(),
-		"numMessages", numMsgs,
-		"toExecute", len(toExecute))
-	proof, err := tree.Prove(toExecute)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{}, 0,
-			fmt.Errorf("unable to prove messages for report %s: %w", report.MerkleRoot.String(), err)
-	}
-
-	var proofsCast []cciptypes.Bytes32
-	for _, p := range proof.Hashes {
-		proofsCast = append(proofsCast, p)
-	}
-
-	finalReport := cciptypes.ExecutePluginReportSingleChain{
-		SourceChainSelector: report.SourceChain,
-		Messages:            msgInRoot,
-		OffchainTokenData:   offchainTokenData,
-		Proofs:              proofsCast,
-		ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
-	}
-
-	// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
-	//       does not add any additional overhead to the size being computed here.
-
-	// Compute the size of the encoded report.
-	encoded, err := encoder.Encode(
-		ctx,
-		cciptypes.ExecutePluginReport{
-			ChainReports: []cciptypes.ExecutePluginReportSingleChain{finalReport},
-		},
-	)
-	if err != nil {
-		lggr.Errorw("unable to encode report", "err", err, "report", finalReport)
-		return cciptypes.ExecutePluginReportSingleChain{}, 0, fmt.Errorf("unable to encode report: %w", err)
-	}
-
-	return finalReport, len(encoded), nil
-}
-
 // selectReport takes a list of reports in execution order and selects the first reports that fit within the
 // maxReportSizeBytes. Individual messages in a commit report may be skipped for various reasons, for example if an
 // out-of-order execution is detected or the message requires additional off-chain metadata which is not yet available.
@@ -446,60 +254,40 @@ func selectReport(
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
-	tokenDataReader TokenDataReader,
-	reports []plugintypes.ExecutePluginCommitDataWithMessages,
+	tokenDataReader types2.TokenDataReader,
+	commitReports []plugintypes.ExecutePluginCommitDataWithMessages,
 	maxReportSizeBytes int,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitDataWithMessages, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	// count number of fully executed reports so that they can be removed after iterating the reports.
-	fullyExecuted := 0
-	accumulatedSize := 0
-	var finalReports []cciptypes.ExecutePluginReportSingleChain
-	for reportIdx, report := range reports {
+	builder := report.NewBuilder(ctx, lggr, hasher, tokenDataReader, encoder, uint64(maxReportSizeBytes), 99)
+	var stillPendingReports []plugintypes.ExecutePluginCommitDataWithMessages
+	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
 		if len(report.Messages) == 0 {
-			break
+			stillPendingReports = append(stillPendingReports, report)
+			continue
 		}
 
-		execReport, encodedSize, updatedReport, err :=
-			buildSingleChainReportMaxSize(ctx, lggr, hasher, tokenDataReader, encoder,
-				report, maxReportSizeBytes-accumulatedSize)
-		// No messages fit into the report, stop adding more reports.
-		if errors.Is(err, errEmptyReport) {
-			break
-		}
+		var err error
+		commitReports[i], err = builder.Add(report)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to build single chain report: %w", err)
+			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
 		}
-		reports[reportIdx] = updatedReport
-		accumulatedSize += encodedSize
-		finalReports = append(finalReports, execReport)
-
-		// partially executed report detected, stop adding more reports.
-		// TODO: do not break if messages were intentionally skipped.
-		if len(updatedReport.Messages) != len(updatedReport.ExecutedMessages) {
-			break
+		// If the report has not been fully executed, keep it for the next round.
+		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
+			stillPendingReports = append(stillPendingReports, commitReports[i])
 		}
-		fullyExecuted++
 	}
 
-	// Remove reports that are about to be executed.
-	if fullyExecuted == len(reports) {
-		reports = nil
-	} else {
-		reports = reports[fullyExecuted:]
-	}
+	execReports, err := builder.Build()
 
 	lggr.Infow(
-		"selected commit reports for execution report",
-		"numReports", len(finalReports),
-		"size", accumulatedSize,
-		"incompleteReports", len(reports),
-		"maxSize", maxReportSizeBytes)
-
-	return finalReports, reports, nil
+		"reports have been selected",
+		"numReports", len(execReports),
+		"numPendingReports", len(stillPendingReports))
+	return execReports, stillPendingReports, err
 }
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
