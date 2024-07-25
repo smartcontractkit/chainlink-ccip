@@ -201,8 +201,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-			p := Plugin{ccipReader: mockReader, lggr: logger.Test(t)}
-			got, got1, err := p.getPendingExecutedReports(context.Background(), mockReader, 123, time.Now())
+			got, got1, err := getPendingExecutedReports(context.Background(), mockReader, 123, time.Now())
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
