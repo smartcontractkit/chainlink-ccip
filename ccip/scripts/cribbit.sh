@@ -50,11 +50,6 @@ fi
 
 # List of required environment variables
 required_vars=(
-	"AWS_REGION"
-	# Should be the short name and not the full IAM role ARN.
-	"AWS_SSO_ROLE_NAME"
-	# The AWS SSO start URL, e.g. https://<org name>.awsapps.com/start
-	"AWS_SSO_START_URL"
 	"DEVSPACE_IMAGE"
 	"HOME"
 )
@@ -85,6 +80,28 @@ aws_profile_name="staging-crib"
 if grep -q "$aws_profile_name" "$path_aws_config"; then
 	echo "Info: Skip updating ${path_aws_config}. Profile already set: ${aws_profile_name}"
 else
+	# List of required environment variables
+	required_aws_vars=(
+		"AWS_REGION"
+		# Should be the short name and not the full IAM role ARN.
+		"AWS_SSO_ROLE_NAME"
+		# The AWS SSO start URL, e.g. https://<org name>.awsapps.com/start
+		"AWS_SSO_START_URL"
+	)
+	missing_aws_vars=0 # Counter for missing variables
+	for var in "${required_aws_vars[@]}"; do
+		if [[ -z ${!var:-} ]]; then # If variable is unset or empty
+			echo "Error: Environment variable ${var} is not set."
+			missing_aws_vars=$((missing_aws_vars + 1))
+		fi
+	done
+
+	# Exit with an error if any variables were missing
+	if [[ $missing_aws_vars -ne 0 ]]; then
+		echo "Error: Total missing environment variables: $missing_aws_vars"
+		exit 1
+	fi
+
 	cat <<EOF >>"$path_aws_config"
 [profile $aws_profile_name]
 region=${AWS_REGION}
