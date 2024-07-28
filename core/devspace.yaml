@@ -142,7 +142,7 @@ images:
 hooks:
   - command: ../scripts/before_deploy_checks.sh
     events: ["before:deploy:app"]
-  - command: ./scripts/check_env_vars.sh
+  - command: ../scripts/check_env_vars.sh
     events: ["before:deploy:app"]
   - command: ./../scripts/manage_namespace.sh
     args: ["create"]
