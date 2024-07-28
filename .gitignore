@@ -3,6 +3,7 @@
 
 # misc
 .DS_Store
+.envrc
 .env*
 .dbenv
 !*/.env.example

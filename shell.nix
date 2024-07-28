@@ -45,10 +45,6 @@ mkShell' {
     # cross-compiling, used in CRIB
     zig
 
-    # 1Password tools
-    _1password
-    #_1password-gui #- This doesn't work see: https://github.com/NixOS/nixpkgs/issues/254944
-
     # gofuzz
   ] ++ lib.optionals stdenv.isLinux [
     # some dependencies needed for node-gyp on pnpm install

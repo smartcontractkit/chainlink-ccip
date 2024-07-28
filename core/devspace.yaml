@@ -2,11 +2,6 @@ version: v2beta1
 name: chainlink
 
 vars:
-  # Enables or disables 1Pass integration
-  ONEPASS_ENABLED:
-    source: env
-    default: false
-
   CHAINLINK_REPO_DIR: "${CHAINLINK_CODE_DIR}/chainlink"
   DEVSPACE_ENV_FILE: .env
   # The list of default ENV Vars for CRIB, you can override any of them in the .env file
@@ -511,8 +506,7 @@ profiles:
         path: deployments.app.helm.values.chainlink.nodes
       - op: add
         path: deployments.app.helm.valuesFiles
-        value:
-          ["./values-profiles/values-dev-simulated-core-ocr1-stateless.yaml"]
+        value: ["./values-profiles/values-dev-simulated-core-ocr1-stateless.yaml"]
   - name: local-dev-simulated-core-ocr1
     patches:
       - op: remove
