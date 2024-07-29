@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"sync"
 	"time"
 
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -16,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -99,6 +102,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		return nil, err
 	}
 
+	// ---------------------------------------------------
+	// The following types are used to decode the events
+	// but should be replaced by chain-reader modifiers and use the base cciptypes.CommitReport type.
+
 	type Interval struct {
 		Min uint64
 		Max uint64
@@ -110,12 +117,32 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		MerkleRoot          cciptypes.Bytes32
 	}
 
+	type TokenPriceUpdate struct {
+		SourceToken []byte
+		UsdPerToken *big.Int
+	}
+
+	type GasPriceUpdate struct {
+		DestChainSelector uint64
+		UsdPerUnitGas     *big.Int
+	}
+
+	type PriceUpdates struct {
+		TokenPriceUpdates []TokenPriceUpdate
+		GasPriceUpdates   []GasPriceUpdate
+	}
+
 	type CommitReportAccepted struct {
-		PriceUpdates cciptypes.PriceUpdates
+		PriceUpdates PriceUpdates
 		MerkleRoots  []MerkleRoot
 	}
 
-	ev := CommitReportAccepted{}
+	type CommitReportAcceptedEvent struct {
+		Report CommitReportAccepted
+	}
+	// ---------------------------------------------------
+
+	ev := CommitReportAcceptedEvent{}
 
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
@@ -138,19 +165,19 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(*CommitReportAccepted)
+		ev, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Debugw("skipping invalid commit report", "report", report)
+			r.lggr.Debugw("skipping invalid commit report", "report", ev.Report)
 			continue
 		}
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(report.MerkleRoots))
-		for _, mr := range report.MerkleRoots {
+		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.Report.MerkleRoots))
+		for _, mr := range ev.Report.MerkleRoots {
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -158,6 +185,25 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 					cciptypes.SeqNum(mr.Interval.Max),
 				),
 				MerkleRoot: mr.MerkleRoot,
+			})
+		}
+
+		priceUpdates := cciptypes.PriceUpdates{
+			TokenPriceUpdates: make([]cciptypes.TokenPrice, 0),
+			GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
+		}
+
+		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
+			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
+				TokenID: types2.Account(typconv.HexEncode(tokenPriceUpdate.SourceToken)),
+				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
+			})
+		}
+
+		for _, gasPriceUpdate := range ev.Report.PriceUpdates.GasPriceUpdates {
+			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, cciptypes.GasPriceChain{
+				ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
+				GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
 			})
 		}
 
@@ -169,7 +215,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				MerkleRoots:  merkleRoots,
-				PriceUpdates: report.PriceUpdates,
+				PriceUpdates: priceUpdates,
 			},
 			Timestamp: time.Unix(int64(item.Timestamp), 0),
 			BlockNum:  blockNum,
