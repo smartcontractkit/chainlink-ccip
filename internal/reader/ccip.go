@@ -110,12 +110,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		MerkleRoot          cciptypes.Bytes32
 	}
 
-	type CommitReportAcceptedEvent struct {
+	type CommitReportAccepted struct {
 		PriceUpdates cciptypes.PriceUpdates
 		MerkleRoots  []MerkleRoot
 	}
 
-	ev := CommitReportAcceptedEvent{}
+	ev := CommitReportAccepted{}
 
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
@@ -138,7 +138,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
-		report, is := (item.Data).(*CommitReportAcceptedEvent)
+		report, is := (item.Data).(*CommitReportAccepted)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
@@ -217,17 +217,6 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		stateChange, ok := item.Data.(*executionStateChangedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
-		}
-		if stateChange.sourceChainSelector != source {
-			return nil, fmt.Errorf("wrong cr query, unexpected source chain %d", stateChange.sourceChainSelector)
-		}
-		if stateChange.sequenceNumber < seqNumRange.Start() || stateChange.sequenceNumber > seqNumRange.End() {
-			return nil, fmt.Errorf("wrong cr query, unexpected sequence number %d", stateChange.sequenceNumber)
-		}
-		if stateChange.state <= 1 {
-			r.lggr.Debugw("execution state change status is %d, skipped",
-				"seqNum", stateChange.sequenceNumber, "state", stateChange.state)
-			continue
 		}
 
 		// todo: filter via the query
