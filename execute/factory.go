@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -47,13 +48,14 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr            logger.Logger
-	ocrConfig       reader.OCR3ConfigWithMeta
-	execCodec       cciptypes.ExecutePluginCodec
-	msgHasher       cciptypes.MessageHasher
-	homeChainReader reader.HomeChain
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
+	lggr             logger.Logger
+	ocrConfig        reader.OCR3ConfigWithMeta
+	execCodec        cciptypes.ExecutePluginCodec
+	msgHasher        cciptypes.MessageHasher
+	homeChainReader  reader.HomeChain
+	estimateProvider gas.EstimateProvider
+	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
@@ -62,17 +64,19 @@ func NewPluginFactory(
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
+	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:            lggr,
-		ocrConfig:       ocrConfig,
-		execCodec:       execCodec,
-		msgHasher:       msgHasher,
-		homeChainReader: homeChainReader,
-		contractReaders: contractReaders,
-		chainWriters:    chainWriters,
+		lggr:             lggr,
+		ocrConfig:        ocrConfig,
+		execCodec:        execCodec,
+		msgHasher:        msgHasher,
+		homeChainReader:  homeChainReader,
+		estimateProvider: estimateProvider,
+		contractReaders:  contractReaders,
+		chainWriters:     chainWriters,
 	}
 }
 
@@ -112,6 +116,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.msgHasher,
 			p.homeChainReader,
 			nil, // TODO: token data reader
+			p.estimateProvider,
 			p.lggr,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",

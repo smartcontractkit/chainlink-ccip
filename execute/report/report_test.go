@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -387,6 +389,7 @@ func Test_Builder_Build(t *testing.T) {
 	type args struct {
 		reports       []plugintypes.ExecutePluginCommitData
 		maxReportSize uint64
+		maxGasLimit   uint64
 	}
 	tests := []struct {
 		name                  string
@@ -409,6 +412,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "half report",
 			args: args{
 				maxReportSize: 2300,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -424,6 +428,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "full report",
 			args: args{
 				maxReportSize: 10000,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -438,6 +443,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "two reports",
 			args: args{
 				maxReportSize: 15000,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -455,6 +461,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "one and half reports",
 			args: args{
 				maxReportSize: 8500,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -473,6 +480,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "exactly one report",
 			args: args{
 				maxReportSize: 4200,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -491,6 +499,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "execute remainder of partially executed report",
 			args: args{
 				maxReportSize: 2500,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -505,6 +514,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "partially execute remainder of partially executed report",
 			args: args{
 				maxReportSize: 2050,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -520,6 +530,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "execute remainder of sparsely executed report",
 			args: args{
 				maxReportSize: 3500,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -534,6 +545,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
 				maxReportSize: 2050,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -549,6 +561,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "broken report",
 			args: args{
 				maxReportSize: 10000,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					breakCommitReport(makeTestCommitReport(hasher, 10, 1, 101, 1000, 10101010102,
 						cciptypes.Bytes32{}, // generate a correct root.
@@ -572,6 +585,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "skip over one large messages",
 			args: args{
 				maxReportSize: 10000,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					setMessageData(5, 20000,
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
@@ -588,6 +602,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "skip over two large messages",
 			args: args{
 				maxReportSize: 10000,
+				maxGasLimit:   10000000,
 				reports: []plugintypes.ExecutePluginCommitData{
 					setMessageData(8, 20000,
 						setMessageData(5, 20000,
@@ -610,7 +625,15 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			builder := NewBuilder(ctx, lggr, hasher, tokenDataReader, codec, tt.args.maxReportSize, 0)
+			builder := NewBuilder(
+				ctx,
+				lggr,
+				hasher,
+				tokenDataReader,
+				codec,
+				evm.EstimateProvider{},
+				tt.args.maxReportSize,
+				tt.args.maxGasLimit)
 			var updatedMessages []plugintypes.ExecutePluginCommitData
 			for _, report := range tt.args.reports {
 				updatedMessage, err := builder.Add(report)
@@ -664,7 +687,9 @@ func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecuteP
 func Test_execReportBuilder_verifyReport(t *testing.T) {
 	type fields struct {
 		encoder            cciptypes.ExecutePluginCodec
+		estimateProvider   gas.EstimateProvider
 		maxReportSizeBytes uint64
+		maxGas             uint64
 		accumulated        validationMetadata
 	}
 	type args struct {
@@ -685,7 +710,9 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				execReport: cciptypes.ExecutePluginReportSingleChain{},
 			},
 			fields: fields{
+				estimateProvider:   evm.EstimateProvider{},
 				maxReportSizeBytes: 1000,
+				maxGas:             1000000,
 			},
 			expectedIsValid: true,
 			expectedMetadata: validationMetadata{
@@ -705,11 +732,14 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
+				estimateProvider:   evm.EstimateProvider{},
 				maxReportSizeBytes: 10000,
+				maxGas:             1000000,
 			},
 			expectedIsValid: true,
 			expectedMetadata: validationMetadata{
 				encodedSizeBytes: 1633,
+				gas:              482_240,
 			},
 		},
 		{
@@ -725,7 +755,9 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
+				estimateProvider:   evm.EstimateProvider{},
 				maxReportSizeBytes: 1000,
+				maxGas:             1000000,
 			},
 			expectedLog: "invalid report, report size exceeds limit",
 		},
@@ -742,10 +774,12 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
+				estimateProvider: evm.EstimateProvider{},
 				accumulated: validationMetadata{
 					encodedSizeBytes: 1000,
 				},
 				maxReportSizeBytes: 2000,
+				maxGas:             1000000,
 			},
 			expectedLog: "invalid report, report size exceeds limit",
 		},
@@ -760,7 +794,8 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				encoder: badCodec{},
+				estimateProvider: evm.EstimateProvider{},
+				encoder:          badCodec{},
 			},
 			expectedError: "unable to encode report",
 			expectedLog:   "unable to encode report",
@@ -784,7 +819,9 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				ctx:                context.Background(),
 				lggr:               lggr,
 				encoder:            resolvedEncoder,
+				estimateProvider:   tt.fields.estimateProvider,
 				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
+				maxGas:             tt.fields.maxGas,
 				accumulated:        tt.fields.accumulated,
 			}
 			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
@@ -792,6 +829,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				assert.Contains(t, err.Error(), tt.expectedError)
 				return
 			}
+			require.NoError(t, err)
 			if tt.expectedLog != "" {
 				found := false
 				for _, log := range logs.All() {
@@ -839,6 +877,7 @@ func (t tdr) ReadTokenData(
 func Test_execReportBuilder_checkMessage(t *testing.T) {
 	type fields struct {
 		tokenDataReader types.TokenDataReader
+		accumulated     validationMetadata
 	}
 	type args struct {
 		idx        int
@@ -988,14 +1027,17 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				lggr:            lggr,
-				tokenDataReader: resolvedTokenDataReader,
+				lggr:             lggr,
+				tokenDataReader:  resolvedTokenDataReader,
+				estimateProvider: evm.EstimateProvider{},
+				accumulated:      tt.fields.accumulated,
 			}
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
 			if tt.expectedError != "" {
 				assert.Contains(t, err.Error(), tt.expectedError)
 				return
 			}
+			require.NoError(t, err)
 			if tt.expectedLog != "" {
 				found := false
 				for _, log := range logs.All() {

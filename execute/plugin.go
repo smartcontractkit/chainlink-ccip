@@ -13,13 +13,13 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	types2 "github.com/smartcontractkit/chainlink-ccip/execute/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -40,9 +40,10 @@ type Plugin struct {
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 
-	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader types2.TokenDataReader
-	lggr            logger.Logger
+	oracleIDToP2pID  map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataReader  types2.TokenDataReader
+	estimateProvider gas.EstimateProvider
+	lggr             logger.Logger
 }
 
 func NewPlugin(
@@ -54,10 +55,9 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
 	tokenDataReader types2.TokenDataReader,
+	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
-	// TODO: initialize tokenDataReader.
-
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
 		ccipReader,
@@ -69,16 +69,17 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		reportingCfg:    reportingCfg,
-		cfg:             cfg,
-		oracleIDToP2pID: oracleIDToP2pID,
-		ccipReader:      ccipReader,
-		readerSyncer:    readerSyncer,
-		reportCodec:     reportCodec,
-		msgHasher:       msgHasher,
-		homeChain:       homeChain,
-		tokenDataReader: tokenDataReader,
-		lggr:            lggr,
+		reportingCfg:     reportingCfg,
+		cfg:              cfg,
+		oracleIDToP2pID:  oracleIDToP2pID,
+		ccipReader:       ccipReader,
+		readerSyncer:     readerSyncer,
+		reportCodec:      reportCodec,
+		msgHasher:        msgHasher,
+		homeChain:        homeChain,
+		tokenDataReader:  tokenDataReader,
+		estimateProvider: estimateProvider,
+		lggr:             lggr,
 	}
 }
 
@@ -270,13 +271,23 @@ func selectReport(
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
 	tokenDataReader types2.TokenDataReader,
+	estimateProvider gas.EstimateProvider,
 	commitReports []plugintypes.ExecutePluginCommitData,
 	maxReportSizeBytes int,
+	maxGas uint64,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	builder := report.NewBuilder(ctx, lggr, hasher, tokenDataReader, encoder, uint64(maxReportSizeBytes), 99)
+	builder := report.NewBuilder(
+		ctx,
+		lggr,
+		hasher,
+		tokenDataReader,
+		encoder,
+		estimateProvider,
+		uint64(maxReportSizeBytes),
+		maxGas)
 	var stillPendingReports []plugintypes.ExecutePluginCommitData
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
@@ -375,8 +386,15 @@ func (p *Plugin) Outcome(
 
 	// TODO: this function should be pure, a context should not be needed.
 	outcomeReports, commitReports, err :=
-		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader,
-			commitReports, maxReportSizeBytes)
+		selectReport(
+			context.Background(),
+			p.lggr, p.msgHasher,
+			p.reportCodec,
+			p.tokenDataReader,
+			p.estimateProvider,
+			commitReports,
+			maxReportSizeBytes,
+			p.cfg.OffchainConfig.BatchGasLimit)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
