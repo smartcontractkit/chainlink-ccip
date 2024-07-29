@@ -9,12 +9,15 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	types2 "github.com/smartcontractkit/chainlink-ccip/execute/types"
@@ -32,10 +35,11 @@ type Plugin struct {
 	cfg          pluginconfig.ExecutePluginConfig
 
 	// providers
-	ccipReader  reader.CCIP
-	reportCodec cciptypes.ExecutePluginCodec
-	msgHasher   cciptypes.MessageHasher
-	homeChain   reader.HomeChain
+	ccipReader   reader.CCIP
+	readerSyncer *plugincommon.BackgroundReaderSyncer
+	reportCodec  cciptypes.ExecutePluginCodec
+	msgHasher    cciptypes.MessageHasher
+	homeChain    reader.HomeChain
 
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataReader types2.TokenDataReader
@@ -59,11 +63,22 @@ func NewPlugin(
 
 	// TODO: initialize tokenDataReader.
 
+	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		syncFrequency(cfg.SyncFrequency),
+	)
+	if err := readerSyncer.Start(context.Background()); err != nil {
+		lggr.Errorw("error starting background reader syncer", "err", err)
+	}
+
 	return &Plugin{
 		reportingCfg:    reportingCfg,
 		cfg:             cfg,
 		oracleIDToP2pID: oracleIDToP2pID,
 		ccipReader:      ccipReader,
+		readerSyncer:    readerSyncer,
 		reportCodec:     reportCodec,
 		msgHasher:       msgHasher,
 		homeChain:       homeChain,
@@ -85,7 +100,6 @@ func getPendingExecutedReports(
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
 		if report.Timestamp.After(latestReportTS) {
@@ -177,7 +191,7 @@ func (p *Plugin) Observation(
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages)
+		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
 		}
@@ -254,14 +268,14 @@ func selectReport(
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
 	tokenDataReader types2.TokenDataReader,
-	commitReports []plugintypes.ExecutePluginCommitDataWithMessages,
+	commitReports []plugintypes.ExecutePluginCommitData,
 	maxReportSizeBytes int,
-) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitDataWithMessages, error) {
+) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
 	builder := report.NewBuilder(ctx, lggr, hasher, tokenDataReader, encoder, uint64(maxReportSizeBytes), 99)
-	var stillPendingReports []plugintypes.ExecutePluginCommitDataWithMessages
+	var stillPendingReports []plugintypes.ExecutePluginCommitData
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
 		if len(report.Messages) == 0 {
@@ -323,7 +337,7 @@ func (p *Plugin) Outcome(
 		mergedMessageObservations)
 
 	// flatten commit reports and sort by timestamp.
-	var commitReports []plugintypes.ExecutePluginCommitDataWithMessages
+	var commitReports []plugintypes.ExecutePluginCommitData
 	for _, report := range observation.CommitReports {
 		commitReports = append(commitReports, report...)
 	}
@@ -418,6 +432,18 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) Close() error {
+	timeout := 10 * time.Second // todo: cfg
+	ctx, cf := context.WithTimeout(context.Background(), timeout)
+	defer cf()
+
+	if err := p.readerSyncer.Close(); err != nil {
+		p.lggr.Errorw("error closing reader syncer", "err", err)
+	}
+
+	if err := p.ccipReader.Close(ctx); err != nil {
+		return fmt.Errorf("close ccip reader: %w", err)
+	}
+
 	return nil
 }
 
@@ -441,6 +467,20 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
 	return chains.Contains(p.cfg.DestChain), nil
+}
+
+func syncFrequency(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 10 * time.Second
+	}
+	return configuredValue
+}
+
+func syncTimeout(configuredValue time.Duration) time.Duration {
+	if configuredValue.Milliseconds() == 0 {
+		return 3 * time.Second
+	}
+	return configuredValue
 }
 
 // Interface compatibility checks.
