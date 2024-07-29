@@ -38,7 +38,7 @@ func validateObserverReadingEligibility(
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
-	observedData map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages,
+	observedData map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData,
 ) error {
 	for _, commitData := range observedData {
 		// observed commitData must not contain duplicates
@@ -77,7 +77,7 @@ var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
 // Note: reports need all messages to create a proof even if some are already executed.
-func computeRanges(reports []plugintypes.ExecutePluginCommitDataWithMessages) ([]cciptypes.SeqNumRange, error) {
+func computeRanges(reports []plugintypes.ExecutePluginCommitData) ([]cciptypes.SeqNumRange, error) {
 	var ranges []cciptypes.SeqNumRange
 
 	if len(reports) == 0 {
@@ -109,19 +109,17 @@ func computeRanges(reports []plugintypes.ExecutePluginCommitDataWithMessages) ([
 
 func groupByChainSelector(
 	reports []plugintypes.CommitPluginReportWithMeta) plugintypes.ExecutePluginCommitObservations {
-	commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitDataWithMessages)
+	commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData)
 	for _, report := range reports {
 		for _, singleReport := range report.Report.MerkleRoots {
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
-				plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SourceChain:         singleReport.ChainSel,
-						Timestamp:           report.Timestamp,
-						BlockNum:            report.BlockNum,
-						MerkleRoot:          singleReport.MerkleRoot,
-						SequenceNumberRange: singleReport.SeqNumsRange,
-						ExecutedMessages:    nil,
-					}})
+				plugintypes.ExecutePluginCommitData{
+					SourceChain:         singleReport.ChainSel,
+					Timestamp:           report.Timestamp,
+					BlockNum:            report.BlockNum,
+					MerkleRoot:          singleReport.MerkleRoot,
+					SequenceNumberRange: singleReport.SeqNumsRange,
+				})
 		}
 	}
 	return commitReportCache
@@ -130,8 +128,8 @@ func groupByChainSelector(
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
 func filterOutExecutedMessages(
-	reports []plugintypes.ExecutePluginCommitDataWithMessages, executedMessages []cciptypes.SeqNumRange,
-) ([]plugintypes.ExecutePluginCommitDataWithMessages, error) {
+	reports []plugintypes.ExecutePluginCommitData, executedMessages []cciptypes.SeqNumRange,
+) ([]plugintypes.ExecutePluginCommitData, error) {
 	sort.Slice(reports, func(i, j int) bool {
 		return reports[i].SequenceNumberRange.Start() < reports[j].SequenceNumberRange.Start()
 	})
@@ -154,7 +152,7 @@ func filterOutExecutedMessages(
 		previousMax = seqRange.End()
 	}
 
-	var filtered []plugintypes.ExecutePluginCommitDataWithMessages
+	var filtered []plugintypes.ExecutePluginCommitData
 
 	reportIdx := 0
 	for _, executed := range executedMessages {
@@ -269,13 +267,13 @@ func mergeCommitObservations(
 ) (plugintypes.ExecutePluginCommitObservations, error) {
 	// Create a validator for each chain
 	validators :=
-		make(map[cciptypes.ChainSelector]validation.MinObservationFilter[plugintypes.ExecutePluginCommitDataWithMessages])
-	idFunc := func(data plugintypes.ExecutePluginCommitDataWithMessages) [32]byte {
+		make(map[cciptypes.ChainSelector]validation.MinObservationFilter[plugintypes.ExecutePluginCommitData])
+	idFunc := func(data plugintypes.ExecutePluginCommitData) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
 	for selector, f := range fChain {
 		validators[selector] =
-			validation.NewMinObservationValidator[plugintypes.ExecutePluginCommitDataWithMessages](f+1, idFunc)
+			validation.NewMinObservationValidator[plugintypes.ExecutePluginCommitData](f+1, idFunc)
 	}
 
 	// Add reports to the validator for each chain selector.

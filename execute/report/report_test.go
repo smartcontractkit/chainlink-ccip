@@ -110,7 +110,7 @@ func assertMerkleRoot(
 	t *testing.T,
 	hasher cciptypes.MessageHasher,
 	execReport cciptypes.ExecutePluginReportSingleChain,
-	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
+	commitReport plugintypes.ExecutePluginCommitData,
 ) {
 	keccak := hashutil.NewKeccak()
 	// Generate merkle root from commit report messages
@@ -181,7 +181,7 @@ func makeTestCommitReport(
 	timestamp int64,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
-) plugintypes.ExecutePluginCommitDataWithMessages {
+) plugintypes.ExecutePluginCommitData {
 	sequenceNumberRange :=
 		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
 
@@ -198,16 +198,14 @@ func makeTestCommitReport(
 			uint64(i)))
 	}
 
-	commitReport := plugintypes.ExecutePluginCommitDataWithMessages{
-		ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-			//MerkleRoot:          root,
-			SourceChain:         cciptypes.ChainSelector(srcChain),
-			SequenceNumberRange: sequenceNumberRange,
-			Timestamp:           time.UnixMilli(timestamp),
-			BlockNum:            uint64(block),
-			ExecutedMessages:    executed,
-		},
-		Messages: messages,
+	commitReport := plugintypes.ExecutePluginCommitData{
+		//MerkleRoot:          root,
+		SourceChain:         cciptypes.ChainSelector(srcChain),
+		SequenceNumberRange: sequenceNumberRange,
+		Timestamp:           time.UnixMilli(timestamp),
+		BlockNum:            uint64(block),
+		Messages:            messages,
+		ExecutedMessages:    executed,
 	}
 
 	// calculate merkle root
@@ -225,16 +223,16 @@ func makeTestCommitReport(
 
 // breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
 func breakCommitReport(
-	commitReport plugintypes.ExecutePluginCommitDataWithMessages,
-) plugintypes.ExecutePluginCommitDataWithMessages {
+	commitReport plugintypes.ExecutePluginCommitData,
+) plugintypes.ExecutePluginCommitData {
 	commitReport.Messages = append(commitReport.Messages, cciptypes.Message{})
 	return commitReport
 }
 
 // setMessageData at the given index to the given size. This function will panic if the index is out of range.
 func setMessageData(
-	idx int, size uint64, commitReport plugintypes.ExecutePluginCommitDataWithMessages,
-) plugintypes.ExecutePluginCommitDataWithMessages {
+	idx int, size uint64, commitReport plugintypes.ExecutePluginCommitData,
+) plugintypes.ExecutePluginCommitData {
 	if len(commitReport.Messages) < idx {
 		panic("message index out of range")
 	}
@@ -282,7 +280,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	lggr := logger.Test(t)
 
 	type args struct {
-		report          plugintypes.ExecutePluginCommitDataWithMessages
+		report          plugintypes.ExecutePluginCommitData
 		hasher          cciptypes.MessageHasher
 		tokenDataReader types.TokenDataReader
 	}
@@ -295,10 +293,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "wrong number of messages",
 			wantErr: "unexpected number of messages: expected 1, got 2",
 			args: args{
-				report: plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					},
+				report: plugintypes.ExecutePluginCommitData{
+					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
 						{Header: cciptypes.RampMessageHeader{}},
@@ -310,10 +306,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "wrong sequence numbers",
 			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
-				report: plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
-					},
+				report: plugintypes.ExecutePluginCommitData{
+					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					Messages: []cciptypes.Message{
 						{
 							Header: cciptypes.RampMessageHeader{
@@ -333,11 +327,9 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "source mismatch",
 			wantErr: "unexpected source chain: expected 1111, got 2222",
 			args: args{
-				report: plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SourceChain:         1111,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					},
+				report: plugintypes.ExecutePluginCommitData{
+					SourceChain:         1111,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{
 							SourceChainSelector: 2222,
@@ -352,11 +344,9 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "bad hasher",
 			wantErr: "unable to hash message (1234567, 100): bad hasher",
 			args: args{
-				report: plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SourceChain:         1234567,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					},
+				report: plugintypes.ExecutePluginCommitData{
+					SourceChain:         1234567,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{
 							SourceChainSelector: 1234567,
@@ -371,11 +361,9 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "bad token data reader",
 			wantErr: "unable to read token data for message 100: bad token data reader",
 			args: args{
-				report: plugintypes.ExecutePluginCommitDataWithMessages{
-					ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-						SourceChain:         1234567,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					},
+				report: plugintypes.ExecutePluginCommitData{
+					SourceChain:         1234567,
+					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{
 							SourceChainSelector: 1234567,
@@ -428,7 +416,7 @@ func Test_Builder_Build(t *testing.T) {
 	var tokenDataReader tdr
 
 	type args struct {
-		reports       []plugintypes.ExecutePluginCommitDataWithMessages
+		reports       []plugintypes.ExecutePluginCommitData
 		maxReportSize uint64
 	}
 	tests := []struct {
@@ -443,7 +431,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "empty report",
 			args: args{
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{},
+				reports: []plugintypes.ExecutePluginCommitData{},
 			},
 			expectedExecReports:   0,
 			expectedCommitReports: 0,
@@ -452,7 +440,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "half report",
 			args: args{
 				maxReportSize: 2300,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -467,7 +455,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "full report",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -481,7 +469,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "two reports",
 			args: args{
 				maxReportSize: 15000,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -498,7 +486,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "one and half reports",
 			args: args{
 				maxReportSize: 8500,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -516,7 +504,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "exactly one report",
 			args: args{
 				maxReportSize: 4200,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -534,7 +522,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "execute remainder of partially executed report",
 			args: args{
 				maxReportSize: 2500,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
@@ -548,7 +536,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "partially execute remainder of partially executed report",
 			args: args{
 				maxReportSize: 2050,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
@@ -563,7 +551,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "execute remainder of sparsely executed report",
 			args: args{
 				maxReportSize: 3500,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
@@ -577,7 +565,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
 				maxReportSize: 2050,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
@@ -592,7 +580,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "broken report",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					breakCommitReport(makeTestCommitReport(hasher, 10, 1, 101, 1000, 10101010102,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil)),
@@ -603,7 +591,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "invalid merkle root",
 			args: args{
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						mustMakeBytes(""), // random root
 						nil),
@@ -615,7 +603,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "skip over one large messages",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					setMessageData(5, 20000,
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 							cciptypes.Bytes32{}, // generate a correct root.
@@ -631,7 +619,7 @@ func Test_Builder_Build(t *testing.T) {
 			name: "skip over two large messages",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitDataWithMessages{
+				reports: []plugintypes.ExecutePluginCommitData{
 					setMessageData(8, 20000,
 						setMessageData(5, 20000,
 							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
@@ -654,7 +642,7 @@ func Test_Builder_Build(t *testing.T) {
 			foundError := false
 
 			builder := NewBuilder(ctx, lggr, hasher, tokenDataReader, codec, tt.args.maxReportSize, 0)
-			var updatedMessages []plugintypes.ExecutePluginCommitDataWithMessages
+			var updatedMessages []plugintypes.ExecutePluginCommitData
 			for _, report := range tt.args.reports {
 				updatedMessage, err := builder.Add(report)
 				if err != nil && tt.wantErr != "" {
