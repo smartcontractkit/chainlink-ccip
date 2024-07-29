@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
