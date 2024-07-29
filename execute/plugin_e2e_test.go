@@ -130,12 +130,11 @@ func setupSimpleTest(
 		makeMsg(105, srcSelector, dstSelector, false),
 	}
 
-	reportData := plugintypes.ExecutePluginCommitDataWithMessages{
-		ExecutePluginCommitData: plugintypes.ExecutePluginCommitData{
-			SourceChain:         srcSelector,
-			SequenceNumberRange: cciptypes.NewSeqNumRange(100, 105),
-		},
-		Messages: slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message }),
+	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
+	reportData := plugintypes.ExecutePluginCommitData{
+		SourceChain:         srcSelector,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(100, 105),
+		Messages:            mapped,
 	}
 
 	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData)
