@@ -62,9 +62,7 @@ func NewPlugin(
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
-	// lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
-	// TODO: Temporary while figuring out the best way to inject it in tests.
-	lastReportTS.Store(time.Unix(0, 0).UnixMilli())
+	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
 
 	// TODO: initialize tokenDataReader.
 
