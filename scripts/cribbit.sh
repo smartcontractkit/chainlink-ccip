@@ -36,8 +36,11 @@ if ! check_namespace_prefix "${DEVSPACE_NAMESPACE}"; then
 	exit 1
 fi
 
+# Automatically determine the directory name from the current working directory
+PRODUCT_DIR=$(basename "$(pwd)")
+
 # Path to the .env file
-env_file="${repo_root}/ccip/.env"
+env_file="${repo_root}/${PRODUCT_DIR}/.env"
 
 # Source .env file if it exists
 if [[ -f ${env_file} ]]; then
@@ -166,13 +169,22 @@ fi
 
 # Function to extract the host URI of the ECR registry from OCI URI
 extract_ecr_host_uri() {
-	local ecr_uri="$1"
+	if [[ ${PRODUCT_DIR} == "core" ]]; then
+		local ecr_uri="${CHAINLINK_CLUSTER_HELM_CHART_URI}"
+	else
+		local ecr_uri="${CHAINLINK_HELM_REGISTRY_URI}"
+	fi
+
 	# Regex to capture the ECR host URI
 	if [[ $ecr_uri =~ oci:\/\/([0-9]+\.dkr\.ecr\.[a-zA-Z0-9-]+\.amazonaws\.com) ]]; then
 		echo "${BASH_REMATCH[1]}"
 	else
 		echo "No valid ECR host URI found in the URI."
-		echo "Have you set CHAINLINK_HELM_REGISTRY_URI env var?"
+		# Print instructions for configuring environment variables
+		echo "Depending on which product you are using, configure the following environment variables:"
+		echo
+		echo "   CHAINLINK_CLUSTER_HELM_CHART_URI for Core"
+		echo "   CHAINLINK_HELM_REGISTRY_URI for CCIP/ATLAS"
 		exit 1
 	fi
 }
@@ -188,7 +200,7 @@ else
 			--password-stdin "${aws_account_id_ecr_registry}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 	echo "Info: Logging helm into AWS ECR registry."
-	helm_registry_uri=$(extract_ecr_host_uri "${CHAINLINK_HELM_REGISTRY_URI}")
+	helm_registry_uri=$(extract_ecr_host_uri)
 	aws ecr get-login-password --region "${AWS_REGION}" |
 		helm registry login "$helm_registry_uri" --username AWS --password-stdin
 fi
