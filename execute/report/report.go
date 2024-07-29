@@ -217,6 +217,8 @@ func (b *execReportBuilder) buildSingleChainReport(
 			plugintypes.ExecutePluginCommitDataWithMessages{},
 			fmt.Errorf("unable to verify report: %w", err)
 	} else if validReport {
+		b.lggr.Debugw("optimistic full single chain report build is successful",
+			"root", report.MerkleRoot.String())
 		return finalize(finalReport, report, meta)
 	}
 
