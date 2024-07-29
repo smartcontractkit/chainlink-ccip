@@ -4,14 +4,13 @@
 product="${1:-}"
 
 # List of required environment variables for CORE
-required_vars_core=(
+required_vars_common=(
 	"CHAINLINK_CODE_DIR"
 	"DEVSPACE_IMAGE"
 	"DEVSPACE_INGRESS_CIDRS"
 	"DEVSPACE_INGRESS_BASE_DOMAIN"
 	"DEVSPACE_INGRESS_CERT_ARN"
 	"DEVSPACE_K8S_POD_WAIT_TIMEOUT"
-	"CHAINLINK_CLUSTER_HELM_CHART_URI"
 	"NS_TTL"
 )
 
@@ -33,8 +32,17 @@ check_vars() {
 missing_vars_total=0
 
 # Check each variable for CORE
-check_vars "${required_vars_core[@]}"
+check_vars "${required_vars_common[@]}"
 missing_vars_total=$((missing_vars_total + $?))
+
+# Check each variable for product CORE
+if [[ $product == "" ]]; then
+	required_vars_core=(
+		"CHAINLINK_CLUSTER_HELM_CHART_URI"
+	)
+	check_vars "${required_vars_core[@]}"
+	missing_vars_total=$((missing_vars_total + $?))
+fi
 
 # Check each variable for product CCIP
 if [[ $product == "ccip" ]]; then
