@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -22,8 +23,7 @@ import (
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 //
 // The messages argument indicates which messages should be included in the report. If messages is empty
-// all messages will be included. This allows the caller to create smaller reports if needed. Executed messages
-// are skipped automatically.
+// all messages will be included. This allows the caller to create smaller reports if needed.
 func buildSingleChainReportHelper(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -39,6 +39,12 @@ func buildSingleChainReportHelper(
 		for i := 0; i < len(report.Messages); i++ {
 			messages[i] = struct{}{}
 		}
+	}
+
+	numMsg := len(report.Messages)
+	if len(report.TokenData) != numMsg {
+		return cciptypes.ExecutePluginReportSingleChain{},
+			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.TokenData), numMsg)
 	}
 
 	lggr.Infow(
@@ -71,36 +77,9 @@ func buildSingleChainReportHelper(
 	var toExecute []int
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.Message
-	executedIdx := 0
 	for i, msg := range report.Messages {
-		seqNum := report.SequenceNumberRange.Start() + cciptypes.SeqNum(i)
-		// Skip messages which are already executed
-		if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
-			executedIdx++
-		} else if _, ok := messages[i]; ok {
-			var tokenData [][]byte
-			var err error
-			if tokenDataReader != nil {
-				tokenData, err = tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
-				if err != nil {
-					// TODO: skip message instead of failing the whole thing.
-					//       that might mean moving the token data reading out of the loop.
-					lggr.Infow(
-						"unable to read token data",
-						"sourceChain", report.SourceChain,
-						"seqNum", msg.Header.SequenceNumber,
-						"error", err)
-					return cciptypes.ExecutePluginReportSingleChain{},
-						fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
-				}
-
-				lggr.Infow(
-					"read token data",
-					"sourceChain", report.SourceChain,
-					"seqNum", msg.Header.SequenceNumber,
-					"data", tokenData)
-			}
-			offchainTokenData = append(offchainTokenData, tokenData)
+		if _, ok := messages[i]; ok {
+			offchainTokenData = append(offchainTokenData, report.TokenData[i])
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
 		}
@@ -142,8 +121,10 @@ func buildSingleChainReportHelper(
 type messageStatus string
 
 const (
-	ReadyToExecute  messageStatus = "ready_to_execute"
-	AlreadyExecuted messageStatus = "already_executed"
+	ReadyToExecute      messageStatus = "ready_to_execute"
+	AlreadyExecuted     messageStatus = "already_executed"
+	TokenDataNotReady   messageStatus = "token_data_not_ready"
+	TokenDataFetchError messageStatus = "token_data_fetch_error"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
@@ -153,8 +134,6 @@ const (
 		InvalidNonce                         messageStatus = "invalid_nonce"
 		AggregateTokenValueComputeError      messageStatus = "aggregate_token_value_compute_error"
 		AggregateTokenLimitExceeded          messageStatus = "aggregate_token_limit_exceeded"
-		TokenDataNotReady                    messageStatus = "token_data_not_ready"
-		TokenDataFetchError                  messageStatus = "token_data_fetch_error"
 		TokenNotInDestTokenPrices            messageStatus = "token_not_in_dest_token_prices"
 		TokenNotInSrcTokenPrices             messageStatus = "token_not_in_src_token_prices"
 		InsufficientRemainingFee             messageStatus = "insufficient_remaining_fee"
@@ -163,14 +142,44 @@ const (
 )
 
 func (b *execReportBuilder) checkMessage(
-	_ context.Context, idx int, execReport plugintypes.ExecutePluginCommitData,
+	ctx context.Context, idx int, execReport plugintypes.ExecutePluginCommitData,
 	// TODO: get rid of the nolint when the error is used
-) (messageStatus, error) { // nolint this will use the error eventually
-	if slices.Contains(execReport.ExecutedMessages, execReport.Messages[idx].Header.SequenceNumber) {
-		return AlreadyExecuted, nil
+) (plugintypes.ExecutePluginCommitData, messageStatus, error) { // nolint this will use the error eventually
+	msg := execReport.Messages[idx]
+
+	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {
+		return plugintypes.ExecutePluginCommitData{}, AlreadyExecuted, nil
 	}
 
-	return ReadyToExecute, nil
+	if b.tokenDataReader != nil {
+		tokenData, err := b.tokenDataReader.ReadTokenData(ctx, execReport.SourceChain, msg.Header.SequenceNumber)
+		if err != nil {
+			if strings.Contains(err.Error(), "token data not found") {
+				b.lggr.Infow(
+					"unable to read token data - token data not ready",
+					"sourceChain", execReport.SourceChain,
+					"seqNum", msg.Header.SequenceNumber,
+					"error", err)
+
+				return plugintypes.ExecutePluginCommitData{}, TokenDataNotReady, nil
+			}
+			return plugintypes.ExecutePluginCommitData{}, TokenDataFetchError, nil
+		}
+
+		// pad token data if needed
+		for len(execReport.TokenData) <= idx {
+			execReport.TokenData = append(execReport.TokenData, nil)
+		}
+
+		execReport.TokenData[idx] = tokenData
+		b.lggr.Infow(
+			"read token data",
+			"sourceChain", execReport.SourceChain,
+			"seqNum", msg.Header.SequenceNumber,
+			"data", tokenData)
+	}
+
+	return execReport, ReadyToExecute, nil
 }
 
 func (b *execReportBuilder) verifyReport(
@@ -216,9 +225,26 @@ func (b *execReportBuilder) buildSingleChainReport(
 		commitReport = markNewMessagesExecuted(execReport, commitReport)
 		return execReport, commitReport, nil
 	}
+
+	// Check which messages are ready to execute
+	readyMessages := make(map[int]struct{})
+	for i := 0; i < len(report.Messages); i++ {
+		updatedReport, status, err := b.checkMessage(ctx, i, report)
+		if err != nil {
+			return cciptypes.ExecutePluginReportSingleChain{},
+				plugintypes.ExecutePluginCommitData{},
+				fmt.Errorf("unable to check message: %w", err)
+		}
+		report = updatedReport
+		if status != ReadyToExecute {
+			continue
+		}
+		readyMessages[i] = struct{}{}
+	}
+
 	// Attempt to include all messages in the report.
 	finalReport, err :=
-		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, nil)
+		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, readyMessages)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			plugintypes.ExecutePluginCommitData{},
@@ -237,13 +263,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	finalReport = cciptypes.ExecutePluginReportSingleChain{}
 	msgs := make(map[int]struct{})
 	for i := range report.Messages {
-		status, err := b.checkMessage(ctx, i, report)
-		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitData{},
-				fmt.Errorf("unable to check message: %w", err)
-		}
-		if status != ReadyToExecute {
+		if _, ok := readyMessages[i]; !ok {
 			continue
 		}
 

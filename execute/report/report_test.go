@@ -290,10 +290,20 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name:    "token data mismatch",
+			wantErr: "token data length mismatch: got 2, expected 0",
+			args: args{
+				report: plugintypes.ExecutePluginCommitData{
+					TokenData: make([][][]byte, 2),
+				},
+			},
+		},
+		{
 			name:    "wrong number of messages",
 			wantErr: "unexpected number of messages: expected 1, got 2",
 			args: args{
 				report: plugintypes.ExecutePluginCommitData{
+					TokenData:           make([][][]byte, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
@@ -307,6 +317,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
 				report: plugintypes.ExecutePluginCommitData{
+					TokenData:           make([][][]byte, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					Messages: []cciptypes.Message{
 						{
@@ -328,13 +339,16 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unexpected source chain: expected 1111, got 2222",
 			args: args{
 				report: plugintypes.ExecutePluginCommitData{
+					TokenData:           make([][][]byte, 1),
 					SourceChain:         1111,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 2222,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
+						{
+							Header: cciptypes.RampMessageHeader{
+								SourceChainSelector: 2222,
+								SequenceNumber:      cciptypes.SeqNum(100),
+							},
+						},
 					},
 				},
 				hasher: badHasher{},
@@ -345,13 +359,16 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unable to hash message (1234567, 100): bad hasher",
 			args: args{
 				report: plugintypes.ExecutePluginCommitData{
+					TokenData:           make([][][]byte, 1),
 					SourceChain:         1234567,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 1234567,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
+						{
+							Header: cciptypes.RampMessageHeader{
+								SourceChainSelector: 1234567,
+								SequenceNumber:      cciptypes.SeqNum(100),
+							},
+						},
 					},
 				},
 				hasher: badHasher{},
@@ -362,13 +379,16 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unable to read token data for message 100: bad token data reader",
 			args: args{
 				report: plugintypes.ExecutePluginCommitData{
+					TokenData:           make([][][]byte, 1),
 					SourceChain:         1234567,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 1234567,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
+						{
+							Header: cciptypes.RampMessageHeader{
+								SourceChainSelector: 1234567,
+								SequenceNumber:      cciptypes.SeqNum(100),
+							},
+						},
 					},
 				},
 				tokenDataReader: badTokenDataReader{},

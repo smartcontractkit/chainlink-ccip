@@ -31,9 +31,8 @@ type ExecutePluginCommitData struct {
 	// ExecutedMessages are the messages in this report that have already been executed.
 	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
 
-	// TODO: cache for token data.
 	// TokenData for each message.
-	// TokenData [][][]byte `json:"-"`
+	TokenData [][][]byte `json:"-"`
 }
 
 type ExecutePluginCommitObservations map[cciptypes.ChainSelector][]ExecutePluginCommitData
