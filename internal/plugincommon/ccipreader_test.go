@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -14,7 +15,50 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-func TestBackgroundReaderSync(t *testing.T) {
+func TestBackgroundReaderSyncer(t *testing.T) {
+	lggr := logger.Test(t)
+	mockReader := mocks.NewCCIPReader()
+
+	t.Run("start/stop checks", func(t *testing.T) {
+		readerSyncer := NewBackgroundReaderSyncer(lggr, mockReader, time.Hour, time.Hour)
+
+		ctx, cf := context.WithCancel(context.Background())
+
+		err := readerSyncer.Close()
+		assert.Error(t, err, "closing a non-started syncer")
+
+		err = readerSyncer.Start(ctx)
+		assert.NoError(t, err, "start success")
+
+		err = readerSyncer.Start(ctx)
+		assert.Error(t, err, "cannot be started twice")
+
+		err = readerSyncer.Close()
+		assert.NoError(t, err, "closing a started syncer")
+
+		err = readerSyncer.Start(ctx)
+		assert.Error(t, err, "restarting")
+
+		cf()
+		err = readerSyncer.Close()
+		assert.NoError(t, err, "closing a syncer with expired context")
+	})
+
+	t.Run("syncing", func(t *testing.T) {
+		ctx := context.Background()
+		mockReader.On("Sync", mock.Anything).Return(false, nil)
+		readerSyncer := NewBackgroundReaderSyncer(lggr, mockReader, time.Second, time.Millisecond)
+		err := readerSyncer.Start(ctx)
+		assert.NoError(t, err, "start success")
+		assert.Eventually(t, func() bool {
+			return mockReader.AssertExpectations(t)
+		}, time.Second, 10*time.Millisecond)
+		err = readerSyncer.Close()
+		assert.NoError(t, err, "closing a started syncer")
+	})
+}
+
+func Test_backgroundReaderSync(t *testing.T) {
 	ctx, cf := context.WithCancel(context.Background())
 	lggr := logger.Test(t)
 	reader := mocks.NewCCIPReader()
@@ -24,7 +68,7 @@ func TestBackgroundReaderSync(t *testing.T) {
 	wg.Add(1)
 
 	// start background syncing
-	BackgroundReaderSync(ctx, wg, lggr, reader, syncTimeout, ticker)
+	backgroundReaderSync(ctx, wg, lggr, reader, syncTimeout, ticker)
 
 	// send a tick to trigger the first sync that errors
 	reader.On("Sync", mock.Anything).Return(false, fmt.Errorf("some err")).Once()

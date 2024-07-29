@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -36,18 +35,16 @@ type Plugin struct {
 	cfg          pluginconfig.ExecutePluginConfig
 
 	// providers
-	ccipReader  reader.CCIP
-	reportCodec cciptypes.ExecutePluginCodec
-	msgHasher   cciptypes.MessageHasher
-	homeChain   reader.HomeChain
+	ccipReader   reader.CCIP
+	readerSyncer *plugincommon.BackgroundReaderSyncer
+	reportCodec  cciptypes.ExecutePluginCodec
+	msgHasher    cciptypes.MessageHasher
+	homeChain    reader.HomeChain
 
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataReader types2.TokenDataReader
 	lastReportTS    *atomic.Int64
 	lggr            logger.Logger
-
-	bgSyncCancelFunc context.CancelFunc
-	bgSyncWG         *sync.WaitGroup
 }
 
 func NewPlugin(
@@ -66,11 +63,22 @@ func NewPlugin(
 
 	// TODO: initialize tokenDataReader.
 
-	p := &Plugin{
+	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		syncFrequency(cfg.SyncFrequency),
+	)
+	if err := readerSyncer.Start(context.Background()); err != nil {
+		lggr.Errorw("error starting background reader syncer", "err", err)
+	}
+
+	return &Plugin{
 		reportingCfg:    reportingCfg,
 		cfg:             cfg,
 		oracleIDToP2pID: oracleIDToP2pID,
 		ccipReader:      ccipReader,
+		readerSyncer:    readerSyncer,
 		reportCodec:     reportCodec,
 		msgHasher:       msgHasher,
 		homeChain:       homeChain,
@@ -78,21 +86,6 @@ func NewPlugin(
 		tokenDataReader: tokenDataReader,
 		lggr:            lggr,
 	}
-
-	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
-	p.bgSyncCancelFunc = bgSyncCf
-	p.bgSyncWG = &sync.WaitGroup{}
-	p.bgSyncWG.Add(1)
-	plugincommon.BackgroundReaderSync(
-		bgSyncCtx,
-		p.bgSyncWG,
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
-	)
-
-	return p
 }
 
 func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (types.Query, error) {
@@ -443,13 +436,12 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
-	if err := p.ccipReader.Close(ctx); err != nil {
-		return fmt.Errorf("close ccip reader: %w", err)
+	if err := p.readerSyncer.Close(); err != nil {
+		p.lggr.Errorw("error closing reader syncer", "err", err)
 	}
 
-	if p.bgSyncCancelFunc != nil {
-		p.bgSyncCancelFunc()
-		p.bgSyncWG.Wait()
+	if err := p.ccipReader.Close(ctx); err != nil {
+		return fmt.Errorf("close ccip reader: %w", err)
 	}
 
 	return nil

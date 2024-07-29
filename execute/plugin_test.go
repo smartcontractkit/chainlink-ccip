@@ -24,6 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -552,7 +554,10 @@ func Test_selectReport(t *testing.T) {
 func TestPlugin_Close(t *testing.T) {
 	mockReader := mocks.NewCCIPReader()
 	mockReader.On("Close", mock.Anything).Return(nil)
-	p := &Plugin{lggr: logger.Test(t), ccipReader: mockReader}
+
+	lggr := logger.Test(t)
+	readerSyncer := plugincommon.NewBackgroundReaderSyncer(lggr, mockReader, 50*time.Millisecond, 100*time.Millisecond)
+	p := &Plugin{lggr: lggr, ccipReader: mockReader, readerSyncer: readerSyncer}
 	require.NoError(t, p.Close())
 }
 

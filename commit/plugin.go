@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -35,14 +34,13 @@ type Plugin struct {
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	cfg               pluginconfig.CommitPluginConfig
 	ccipReader        reader.CCIP
+	readerSyncer      *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
-	homeChain        reader.HomeChain
-	bgSyncCancelFunc context.CancelFunc
-	bgSyncWG         *sync.WaitGroup
+	homeChain reader.HomeChain
 }
 
 func NewPlugin(
@@ -57,32 +55,28 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 ) *Plugin {
-	p := &Plugin{
+	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		syncFrequency(cfg.SyncFrequency),
+	)
+	if err := readerSyncer.Start(context.Background()); err != nil {
+		lggr.Errorw("error starting background reader syncer", "err", err)
+	}
+
+	return &Plugin{
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		cfg:               cfg,
 		ccipReader:        ccipReader,
+		readerSyncer:      readerSyncer,
 		tokenPricesReader: tokenPricesReader,
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		lggr:              lggr,
 		homeChain:         homeChain,
 	}
-
-	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
-	p.bgSyncCancelFunc = bgSyncCf
-	p.bgSyncWG = &sync.WaitGroup{}
-	p.bgSyncWG.Add(1)
-	plugincommon.BackgroundReaderSync(
-		bgSyncCtx,
-		p.bgSyncWG,
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
-	)
-
-	return p
 }
 
 // Query phase is not used.
@@ -371,12 +365,14 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
+	if err := p.readerSyncer.Close(); err != nil {
+		p.lggr.Errorw("error closing reader syncer", "err", err)
+	}
+
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
 
-	p.bgSyncCancelFunc()
-	p.bgSyncWG.Wait()
 	return nil
 }
 
