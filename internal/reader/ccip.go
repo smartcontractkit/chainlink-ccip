@@ -232,13 +232,13 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		return nil, err
 	}
 
-	type executionStateChangedEvent struct {
-		sourceChainSelector cciptypes.ChainSelector
-		sequenceNumber      cciptypes.SeqNum
-		state               uint8
+	type ExecutionStateChangedEvent struct {
+		SourceChainSelector cciptypes.ChainSelector
+		SequenceNumber      cciptypes.SeqNum
+		State               uint8
 	}
 
-	dataTyp := executionStateChangedEvent{}
+	dataTyp := ExecutionStateChangedEvent{}
 
 	iter, err := r.contractReaders[dest].QueryKey(
 		ctx,
@@ -260,22 +260,22 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 
 	executed := make([]cciptypes.SeqNumRange, 0)
 	for _, item := range iter {
-		stateChange, ok := item.Data.(*executionStateChangedEvent)
+		stateChange, ok := item.Data.(*ExecutionStateChangedEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
 
 		// todo: filter via the query
-		valid := stateChange.sourceChainSelector == source &&
-			stateChange.sequenceNumber >= seqNumRange.Start() &&
-			stateChange.sequenceNumber <= seqNumRange.End() &&
-			stateChange.state > 1
+		valid := stateChange.SourceChainSelector == source &&
+			stateChange.SequenceNumber >= seqNumRange.Start() &&
+			stateChange.SequenceNumber <= seqNumRange.End() &&
+			stateChange.State > 1
 		if !valid {
 			r.lggr.Debugw("skipping invalid state change", "stateChange", stateChange)
 			continue
 		}
 
-		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.sequenceNumber, stateChange.sequenceNumber))
+		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.SequenceNumber, stateChange.SequenceNumber))
 	}
 
 	return executed, nil
