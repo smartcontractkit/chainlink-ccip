@@ -52,7 +52,7 @@ pipelines:
 
         args=""
         for i in {0..5}; do
-          args+="--set=helm.values.chainlink.nodes[$i].image=$image "
+          args+="--set=helm.values.chainlink.node$i.image=$image "
         done
 
         create_deployments app $args
