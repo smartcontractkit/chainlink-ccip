@@ -1,6 +1,9 @@
 version: v2beta1
 name: chainlink
 
+imports:
+  - path: ../components/atlas/atlas.yaml
+
 vars:
   DEVSPACE_ENV_FILE: .env
 
@@ -48,33 +51,7 @@ vars:
   ATLAS_ENABLED:
     source: env
     default: false
-  MONITORING_SCRIPT:
-    source: env
-    default: "./atlas/init"
-  MONITORING_NETWORK_2_VALUES_PATH:
-    source: env
-    default: "${MONITORING_SCRIPT}/output/values-network-2.yaml"
-  MONITORING_NETWORK_1_VALUES_PATH:
-    source: env
-    default: "${MONITORING_SCRIPT}/output/values-network-1.yaml"
-  NETWORK_1:
-    source: env
-    default: simulated-network-1
-  NETWORK_1_CHAINID:
-    source: env
-    default: 1337
-  NETWORK_1_RPC:
-    source: env
-    default: http://geth-1337:8544
-  NETWORK_2:
-    source: env
-    default: simulated-network-2
-  NETWORK_2_CHAINID:
-    source: env
-    default: 2337
-  NETWORK_2_RPC:
-    source: env
-    default: http://geth-2337:8544
+
 pipelines:
   deploy:
     flags:
@@ -111,29 +88,6 @@ pipelines:
       fi
 
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
-
-  atlas:
-    run: |-
-      run_pipelines atlas-infra
-      run_pipelines atlas-network-1 atlas-network-2
-
-  atlas-infra:
-    run: |-
-      create_deployments atlas-infra
-
-  atlas-network-1:
-    run: |-
-      cd ${MONITORING_SCRIPT}
-      go run main.go ${NETWORK_1}  ${NETWORK_1_CHAINID}  ${NETWORK_1_RPC}  values-network-1.yaml
-      cd ../..
-      create_deployments atlas-network-1
-
-  atlas-network-2:
-    run: |-
-      cd ${MONITORING_SCRIPT}
-      go run main.go  ${NETWORK_2}  ${NETWORK_2_CHAINID}  ${NETWORK_2_RPC}  values-network-2.yaml
-      cd ../..
-      create_deployments atlas-network-2
 
   purge:
     run: |-
@@ -563,52 +517,6 @@ deployments:
           image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
           oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
           outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
-  atlas-network-1:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      releaseName: atlas-network-1
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
-        version: "0.0.4"
-      valuesFiles:
-        - ${MONITORING_NETWORK_1_VALUES_PATH}
-      values:
-        podSecurityContext:
-          fsGroup: 999
-  atlas-network-2:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      releaseName: atlas-network-2
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
-        version: "0.0.4"
-      valuesFiles:
-        - ${MONITORING_NETWORK_2_VALUES_PATH}
-      values:
-        podSecurityContext:
-          fsGroup: 999
-  atlas-infra:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      upgradeArgs: ["--timeout", "10m"]
-      displayOutput: true
-      chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-infra
-        version: "0.1.0"
-      values:
-        postgres-migration:
-          envVars:
-            NETWORKS: "${NETWORK_1},${NETWORK_2}"
-        atlas-setup:
-          envVars:
-            NETWORKS: "${NETWORK_1},${NETWORK_2}"
 
 profiles:
   - name: local-dev
@@ -632,22 +540,4 @@ profiles:
             chart:
               name: crib-ccip
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip
-              version: null
-        atlas-infra:
-          helm:
-            chart:
-              name: atlas-infra
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-infra
-              version: null
-        atlas-network-1:
-          helm:
-            chart:
-              name: network-1
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
-              version: null
-        atlas-network-2:
-          helm:
-            chart:
-              name: network-2
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
               version: null
