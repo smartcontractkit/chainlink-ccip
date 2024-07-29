@@ -269,7 +269,7 @@ func (r *CCIPChainReader) ExecutedMessageRanges(
 		valid := stateChange.SourceChainSelector == source &&
 			stateChange.SequenceNumber >= seqNumRange.Start() &&
 			stateChange.SequenceNumber <= seqNumRange.End() &&
-			stateChange.State > 1
+			stateChange.State > 0
 		if !valid {
 			r.lggr.Debugw("skipping invalid state change", "stateChange", stateChange)
 			continue
