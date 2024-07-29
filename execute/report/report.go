@@ -12,7 +12,6 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -28,7 +27,6 @@ func buildSingleChainReportHelper(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader types.TokenDataReader,
 	report plugintypes.ExecutePluginCommitData,
 	messages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, error) {
@@ -148,7 +146,7 @@ func (b *execReportBuilder) checkMessage(
 	msg := execReport.Messages[idx]
 
 	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {
-		return plugintypes.ExecutePluginCommitData{}, AlreadyExecuted, nil
+		return execReport, AlreadyExecuted, nil
 	}
 
 	if b.tokenDataReader != nil {
@@ -236,15 +234,14 @@ func (b *execReportBuilder) buildSingleChainReport(
 				fmt.Errorf("unable to check message: %w", err)
 		}
 		report = updatedReport
-		if status != ReadyToExecute {
-			continue
+		if status == ReadyToExecute {
+			readyMessages[i] = struct{}{}
 		}
-		readyMessages[i] = struct{}{}
 	}
 
 	// Attempt to include all messages in the report.
 	finalReport, err :=
-		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, readyMessages)
+		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, report, readyMessages)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			plugintypes.ExecutePluginCommitData{},
@@ -269,8 +266,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err :=
-			buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, b.tokenDataReader, report, msgs)
+		finalReport2, err := buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
 				plugintypes.ExecutePluginCommitData{},

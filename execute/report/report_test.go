@@ -374,26 +374,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 				hasher: badHasher{},
 			},
 		},
-		{
-			name:    "bad token data reader",
-			wantErr: "unable to read token data for message 100: bad token data reader",
-			args: args{
-				report: plugintypes.ExecutePluginCommitData{
-					TokenData:           make([][][]byte, 1),
-					SourceChain:         1234567,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					Messages: []cciptypes.Message{
-						{
-							Header: cciptypes.RampMessageHeader{
-								SourceChainSelector: 1234567,
-								SequenceNumber:      cciptypes.SeqNum(100),
-							},
-						},
-					},
-				},
-				tokenDataReader: badTokenDataReader{},
-			},
-		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -408,21 +388,12 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 				resolvedHasher = mocks.NewMessageHasher()
 			}
 
-			// Select token data reader mock.
-			var resolvedTokenDataReader types.TokenDataReader
-			if tt.args.tokenDataReader != nil {
-				resolvedTokenDataReader = tt.args.tokenDataReader
-			} else {
-				resolvedTokenDataReader = tdr{}
-			}
-
 			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
-			_, err := buildSingleChainReportHelper(
-				ctx, lggr, resolvedHasher, resolvedTokenDataReader, tt.args.report, msgs)
+			_, err := buildSingleChainReportHelper(ctx, lggr, resolvedHasher, tt.args.report, msgs)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
 		})
