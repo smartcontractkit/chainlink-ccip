@@ -146,9 +146,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		pageIndex++
 	}
 
-	if len(allChainConfigInfos) >= 0 {
-		r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
-	}
+	r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
 
 	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
