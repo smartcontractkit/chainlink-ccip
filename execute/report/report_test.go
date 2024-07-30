@@ -672,3 +672,72 @@ func Test_Builder_Build(t *testing.T) {
 		})
 	}
 }
+
+func Test_execReportBuilder_verifyReport(t *testing.T) {
+	type fields struct {
+		//ctx                context.Context
+		//lggr               logger.Logger
+		//tokenDataReader    types.TokenDataReader
+		encoder            cciptypes.ExecutePluginCodec
+		hasher             cciptypes.MessageHasher
+		maxReportSizeBytes uint64
+		maxGas             uint64
+		accumulated        validationMetadata
+		execReports        []cciptypes.ExecutePluginReportSingleChain
+	}
+	type args struct {
+		execReport cciptypes.ExecutePluginReportSingleChain
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    bool
+		want1   validationMetadata
+		wantErr assert.ErrorAssertionFunc
+	}{
+		// TODO: Add test cases.
+		{
+			name: "simple",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{},
+			},
+			fields: fields{},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		lggr := logger.Test(t)
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Select token data reader mock.
+			var resolvedEncoder cciptypes.ExecutePluginCodec
+			if tt.fields.encoder != nil {
+				resolvedEncoder = tt.fields.encoder
+			} else {
+				resolvedEncoder = mocks.NewExecutePluginJSONReportCodec()
+			}
+
+			b := &execReportBuilder{
+				ctx:  context.Background(),
+				lggr: lggr,
+				//ctx:                tt.fields.ctx,
+				//lggr:               tt.fields.lggr,
+				//tokenDataReader:    tt.fields.tokenDataReader,
+				encoder: resolvedEncoder,
+				//hasher:             tt.fields.hasher,
+				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
+				//maxGas:             tt.fields.maxGas,
+				accumulated: tt.fields.accumulated,
+				//execReports:        tt.fields.execReports,
+			}
+			got, got1, err := b.verifyReport(tt.args.ctx, tt.args.execReport)
+			if !tt.wantErr(t, err, fmt.Sprintf("verifyReport(%v, %v)", tt.args.ctx, tt.args.execReport)) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "verifyReport(%v, %v)", tt.args.ctx, tt.args.execReport)
+			assert.Equalf(t, tt.want1, got1, "verifyReport(%v, %v)", tt.args.ctx, tt.args.execReport)
+		})
+	}
+}
