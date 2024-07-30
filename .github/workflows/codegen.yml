@@ -23,7 +23,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Install Mockery
-        run: go install github.com/vektra/mockery/v2@v2.43.0
+        run: go install github.com/vektra/mockery/v2@v2.43.1
       - name: Display Go version
         run: go version
       - name: Generate mocks
