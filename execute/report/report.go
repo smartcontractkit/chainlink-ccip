@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -143,25 +142,42 @@ func (b *execReportBuilder) checkMessage(
 	ctx context.Context, idx int, execReport plugintypes.ExecutePluginCommitData,
 	// TODO: get rid of the nolint when the error is used
 ) (plugintypes.ExecutePluginCommitData, messageStatus, error) { // nolint this will use the error eventually
+	if idx >= len(execReport.Messages) {
+		b.lggr.Errorw("message index out of range", "index", idx, "numMessages", len(execReport.Messages))
+		return execReport, TokenDataFetchError, fmt.Errorf("message index out of range")
+	}
+
 	msg := execReport.Messages[idx]
 
+	// Check if the message has already been executed.
 	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {
+		b.lggr.Infow(
+			"message already executed",
+			"messageID", msg.Header.MessageID,
+			"sourceChain", execReport.SourceChain,
+			"seqNum", msg.Header.SequenceNumber)
 		return execReport, AlreadyExecuted, nil
 	}
 
+	// Check if token data is ready.
 	if b.tokenDataReader != nil {
 		tokenData, err := b.tokenDataReader.ReadTokenData(ctx, execReport.SourceChain, msg.Header.SequenceNumber)
 		if err != nil {
-			if strings.Contains(err.Error(), "token data not found") {
+			if errors.Is(err, ErrNotReady) {
 				b.lggr.Infow(
 					"unable to read token data - token data not ready",
+					"messageID", msg.Header.MessageID,
 					"sourceChain", execReport.SourceChain,
 					"seqNum", msg.Header.SequenceNumber,
 					"error", err)
-
-				return plugintypes.ExecutePluginCommitData{}, TokenDataNotReady, nil
+				return execReport, TokenDataNotReady, nil
 			}
-			return plugintypes.ExecutePluginCommitData{}, TokenDataFetchError, nil
+			b.lggr.Infow(
+				"unable to read token data - unknown error",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", execReport.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"error", err)
 		}
 
 		// pad token data if needed
@@ -172,10 +188,15 @@ func (b *execReportBuilder) checkMessage(
 		execReport.TokenData[idx] = tokenData
 		b.lggr.Infow(
 			"read token data",
+			"messageID", msg.Header.MessageID,
 			"sourceChain", execReport.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
 			"data", tokenData)
 	}
+
+	// TODO: Check for valid nonce
+	// TODO: Check for max gas limit
+	// TODO: Check for fee boost
 
 	return execReport, ReadyToExecute, nil
 }

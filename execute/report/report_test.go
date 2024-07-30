@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -241,27 +242,10 @@ func setMessageData(
 	return commitReport
 }
 
-// TODO: better than this
-type tdr struct{}
-
-func (t tdr) ReadTokenData(
-	ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error,
-) {
-	return nil, nil
-}
-
 type badHasher struct{}
 
 func (bh badHasher) Hash(context.Context, cciptypes.Message) (cciptypes.Bytes32, error) {
 	return cciptypes.Bytes32{}, fmt.Errorf("bad hasher")
-}
-
-type badTokenDataReader struct{}
-
-func (btdr badTokenDataReader) ReadTokenData(
-	_ context.Context, _ cciptypes.ChainSelector, _ cciptypes.SeqNum,
-) ([][]byte, error) {
-	return nil, fmt.Errorf("bad token data reader")
 }
 
 func Test_buildSingleChainReport_Errors(t *testing.T) {
@@ -816,6 +800,171 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			}
 			assert.Equalf(t, tt.expectedIsValid, isValid, "verifyReport(...)")
 			assert.Equalf(t, tt.expectedMetadata, metadata, "verifyReport(...)")
+		})
+	}
+}
+
+// TODO: better than this
+type tdr struct {
+	mode tokenDataMode
+}
+
+type tokenDataMode int
+
+const (
+	noop tokenDataMode = iota + 1
+	good
+	bad
+	notReady
+)
+
+func (t tdr) ReadTokenData(
+	ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error,
+) {
+	switch t.mode {
+	case noop:
+		return nil, nil
+	case good:
+		return [][]byte{{0x01, 0x02, 0x03}}, nil
+	case bad:
+		return nil, fmt.Errorf("bad token data reader")
+	case notReady:
+		return nil, ErrNotReady
+	default:
+		panic("mode should be 1, 2 or 3")
+	}
+}
+
+func Test_execReportBuilder_checkMessage(t *testing.T) {
+	type fields struct {
+		lggr            logger.Logger
+		tokenDataReader types.TokenDataReader
+	}
+	type args struct {
+		idx        int
+		execReport plugintypes.ExecutePluginCommitData
+	}
+	tests := []struct {
+		name             string
+		fields           fields
+		args             args
+		expectedData     plugintypes.ExecutePluginCommitData
+		expectedStatus   messageStatus
+		expectedMetadata validationMetadata
+		expectedError    string
+		expectedLog      string
+	}{
+		{
+			name:          "empty",
+			expectedError: "message index out of range",
+			expectedLog:   "message index out of range",
+		},
+		{
+			name: "already executed",
+			args: args{
+				idx: 0,
+				execReport: plugintypes.ExecutePluginCommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+					ExecutedMessages: []cciptypes.SeqNum{100},
+				},
+			},
+			expectedStatus: AlreadyExecuted,
+			expectedLog:    "message already executed",
+		},
+		{
+			name: "bad token data",
+			args: args{
+				idx: 0,
+				execReport: plugintypes.ExecutePluginCommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: bad},
+			},
+			expectedStatus: TokenDataFetchError,
+			expectedLog:    "unable to read token data - unknown error",
+		},
+		{
+			name: "token data not ready",
+			args: args{
+				idx: 0,
+				execReport: plugintypes.ExecutePluginCommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: notReady},
+			},
+			expectedStatus: TokenDataNotReady,
+			expectedLog:    "unable to read token data - token data not ready",
+		},
+		{
+			name: "good token data is cached",
+			args: args{
+				idx: 0,
+				execReport: plugintypes.ExecutePluginCommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: good},
+			},
+			expectedStatus: ReadyToExecute,
+			expectedData: plugintypes.ExecutePluginCommitData{
+				Messages: []cciptypes.Message{
+					makeMessage(1, 100, 0),
+				},
+				TokenData: [][][]byte{{{0x01, 0x02, 0x03}}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+
+			// Select token data reader mock.
+			var resolvedTokenDataReader types.TokenDataReader
+			if tt.fields.tokenDataReader != nil {
+				resolvedTokenDataReader = tt.fields.tokenDataReader
+			} else {
+				resolvedTokenDataReader = tdr{mode: good}
+			}
+
+			b := &execReportBuilder{
+				lggr:            lggr,
+				tokenDataReader: resolvedTokenDataReader,
+			}
+			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
+			if tt.expectedError != "" {
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+			if tt.expectedLog != "" {
+				found := false
+				for _, log := range logs.All() {
+					fmt.Println(log.Message)
+					found = found || strings.Contains(log.Message, tt.expectedLog)
+				}
+				assert.True(t, found, "expected log not found")
+			}
+			assert.Equalf(t, tt.expectedStatus, status, "checkMessage(...)")
+			// If expected data not provided, we expect the result to be the same as the input.
+			if reflect.DeepEqual(tt.expectedData, plugintypes.ExecutePluginCommitData{}) {
+				assert.Equalf(t, tt.args.execReport, data, "checkMessage(...)")
+			} else {
+				assert.Equalf(t, tt.expectedData, data, "checkMessage(...)")
+			}
 		})
 	}
 }
