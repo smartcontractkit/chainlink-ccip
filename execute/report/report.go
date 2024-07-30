@@ -245,7 +245,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 		return execReport, commitReport, nil
 	}
 
-	// Check which messages are ready to execute
+	// Check which messages are ready to execute, and update report with any additional metadata needed for execution.
 	readyMessages := make(map[int]struct{})
 	for i := 0; i < len(report.Messages); i++ {
 		updatedReport, status, err := b.checkMessage(ctx, i, report)

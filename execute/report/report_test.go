@@ -375,7 +375,7 @@ func Test_Builder_Build(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
 	codec := mocks.NewExecutePluginJSONReportCodec()
 	lggr := logger.Test(t)
-	var tokenDataReader tdr
+	tokenDataReader := tdr{mode: good}
 
 	type args struct {
 		reports       []plugintypes.ExecutePluginCommitData
