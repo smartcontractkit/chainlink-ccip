@@ -73,7 +73,7 @@ type nodeSetup struct {
 	node            *Plugin
 	reportCodec     *mocks.ExecutePluginJSONReportCodec
 	msgHasher       cciptypes.MessageHasher
-	TokenDataReader *mocks.TokenDataReader
+	TokenDataReader *mocks.MockTokenDataReader
 }
 
 func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
@@ -200,7 +200,7 @@ func setupSimpleTest(
 	err = homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 
-	tokenDataReader := mocks.NewTokenDataReader(t)
+	tokenDataReader := mocks.NewMockTokenDataReader(t)
 	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)

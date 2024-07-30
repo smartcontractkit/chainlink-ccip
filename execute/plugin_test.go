@@ -320,7 +320,7 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 }
 
 func TestPlugin_Outcome_HomeChainError(t *testing.T) {
-	homeChain := reader_mock.NewHomeChain(t)
+	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
 
 	p := &Plugin{
@@ -332,7 +332,7 @@ func TestPlugin_Outcome_HomeChainError(t *testing.T) {
 }
 
 func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
-	homeChain := reader_mock.NewHomeChain(t)
+	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 	}
@@ -358,7 +358,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 }
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
-	homeChain := reader_mock.NewHomeChain(t)
+	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
 	}
@@ -397,7 +397,7 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 }
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
-	codec := mocks.NewExecutePluginCodec(t)
+	codec := mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec}
@@ -410,7 +410,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
-	codec := mocks.NewExecutePluginCodec(t)
+	codec := mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 	p := &Plugin{
@@ -422,7 +422,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
-	codec := mocks.NewExecutePluginCodec(t)
+	codec := mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 	p := &Plugin{
@@ -435,7 +435,7 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
-	codec := mocks.NewExecutePluginCodec(t)
+	codec := mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{
 			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
@@ -487,9 +487,9 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
-	homeChain := reader_mock.NewHomeChain(t)
+	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
-	codec := mocks.NewExecutePluginCodec(t)
+	codec := mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
@@ -511,9 +511,9 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 
 func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
-	homeChain := reader_mock.NewHomeChain(t)
+	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
-	codec := mocks.NewExecutePluginCodec(t)
+	codec := mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 
