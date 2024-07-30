@@ -9,7 +9,7 @@ import (
 // TokenDataReader is an interface for reading extra token data from an async process.
 // TODO: Build a token data reading process.
 //
-//go:generate mockery --quiet --name TokenDataReader --output ../../internal/mocks --case=underscore
+//go:generate mockery --name TokenDataReader --output ../../internal/mocks --case=underscore
 type TokenDataReader interface {
 	ReadTokenData(ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error)
 }

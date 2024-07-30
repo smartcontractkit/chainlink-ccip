@@ -1,12 +1,21 @@
+TEST_COUNT ?= 10
+COVERAGE_FILE ?= coverage.out
 
-ensure_go_1_21:
+build: ensure_go_version
+	go build -v ./...
+
+generate: ensure_go_version
+	go generate ./...
+
+test: ensure_go_version
+	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) ./...
+
+lint: ensure_go_version
+	golangci-lint run -c .golangci.yml
+
+ensure_go_version:
 	@go version | grep -q 'go1.21' || (echo "Please use go1.21" && exit 1)
 
 ensure_golangcilint_1_59:
 	@golangci-lint --version | grep -q '1.59' || (echo "Please use golangci-lint 1.59" && exit 1)
 
-test: ensure_go_1_21
-	go test -race -fullpath -shuffle on -count 10 ./...
-
-lint: ensure_go_1_21
-	golangci-lint run -c .golangci.yml
