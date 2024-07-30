@@ -19,7 +19,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
-//go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 const (
 	PageSize = uint64(500)
 )
@@ -126,8 +125,8 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
 			ctx,
-			"CCIPConfig",
-			"getAllChainConfigs",
+			consts.ContractNameCCIPConfig,
+			consts.MethodNameGetAllChainConfigs,
 			primitives.Unconfirmed,
 			map[string]interface{}{
 				"pageIndex": pageIndex,
@@ -226,9 +225,9 @@ func (r *homeChainPoller) GetOCRConfigs(
 		consts.MethodNameGetOCRConfig,
 		primitives.Unconfirmed,
 		map[string]any{
-		"donId":      donID,
-		"pluginType": pluginType,
-	}, &ocrConfigs)
+			"donId":      donID,
+			"pluginType": pluginType,
+		}, &ocrConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
