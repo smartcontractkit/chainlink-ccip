@@ -24,8 +24,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Display Go version
         run: go version
-      - name: Generate mocks
-        run: make generate
+      - name: Re-Generate mocks
+        run: |
+          rm -rf mocks # delete all mocks to ensure any deprecated files have been removed.
+          make generate
       - name: Tidy
         run: go mod tidy
       - name: ensure no changes
