@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	PageSize = uint64(500)
+	defaultConfigPageSize = uint64(10)
+	pageIndexHardLimit    = 100
 )
 
 type HomeChain interface {
@@ -121,7 +122,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var allChainConfigInfos []ChainConfigInfo
 	pageIndex := uint64(0)
 
-	for {
+	for pageIndex < pageIndexHardLimit {
 		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
 			ctx,
@@ -130,12 +131,12 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			primitives.Unconfirmed,
 			map[string]interface{}{
 				"pageIndex": pageIndex,
-				"pageSize":  PageSize,
+				"pageSize":  defaultConfigPageSize,
 			},
 			&chainConfigInfos,
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
 		}
 
 		if len(chainConfigInfos) == 0 {
@@ -144,6 +145,10 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 
 		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
 		pageIndex++
+	}
+
+	if pageIndex >= pageIndexHardLimit {
+		r.lggr.Warnw("pageIndex hard limit reached or exceeded", "limit", pageIndexHardLimit)
 	}
 
 	r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
