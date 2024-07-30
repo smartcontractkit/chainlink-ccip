@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -262,19 +263,6 @@ func (btdr badTokenDataReader) ReadTokenData(
 ) ([][]byte, error) {
 	return nil, fmt.Errorf("bad token data reader")
 }
-
-/*
-// TODO: Use this to test the verifyReport function.
-type badCodec struct{}
-
-func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
-	return nil, fmt.Errorf("bad codec")
-}
-
-func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
-	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
-}
-*/
 
 func Test_buildSingleChainReport_Errors(t *testing.T) {
 	lggr := logger.Test(t)
@@ -673,11 +661,19 @@ func Test_Builder_Build(t *testing.T) {
 	}
 }
 
+// TODO: Use this to test the verifyReport function.
+type badCodec struct{}
+
+func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+	return nil, fmt.Errorf("bad codec")
+}
+
+func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
+	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
+}
+
 func Test_execReportBuilder_verifyReport(t *testing.T) {
 	type fields struct {
-		//ctx                context.Context
-		//lggr               logger.Logger
-		//tokenDataReader    types.TokenDataReader
 		encoder            cciptypes.ExecutePluginCodec
 		hasher             cciptypes.MessageHasher
 		maxReportSizeBytes uint64
@@ -689,25 +685,104 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 		execReport cciptypes.ExecutePluginReportSingleChain
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    bool
-		want1   validationMetadata
-		wantErr assert.ErrorAssertionFunc
+		name             string
+		fields           fields
+		args             args
+		expectedLog      string
+		expectedIsValid  bool
+		expectedMetadata validationMetadata
+		expectedError    string
 	}{
-		// TODO: Add test cases.
 		{
-			name: "simple",
+			name: "empty report",
 			args: args{
 				execReport: cciptypes.ExecutePluginReportSingleChain{},
 			},
-			fields: fields{},
+			fields: fields{
+				maxReportSizeBytes: 1000,
+			},
+			expectedIsValid: true,
+			expectedMetadata: validationMetadata{
+				encodedSizeBytes: 120,
+			},
+		},
+		{
+			name: "good report",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+						makeMessage(1, 102, 0),
+						makeMessage(1, 103, 0),
+					},
+				},
+			},
+			fields: fields{
+				maxReportSizeBytes: 10000,
+			},
+			expectedIsValid: true,
+			expectedMetadata: validationMetadata{
+				encodedSizeBytes: 1633,
+			},
+		},
+		{
+			name: "oversized report",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+						makeMessage(1, 102, 0),
+						makeMessage(1, 103, 0),
+					},
+				},
+			},
+			fields: fields{
+				maxReportSizeBytes: 1000,
+			},
+			expectedLog: "invalid report, report size exceeds limit",
+		},
+		{
+			name: "oversized report - accumulated size",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+						makeMessage(1, 102, 0),
+						makeMessage(1, 103, 0),
+					},
+				},
+			},
+			fields: fields{
+				accumulated: validationMetadata{
+					encodedSizeBytes: 1000,
+				},
+				maxReportSizeBytes: 2000,
+			},
+			expectedLog: "invalid report, report size exceeds limit",
+		},
+		{
+			name: "bad token data reader",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+					},
+				},
+			},
+			fields: fields{
+				encoder: badCodec{},
+			},
+			expectedError: "unable to encode report",
+			expectedLog:   "unable to encode report",
 		},
 	}
 	for _, tt := range tests {
 		tt := tt
-		lggr := logger.Test(t)
+		lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -720,24 +795,27 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				ctx:  context.Background(),
-				lggr: lggr,
-				//ctx:                tt.fields.ctx,
-				//lggr:               tt.fields.lggr,
-				//tokenDataReader:    tt.fields.tokenDataReader,
-				encoder: resolvedEncoder,
-				//hasher:             tt.fields.hasher,
+				ctx:                context.Background(),
+				lggr:               lggr,
+				encoder:            resolvedEncoder,
 				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
-				//maxGas:             tt.fields.maxGas,
-				accumulated: tt.fields.accumulated,
-				//execReports:        tt.fields.execReports,
+				accumulated:        tt.fields.accumulated,
 			}
-			got, got1, err := b.verifyReport(tt.args.ctx, tt.args.execReport)
-			if !tt.wantErr(t, err, fmt.Sprintf("verifyReport(%v, %v)", tt.args.ctx, tt.args.execReport)) {
+			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
+			if tt.expectedError != "" {
+				assert.Contains(t, err.Error(), tt.expectedError)
 				return
 			}
-			assert.Equalf(t, tt.want, got, "verifyReport(%v, %v)", tt.args.ctx, tt.args.execReport)
-			assert.Equalf(t, tt.want1, got1, "verifyReport(%v, %v)", tt.args.ctx, tt.args.execReport)
+			if tt.expectedLog != "" {
+				found := false
+				for _, log := range logs.All() {
+					fmt.Println(log.Message)
+					found = found || strings.Contains(log.Message, tt.expectedLog)
+				}
+				assert.True(t, found, "expected log not found")
+			}
+			assert.Equalf(t, tt.expectedIsValid, isValid, "verifyReport(...)")
+			assert.Equalf(t, tt.expectedMetadata, metadata, "verifyReport(...)")
 		})
 	}
 }
