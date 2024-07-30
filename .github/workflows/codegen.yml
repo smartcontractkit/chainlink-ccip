@@ -26,6 +26,8 @@ jobs:
         run: go version
       - name: Generate mocks
         run: make generate
+      - name: Tidy
+        run: go mod tidy
       - name: ensure no changes
         run: |
           set -e
@@ -33,6 +35,6 @@ jobs:
           if [ ! -z "$git_status" ]; then
             git status
             git diff
-            echo "Error: modified files detected, run 'make generate'."
+            echo "Error: modified files detected, run 'make generate' / 'go mod tidy'."
             exit 1
           fi
