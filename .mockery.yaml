@@ -1,7 +1,6 @@
 with-expecter: true
 filename: "{{.InterfaceName | snakecase}}.go"
-dir: "internal/mocks"
-outpkg: "mocks"
+dir: mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_" }}
 packages:
     github.com/smartcontractkit/chainlink-ccip/execute/types:
         interfaces:
@@ -12,5 +11,3 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
-              config:
-                dir: "internal/reader/mocks"
