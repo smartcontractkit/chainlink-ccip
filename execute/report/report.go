@@ -120,7 +120,7 @@ type messageStatus string
 const (
 	ReadyToExecute      messageStatus = "ready_to_execute"
 	AlreadyExecuted     messageStatus = "already_executed"
-	TokenDataNotReady   messageStatus = "token_data_not_ready"
+	TokenDataNotReady   messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
 	TokenDataFetchError messageStatus = "token_data_fetch_error"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"

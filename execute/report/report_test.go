@@ -252,9 +252,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	lggr := logger.Test(t)
 
 	type args struct {
-		report          plugintypes.ExecutePluginCommitData
-		hasher          cciptypes.MessageHasher
-		tokenDataReader types.TokenDataReader
+		report plugintypes.ExecutePluginCommitData
+		hasher cciptypes.MessageHasher
 	}
 	tests := []struct {
 		name    string
@@ -659,11 +658,8 @@ func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecuteP
 func Test_execReportBuilder_verifyReport(t *testing.T) {
 	type fields struct {
 		encoder            cciptypes.ExecutePluginCodec
-		hasher             cciptypes.MessageHasher
 		maxReportSizeBytes uint64
-		maxGas             uint64
 		accumulated        validationMetadata
-		execReports        []cciptypes.ExecutePluginReportSingleChain
 	}
 	type args struct {
 		execReport cciptypes.ExecutePluginReportSingleChain
@@ -837,7 +833,6 @@ func (t tdr) ReadTokenData(
 
 func Test_execReportBuilder_checkMessage(t *testing.T) {
 	type fields struct {
-		lggr            logger.Logger
 		tokenDataReader types.TokenDataReader
 	}
 	type args struct {
