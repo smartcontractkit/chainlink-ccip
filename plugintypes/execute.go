@@ -2,7 +2,6 @@ package plugintypes
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"time"
 
@@ -111,8 +110,4 @@ func DecodeExecutePluginOutcome(b []byte) (ExecutePluginOutcome, error) {
 	o := ExecutePluginOutcome{}
 	err := json.Unmarshal(b, &o)
 	return o, err
-}
-
-func (o ExecutePluginOutcome) String() string {
-	return fmt.Sprintf("NextCommits: %v", o.PendingCommitReports)
 }

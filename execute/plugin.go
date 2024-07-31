@@ -389,8 +389,11 @@ func (p *Plugin) Outcome(
 	}
 
 	outcome := plugintypes.NewExecutePluginOutcome(commitReports, execReport)
-	p.lggr.Warnw("exec outcome: generated outcome", "outcome", outcome, "myOracleID", p.reportingCfg.OracleID)
+	if len(outcome.PendingCommitReports) == 0 && len(outcome.Report.ChainReports) == 0 { // todo: if outcome.IsEmpty()
+		return nil, nil
+	}
 
+	p.lggr.Infof("[oracle %d] exec outcome: generated outcome: %+v", p.reportingCfg.OracleID, outcome)
 	return outcome.Encode()
 }
 
@@ -422,10 +425,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
+	p.lggr.Infof("Checking if ShouldAcceptAttestedReport: %+v", decodedReport.ChainReports)
 	if len(decodedReport.ChainReports) == 0 {
 		p.lggr.Infow("skipping empty report")
 		return false, nil
 	}
+
+	p.lggr.Infof("ShouldAcceptAttestedReport returns true, report accepted")
 	return true, nil
 }
 
@@ -437,7 +443,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Debugw("not a destination writer, skipping report transmission")
+		p.lggr.Infow("not a destination writer, skipping report transmission")
 		return false, nil
 	}
 
