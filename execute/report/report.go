@@ -20,21 +20,21 @@ import (
 //
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 //
-// The messages argument indicates which messages should be included in the report. If messages is empty
+// The readyMessages argument indicates which messages should be included in the report. If readyMessages is empty
 // all messages will be included. This allows the caller to create smaller reports if needed.
 func buildSingleChainReportHelper(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	report plugintypes.ExecutePluginCommitData,
-	messages map[int]struct{},
+	readyMessages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, error) {
-	if len(messages) == 0 {
-		if messages == nil {
-			messages = make(map[int]struct{})
+	if len(readyMessages) == 0 {
+		if readyMessages == nil {
+			readyMessages = make(map[int]struct{})
 		}
 		for i := 0; i < len(report.Messages); i++ {
-			messages[i] = struct{}{}
+			readyMessages[i] = struct{}{}
 		}
 	}
 
@@ -75,7 +75,7 @@ func buildSingleChainReportHelper(
 	var offchainTokenData [][][]byte
 	var msgInRoot []cciptypes.Message
 	for i, msg := range report.Messages {
-		if _, ok := messages[i]; ok {
+		if _, ok := readyMessages[i]; ok {
 			offchainTokenData = append(offchainTokenData, report.TokenData[i])
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
