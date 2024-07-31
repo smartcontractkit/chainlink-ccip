@@ -70,7 +70,7 @@ func NewPlugin(
 		syncFrequency(cfg.SyncFrequency),
 	)
 	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Errorw("error starting background reader syncer", "err", err)
+		lggr.Warnw("error starting background reader syncer", "err", err)
 	}
 
 	return &Plugin{
@@ -93,13 +93,19 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func getPendingExecutedReports(
-	ctx context.Context, ccipReader reader.CCIP, dest cciptypes.ChainSelector, ts time.Time,
+	ctx context.Context,
+	ccipReader reader.CCIP,
+	dest cciptypes.ChainSelector,
+	ts time.Time,
+	lggr logger.Logger,
 ) (plugintypes.ExecutePluginCommitObservations, time.Time, error) {
 	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
+	lggr.Warnw("commit reports", "commitReports", commitReports, "count", len(commitReports))
+
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
 		if report.Timestamp.After(latestReportTS) {
@@ -108,6 +114,8 @@ func getPendingExecutedReports(
 	}
 
 	groupedCommits := groupByChainSelector(commitReports)
+	lggr.Warnw("grouped commits before removing fully executed reports",
+		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	// Remove fully executed reports.
 	for selector, reports := range groupedCommits {
@@ -136,6 +144,9 @@ func getPendingExecutedReports(
 		}
 	}
 
+	lggr.Warnw("grouped commits after removing fully executed reports",
+		"groupedCommits", groupedCommits, "count", len(groupedCommits))
+
 	return groupedCommits, latestReportTS, nil
 }
 
@@ -161,6 +172,8 @@ func (p *Plugin) Observation(
 		}
 	}
 
+	p.lggr.Warnw("decoded previous outcome", "previousOutcome", previousOutcome)
+
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
 	var groupedCommits plugintypes.ExecutePluginCommitObservations
@@ -171,7 +184,7 @@ func (p *Plugin) Observation(
 	if supportsDest {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
-			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()), p.lggr)
 		if err != nil {
 			return types.Observation{}, err
 		}
@@ -187,7 +200,7 @@ func (p *Plugin) Observation(
 	// Phase 2: Gather messages from the source chains and build the execution report.
 	messages := make(plugintypes.ExecutePluginMessageObservations)
 	if len(previousOutcome.PendingCommitReports) == 0 {
-		fmt.Println("TODO: No reports to execute. This is expected after a cold start.")
+		p.lggr.Warnw("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
@@ -437,7 +450,7 @@ func (p *Plugin) Close() error {
 	defer cf()
 
 	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Errorw("error closing reader syncer", "err", err)
+		p.lggr.Warnw("error closing reader syncer", "err", err)
 	}
 
 	if err := p.ccipReader.Close(ctx); err != nil {
