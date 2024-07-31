@@ -10,6 +10,7 @@ To learn more about CRIB please the general documentation in Confluence:
 ## Project Structure
 ```
 .
+├── components (devspace components used as imports)
 ├── ccip (CCIP CRIB)
 ├── core (CORE CRIB)
 ├── dashboards-lib (Library for generating Grafana dashboards)
