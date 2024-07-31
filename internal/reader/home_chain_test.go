@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -117,6 +116,7 @@ func Test_PollingWorking(t *testing.T) {
 	}
 
 	homeChainReader := mocks.NewContractReaderMock()
+	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -128,14 +128,19 @@ func Test_PollingWorking(t *testing.T) {
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(5).(*[]ChainConfigInfo)
-			*arg = onChainConfigs
+			if firstCall {
+				*arg = onChainConfigs
+				firstCall = false
+			} else {
+				*arg = []ChainConfigInfo{} // return empty for other pages
+			}
 		}).Return(nil)
 
 	defer homeChainReader.AssertExpectations(t)
 
 	var (
 		tickTime       = 2 * time.Millisecond
-		totalSleepTime = tickTime * 4
+		totalSleepTime = tickTime * 0
 	)
 
 	configPoller := NewHomeChainConfigPoller(

@@ -19,6 +19,14 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
+const (
+	defaultConfigPageSize = uint64(10)
+	// pageIndexHardLimit is the maximum number of pages that the poller will fetch
+	// this is set as 500 so that we can get 5000 chainConfigs with in 500 rpc calls and
+	// maximum time for all rpc calls is around 150 seconds
+	pageIndexHardLimit = 500
+)
+
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 type HomeChain interface {
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
@@ -115,24 +123,46 @@ func (r *homeChainPoller) poll() {
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	var chainConfigInfos []ChainConfigInfo
-	err := r.homeChainReader.GetLatestValue(
-		ctx,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
-		primitives.Unconfirmed,
-		nil,
-		&chainConfigInfos,
-	)
-	if err != nil {
-		return err
+	var allChainConfigInfos []ChainConfigInfo
+	pageIndex := uint64(0)
+
+	for pageIndex < pageIndexHardLimit {
+		var chainConfigInfos []ChainConfigInfo
+		err := r.homeChainReader.GetLatestValue(
+			ctx,
+			consts.ContractNameCCIPConfig,
+			consts.MethodNameGetAllChainConfigs,
+			primitives.Unconfirmed,
+			map[string]interface{}{
+				"pageIndex": pageIndex,
+				"pageSize":  defaultConfigPageSize,
+			},
+			&chainConfigInfos,
+		)
+		if err != nil {
+			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
+		}
+
+		if len(chainConfigInfos) == 0 {
+			break
+		}
+
+		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
+		pageIndex++
 	}
-	if len(chainConfigInfos) == 0 {
+
+	if pageIndex >= pageIndexHardLimit {
+		r.lggr.Warnw("pageIndex hard limit reached or exceeded", "limit", pageIndexHardLimit)
+	}
+
+	r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
+
+	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	r.setState(convertOnChainConfigToHomeChainConfig(chainConfigInfos))
+
 	return nil
 }
 
