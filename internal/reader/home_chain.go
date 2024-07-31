@@ -21,7 +21,10 @@ import (
 
 const (
 	defaultConfigPageSize = uint64(10)
-	pageIndexHardLimit    = 100
+	// pageIndexHardLimit is the maximum number of pages that the poller will fetch
+	// this is set as 500 so that we can get 5000 chainConfigs with in 500 rpc calls and
+	// maximum time for all rpc calls is around 150 seconds
+	pageIndexHardLimit = 500
 )
 
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
