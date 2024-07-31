@@ -15,13 +15,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-// buildSingleChainReportHelper converts the on-chain event data stored in
-// cciptypes.ExecutePluginCommitDataWithMessages into the final on-chain report format.
+// buildSingleChainReportHelper converts the on-chain event data stored in cciptypes.ExecutePluginCommitData into the
+// final on-chain report format. Messages in the report are selected based on the readyMessages argument. If
+// readyMessages is empty all messages will be included. This allows the caller to create smaller reports if needed.
+//
+// Before calling this function all messages should have been checked and processed by the checkMessage function.
 //
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
-//
-// The readyMessages argument indicates which messages should be included in the report. If readyMessages is empty
-// all messages will be included. This allows the caller to create smaller reports if needed.
 func buildSingleChainReportHelper(
 	ctx context.Context,
 	lggr logger.Logger,
