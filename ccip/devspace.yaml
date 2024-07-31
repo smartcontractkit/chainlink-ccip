@@ -346,6 +346,15 @@ deployments:
                 memory: 1024Mi
           # default cluster shipped with latest Geth ( dev mode by default )
           geth:
+            networkPolicy:
+              # Allow additional services to access geth
+              extraIngressSelectors:
+                - podSelector:
+                    matchLabels:
+                      app: atlas
+                - podSelector:
+                    matchLabels:
+                      app: ccip-scripts-deployer
             securityContext:
               capabilities:
                 drop:
