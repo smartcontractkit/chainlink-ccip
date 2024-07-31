@@ -309,7 +309,7 @@ func selectReport(
 
 	execReports, err := builder.Build()
 
-	lggr.Infow(
+	lggr.Warnw(
 		"reports have been selected",
 		"numReports", len(execReports),
 		"numPendingReports", len(stillPendingReports))
@@ -393,11 +393,16 @@ func (p *Plugin) Outcome(
 		return nil, nil
 	}
 
-	p.lggr.Infof("[oracle %d] exec outcome: generated outcome: %+v", p.reportingCfg.OracleID, outcome)
+	p.lggr.Warnf("[oracle %d] exec outcome: generated outcome: %+v", p.reportingCfg.OracleID, outcome)
 	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+	if outcome == nil {
+		p.lggr.Warnw("no outcome, skipping report generation")
+		return nil, nil
+	}
+
 	decodedOutcome, err := plugintypes.DecodeExecutePluginOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
@@ -425,13 +430,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	p.lggr.Infof("Checking if ShouldAcceptAttestedReport: %+v", decodedReport.ChainReports)
+	p.lggr.Warnw("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
 	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Infow("skipping empty report")
+		p.lggr.Warnw("skipping empty report")
 		return false, nil
 	}
 
-	p.lggr.Infof("ShouldAcceptAttestedReport returns true, report accepted")
+	p.lggr.Warnw("ShouldAcceptAttestedReport returns true, report accepted")
 	return true, nil
 }
 
@@ -443,7 +448,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Infow("not a destination writer, skipping report transmission")
+		p.lggr.Warnw("not a destination writer, skipping report transmission")
 		return false, nil
 	}
 
@@ -454,8 +459,8 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// TODO: Final validation?
 
-	p.lggr.Debugw("transmitting report",
-		"reports", len(decodedReport.ChainReports),
+	p.lggr.Warnw("transmitting report",
+		"reports", decodedReport.ChainReports,
 	)
 	return true, nil
 }

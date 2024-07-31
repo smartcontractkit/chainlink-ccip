@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -16,6 +17,7 @@ func ConstructMerkleTree(
 	ctx context.Context,
 	hasher cciptypes.MessageHasher,
 	report plugintypes.ExecutePluginCommitData,
+	lggr logger.Logger,
 ) (*merklemulti.Tree[[32]byte], error) {
 	// Ensure we have the expected number of messages
 	numMsgs := int(report.SequenceNumberRange.End() - report.SequenceNumberRange.Start() + 1)
@@ -42,6 +44,7 @@ func ConstructMerkleTree(
 				"unable to hash message (%d, %d): %w",
 				msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
 		}
+		lggr.Warnw("Hashed message, adding to tree leaves", "hash", leaf, "msg", msg, "merkleRoot", report.MerkleRoot, "sourceChain", report.SourceChain)
 		treeLeaves = append(treeLeaves, leaf)
 	}
 

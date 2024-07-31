@@ -153,7 +153,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-			got, got1, err := getPendingExecutedReports(context.Background(), mockReader, 123, time.Now())
+			got, got1, err := getPendingExecutedReports(context.Background(), mockReader, 123, time.Now(), logger.Nop())
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
@@ -285,6 +285,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	p := &Plugin{
 		homeChain:       setupHomeChainPoller(lggr, []reader.ChainConfigInfo{}),
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
+		lggr:            lggr,
 	}
 
 	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{}, nil)
@@ -325,6 +326,7 @@ func TestPlugin_Outcome_HomeChainError(t *testing.T) {
 
 	p := &Plugin{
 		homeChain: homeChain,
+		lggr:      logger.Nop(),
 	}
 	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
 	require.Error(t, err)
@@ -366,6 +368,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 
 	p := &Plugin{
 		homeChain: homeChain,
+		lggr:      logger.Nop(),
 	}
 
 	// map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message

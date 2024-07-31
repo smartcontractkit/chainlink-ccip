@@ -41,13 +41,13 @@ func buildSingleChainReportHelper(
 		}
 	}
 
-	lggr.Debugw(
+	lggr.Warnw(
 		"constructing merkle tree",
 		"sourceChain", report.SourceChain,
 		"expectedRoot", report.MerkleRoot.String(),
 		"treeLeaves", len(report.Messages))
 
-	tree, err := ConstructMerkleTree(ctx, hasher, report)
+	tree, err := ConstructMerkleTree(ctx, hasher, report, lggr)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
@@ -60,6 +60,11 @@ func buildSingleChainReportHelper(
 		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
+
+	lggr.Warnw("merkle root verified",
+		"sourceChain", report.SourceChain,
+		"commitRoot", report.MerkleRoot.String(),
+		"computedRoot", cciptypes.Bytes32(hash))
 
 	// Iterate sequence range and executed messages to select messages to execute.
 	numMsgs := len(report.Messages)
@@ -101,12 +106,12 @@ func buildSingleChainReportHelper(
 		}
 	}
 
-	lggr.Infow(
-		"selected messages from commit report for execution",
+	lggr.Warnw(
+		"selected messages from commit report for execution, generating merkle proofs",
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
 		"numMessages", numMsgs,
-		"toExecute", len(toExecute))
+		"toExecute", toExecute)
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
@@ -118,6 +123,9 @@ func buildSingleChainReportHelper(
 		proofsCast = append(proofsCast, p)
 	}
 
+	lggr.Warnw("generated proofs", "sourceChain", report.SourceChain,
+		"proofsCast", proofsCast, "proof", proof)
+
 	finalReport := cciptypes.ExecutePluginReportSingleChain{
 		SourceChainSelector: report.SourceChain,
 		Messages:            msgInRoot,
@@ -125,6 +133,8 @@ func buildSingleChainReportHelper(
 		Proofs:              proofsCast,
 		ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 	}
+
+	lggr.Warnw("final report", "sourceChain", report.SourceChain, "report", finalReport)
 
 	return finalReport, nil
 }

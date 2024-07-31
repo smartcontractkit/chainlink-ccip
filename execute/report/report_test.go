@@ -211,7 +211,7 @@ func makeTestCommitReport(
 	// calculate merkle root
 	root := rootOverride
 	if root.IsEmpty() {
-		tree, err := ConstructMerkleTree(context.Background(), hasher, commitReport)
+		tree, err := ConstructMerkleTree(context.Background(), hasher, commitReport, logger.Nop())
 		if err != nil {
 			panic(fmt.Sprintf("unable to construct merkle tree: %s", err))
 		}
