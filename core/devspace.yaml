@@ -5,6 +5,10 @@ vars:
   CHAINLINK_REPO_DIR: "${CHAINLINK_CODE_DIR}/chainlink"
   DEVSPACE_ENV_FILE: .env
   # The list of default ENV Vars for CRIB, you can override any of them in the .env file
+  # AWS Account ID used for deploying CRIB environment
+  AWS_ACCOUNT_ID:
+    source: env
+    default: 323150190480
   # The image that will be used for the Chainlink nodes.
   DEVSPACE_IMAGE:
     source: env
@@ -26,9 +30,12 @@ vars:
     source: env
     default: 600s
   # Helm repo URI for the crib-ccip helm chart
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
   CHAINLINK_CLUSTER_HELM_CHART_URI:
     source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/crib-chainlink-cluster"
+    default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
 
 pipelines:
   deploy:
@@ -51,11 +58,17 @@ pipelines:
         echo "Using user provided image: $image"
 
         args=""
-        for i in {0..5}; do
-          args+="--set=helm.values.chainlink.node$i.image=$image "
+        for i in {1..5}; do
+          args+="--set=helm.values.chainlink.nodes.node$i.image=$image "
         done
+        echo $args
+
 
         create_deployments app $args
+      elif ! [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-devspace$  ]]; then
+        echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
+        echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
+        exit 1
       else
         build_images --all
         create_deployments app
@@ -135,6 +148,9 @@ images:
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
         docker push $image
 hooks:
+  - name: "pre-image-build-hook"
+    command: ../scripts/before_build_checks.sh
+    events: ["before:build:app"]
   - command: ../scripts/before_deploy_checks.sh
     events: ["before:deploy:app"]
   - command: ../scripts/check_env_vars.sh

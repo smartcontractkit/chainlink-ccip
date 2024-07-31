@@ -1,0 +1,20 @@
+version: '3'
+
+tasks:
+  lint:
+    desc: Runs The same lint commands as in CI, doesn't fix errors
+    deps: [lint-yaml, shfmt, shellcheck]
+  fix-lint-errors:
+    desc: Fixes lint errors, so far it supports shfmt fixes only
+    deps: [fix-shfmt-errors]
+  lint-yaml:
+    cmd: yamllint -c .yamllint.yml .
+  # todo: Add script for auto fixing lint errors
+  shfmt:
+    cmd: shfmt -s -d .
+  shellcheck:
+    cmd: git ls-files -- '*.sh' | xargs shellcheck -e SC1004
+  fix-shfmt-errors:
+    vars:
+      SHELLCHECK_OPTS: -e SC1004
+    cmd: find . -type f -name "*.sh" -exec shfmt -w {} \;

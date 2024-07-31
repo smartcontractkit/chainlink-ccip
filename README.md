@@ -16,6 +16,21 @@ To learn more about CRIB please the general documentation in Confluence:
 └── scripts (reusable scripts)
 ```
 
+## Contributing
+
+### Dev Tooling Setup
+If you like to contribute to CRIB, install following tools in your dev environment:
+
+* [taskfile] (https://taskfile.dev/installation/)
+* [yamllint] (https://yamllint.readthedocs.io/en/stable/quickstart.html#installing-yamllint)
+* [shfmt] (https://github.com/patrickvane/shfmt)
+* [shellcheck] (https://github.com/koalaman/shellcheck)
+
+#### Linting
+If the Linting workflows fails on your PR, you can use local tooling to fix errors. 
+* To check lint errors run `task lint`
+* To fix lint errors run: `task fix-lint-errors` 
+
 ## Testing changes in CRIB Charts before merge to main
 CRIB devspace config orchestrates deployment of multiple helm charts. CRIB internal Charts are managed in the [smartcontract/infra-charts](https://github.com/smartcontractkit/infra-charts) repository.
 

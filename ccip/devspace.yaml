@@ -6,8 +6,11 @@ imports:
 
 vars:
   DEVSPACE_ENV_FILE: .env
-
   # The list of default ENV Vars for CRIB, you can override any of them in the .env file
+  # AWS Account ID used for deploying CRIB environment
+  AWS_ACCOUNT_ID:
+    source: env
+    default: 323150190480
   # The image that will be used for the Chainlink nodes.
   DEVSPACE_IMAGE:
     source: env
@@ -51,6 +54,9 @@ vars:
   ATLAS_ENABLED:
     source: env
     default: false
+  MONITORING_SCRIPT:
+    source: env
+    default: ../components/atlas/init
 
 pipelines:
   deploy:
@@ -69,11 +75,15 @@ pipelines:
         echo "Using user provided image: $image"
 
         args=""
-        for i in {0..5}; do
+        for i in {1..5}; do
           args+="--set=helm.values.crib-chainlink-cluster.chainlink.nodes.node$i.image=$image "
         done
 
         create_deployments app $args
+      elif ! [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-ccip-devspace$  ]]; then
+        echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
+        echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
+        exit 1
       else
         build_images --all
         create_deployments app
@@ -137,6 +147,9 @@ images:
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
         docker push $image
 hooks:
+  - name: "pre-image-build-hook"
+    command: ../scripts/before_build_checks.sh
+    events: ["before:build:app"]
   - command: ../scripts/before_deploy_checks.sh
     events: ["before:deploy:app"]
   - command: ../scripts/check_env_vars.sh

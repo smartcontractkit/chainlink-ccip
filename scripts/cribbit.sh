@@ -55,6 +55,7 @@ fi
 required_vars=(
 	"DEVSPACE_IMAGE"
 	"HOME"
+	"AWS_ACCOUNT_ID"
 )
 
 missing_vars=0 # Counter for missing variables
@@ -77,7 +78,16 @@ fi
 ##
 
 path_aws_config="$HOME/.aws/config"
-aws_account_id_ecr_registry=$(echo "${DEVSPACE_IMAGE}" | cut -d'.' -f1)
+skip_ecr_login=${skip_ecr_login:-}
+
+# Check if the string starts with AWS ACCOUNT_ID
+if [[ $DEVSPACE_IMAGE =~ ^[0-9]{12} ]]; then
+	aws_account_id_ecr_registry=$(echo "${DEVSPACE_IMAGE}" | cut -d'.' -f1)
+else
+	echo "DEVSPACE_IMAGE is set to use public registry, skipping ECR login"
+	skip_ecr_login=true
+fi
+
 aws_profile_name="staging-crib"
 
 if grep -q "$aws_profile_name" "$path_aws_config"; then
@@ -110,7 +120,7 @@ else
 region=${AWS_REGION}
 sso_start_url=${AWS_SSO_START_URL}
 sso_region=${AWS_REGION}
-sso_account_id=${aws_account_id_ecr_registry}
+sso_account_id=${AWS_ACCOUNT_ID}
 sso_role_name=${AWS_SSO_ROLE_NAME}
 EOF
 	echo "Info: ${path_aws_config} modified. Added profile: ${aws_profile_name}"
@@ -169,11 +179,7 @@ fi
 
 # Function to extract the host URI of the ECR registry from OCI URI
 extract_ecr_host_uri() {
-	if [[ ${PRODUCT_DIR} == "core" ]]; then
-		local ecr_uri="${CHAINLINK_CLUSTER_HELM_CHART_URI}"
-	else
-		local ecr_uri="${CHAINLINK_HELM_REGISTRY_URI}"
-	fi
+	local ecr_uri="${CHAINLINK_HELM_REGISTRY_URI}"
 
 	# Regex to capture the ECR host URI
 	if [[ $ecr_uri =~ oci:\/\/([0-9]+\.dkr\.ecr\.[a-zA-Z0-9-]+\.amazonaws\.com) ]]; then
@@ -181,16 +187,13 @@ extract_ecr_host_uri() {
 	else
 		echo "No valid ECR host URI found in the URI."
 		# Print instructions for configuring environment variables
-		echo "Depending on which product you are using, configure the following environment variables:"
-		echo
-		echo "   CHAINLINK_CLUSTER_HELM_CHART_URI for Core"
-		echo "   CHAINLINK_HELM_REGISTRY_URI for CCIP/ATLAS"
+		echo "Configure CHAINLINK_HELM_REGISTRY_URI env var in your .env config"
 		exit 1
 	fi
 }
 
 # Set env var CRIB_SKIP_ECR_LOGIN=true to skip ECR login.
-if [[ -n ${CRIB_SKIP_ECR_LOGIN:-} ]]; then
+if [[ -n ${skip_ecr_login:-} ]]; then
 	echo "Info: Skipping ECR login."
 else
 	echo "Info: Logging docker into AWS ECR registry."

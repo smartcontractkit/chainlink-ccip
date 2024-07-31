@@ -10,16 +10,4 @@ jobs:
       - name: yaml-lint
         uses: ibiqlik/action-yamllint@v3
         with:
-          config_data: |
-            extends: default
-            rules:
-              new-line-at-end-of-file:
-                level: warning
-              line-length:
-                max: 120
-                level: warning
-            yaml-files:
-              - '*.yaml'
-              - '*.yml'
-              - '.yamllint'
-              - '*.yaml.example'
+          config_file: .yamllint.yml
