@@ -651,7 +651,6 @@ func Test_Builder_Build(t *testing.T) {
 	}
 }
 
-// TODO: Use this to test the verifyReport function.
 type badCodec struct{}
 
 func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
@@ -807,7 +806,6 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 	}
 }
 
-// TODO: better than this
 type tdr struct {
 	mode tokenDataMode
 }
