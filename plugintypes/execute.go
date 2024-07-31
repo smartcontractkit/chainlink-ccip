@@ -3,6 +3,7 @@ package plugintypes
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -33,7 +34,7 @@ type ExecutePluginCommitData struct {
 
 	// TODO: cache for token data.
 	// TokenData for each message.
-	//TokenData [][][]byte `json:"-"`
+	// TokenData [][][]byte `json:"-"`
 }
 
 type ExecutePluginCommitObservations map[cciptypes.ChainSelector][]ExecutePluginCommitData
@@ -90,9 +91,15 @@ func NewExecutePluginOutcome(
 	pendingCommits []ExecutePluginCommitData,
 	report cciptypes.ExecutePluginReport,
 ) ExecutePluginOutcome {
+	pendingCommitsCP := append([]ExecutePluginCommitData{}, pendingCommits...)
+	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
+	sort.Slice(pendingCommitsCP, func(i, j int) bool { return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain })
+	sort.Slice(reportCP, func(i, j int) bool {
+		return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
+	})
 	return ExecutePluginOutcome{
-		PendingCommitReports: pendingCommits,
-		Report:               report,
+		PendingCommitReports: pendingCommitsCP,
+		Report:               cciptypes.ExecutePluginReport{ChainReports: reportCP},
 	}
 }
 
