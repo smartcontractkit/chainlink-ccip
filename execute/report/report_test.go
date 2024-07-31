@@ -827,7 +827,7 @@ func (t tdr) ReadTokenData(
 	case notReady:
 		return nil, ErrNotReady
 	default:
-		panic("mode should be 1, 2 or 3")
+		panic("mode should be one of the valid ones.")
 	}
 }
 
@@ -918,7 +918,53 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
-				TokenData: [][][]byte{{{0x01, 0x02, 0x03}}},
+				TokenData: [][][]byte{
+					{{0x01, 0x02, 0x03}},
+				},
+			},
+		},
+		{
+			name: "good - no token data - 1 msg",
+			args: args{
+				idx: 0,
+				execReport: plugintypes.ExecutePluginCommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: ReadyToExecute,
+			expectedData: plugintypes.ExecutePluginCommitData{
+				Messages: []cciptypes.Message{
+					makeMessage(1, 100, 0),
+				},
+				TokenData: [][][]byte{nil},
+			},
+		},
+		{
+			name: "good - no token data - 2nd msg pads slice",
+			args: args{
+				idx: 1,
+				execReport: plugintypes.ExecutePluginCommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: ReadyToExecute,
+			expectedData: plugintypes.ExecutePluginCommitData{
+				Messages: []cciptypes.Message{
+					makeMessage(1, 100, 0),
+					makeMessage(1, 101, 0),
+				},
+				TokenData: [][][]byte{nil, nil},
 			},
 		},
 	}
