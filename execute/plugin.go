@@ -324,11 +324,12 @@ func (p *Plugin) Outcome(
 	decodedObservations, err := decodeAttributedObservations(aos)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
-
 	}
 	if len(decodedObservations) < p.reportingCfg.F {
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
+
+	p.lggr.Warnw("exec outcome: decoded observations", "decodedObservations", decodedObservations)
 
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
@@ -340,10 +341,14 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
 
+	p.lggr.Warnw("exec outcome: merged commit observations", "mergedCommitObservations", mergedCommitObservations)
+
 	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
+
+	p.lggr.Warnw("exec outcome: merged message observations", "mergedMessageObservations", mergedMessageObservations)
 
 	observation := plugintypes.NewExecutePluginObservation(
 		mergedCommitObservations,
@@ -357,6 +362,8 @@ func (p *Plugin) Outcome(
 	sort.Slice(commitReports, func(i, j int) bool {
 		return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
 	})
+
+	p.lggr.Warnw("exec outcome: commit reports", "commitReports", commitReports)
 
 	// add messages to their commitReports.
 	for i, report := range commitReports {
@@ -381,7 +388,10 @@ func (p *Plugin) Outcome(
 		ChainReports: outcomeReports,
 	}
 
-	return plugintypes.NewExecutePluginOutcome(commitReports, execReport).Encode()
+	outcome := plugintypes.NewExecutePluginOutcome(commitReports, execReport)
+	p.lggr.Warnw("exec outcome: generated outcome", "outcome", outcome, "myOracleID", p.reportingCfg.OracleID)
+
+	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {

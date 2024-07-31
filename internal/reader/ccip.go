@@ -162,6 +162,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
+	r.lggr.Warnw("queried commit reports", "numReports", len(iter),
+		"destChain", dest,
+		"ts", ts,
+		"limit", limit)
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
@@ -172,7 +176,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Debugw("skipping invalid commit report", "report", ev.Report)
+			r.lggr.Warnw("commit report too old, skipping", "report", ev.Report, "item", item,
+				"destChain", dest,
+				"ts", ts,
+				"limit", limit)
 			continue
 		}
 
