@@ -143,7 +143,7 @@ fi
 # Setup EKS KUBECONFIG
 ##
 
-# Set env var SETUP_EKS_CONFIG=false to skip ESK config.
+# Set env var SETUP_EKS_CONFIG=false to skip EKS config.
 if [[ ${SETUP_EKS_CONFIG:-} != "false" ]]; then
 	path_kubeconfig="${KUBECONFIG:-$HOME/.kube/config}"
 	eks_cluster_name="${CRIB_EKS_CLUSTER_NAME:-main-stage-cluster}"
