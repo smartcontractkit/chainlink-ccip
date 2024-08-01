@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -43,7 +42,6 @@ type Plugin struct {
 
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataReader types2.TokenDataReader
-	lastReportTS    *atomic.Int64
 	lggr            logger.Logger
 }
 
@@ -58,9 +56,6 @@ func NewPlugin(
 	tokenDataReader types2.TokenDataReader,
 	lggr logger.Logger,
 ) *Plugin {
-	lastReportTS := &atomic.Int64{}
-	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
-
 	// TODO: initialize tokenDataReader.
 
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
@@ -82,7 +77,6 @@ func NewPlugin(
 		reportCodec:     reportCodec,
 		msgHasher:       msgHasher,
 		homeChain:       homeChain,
-		lastReportTS:    lastReportTS,
 		tokenDataReader: tokenDataReader,
 		lggr:            lggr,
 	}
@@ -98,11 +92,11 @@ func getPendingExecutedReports(
 	dest cciptypes.ChainSelector,
 	ts time.Time,
 	lggr logger.Logger,
-) (plugintypes.ExecutePluginCommitObservations, time.Time, error) {
+) (plugintypes.ExecutePluginCommitObservations, error) {
 	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, err
 	}
 	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
@@ -125,14 +119,14 @@ func getPendingExecutedReports(
 
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return nil, time.Time{}, err
+			return nil, err
 		}
 
 		var executedMessages []cciptypes.SeqNumRange
 		for _, seqRange := range ranges {
 			executedMessagesForRange, err2 := ccipReader.ExecutedMessageRanges(ctx, selector, dest, seqRange)
 			if err2 != nil {
-				return nil, time.Time{}, err2
+				return nil, err2
 			}
 			executedMessages = append(executedMessages, executedMessagesForRange...)
 		}
@@ -140,14 +134,14 @@ func getPendingExecutedReports(
 		// Remove fully executed reports.
 		groupedCommits[selector], err = filterOutExecutedMessages(reports, executedMessages)
 		if err != nil {
-			return nil, time.Time{}, err
+			return nil, err
 		}
 	}
 
 	lggr.Debugw("grouped commits after removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
-	return groupedCommits, latestReportTS, nil
+	return groupedCommits, nil
 }
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -172,6 +166,7 @@ func (p *Plugin) Observation(
 		}
 	}
 
+	fetchFrom := time.Now().Add(-p.cfg.MessageVisibilityInterval).UTC()
 	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
@@ -182,15 +177,9 @@ func (p *Plugin) Observation(
 		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if supportsDest {
-		var latestReportTS time.Time
-		groupedCommits, latestReportTS, err =
-			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()), p.lggr)
+		groupedCommits, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, fetchFrom, p.lggr)
 		if err != nil {
 			return types.Observation{}, err
-		}
-		// Update timestamp to the last report.
-		if len(groupedCommits) > 0 {
-			p.lastReportTS.Store(latestReportTS.UnixMilli())
 		}
 
 		// TODO: truncate grouped commits to a maximum observation size.
