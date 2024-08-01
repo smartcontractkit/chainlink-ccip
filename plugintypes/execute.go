@@ -12,11 +12,6 @@ import (
 // Execute Observation //
 // ///////////////////////
 
-type ExecutePluginCommitDataWithMessages struct {
-	ExecutePluginCommitData
-	Messages []cciptypes.Message `json:"messages"`
-}
-
 // ExecutePluginCommitData is the data that is committed to the chain.
 type ExecutePluginCommitData struct {
 	// SourceChain of the chain that contains the commit report.
@@ -29,11 +24,19 @@ type ExecutePluginCommitData struct {
 	MerkleRoot cciptypes.Bytes32 `json:"merkleRoot"`
 	// SequenceNumberRange of the messages that are in this commit report.
 	SequenceNumberRange cciptypes.SeqNumRange `json:"sequenceNumberRange"`
+
+	// Messages that are part of the commit report.
+	Messages []cciptypes.Message `json:"messages"`
+
 	// ExecutedMessages are the messages in this report that have already been executed.
-	ExecutedMessages []cciptypes.SeqNum `json:"executed"`
+	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
+
+	// TODO: cache for token data.
+	// TokenData for each message.
+	//TokenData [][][]byte `json:"-"`
 }
 
-type ExecutePluginCommitObservations map[cciptypes.ChainSelector][]ExecutePluginCommitDataWithMessages
+type ExecutePluginCommitObservations map[cciptypes.ChainSelector][]ExecutePluginCommitData
 type ExecutePluginMessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
 // ExecutePluginObservation is the observation of the ExecutePlugin.
@@ -77,14 +80,14 @@ func DecodeExecutePluginObservation(b []byte) (ExecutePluginObservation, error) 
 type ExecutePluginOutcome struct {
 	// PendingCommitReports are the oldest reports with pending commits. The slice is
 	// sorted from oldest to newest.
-	PendingCommitReports []ExecutePluginCommitDataWithMessages `json:"commitReports"`
+	PendingCommitReports []ExecutePluginCommitData `json:"commitReports"`
 
 	// Report is built from the oldest pending commit reports.
 	Report cciptypes.ExecutePluginReport `json:"report"`
 }
 
 func NewExecutePluginOutcome(
-	pendingCommits []ExecutePluginCommitDataWithMessages,
+	pendingCommits []ExecutePluginCommitData,
 	report cciptypes.ExecutePluginReport,
 ) ExecutePluginOutcome {
 	return ExecutePluginOutcome{

@@ -1,6 +1,7 @@
 run:
   timeout: 60s
 linters:
+  verbose: true
   enable:
     - exhaustive
     - exportloopref
@@ -86,6 +87,8 @@ linters-settings:
     # Default: 120.
     line-length: 120
 issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
   exclude-rules:
     - path: test
       text: "^G404:"

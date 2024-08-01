@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"sync"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -34,14 +34,13 @@ type Plugin struct {
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	cfg               pluginconfig.CommitPluginConfig
 	ccipReader        reader.CCIP
+	readerSyncer      *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 
-	homeChain        reader.HomeChain
-	bgSyncCancelFunc context.CancelFunc
-	bgSyncWG         *sync.WaitGroup
+	homeChain reader.HomeChain
 }
 
 func NewPlugin(
@@ -56,32 +55,28 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 ) *Plugin {
-	p := &Plugin{
+	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
+		lggr,
+		ccipReader,
+		syncTimeout(cfg.SyncTimeout),
+		syncFrequency(cfg.SyncFrequency),
+	)
+	if err := readerSyncer.Start(context.Background()); err != nil {
+		lggr.Errorw("error starting background reader syncer", "err", err)
+	}
+
+	return &Plugin{
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		cfg:               cfg,
 		ccipReader:        ccipReader,
+		readerSyncer:      readerSyncer,
 		tokenPricesReader: tokenPricesReader,
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		lggr:              lggr,
 		homeChain:         homeChain,
 	}
-
-	bgSyncCtx, bgSyncCf := context.WithCancel(context.Background())
-	p.bgSyncCancelFunc = bgSyncCf
-	p.bgSyncWG = &sync.WaitGroup{}
-	p.bgSyncWG.Add(1)
-	backgroundReaderSync(
-		bgSyncCtx,
-		p.bgSyncWG,
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		time.NewTicker(syncFrequency(p.cfg.SyncFrequency)).C,
-	)
-
-	return p
 }
 
 // Query phase is not used.
@@ -200,14 +195,22 @@ func (p *Plugin) Observation(
 
 }
 
-func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
+func (p *Plugin) ValidateObservation(
+	outCtx ocr3types.OutcomeContext, _ types.Query, ao types.AttributedObservation) error {
 	obs, err := plugintypes.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("decode commit plugin observation: %w", err)
 	}
 
-	if err := validateObservedSequenceNumbers(obs.NewMsgs, obs.MaxSeqNums); err != nil {
-		return fmt.Errorf("validate sequence numbers: %w", err)
+	if outCtx.PreviousOutcome != nil {
+		prevOutcome, err := plugintypes.DecodeCommitPluginOutcome(outCtx.PreviousOutcome)
+		if err != nil {
+			return fmt.Errorf("decode commit plugin previous outcome: %w", err)
+		}
+
+		if err := validateObservedSequenceNumbers(obs.NewMsgs, prevOutcome.MaxSeqNums); err != nil {
+			return fmt.Errorf("validate sequence numbers: %w", err)
+		}
 	}
 
 	observerSupportedChains, err := p.supportedChains(ao.Observer)
@@ -358,16 +361,18 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) Close() error {
-	timeout := 10 * time.Second
+	timeout := 10 * time.Second // todo: cfg
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
+
+	if err := p.readerSyncer.Close(); err != nil {
+		p.lggr.Errorw("error closing reader syncer", "err", err)
+	}
 
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
 
-	p.bgSyncCancelFunc()
-	p.bgSyncWG.Wait()
 	return nil
 }
 

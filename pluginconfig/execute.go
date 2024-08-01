@@ -11,6 +11,12 @@ type ExecutePluginConfig struct {
 	// DestChain is the ccip destination chain configured for the execute DON.
 	DestChain cciptypes.ChainSelector `json:"destChain"`
 
+	// SyncTimeout is the timeout for syncing the commit plugin reader.
+	SyncTimeout time.Duration `json:"syncTimeout"`
+
+	// SyncFrequency is the frequency at which the commit plugin reader should sync.
+	SyncFrequency time.Duration `json:"syncFrequency"`
+
 	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
 	MessageVisibilityInterval time.Duration `json:"messageVisibilityInterval"`
 }
