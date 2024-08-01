@@ -467,7 +467,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// TODO: Final validation?
 
-	p.lggr.Warnw("transmitting report",
+	p.lggr.Infow("transmitting report",
 		"reports", decodedReport.ChainReports,
 	)
 	return true, nil
