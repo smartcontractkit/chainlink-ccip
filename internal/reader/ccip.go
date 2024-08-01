@@ -101,6 +101,13 @@ func NewCCIPChainReader(
 	}
 }
 
+// WithExtendedContractReader sets the extended contract reader for the provided chain.
+func (r *CCIPChainReader) WithExtendedContractReader(
+	ch cciptypes.ChainSelector, cr contractreader.Extended) *CCIPChainReader {
+	r.contractReaders[ch] = cr
+	return r
+}
+
 func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
 ) ([]plugintypes.CommitPluginReportWithMeta, error) {
