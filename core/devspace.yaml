@@ -177,7 +177,7 @@ hooks:
   # Check that the namespace cleanup label is set successfully.
   - name: "label-namespace-hook"
     command: ./../scripts/manage_namespace.sh
-    args: ["label", "${NS_TTL}"]
+    args: ["label", "${NS_TTL}", "--overwrite"]
     events: ["after:deploy:app", "error:deploy:*"]
 
   # Prints man pages about available commands
@@ -522,7 +522,8 @@ profiles:
         path: deployments.app.helm.values.chainlink.nodes
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-simulated-core-ocr1-stateless.yaml"]
+        value:
+          ["./values-profiles/values-dev-simulated-core-ocr1-stateless.yaml"]
   - name: local-dev-simulated-core-ocr1
     patches:
       - op: remove
