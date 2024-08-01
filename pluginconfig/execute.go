@@ -1,6 +1,7 @@
 package pluginconfig
 
 import (
+	"errors"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -21,13 +22,9 @@ type ExecutePluginConfig struct {
 	MessageVisibilityInterval time.Duration `json:"messageVisibilityInterval"`
 }
 
-type ExecuteReportingPluginConfig struct {
-	// DestOptimisticConfirmations is how many confirmations to wait for the dest chain event before we consider it
-	// confirmed (optimistically, need not be finalized).
-	// TODO: seems like a good candiate for chain config?
-	DestOptimisticConfirmations uint32 `json:"destOptimisticConfirmations"`
-
+type ExecuteOffchainConfig struct {
 	// BatchGasLimit is the maximum sum of user callback gas we permit in one execution report.
+	// EVM only.
 	BatchGasLimit uint64 `json:"batchGasLimit"`
 
 	// RelativeBoostPerWaitHour indicates how much to increase (artificially) the fee paid on the source chain per hour
@@ -47,4 +44,24 @@ type ExecuteReportingPluginConfig struct {
 
 	// BatchingStrategyID is the strategy to use for batching messages.
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
+}
+
+func (e ExecuteOffchainConfig) Validate() error {
+	if e.BatchGasLimit == 0 {
+		return errors.New("BatchGasLimit not set")
+	}
+	if e.RelativeBoostPerWaitHour == 0 {
+		return errors.New("RelativeBoostPerWaitHour not set")
+	}
+	if e.InflightCacheExpiry.Duration() == 0 {
+		return errors.New("InflightCacheExpiry not set")
+	}
+	if e.RootSnoozeTime.Duration() == 0 {
+		return errors.New("RootSnoozeTime not set")
+	}
+	if e.MessageVisibilityInterval.Duration() == 0 {
+		return errors.New("MessageVisibilityInterval not set")
+	}
+
+	return nil
 }

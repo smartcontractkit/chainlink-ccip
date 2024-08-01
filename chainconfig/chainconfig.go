@@ -1,6 +1,9 @@
 package chainconfig
 
 import (
+	"errors"
+	"math/big"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -17,12 +20,34 @@ type ChainConfig struct {
 	// data-availability gas price of this chain is allowed to deviate from the last
 	// written data-availability gas price on-chain before we write a new data-availability
 	// gas price.
-	// Note that this is only applicable for some chains, such as L2's.
+	// This is only applicable for some chains, such as L2's.
 	DAGasPriceDeviationPPB cciptypes.BigInt `json:"daGasPriceDeviationPPB"`
 
-	// TODO: do we want something like finality tag enabled / finality depth here?
-	// FinalityDepth is the number of blocks on top of a block that need to be included
-	// before a block is considered finalized.
-	// If set to 0, finality tags will be used.
-	FinalityDepth uint64 `json:"finalityDepth"`
+	// FinalityDepth is the number of confirmations before a block is considered finalized.
+	// If set to -1, finality tags will be used.
+	// 0 is not a valid value.
+	FinalityDepth int64 `json:"finalityDepth"`
+
+	// OptimisticConfirmations is the number of confirmations of a chain event before
+	// it is considered optimistically confirmed (i.e not necessarily finalized).
+	OptimisticConfirmations uint32 `json:"optimisticConfirmations"`
+}
+
+func (cc ChainConfig) Validate() error {
+	if cc.GasPriceDeviationPPB.Int.Cmp(big.NewInt(0)) <= 0 {
+		return errors.New("GasPriceDeviationPPB not set or negative")
+	}
+
+	// No validation for DAGasPriceDeviationPPB as it is optional
+	// and only applicable to L2's.
+
+	if cc.FinalityDepth == 0 {
+		return errors.New("FinalityDepth not set")
+	}
+
+	if cc.OptimisticConfirmations == 0 {
+		return errors.New("OptimisticConfirmations not set")
+	}
+
+	return nil
 }
