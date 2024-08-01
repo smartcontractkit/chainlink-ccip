@@ -161,7 +161,6 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
-			Limit:  query.Limit{Count: uint64(limit)},
 		},
 		&ev,
 	)
@@ -328,9 +327,6 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		query.LimitAndSort{
 			SortBy: []query.SortBy{
 				query.NewSortByTimestamp(query.Asc),
-			},
-			Limit: query.Limit{
-				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
 		&SendRequestedEvent{},
