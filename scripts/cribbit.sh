@@ -78,15 +78,6 @@ fi
 ##
 
 path_aws_config="$HOME/.aws/config"
-skip_ecr_login=${skip_ecr_login:-}
-
-# Check if the string starts with AWS ACCOUNT_ID
-if [[ $DEVSPACE_IMAGE =~ ^[0-9]{12} ]]; then
-	aws_account_id_ecr_registry=$(echo "${DEVSPACE_IMAGE}" | cut -d'.' -f1)
-else
-	echo "DEVSPACE_IMAGE is set to use public registry, skipping ECR login"
-	skip_ecr_login=true
-fi
 
 aws_profile_name="staging-crib"
 
@@ -192,21 +183,30 @@ extract_ecr_host_uri() {
 	fi
 }
 
-# Set env var CRIB_SKIP_ECR_LOGIN=true to skip ECR login.
-if [[ -n ${skip_ecr_login:-} ]]; then
+# Set env var CRIB_SKIP_DOCKER_ECR_LOGIN=true to skip Docker ECR login.
+skip_docker_ecr_login=${CRIB_SKIP_DOCKER_ECR_LOGIN:-}
+
+# Check if the string starts with AWS ACCOUNT_ID
+if is_custom_image "${DEVSPACE_IMAGE}"; then
+	echo "DEVSPACE_IMAGE is set to use pre-built image $DEVSPACE_IMAGE, building from source is disabled, skipping ECR Login"
+	skip_docker_ecr_login=true
+fi
+
+if [[ -n ${skip_docker_ecr_login:-} ]]; then
 	echo "Info: Skipping ECR login."
 else
+	aws_account_id_ecr_registry=$(echo "${DEVSPACE_IMAGE}" | cut -d'.' -f1)
 	echo "Info: Logging docker into AWS ECR registry."
 	aws ecr get-login-password \
 		--region "${AWS_REGION}" |
 		docker login --username AWS \
 			--password-stdin "${aws_account_id_ecr_registry}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-
-	echo "Info: Logging helm into AWS ECR registry."
-	helm_registry_uri=$(extract_ecr_host_uri)
-	aws ecr get-login-password --region "${AWS_REGION}" |
-		helm registry login "$helm_registry_uri" --username AWS --password-stdin
 fi
+
+echo "Info: Logging helm into AWS ECR registry."
+helm_registry_uri=$(extract_ecr_host_uri)
+aws ecr get-login-password --region "${AWS_REGION}" |
+	helm registry login "$helm_registry_uri" --username AWS --password-stdin
 
 ##
 # Setup DevSpace
