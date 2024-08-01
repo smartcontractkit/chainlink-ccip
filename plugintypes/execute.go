@@ -2,7 +2,7 @@ package plugintypes
 
 import (
 	"encoding/json"
-	"fmt"
+	"sort"
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -33,7 +33,7 @@ type ExecutePluginCommitData struct {
 
 	// TODO: cache for token data.
 	// TokenData for each message.
-	//TokenData [][][]byte `json:"-"`
+	// TokenData [][][]byte `json:"-"`
 }
 
 type ExecutePluginCommitObservations map[cciptypes.ChainSelector][]ExecutePluginCommitData
@@ -86,26 +86,48 @@ type ExecutePluginOutcome struct {
 	Report cciptypes.ExecutePluginReport `json:"report"`
 }
 
+func (o ExecutePluginOutcome) IsEmpty() bool {
+	return len(o.PendingCommitReports) == 0 && len(o.Report.ChainReports) == 0
+}
+
 func NewExecutePluginOutcome(
 	pendingCommits []ExecutePluginCommitData,
 	report cciptypes.ExecutePluginReport,
 ) ExecutePluginOutcome {
-	return ExecutePluginOutcome{
-		PendingCommitReports: pendingCommits,
-		Report:               report,
-	}
+	return newSortedExecuteOutcome(pendingCommits, report)
 }
 
+// Encode encodes the outcome by first sorting the pending commit reports and the chain reports
+// and then JSON marshalling.
+// The encoding MUST be deterministic.
 func (o ExecutePluginOutcome) Encode() ([]byte, error) {
-	return json.Marshal(o)
+	// We sort again here in case construction is not via the constructor.
+	return json.Marshal(newSortedExecuteOutcome(o.PendingCommitReports, o.Report))
+}
+
+func newSortedExecuteOutcome(
+	pendingCommits []ExecutePluginCommitData,
+	report cciptypes.ExecutePluginReport) ExecutePluginOutcome {
+	pendingCommitsCP := append([]ExecutePluginCommitData{}, pendingCommits...)
+	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
+	sort.Slice(
+		pendingCommitsCP,
+		func(i, j int) bool {
+			return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
+		})
+	sort.Slice(
+		reportCP,
+		func(i, j int) bool {
+			return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
+		})
+	return ExecutePluginOutcome{
+		PendingCommitReports: pendingCommitsCP,
+		Report:               cciptypes.ExecutePluginReport{ChainReports: reportCP},
+	}
 }
 
 func DecodeExecutePluginOutcome(b []byte) (ExecutePluginOutcome, error) {
 	o := ExecutePluginOutcome{}
 	err := json.Unmarshal(b, &o)
 	return o, err
-}
-
-func (o ExecutePluginOutcome) String() string {
-	return fmt.Sprintf("NextCommits: %v", o.PendingCommitReports)
 }
