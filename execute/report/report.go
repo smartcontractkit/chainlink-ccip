@@ -124,7 +124,7 @@ func buildSingleChainReportHelper(
 	}
 
 	lggr.Debugw("generated proofs", "sourceChain", report.SourceChain,
-		"proofsCast", proofsCast, "proof", proof)
+		"proofs", proofsCast, "proof", proof)
 
 	finalReport := cciptypes.ExecutePluginReportSingleChain{
 		SourceChainSelector: report.SourceChain,
