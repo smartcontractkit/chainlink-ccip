@@ -234,7 +234,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		})
 	}
 
-	return reports, nil
+	if len(reports) < limit {
+		return reports, nil
+	}
+	return reports[:limit], nil
 }
 
 func (r *CCIPChainReader) ExecutedMessageRanges(

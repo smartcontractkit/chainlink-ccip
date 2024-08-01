@@ -154,31 +154,6 @@ func filterOutExecutedMessages(
 
 	var filtered []plugintypes.ExecutePluginCommitData
 
-	// ----------------------------------------
-	// TODO: optimize algorithm
-	executedSeqNums := mapset.NewSet[cciptypes.SeqNum]()
-	for _, execedRange := range executedMessages {
-		for seqNum := execedRange.Start(); seqNum <= execedRange.End(); seqNum++ {
-			executedSeqNums.Add(seqNum)
-		}
-	}
-
-	// mark executed messages for each report
-	for reportIdx := range reports {
-		report := &reports[reportIdx]
-		executedSeqNumsForReport := mapset.NewSet[cciptypes.SeqNum]()
-		for seqNum := report.SequenceNumberRange.Start(); seqNum <= report.SequenceNumberRange.End(); seqNum++ {
-			if executedSeqNums.Contains(seqNum) {
-				executedSeqNumsForReport.Add(seqNum)
-			}
-		}
-		report.ExecutedMessages = executedSeqNumsForReport.ToSlice()
-		sort.Slice(report.ExecutedMessages, func(i, j int) bool {
-			return report.ExecutedMessages[i] < report.ExecutedMessages[j]
-		})
-	}
-	// ----------------------------------------
-
 	reportIdx := 0
 	for _, executed := range executedMessages {
 		for i := reportIdx; i < len(reports); i++ {
@@ -212,6 +187,7 @@ func filterOutExecutedMessages(
 					filtered = append(filtered, reports[i])
 					break
 				}
+				reports[i].ExecutedMessages = append(reports[i].ExecutedMessages, s)
 			}
 		}
 	}
