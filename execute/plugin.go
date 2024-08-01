@@ -309,7 +309,7 @@ func selectReport(
 
 	execReports, err := builder.Build()
 
-	lggr.Warnw(
+	lggr.Infow(
 		"reports have been selected",
 		"numReports", len(execReports),
 		"numPendingReports", len(stillPendingReports))
@@ -389,11 +389,13 @@ func (p *Plugin) Outcome(
 	}
 
 	outcome := plugintypes.NewExecutePluginOutcome(commitReports, execReport)
-	if len(outcome.PendingCommitReports) == 0 && len(outcome.Report.ChainReports) == 0 { // todo: if outcome.IsEmpty()
+	if outcome.IsEmpty() {
 		return nil, nil
 	}
 
-	p.lggr.Warnf("[oracle %d] exec outcome: generated outcome: %+v", p.reportingCfg.OracleID, outcome)
+	p.lggr.Infow(
+		fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
+		"outcome", outcome)
 	return outcome.Encode()
 }
 
@@ -425,18 +427,24 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	// Just a safety check, should never happen.
+	if r.Report == nil {
+		p.lggr.Warn("skipping nil report")
+		return false, nil
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	p.lggr.Warnw("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
+	p.lggr.Infow("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
 	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Warnw("skipping empty report")
+		p.lggr.Info("skipping empty report")
 		return false, nil
 	}
 
-	p.lggr.Warnw("ShouldAcceptAttestedReport returns true, report accepted")
+	p.lggr.Info("ShouldAcceptAttestedReport returns true, report accepted")
 	return true, nil
 }
 
@@ -448,7 +456,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Warnw("not a destination writer, skipping report transmission")
+		p.lggr.Debug("not a destination writer, skipping report transmission")
 		return false, nil
 	}
 

@@ -86,16 +86,26 @@ type ExecutePluginOutcome struct {
 	Report cciptypes.ExecutePluginReport `json:"report"`
 }
 
+func (o ExecutePluginOutcome) IsEmpty() bool {
+	return len(o.PendingCommitReports) == 0 && len(o.Report.ChainReports) == 0
+}
+
 func NewExecutePluginOutcome(
 	pendingCommits []ExecutePluginCommitData,
 	report cciptypes.ExecutePluginReport,
 ) ExecutePluginOutcome {
 	pendingCommitsCP := append([]ExecutePluginCommitData{}, pendingCommits...)
 	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
-	sort.Slice(pendingCommitsCP, func(i, j int) bool { return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain })
-	sort.Slice(reportCP, func(i, j int) bool {
-		return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
-	})
+	sort.Slice(
+		pendingCommitsCP,
+		func(i, j int) bool {
+			return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
+		})
+	sort.Slice(
+		reportCP,
+		func(i, j int) bool {
+			return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
+		})
 	return ExecutePluginOutcome{
 		PendingCommitReports: pendingCommitsCP,
 		Report:               cciptypes.ExecutePluginReport{ChainReports: reportCP},

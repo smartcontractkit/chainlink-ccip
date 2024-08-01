@@ -44,7 +44,11 @@ func ConstructMerkleTree(
 				"unable to hash message (%d, %d): %w",
 				msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
 		}
-		lggr.Warnw("Hashed message, adding to tree leaves", "hash", leaf, "msg", msg, "merkleRoot", report.MerkleRoot, "sourceChain", report.SourceChain)
+		lggr.Debugw("Hashed message, adding to tree leaves",
+			"hash", leaf,
+			"msg", msg,
+			"merkleRoot", report.MerkleRoot,
+			"sourceChain", report.SourceChain)
 		treeLeaves = append(treeLeaves, leaf)
 	}
 

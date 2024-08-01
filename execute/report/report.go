@@ -41,7 +41,7 @@ func buildSingleChainReportHelper(
 		}
 	}
 
-	lggr.Warnw(
+	lggr.Infow(
 		"constructing merkle tree",
 		"sourceChain", report.SourceChain,
 		"expectedRoot", report.MerkleRoot.String(),
@@ -61,7 +61,7 @@ func buildSingleChainReportHelper(
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
 
-	lggr.Warnw("merkle root verified",
+	lggr.Debugw("merkle root verified",
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
 		"computedRoot", cciptypes.Bytes32(hash))
@@ -106,7 +106,7 @@ func buildSingleChainReportHelper(
 		}
 	}
 
-	lggr.Warnw(
+	lggr.Infow(
 		"selected messages from commit report for execution, generating merkle proofs",
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
@@ -123,7 +123,7 @@ func buildSingleChainReportHelper(
 		proofsCast = append(proofsCast, p)
 	}
 
-	lggr.Warnw("generated proofs", "sourceChain", report.SourceChain,
+	lggr.Debugw("generated proofs", "sourceChain", report.SourceChain,
 		"proofsCast", proofsCast, "proof", proof)
 
 	finalReport := cciptypes.ExecutePluginReportSingleChain{
@@ -134,7 +134,7 @@ func buildSingleChainReportHelper(
 		ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 	}
 
-	lggr.Warnw("final report", "sourceChain", report.SourceChain, "report", finalReport)
+	lggr.Debugw("final report", "sourceChain", report.SourceChain, "report", finalReport)
 
 	return finalReport, nil
 }
