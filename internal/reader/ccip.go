@@ -168,7 +168,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
-	r.lggr.Warnw("queried commit reports", "numReports", len(iter),
+	r.lggr.Debugw("queried commit reports", "numReports", len(iter),
 		"destChain", dest,
 		"ts", ts,
 		"limit", limit)
@@ -182,7 +182,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Warnw("commit report too old, skipping", "report", ev.Report, "item", item,
+			r.lggr.Debugw("commit report too old, skipping", "report", ev.Report, "item", item,
 				"destChain", dest,
 				"ts", ts,
 				"limit", limit)
