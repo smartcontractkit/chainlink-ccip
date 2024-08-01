@@ -177,7 +177,7 @@ hooks:
   # Check that the namespace cleanup label is set successfully.
   - name: "label-namespace-hook"
     command: ./../scripts/manage_namespace.sh
-    args: ["label", "${NS_TTL}"]
+    args: ["label", "${NS_TTL}", "--overwrite"]
     events: ["after:deploy:app", "error:deploy:*"]
 
   # Prints man pages about available commands
