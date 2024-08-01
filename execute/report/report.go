@@ -178,6 +178,7 @@ func (b *execReportBuilder) checkMessage(
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"error", err)
+			return execReport, TokenDataFetchError, nil
 		}
 
 		// pad token data if needed
