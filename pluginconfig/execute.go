@@ -47,18 +47,25 @@ type ExecuteOffchainConfig struct {
 }
 
 func (e ExecuteOffchainConfig) Validate() error {
+	// TODO: this doesn't really make much sense for non-EVM chains.
+	// Maybe we need to have a field in the config that is not JSON-encoded
+	// that indicates chain family?
 	if e.BatchGasLimit == 0 {
 		return errors.New("BatchGasLimit not set")
 	}
+
 	if e.RelativeBoostPerWaitHour == 0 {
 		return errors.New("RelativeBoostPerWaitHour not set")
 	}
+
 	if e.InflightCacheExpiry.Duration() == 0 {
 		return errors.New("InflightCacheExpiry not set")
 	}
+
 	if e.RootSnoozeTime.Duration() == 0 {
 		return errors.New("RootSnoozeTime not set")
 	}
+
 	if e.MessageVisibilityInterval.Duration() == 0 {
 		return errors.New("MessageVisibilityInterval not set")
 	}
