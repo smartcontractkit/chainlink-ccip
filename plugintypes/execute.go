@@ -94,6 +94,20 @@ func NewExecutePluginOutcome(
 	pendingCommits []ExecutePluginCommitData,
 	report cciptypes.ExecutePluginReport,
 ) ExecutePluginOutcome {
+	return newSortedExecuteOutcome(pendingCommits, report)
+}
+
+// Encode encodes the outcome by first sorting the pending commit reports and the chain reports
+// and then JSON marshalling.
+// The encoding MUST be deterministic.
+func (o ExecutePluginOutcome) Encode() ([]byte, error) {
+	// We sort again here in case construction is not via the constructor.
+	return json.Marshal(newSortedExecuteOutcome(o.PendingCommitReports, o.Report))
+}
+
+func newSortedExecuteOutcome(
+	pendingCommits []ExecutePluginCommitData,
+	report cciptypes.ExecutePluginReport) ExecutePluginOutcome {
 	pendingCommitsCP := append([]ExecutePluginCommitData{}, pendingCommits...)
 	reportCP := append([]cciptypes.ExecutePluginReportSingleChain{}, report.ChainReports...)
 	sort.Slice(
@@ -110,10 +124,6 @@ func NewExecutePluginOutcome(
 		PendingCommitReports: pendingCommitsCP,
 		Report:               cciptypes.ExecutePluginReport{ChainReports: reportCP},
 	}
-}
-
-func (o ExecutePluginOutcome) Encode() ([]byte, error) {
-	return json.Marshal(o)
 }
 
 func DecodeExecutePluginOutcome(b []byte) (ExecutePluginOutcome, error) {
