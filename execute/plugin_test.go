@@ -154,7 +154,12 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-			got, got1, err := getPendingExecutedReports(context.Background(), mockReader, 123, time.Now())
+			got, got1, err := getPendingExecutedReports(
+				context.Background(),
+				mockReader,
+				123,
+				time.Now(),
+				logger.Test(t))
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
@@ -286,6 +291,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 	p := &Plugin{
 		homeChain:       setupHomeChainPoller(lggr, []reader.ChainConfigInfo{}),
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{},
+		lggr:            lggr,
 	}
 
 	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{}, nil)
@@ -326,6 +332,7 @@ func TestPlugin_Outcome_HomeChainError(t *testing.T) {
 
 	p := &Plugin{
 		homeChain: homeChain,
+		lggr:      logger.Test(t),
 	}
 	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
 	require.Error(t, err)
@@ -367,6 +374,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 
 	p := &Plugin{
 		homeChain: homeChain,
+		lggr:      logger.Test(t),
 	}
 
 	// map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
@@ -416,8 +424,11 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 	p := &Plugin{
 		reportCodec: codec,
+		lggr:        logger.Test(t),
 	}
-	_, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
+	_, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
+		Report: []byte("will not decode"), // faked out, see mock above
+	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "decode commit plugin report: test error")
 }
@@ -430,7 +441,9 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 		lggr:        logger.Test(t),
 		reportCodec: codec,
 	}
-	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
+	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
+		Report: []byte("empty report"), // faked out, see mock above
+	})
 	require.NoError(t, err)
 	require.False(t, result)
 }
@@ -447,7 +460,9 @@ func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
 		lggr:        logger.Test(t),
 		reportCodec: codec,
 	}
-	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{})
+	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
+		Report: []byte("report"), // faked out, see mock above
+	})
 	require.NoError(t, err)
 	require.True(t, result)
 }

@@ -41,13 +41,13 @@ func buildSingleChainReportHelper(
 		}
 	}
 
-	lggr.Debugw(
+	lggr.Infow(
 		"constructing merkle tree",
 		"sourceChain", report.SourceChain,
 		"expectedRoot", report.MerkleRoot.String(),
 		"treeLeaves", len(report.Messages))
 
-	tree, err := ConstructMerkleTree(ctx, hasher, report)
+	tree, err := ConstructMerkleTree(ctx, hasher, report, lggr)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
@@ -61,6 +61,11 @@ func buildSingleChainReportHelper(
 			fmt.Errorf("merkle root mismatch: expected %s, got %s", report.MerkleRoot.String(), actualStr)
 	}
 
+	lggr.Debugw("merkle root verified",
+		"sourceChain", report.SourceChain,
+		"commitRoot", report.MerkleRoot.String(),
+		"computedRoot", cciptypes.Bytes32(hash))
+
 	// Iterate sequence range and executed messages to select messages to execute.
 	numMsgs := len(report.Messages)
 	var toExecute []int
@@ -73,24 +78,28 @@ func buildSingleChainReportHelper(
 		if executedIdx < len(report.ExecutedMessages) && report.ExecutedMessages[executedIdx] == seqNum {
 			executedIdx++
 		} else if _, ok := messages[i]; ok {
-			tokenData, err := tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
-			if err != nil {
-				// TODO: skip message instead of failing the whole thing.
-				//       that might mean moving the token data reading out of the loop.
+			var tokenData [][]byte
+			var err error
+			if tokenDataReader != nil {
+				tokenData, err = tokenDataReader.ReadTokenData(context.Background(), report.SourceChain, msg.Header.SequenceNumber)
+				if err != nil {
+					// TODO: skip message instead of failing the whole thing.
+					//       that might mean moving the token data reading out of the loop.
+					lggr.Infow(
+						"unable to read token data",
+						"sourceChain", report.SourceChain,
+						"seqNum", msg.Header.SequenceNumber,
+						"error", err)
+					return cciptypes.ExecutePluginReportSingleChain{},
+						fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
+				}
+
 				lggr.Infow(
-					"unable to read token data",
+					"read token data",
 					"sourceChain", report.SourceChain,
 					"seqNum", msg.Header.SequenceNumber,
-					"error", err)
-				return cciptypes.ExecutePluginReportSingleChain{},
-					fmt.Errorf("unable to read token data for message %d: %w", msg.Header.SequenceNumber, err)
+					"data", tokenData)
 			}
-
-			lggr.Infow(
-				"read token data",
-				"sourceChain", report.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"data", tokenData)
 			offchainTokenData = append(offchainTokenData, tokenData)
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
@@ -98,11 +107,11 @@ func buildSingleChainReportHelper(
 	}
 
 	lggr.Infow(
-		"selected messages from commit report for execution",
+		"selected messages from commit report for execution, generating merkle proofs",
 		"sourceChain", report.SourceChain,
 		"commitRoot", report.MerkleRoot.String(),
 		"numMessages", numMsgs,
-		"toExecute", len(toExecute))
+		"toExecute", toExecute)
 	proof, err := tree.Prove(toExecute)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
@@ -114,6 +123,9 @@ func buildSingleChainReportHelper(
 		proofsCast = append(proofsCast, p)
 	}
 
+	lggr.Debugw("generated proofs", "sourceChain", report.SourceChain,
+		"proofs", proofsCast, "proof", proof)
+
 	finalReport := cciptypes.ExecutePluginReportSingleChain{
 		SourceChainSelector: report.SourceChain,
 		Messages:            msgInRoot,
@@ -121,6 +133,8 @@ func buildSingleChainReportHelper(
 		Proofs:              proofsCast,
 		ProofFlagBits:       cciptypes.BigInt{Int: slicelib.BoolsToBitFlags(proof.SourceFlags)},
 	}
+
+	lggr.Debugw("final report", "sourceChain", report.SourceChain, "report", finalReport)
 
 	return finalReport, nil
 }

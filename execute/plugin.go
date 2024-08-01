@@ -93,13 +93,19 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 }
 
 func getPendingExecutedReports(
-	ctx context.Context, ccipReader reader.CCIP, dest cciptypes.ChainSelector, ts time.Time,
+	ctx context.Context,
+	ccipReader reader.CCIP,
+	dest cciptypes.ChainSelector,
+	ts time.Time,
+	lggr logger.Logger,
 ) (plugintypes.ExecutePluginCommitObservations, time.Time, error) {
 	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
+	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
+
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
 		if report.Timestamp.After(latestReportTS) {
@@ -108,6 +114,8 @@ func getPendingExecutedReports(
 	}
 
 	groupedCommits := groupByChainSelector(commitReports)
+	lggr.Debugw("grouped commits before removing fully executed reports",
+		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	// Remove fully executed reports.
 	for selector, reports := range groupedCommits {
@@ -136,6 +144,9 @@ func getPendingExecutedReports(
 		}
 	}
 
+	lggr.Debugw("grouped commits after removing fully executed reports",
+		"groupedCommits", groupedCommits, "count", len(groupedCommits))
+
 	return groupedCommits, latestReportTS, nil
 }
 
@@ -161,6 +172,8 @@ func (p *Plugin) Observation(
 		}
 	}
 
+	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
 	var groupedCommits plugintypes.ExecutePluginCommitObservations
@@ -171,7 +184,7 @@ func (p *Plugin) Observation(
 	if supportsDest {
 		var latestReportTS time.Time
 		groupedCommits, latestReportTS, err =
-			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()))
+			getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, time.UnixMilli(p.lastReportTS.Load()), p.lggr)
 		if err != nil {
 			return types.Observation{}, err
 		}
@@ -187,7 +200,7 @@ func (p *Plugin) Observation(
 	// Phase 2: Gather messages from the source chains and build the execution report.
 	messages := make(plugintypes.ExecutePluginMessageObservations)
 	if len(previousOutcome.PendingCommitReports) == 0 {
-		fmt.Println("TODO: No reports to execute. This is expected after a cold start.")
+		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
@@ -311,11 +324,14 @@ func (p *Plugin) Outcome(
 	decodedObservations, err := decodeAttributedObservations(aos)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
-
 	}
 	if len(decodedObservations) < p.reportingCfg.F {
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
+
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", p.reportingCfg.OracleID),
+		"decodedObservations", decodedObservations)
 
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
@@ -327,10 +343,18 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
 
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged commit observations", p.reportingCfg.OracleID),
+		"mergedCommitObservations", mergedCommitObservations)
+
 	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
+
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", p.reportingCfg.OracleID),
+		"mergedMessageObservations", mergedMessageObservations)
 
 	observation := plugintypes.NewExecutePluginObservation(
 		mergedCommitObservations,
@@ -344,6 +368,10 @@ func (p *Plugin) Outcome(
 	sort.Slice(commitReports, func(i, j int) bool {
 		return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
 	})
+
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: commit reports", p.reportingCfg.OracleID),
+		"commitReports", commitReports)
 
 	// add messages to their commitReports.
 	for i, report := range commitReports {
@@ -368,10 +396,24 @@ func (p *Plugin) Outcome(
 		ChainReports: outcomeReports,
 	}
 
-	return plugintypes.NewExecutePluginOutcome(commitReports, execReport).Encode()
+	outcome := plugintypes.NewExecutePluginOutcome(commitReports, execReport)
+	if outcome.IsEmpty() {
+		return nil, nil
+	}
+
+	p.lggr.Infow(
+		fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
+		"outcome", outcome)
+
+	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+	if outcome == nil {
+		p.lggr.Warn("no outcome, skipping report generation")
+		return nil, nil
+	}
+
 	decodedOutcome, err := plugintypes.DecodeExecutePluginOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
@@ -394,15 +436,24 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	// Just a safety check, should never happen.
+	if r.Report == nil {
+		p.lggr.Warn("skipping nil report")
+		return false, nil
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
+	p.lggr.Infow("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
 	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Infow("skipping empty report")
+		p.lggr.Info("skipping empty report")
 		return false, nil
 	}
+
+	p.lggr.Info("ShouldAcceptAttestedReport returns true, report accepted")
 	return true, nil
 }
 
@@ -414,7 +465,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
 	if !isWriter {
-		p.lggr.Debugw("not a destination writer, skipping report transmission")
+		p.lggr.Debug("not a destination writer, skipping report transmission")
 		return false, nil
 	}
 
@@ -425,8 +476,8 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// TODO: Final validation?
 
-	p.lggr.Debugw("transmitting report",
-		"reports", len(decodedReport.ChainReports),
+	p.lggr.Infow("transmitting report",
+		"reports", decodedReport.ChainReports,
 	)
 	return true, nil
 }
@@ -437,7 +488,7 @@ func (p *Plugin) Close() error {
 	defer cf()
 
 	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Errorw("error closing reader syncer", "err", err)
+		p.lggr.Warnw("error closing reader syncer", "err", err)
 	}
 
 	if err := p.ccipReader.Close(ctx); err != nil {
