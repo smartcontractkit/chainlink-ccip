@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -76,7 +77,7 @@ var (
 // can be generated.
 type CCIPChainReader struct {
 	lggr            logger.Logger
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
 	destChain       cciptypes.ChainSelector
 }
@@ -87,9 +88,14 @@ func NewCCIPChainReader(
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 ) *CCIPChainReader {
+	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
+	for chainSelector, cr := range contractReaders {
+		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
+	}
+
 	return &CCIPChainReader{
 		lggr:            lggr,
-		contractReaders: contractReaders,
+		contractReaders: crs,
 		contractWriters: contractWriters,
 		destChain:       destChain,
 	}
@@ -162,6 +168,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	if err != nil {
 		return nil, fmt.Errorf("failed to query offRamp: %w", err)
 	}
+	r.lggr.Debugw("queried commit reports", "numReports", len(iter),
+		"destChain", dest,
+		"ts", ts,
+		"limit", limit)
 
 	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
@@ -172,7 +182,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Debugw("skipping invalid commit report", "report", ev.Report)
+			r.lggr.Debugw("commit report too old, skipping", "report", ev.Report, "item", item,
+				"destChain", dest,
+				"ts", ts,
+				"limit", limit)
 			continue
 		}
 
@@ -288,6 +301,16 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
+	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
+	if len(bindings) != 1 {
+		return nil, fmt.Errorf("expected one binding for onRamp contract, got %d", len(bindings))
+	}
+
+	onRampAddressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(sourceChainSelector))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert onRamp address to bytes: %w", err)
+	}
+
 	type SendRequestedEvent struct {
 		DestChainSelector cciptypes.ChainSelector
 		Message           cciptypes.Message
@@ -334,6 +357,8 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			msg.Message.Header.DestChainSelector == r.destChain &&
 			msg.Message.Header.SequenceNumber >= seqNumRange.Start() &&
 			msg.Message.Header.SequenceNumber <= seqNumRange.End()
+
+		msg.Message.Header.OnRamp = onRampAddressBytes
 
 		if valid {
 			msgs = append(msgs, msg.Message)

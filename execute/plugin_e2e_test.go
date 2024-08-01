@@ -138,7 +138,7 @@ func setupSimpleTest(
 		Messages:            mapped,
 	}
 
-	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData)
+	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(t))
 	require.NoError(t, err, "failed to construct merkle tree")
 
 	// Initialize reader with some data
