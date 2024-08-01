@@ -17,7 +17,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v4.1.2
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 
       - name: Deploy and validate CRIB Environment for CCIP and Atlas
         uses: smartcontractkit/.github/actions/setup-crib-environment@fb4c26ad00aab4121a26c55a67acb0c8057bb4a7
