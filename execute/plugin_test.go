@@ -37,7 +37,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		reports []plugintypes.CommitPluginReportWithMeta
 		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
 		want    plugintypes.ExecutePluginCommitObservations
-		want1   time.Time
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
@@ -45,7 +44,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			reports: nil,
 			ranges:  nil,
 			want:    plugintypes.ExecutePluginCommitObservations{},
-			want1:   time.Time{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -77,7 +75,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			want1:   time.UnixMilli(10101010101),
 			wantErr: assert.NoError,
 		},
 		{
@@ -113,7 +110,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					},
 				},
 			},
-			want1:   time.UnixMilli(10101010101),
 			wantErr: assert.NoError,
 		},
 		{
@@ -132,7 +128,6 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			},
 			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{},
 			want:    plugintypes.ExecutePluginCommitObservations{},
-			want1:   time.UnixMilli(9999999999999999),
 			wantErr: assert.NoError,
 		},
 	}
@@ -154,17 +149,17 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			//      CommitReportsGTETimestamp(ctx, dest, ts, 1000) -> ([]cciptypes.CommitPluginReportWithMeta, error)
 			// for each chain selector:
 			//      ExecutedMessageRanges(ctx, selector, dest, seqRange) -> ([]cciptypes.SeqNumRange, error)
-			got, got1, err := getPendingExecutedReports(
+			got, err := getPendingExecutedReports(
 				context.Background(),
 				mockReader,
 				123,
 				time.Now(),
-				logger.Test(t))
+				logger.Test(t),
+			)
 			if !tt.wantErr(t, err, "getPendingExecutedReports(...)") {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "getPendingExecutedReports(...)")
-			assert.Equalf(t, tt.want1, got1, "getPendingExecutedReports(...)")
 		})
 	}
 }
