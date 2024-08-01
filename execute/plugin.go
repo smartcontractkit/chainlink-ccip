@@ -70,7 +70,7 @@ func NewPlugin(
 		syncFrequency(cfg.SyncFrequency),
 	)
 	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Warnw("error starting background reader syncer", "err", err)
+		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
 	return &Plugin{
@@ -104,7 +104,7 @@ func getPendingExecutedReports(
 	if err != nil {
 		return nil, time.Time{}, err
 	}
-	lggr.Warnw("commit reports", "commitReports", commitReports, "count", len(commitReports))
+	lggr.Debugw("commit reports", "commitReports", commitReports, "count", len(commitReports))
 
 	// TODO: this could be more efficient. commitReports is also traversed in 'groupByChainSelector'.
 	for _, report := range commitReports {
@@ -114,7 +114,7 @@ func getPendingExecutedReports(
 	}
 
 	groupedCommits := groupByChainSelector(commitReports)
-	lggr.Warnw("grouped commits before removing fully executed reports",
+	lggr.Debugw("grouped commits before removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	// Remove fully executed reports.
@@ -144,7 +144,7 @@ func getPendingExecutedReports(
 		}
 	}
 
-	lggr.Warnw("grouped commits after removing fully executed reports",
+	lggr.Debugw("grouped commits after removing fully executed reports",
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	return groupedCommits, latestReportTS, nil
@@ -172,7 +172,7 @@ func (p *Plugin) Observation(
 		}
 	}
 
-	p.lggr.Warnw("decoded previous outcome", "previousOutcome", previousOutcome)
+	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
@@ -200,7 +200,7 @@ func (p *Plugin) Observation(
 	// Phase 2: Gather messages from the source chains and build the execution report.
 	messages := make(plugintypes.ExecutePluginMessageObservations)
 	if len(previousOutcome.PendingCommitReports) == 0 {
-		p.lggr.Warnw("TODO: No reports to execute. This is expected after a cold start.")
+		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
@@ -329,7 +329,9 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
 	}
 
-	p.lggr.Warnw("exec outcome: decoded observations", "decodedObservations", decodedObservations)
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", p.reportingCfg.OracleID),
+		"decodedObservations", decodedObservations)
 
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
@@ -341,14 +343,18 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
 
-	p.lggr.Warnw("exec outcome: merged commit observations", "mergedCommitObservations", mergedCommitObservations)
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged commit observations", p.reportingCfg.OracleID),
+		"mergedCommitObservations", mergedCommitObservations)
 
 	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
 
-	p.lggr.Warnw("exec outcome: merged message observations", "mergedMessageObservations", mergedMessageObservations)
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", p.reportingCfg.OracleID),
+		"mergedMessageObservations", mergedMessageObservations)
 
 	observation := plugintypes.NewExecutePluginObservation(
 		mergedCommitObservations,
@@ -363,7 +369,9 @@ func (p *Plugin) Outcome(
 		return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
 	})
 
-	p.lggr.Warnw("exec outcome: commit reports", "commitReports", commitReports)
+	p.lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: commit reports", p.reportingCfg.OracleID),
+		"commitReports", commitReports)
 
 	// add messages to their commitReports.
 	for i, report := range commitReports {
@@ -396,12 +404,13 @@ func (p *Plugin) Outcome(
 	p.lggr.Infow(
 		fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
 		"outcome", outcome)
+
 	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	if outcome == nil {
-		p.lggr.Warnw("no outcome, skipping report generation")
+		p.lggr.Warn("no outcome, skipping report generation")
 		return nil, nil
 	}
 
