@@ -3,12 +3,14 @@ package commitrmnocb
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -32,7 +34,7 @@ func (p *Plugin) Observation(
 
 	case BuildingReport:
 		return CommitPluginObservation{
-			MerkleRoots: p.ObserveMerkleRoots(previousOutcome.RangesSelectedForReport),
+			MerkleRoots: p.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			GasPrices:   p.ObserveGasPrices(ctx),
 			TokenPrices: p.ObserveTokenPrices(ctx),
 			FChain:      p.ObserveFChain(),
@@ -71,14 +73,68 @@ func (p *Plugin) ObserveOffRampMaxSeqNums() []plugintypes.SeqNumChain {
 }
 
 // ObserveMerkleRoots TODO: doc
-func (p *Plugin) ObserveMerkleRoots(ranges []ChainRange) []MerkleRoot {
-	roots, err := p.onChain.GetMerkleRoots(ranges)
-	if err != nil {
-		p.log.Warnw("call to GetMerkleRoots failed", "err", err)
-		return nil
+func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []MerkleRoot {
+	roots := make([]MerkleRoot, len(ranges))
+	for _, chainRange := range ranges {
+		msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
+		if err != nil {
+			p.log.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+		} else {
+			root, err := computeMerkleRoot(msgs)
+			if err != nil {
+				p.log.Warnw("call to computeMerkleRoot failed", "err", err)
+			} else {
+				merkleRoot := MerkleRoot{
+					ChainSel:    chainRange.ChainSel,
+					SeqNumRange: chainRange.SeqNumRange,
+					RootHash:    root,
+				}
+				roots = append(roots, merkleRoot)
+			}
+		}
 	}
 
 	return roots
+}
+
+// computeMerkleRoot Compute the merkle root of a list of messages
+func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
+	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+	seqNums := make([]cciptypes.SeqNum, len(msgs))
+
+	for _, msg := range msgs {
+		seqNum := msg.Header.SequenceNumber
+		seqNums = append(seqNums, seqNum)
+		msgSeqNumToHash[seqNum] = msg.Header.MsgHash
+	}
+
+	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i] < seqNums[j] })
+
+	// Assert there are no gaps in the seq num range
+	if len(seqNums) >= 2 {
+		for i := 1; i < len(seqNums); i++ {
+			if seqNums[i] != seqNums[i-1]+1 {
+				return [32]byte{}, fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
+					"gap between seq nums %d and %d, messages: %v", seqNums[i-1], seqNums[i], msgs)
+			}
+		}
+	}
+
+	treeLeaves := make([][32]byte, 0)
+	for _, seqNum := range seqNums {
+		msgHash, ok := msgSeqNumToHash[seqNum]
+		if !ok {
+			return [32]byte{}, fmt.Errorf("msg hash not found for seq num %d", seqNum)
+		}
+		treeLeaves = append(treeLeaves, msgHash)
+	}
+
+	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(treeLeaves), err)
+	}
+
+	return tree.Root(), nil
 }
 
 // ObserveGasPrices TODO: doc

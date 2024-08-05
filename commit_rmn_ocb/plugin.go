@@ -80,7 +80,7 @@ func (p *Plugin) Close() error {
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
-	
+
 	return nil
 }
 

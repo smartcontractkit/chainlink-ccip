@@ -315,9 +315,6 @@ type OnChain interface {
 	// GetOffRampMaxSeqNums returns the maximum sequence number that this oracle finds on the OffRamp for each given
 	// chain (for the configured dest chain)
 	GetOffRampMaxSeqNums() ([]plugintypes.SeqNumChain, error)
-
-	// GetMerkleRoots returns the merkle roots for the given chain and range pairs
-	GetMerkleRoots([]ChainRange) ([]MerkleRoot, error)
 }
 
 // CommitPluginReport is the report that will be transmitted by the Commit Plugin
