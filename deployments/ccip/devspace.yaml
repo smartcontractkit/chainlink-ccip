@@ -2,39 +2,16 @@ version: v2beta1
 name: chainlink
 
 imports:
-  - path: ../components/atlas/atlas.yaml
+  - path: ../../components/don/don.yaml
+  - path: ../../components/atlas/atlas.yaml
 
 vars:
-  DEVSPACE_ENV_FILE: .env
-  # The list of default ENV Vars for CRIB, you can override any of them in the .env file
-  # AWS Account ID used for deploying CRIB environment
-  AWS_ACCOUNT_ID:
+  SCRIPTS_DIR:
     source: env
-    default: 323150190480
-  # The image that will be used for the Chainlink nodes.
-  DEVSPACE_IMAGE:
+    default: "../../scripts"
+  COMPONENTS_DIR:
     source: env
-    default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
-  # This is a comma separated list of CIDR blocks that will be allowed to access the ingress.
-  DEVSPACE_INGRESS_CIDRS:
-    source: env
-    default: "0.0.0.0/0"
-  # This is the base domain in AWS Route 53 that our ingress subdomains will use.
-  DEVSPACE_INGRESS_BASE_DOMAIN:
-    source: env
-    default: "main.stage.cldev.sh"
-  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
-  DEVSPACE_INGRESS_CERT_ARN:
-    source: env
-    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
-  # Time to wait for pods to be in `Ready` condition
-  DEVSPACE_K8S_POD_WAIT_TIMEOUT:
-    source: env
-    default: 1200s
-  CHAINLINK_HELM_REGISTRY_URI:
-    source: env
-    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
-
+    default: "../../components"
   # Env Vars Required for ccip-scripts based contracts and jobs deployment
   # Image URI required for deploying CCIP Contracts and Jobs
   DEVSPACE_CCIP_SCRIPTS_IMAGE:
@@ -48,15 +25,11 @@ vars:
   DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
     source: env
     default: "cl-stage-ccip-scripts-deploy-output"
-
   # Env vars required for Atlas Monitoring
   # Enables or disables Atlas components/pipeline
   ATLAS_ENABLED:
     source: env
     default: false
-  MONITORING_SCRIPT:
-    source: env
-    default: ../components/atlas/init
 
 pipelines:
   deploy:
@@ -65,7 +38,6 @@ pipelines:
         short: o
         type: string
         description: "If specified, the specified tag will be used instead of building a new image"
-
     run: |-
       tagOverride=$(get_flag "override-image-tag")
       run_dependencies --all
@@ -99,38 +71,10 @@ pipelines:
 
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
 
-  purge:
-    run: |-
-      kubectl delete ns ${DEVSPACE_NAMESPACE}
-
 commands:
-  ingress-hosts:
-    command: |-
-      kubectl get ingress -n ${DEVSPACE_NAMESPACE} -o=jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
-    description: List Kubernetes ingress hostnames in the namespace.
-  connect:
-    command: |-
-      echo "Exposing services from ${DEVSPACE_NAMESPACE} CRIB namespace locally..."
-      sudo kubefwd svc -n $DEVSPACE_NAMESPACE
-    description: Expose Kubernetes services from the CRIB namespace to local machine for direct, secure access during development. It facilitates debugging and access to ports not exposed through Ingress.
-  ttl:
-    command: ./../scripts/manage_namespace.sh label $1 --overwrite
-    description: Configure TTL for devspace resource cleanup. Default is 72h.
-  workload:
-    command: cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -
-    description: Run workload
-  dashboard-deploy:
-    command: go run dashboard/cmd/deploy.go
-    description: Deploy dashboards
-  dashboard-test:
-    command: cd dashboard/tests && npx playwright test || cd -
-    description: Run tests
   get_test_input:
     command: aws s3 cp s3://${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}/${DEVSPACE_NAMESPACE}-testInput.toml override.toml
     description: Download the testInput.toml file from the S3 bucket
-  man:
-    command: ../scripts/man.sh $1
-    description: Display man pages
 
 images:
   app:
@@ -146,48 +90,11 @@ images:
         image=${runtime.images.app}
         MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper release --snapshot --clean --config .goreleaser.devspace.yaml
         docker push $image
+
 hooks:
-  - name: "pre-image-build-hook"
-    command: ../scripts/before_build_checks.sh
-    events: ["before:build:app"]
-  - command: ../scripts/before_deploy_checks.sh
+  - command: ${SCRIPTS_DIR}/check_env_vars.sh
+    args: [ "ccip" ]
     events: ["before:deploy:app"]
-  - command: ../scripts/check_env_vars.sh
-    args: ["ccip"]
-    events: ["before:deploy:app"]
-  - command: ./../scripts/manage_namespace.sh
-    args: ["create"]
-    events: ["before:deploy:*"]
-  - wait:
-      running: true
-      terminatedWithCode: 0
-      timeout: 600
-    container:
-      labelSelector:
-        # vars don't work here, = releaseName
-        release: "app"
-    events: ["after:deploy:app"]
-
-  # Check that the ingress was created successfully, and print ingress hostnames.
-  - name: "ingress-check-hook"
-    command: ./../scripts/ingress_check.sh
-    args: ["app"] # Ingress name.
-    events: ["after:deploy:app"]
-
-  # Check that the namespace cleanup label is set successfully.
-  - name: "label-namespace-hook"
-    command: ./../scripts/manage_namespace.sh
-    args: ["label", "${NS_TTL}", "--overwrite"]
-    events: ["after:deploy:app", "error:deploy:*"]
-
-  # Prints man pages about available commands
-  - command: ../scripts/man.sh
-    events: ["after:deploy:app"]
-
-  # Prints man pages about build errors
-  - command: ../scripts/man.sh
-    args: ["build-error"]
-    events: ["error:build:*"]
 
 # This is a list of `deployments` that DevSpace can create for this project
 deployments:
