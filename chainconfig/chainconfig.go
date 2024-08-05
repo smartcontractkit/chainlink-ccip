@@ -1,6 +1,7 @@
 package chainconfig
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 
@@ -50,4 +51,18 @@ func (cc ChainConfig) Validate() error {
 	}
 
 	return nil
+}
+
+// EncodeChainConfig encodes a ChainConfig into bytes using JSON.
+func EncodeChainConfig(cc ChainConfig) ([]byte, error) {
+	return json.Marshal(cc)
+}
+
+// DecodeChainConfig JSON decodes a ChainConfig from bytes.
+func DecodeChainConfig(encodedChainConfig []byte) (ChainConfig, error) {
+	var cc ChainConfig
+	if err := json.Unmarshal(encodedChainConfig, &cc); err != nil {
+		return cc, err
+	}
+	return cc, nil
 }

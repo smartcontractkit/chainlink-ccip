@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -494,12 +493,9 @@ var (
 	fChainOne = uint8(1)
 
 	pIDs1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
-	tokenX    = types.Account("tk_xxx")
 
 	destCfg = pluginconfig.CommitPluginConfig{
 		DestChain:           destChain,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
 		NewMsgScanBatchSize: 256,
 	}
 )

@@ -59,7 +59,7 @@ func NewPlugin(
 	lggr logger.Logger,
 ) *Plugin {
 	lastReportTS := &atomic.Int64{}
-	lastReportTS.Store(time.Now().Add(-cfg.MessageVisibilityInterval).UnixMilli())
+	lastReportTS.Store(time.Now().Add(-cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UnixMilli())
 
 	// TODO: initialize tokenDataReader.
 

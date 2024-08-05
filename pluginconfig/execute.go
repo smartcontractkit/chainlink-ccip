@@ -1,6 +1,7 @@
 package pluginconfig
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -18,8 +19,8 @@ type ExecutePluginConfig struct {
 	// SyncFrequency is the frequency at which the commit plugin reader should sync.
 	SyncFrequency time.Duration `json:"syncFrequency"`
 
-	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
-	MessageVisibilityInterval time.Duration `json:"messageVisibilityInterval"`
+	// OffchainConfig is the offchain config set for the exec DON.
+	OffchainConfig ExecuteOffchainConfig `json:"offchainConfig"`
 }
 
 type ExecuteOffchainConfig struct {
@@ -71,4 +72,18 @@ func (e ExecuteOffchainConfig) Validate() error {
 	}
 
 	return nil
+}
+
+// EncodeExecuteOffchainConfig encodes a ExecuteOffchainConfig into bytes using JSON.
+func EncodeExecuteOffchainConfig(e ExecuteOffchainConfig) ([]byte, error) {
+	return json.Marshal(e)
+}
+
+// DecodeExecuteOffchainConfig JSON decodes a ExecuteOffchainConfig from bytes.
+func DecodeExecuteOffchainConfig(encodedExecuteOffchainConfig []byte) (ExecuteOffchainConfig, error) {
+	var e ExecuteOffchainConfig
+	if err := json.Unmarshal(encodedExecuteOffchainConfig, &e); err != nil {
+		return e, err
+	}
+	return e, nil
 }

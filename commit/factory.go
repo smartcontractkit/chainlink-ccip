@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"google.golang.org/grpc"
@@ -79,6 +80,11 @@ func NewPluginFactory(
 
 func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
+	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
+	}
+
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
@@ -103,6 +109,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			pluginconfig.CommitPluginConfig{
 				DestChain:           p.ocrConfig.Config.ChainSelector,
 				NewMsgScanBatchSize: merklemulti.MaxNumberTreeLeaves,
+				OffchainConfig:      offchainConfig,
 			},
 			ccipReader,
 			onChainTokenPricesReader,

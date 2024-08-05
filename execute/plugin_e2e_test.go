@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -172,8 +173,10 @@ func setupSimpleTest(
 	}
 
 	cfg := pluginconfig.ExecutePluginConfig{
-		MessageVisibilityInterval: 8 * time.Hour,
-		DestChain:                 dstSelector,
+		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		},
+		DestChain: dstSelector,
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{

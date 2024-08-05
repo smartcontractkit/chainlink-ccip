@@ -2,6 +2,7 @@ package pluginconfig
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -18,12 +19,6 @@ type CommitPluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
 	DestChain cciptypes.ChainSelector `json:"destChain"`
 
-	// PricedTokens is a list of tokens that we want to submit price updates for.
-	PricedTokens []types.Account `json:"pricedTokens"`
-
-	// TokenPricesObserver indicates that the node can observe token prices.
-	TokenPricesObserver bool `json:"tokenPricesObserver"`
-
 	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
 	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
 
@@ -32,6 +27,9 @@ type CommitPluginConfig struct {
 
 	// SyncFrequency is the frequency at which the commit plugin reader should sync.
 	SyncFrequency time.Duration `json:"syncFrequency"`
+
+	// OffchainConfig is the offchain config set for the commit DON.
+	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
 }
 
 func (c CommitPluginConfig) Validate() error {
@@ -39,15 +37,11 @@ func (c CommitPluginConfig) Validate() error {
 		return fmt.Errorf("destChain not set")
 	}
 
-	if len(c.PricedTokens) == 0 {
-		return fmt.Errorf("priced tokens not set, at least one priced token is required")
-	}
-
 	if c.NewMsgScanBatchSize == 0 {
 		return fmt.Errorf("newMsgScanBatchSize not set")
 	}
 
-	return nil
+	return c.OffchainConfig.Validate()
 }
 
 // ArbitrumPriceSource is the source of the TOKEN/USD price data of a particular token
@@ -96,6 +90,12 @@ type CommitOffchainConfig struct {
 	// PriceSources is a map of Arbitrum price sources for each token.
 	// Note that the token address is that on the remote chain.
 	PriceSources map[types.Account]ArbitrumPriceSource `json:"priceSources"`
+
+	// TokenPriceChainSelector is the chain selector for the chain on which
+	// the token prices are read from.
+	// This will typically be an arbitrum testnet/mainnet chain depending on
+	// the deployment.
+	TokenPriceChainSelector uint64 `json:"tokenPriceChainSelector"`
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -105,20 +105,29 @@ func (c CommitOffchainConfig) Validate() error {
 
 	// Note that commit may not have to submit prices if keystone feeds
 	// are enabled for the chain.
-	// If neither frequency nor price sources are set, then the node will
-	// not submit token prices.
-	if c.TokenPriceBatchWriteFrequency.Duration() != 0 {
-		if len(c.PriceSources) == 0 {
-			return errors.New("tokenPriceBatchWriteFrequency set but no price sources provided")
-		}
-		for _, priceSource := range c.PriceSources {
-			if err := priceSource.Validate(); err != nil {
-				return fmt.Errorf("price source validation failed on %+v: %w", priceSource, err)
-			}
-		}
-	} else if len(c.PriceSources) != 0 {
-		return errors.New("price sources provided but tokenPriceBatchWriteFrequency not set")
+	// If price sources are provided the batch write frequency and token price chain selector
+	// config fields MUST be provided.
+	if len(c.PriceSources) > 0 &&
+		(c.TokenPriceBatchWriteFrequency.Duration() == 0 || c.TokenPriceChainSelector == 0) {
+		return fmt.Errorf("tokenPriceBatchWriteFrequency (%s) or tokenPriceChainSelector (%d) not set",
+			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
 	}
 
+	// if len(c.PriceSources) == 0 the other fields are ignored.
+
 	return nil
+}
+
+// EncodeCommitOffchainConfig encodes a CommitOffchainConfig into bytes using JSON.
+func EncodeCommitOffchainConfig(c CommitOffchainConfig) ([]byte, error) {
+	return json.Marshal(c)
+}
+
+// DecodeCommitOffchainConfig JSON decodes a CommitOffchainConfig from bytes.
+func DecodeCommitOffchainConfig(encodedCommitOffchainConfig []byte) (CommitOffchainConfig, error) {
+	var c CommitOffchainConfig
+	if err := json.Unmarshal(encodedCommitOffchainConfig, &c); err != nil {
+		return c, err
+	}
+	return c, nil
 }
