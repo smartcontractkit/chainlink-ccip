@@ -16,6 +16,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
@@ -131,7 +132,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	r.setState(convertOnChainConfigToHomeChainConfig(chainConfigInfos))
+	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, chainConfigInfos))
 	return nil
 }
 
@@ -270,15 +271,21 @@ func createNodesSupportedChains(
 	return nodeSupportedChains
 }
 
-func convertOnChainConfigToHomeChainConfig(capabilityCfgs []ChainConfigInfo) map[cciptypes.ChainSelector]ChainConfig {
+func convertOnChainConfigToHomeChainConfig(lggr logger.Logger, chainConfigInfos []ChainConfigInfo) map[cciptypes.ChainSelector]ChainConfig {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
-	for _, capabilityConfig := range capabilityCfgs {
-		chainSelector := capabilityConfig.ChainSelector
-		config := capabilityConfig.ChainConfig
+	for _, chainConfigInfo := range chainConfigInfos {
+		chainSelector := chainConfigInfo.ChainSelector
+		chainConfig := chainConfigInfo.ChainConfig
+		decoded, err := chainconfig.DecodeChainConfig(chainConfig.Config)
+		if err != nil {
+			lggr.Warnw(fmt.Sprintf("failed to decode opaque chain config of chain selector %d", chainSelector), "err", err)
+			continue
+		}
 
 		chainConfigs[chainSelector] = ChainConfig{
-			FChain:         int(config.FChain),
-			SupportedNodes: mapset.NewSet(config.Readers...),
+			FChain:         int(chainConfig.FChain),
+			SupportedNodes: mapset.NewSet(chainConfig.Readers...),
+			Config:         decoded,
 		}
 	}
 	return chainConfigs
@@ -309,7 +316,7 @@ type ChainConfig struct {
 	// SupportedNodes is a map of PeerIDs to SupportedChains.
 	SupportedNodes mapset.Set[libocrtypes.PeerID] `json:"supportedNodes"`
 	// Config is the chain specific configuration.
-	Config []byte `json:"config"`
+	Config chainconfig.ChainConfig `json:"config"`
 }
 
 // OCR3Config mirrors CCIPConfig.sol's OCR3Config struct

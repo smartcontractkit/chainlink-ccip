@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -186,7 +187,9 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: []byte{0},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
+					FinalityDepth: 1,
+				}),
 			},
 		}, {
 			ChainSelector: dstSelector,
@@ -195,7 +198,9 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: []byte{0},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
+					FinalityDepth: 1,
+				}),
 			},
 		},
 	}
@@ -265,4 +270,12 @@ func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
 	}
 	return res
+}
+
+func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
+	encoded, err := chainconfig.EncodeChainConfig(cc)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }
