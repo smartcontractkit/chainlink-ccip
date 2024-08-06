@@ -32,7 +32,6 @@ type Plugin struct {
 	log               logger.Logger
 	homeChain         reader.HomeChain
 
-	onChain      OnChain
 	reportingCfg ocr3types.ReportingPluginConfig
 }
 
@@ -47,7 +46,6 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	log logger.Logger,
 	homeChain reader.HomeChain,
-	onChain OnChain,
 	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
@@ -66,7 +64,6 @@ func NewPlugin(
 		oracleIDToP2pID:   oracleIDToP2pID,
 		log:               log,
 		cfg:               cfg,
-		onChain:           onChain,
 		tokenPricesReader: tokenPricesReader,
 		ccipReader:        ccipReader,
 		homeChain:         homeChain,
