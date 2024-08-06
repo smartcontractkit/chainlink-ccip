@@ -101,6 +101,13 @@ func NewCCIPChainReader(
 	}
 }
 
+// WithExtendedContractReader sets the extended contract reader for the provided chain.
+func (r *CCIPChainReader) WithExtendedContractReader(
+	ch cciptypes.ChainSelector, cr contractreader.Extended) *CCIPChainReader {
+	r.contractReaders[ch] = cr
+	return r
+}
+
 func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
 ) ([]plugintypes.CommitPluginReportWithMeta, error) {
@@ -161,7 +168,6 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
-			Limit:  query.Limit{Count: uint64(limit)},
 		},
 		&ev,
 	)
@@ -235,7 +241,10 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		})
 	}
 
-	return reports, nil
+	if len(reports) < limit {
+		return reports, nil
+	}
+	return reports[:limit], nil
 }
 
 func (r *CCIPChainReader) ExecutedMessageRanges(
@@ -328,9 +337,6 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		query.LimitAndSort{
 			SortBy: []query.SortBy{
 				query.NewSortByTimestamp(query.Asc),
-			},
-			Limit: query.Limit{
-				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
 		&SendRequestedEvent{},
