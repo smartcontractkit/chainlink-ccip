@@ -93,7 +93,7 @@ images:
 
 hooks:
   - command: ${SCRIPTS_DIR}/check_env_vars.sh
-    args: [ "ccip" ]
+    args: ["ccip"]
     events: ["before:deploy:app"]
 
 # This is a list of `deployments` that DevSpace can create for this project
