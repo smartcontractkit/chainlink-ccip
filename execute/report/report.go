@@ -193,6 +193,13 @@ func (b *execReportBuilder) checkMessage(
 			"sourceChain", execReport.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
 			"data", tokenData)
+	} else {
+		b.lggr.Debugw(
+			"token data reader not set, skipping token data read",
+			"messageID", msg.Header.MessageID,
+			"sourceChain", execReport.SourceChain,
+			"seqNum", msg.Header.SequenceNumber)
+		execReport.TokenData = append(execReport.TokenData, nil)
 	}
 
 	// TODO: Check for valid nonce
