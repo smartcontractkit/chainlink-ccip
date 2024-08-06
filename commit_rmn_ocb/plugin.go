@@ -3,6 +3,7 @@ package commitrmnocb
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -10,8 +11,10 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -23,7 +26,7 @@ type Plugin struct {
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	log               logger.Logger
 	rmn               Rmn
-	cfg               CommitPluginConfig
+	cfg               pluginconfig.CommitPluginConfig
 	onChain           OnChain
 	tokenPricesReader reader.TokenPrices
 	ccipReader        reader.CCIP
@@ -37,7 +40,7 @@ func NewPlugin(
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	log logger.Logger,
 	rmn Rmn,
-	cfg CommitPluginConfig,
+	cfg pluginconfig.CommitPluginConfig,
 	onChain OnChain,
 	tokenPricesReader reader.TokenPrices,
 	ccipReader reader.CCIP,
@@ -99,9 +102,18 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, 
 }
 
 // TODO: doc
-// is this all source chains? across all nodes?
-func (p *Plugin) sourceChains() []cciptypes.ChainSelector {
-	return []cciptypes.ChainSelector{}
+func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
+	knownSourceChains, err := p.homeChain.GetKnownCCIPChains()
+	if err != nil {
+		p.log.Errorw("error getting known chains", "err", err)
+		return nil
+	}
+	knownSourceChainsSlice := knownSourceChains.ToSlice()
+	sort.Slice(
+		knownSourceChainsSlice,
+		func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] },
+	)
+	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
 
 // Return the set of chains that the given Oracle is configured to access
@@ -126,6 +138,15 @@ func (p *Plugin) supportsDestChain(oracle commontypes.OracleID) (bool, error) {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[oracle]), nil
+}
+
+func (p *Plugin) supportsTokenPriceChain() (bool, error) {
+	tokPriceChainConfig, err := p.homeChain.GetChainConfig(
+		cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector))
+	if err != nil {
+		return false, fmt.Errorf("get token price chain config: %w", err)
+	}
+	return tokPriceChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
 }
 
 func syncFrequency(configuredValue time.Duration) time.Duration {
