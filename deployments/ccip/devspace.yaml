@@ -253,6 +253,9 @@ deployments:
                 memory: 1024Mi
           # default cluster shipped with latest Geth ( dev mode by default )
           geth:
+            statefulSet:
+              # Set to true to use StatefulSet instead of Deployment.
+              enabled: true
             networkPolicy:
               # Allow additional services to access geth
               extraIngressSelectors:
