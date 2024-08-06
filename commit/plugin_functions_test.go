@@ -1546,7 +1546,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainNextSeqNums, nil)
-			valid, err := validateMerkleRootsState(ctx, lggr, rep, reader)
+			valid, err := ValidateMerkleRootsState(ctx, lggr, rep, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

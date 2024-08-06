@@ -591,8 +591,8 @@ func ValidateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
 	return nil
 }
 
-// validateMerkleRootsState merkle roots seq nums validation by comparing with on-chain state.
-func validateMerkleRootsState(
+// ValidateMerkleRootsState merkle roots seq nums validation by comparing with on-chain state.
+func ValidateMerkleRootsState(
 	ctx context.Context,
 	lggr logger.Logger,
 	report cciptypes.CommitPluginReport,

@@ -251,14 +251,6 @@ type ChainRange struct {
 	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
 }
 
-// Rmn is an interface for all RMN logic
-type Rmn interface {
-	// RequestOnRampMaxSeqNums returns the maximum sequence number that RMN finds on the OnRamp for each given chain
-	// (for the configured dest chain)
-	RequestOnRampMaxSeqNums(chains []cciptypes.ChainSelector) ([]plugintypes.SeqNumChain, error)
-	RequestMerkleRoots(chainRanges []ChainRange) ([]cciptypes.MerkleRootChain, error)
-}
-
 type OnChain interface {
 	// GetOnRampMaxSeqNums returns the maximum sequence number that this oracle finds on the OnRamp for each given chain
 	// (for the configured dest chain)
