@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4.1.2
 
       - name: Deploy and validate CRIB Environment for Core
-        uses: smartcontractkit/.github/actions/setup-crib-environment@3c78a88c065000589cf52ec9a2b17c9db00fc66e
+        uses: smartcontractkit/.github/actions/setup-crib-environment@558c326193176424a00c2319cdaba49a0f4a547b
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -30,3 +30,4 @@ jobs:
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           product: "core"
+          working-directory: "deployments/core"

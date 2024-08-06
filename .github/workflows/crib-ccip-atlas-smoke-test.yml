@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
 
       - name: Deploy and validate CRIB Environment for CCIP and Atlas
-        uses: smartcontractkit/.github/actions/setup-crib-environment@3c78a88c065000589cf52ec9a2b17c9db00fc66e
+        uses: smartcontractkit/.github/actions/setup-crib-environment@558c326193176424a00c2319cdaba49a0f4a547b
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -30,3 +30,4 @@ jobs:
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           product: "ccip"
+          working-directory: "deployments/ccip"
