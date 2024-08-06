@@ -27,9 +27,10 @@ func (p *Plugin) Observation(
 
 	switch nextState {
 	case SelectingRangesForReport:
+		offRampNextSeqNums := p.ObserveOffRampNextSeqNums(ctx)
 		return CommitPluginObservation{
-			OnRampMaxSeqNums:   p.ObserveOnRampMaxSeqNums(),
-			OffRampNextSeqNums: p.ObserveOffRampNextSeqNums(ctx),
+			OnRampMaxSeqNums:   p.ObserveOnRampMaxSeqNums(offRampNextSeqNums),
+			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             p.ObserveFChain(),
 		}.Encode()
 
@@ -53,11 +54,17 @@ func (p *Plugin) Observation(
 	}
 }
 
-// ObserveOnRampMaxSeqNums TODO: doc
-func (p *Plugin) ObserveOnRampMaxSeqNums() []plugintypes.SeqNumChain {
-	onRampMaxSeqNums, err := p.onChain.GetOnRampMaxSeqNums()
-	if err != nil {
-		p.log.Warnw("call to GetOnRampMaxSeqNums failed", "err", err)
+// ObserveOnRampMaxSeqNums Simply add NewMsgScanBatchSize to the offRampNextSeqNums
+// TODO: read from the source chain OnRamps to get their OnRampMaxSeqNums
+func (p *Plugin) ObserveOnRampMaxSeqNums(offRampNextSeqNums []plugintypes.SeqNumChain) []plugintypes.SeqNumChain {
+	onRampMaxSeqNums := make([]plugintypes.SeqNumChain, len(offRampNextSeqNums))
+	copy(onRampMaxSeqNums, offRampNextSeqNums)
+
+	for i := range onRampMaxSeqNums {
+		onRampMaxSeqNums[i] = plugintypes.NewSeqNumChain(
+			onRampMaxSeqNums[i].ChainSel,
+			onRampMaxSeqNums[i].SeqNum+cciptypes.SeqNum(p.cfg.NewMsgScanBatchSize),
+		)
 	}
 
 	return onRampMaxSeqNums

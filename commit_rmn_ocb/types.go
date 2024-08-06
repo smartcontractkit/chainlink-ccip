@@ -251,12 +251,6 @@ type ChainRange struct {
 	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
 }
 
-type OnChain interface {
-	// GetOnRampMaxSeqNums returns the maximum sequence number that this oracle finds on the OnRamp for each given chain
-	// (for the configured dest chain)
-	GetOnRampMaxSeqNums() ([]plugintypes.SeqNumChain, error)
-}
-
 // CommitPluginReport is the report that will be transmitted by the Commit Plugin
 type CommitPluginReport struct {
 	MerkleRoots []cciptypes.MerkleRootChain
