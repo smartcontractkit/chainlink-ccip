@@ -347,7 +347,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	isValid, err := validateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
+	isValid, err := ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
 	if !isValid {
 		return false, nil
 	}

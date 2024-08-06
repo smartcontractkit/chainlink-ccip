@@ -21,30 +21,34 @@ import (
 )
 
 type Plugin struct {
-	reportingCfg      ocr3types.ReportingPluginConfig
 	nodeID            commontypes.OracleID
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	log               logger.Logger
-	rmn               Rmn
 	cfg               pluginconfig.CommitPluginConfig
-	onChain           OnChain
-	tokenPricesReader reader.TokenPrices
 	ccipReader        reader.CCIP
-	homeChain         reader.HomeChain
 	readerSyncer      *plugincommon.BackgroundReaderSyncer
+	tokenPricesReader reader.TokenPrices
+	reportCodec       cciptypes.CommitPluginCodec
+	msgHasher         cciptypes.MessageHasher
+	log               logger.Logger
+	homeChain         reader.HomeChain
+
+	onChain      OnChain
+	reportingCfg ocr3types.ReportingPluginConfig
 }
 
 func NewPlugin(
-	reportingCfg ocr3types.ReportingPluginConfig,
+	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	log logger.Logger,
-	rmn Rmn,
 	cfg pluginconfig.CommitPluginConfig,
-	onChain OnChain,
-	tokenPricesReader reader.TokenPrices,
 	ccipReader reader.CCIP,
+	tokenPricesReader reader.TokenPrices,
+	reportCodec cciptypes.CommitPluginCodec,
+	msgHasher cciptypes.MessageHasher,
+	log logger.Logger,
 	homeChain reader.HomeChain,
+	onChain OnChain,
+	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		log,
@@ -61,13 +65,13 @@ func NewPlugin(
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		log:               log,
-		rmn:               rmn,
 		cfg:               cfg,
 		onChain:           onChain,
 		tokenPricesReader: tokenPricesReader,
 		ccipReader:        ccipReader,
 		homeChain:         homeChain,
 		readerSyncer:      readerSyncer,
+		reportCodec:       reportCodec,
 	}
 }
 
