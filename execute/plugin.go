@@ -166,7 +166,7 @@ func (p *Plugin) Observation(
 		}
 	}
 
-	fetchFrom := time.Now().Add(-p.cfg.MessageVisibilityInterval).UTC()
+	fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
 	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a

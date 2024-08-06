@@ -13,12 +13,12 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	helpers "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -458,13 +458,25 @@ func mockMsgsBetweenSeqNums(
 	).Return(msgs, nil)
 }
 
+func mustEncodeChainConfig(cfg chainconfig.ChainConfig) []byte {
+	b, err := chainconfig.EncodeChainConfig(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 var (
-	chainA               = cciptypes.ChainSelector(1)
-	cfgA                 = []byte("ChainA")
+	chainA = cciptypes.ChainSelector(1)
+	cfgA   = mustEncodeChainConfig(chainconfig.ChainConfig{
+		FinalityDepth: 1,
+	})
 	lastCommittedSeqNumA = cciptypes.SeqNum(10)
 	seqNumA              = cciptypes.SeqNum(11)
 	chainB               = cciptypes.ChainSelector(2)
-	cfgB                 = []byte("ChainB")
+	cfgB                 = mustEncodeChainConfig(chainconfig.ChainConfig{
+		FinalityDepth: 1,
+	})
 	lastCommittedSeqNumB = cciptypes.SeqNum(20)
 	seqNumB              = cciptypes.SeqNum(21)
 
@@ -490,16 +502,15 @@ var (
 	}
 
 	destChain = cciptypes.ChainSelector(3)
-	cfgC      = []byte("destChain")
+	cfgC      = mustEncodeChainConfig(chainconfig.ChainConfig{
+		FinalityDepth: 1,
+	})
 	fChainOne = uint8(1)
 
 	pIDs1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
-	tokenX    = types.Account("tk_xxx")
 
 	destCfg = pluginconfig.CommitPluginConfig{
 		DestChain:           destChain,
-		PricedTokens:        []types.Account{tokenX},
-		TokenPricesObserver: false,
 		NewMsgScanBatchSize: 256,
 	}
 )
