@@ -1,6 +1,7 @@
 name: CRIB CCIP/Atlas Smoke Test
 
 on:
+  workflow_dispatch:
   push:
     paths:
       # Include common changes

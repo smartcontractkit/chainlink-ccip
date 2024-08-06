@@ -41,6 +41,13 @@ chainlink:
       Name = 'geth'
       WSURL = 'ws://geth-1337:8546'
       HTTPURL = 'http://geth-1337:8544'
+      [EVM.Transactions]
+      MaxInFlight = 0
+      MaxQueued = 0
+      [EVM.GasEstimator]
+      Mode = 'BlockHistory'
+      PriceDefault = '50 gwei'
+      PriceMin = '50 gwei'
       [WebServer.RateLimit]
       Authenticated = 2000
       Unauthenticated = 1000
