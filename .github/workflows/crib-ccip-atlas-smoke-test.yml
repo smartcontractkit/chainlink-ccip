@@ -3,10 +3,15 @@ name: CRIB CCIP/Atlas Smoke Test
 on:
   push:
     paths:
+      # Include common changes
+      - "*"
+      - "components/**"
+      - "scripts/**"
+      # Include crib ccip changes
       - "deployments/ccip/**"
-      - "!(deployments/core)/**" # Exclude changes in the core directory
-      - "!*.md" # Exclude markdown files
-      - "*" # Include any common changes
+      - "./github/workflows/crib-ccip-atlas-smoke-test.yml"
+      # Exclude doc updates
+      - '!**/*.md'  # Exclude doc updates
 
 jobs:
   run-crib-ccip-atlas-smoke-test:
