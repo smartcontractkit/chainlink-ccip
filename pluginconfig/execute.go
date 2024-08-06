@@ -9,20 +9,27 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
+// ExecutePluginConfig is configuration for the execute plugin
+// which includes the offchain configuration as well as other parameters
+// fetched from the OCR configuration.
 type ExecutePluginConfig struct {
 	// DestChain is the ccip destination chain configured for the execute DON.
 	DestChain cciptypes.ChainSelector `json:"destChain"`
 
-	// SyncTimeout is the timeout for syncing the commit plugin reader.
+	// SyncTimeout is the timeout for syncing the exec plugin ccip reader.
 	SyncTimeout time.Duration `json:"syncTimeout"`
 
-	// SyncFrequency is the frequency at which the commit plugin reader should sync.
+	// SyncFrequency is the frequency at which the exec plugin ccip reader should sync.
 	SyncFrequency time.Duration `json:"syncFrequency"`
 
 	// OffchainConfig is the offchain config set for the exec DON.
 	OffchainConfig ExecuteOffchainConfig `json:"offchainConfig"`
 }
 
+// ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
+// This is posted onchain as part of the OCR configuration process of the exec plugin.
+// Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
+// method on the ReportingPluginFactory interface.
 type ExecuteOffchainConfig struct {
 	// BatchGasLimit is the maximum sum of user callback gas we permit in one execution report.
 	// EVM only.

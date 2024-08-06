@@ -46,6 +46,8 @@ func (c CommitPluginConfig) Validate() error {
 
 // ArbitrumPriceSource is the source of the TOKEN/USD price data of a particular token
 // on Arbitrum.
+// The commit plugin will use this to fetch prices for a particular token.
+// See the PriceSources mapping in the CommitOffchainConfig struct.
 type ArbitrumPriceSource struct {
 	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on arbitrum.
 	AggregatorAddress string `json:"aggregatorAddress"`
@@ -77,6 +79,9 @@ func (a ArbitrumPriceSource) Validate() error {
 }
 
 // CommitOffchainConfig is the OCR offchainConfig for the commit plugin.
+// This is posted onchain as part of the OCR configuration process of the commit plugin.
+// Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
+// method on the ReportingPluginFactory interface.
 type CommitOffchainConfig struct {
 	// RemoteGasPriceBatchWriteFrequency is the frequency at which the commit plugin
 	// should write gas prices to the remote chain.

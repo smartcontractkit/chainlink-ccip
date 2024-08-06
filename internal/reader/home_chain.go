@@ -271,7 +271,10 @@ func createNodesSupportedChains(
 	return nodeSupportedChains
 }
 
-func convertOnChainConfigToHomeChainConfig(lggr logger.Logger, chainConfigInfos []ChainConfigInfo) map[cciptypes.ChainSelector]ChainConfig {
+func convertOnChainConfigToHomeChainConfig(
+	lggr logger.Logger,
+	chainConfigInfos []ChainConfigInfo,
+) map[cciptypes.ChainSelector]ChainConfig {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
 	for _, chainConfigInfo := range chainConfigInfos {
 		chainSelector := chainConfigInfo.ChainSelector
