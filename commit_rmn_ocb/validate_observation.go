@@ -42,8 +42,8 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("failed to validate OnRampMaxSeqNums: %w", err)
 	}
 
-	if err := validateObservedOffRampMaxSeqNums(obs.OffRampMaxSeqNums, ao.Observer, supportsDestChain); err != nil {
-		return fmt.Errorf("failed to validate OffRampMaxSeqNums: %w", err)
+	if err := validateObservedOffRampMaxSeqNums(obs.OffRampNextSeqNums, ao.Observer, supportsDestChain); err != nil {
+		return fmt.Errorf("failed to validate OffRampNextSeqNums: %w", err)
 	}
 
 	if err := commit.ValidateObservedTokenPrices(obs.TokenPrices); err != nil {
@@ -58,7 +58,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 }
 
 func validateObservedMerkleRoots(
-	merkleRoots []MerkleRoot,
+	merkleRoots []cciptypes.MerkleRootChain,
 	observer commontypes.OracleID,
 	observerSupportedChains mapset.Set[cciptypes.ChainSelector],
 ) error {
