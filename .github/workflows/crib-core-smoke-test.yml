@@ -1,12 +1,18 @@
 name: CRIB Core Smoke Test
 
 on:
+  workflow_dispatch:
   push:
     paths:
+      # Include common changes
+      - "*"
+      - "components/**"
+      - "scripts/**"
+      # Include crib core changes
       - "core/**"
-      - "!(ccip)/**" # Exclude changes in the ccip directory
-      - "!*.md" # Exclude markdown files
-      - "*" # Include any common changes
+      - "./github/workflows/crib-core-smoke-test.yml"
+      # Exclude doc updates
+      - '!**/*.md'  # Exclude doc updates
 
 jobs:
   run-crib-core-smoke-test:
