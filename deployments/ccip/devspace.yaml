@@ -473,4 +473,3 @@ profiles:
               name: crib-ccip
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip
               version: null
-
