@@ -16,7 +16,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 	}
 
 	report := CommitPluginReport{
-		SignedRoots: outcome.SignedRootsToReport,
+		MerkleRoots: outcome.RootsToReport,
 		GasPrices:   outcome.GasPrices,
 		TokenPrices: outcome.TokenPrices,
 	}
@@ -71,7 +71,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// TODO: metrics
 	p.log.Debugw("transmitting report",
-		"signedRoots", len(decodedReport.SignedRoots),
+		"signedRoots", len(decodedReport.MerkleRoots),
 		"tokenPrices", len(decodedReport.TokenPrices),
 		"gasPriceUpdates", len(decodedReport.GasPrices),
 	)

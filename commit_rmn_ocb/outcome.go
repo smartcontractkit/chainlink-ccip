@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -58,9 +59,9 @@ func (p *Plugin) ReportRangesOutcome(
 	}
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
-	observedOffRampMaxSeqNumsMap := consensusObservation.OffRampMaxSeqNums
+	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
 
-	for chainSel, offRampMaxSeqNum := range observedOffRampMaxSeqNumsMap {
+	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
 		if !exists {
 			continue
@@ -70,18 +71,10 @@ func (p *Plugin) ReportRangesOutcome(
 			onRampMaxSeqNum = min(onRampMaxSeqNum, rmnOnRampMaxSeqNum)
 		}
 
-		if offRampMaxSeqNum > onRampMaxSeqNum {
-			// TODO: metrics
-			p.log.Warnw("Found an offRampMaxSeqNum greater than an onRampMaxSeqNum",
-				"offRampMaxSeqNum", offRampMaxSeqNum,
-				"onRampMaxSeqNum", onRampMaxSeqNum,
-				"chainSelector", chainSel)
-		}
-
-		if offRampMaxSeqNum < onRampMaxSeqNum {
+		if offRampNextSeqNum <= onRampMaxSeqNum {
 			chainRange := ChainRange{
 				ChainSel:    chainSel,
-				SeqNumRange: [2]cciptypes.SeqNum{offRampMaxSeqNum, onRampMaxSeqNum},
+				SeqNumRange: [2]cciptypes.SeqNum{offRampNextSeqNum, onRampMaxSeqNum},
 			}
 			rangesToReport = append(rangesToReport, chainRange)
 		}
@@ -98,108 +91,30 @@ func (p *Plugin) ReportRangesOutcome(
 	return outcome.Encode()
 }
 
-// Given a set of observed merkle roots, gas prices and token prices, and signed roots from RMN, construct a report
+// Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
 // to transmit on-chain
 func (p *Plugin) buildReport(
 	query CommitQuery,
 	consensusObservation ConsensusObservation,
 ) (ocr3types.Outcome, error) {
-	verifiedSignedRoots := p.verifySignedRoots(query.SignedMerkleRoots, consensusObservation.MerkleRoots)
-
-	// Only include chains in the report that have gas prices
-	// TODO: is this correct?
-	chainsToExclude := make([]cciptypes.ChainSelector, 0)
-	for chain := range verifiedSignedRoots {
-		if _, exists := consensusObservation.GasPrices[chain]; !exists {
-			// TODO: metrics
-			p.log.Warnw(
-				"did not find a consensus gas price for chain %d, excluding it from the report", chain)
-			chainsToExclude = append(chainsToExclude, chain)
-		}
-	}
-
-	for _, chainSelector := range chainsToExclude {
-		delete(verifiedSignedRoots, chainSelector)
-	}
+	// TODO: Only include chains in the report that have gas prices?
 
 	// TODO: token prices validation
 	// exclude merkle roots if expected token prices don't exist?
 
-	verifiedSignedRootsArray := make([]SignedMerkleRoot, 0, len(verifiedSignedRoots))
-	for _, signedRoot := range verifiedSignedRoots {
-		verifiedSignedRootsArray = append(verifiedSignedRootsArray, signedRoot)
-	}
+	roots := maps.Values(consensusObservation.MerkleRoots)
 
 	// We sort here so that Outcome serializes deterministically
-	sort.Slice(verifiedSignedRootsArray, func(i, j int) bool {
-		return verifiedSignedRootsArray[i].chain() < verifiedSignedRootsArray[j].chain()
+	sort.Slice(roots, func(i, j int) bool {
+		return roots[i].ChainSel < roots[j].ChainSel
 	})
 
 	return CommitPluginOutcome{
-		OutcomeType:         ReportGenerated,
-		SignedRootsToReport: verifiedSignedRootsArray,
-		GasPrices:           consensusObservation.GasPricesSortedArray(),
-		TokenPrices:         consensusObservation.TokenPricesSortedArray(),
+		OutcomeType:   ReportGenerated,
+		RootsToReport: roots,
+		GasPrices:     consensusObservation.GasPricesSortedArray(),
+		TokenPrices:   consensusObservation.TokenPricesSortedArray(),
 	}.Encode()
-}
-
-// Given a list of signed roots from RMN and observed roots, return the list of signed roots that should be included
-// in the next report.
-//
-// A merkle root will be excluded if:
-// - it was signed by RMN but one of these signatures is invalid or there are not enough signatures
-// - the root from RMN differs from the observed root for a given chain
-// - RMN returned a merkle root, but we did not observe a root for the given chain
-func (p *Plugin) verifySignedRoots(
-	rmnSignedRoots []SignedMerkleRoot,
-	observedRoots map[cciptypes.ChainSelector]MerkleRoot,
-) map[cciptypes.ChainSelector]SignedMerkleRoot {
-	verifiedSignedRoots := make(map[cciptypes.ChainSelector]SignedMerkleRoot)
-	for _, signedRoot := range rmnSignedRoots {
-		if err := p.rmn.VerifySignedMerkleRoot(signedRoot); err != nil {
-			// TODO: metrics
-			p.log.Warnw("failed to verify signed merkle root",
-				"err", err,
-				"signedRoot", signedRoot)
-			continue
-		}
-
-		if observedMerkleRoot, exists := observedRoots[signedRoot.chain()]; exists {
-			if observedMerkleRoot == signedRoot.MerkleRoot {
-				verifiedSignedRoots[signedRoot.chain()] = signedRoot
-			} else {
-				// TODO: metrics
-				p.log.Warnw("observed merkle root does not match merkle root received from RMN",
-					"rmnSignedRoot", signedRoot,
-					"observedMerkleRoot", observedMerkleRoot)
-			}
-		} else {
-			// TODO: metrics
-			p.log.Warnw(
-				"received a signed merkle root from RMN for a chain, but did not observe a merkle root for "+
-					"this chain",
-				"rmnSignedRoot", signedRoot)
-		}
-	}
-
-	// TODO: explain this
-	for chain, observedMerkleRoot := range observedRoots {
-		if _, exists := verifiedSignedRoots[chain]; !exists {
-			if p.rmn.ChainThreshold(chain) == 0 {
-				verifiedSignedRoots[chain] = SignedMerkleRoot{
-					MerkleRoot: observedMerkleRoot,
-					RmnSigs:    []RmnSig{},
-				}
-			} else {
-				// TODO: metrics
-				p.log.Warnw(
-					"did not receive RMN signatures for chain %d that requires %d RMN signatures, "+
-						"MerkleRoot: %v", chain, p.rmn.ChainThreshold(chain), observedMerkleRoot)
-			}
-		}
-	}
-
-	return verifiedSignedRoots
 }
 
 // checkForReportTransmission checks if the OffRamp has an updated set of max seq nums compared to the seq nums that
@@ -215,8 +130,8 @@ func (p *Plugin) checkForReportTransmission(
 ) (ocr3types.Outcome, error) {
 
 	offRampUpdated := false
-	for _, previousSeqNumChain := range previousOutcome.OffRampMaxSeqNums {
-		if currentSeqNum, exists := consensusObservation.OffRampMaxSeqNums[previousSeqNumChain.ChainSel]; exists {
+	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
+		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
 			if previousSeqNumChain.SeqNum != currentSeqNum {
 				offRampUpdated = true
 				break
@@ -238,7 +153,7 @@ func (p *Plugin) checkForReportTransmission(
 
 	return CommitPluginOutcome{
 		OutcomeType:                     ReportNotYetTransmitted,
-		OffRampMaxSeqNums:               previousOutcome.OffRampMaxSeqNums,
+		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
 	}.Encode()
 }
@@ -254,19 +169,20 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 			fmt.Errorf("no consensus value for fDestChain, DestChain: %d", p.cfg.DestChain)
 	}
 
-	fTokenChain, exists := fChains[p.cfg.TokenPriceChain]
+	fTokenChain, exists := fChains[cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector)]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d", p.cfg.TokenPriceChain)
+			fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d",
+				p.cfg.OffchainConfig.TokenPriceChainSelector)
 	}
 
 	consensusObs := ConsensusObservation{
-		MerkleRoots:       p.merkleRootConsensus(aggObs.MerkleRoots, fChains),
-		GasPrices:         p.gasPriceConsensus(aggObs.GasPrices, fChains),
-		TokenPrices:       p.tokenPriceConsensus(aggObs.TokenPrices, fTokenChain),
-		OnRampMaxSeqNums:  p.onRampMaxSeqNumsConsensus(aggObs.OnRampMaxSeqNums, fChains),
-		OffRampMaxSeqNums: p.offRampMaxSeqNumsConsensus(aggObs.OffRampMaxSeqNums, fDestChain),
-		FChain:            fChains,
+		MerkleRoots:        p.merkleRootConsensus(aggObs.MerkleRoots, fChains),
+		GasPrices:          p.gasPriceConsensus(aggObs.GasPrices, fChains),
+		TokenPrices:        p.tokenPriceConsensus(aggObs.TokenPrices, fTokenChain),
+		OnRampMaxSeqNums:   p.onRampMaxSeqNumsConsensus(aggObs.OnRampMaxSeqNums, fChains),
+		OffRampNextSeqNums: p.offRampMaxSeqNumsConsensus(aggObs.OffRampNextSeqNums, fDestChain),
+		FChain:             fChains,
 	}
 
 	return consensusObs, nil
@@ -276,10 +192,10 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 // root. The consensus merkle root for a given chain is the merkle root with the most observations that was observed at
 // least fChain times.
 func (p *Plugin) merkleRootConsensus(
-	rootsByChain map[cciptypes.ChainSelector][]MerkleRoot,
+	rootsByChain map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain,
 	fChains map[cciptypes.ChainSelector]int,
-) map[cciptypes.ChainSelector]MerkleRoot {
-	consensus := make(map[cciptypes.ChainSelector]MerkleRoot)
+) map[cciptypes.ChainSelector]cciptypes.MerkleRootChain {
+	consensus := make(map[cciptypes.ChainSelector]cciptypes.MerkleRootChain)
 
 	for chain, roots := range rootsByChain {
 		if f, exists := fChains[chain]; exists {

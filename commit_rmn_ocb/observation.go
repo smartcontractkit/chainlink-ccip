@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
@@ -27,9 +28,9 @@ func (p *Plugin) Observation(
 	switch nextState {
 	case SelectingRangesForReport:
 		return CommitPluginObservation{
-			OnRampMaxSeqNums:  p.ObserveOnRampMaxSeqNums(),
-			OffRampMaxSeqNums: p.ObserveOffRampMaxSeqNums(),
-			FChain:            p.ObserveFChain(),
+			OnRampMaxSeqNums:   p.ObserveOnRampMaxSeqNums(),
+			OffRampNextSeqNums: p.ObserveOffRampNextSeqNums(ctx),
+			FChain:             p.ObserveFChain(),
 		}.Encode()
 
 	case BuildingReport:
@@ -42,8 +43,8 @@ func (p *Plugin) Observation(
 
 	case WaitingForReportTransmission:
 		return CommitPluginObservation{
-			OffRampMaxSeqNums: p.ObserveOffRampMaxSeqNums(),
-			FChain:            p.ObserveFChain(),
+			OffRampNextSeqNums: p.ObserveOffRampNextSeqNums(ctx),
+			FChain:             p.ObserveFChain(),
 		}.Encode()
 
 	default:
@@ -62,34 +63,65 @@ func (p *Plugin) ObserveOnRampMaxSeqNums() []plugintypes.SeqNumChain {
 	return onRampMaxSeqNums
 }
 
-// ObserveOffRampMaxSeqNums TODO: doc
-func (p *Plugin) ObserveOffRampMaxSeqNums() []plugintypes.SeqNumChain {
-	offRampMaxSeqNums, err := p.onChain.GetOffRampMaxSeqNums()
+// ObserveOffRampNextSeqNums TODO: impl
+func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
+	supportsDestChain, err := p.supportsDestChain(p.nodeID)
 	if err != nil {
-		p.log.Warnw("call to GetOffRampMaxSeqNums failed", "err", err)
+		p.log.Warnw("call to SupportsDestChain failed", "err", err)
+		return nil
 	}
 
-	return offRampMaxSeqNums
+	if supportsDestChain {
+		sourceChains := p.knownSourceChainsSlice()
+		offRampNextSeqNums, err := p.ccipReader.NextSeqNum(ctx, sourceChains)
+		if err != nil {
+			p.log.Warnw("call to NextSeqNum failed", "err", err)
+			return nil
+		}
+
+		if len(offRampNextSeqNums) != len(sourceChains) {
+			p.log.Warnf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
+				len(offRampNextSeqNums), len(sourceChains))
+			return nil
+		}
+
+		result := make([]plugintypes.SeqNumChain, len(sourceChains))
+		for i := range sourceChains {
+			result = append(result, plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]})
+		}
+
+		return result
+	}
+
+	return nil
 }
 
 // ObserveMerkleRoots TODO: doc
-func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []MerkleRoot {
-	roots := make([]MerkleRoot, len(ranges))
+func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []cciptypes.MerkleRootChain {
+	roots := make([]cciptypes.MerkleRootChain, len(ranges))
+	supportedChains, err := p.supportedChains(p.nodeID)
+	if err != nil {
+		p.log.Warnw("call to supportedChains failed", "err", err)
+		return nil
+	}
+
 	for _, chainRange := range ranges {
-		msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
-		if err != nil {
-			p.log.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
-		} else {
-			root, err := computeMerkleRoot(msgs)
+		if supportedChains.Contains(chainRange.ChainSel) {
+			msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
 			if err != nil {
-				p.log.Warnw("call to computeMerkleRoot failed", "err", err)
+				p.log.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
 			} else {
-				merkleRoot := MerkleRoot{
-					ChainSel:    chainRange.ChainSel,
-					SeqNumRange: chainRange.SeqNumRange,
-					RootHash:    root,
+				root, err := computeMerkleRoot(msgs)
+				if err != nil {
+					p.log.Warnw("call to computeMerkleRoot failed", "err", err)
+				} else {
+					merkleRoot := cciptypes.MerkleRootChain{
+						ChainSel:     chainRange.ChainSel,
+						SeqNumsRange: chainRange.SeqNumRange,
+						MerkleRoot:   root,
+					}
+					roots = append(roots, merkleRoot)
 				}
-				roots = append(roots, merkleRoot)
 			}
 		}
 	}
@@ -140,7 +172,7 @@ func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
 // ObserveGasPrices TODO: doc
 func (p *Plugin) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain {
 	// TODO: Should this be sourceChains or supportedChains?
-	chains := p.sourceChains()
+	chains := p.knownSourceChainsSlice()
 	if len(chains) == 0 {
 		return []cciptypes.GasPriceChain{}
 	}
@@ -179,19 +211,52 @@ func (p *Plugin) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice 
 
 // ObserveTokenPricesHelper TODO: doc
 func (p *Plugin) observeTokenPricesHelper(ctx context.Context) ([]cciptypes.TokenPrice, error) {
-	if p.cfg.TokenPricesObserver {
-		tokenPrices, err := p.tokenPricesReader.GetTokenPricesUSD(ctx, p.cfg.PricedTokens)
+	//if p.cfg.TokenPricesObserver {
+	//	tokenPrices, err := p.tokenPricesReader.GetTokenPricesUSD(ctx, p.cfg.PricedTokens)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//
+	//	if len(tokenPrices) != len(p.cfg.PricedTokens) {
+	//		return nil, fmt.Errorf("token prices length mismatch: got %d, expected %d",
+	//			len(tokenPrices), len(p.cfg.PricedTokens))
+	//	}
+	//
+	//	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(p.cfg.PricedTokens))
+	//	for i, token := range p.cfg.PricedTokens {
+	//		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
+	//	}
+	//
+	//	return tokenPricesUSD, nil
+	//}
+
+	//var tokenPrices []cciptypes.TokenPrice
+	//if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
+	//	tokenPrices, err = observeTokenPrices(
+	//		ctx,
+	//		p.tokenPricesReader,
+	//		maps.Keys(p.cfg.OffchainConfig.PriceSources),
+	//	)
+	//	if err != nil {
+	//		return types.Observation{}, fmt.Errorf("observe token prices: %w", err)
+	//	}
+	//}
+
+	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
+		tokens := maps.Keys(p.cfg.OffchainConfig.PriceSources)
+
+		tokenPrices, err := p.tokenPricesReader.GetTokenPricesUSD(ctx, tokens)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get token prices: %w", err)
 		}
 
-		if len(tokenPrices) != len(p.cfg.PricedTokens) {
-			return nil, fmt.Errorf("token prices length mismatch: got %d, expected %d",
-				len(tokenPrices), len(p.cfg.PricedTokens))
+		if len(tokenPrices) != len(tokens) {
+			return nil, fmt.Errorf("internal critical error token prices length mismatch: got %d, want %d",
+				len(tokenPrices), len(tokens))
 		}
 
-		tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(p.cfg.PricedTokens))
-		for i, token := range p.cfg.PricedTokens {
+		tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokens))
+		for i, token := range tokens {
 			tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
 		}
 

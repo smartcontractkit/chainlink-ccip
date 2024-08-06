@@ -16,7 +16,7 @@ func (p *Plugin) Query(_ context.Context, outCtx ocr3types.OutcomeContext) (type
 		return p.BuildRmnSeqNumsQuery()
 
 	case BuildingReport:
-		return p.BuildSignedRootsQuery(previousOutcome)
+		return p.BuildMerkleRootsQuery(previousOutcome)
 
 	default:
 		return types.Query{}, nil
@@ -25,7 +25,7 @@ func (p *Plugin) Query(_ context.Context, outCtx ocr3types.OutcomeContext) (type
 
 // BuildRmnSeqNumsQuery builds a Query that contains OnRamp max seq nums from RMN
 func (p *Plugin) BuildRmnSeqNumsQuery() (types.Query, error) {
-	rmnMaxSourceSeqNums, err := p.rmn.RequestOnRampMaxSeqNums(p.cfg.AllSourceChains)
+	rmnMaxSourceSeqNums, err := p.rmn.RequestOnRampMaxSeqNums(p.knownSourceChainsSlice())
 	if err != nil {
 		return types.Query{}, err
 	}
@@ -38,9 +38,9 @@ func (p *Plugin) BuildRmnSeqNumsQuery() (types.Query, error) {
 	return encodedQuery, nil
 }
 
-// BuildSignedRootsQuery builds a Query that contains RMN signed roots
-func (p *Plugin) BuildSignedRootsQuery(previousOutcome CommitPluginOutcome) (types.Query, error) {
-	signedRoots, err := p.rmn.RequestSignedIntervals(previousOutcome.RangesSelectedForReport)
+// BuildMerkleRootsQuery builds a Query that contains RMN signed roots
+func (p *Plugin) BuildMerkleRootsQuery(previousOutcome CommitPluginOutcome) (types.Query, error) {
+	signedRoots, err := p.rmn.RequestMerkleRoots(previousOutcome.RangesSelectedForReport)
 	if err != nil {
 		return types.Query{}, err
 	}
