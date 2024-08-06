@@ -59,7 +59,6 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 	required_vars=(
 		"DEVSPACE_IMAGE"
 		"HOME"
-		"AWS_ACCOUNT_ID"
 	)
 
 	missing_vars=0 # Counter for missing variables
@@ -91,6 +90,7 @@ if [[ ${SETUP_AWS_PROFILE:-} != "false" ]]; then
 	else
 		# List of required environment variables
 		required_aws_vars=(
+			"AWS_ACCOUNT_ID"
 			"AWS_REGION"
 			# Should be the short name and not the full IAM role ARN.
 			"AWS_SSO_ROLE_NAME"
