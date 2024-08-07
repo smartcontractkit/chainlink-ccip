@@ -36,6 +36,8 @@ mkShell' {
     github-cli
     jq
 
+    kind
+
     # deployment
     awscli2
     devspace
@@ -59,6 +61,12 @@ mkShell' {
   CL_DATABASE_URL = "postgresql://chainlink:chainlink@localhost:5432/chainlink_test?sslmode=disable";
 
   shellHook = ''
+    # Some useful custom aliases
+    alias k=kubectl
+    alias kgp="kubectl get pod"
+    alias kge="kubectl get events --sort-by=.metadata.creationTimestamp"
+    alias kexec="kubectl exec -it"
+
     # Find the root of the git repository
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
     export PATH=$PATH:$repo_root/scripts
