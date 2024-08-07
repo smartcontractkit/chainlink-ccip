@@ -11,7 +11,7 @@ pipelines:
 
 deployments:
   beholder-test-client:
-    updateImageTags: false 
+    updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       releaseName: beholder-test-client
