@@ -14,7 +14,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 	outcome, err := DecodeCommitPluginOutcome(outcomeBytes)
 	if err != nil {
 		// TODO: metrics
-		p.log.Errorw("failed to decode CommitPluginOutcome", "outcomeBytes", outcomeBytes, "err", err)
+		p.lggr.Errorw("failed to decode CommitPluginOutcome", "outcomeBytes", outcomeBytes, "err", err)
 		return nil, fmt.Errorf("failed to decode CommitPluginOutcome: %w", err)
 	}
 
@@ -38,7 +38,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	isEmpty := decodedReport.IsEmpty()
 	if isEmpty {
-		p.log.Infow("skipping empty report")
+		p.lggr.Infow("skipping empty report")
 		return false, nil
 	}
 
@@ -53,7 +53,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("can't know if it's a writer: %w", err)
 	}
 	if !isWriter {
-		p.log.Infow("not a writer, skipping report transmission")
+		p.lggr.Infow("not a writer, skipping report transmission")
 		return false, nil
 	}
 
@@ -62,7 +62,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	isValid, err := commit.ValidateMerkleRootsState(ctx, p.log, decodedReport, p.ccipReader)
+	isValid, err := commit.ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
 	if !isValid {
 		return false, nil
 	}
@@ -70,7 +70,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("validate merkle roots state: %w", err)
 	}
 
-	p.log.Infow("transmitting report",
+	p.lggr.Infow("transmitting report",
 		"roots", len(decodedReport.MerkleRoots),
 		"tokenPriceUpdates", len(decodedReport.PriceUpdates.TokenPriceUpdates),
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),

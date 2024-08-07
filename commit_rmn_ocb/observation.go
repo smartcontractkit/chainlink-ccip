@@ -49,7 +49,7 @@ func (p *Plugin) Observation(
 		}.Encode()
 
 	default:
-		p.log.Warnw("Unexpected state", "state", nextState)
+		p.lggr.Warnw("Unexpected state", "state", nextState)
 		return types.Observation{}, nil
 	}
 }
@@ -74,7 +74,7 @@ func (p *Plugin) ObserveOnRampMaxSeqNums(offRampNextSeqNums []plugintypes.SeqNum
 func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	supportsDestChain, err := p.supportsDestChain(p.nodeID)
 	if err != nil {
-		p.log.Warnw("call to SupportsDestChain failed", "err", err)
+		p.lggr.Warnw("call to SupportsDestChain failed", "err", err)
 		return nil
 	}
 
@@ -82,12 +82,12 @@ func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.Se
 		sourceChains := p.knownSourceChainsSlice()
 		offRampNextSeqNums, err := p.ccipReader.NextSeqNum(ctx, sourceChains)
 		if err != nil {
-			p.log.Warnw("call to NextSeqNum failed", "err", err)
+			p.lggr.Warnw("call to NextSeqNum failed", "err", err)
 			return nil
 		}
 
 		if len(offRampNextSeqNums) != len(sourceChains) {
-			p.log.Warnf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
+			p.lggr.Warnf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
 				len(offRampNextSeqNums), len(sourceChains))
 			return nil
 		}
@@ -108,7 +108,7 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 	roots := make([]cciptypes.MerkleRootChain, len(ranges))
 	supportedChains, err := p.supportedChains(p.nodeID)
 	if err != nil {
-		p.log.Warnw("call to supportedChains failed", "err", err)
+		p.lggr.Warnw("call to supportedChains failed", "err", err)
 		return nil
 	}
 
@@ -116,11 +116,11 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 		if supportedChains.Contains(chainRange.ChainSel) {
 			msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
 			if err != nil {
-				p.log.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+				p.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
 			} else {
 				root, err := computeMerkleRoot(msgs)
 				if err != nil {
-					p.log.Warnw("call to computeMerkleRoot failed", "err", err)
+					p.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
 				} else {
 					merkleRoot := cciptypes.MerkleRootChain{
 						ChainSel:     chainRange.ChainSel,
@@ -186,12 +186,12 @@ func (p *Plugin) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain
 
 	gasPrices, err := p.ccipReader.GasPrices(ctx, chains)
 	if err != nil {
-		p.log.Warnw("failed to get gas prices", "err", err)
+		p.lggr.Warnw("failed to get gas prices", "err", err)
 		return []cciptypes.GasPriceChain{}
 	}
 
 	if len(gasPrices) != len(chains) {
-		p.log.Warnw(
+		p.lggr.Warnw(
 			"gas prices length mismatch",
 			"len(gasPrices)", len(gasPrices),
 			"len(chains)", len(chains),
@@ -211,44 +211,13 @@ func (p *Plugin) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain
 func (p *Plugin) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
 	tokenPrices, err := p.observeTokenPricesHelper(ctx)
 	if err != nil {
-		p.log.Warnw("call to ObserveTokenPrices failed", "err", err)
+		p.lggr.Warnw("call to ObserveTokenPrices failed", "err", err)
 	}
 	return tokenPrices
 }
 
 // ObserveTokenPricesHelper TODO: doc
 func (p *Plugin) observeTokenPricesHelper(ctx context.Context) ([]cciptypes.TokenPrice, error) {
-	//if p.cfg.TokenPricesObserver {
-	//	tokenPrices, err := p.tokenPricesReader.GetTokenPricesUSD(ctx, p.cfg.PricedTokens)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//
-	//	if len(tokenPrices) != len(p.cfg.PricedTokens) {
-	//		return nil, fmt.Errorf("token prices length mismatch: got %d, expected %d",
-	//			len(tokenPrices), len(p.cfg.PricedTokens))
-	//	}
-	//
-	//	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(p.cfg.PricedTokens))
-	//	for i, token := range p.cfg.PricedTokens {
-	//		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
-	//	}
-	//
-	//	return tokenPricesUSD, nil
-	//}
-
-	//var tokenPrices []cciptypes.TokenPrice
-	//if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
-	//	tokenPrices, err = observeTokenPrices(
-	//		ctx,
-	//		p.tokenPricesReader,
-	//		maps.Keys(p.cfg.OffchainConfig.PriceSources),
-	//	)
-	//	if err != nil {
-	//		return types.Observation{}, fmt.Errorf("observe token prices: %w", err)
-	//	}
-	//}
-
 	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
 		tokens := maps.Keys(p.cfg.OffchainConfig.PriceSources)
 
@@ -276,7 +245,7 @@ func (p *Plugin) observeTokenPricesHelper(ctx context.Context) ([]cciptypes.Toke
 func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.log.Warnw("call to GetFChain failed", "err", err)
+		p.lggr.Warnw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

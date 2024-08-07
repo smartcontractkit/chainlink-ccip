@@ -90,7 +90,7 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 	for _, ao := range aos {
 		obs, err := DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
-			// TODO: log
+			// TODO: lggr
 			continue
 		}
 

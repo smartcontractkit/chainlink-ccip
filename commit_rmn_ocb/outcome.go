@@ -203,7 +203,7 @@ func (p *Plugin) merkleRootConsensus(
 
 			if count <= f {
 				// TODO: metrics
-				p.log.Warnf("failed to reach consensus on a merkle root for chain %d "+
+				p.lggr.Warnf("failed to reach consensus on a merkle root for chain %d "+
 					"because no single merkle root was observed more than the expected %d times, found merkle root %d "+
 					"observed by only %d oracles, all observed merkle roots: %v",
 					chain, f, root, count, roots)
@@ -212,7 +212,7 @@ func (p *Plugin) merkleRootConsensus(
 			consensus[chain] = root
 		} else {
 			// TODO: metrics
-			p.log.Warnf("merkleRootConsensus: fChain not found for chain %d", chain)
+			p.lggr.Warnf("merkleRootConsensus: fChain not found for chain %d", chain)
 		}
 	}
 
@@ -232,7 +232,7 @@ func (p *Plugin) gasPriceConsensus(
 		if f, exists := fChains[chain]; exists {
 			if len(prices) < 2*f+1 {
 				// TODO: metrics
-				p.log.Warnf("could not reach consensus on gas prices for chain %d "+
+				p.lggr.Warnf("could not reach consensus on gas prices for chain %d "+
 					"because we did not receive more than 2f+1 observed prices, 2f+1: %d, len(prices): %d, prices: %v",
 					chain, 2*f+1, len(prices), prices)
 			}
@@ -240,7 +240,7 @@ func (p *Plugin) gasPriceConsensus(
 			consensus[chain] = slicelib.BigIntSortedMiddle(prices)
 		} else {
 			// TODO: metrics
-			p.log.Warnf("could not reach consensus on gas prices for chain %d because "+
+			p.lggr.Warnf("could not reach consensus on gas prices for chain %d because "+
 				"there was no consensus f value for this chain", chain)
 		}
 	}
@@ -261,7 +261,7 @@ func (p *Plugin) tokenPriceConsensus(
 	for tokenID, prices := range pricesByToken {
 		if len(prices) < 2*fTokenChain+1 {
 			// TODO: metrics
-			p.log.Warnf("could not reach consensus on token prices for token %s because "+
+			p.lggr.Warnf("could not reach consensus on token prices for token %s because "+
 				"we did not receive more than 2f+1 observed prices, 2f+1: %d, len(prices): %d, prices: %v",
 				tokenID, 2*fTokenChain+1, len(prices), prices)
 		}
@@ -285,7 +285,7 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 		if f, exists := fChains[chain]; exists {
 			if len(onRampMaxSeqNums) < 2*f+1 {
 				// TODO: metrics
-				p.log.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
+				p.lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
 					"because we did not receive more than 2f+1 observed sequence numbers, 2f+1: %d, "+
 					"len(onRampMaxSeqNums): %d, onRampMaxSeqNums: %v",
 					chain, 2*f+1, len(onRampMaxSeqNums), onRampMaxSeqNums)
@@ -295,7 +295,7 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 			}
 		} else {
 			// TODO: metrics
-			p.log.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
+			p.lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
 				"because there was no consensus f value for this chain", chain)
 		}
 	}
@@ -316,7 +316,7 @@ func (p *Plugin) offRampMaxSeqNumsConsensus(
 		seqNum, count := mostFrequentElem(offRampMaxSeqNums)
 		if count <= fDestChain {
 			// TODO: metrics
-			p.log.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
+			p.lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
 				"because we did not receive a sequence number that was observed by at least f (%d) oracles, "+
 				"offRampMaxSeqNums: %v", chain, fDestChain, offRampMaxSeqNums)
 		} else {
@@ -334,14 +334,15 @@ func (p *Plugin) fChainConsensus(fChainValues map[cciptypes.ChainSelector][]int)
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		f, count := mostFrequentElem(fValues)
-		if count < p.reportingCfg.F {
-			// TODO: metrics
-			p.log.Warnf("failed to reach consensus on fChain values for chain %d because no single f "+
-				"value was observed more than the expected %d times, found f value %d observed by only %d oracles, "+
-				"f values: %v",
-				chain, p.reportingCfg.F, f, count, fValues)
-		}
+		f, _ := mostFrequentElem(fValues)
+		// TODO: uncomment when p.reportingCfg is added back
+		//if count < p.reportingCfg.F {
+		//	// TODO: metrics
+		//	p.lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single f "+
+		//		"value was observed more than the expected %d times, found f value %d observed by only %d oracles, "+
+		//		"f values: %v",
+		//		chain, p.reportingCfg.F, f, count, fValues)
+		//}
 
 		consensus[chain] = f
 	}
