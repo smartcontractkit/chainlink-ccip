@@ -9,14 +9,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 )
 
 // ConstructMerkleTree creates the merkle tree object from the messages in the report.
 func ConstructMerkleTree(
 	ctx context.Context,
 	hasher cciptypes.MessageHasher,
-	report plugintypes.ExecutePluginCommitData,
+	report exectypes.CommitData,
 	lggr logger.Logger,
 ) (*merklemulti.Tree[[32]byte], error) {
 	// Ensure we have the expected number of messages

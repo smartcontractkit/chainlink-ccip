@@ -18,12 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
-	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // mustMakeBytes parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
@@ -114,7 +113,7 @@ func assertMerkleRoot(
 	t *testing.T,
 	hasher cciptypes.MessageHasher,
 	execReport cciptypes.ExecutePluginReportSingleChain,
-	commitReport plugintypes.ExecutePluginCommitData,
+	commitReport exectypes.CommitData,
 ) {
 	keccak := hashutil.NewKeccak()
 	// Generate merkle root from commit report messages
@@ -185,7 +184,7 @@ func makeTestCommitReport(
 	timestamp int64,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
-) plugintypes.ExecutePluginCommitData {
+) exectypes.CommitData {
 	sequenceNumberRange :=
 		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
 
@@ -202,7 +201,7 @@ func makeTestCommitReport(
 			uint64(i)))
 	}
 
-	commitReport := plugintypes.ExecutePluginCommitData{
+	commitReport := exectypes.CommitData{
 		//MerkleRoot:          root,
 		SourceChain:         cciptypes.ChainSelector(srcChain),
 		SequenceNumberRange: sequenceNumberRange,
@@ -227,16 +226,16 @@ func makeTestCommitReport(
 
 // breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
 func breakCommitReport(
-	commitReport plugintypes.ExecutePluginCommitData,
-) plugintypes.ExecutePluginCommitData {
+	commitReport exectypes.CommitData,
+) exectypes.CommitData {
 	commitReport.Messages = append(commitReport.Messages, cciptypes.Message{})
 	return commitReport
 }
 
 // setMessageData at the given index to the given size. This function will panic if the index is out of range.
 func setMessageData(
-	idx int, size uint64, commitReport plugintypes.ExecutePluginCommitData,
-) plugintypes.ExecutePluginCommitData {
+	idx int, size uint64, commitReport exectypes.CommitData,
+) exectypes.CommitData {
 	if len(commitReport.Messages) < idx {
 		panic("message index out of range")
 	}
@@ -254,7 +253,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	lggr := logger.Test(t)
 
 	type args struct {
-		report plugintypes.ExecutePluginCommitData
+		report exectypes.CommitData
 		hasher cciptypes.MessageHasher
 	}
 	tests := []struct {
@@ -266,7 +265,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "token data mismatch",
 			wantErr: "token data length mismatch: got 2, expected 0",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
 					TokenData: make([][][]byte, 2),
 				},
 			},
@@ -275,7 +274,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "wrong number of messages",
 			wantErr: "unexpected number of messages: expected 1, got 2",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
 					TokenData:           make([][][]byte, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
@@ -289,7 +288,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "wrong sequence numbers",
 			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
 					TokenData:           make([][][]byte, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					Messages: []cciptypes.Message{
@@ -311,7 +310,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "source mismatch",
 			wantErr: "unexpected source chain: expected 1111, got 2222",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
 					TokenData:           make([][][]byte, 1),
 					SourceChain:         1111,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
@@ -331,7 +330,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "bad hasher",
 			wantErr: "unable to hash message (1234567, 100): bad hasher",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
 					TokenData:           make([][][]byte, 1),
 					SourceChain:         1234567,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
@@ -387,7 +386,7 @@ func Test_Builder_Build(t *testing.T) {
 	tokenDataReader := tdr{mode: good}
 
 	type args struct {
-		reports       []plugintypes.ExecutePluginCommitData
+		reports       []exectypes.CommitData
 		maxReportSize uint64
 		maxGasLimit   uint64
 	}
@@ -403,7 +402,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "empty report",
 			args: args{
-				reports: []plugintypes.ExecutePluginCommitData{},
+				reports: []exectypes.CommitData{},
 			},
 			expectedExecReports:   0,
 			expectedCommitReports: 0,
@@ -413,7 +412,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 2300,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -429,7 +428,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -444,7 +443,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 15000,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -462,7 +461,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 8500,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -481,7 +480,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 4200,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -500,7 +499,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 2500,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
@@ -515,7 +514,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 2050,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
@@ -531,7 +530,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 3500,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
@@ -546,7 +545,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 2050,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
@@ -562,7 +561,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					breakCommitReport(makeTestCommitReport(hasher, 10, 1, 101, 1000, 10101010102,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil)),
@@ -573,7 +572,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "invalid merkle root",
 			args: args{
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						mustMakeBytes(""), // random root
 						nil),
@@ -586,7 +585,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					setMessageData(5, 20000,
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 							cciptypes.Bytes32{}, // generate a correct root.
@@ -603,7 +602,7 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					setMessageData(8, 20000,
 						setMessageData(5, 20000,
 							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
@@ -634,7 +633,7 @@ func Test_Builder_Build(t *testing.T) {
 				evm.EstimateProvider{},
 				tt.args.maxReportSize,
 				tt.args.maxGasLimit)
-			var updatedMessages []plugintypes.ExecutePluginCommitData
+			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
 				updatedMessage, err := builder.Add(report)
 				if err != nil && tt.wantErr != "" {
@@ -876,18 +875,18 @@ func (t tdr) ReadTokenData(
 
 func Test_execReportBuilder_checkMessage(t *testing.T) {
 	type fields struct {
-		tokenDataReader types.TokenDataReader
+		tokenDataReader exectypes.TokenDataReader
 		accumulated     validationMetadata
 	}
 	type args struct {
 		idx        int
-		execReport plugintypes.ExecutePluginCommitData
+		execReport exectypes.CommitData
 	}
 	tests := []struct {
 		name             string
 		fields           fields
 		args             args
-		expectedData     plugintypes.ExecutePluginCommitData
+		expectedData     exectypes.CommitData
 		expectedStatus   messageStatus
 		expectedMetadata validationMetadata
 		expectedError    string
@@ -902,7 +901,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			name: "already executed",
 			args: args{
 				idx: 0,
-				execReport: plugintypes.ExecutePluginCommitData{
+				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
@@ -916,7 +915,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			name: "bad token data",
 			args: args{
 				idx: 0,
-				execReport: plugintypes.ExecutePluginCommitData{
+				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
@@ -932,7 +931,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			name: "token data not ready",
 			args: args{
 				idx: 0,
-				execReport: plugintypes.ExecutePluginCommitData{
+				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
@@ -948,7 +947,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			name: "good token data is cached",
 			args: args{
 				idx: 0,
-				execReport: plugintypes.ExecutePluginCommitData{
+				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
@@ -958,7 +957,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				tokenDataReader: tdr{mode: good},
 			},
 			expectedStatus: ReadyToExecute,
-			expectedData: plugintypes.ExecutePluginCommitData{
+			expectedData: exectypes.CommitData{
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
@@ -971,7 +970,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			name: "good - no token data - 1 msg",
 			args: args{
 				idx: 0,
-				execReport: plugintypes.ExecutePluginCommitData{
+				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
@@ -981,7 +980,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				tokenDataReader: tdr{mode: noop},
 			},
 			expectedStatus: ReadyToExecute,
-			expectedData: plugintypes.ExecutePluginCommitData{
+			expectedData: exectypes.CommitData{
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
@@ -992,7 +991,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			name: "good - no token data - 2nd msg pads slice",
 			args: args{
 				idx: 1,
-				execReport: plugintypes.ExecutePluginCommitData{
+				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 						makeMessage(1, 101, 0),
@@ -1003,7 +1002,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				tokenDataReader: tdr{mode: noop},
 			},
 			expectedStatus: ReadyToExecute,
-			expectedData: plugintypes.ExecutePluginCommitData{
+			expectedData: exectypes.CommitData{
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 					makeMessage(1, 101, 0),
@@ -1019,7 +1018,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 
 			// Select token data reader mock.
-			var resolvedTokenDataReader types.TokenDataReader
+			var resolvedTokenDataReader exectypes.TokenDataReader
 			if tt.fields.tokenDataReader != nil {
 				resolvedTokenDataReader = tt.fields.tokenDataReader
 			} else {
@@ -1048,7 +1047,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			}
 			assert.Equalf(t, tt.expectedStatus, status, "checkMessage(...)")
 			// If expected data not provided, we expect the result to be the same as the input.
-			if reflect.DeepEqual(tt.expectedData, plugintypes.ExecutePluginCommitData{}) {
+			if reflect.DeepEqual(tt.expectedData, exectypes.CommitData{}) {
 				assert.Equalf(t, tt.args.execReport, data, "checkMessage(...)")
 			} else {
 				assert.Equalf(t, tt.expectedData, data, "checkMessage(...)")
