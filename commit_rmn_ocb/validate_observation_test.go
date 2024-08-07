@@ -14,16 +14,16 @@ import (
 func Test_validateObservedMerkleRoots(t *testing.T) {
 	testCases := []struct {
 		name                    string
-		merkleRoots             []MerkleRoot
+		merkleRoots             []cciptypes.MerkleRootChain
 		observer                commontypes.OracleID
 		observerSupportedChains mapset.Set[cciptypes.ChainSelector]
 		expErr                  bool
 	}{
 		{
 			name: "Chain not supported",
-			merkleRoots: []MerkleRoot{
-				{ChainSel: 1, SeqNumRange: [2]cciptypes.SeqNum{10, 20}, RootHash: [32]byte{1, 2, 3}},
-				{ChainSel: 2, SeqNumRange: [2]cciptypes.SeqNum{24, 45}, RootHash: [32]byte{1, 2, 3}},
+			merkleRoots: []cciptypes.MerkleRootChain{
+				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
 			},
 			observer:                10,
 			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 3, 4, 5),
@@ -31,10 +31,10 @@ func Test_validateObservedMerkleRoots(t *testing.T) {
 		},
 		{
 			name: "Duplicate chains",
-			merkleRoots: []MerkleRoot{
-				{ChainSel: 1, SeqNumRange: [2]cciptypes.SeqNum{10, 20}, RootHash: [32]byte{1, 2, 3}},
-				{ChainSel: 2, SeqNumRange: [2]cciptypes.SeqNum{24, 45}, RootHash: [32]byte{1, 2, 3}},
-				{ChainSel: 2, SeqNumRange: [2]cciptypes.SeqNum{3, 7}, RootHash: [32]byte{1, 2, 3}},
+			merkleRoots: []cciptypes.MerkleRootChain{
+				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{3, 7}, MerkleRoot: [32]byte{1, 2, 3}},
 			},
 			observer:                10,
 			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
@@ -42,9 +42,9 @@ func Test_validateObservedMerkleRoots(t *testing.T) {
 		},
 		{
 			name: "Valid offRampMaxSeqNums",
-			merkleRoots: []MerkleRoot{
-				{ChainSel: 1, SeqNumRange: [2]cciptypes.SeqNum{10, 20}, RootHash: [32]byte{1, 2, 3}},
-				{ChainSel: 2, SeqNumRange: [2]cciptypes.SeqNum{24, 45}, RootHash: [32]byte{1, 2, 3}},
+			merkleRoots: []cciptypes.MerkleRootChain{
+				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
+				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
 			},
 			observer:                10,
 			observerSupportedChains: mapset.NewSet[cciptypes.ChainSelector](1, 2),
