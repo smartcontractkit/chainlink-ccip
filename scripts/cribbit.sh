@@ -48,6 +48,7 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 
 	# Source .env file if it exists
 	if [[ -f ${env_file} ]]; then
+		echo "Sourcing the ${env_file} file..."
 		# shellcheck disable=SC1090
 		source "${env_file}"
 	else
@@ -179,7 +180,7 @@ fi
 
 # Function to extract the host URI of the ECR registry from OCI URI
 extract_ecr_host_uri() {
-	local ecr_uri="${CHAINLINK_HELM_REGISTRY_URI}"
+	local ecr_uri="${CHAINLINK_HELM_REGISTRY_URI:-}"
 
 	# Regex to capture the ECR host URI
 	if [[ $ecr_uri =~ oci:\/\/([0-9]+\.dkr\.ecr\.[a-zA-Z0-9-]+\.amazonaws\.com) ]]; then
