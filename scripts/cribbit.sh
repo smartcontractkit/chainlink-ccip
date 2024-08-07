@@ -44,7 +44,7 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 	PRODUCT_DIR=$(basename "$(pwd)")
 
 	# Path to the .env file
-	env_file="${repo_root}/${PRODUCT_DIR}/.env"
+	env_file="${repo_root}/deployments/${PRODUCT_DIR}/.env"
 
 	# Source .env file if it exists
 	if [[ -f ${env_file} ]]; then

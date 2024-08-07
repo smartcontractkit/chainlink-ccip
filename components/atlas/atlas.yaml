@@ -1,11 +1,15 @@
+---
 version: v2beta1
 
 vars:
+  COMPONENTS_DIR:
+    source: env
+    default: "../"
   # Env vars required for Atlas Monitoring
   # Enables or disables Atlas components/pipeline
   MONITORING_SCRIPT:
     source: env
-    default: "./atlas/init"
+    default: "./${COMPONENTS_DIR}/atlas/init"
   MONITORING_NETWORK_2_VALUES_PATH:
     source: env
     default: "${MONITORING_SCRIPT}/output/values-network-2.yaml"
@@ -43,16 +47,18 @@ pipelines:
 
   atlas-network-1:
     run: |-
-      cd ${MONITORING_SCRIPT}
-      go run main.go ${NETWORK_1}  ${NETWORK_1_CHAINID}  ${NETWORK_1_RPC}  values-network-1.yaml
-      cd ../..
+      (
+        cd ${MONITORING_SCRIPT}
+        go run main.go ${NETWORK_1} ${NETWORK_1_CHAINID} ${NETWORK_1_RPC} values-network-1.yaml
+      )
       create_deployments atlas-network-1
 
   atlas-network-2:
     run: |-
-      cd ${MONITORING_SCRIPT}
-      go run main.go  ${NETWORK_2}  ${NETWORK_2_CHAINID}  ${NETWORK_2_RPC}  values-network-2.yaml
-      cd ../..
+      (
+        cd ${MONITORING_SCRIPT}
+        go run main.go ${NETWORK_2} ${NETWORK_2_CHAINID} ${NETWORK_2_RPC} values-network-2.yaml
+      )
       create_deployments atlas-network-2
 
 deployments:

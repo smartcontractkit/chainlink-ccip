@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/crib/ccip
+module github.com/smartcontractkit/crib/deployments/ccip
 
 go 1.21.7
 

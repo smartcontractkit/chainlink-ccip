@@ -1,3 +1,4 @@
+---
 extends: default
 rules:
   new-line-at-end-of-file:

@@ -1,3 +1,4 @@
+---
 name: CRIB CCIP/Atlas Smoke Test
 
 on:
@@ -9,7 +10,7 @@ on:
       - "components/**"
       - "scripts/**"
       # Include crib ccip changes
-      - "ccip/**"
+      - "deployments/ccip/**"
       - "./github/workflows/crib-ccip-atlas-smoke-test.yml"
       # Exclude doc updates
       - '!**/*.md'  # Exclude doc updates
@@ -23,10 +24,10 @@ jobs:
       actions: read
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633  # v4.1.2
 
       - name: Deploy and validate CRIB Environment for CCIP and Atlas
-        uses: smartcontractkit/.github/actions/setup-crib-environment@fb4c26ad00aab4121a26c55a67acb0c8057bb4a7
+        uses: smartcontractkit/.github/actions/setup-crib-environment@338cf0821b7459a46b80b67a73ecaffdd12dee26  # v0.3.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -36,3 +37,4 @@ jobs:
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           product: "ccip"
+          working-directory: "deployments/ccip"

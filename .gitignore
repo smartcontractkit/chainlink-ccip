@@ -6,7 +6,7 @@
 .envrc
 .env*
 .dbenv
-!*/.env.example
+!*.env.example
 !.github/actions/setup-postgres/.env
 .direnv
 .idea
@@ -18,4 +18,4 @@ debug.env
 
 # Ignore DevSpace cache and log folder
 .devspace/
-/ccip/atlas/init/output/*
+/components/atlas/init/output/*

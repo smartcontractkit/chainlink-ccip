@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/crib/core
+module github.com/smartcontractkit/crib/deployments/core
 
 go 1.21.7
 
