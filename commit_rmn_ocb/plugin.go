@@ -29,10 +29,11 @@ type Plugin struct {
 	tokenPricesReader reader.TokenPrices
 	reportCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
-	log               logger.Logger
+	lggr              logger.Logger
 	homeChain         reader.HomeChain
 
-	reportingCfg ocr3types.ReportingPluginConfig
+	// TODO: add back
+	// reportingCfg ocr3types.ReportingPluginConfig
 }
 
 func NewPlugin(
@@ -44,25 +45,25 @@ func NewPlugin(
 	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
-	log logger.Logger,
+	lggr logger.Logger,
 	homeChain reader.HomeChain,
-	reportingCfg ocr3types.ReportingPluginConfig,
+	// reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
-		log,
+		lggr,
 		ccipReader,
 		syncTimeout(cfg.SyncTimeout),
 		syncFrequency(cfg.SyncFrequency),
 	)
 	if err := readerSyncer.Start(context.Background()); err != nil {
-		log.Errorw("error starting background reader syncer", "err", err)
+		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
 	return &Plugin{
-		reportingCfg:      reportingCfg,
+		// reportingCfg:      reportingCfg,
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
-		log:               log,
+		lggr:              lggr,
 		cfg:               cfg,
 		tokenPricesReader: tokenPricesReader,
 		ccipReader:        ccipReader,
@@ -78,7 +79,7 @@ func (p *Plugin) Close() error {
 	defer cf()
 
 	if err := p.readerSyncer.Close(); err != nil {
-		p.log.Errorw("error closing reader syncer", "err", err)
+		p.lggr.Errorw("error closing reader syncer", "err", err)
 	}
 
 	if err := p.ccipReader.Close(ctx); err != nil {
@@ -95,7 +96,7 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, 
 
 	decodedOutcome, err := DecodeCommitPluginOutcome(outcome)
 	if err != nil {
-		p.log.Errorw("Failed to decode CommitPluginOutcome", "outcome", outcome, "err", err)
+		p.lggr.Errorw("Failed to decode CommitPluginOutcome", "outcome", outcome, "err", err)
 		return CommitPluginOutcome{}, SelectingRangesForReport
 	}
 
@@ -106,7 +107,7 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, 
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
 	knownSourceChains, err := p.homeChain.GetKnownCCIPChains()
 	if err != nil {
-		p.log.Errorw("error getting known chains", "err", err)
+		p.lggr.Errorw("error getting known chains", "err", err)
 		return nil
 	}
 	knownSourceChainsSlice := knownSourceChains.ToSlice()
@@ -125,7 +126,7 @@ func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[ccip
 	}
 	supportedChains, err := p.homeChain.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
-		p.log.Warnw("error getting supported chains", err)
+		p.lggr.Warnw("error getting supported chains", err)
 		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
 	}
 
