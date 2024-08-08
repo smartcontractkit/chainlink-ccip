@@ -11,7 +11,7 @@ on:
       - "scripts/**"
       # Include crib core changes
       - "deployments/core/**"
-      - "./github/workflows/crib-core-smoke-test.yml"
+      - ".github/workflows/crib-core-smoke-test.yml"
       # Exclude doc updates
       - '!**/*.md'  # Exclude doc updates
 

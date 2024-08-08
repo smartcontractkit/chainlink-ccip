@@ -11,7 +11,7 @@ on:
       - "scripts/**"
       # Include crib ccip changes
       - "deployments/ccip/**"
-      - "./github/workflows/crib-ccip-atlas-smoke-test.yml"
+      - ".github/workflows/crib-ccip-atlas-smoke-test.yml"
       # Exclude doc updates
       - '!**/*.md'  # Exclude doc updates
 
