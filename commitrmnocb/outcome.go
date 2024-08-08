@@ -21,36 +21,38 @@ func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
-	commitQuery, err := DecodeCommitPluginQuery(query)
-	if err != nil {
-		return ocr3types.Outcome{}, err
-	}
+	commitQuery := CommitQuery{}
 
 	consensusObservation, err := p.getConsensusObservation(aos)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
+	outcome := CommitPluginOutcome{}
+
 	switch nextState {
 	case SelectingRangesForReport:
-		return p.ReportRangesOutcome(commitQuery, consensusObservation)
+		outcome = p.ReportRangesOutcome(commitQuery, consensusObservation)
 
 	case BuildingReport:
-		return p.buildReport(commitQuery, consensusObservation)
+		outcome = p.buildReport(commitQuery, consensusObservation)
 
 	case WaitingForReportTransmission:
-		return p.checkForReportTransmission(previousOutcome, consensusObservation)
+		outcome = p.checkForReportTransmission(previousOutcome, consensusObservation)
 
 	default:
 		return nil, fmt.Errorf("outcome unexpected state: %d", nextState)
 	}
+
+	p.lggr.Infow("Commit Plugin Outcome", "outcome", outcome, "oid", p.nodeID)
+	return outcome.Encode()
 }
 
 // ReportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 func (p *Plugin) ReportRangesOutcome(
 	query CommitQuery,
 	consensusObservation ConsensusObservation,
-) (ocr3types.Outcome, error) {
+) CommitPluginOutcome {
 	rangesToReport := make([]ChainRange, 0)
 
 	rmnOnRampMaxSeqNumsMap := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
@@ -88,7 +90,7 @@ func (p *Plugin) ReportRangesOutcome(
 		RangesSelectedForReport: rangesToReport,
 	}
 
-	return outcome.Encode()
+	return outcome
 }
 
 // Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
@@ -96,7 +98,7 @@ func (p *Plugin) ReportRangesOutcome(
 func (p *Plugin) buildReport(
 	query CommitQuery,
 	consensusObservation ConsensusObservation,
-) (ocr3types.Outcome, error) {
+) CommitPluginOutcome {
 	// TODO: Only include chains in the report that have gas prices?
 
 	// TODO: token prices validation
@@ -109,12 +111,19 @@ func (p *Plugin) buildReport(
 		return roots[i].ChainSel < roots[j].ChainSel
 	})
 
-	return CommitPluginOutcome{
-		OutcomeType:   ReportGenerated,
+	outcomeType := ReportGenerated
+	if len(roots) == 0 {
+		outcomeType = ReportEmpty
+	}
+
+	outcome := CommitPluginOutcome{
+		OutcomeType:   outcomeType,
 		RootsToReport: roots,
 		GasPrices:     consensusObservation.GasPricesSortedArray(),
 		TokenPrices:   consensusObservation.TokenPricesSortedArray(),
-	}.Encode()
+	}
+
+	return outcome
 }
 
 // checkForReportTransmission checks if the OffRamp has an updated set of max seq nums compared to the seq nums that
@@ -127,7 +136,7 @@ func (p *Plugin) buildReport(
 func (p *Plugin) checkForReportTransmission(
 	previousOutcome CommitPluginOutcome,
 	consensusObservation ConsensusObservation,
-) (ocr3types.Outcome, error) {
+) CommitPluginOutcome {
 
 	offRampUpdated := false
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
@@ -142,20 +151,21 @@ func (p *Plugin) checkForReportTransmission(
 	if offRampUpdated {
 		return CommitPluginOutcome{
 			OutcomeType: ReportTransmitted,
-		}.Encode()
+		}
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= p.cfg.MaxReportTransmissionCheckAttempts {
+		p.lggr.Warnw("Failed to detect report transmission")
 		return CommitPluginOutcome{
 			OutcomeType: ReportNotTransmitted,
-		}.Encode()
+		}
 	}
 
 	return CommitPluginOutcome{
 		OutcomeType:                     ReportNotYetTransmitted,
 		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
-	}.Encode()
+	}
 }
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
@@ -169,17 +179,17 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 			fmt.Errorf("no consensus value for fDestChain, DestChain: %d", p.cfg.DestChain)
 	}
 
-	fTokenChain, exists := fChains[cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector)]
-	if !exists {
-		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d",
-				p.cfg.OffchainConfig.TokenPriceChainSelector)
-	}
+	//fTokenChain, exists := fChains[cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector)]
+	//if !exists {
+	//	return ConsensusObservation{},
+	//		fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d",
+	//			p.cfg.OffchainConfig.TokenPriceChainSelector)
+	//}
 
 	consensusObs := ConsensusObservation{
 		MerkleRoots:        p.merkleRootConsensus(aggObs.MerkleRoots, fChains),
-		GasPrices:          p.gasPriceConsensus(aggObs.GasPrices, fChains),
-		TokenPrices:        p.tokenPriceConsensus(aggObs.TokenPrices, fTokenChain),
+		GasPrices:          make(map[cciptypes.ChainSelector]cciptypes.BigInt), // p.gasPriceConsensus(aggObs.GasPrices, fChains),
+		TokenPrices:        make(map[types.Account]cciptypes.BigInt),           // p.tokenPriceConsensus(aggObs.TokenPrices, fTokenChain),
 		OnRampMaxSeqNums:   p.onRampMaxSeqNumsConsensus(aggObs.OnRampMaxSeqNums, fChains),
 		OffRampNextSeqNums: p.offRampMaxSeqNumsConsensus(aggObs.OffRampNextSeqNums, fDestChain),
 		FChain:             fChains,

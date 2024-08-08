@@ -94,8 +94,9 @@ func validateObservedOnRampMaxSeqNums(
 	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for _, seqNumChain := range onRampMaxSeqNums {
 		if !observerSupportedChains.Contains(seqNumChain.ChainSel) {
-			return fmt.Errorf("found onRampMaxSeqNum for chain %d, but this chain is not supported by Observer %d",
-				seqNumChain.ChainSel, observer)
+			return fmt.Errorf("found onRampMaxSeqNum for chain %d, but this chain is not supported by Observer %d, "+
+				"observerSupportedChains: %v, onRampMaxSeqNums: %v",
+				seqNumChain.ChainSel, observer, observerSupportedChains, onRampMaxSeqNums)
 		}
 
 		if seenChains.Contains(seqNumChain.ChainSel) {

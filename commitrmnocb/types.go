@@ -85,7 +85,14 @@ type AggregatedObservation struct {
 
 // aggregateObservations takes a list of observations and produces an AggregatedObservation
 func aggregateObservations(aos []types.AttributedObservation) AggregatedObservation {
-	aggObs := AggregatedObservation{}
+	aggObs := AggregatedObservation{
+		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
+		GasPrices:          make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
+		TokenPrices:        make(map[types.Account][]cciptypes.BigInt),
+		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
+		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
+		FChain:             make(map[cciptypes.ChainSelector][]int),
+	}
 
 	for _, ao := range aos {
 		obs, err := DecodeCommitPluginObservation(ao.Observation)
@@ -194,13 +201,13 @@ const (
 )
 
 type CommitPluginOutcome struct {
-	OutcomeType                     CommitPluginOutcomeType
-	RangesSelectedForReport         []ChainRange
-	RootsToReport                   []cciptypes.MerkleRootChain
-	OffRampNextSeqNums              []plugintypes.SeqNumChain
-	TokenPrices                     []cciptypes.TokenPrice    `json:"tokenPrices"`
-	GasPrices                       []cciptypes.GasPriceChain `json:"gasPrices"`
-	ReportTransmissionCheckAttempts uint                      `json:"reportTransmissionCheckAttempts"`
+	OutcomeType                     CommitPluginOutcomeType     `json:"outcomeType"`
+	RangesSelectedForReport         []ChainRange                `json:"rangesSelectedForReport"`
+	RootsToReport                   []cciptypes.MerkleRootChain `json:"rootsToReport"`
+	OffRampNextSeqNums              []plugintypes.SeqNumChain   `json:"offRampNextSeqNums"`
+	TokenPrices                     []cciptypes.TokenPrice      `json:"tokenPrices"`
+	GasPrices                       []cciptypes.GasPriceChain   `json:"gasPrices"`
+	ReportTransmissionCheckAttempts uint                        `json:"reportTransmissionCheckAttempts"`
 }
 
 // Encode TODO: sort all lists here to ensure deterministic serialization
