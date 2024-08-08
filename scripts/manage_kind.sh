@@ -161,18 +161,26 @@ delete_docker_registry() {
 # Function to install NGINX ingress controller if it is not already installed
 install_ingress_controller() {
 	local ingress_namespace="ingress-nginx"
+	local release_name="nginx-ingress"
+	local chart_repo="https://kubernetes.github.io/ingress-nginx"
+	local chart_name="ingress-nginx/ingress-nginx"
 
 	echo "Checking for existing NGINX ingress controller..."
 
 	# Check if the NGINX ingress controller is already installed
-	if kubectl get pods -n "$ingress_namespace" --selector=app.kubernetes.io/name=ingress-nginx --no-headers | grep -q 'Running'; then
+	if helm list -n "$ingress_namespace" | grep -q "$release_name"; then
 		echo "NGINX ingress controller is already installed."
 		return
 	fi
 
-	echo "Installing NGINX ingress controller..."
-	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-	echo "NGINX ingress controller installed successfully."
+	echo "Adding Helm repository for NGINX ingress controller..."
+	helm repo add ingress-nginx "$chart_repo"
+	helm repo update
+
+	echo "Installing NGINX ingress controller using Helm..."
+	helm install "$release_name" "$chart_name" --namespace "$ingress_namespace" --create-namespace
+
+	echo "NGINX ingress controller installed and is now ready."
 }
 
 # Main script execution
