@@ -4,6 +4,7 @@ name: chainlink
 imports:
   - path: ../../components/don/don.yaml
   - path: ../../components/atlas/atlas.yaml
+  - path: ../../components/kind/kind.yaml
 
 vars:
   SCRIPTS_DIR:
@@ -30,9 +31,6 @@ vars:
   ATLAS_ENABLED:
     source: env
     default: false
-  PROVIDER:
-    source: all
-    default: "aws"
 
 pipelines:
   deploy:

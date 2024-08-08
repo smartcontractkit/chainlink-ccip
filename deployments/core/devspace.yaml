@@ -4,6 +4,7 @@ name: chainlink
 
 imports:
   - path: ../../components/don/don.yaml
+  - path: ../../components/kind/kind.yaml
 
 vars:
   SCRIPTS_DIR:
@@ -16,9 +17,6 @@ vars:
   CHAINLINK_CLUSTER_HELM_CHART_URI:
     source: env
     default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
-  PROVIDER:
-    source: all
-    default: "aws"
 
 pipelines:
   deploy:

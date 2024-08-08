@@ -161,6 +161,7 @@ delete_docker_registry() {
 # Function to install NGINX ingress controller if it is not already installed
 install_ingress_controller() {
 	local ingress_namespace="ingress-nginx"
+	local timeout="600s"
 
 	echo "Checking for existing NGINX ingress controller..."
 
@@ -172,6 +173,12 @@ install_ingress_controller() {
 
 	echo "Installing NGINX ingress controller..."
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+	echo -n "Wait for Kubernetes Nginx Ingress pod to be ready (timeout=$timeout)..."
+	kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=$timeout
 	echo "NGINX ingress controller installed successfully."
 }
 
