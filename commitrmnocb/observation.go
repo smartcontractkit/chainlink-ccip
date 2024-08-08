@@ -25,33 +25,37 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 
+	observation := CommitPluginObservation{}
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := p.ObserveOffRampNextSeqNums(ctx)
-		return CommitPluginObservation{
-			OnRampMaxSeqNums:   p.ObserveOnRampMaxSeqNums(offRampNextSeqNums),
+		observation = CommitPluginObservation{
+			OnRampMaxSeqNums:   offRampNextSeqNums, // TODO: change
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             p.ObserveFChain(),
-		}.Encode()
+		}
 
 	case BuildingReport:
-		return CommitPluginObservation{
+		observation = CommitPluginObservation{
 			MerkleRoots: p.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			GasPrices:   p.ObserveGasPrices(ctx),
 			TokenPrices: p.ObserveTokenPrices(ctx),
 			FChain:      p.ObserveFChain(),
-		}.Encode()
+		}
 
 	case WaitingForReportTransmission:
-		return CommitPluginObservation{
+		observation = CommitPluginObservation{
 			OffRampNextSeqNums: p.ObserveOffRampNextSeqNums(ctx),
 			FChain:             p.ObserveFChain(),
-		}.Encode()
+		}
 
 	default:
 		p.lggr.Warnw("Unexpected state", "state", nextState)
 		return types.Observation{}, nil
 	}
+
+	p.lggr.Infow("Observation", "observation", observation)
+	return observation.Encode()
 }
 
 // ObserveOnRampMaxSeqNums Simply add NewMsgScanBatchSize to the offRampNextSeqNums
@@ -94,7 +98,7 @@ func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.Se
 
 		result := make([]plugintypes.SeqNumChain, len(sourceChains))
 		for i := range sourceChains {
-			result = append(result, plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]})
+			result[i] = plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]}
 		}
 
 		return result
@@ -105,7 +109,7 @@ func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.Se
 
 // ObserveMerkleRoots TODO: doc
 func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []cciptypes.MerkleRootChain {
-	roots := make([]cciptypes.MerkleRootChain, len(ranges))
+	roots := make([]cciptypes.MerkleRootChain, 0)
 	supportedChains, err := p.supportedChains(p.nodeID)
 	if err != nil {
 		p.lggr.Warnw("call to supportedChains failed", "err", err)
@@ -139,7 +143,7 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 // computeMerkleRoot Compute the merkle root of a list of messages
 func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
 	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-	seqNums := make([]cciptypes.SeqNum, len(msgs))
+	seqNums := make([]cciptypes.SeqNum, 0)
 
 	for _, msg := range msgs {
 		seqNum := msg.Header.SequenceNumber

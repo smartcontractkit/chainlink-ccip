@@ -125,11 +125,10 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
-				// No query for this commit implementation.
-				MaxQueryLength:       0,
-				MaxObservationLength: 20_000, // 20kB
-				MaxOutcomeLength:     10_000, // 10kB
-				MaxReportLength:      10_000, // 10kB
+				MaxQueryLength:       1024 * 1024, // 1MB
+				MaxObservationLength: 20_000,      // 20kB
+				MaxOutcomeLength:     10_000,      // 10kB
+				MaxReportLength:      10_000,      // 10kB
 				MaxReportCount:       10,
 			},
 		}, nil

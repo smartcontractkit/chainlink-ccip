@@ -18,6 +18,10 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		return nil, fmt.Errorf("failed to decode CommitPluginOutcome: %w", err)
 	}
 
+	if outcome.OutcomeType != ReportGenerated {
+		return []ocr3types.ReportWithInfo[[]byte]{}, nil
+	}
+
 	rep := cciptypes.NewCommitPluginReport(outcome.RootsToReport, outcome.TokenPrices, outcome.GasPrices)
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
