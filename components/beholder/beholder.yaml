@@ -3,10 +3,7 @@ version: v2beta1
 pipelines:
   beholder:
     run: |-
-      run_pipelines beholder-test-client
-
-  beholder-test-client:
-    run: |-
+      create_deployments crib-beholder-infra
       create_deployments beholder-test-client
 
 deployments:
@@ -17,7 +14,20 @@ deployments:
       releaseName: beholder-test-client
       displayOutput: true
       chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-beholder
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/beholder-test-client
+        version: "0.0.1"
+      values:
+        podSecurityContext:
+          fsGroup: 999
+
+  crib-beholder-infra:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: crib-beholder-infra
+      displayOutput: true
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-beholder-infra
         version: "0.0.1"
       values:
         podSecurityContext:
@@ -31,5 +41,11 @@ profiles:
           helm:
             chart:
               name: beholder-test-client
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-beholder
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/beholder-test-client
+              version: null
+        crib-beholder-infra:
+          helm:
+            chart:
+              name: crib-beholder-infra
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-beholder-infra
               version: null
