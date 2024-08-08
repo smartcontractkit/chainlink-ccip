@@ -14,10 +14,15 @@ function check_namespace_prefix() {
 
 # Check if DEVSPACE_IMAGE is overridden to use custom image
 function is_custom_image() {
+	local DEVSPACE_NAMESPACE="${DEVSPACE_NAMESPACE:-}"
 	local DEVSPACE_IMAGE="${1:-}"
 
-	if ! [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-?[a-z]*-devspace$ ]]; then
+	# Regular expression to match the desired image patterns
+	if [[ $DEVSPACE_NAMESPACE == "crib-local" && $DEVSPACE_IMAGE =~ ^localhost:5001/chainlink-[a-z]*-devspace(:[a-zA-Z0-9._-]+)?$ ]]; then
 		return 0
+	elif [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com/chainlink-[a-z]*-devspace(:[a-zA-Z0-9._-]+)?$ ]]; then
+		return 0
+	else
+		return 1
 	fi
-	return 1
 }
