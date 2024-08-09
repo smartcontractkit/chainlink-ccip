@@ -70,6 +70,7 @@ func NewPlugin(
 		homeChain:         homeChain,
 		readerSyncer:      readerSyncer,
 		reportCodec:       reportCodec,
+		msgHasher:         msgHasher,
 	}
 }
 
