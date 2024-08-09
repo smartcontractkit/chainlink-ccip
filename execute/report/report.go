@@ -118,15 +118,16 @@ func buildSingleChainReportHelper(
 type messageStatus string
 
 const (
-	ReadyToExecute      messageStatus = "ready_to_execute"
-	AlreadyExecuted     messageStatus = "already_executed"
-	TokenDataNotReady   messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
-	TokenDataFetchError messageStatus = "token_data_fetch_error"
+	Unknown                       messageStatus = "unknown"
+	ReadyToExecute                messageStatus = "ready_to_execute"
+	AlreadyExecuted               messageStatus = "already_executed"
+	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
+	TokenDataFetchError           messageStatus = "token_data_fetch_error"
+	InsufficientRemainingBatchGas messageStatus = "insufficient_remaining_batch_gas"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
 		InsufficientRemainingBatchDataLength messageStatus = "insufficient_remaining_batch_data_length"
-		InsufficientRemainingBatchGas        messageStatus = "insufficient_remaining_batch_gas"
 		MissingNonce                         messageStatus = "missing_nonce"
 		InvalidNonce                         messageStatus = "invalid_nonce"
 		AggregateTokenValueComputeError      messageStatus = "aggregate_token_value_compute_error"
@@ -138,13 +139,20 @@ const (
 	*/
 )
 
+func padSlice[T any](slice []T, padLen int, defaultValue T) []T {
+	for len(slice) < padLen {
+		slice = append(slice, defaultValue)
+	}
+	return slice
+}
+
 func (b *execReportBuilder) checkMessage(
 	ctx context.Context, idx int, execReport plugintypes.ExecutePluginCommitData,
 	// TODO: get rid of the nolint when the error is used
 ) (plugintypes.ExecutePluginCommitData, messageStatus, error) { // nolint this will use the error eventually
 	if idx >= len(execReport.Messages) {
 		b.lggr.Errorw("message index out of range", "index", idx, "numMessages", len(execReport.Messages))
-		return execReport, TokenDataFetchError, fmt.Errorf("message index out of range")
+		return execReport, Unknown, fmt.Errorf("message index out of range")
 	}
 
 	msg := execReport.Messages[idx]
@@ -160,57 +168,47 @@ func (b *execReportBuilder) checkMessage(
 	}
 
 	// Check if token data is ready.
-	if b.tokenDataReader != nil {
-		tokenData, err := b.tokenDataReader.ReadTokenData(ctx, execReport.SourceChain, msg.Header.SequenceNumber)
-		if err != nil {
-			if errors.Is(err, ErrNotReady) {
-				b.lggr.Infow(
-					"unable to read token data - token data not ready",
-					"messageID", msg.Header.MessageID,
-					"sourceChain", execReport.SourceChain,
-					"seqNum", msg.Header.SequenceNumber,
-					"error", err)
-				return execReport, TokenDataNotReady, nil
-			}
+	if b.tokenDataReader == nil {
+		return execReport, Unknown, fmt.Errorf("token data reader must be initialized")
+	}
+	tokenData, err := b.tokenDataReader.ReadTokenData(ctx, execReport.SourceChain, msg.Header.SequenceNumber)
+	if err != nil {
+		if errors.Is(err, ErrNotReady) {
 			b.lggr.Infow(
-				"unable to read token data - unknown error",
+				"unable to read token data - token data not ready",
 				"messageID", msg.Header.MessageID,
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"error", err)
-			return execReport, TokenDataFetchError, nil
+			return execReport, TokenDataNotReady, nil
 		}
-
-		// pad token data if needed
-		for len(execReport.TokenData) <= idx {
-			execReport.TokenData = append(execReport.TokenData, nil)
-		}
-
-		execReport.TokenData[idx] = tokenData
 		b.lggr.Infow(
-			"read token data",
+			"unable to read token data - unknown error",
 			"messageID", msg.Header.MessageID,
 			"sourceChain", execReport.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
-			"data", tokenData)
-	} else {
-		b.lggr.Debugw(
-			"token data reader not set, skipping token data read",
-			"messageID", msg.Header.MessageID,
-			"sourceChain", execReport.SourceChain,
-			"seqNum", msg.Header.SequenceNumber)
-		execReport.TokenData = append(execReport.TokenData, nil)
+			"error", err)
+		return execReport, TokenDataFetchError, nil
 	}
 
+	execReport.TokenData = padSlice(execReport.TokenData, idx+1, nil)
+	execReport.TokenData[idx] = tokenData
+	b.lggr.Infow(
+		"read token data",
+		"messageID", msg.Header.MessageID,
+		"sourceChain", execReport.SourceChain,
+		"seqNum", msg.Header.SequenceNumber,
+		"data", tokenData)
+
 	// TODO: Check for valid nonce
-	// TODO: Check for max gas limit
 	// TODO: Check for fee boost
 
 	return execReport, ReadyToExecute, nil
 }
 
 func (b *execReportBuilder) verifyReport(
-	ctx context.Context, execReport cciptypes.ExecutePluginReportSingleChain,
+	ctx context.Context,
+	execReport cciptypes.ExecutePluginReportSingleChain,
 ) (bool, validationMetadata, error) {
 	// Compute the size of the encoded report.
 	// Note: ExecutePluginReport is a strict array of data, so wrapping the final report
@@ -228,12 +226,30 @@ func (b *execReportBuilder) verifyReport(
 
 	maxSizeBytes := int(b.maxReportSizeBytes - b.accumulated.encodedSizeBytes)
 	if len(encoded) > maxSizeBytes {
-		b.lggr.Debugw("invalid report, report size exceeds limit", "size", len(encoded), "maxSize", maxSizeBytes)
+		b.lggr.Infow("invalid report, report size exceeds limit", "size", len(encoded), "maxSize", maxSizeBytes)
+		return false, validationMetadata{}, nil
+	}
+
+	// Add in accumulated gas
+	if b.estimateProvider == nil {
+		return false, validationMetadata{}, fmt.Errorf("gas estimator must be initialized")
+	}
+	gasSum := uint64(0)
+	for _, msg := range execReport.Messages {
+		gasSum += b.estimateProvider.CalculateMessageMaxGas(msg)
+	}
+	merkleTreeGas := b.estimateProvider.CalculateMerkleTreeGas(len(execReport.Messages))
+	totalGas := gasSum + merkleTreeGas
+
+	maxGas := b.maxGas - b.accumulated.gas
+	if totalGas > maxGas {
+		b.lggr.Infow("invalid report, report estimated gas usage exceeds limit", "gas", totalGas, "maxGas", maxGas)
 		return false, validationMetadata{}, nil
 	}
 
 	return true, validationMetadata{
 		encodedSizeBytes: uint64(len(encoded)),
+		gas:              totalGas,
 	}, nil
 }
 
@@ -248,7 +264,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 		commitReport plugintypes.ExecutePluginCommitData,
 		meta validationMetadata,
 	) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitData, error) {
-		b.accumulated.encodedSizeBytes += meta.encodedSizeBytes
+		b.accumulated = b.accumulated.accumulate(meta)
 		commitReport = markNewMessagesExecuted(execReport, commitReport)
 		return execReport, commitReport, nil
 	}

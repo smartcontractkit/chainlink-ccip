@@ -17,6 +17,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -176,6 +177,7 @@ func setupSimpleTest(
 	cfg := pluginconfig.ExecutePluginConfig{
 		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+			BatchGasLimit:             100000000,
 		},
 		DestChain: dstSelector,
 	}
@@ -255,6 +257,7 @@ func newNode(
 		msgHasher,
 		homeChain,
 		tokenDataReader,
+		evm.EstimateProvider{},
 		lggr)
 
 	return nodeSetup{
