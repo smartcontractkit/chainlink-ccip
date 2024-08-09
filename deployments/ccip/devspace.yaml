@@ -476,13 +476,7 @@ profiles:
       - op: remove
         path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node1.resources
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node2.resources
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node3.resources
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node4.resources
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node5.resources
+        path: deployments.app.helm.values.crib-chainlink-cluster.mockserver.resources
       - op: remove
         path: deployments.app.helm.values.crib-chainlink-cluster.geth.resources
       - op: remove
