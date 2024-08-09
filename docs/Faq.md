@@ -3,7 +3,7 @@
 ### Why are my Pods failing with the `Init:ImagePullBackOff` error after deploying Crib?
 
 - **Check Kubernetes Events**: Run the `kge` command to list Kubernetes events. This can help you understand the underlying issue.
-- **Image Repository Configuration**: If you are using a custom image or an image from a different repository, ensure that you set the environment variable `DEVSPACE_IMAGE`.
+- **Image Repository Configuration**: If you are using a custom image or an image from a different repository, ensure that you set the environment variable `DEVSPACE_IMAGE` and, if specifying a tag via the `-o ...` argument, that the tag exists.
 
 ### I have deployed a CRIB environment on a local Kind cluster, but Pods are in a pending state.
 
