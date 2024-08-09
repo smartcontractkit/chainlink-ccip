@@ -90,15 +90,15 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, CommitPluginState) {
+func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (Outcome, CommitPluginState) {
 	if len(outcome) == 0 {
-		return CommitPluginOutcome{}, SelectingRangesForReport
+		return Outcome{}, SelectingRangesForReport
 	}
 
 	decodedOutcome, err := DecodeCommitPluginOutcome(outcome)
 	if err != nil {
-		p.lggr.Errorw("Failed to decode CommitPluginOutcome", "outcome", outcome, "err", err)
-		return CommitPluginOutcome{}, SelectingRangesForReport
+		p.lggr.Errorw("Failed to decode Outcome", "outcome", outcome, "err", err)
+		return Outcome{}, SelectingRangesForReport
 	}
 
 	return decodedOutcome, decodedOutcome.NextState()

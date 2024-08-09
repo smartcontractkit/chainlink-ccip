@@ -26,18 +26,18 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 
-	observation := CommitPluginObservation{}
+	observation := Observation{}
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := p.ObserveOffRampNextSeqNums(ctx)
-		observation = CommitPluginObservation{
+		observation = Observation{
 			OnRampMaxSeqNums:   offRampNextSeqNums, // TODO: change
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             p.ObserveFChain(),
 		}
 
 	case BuildingReport:
-		observation = CommitPluginObservation{
+		observation = Observation{
 			MerkleRoots: p.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			GasPrices:   p.ObserveGasPrices(ctx),
 			TokenPrices: p.ObserveTokenPrices(ctx),
@@ -45,14 +45,14 @@ func (p *Plugin) Observation(
 		}
 
 	case WaitingForReportTransmission:
-		observation = CommitPluginObservation{
+		observation = Observation{
 			OffRampNextSeqNums: p.ObserveOffRampNextSeqNums(ctx),
 			FChain:             p.ObserveFChain(),
 		}
 
 	default:
 		p.lggr.Warnw("Unexpected state", "state", nextState)
-		return types.Observation{}, nil
+		return observation.Encode()
 	}
 
 	p.lggr.Infow("Observation", "observation", observation)

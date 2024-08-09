@@ -14,8 +14,8 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 	outcome, err := DecodeCommitPluginOutcome(outcomeBytes)
 	if err != nil {
 		// TODO: metrics
-		p.lggr.Errorw("failed to decode CommitPluginOutcome", "outcomeBytes", outcomeBytes, "err", err)
-		return nil, fmt.Errorf("failed to decode CommitPluginOutcome: %w", err)
+		p.lggr.Errorw("failed to decode Outcome", "outcomeBytes", outcomeBytes, "err", err)
+		return nil, fmt.Errorf("failed to decode Outcome: %w", err)
 	}
 
 	if outcome.OutcomeType != ReportGenerated {
