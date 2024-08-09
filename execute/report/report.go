@@ -11,8 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // buildSingleChainReportHelper converts the on-chain event data stored in cciptypes.ExecutePluginCommitData into the
@@ -26,7 +26,7 @@ func buildSingleChainReportHelper(
 	ctx context.Context,
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
-	report plugintypes.ExecutePluginCommitData,
+	report exectypes.CommitData,
 	readyMessages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, error) {
 	if len(readyMessages) == 0 {
@@ -147,9 +147,9 @@ func padSlice[T any](slice []T, padLen int, defaultValue T) []T {
 }
 
 func (b *execReportBuilder) checkMessage(
-	ctx context.Context, idx int, execReport plugintypes.ExecutePluginCommitData,
+	ctx context.Context, idx int, execReport exectypes.CommitData,
 	// TODO: get rid of the nolint when the error is used
-) (plugintypes.ExecutePluginCommitData, messageStatus, error) { // nolint this will use the error eventually
+) (exectypes.CommitData, messageStatus, error) { // nolint this will use the error eventually
 	if idx >= len(execReport.Messages) {
 		b.lggr.Errorw("message index out of range", "index", idx, "numMessages", len(execReport.Messages))
 		return execReport, Unknown, fmt.Errorf("message index out of range")
@@ -257,13 +257,13 @@ func (b *execReportBuilder) verifyReport(
 // See buildSingleChainReport for more details about how a report is built.
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
-	report plugintypes.ExecutePluginCommitData,
-) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitData, error) {
+	report exectypes.CommitData,
+) (cciptypes.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 	finalize := func(
 		execReport cciptypes.ExecutePluginReportSingleChain,
-		commitReport plugintypes.ExecutePluginCommitData,
+		commitReport exectypes.CommitData,
 		meta validationMetadata,
-	) (cciptypes.ExecutePluginReportSingleChain, plugintypes.ExecutePluginCommitData, error) {
+	) (cciptypes.ExecutePluginReportSingleChain, exectypes.CommitData, error) {
 		b.accumulated = b.accumulated.accumulate(meta)
 		commitReport = markNewMessagesExecuted(execReport, commitReport)
 		return execReport, commitReport, nil
@@ -275,7 +275,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 		updatedReport, status, err := b.checkMessage(ctx, i, report)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitData{},
+				exectypes.CommitData{},
 				fmt.Errorf("unable to check message: %w", err)
 		}
 		report = updatedReport
@@ -289,14 +289,14 @@ func (b *execReportBuilder) buildSingleChainReport(
 		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, report, readyMessages)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			plugintypes.ExecutePluginCommitData{},
+			exectypes.CommitData{},
 			fmt.Errorf("unable to build a single chain report (max): %w", err)
 	}
 
 	validReport, meta, err := b.verifyReport(ctx, finalReport)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			plugintypes.ExecutePluginCommitData{},
+			exectypes.CommitData{},
 			fmt.Errorf("unable to verify report: %w", err)
 	} else if validReport {
 		return finalize(finalReport, report, meta)
@@ -314,14 +314,14 @@ func (b *execReportBuilder) buildSingleChainReport(
 		finalReport2, err := buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitData{},
+				exectypes.CommitData{},
 				fmt.Errorf("unable to build a single chain report (messages %d): %w", len(msgs), err)
 		}
 
 		validReport, meta2, err := b.verifyReport(ctx, finalReport2)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
-				plugintypes.ExecutePluginCommitData{},
+				exectypes.CommitData{},
 				fmt.Errorf("unable to verify report: %w", err)
 		} else if validReport {
 			finalReport = finalReport2

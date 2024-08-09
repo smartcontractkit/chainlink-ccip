@@ -8,15 +8,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
-	"github.com/smartcontractkit/chainlink-ccip/execute/types"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
-	Add(report plugintypes.ExecutePluginCommitData) (plugintypes.ExecutePluginCommitData, error)
+	Add(report exectypes.CommitData) (exectypes.CommitData, error)
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
@@ -24,7 +23,7 @@ func NewBuilder(
 	ctx context.Context,
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader types.TokenDataReader,
+	tokenDataReader exectypes.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider gas.EstimateProvider,
 	maxReportSizeBytes uint64,
@@ -62,7 +61,7 @@ type execReportBuilder struct {
 	lggr logger.Logger
 
 	// Providers
-	tokenDataReader  types.TokenDataReader
+	tokenDataReader  exectypes.TokenDataReader
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
 	estimateProvider gas.EstimateProvider
@@ -79,8 +78,8 @@ type execReportBuilder struct {
 }
 
 func (b *execReportBuilder) Add(
-	commitReport plugintypes.ExecutePluginCommitData,
-) (plugintypes.ExecutePluginCommitData, error) {
+	commitReport exectypes.CommitData,
+) (exectypes.CommitData, error) {
 	execReport, updatedReport, err := b.buildSingleChainReport(b.ctx, commitReport)
 
 	// No messages fit into the report, move to next report
