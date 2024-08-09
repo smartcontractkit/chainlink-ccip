@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -84,7 +85,7 @@ type AggregatedObservation struct {
 }
 
 // aggregateObservations takes a list of observations and produces an AggregatedObservation
-func aggregateObservations(aos []types.AttributedObservation) AggregatedObservation {
+func aggregateObservations(lggr logger.Logger, aos []types.AttributedObservation) AggregatedObservation {
 	aggObs := AggregatedObservation{
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
 		GasPrices:          make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
@@ -103,6 +104,7 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 
 		// MerkleRoots
 		for _, merkleRoot := range obs.MerkleRoots {
+			lggr.Infow("aggregateObservations: appending merkle root", "merkleRoot", merkleRoot)
 			aggObs.MerkleRoots[merkleRoot.ChainSel] =
 				append(aggObs.MerkleRoots[merkleRoot.ChainSel], merkleRoot)
 		}

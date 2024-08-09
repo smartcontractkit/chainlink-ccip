@@ -170,7 +170,7 @@ func (p *Plugin) checkForReportTransmission(
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (ConsensusObservation, error) {
-	aggObs := aggregateObservations(aos)
+	aggObs := aggregateObservations(p.lggr, aos)
 	fChains := p.fChainConsensus(aggObs.FChain)
 
 	fDestChain, exists := fChains[p.cfg.DestChain]

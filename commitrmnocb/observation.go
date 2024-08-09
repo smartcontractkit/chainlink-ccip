@@ -2,6 +2,7 @@ package commitrmnocb
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sort"
 
@@ -11,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -122,7 +124,16 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 			if err != nil {
 				p.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
 			} else {
-				root, err := computeMerkleRoot(msgs)
+				// compute message hashes for each message and populate the MsgHash field.
+				var msgHashes []cciptypes.Bytes32
+				for _, msg := range msgs {
+					msgHash, err := p.msgHasher.Hash(ctx, msg)
+					if err != nil {
+						p.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+					}
+					msgHashes = append(msgHashes, msgHash)
+				}
+				root, err := computeMerkleRoot(p.lggr, msgs, msgHashes)
 				if err != nil {
 					p.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
 				} else {
@@ -137,18 +148,32 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 		}
 	}
 
+	p.lggr.Infow("ObserveMerkleRoots: observed merkle roots", "roots", func() []string {
+		strs := make([]string, len(roots))
+		for i, root := range roots {
+			strs[i] = fmt.Sprintf("%x", root.MerkleRoot[:])
+		}
+		return strs
+	}())
+
 	return roots
 }
 
 // computeMerkleRoot Compute the merkle root of a list of messages
-func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
+func computeMerkleRoot(lggr logger.Logger, msgs []cciptypes.Message, msgHashes []cciptypes.Bytes32) (cciptypes.Bytes32, error) {
+	if len(msgs) != len(msgHashes) {
+		return cciptypes.Bytes32{}, fmt.Errorf("computeMerkleRoot: length mismatch between messages and message hashes")
+	}
+
+	lggr.Infow("computeMerkleRoot: computing merkle root for messages", "msgs", msgs, "msgHashes", msgHashes)
+
 	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
 	seqNums := make([]cciptypes.SeqNum, 0)
 
-	for _, msg := range msgs {
+	for i, msg := range msgs {
 		seqNum := msg.Header.SequenceNumber
 		seqNums = append(seqNums, seqNum)
-		msgSeqNumToHash[seqNum] = msg.Header.MsgHash
+		msgSeqNumToHash[seqNum] = msgHashes[i]
 	}
 
 	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i] < seqNums[j] })
@@ -172,12 +197,23 @@ func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
 		treeLeaves = append(treeLeaves, msgHash)
 	}
 
+	lggr.Infow("computeMerkleRoot: Constructing merkle tree from leaves", "leaves", func() []string {
+		strs := make([]string, len(treeLeaves))
+		for i, leaf := range treeLeaves {
+			strs[i] = hex.EncodeToString(leaf[:])
+		}
+		return strs
+	}())
+
 	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(treeLeaves), err)
 	}
 
-	return tree.Root(), nil
+	root := tree.Root()
+	lggr.Infow("computeMerkleRoot: Computed merkle root", "root", hex.EncodeToString(root[:]))
+
+	return root, nil
 }
 
 // ObserveGasPrices TODO: doc
