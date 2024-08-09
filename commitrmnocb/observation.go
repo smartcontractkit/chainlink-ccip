@@ -2,6 +2,7 @@ package commitrmnocb
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"sort"
 
@@ -122,7 +123,7 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 			if err != nil {
 				p.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
 			} else {
-				root, err := computeMerkleRoot(msgs)
+				root, err := p.computeMerkleRoot(ctx, msgs)
 				if err != nil {
 					p.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
 				} else {
@@ -141,14 +142,19 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 }
 
 // computeMerkleRoot Compute the merkle root of a list of messages
-func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
+func (p *Plugin) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
 	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
 	seqNums := make([]cciptypes.SeqNum, 0)
 
 	for _, msg := range msgs {
+		msgHash, err := p.msgHasher.Hash(ctx, msg)
+		if err != nil {
+			p.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+			return cciptypes.Bytes32{}, err
+		}
 		seqNum := msg.Header.SequenceNumber
 		seqNums = append(seqNums, seqNum)
-		msgSeqNumToHash[seqNum] = msg.Header.MsgHash
+		msgSeqNumToHash[seqNum] = msgHash
 	}
 
 	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i] < seqNums[j] })
@@ -177,7 +183,10 @@ func computeMerkleRoot(msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(treeLeaves), err)
 	}
 
-	return tree.Root(), nil
+	root := tree.Root()
+	p.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", hex.EncodeToString(root[:]))
+
+	return root, nil
 }
 
 // ObserveGasPrices TODO: doc
