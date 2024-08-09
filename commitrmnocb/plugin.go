@@ -11,11 +11,12 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
@@ -90,21 +91,20 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (CommitPluginOutcome, CommitPluginState) {
+func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (Outcome, CommitPluginState) {
 	if len(outcome) == 0 {
-		return CommitPluginOutcome{}, SelectingRangesForReport
+		return Outcome{}, SelectingRangesForReport
 	}
 
 	decodedOutcome, err := DecodeCommitPluginOutcome(outcome)
 	if err != nil {
-		p.lggr.Errorw("Failed to decode CommitPluginOutcome", "outcome", outcome, "err", err)
-		return CommitPluginOutcome{}, SelectingRangesForReport
+		p.lggr.Errorw("Failed to decode Outcome", "outcome", outcome, "err", err)
+		return Outcome{}, SelectingRangesForReport
 	}
 
 	return decodedOutcome, decodedOutcome.NextState()
 }
 
-// TODO: doc
 func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
 	knownSourceChains, err := p.homeChain.GetKnownCCIPChains()
 	if err != nil {
@@ -141,15 +141,6 @@ func (p *Plugin) supportsDestChain(oracle commontypes.OracleID) (bool, error) {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[oracle]), nil
-}
-
-func (p *Plugin) supportsTokenPriceChain() (bool, error) {
-	tokPriceChainConfig, err := p.homeChain.GetChainConfig(
-		cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector))
-	if err != nil {
-		return false, fmt.Errorf("get token price chain config: %w", err)
-	}
-	return tokPriceChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
 }
 
 func syncFrequency(configuredValue time.Duration) time.Duration {

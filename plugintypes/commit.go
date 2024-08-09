@@ -11,12 +11,11 @@ import (
 // ---[ Observation ]-----------------------------------------------------------
 
 type CommitPluginObservation struct {
-	NewMsgs     []cciptypes.RampMessageHeader `json:"newMsgs"`
-	GasPrices   []cciptypes.GasPriceChain     `json:"gasPrices"`
-	TokenPrices []cciptypes.TokenPrice        `json:"tokenPrices"`
-	MaxSeqNums  []SeqNumChain                 `json:"maxSeqNums"`
-	// TODO: Why is this a map and not a list?
-	FChain map[cciptypes.ChainSelector]int `json:"fChain"`
+	NewMsgs     []cciptypes.RampMessageHeader   `json:"newMsgs"`
+	GasPrices   []cciptypes.GasPriceChain       `json:"gasPrices"`
+	TokenPrices []cciptypes.TokenPrice          `json:"tokenPrices"`
+	MaxSeqNums  []SeqNumChain                   `json:"maxSeqNums"`
+	FChain      map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
 func NewCommitPluginObservation(

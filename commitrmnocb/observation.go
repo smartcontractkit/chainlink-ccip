@@ -8,12 +8,12 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
@@ -26,56 +26,40 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 
-	observation := CommitPluginObservation{}
+	observation := Observation{}
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := p.ObserveOffRampNextSeqNums(ctx)
-		observation = CommitPluginObservation{
-			OnRampMaxSeqNums:   offRampNextSeqNums, // TODO: change
+		observation = Observation{
+			OnRampMaxSeqNums:   offRampNextSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             p.ObserveFChain(),
 		}
 
 	case BuildingReport:
-		observation = CommitPluginObservation{
+		observation = Observation{
 			MerkleRoots: p.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			GasPrices:   p.ObserveGasPrices(ctx),
-			TokenPrices: p.ObserveTokenPrices(ctx),
+			GasPrices:   []cciptypes.GasPriceChain{},
+			TokenPrices: []cciptypes.TokenPrice{},
 			FChain:      p.ObserveFChain(),
 		}
 
 	case WaitingForReportTransmission:
-		observation = CommitPluginObservation{
+		observation = Observation{
 			OffRampNextSeqNums: p.ObserveOffRampNextSeqNums(ctx),
 			FChain:             p.ObserveFChain(),
 		}
 
 	default:
 		p.lggr.Warnw("Unexpected state", "state", nextState)
-		return types.Observation{}, nil
+		return observation.Encode()
 	}
 
 	p.lggr.Infow("Observation", "observation", observation)
 	return observation.Encode()
 }
 
-// ObserveOnRampMaxSeqNums Simply add NewMsgScanBatchSize to the offRampNextSeqNums
-// TODO: read from the source chain OnRamps to get their OnRampMaxSeqNums
-func (p *Plugin) ObserveOnRampMaxSeqNums(offRampNextSeqNums []plugintypes.SeqNumChain) []plugintypes.SeqNumChain {
-	onRampMaxSeqNums := make([]plugintypes.SeqNumChain, len(offRampNextSeqNums))
-	copy(onRampMaxSeqNums, offRampNextSeqNums)
-
-	for i := range onRampMaxSeqNums {
-		onRampMaxSeqNums[i] = plugintypes.NewSeqNumChain(
-			onRampMaxSeqNums[i].ChainSel,
-			onRampMaxSeqNums[i].SeqNum+cciptypes.SeqNum(p.cfg.NewMsgScanBatchSize),
-		)
-	}
-
-	return onRampMaxSeqNums
-}
-
-// ObserveOffRampNextSeqNums TODO: impl
+// ObserveOffRampNextSeqNums Observe the next sequence numbers for each source chain from the OffRamp
 func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	supportsDestChain, err := p.supportsDestChain(p.nodeID)
 	if err != nil {
@@ -108,7 +92,7 @@ func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.Se
 	return nil
 }
 
-// ObserveMerkleRoots TODO: doc
+// ObserveMerkleRoots Compute the merkle roots for the given sequence number ranges
 func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []cciptypes.MerkleRootChain {
 	roots := make([]cciptypes.MerkleRootChain, 0)
 	supportedChains, err := p.supportedChains(p.nodeID)
@@ -143,116 +127,37 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 
 // computeMerkleRoot Compute the merkle root of a list of messages
 func (p *Plugin) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
-	msgSeqNumToHash := make(map[cciptypes.SeqNum]cciptypes.Bytes32)
-	seqNums := make([]cciptypes.SeqNum, 0)
+	hashes := make([][32]byte, 0)
+	sort.Slice(msgs, func(i, j int) bool { return msgs[i].Header.SequenceNumber < msgs[j].Header.SequenceNumber })
 
-	for _, msg := range msgs {
+	for i, msg := range msgs {
+		// Assert there are no sequence number gaps in msgs
+		if i > 0 {
+			if msg.Header.SequenceNumber != msgs[i-1].Header.SequenceNumber+1 {
+				return [32]byte{}, fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
+					"gap between sequence nums %d and %d, messages: %v", msgs[i-1].Header.SequenceNumber,
+					msg.Header.SequenceNumber, msgs)
+			}
+		}
+
 		msgHash, err := p.msgHasher.Hash(ctx, msg)
 		if err != nil {
 			p.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
 			return cciptypes.Bytes32{}, err
 		}
-		seqNum := msg.Header.SequenceNumber
-		seqNums = append(seqNums, seqNum)
-		msgSeqNumToHash[seqNum] = msgHash
+
+		hashes = append(hashes, msgHash)
 	}
 
-	sort.Slice(seqNums, func(i, j int) bool { return seqNums[i] < seqNums[j] })
-
-	// Assert there are no gaps in the seq num range
-	if len(seqNums) >= 2 {
-		for i := 1; i < len(seqNums); i++ {
-			if seqNums[i] != seqNums[i-1]+1 {
-				return [32]byte{}, fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
-					"gap between seq nums %d and %d, messages: %v", seqNums[i-1], seqNums[i], msgs)
-			}
-		}
-	}
-
-	treeLeaves := make([][32]byte, 0)
-	for _, seqNum := range seqNums {
-		msgHash, ok := msgSeqNumToHash[seqNum]
-		if !ok {
-			return [32]byte{}, fmt.Errorf("msg hash not found for seq num %d", seqNum)
-		}
-		treeLeaves = append(treeLeaves, msgHash)
-	}
-
-	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), treeLeaves)
+	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), hashes)
 	if err != nil {
-		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(treeLeaves), err)
+		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(hashes), err)
 	}
 
 	root := tree.Root()
 	p.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", hex.EncodeToString(root[:]))
 
 	return root, nil
-}
-
-// ObserveGasPrices TODO: doc
-func (p *Plugin) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain {
-	// TODO: Should this be sourceChains or supportedChains?
-	chains := p.knownSourceChainsSlice()
-	if len(chains) == 0 {
-		return []cciptypes.GasPriceChain{}
-	}
-
-	gasPrices, err := p.ccipReader.GasPrices(ctx, chains)
-	if err != nil {
-		p.lggr.Warnw("failed to get gas prices", "err", err)
-		return []cciptypes.GasPriceChain{}
-	}
-
-	if len(gasPrices) != len(chains) {
-		p.lggr.Warnw(
-			"gas prices length mismatch",
-			"len(gasPrices)", len(gasPrices),
-			"len(chains)", len(chains),
-		)
-		return []cciptypes.GasPriceChain{}
-	}
-
-	gasPricesGwei := make([]cciptypes.GasPriceChain, 0, len(chains))
-	for i, chain := range chains {
-		gasPricesGwei = append(gasPricesGwei, cciptypes.NewGasPriceChain(gasPrices[i].Int, chain))
-	}
-
-	return gasPricesGwei
-}
-
-// ObserveTokenPrices TODO: doc
-func (p *Plugin) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
-	tokenPrices, err := p.observeTokenPricesHelper(ctx)
-	if err != nil {
-		p.lggr.Warnw("call to ObserveTokenPrices failed", "err", err)
-	}
-	return tokenPrices
-}
-
-// ObserveTokenPricesHelper TODO: doc
-func (p *Plugin) observeTokenPricesHelper(ctx context.Context) ([]cciptypes.TokenPrice, error) {
-	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
-		tokens := maps.Keys(p.cfg.OffchainConfig.PriceSources)
-
-		tokenPrices, err := p.tokenPricesReader.GetTokenPricesUSD(ctx, tokens)
-		if err != nil {
-			return nil, fmt.Errorf("get token prices: %w", err)
-		}
-
-		if len(tokenPrices) != len(tokens) {
-			return nil, fmt.Errorf("internal critical error token prices length mismatch: got %d, want %d",
-				len(tokenPrices), len(tokens))
-		}
-
-		tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokens))
-		for i, token := range tokens {
-			tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
-		}
-
-		return tokenPricesUSD, nil
-	}
-
-	return nil, nil
 }
 
 func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {

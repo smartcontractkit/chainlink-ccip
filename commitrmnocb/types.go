@@ -12,33 +12,29 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-type RmnSig struct {
-	sig []byte
-}
-
-type CommitQuery struct {
+type Query struct {
 	RmnOnRampMaxSeqNums []plugintypes.SeqNumChain
 	MerkleRoots         []cciptypes.MerkleRootChain
 }
 
-func (q CommitQuery) Encode() ([]byte, error) {
+func (q Query) Encode() ([]byte, error) {
 	return json.Marshal(q)
 }
 
-func DecodeCommitPluginQuery(encodedQuery []byte) (CommitQuery, error) {
-	q := CommitQuery{}
+func DecodeCommitPluginQuery(encodedQuery []byte) (Query, error) {
+	q := Query{}
 	err := json.Unmarshal(encodedQuery, &q)
 	return q, err
 }
 
-func NewCommitQuery(rmnOnRampMaxSeqNums []plugintypes.SeqNumChain, merkleRoots []cciptypes.MerkleRootChain) CommitQuery {
-	return CommitQuery{
+func NewCommitQuery(rmnOnRampMaxSeqNums []plugintypes.SeqNumChain, merkleRoots []cciptypes.MerkleRootChain) Query {
+	return Query{
 		RmnOnRampMaxSeqNums: rmnOnRampMaxSeqNums,
 		MerkleRoots:         merkleRoots,
 	}
 }
 
-type CommitPluginObservation struct {
+type Observation struct {
 	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
 	GasPrices          []cciptypes.GasPriceChain       `json:"gasPrices"`
 	TokenPrices        []cciptypes.TokenPrice          `json:"tokenPrices"`
@@ -47,17 +43,17 @@ type CommitPluginObservation struct {
 	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
-func (obs CommitPluginObservation) Encode() ([]byte, error) {
+func (obs Observation) Encode() ([]byte, error) {
 	encodedObservation, err := json.Marshal(obs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode CommitPluginObservation: %w", err)
+		return nil, fmt.Errorf("failed to encode Observation: %w", err)
 	}
 
 	return encodedObservation, nil
 }
 
-func DecodeCommitPluginObservation(encodedObservation []byte) (CommitPluginObservation, error) {
-	o := CommitPluginObservation{}
+func DecodeCommitPluginObservation(encodedObservation []byte) (Observation, error) {
+	o := Observation{}
 	err := json.Unmarshal(encodedObservation, &o)
 	return o, err
 }
@@ -189,19 +185,19 @@ func (co ConsensusObservation) TokenPricesSortedArray() []cciptypes.TokenPrice {
 	return tokenPrices
 }
 
-type CommitPluginOutcomeType int
+type OutcomeType int
 
 const (
-	ReportIntervalsSelected CommitPluginOutcomeType = iota
+	ReportIntervalsSelected OutcomeType = iota
 	ReportGenerated
 	ReportEmpty
-	ReportNotYetTransmitted
+	ReportInFlight
 	ReportTransmitted
-	ReportNotTransmitted
+	ReportTransmissionFailed
 )
 
-type CommitPluginOutcome struct {
-	OutcomeType                     CommitPluginOutcomeType     `json:"outcomeType"`
+type Outcome struct {
+	OutcomeType                     OutcomeType                 `json:"outcomeType"`
 	RangesSelectedForReport         []ChainRange                `json:"rangesSelectedForReport"`
 	RootsToReport                   []cciptypes.MerkleRootChain `json:"rootsToReport"`
 	OffRampNextSeqNums              []plugintypes.SeqNumChain   `json:"offRampNextSeqNums"`
@@ -211,22 +207,22 @@ type CommitPluginOutcome struct {
 }
 
 // Encode TODO: sort all lists here to ensure deterministic serialization
-func (o CommitPluginOutcome) Encode() ([]byte, error) {
+func (o Outcome) Encode() ([]byte, error) {
 	encodedOutcome, err := json.Marshal(o)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode CommitPluginOutcome: %w", err)
+		return nil, fmt.Errorf("failed to encode Outcome: %w", err)
 	}
 
 	return encodedOutcome, nil
 }
 
-func DecodeCommitPluginOutcome(b []byte) (CommitPluginOutcome, error) {
-	o := CommitPluginOutcome{}
+func DecodeCommitPluginOutcome(b []byte) (Outcome, error) {
+	o := Outcome{}
 	err := json.Unmarshal(b, &o)
 	return o, err
 }
 
-func (o CommitPluginOutcome) NextState() CommitPluginState {
+func (o Outcome) NextState() CommitPluginState {
 	switch o.OutcomeType {
 	case ReportIntervalsSelected:
 		return BuildingReport
@@ -234,11 +230,11 @@ func (o CommitPluginOutcome) NextState() CommitPluginState {
 		return WaitingForReportTransmission
 	case ReportEmpty:
 		return SelectingRangesForReport
-	case ReportNotYetTransmitted:
+	case ReportInFlight:
 		return WaitingForReportTransmission
 	case ReportTransmitted:
 		return SelectingRangesForReport
-	case ReportNotTransmitted:
+	case ReportTransmissionFailed:
 		return SelectingRangesForReport
 	default:
 		return SelectingRangesForReport
@@ -256,30 +252,4 @@ const (
 type ChainRange struct {
 	ChainSel    cciptypes.ChainSelector `json:"chain"`
 	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
-}
-
-// CommitPluginReport is the report that will be transmitted by the Commit Plugin
-type CommitPluginReport struct {
-	MerkleRoots []cciptypes.MerkleRootChain
-	TokenPrices []cciptypes.TokenPrice    `json:"tokenPrices"`
-	GasPrices   []cciptypes.GasPriceChain `json:"gasPrices"`
-}
-
-func (r CommitPluginReport) IsEmpty() bool {
-	return len(r.MerkleRoots) == 0 && len(r.TokenPrices) == 0 && len(r.GasPrices) == 0
-}
-
-func (r CommitPluginReport) Encode() ([]byte, error) {
-	encodedReport, err := json.Marshal(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode CommitPluginReport: %w", err)
-	}
-
-	return encodedReport, nil
-}
-
-func DecodeCommitPluginReport(b []byte) (CommitPluginReport, error) {
-	r := CommitPluginReport{}
-	err := json.Unmarshal(b, &r)
-	return r, err
 }

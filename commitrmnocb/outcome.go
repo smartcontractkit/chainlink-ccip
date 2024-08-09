@@ -9,7 +9,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -21,14 +20,14 @@ func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
-	commitQuery := CommitQuery{}
+	commitQuery := Query{}
 
 	consensusObservation, err := p.getConsensusObservation(aos)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
 
-	outcome := CommitPluginOutcome{}
+	outcome := Outcome{}
 
 	switch nextState {
 	case SelectingRangesForReport:
@@ -41,7 +40,8 @@ func (p *Plugin) Outcome(
 		outcome = p.checkForReportTransmission(previousOutcome, consensusObservation)
 
 	default:
-		return nil, fmt.Errorf("outcome unexpected state: %d", nextState)
+		p.lggr.Warnw("Unexpected state in Outcome", "state", nextState)
+		return outcome.Encode()
 	}
 
 	p.lggr.Infow("Commit Plugin Outcome", "outcome", outcome, "oid", p.nodeID)
@@ -50,9 +50,9 @@ func (p *Plugin) Outcome(
 
 // ReportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 func (p *Plugin) ReportRangesOutcome(
-	query CommitQuery,
+	query Query,
 	consensusObservation ConsensusObservation,
-) CommitPluginOutcome {
+) Outcome {
 	rangesToReport := make([]ChainRange, 0)
 
 	rmnOnRampMaxSeqNumsMap := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
@@ -85,7 +85,7 @@ func (p *Plugin) ReportRangesOutcome(
 	// We sort here so that Outcome serializes deterministically
 	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
 
-	outcome := CommitPluginOutcome{
+	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
 	}
@@ -96,14 +96,9 @@ func (p *Plugin) ReportRangesOutcome(
 // Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
 // to transmit on-chain
 func (p *Plugin) buildReport(
-	query CommitQuery,
+	_ Query,
 	consensusObservation ConsensusObservation,
-) CommitPluginOutcome {
-	// TODO: Only include chains in the report that have gas prices?
-
-	// TODO: token prices validation
-	// exclude merkle roots if expected token prices don't exist?
-
+) Outcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
 	// We sort here so that Outcome serializes deterministically
@@ -116,7 +111,7 @@ func (p *Plugin) buildReport(
 		outcomeType = ReportEmpty
 	}
 
-	outcome := CommitPluginOutcome{
+	outcome := Outcome{
 		OutcomeType:   outcomeType,
 		RootsToReport: roots,
 		GasPrices:     consensusObservation.GasPricesSortedArray(),
@@ -130,13 +125,13 @@ func (p *Plugin) buildReport(
 // were observed when the most recent report was generated. If an update to these max seq sums is detected, it means
 // that the previous report has been transmitted, and we output ReportTransmitted to dictate that a new report
 // generation phase should begin. If no update is detected, and we've exhausted our check attempts, output
-// ReportNotTransmitted to signify we stop checking for updates and start a new report generation phase. If no update
-// is detected, and we haven't exhausted our check attempts, output ReportNotYetTransmitted to signify that we should
+// ReportTransmissionFailed to signify we stop checking for updates and start a new report generation phase. If no
+// update is detected, and we haven't exhausted our check attempts, output ReportInFlight to signify that we should
 // check again next round.
 func (p *Plugin) checkForReportTransmission(
-	previousOutcome CommitPluginOutcome,
+	previousOutcome Outcome,
 	consensusObservation ConsensusObservation,
-) CommitPluginOutcome {
+) Outcome {
 
 	offRampUpdated := false
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
@@ -149,20 +144,20 @@ func (p *Plugin) checkForReportTransmission(
 	}
 
 	if offRampUpdated {
-		return CommitPluginOutcome{
+		return Outcome{
 			OutcomeType: ReportTransmitted,
 		}
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= p.cfg.MaxReportTransmissionCheckAttempts {
 		p.lggr.Warnw("Failed to detect report transmission")
-		return CommitPluginOutcome{
-			OutcomeType: ReportNotTransmitted,
+		return Outcome{
+			OutcomeType: ReportTransmissionFailed,
 		}
 	}
 
-	return CommitPluginOutcome{
-		OutcomeType:                     ReportNotYetTransmitted,
+	return Outcome{
+		OutcomeType:                     ReportInFlight,
 		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
 	}
@@ -179,17 +174,12 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 			fmt.Errorf("no consensus value for fDestChain, DestChain: %d", p.cfg.DestChain)
 	}
 
-	//fTokenChain, exists := fChains[cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector)]
-	//if !exists {
-	//	return ConsensusObservation{},
-	//		fmt.Errorf("no consensus value for fTokenChain, TokenPriceChain: %d",
-	//			p.cfg.OffchainConfig.TokenPriceChainSelector)
-	//}
-
 	consensusObs := ConsensusObservation{
-		MerkleRoots:        p.merkleRootConsensus(aggObs.MerkleRoots, fChains),
-		GasPrices:          make(map[cciptypes.ChainSelector]cciptypes.BigInt), // p.gasPriceConsensus(aggObs.GasPrices, fChains),
-		TokenPrices:        make(map[types.Account]cciptypes.BigInt),           // p.tokenPriceConsensus(aggObs.TokenPrices, fTokenChain),
+		MerkleRoots: p.merkleRootConsensus(aggObs.MerkleRoots, fChains),
+		// TODO: use consensus of observed gas prices
+		GasPrices: make(map[cciptypes.ChainSelector]cciptypes.BigInt),
+		// TODO: use consensus of observed token prices
+		TokenPrices:        make(map[types.Account]cciptypes.BigInt),
 		OnRampMaxSeqNums:   p.onRampMaxSeqNumsConsensus(aggObs.OnRampMaxSeqNums, fChains),
 		OffRampNextSeqNums: p.offRampMaxSeqNumsConsensus(aggObs.OffRampNextSeqNums, fDestChain),
 		FChain:             fChains,
@@ -224,59 +214,6 @@ func (p *Plugin) merkleRootConsensus(
 			// TODO: metrics
 			p.lggr.Warnf("merkleRootConsensus: fChain not found for chain %d", chain)
 		}
-	}
-
-	return consensus
-}
-
-// Given a mapping from chains to a list of gas prices, return a mapping from chains to a single consensus gas price.
-// The consensus gas price for a given chain is the median gas price if the number of gas price observations is
-// greater or equal than 2f+1, where f is the FChain of the corresponding source chain.
-func (p *Plugin) gasPriceConsensus(
-	pricesByChain map[cciptypes.ChainSelector][]cciptypes.BigInt,
-	fChains map[cciptypes.ChainSelector]int,
-) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	consensus := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
-
-	for chain, prices := range pricesByChain {
-		if f, exists := fChains[chain]; exists {
-			if len(prices) < 2*f+1 {
-				// TODO: metrics
-				p.lggr.Warnf("could not reach consensus on gas prices for chain %d "+
-					"because we did not receive more than 2f+1 observed prices, 2f+1: %d, len(prices): %d, prices: %v",
-					chain, 2*f+1, len(prices), prices)
-			}
-
-			consensus[chain] = slicelib.BigIntSortedMiddle(prices)
-		} else {
-			// TODO: metrics
-			p.lggr.Warnf("could not reach consensus on gas prices for chain %d because "+
-				"there was no consensus f value for this chain", chain)
-		}
-	}
-
-	return consensus
-}
-
-// Given a mapping from token IDs to a list of token prices, return a mapping from token IDs to a single consensus
-// token price. The consensus token price for a given token ID is the median token price if the number of token price
-// observations is greater or equal than 2f+1, where f is the FChain of the chain that token prices were retrieved
-// from.
-func (p *Plugin) tokenPriceConsensus(
-	pricesByToken map[types.Account][]cciptypes.BigInt,
-	fTokenChain int,
-) map[types.Account]cciptypes.BigInt {
-	consensus := make(map[types.Account]cciptypes.BigInt)
-
-	for tokenID, prices := range pricesByToken {
-		if len(prices) < 2*fTokenChain+1 {
-			// TODO: metrics
-			p.lggr.Warnf("could not reach consensus on token prices for token %s because "+
-				"we did not receive more than 2f+1 observed prices, 2f+1: %d, len(prices): %d, prices: %v",
-				tokenID, 2*fTokenChain+1, len(prices), prices)
-		}
-
-		consensus[tokenID] = slicelib.BigIntSortedMiddle(prices)
 	}
 
 	return consensus
