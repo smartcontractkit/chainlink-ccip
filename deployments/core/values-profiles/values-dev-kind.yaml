@@ -1,0 +1,27 @@
+geth:
+  enabled: true
+  statefulSet:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+db:
+  statefulSet:
+    enabled: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+
+ingress:
+  ingressClassName: nginx
+
+chainlink:
+  nodes:
+    node1:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi

@@ -4,6 +4,7 @@ name: chainlink
 
 imports:
   - path: ../../components/don/don.yaml
+  - path: ../../components/kind/kind.yaml
 
 vars:
   SCRIPTS_DIR:
@@ -30,7 +31,12 @@ pipelines:
         description: "If specified, keystone caches will be cleaned before deploying"
 
     run: |-
+      # Source the shared functions file.
+      # shellcheck disable=SC1091
+      source "../../scripts/lib/shared_functions.sh"
+
       tagOverride=$(get_flag "override-image-tag")
+
       run_dependencies --all
 
       if [[ -n "${tagOverride}" ]]; then
@@ -43,9 +49,8 @@ pipelines:
         done
         echo $args
 
-
         create_deployments app $args
-      elif ! [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-devspace$  ]]; then
+      elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
         echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
         exit 1
@@ -417,6 +422,29 @@ deployments:
         tolerations:
         affinity:
 profiles:
+  - name: kind
+    # This profile will be automatically activated
+    activation:
+      - env:
+          PROVIDER: "kind"
+    patches:
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes.node1.resources
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes.node2.resources
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes.node3.resources
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes.node4.resources
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes.node5.resources
+      - op: remove
+        path: deployments.app.helm.values.geth.resources
+      - op: remove
+        path: deployments.app.helm.values.db.resources
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value: ["./values-profiles/values-dev-kind.yaml"]
   - name: local-dev
     patches:
       # Remove the global overridesToml field.

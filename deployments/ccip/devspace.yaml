@@ -4,6 +4,7 @@ name: chainlink
 imports:
   - path: ../../components/don/don.yaml
   - path: ../../components/atlas/atlas.yaml
+  - path: ../../components/kind/kind.yaml
 
 vars:
   SCRIPTS_DIR:
@@ -39,6 +40,10 @@ pipelines:
         type: string
         description: "If specified, the specified tag will be used instead of building a new image"
     run: |-
+      # Source the shared functions file.
+      # shellcheck disable=SC1091
+      source "../../scripts/lib/shared_functions.sh"
+
       tagOverride=$(get_flag "override-image-tag")
       run_dependencies --all
 
@@ -52,12 +57,22 @@ pipelines:
         done
 
         create_deployments app $args
-      elif ! [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-ccip-devspace$  ]]; then
+      elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
         echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
         exit 1
       else
         build_images --all
+
+        # TODO: Add a function to lib.sh to check if the image already exist
+        # and move the sync step to a function
+        if [[ "${PROVIDER}" == "kind" ]]; then
+          echo "Info: It appears you are deploying to a local Kind cluster. Let's ensure that the latest CCIP job deploy image is in the local registry."
+          docker pull "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest" --platform linux/amd64
+          docker tag "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest" "localhost:5001/ccip-scripts:latest"
+          docker push "localhost:5001/ccip-scripts:latest"
+        fi
+
         create_deployments app
       fi
 
@@ -451,6 +466,32 @@ deployments:
           outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
 
 profiles:
+  - name: kind
+    description: The profile is supposed to be used with local deployment on a Kind cluster
+    # This profile will be automatically activated
+    activation:
+      - env:
+          PROVIDER: "kind"
+    patches:
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node1.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node2.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node3.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node4.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node5.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.db.resources
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value: ["./values-profiles/values-dev-kind.yaml"]
   - name: local-dev
     patches:
       # Remove the global overridesToml field.

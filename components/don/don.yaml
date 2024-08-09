@@ -99,7 +99,7 @@ hooks:
   # Check that the ingress was created successfully, and print ingress hostnames.
   - name: "ingress-check-hook"
     command: ./${SCRIPTS_DIR}/ingress_check.sh
-    args: ["app"]  # Ingress name.
+    args: ["app"] # Ingress name.
     events: ["after:deploy:app"]
 
   # Check that the namespace cleanup label is set successfully.

@@ -55,7 +55,9 @@ create_namespace() {
 		fi
 	fi
 
-	check_role_binding "$namespace"
+	if [ "${PROVIDER:-}" = "aws" ]; then
+		check_role_binding "$namespace"
+	fi
 }
 
 # Function to label the namespace
