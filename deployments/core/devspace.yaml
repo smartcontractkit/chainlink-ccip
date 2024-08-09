@@ -431,15 +431,9 @@ profiles:
       - op: remove
         path: deployments.app.helm.values.chainlink.nodes.node1.resources
       - op: remove
-        path: deployments.app.helm.values.chainlink.nodes.node2.resources
-      - op: remove
-        path: deployments.app.helm.values.chainlink.nodes.node3.resources
-      - op: remove
-        path: deployments.app.helm.values.chainlink.nodes.node4.resources
-      - op: remove
-        path: deployments.app.helm.values.chainlink.nodes.node5.resources
-      - op: remove
         path: deployments.app.helm.values.geth.resources
+      - op: remove
+        path: deployments.app.helm.values.mockserver.resources
       - op: remove
         path: deployments.app.helm.values.db.resources
       - op: add

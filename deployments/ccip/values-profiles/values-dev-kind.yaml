@@ -1,24 +1,9 @@
+ccipScriptsDeployment:
+  extraEnvs:
+    - name: AWS_IAM_ENABLED
+      value: "false"
+
 crib-chainlink-cluster:
-  geth:
-    enabled: true
-    statefulSet:
-      enabled: false
-    resources:
-      requests:
-        cpu: 50m
-        memory: 256Mi
-
-  db:
-    statefulSet:
-      enabled: false
-    resources:
-      requests:
-        cpu: 50m
-        memory: 256Mi
-
-  ingress:
-    ingressClassName: nginx
-
   chainlink:
     nodes:
       node1:
@@ -26,8 +11,25 @@ crib-chainlink-cluster:
           requests:
             cpu: 50m
             memory: 256Mi
-
-ccipScriptsDeployment:
-  extraEnvs:
-    - name: AWS_IAM_ENABLED
-      value: "false"
+  db:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+    statefulSet:
+      enabled: false
+  geth:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+    statefulSet:
+      enabled: false
+  ingress:
+    ingressClassName: nginx
+  mockserver:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
