@@ -156,7 +156,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		r.lggr.Warnw("pageIndex hard limit reached or exceeded", "limit", pageIndexHardLimit)
 	}
 
-	r.setState(convertOnChainConfigToHomeChainConfig(allChainConfigInfos))
+	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, allChainConfigInfos))
 
 	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
