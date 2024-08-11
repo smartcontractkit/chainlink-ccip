@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -123,12 +124,14 @@ func (p *Plugin) Observation(
 		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
 	}
 
+	// observe token prices if the node supports the token price chain
+	// otherwise move on to gas prices.
 	var tokenPrices []cciptypes.TokenPrice
-	if p.cfg.TokenPricesObserver {
+	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
 		tokenPrices, err = observeTokenPrices(
 			ctx,
 			p.tokenPricesReader,
-			p.cfg.PricedTokens,
+			maps.Keys(p.cfg.OffchainConfig.PriceSources),
 		)
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("observe token prices: %w", err)
@@ -411,6 +414,15 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
 	return destChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
+}
+
+func (p *Plugin) supportsTokenPriceChain() (bool, error) {
+	tokPriceChainConfig, err := p.homeChain.GetChainConfig(
+		cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector))
+	if err != nil {
+		return false, fmt.Errorf("get token price chain config: %w", err)
+	}
+	return tokPriceChainConfig.SupportedNodes.Contains(p.oracleIDToP2pID[p.nodeID]), nil
 }
 
 func syncFrequency(configuredValue time.Duration) time.Duration {

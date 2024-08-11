@@ -8,14 +8,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/types"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 )
 
 var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
-	Add(report plugintypes.ExecutePluginCommitData) (plugintypes.ExecutePluginCommitData, error)
+	Add(report exectypes.CommitData) (exectypes.CommitData, error)
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
@@ -23,8 +23,9 @@ func NewBuilder(
 	ctx context.Context,
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader types.TokenDataReader,
+	tokenDataReader exectypes.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
+	estimateProvider gas.EstimateProvider,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
 ) ExecReportBuilder {
@@ -32,9 +33,10 @@ func NewBuilder(
 		ctx:  ctx,
 		lggr: logger,
 
-		tokenDataReader: tokenDataReader,
-		encoder:         encoder,
-		hasher:          hasher,
+		tokenDataReader:  tokenDataReader,
+		encoder:          encoder,
+		hasher:           hasher,
+		estimateProvider: estimateProvider,
 
 		maxReportSizeBytes: maxReportSizeBytes,
 		maxGas:             maxGas,
@@ -44,9 +46,14 @@ func NewBuilder(
 // validationMetadata contains all metadata needed to accumulate results across multiple reports and messages.
 type validationMetadata struct {
 	encodedSizeBytes uint64
+	gas              uint64
+}
 
-	// TODO: gas limit
-	//gas             uint64
+func (vm validationMetadata) accumulate(other validationMetadata) validationMetadata {
+	var result validationMetadata
+	result.encodedSizeBytes = vm.encodedSizeBytes + other.encodedSizeBytes
+	result.gas = vm.gas + other.gas
+	return result
 }
 
 type execReportBuilder struct {
@@ -54,9 +61,10 @@ type execReportBuilder struct {
 	lggr logger.Logger
 
 	// Providers
-	tokenDataReader types.TokenDataReader
-	encoder         cciptypes.ExecutePluginCodec
-	hasher          cciptypes.MessageHasher
+	tokenDataReader  exectypes.TokenDataReader
+	encoder          cciptypes.ExecutePluginCodec
+	hasher           cciptypes.MessageHasher
+	estimateProvider gas.EstimateProvider
 
 	// Config
 	maxReportSizeBytes uint64
@@ -70,8 +78,8 @@ type execReportBuilder struct {
 }
 
 func (b *execReportBuilder) Add(
-	commitReport plugintypes.ExecutePluginCommitData,
-) (plugintypes.ExecutePluginCommitData, error) {
+	commitReport exectypes.CommitData,
+) (exectypes.CommitData, error) {
 	execReport, updatedReport, err := b.buildSingleChainReport(b.ctx, commitReport)
 
 	// No messages fit into the report, move to next report

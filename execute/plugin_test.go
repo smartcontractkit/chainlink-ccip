@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -36,14 +37,14 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		name    string
 		reports []plugintypes.CommitPluginReportWithMeta
 		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
-		want    plugintypes.ExecutePluginCommitObservations
+		want    exectypes.CommitObservations
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			reports: nil,
 			ranges:  nil,
-			want:    plugintypes.ExecutePluginCommitObservations{},
+			want:    exectypes.CommitObservations{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -65,8 +66,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 			ranges: map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{
 				1: nil,
 			},
-			want: plugintypes.ExecutePluginCommitObservations{
-				1: []plugintypes.ExecutePluginCommitData{
+			want: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
@@ -99,8 +100,8 @@ func Test_getPendingExecutedReports(t *testing.T) {
 					cciptypes.NewSeqNumRange(7, 8),
 				},
 			},
-			want: plugintypes.ExecutePluginCommitObservations{
-				1: []plugintypes.ExecutePluginCommitData{
+			want: exectypes.CommitObservations{
+				1: []exectypes.CommitData{
 					{
 						SourceChain:         1,
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
@@ -127,7 +128,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 				},
 			},
 			ranges:  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange{},
-			want:    plugintypes.ExecutePluginCommitObservations{},
+			want:    exectypes.CommitObservations{},
 			wantErr: assert.NoError,
 		},
 	}
@@ -221,7 +222,7 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 		},
 	}
 
-	observation := plugintypes.NewExecutePluginObservation(nil, plugintypes.ExecutePluginMessageObservations{
+	observation := exectypes.NewObservation(nil, exectypes.MessageObservations{
 		0: map[cciptypes.SeqNum]cciptypes.Message{
 			1: {
 				Header: cciptypes.RampMessageHeader{
@@ -256,13 +257,13 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 
 	// Reports with duplicate roots.
 	root := cciptypes.Bytes32{}
-	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData{
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {
 			{MerkleRoot: root},
 			{MerkleRoot: root},
 		},
 	}
-	observation := plugintypes.NewExecutePluginObservation(commitReports, nil)
+	observation := exectypes.NewObservation(commitReports, nil)
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -346,10 +347,10 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 		lggr:      logger.Test(t),
 	}
 
-	commitReports := map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData{
+	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := plugintypes.NewExecutePluginObservation(commitReports, nil).Encode()
+	observation, err := exectypes.NewObservation(commitReports, nil).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -382,7 +383,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := plugintypes.NewExecutePluginObservation(nil, messages).Encode()
+	observation, err := exectypes.NewObservation(nil, messages).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -405,7 +406,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec}
-	report, err := plugintypes.NewExecutePluginOutcome(nil, cciptypes.ExecutePluginReport{}).Encode()
+	report, err := exectypes.NewOutcome(nil, cciptypes.ExecutePluginReport{}).Encode()
 	require.NoError(t, err)
 
 	_, err = p.Reports(0, report)

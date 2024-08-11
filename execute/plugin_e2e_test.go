@@ -12,17 +12,20 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	"github.com/smartcontractkit/chainlink-ccip/execute/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/types"
+	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -50,7 +53,7 @@ func TestPlugin(t *testing.T) {
 	// Two of the messages are executed which should be indicated in the Outcome.
 	res, err := runner.RunRound(ctx)
 	require.NoError(t, err)
-	outcome, err := plugintypes.DecodeExecutePluginOutcome(res.Outcome)
+	outcome, err := exectypes.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
@@ -60,7 +63,7 @@ func TestPlugin(t *testing.T) {
 	// The exec report should indicate the following messages are executed: 102, 103, 104, 105.
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
-	outcome, err = plugintypes.DecodeExecutePluginOutcome(res.Outcome)
+	outcome, err = exectypes.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Len(t, outcome.Report.ChainReports, 1)
 	require.Len(t, outcome.PendingCommitReports, 0)
@@ -142,7 +145,7 @@ func setupSimpleTest(
 	}
 
 	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
-	reportData := plugintypes.ExecutePluginCommitData{
+	reportData := exectypes.CommitData{
 		SourceChain:         srcSelector,
 		SequenceNumberRange: cciptypes.NewSeqNumRange(100, 105),
 		Messages:            mapped,
@@ -182,8 +185,11 @@ func setupSimpleTest(
 	}
 
 	cfg := pluginconfig.ExecutePluginConfig{
-		MessageVisibilityInterval: 8 * time.Hour,
-		DestChain:                 dstSelector,
+		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+			BatchGasLimit:             100000000,
+		},
+		DestChain: dstSelector,
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
@@ -193,7 +199,9 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: []byte{0},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
+					FinalityDepth: 1,
+				}),
 			},
 		}, {
 			ChainSelector: dstSelector,
@@ -202,7 +210,9 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: []byte{0},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
+					FinalityDepth: 1,
+				}),
 			},
 		},
 	}
@@ -236,7 +246,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
-	tokenDataReader types.TokenDataReader,
+	tokenDataReader exectypes.TokenDataReader,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
@@ -257,6 +267,7 @@ func newNode(
 		msgHasher,
 		homeChain,
 		tokenDataReader,
+		evm.EstimateProvider{},
 		lggr)
 
 	return nodeSetup{
@@ -272,4 +283,12 @@ func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
 	}
 	return res
+}
+
+func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
+	encoded, err := chainconfig.EncodeChainConfig(cc)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }

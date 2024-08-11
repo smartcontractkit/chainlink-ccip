@@ -4,22 +4,25 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/types"
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // mustMakeBytes parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
@@ -110,7 +113,7 @@ func assertMerkleRoot(
 	t *testing.T,
 	hasher cciptypes.MessageHasher,
 	execReport cciptypes.ExecutePluginReportSingleChain,
-	commitReport plugintypes.ExecutePluginCommitData,
+	commitReport exectypes.CommitData,
 ) {
 	keccak := hashutil.NewKeccak()
 	// Generate merkle root from commit report messages
@@ -181,7 +184,7 @@ func makeTestCommitReport(
 	timestamp int64,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
-) plugintypes.ExecutePluginCommitData {
+) exectypes.CommitData {
 	sequenceNumberRange :=
 		cciptypes.NewSeqNumRange(cciptypes.SeqNum(firstSeqNum), cciptypes.SeqNum(firstSeqNum+numMessages-1))
 
@@ -198,7 +201,7 @@ func makeTestCommitReport(
 			uint64(i)))
 	}
 
-	commitReport := plugintypes.ExecutePluginCommitData{
+	commitReport := exectypes.CommitData{
 		//MerkleRoot:          root,
 		SourceChain:         cciptypes.ChainSelector(srcChain),
 		SequenceNumberRange: sequenceNumberRange,
@@ -223,30 +226,21 @@ func makeTestCommitReport(
 
 // breakCommitReport by adding an extra message. This causes the report to have an unexpected number of messages.
 func breakCommitReport(
-	commitReport plugintypes.ExecutePluginCommitData,
-) plugintypes.ExecutePluginCommitData {
+	commitReport exectypes.CommitData,
+) exectypes.CommitData {
 	commitReport.Messages = append(commitReport.Messages, cciptypes.Message{})
 	return commitReport
 }
 
 // setMessageData at the given index to the given size. This function will panic if the index is out of range.
 func setMessageData(
-	idx int, size uint64, commitReport plugintypes.ExecutePluginCommitData,
-) plugintypes.ExecutePluginCommitData {
+	idx int, size uint64, commitReport exectypes.CommitData,
+) exectypes.CommitData {
 	if len(commitReport.Messages) < idx {
 		panic("message index out of range")
 	}
 	commitReport.Messages[idx].Data = make([]byte, size)
 	return commitReport
-}
-
-// TODO: better than this
-type tdr struct{}
-
-func (t tdr) ReadTokenData(
-	ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error,
-) {
-	return nil, nil
 }
 
 type badHasher struct{}
@@ -255,34 +249,12 @@ func (bh badHasher) Hash(context.Context, cciptypes.Message) (cciptypes.Bytes32,
 	return cciptypes.Bytes32{}, fmt.Errorf("bad hasher")
 }
 
-type badTokenDataReader struct{}
-
-func (btdr badTokenDataReader) ReadTokenData(
-	_ context.Context, _ cciptypes.ChainSelector, _ cciptypes.SeqNum,
-) ([][]byte, error) {
-	return nil, fmt.Errorf("bad token data reader")
-}
-
-/*
-// TODO: Use this to test the verifyReport function.
-type badCodec struct{}
-
-func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
-	return nil, fmt.Errorf("bad codec")
-}
-
-func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
-	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
-}
-*/
-
 func Test_buildSingleChainReport_Errors(t *testing.T) {
 	lggr := logger.Test(t)
 
 	type args struct {
-		report          plugintypes.ExecutePluginCommitData
-		hasher          cciptypes.MessageHasher
-		tokenDataReader types.TokenDataReader
+		report exectypes.CommitData
+		hasher cciptypes.MessageHasher
 	}
 	tests := []struct {
 		name    string
@@ -290,10 +262,20 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name:    "token data mismatch",
+			wantErr: "token data length mismatch: got 2, expected 0",
+			args: args{
+				report: exectypes.CommitData{
+					TokenData: make([][][]byte, 2),
+				},
+			},
+		},
+		{
 			name:    "wrong number of messages",
 			wantErr: "unexpected number of messages: expected 1, got 2",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
+					TokenData:           make([][][]byte, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
@@ -306,7 +288,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "wrong sequence numbers",
 			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
+					TokenData:           make([][][]byte, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					Messages: []cciptypes.Message{
 						{
@@ -327,14 +310,17 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "source mismatch",
 			wantErr: "unexpected source chain: expected 1111, got 2222",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
+					TokenData:           make([][][]byte, 1),
 					SourceChain:         1111,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 2222,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
+						{
+							Header: cciptypes.RampMessageHeader{
+								SourceChainSelector: 2222,
+								SequenceNumber:      cciptypes.SeqNum(100),
+							},
+						},
 					},
 				},
 				hasher: badHasher{},
@@ -344,34 +330,20 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			name:    "bad hasher",
 			wantErr: "unable to hash message (1234567, 100): bad hasher",
 			args: args{
-				report: plugintypes.ExecutePluginCommitData{
+				report: exectypes.CommitData{
+					TokenData:           make([][][]byte, 1),
 					SourceChain:         1234567,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 1234567,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
+						{
+							Header: cciptypes.RampMessageHeader{
+								SourceChainSelector: 1234567,
+								SequenceNumber:      cciptypes.SeqNum(100),
+							},
+						},
 					},
 				},
 				hasher: badHasher{},
-			},
-		},
-		{
-			name:    "bad token data reader",
-			wantErr: "unable to read token data for message 100: bad token data reader",
-			args: args{
-				report: plugintypes.ExecutePluginCommitData{
-					SourceChain:         1234567,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					Messages: []cciptypes.Message{
-						{Header: cciptypes.RampMessageHeader{
-							SourceChainSelector: 1234567,
-							SequenceNumber:      cciptypes.SeqNum(100),
-						}},
-					},
-				},
-				tokenDataReader: badTokenDataReader{},
 			},
 		},
 	}
@@ -388,23 +360,21 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 				resolvedHasher = mocks.NewMessageHasher()
 			}
 
-			// Select token data reader mock.
-			var resolvedTokenDataReader types.TokenDataReader
-			if tt.args.tokenDataReader != nil {
-				resolvedTokenDataReader = tt.args.tokenDataReader
-			} else {
-				resolvedTokenDataReader = tdr{}
-			}
-
 			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
-			_, err := buildSingleChainReportHelper(
-				ctx, lggr, resolvedHasher, resolvedTokenDataReader, tt.args.report, msgs)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
+
+			test := func(readyMessages map[int]struct{}) {
+				_, err := buildSingleChainReportHelper(ctx, lggr, resolvedHasher, tt.args.report, readyMessages)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
+			}
+
+			// Test with pre-built and all messages.
+			test(msgs)
+			test(nil)
 		})
 	}
 }
@@ -413,11 +383,12 @@ func Test_Builder_Build(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
 	codec := mocks.NewExecutePluginJSONReportCodec()
 	lggr := logger.Test(t)
-	var tokenDataReader tdr
+	tokenDataReader := tdr{mode: good}
 
 	type args struct {
-		reports       []plugintypes.ExecutePluginCommitData
+		reports       []exectypes.CommitData
 		maxReportSize uint64
+		maxGasLimit   uint64
 	}
 	tests := []struct {
 		name                  string
@@ -431,7 +402,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "empty report",
 			args: args{
-				reports: []plugintypes.ExecutePluginCommitData{},
+				reports: []exectypes.CommitData{},
 			},
 			expectedExecReports:   0,
 			expectedCommitReports: 0,
@@ -440,7 +411,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "half report",
 			args: args{
 				maxReportSize: 2300,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -455,7 +427,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "full report",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -469,7 +442,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "two reports",
 			args: args{
 				maxReportSize: 15000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -486,7 +460,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "one and half reports",
 			args: args{
 				maxReportSize: 8500,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -504,7 +479,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "exactly one report",
 			args: args{
 				maxReportSize: 4200,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
@@ -522,7 +498,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "execute remainder of partially executed report",
 			args: args{
 				maxReportSize: 2500,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
@@ -536,7 +513,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "partially execute remainder of partially executed report",
 			args: args{
 				maxReportSize: 2050,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
@@ -551,7 +529,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "execute remainder of sparsely executed report",
 			args: args{
 				maxReportSize: 3500,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
@@ -565,7 +544,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
 				maxReportSize: 2050,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
@@ -580,7 +560,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "broken report",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					breakCommitReport(makeTestCommitReport(hasher, 10, 1, 101, 1000, 10101010102,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil)),
@@ -591,7 +572,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "invalid merkle root",
 			args: args{
-				reports: []plugintypes.ExecutePluginCommitData{
+				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 						mustMakeBytes(""), // random root
 						nil),
@@ -603,7 +584,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "skip over one large messages",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					setMessageData(5, 20000,
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
 							cciptypes.Bytes32{}, // generate a correct root.
@@ -619,7 +601,8 @@ func Test_Builder_Build(t *testing.T) {
 			name: "skip over two large messages",
 			args: args{
 				maxReportSize: 10000,
-				reports: []plugintypes.ExecutePluginCommitData{
+				maxGasLimit:   10000000,
+				reports: []exectypes.CommitData{
 					setMessageData(8, 20000,
 						setMessageData(5, 20000,
 							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
@@ -641,8 +624,16 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			builder := NewBuilder(ctx, lggr, hasher, tokenDataReader, codec, tt.args.maxReportSize, 0)
-			var updatedMessages []plugintypes.ExecutePluginCommitData
+			builder := NewBuilder(
+				ctx,
+				lggr,
+				hasher,
+				tokenDataReader,
+				codec,
+				evm.EstimateProvider{},
+				tt.args.maxReportSize,
+				tt.args.maxGasLimit)
+			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
 				updatedMessage, err := builder.Add(report)
 				if err != nil && tt.wantErr != "" {
@@ -677,6 +668,389 @@ func Test_Builder_Build(t *testing.T) {
 			if len(updatedMessages) > 0 && len(tt.lastReportExecuted) > 0 {
 				lastReport := updatedMessages[len(updatedMessages)-1]
 				require.ElementsMatch(t, tt.lastReportExecuted, lastReport.ExecutedMessages)
+			}
+		})
+	}
+}
+
+type badCodec struct{}
+
+func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+	return nil, fmt.Errorf("bad codec")
+}
+
+func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
+	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
+}
+
+func Test_execReportBuilder_verifyReport(t *testing.T) {
+	type fields struct {
+		encoder            cciptypes.ExecutePluginCodec
+		estimateProvider   gas.EstimateProvider
+		maxReportSizeBytes uint64
+		maxGas             uint64
+		accumulated        validationMetadata
+	}
+	type args struct {
+		execReport cciptypes.ExecutePluginReportSingleChain
+	}
+	tests := []struct {
+		name             string
+		fields           fields
+		args             args
+		expectedLog      string
+		expectedIsValid  bool
+		expectedMetadata validationMetadata
+		expectedError    string
+	}{
+		{
+			name: "empty report",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{},
+			},
+			fields: fields{
+				estimateProvider:   evm.EstimateProvider{},
+				maxReportSizeBytes: 1000,
+				maxGas:             1000000,
+			},
+			expectedIsValid: true,
+			expectedMetadata: validationMetadata{
+				encodedSizeBytes: 120,
+			},
+		},
+		{
+			name: "good report",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+						makeMessage(1, 102, 0),
+						makeMessage(1, 103, 0),
+					},
+				},
+			},
+			fields: fields{
+				estimateProvider:   evm.EstimateProvider{},
+				maxReportSizeBytes: 10000,
+				maxGas:             1000000,
+			},
+			expectedIsValid: true,
+			expectedMetadata: validationMetadata{
+				encodedSizeBytes: 1633,
+				gas:              482_240,
+			},
+		},
+		{
+			name: "oversized report",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+						makeMessage(1, 102, 0),
+						makeMessage(1, 103, 0),
+					},
+				},
+			},
+			fields: fields{
+				estimateProvider:   evm.EstimateProvider{},
+				maxReportSizeBytes: 1000,
+				maxGas:             1000000,
+			},
+			expectedLog: "invalid report, report size exceeds limit",
+		},
+		{
+			name: "oversized report - accumulated size",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+						makeMessage(1, 102, 0),
+						makeMessage(1, 103, 0),
+					},
+				},
+			},
+			fields: fields{
+				estimateProvider: evm.EstimateProvider{},
+				accumulated: validationMetadata{
+					encodedSizeBytes: 1000,
+				},
+				maxReportSizeBytes: 2000,
+				maxGas:             1000000,
+			},
+			expectedLog: "invalid report, report size exceeds limit",
+		},
+		{
+			name: "bad token data reader",
+			args: args{
+				execReport: cciptypes.ExecutePluginReportSingleChain{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+					},
+				},
+			},
+			fields: fields{
+				estimateProvider: evm.EstimateProvider{},
+				encoder:          badCodec{},
+			},
+			expectedError: "unable to encode report",
+			expectedLog:   "unable to encode report",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Select token data reader mock.
+			var resolvedEncoder cciptypes.ExecutePluginCodec
+			if tt.fields.encoder != nil {
+				resolvedEncoder = tt.fields.encoder
+			} else {
+				resolvedEncoder = mocks.NewExecutePluginJSONReportCodec()
+			}
+
+			b := &execReportBuilder{
+				ctx:                context.Background(),
+				lggr:               lggr,
+				encoder:            resolvedEncoder,
+				estimateProvider:   tt.fields.estimateProvider,
+				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
+				maxGas:             tt.fields.maxGas,
+				accumulated:        tt.fields.accumulated,
+			}
+			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
+			if tt.expectedError != "" {
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			if tt.expectedLog != "" {
+				found := false
+				for _, log := range logs.All() {
+					fmt.Println(log.Message)
+					found = found || strings.Contains(log.Message, tt.expectedLog)
+				}
+				assert.True(t, found, "expected log not found")
+			}
+			assert.Equalf(t, tt.expectedIsValid, isValid, "verifyReport(...)")
+			assert.Equalf(t, tt.expectedMetadata, metadata, "verifyReport(...)")
+		})
+	}
+}
+
+type tdr struct {
+	mode tokenDataMode
+}
+
+type tokenDataMode int
+
+const (
+	noop tokenDataMode = iota + 1
+	good
+	bad
+	notReady
+)
+
+func (t tdr) ReadTokenData(
+	ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error,
+) {
+	switch t.mode {
+	case noop:
+		return nil, nil
+	case good:
+		return [][]byte{{0x01, 0x02, 0x03}}, nil
+	case bad:
+		return nil, fmt.Errorf("bad token data reader")
+	case notReady:
+		return nil, ErrNotReady
+	default:
+		panic("mode should be one of the valid ones.")
+	}
+}
+
+func Test_execReportBuilder_checkMessage(t *testing.T) {
+	type fields struct {
+		tokenDataReader exectypes.TokenDataReader
+		accumulated     validationMetadata
+	}
+	type args struct {
+		idx        int
+		execReport exectypes.CommitData
+	}
+	tests := []struct {
+		name             string
+		fields           fields
+		args             args
+		expectedData     exectypes.CommitData
+		expectedStatus   messageStatus
+		expectedMetadata validationMetadata
+		expectedError    string
+		expectedLog      string
+	}{
+		{
+			name:          "empty",
+			expectedError: "message index out of range",
+			expectedLog:   "message index out of range",
+		},
+		{
+			name: "already executed",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+					ExecutedMessages: []cciptypes.SeqNum{100},
+				},
+			},
+			expectedStatus: AlreadyExecuted,
+			expectedLog:    "message already executed",
+		},
+		{
+			name: "bad token data",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: bad},
+			},
+			expectedStatus: TokenDataFetchError,
+			expectedLog:    "unable to read token data - unknown error",
+		},
+		{
+			name: "token data not ready",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: notReady},
+			},
+			expectedStatus: TokenDataNotReady,
+			expectedLog:    "unable to read token data - token data not ready",
+		},
+		{
+			name: "good token data is cached",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: good},
+			},
+			expectedStatus: ReadyToExecute,
+			expectedData: exectypes.CommitData{
+				Messages: []cciptypes.Message{
+					makeMessage(1, 100, 0),
+				},
+				TokenData: [][][]byte{
+					{{0x01, 0x02, 0x03}},
+				},
+			},
+		},
+		{
+			name: "good - no token data - 1 msg",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: ReadyToExecute,
+			expectedData: exectypes.CommitData{
+				Messages: []cciptypes.Message{
+					makeMessage(1, 100, 0),
+				},
+				TokenData: [][][]byte{nil},
+			},
+		},
+		{
+			name: "good - no token data - 2nd msg pads slice",
+			args: args{
+				idx: 1,
+				execReport: exectypes.CommitData{
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 0),
+						makeMessage(1, 101, 0),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: ReadyToExecute,
+			expectedData: exectypes.CommitData{
+				Messages: []cciptypes.Message{
+					makeMessage(1, 100, 0),
+					makeMessage(1, 101, 0),
+				},
+				TokenData: [][][]byte{nil, nil},
+			},
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
+
+			// Select token data reader mock.
+			var resolvedTokenDataReader exectypes.TokenDataReader
+			if tt.fields.tokenDataReader != nil {
+				resolvedTokenDataReader = tt.fields.tokenDataReader
+			} else {
+				resolvedTokenDataReader = tdr{mode: good}
+			}
+
+			b := &execReportBuilder{
+				lggr:             lggr,
+				tokenDataReader:  resolvedTokenDataReader,
+				estimateProvider: evm.EstimateProvider{},
+				accumulated:      tt.fields.accumulated,
+			}
+			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
+			if tt.expectedError != "" {
+				assert.Contains(t, err.Error(), tt.expectedError)
+				return
+			}
+			require.NoError(t, err)
+			if tt.expectedLog != "" {
+				found := false
+				for _, log := range logs.All() {
+					fmt.Println(log.Message)
+					found = found || strings.Contains(log.Message, tt.expectedLog)
+				}
+				assert.True(t, found, "expected log not found")
+			}
+			assert.Equalf(t, tt.expectedStatus, status, "checkMessage(...)")
+			// If expected data not provided, we expect the result to be the same as the input.
+			if reflect.DeepEqual(tt.expectedData, exectypes.CommitData{}) {
+				assert.Equalf(t, tt.args.execReport, data, "checkMessage(...)")
+			} else {
+				assert.Equalf(t, tt.expectedData, data, "checkMessage(...)")
 			}
 		})
 	}

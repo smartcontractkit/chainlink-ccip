@@ -3,7 +3,7 @@ package execute
 import (
 	"context"
 	"errors"
-	"time"
+	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -47,13 +48,14 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr            logger.Logger
-	ocrConfig       reader.OCR3ConfigWithMeta
-	execCodec       cciptypes.ExecutePluginCodec
-	msgHasher       cciptypes.MessageHasher
-	homeChainReader reader.HomeChain
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
+	lggr             logger.Logger
+	ocrConfig        reader.OCR3ConfigWithMeta
+	execCodec        cciptypes.ExecutePluginCodec
+	msgHasher        cciptypes.MessageHasher
+	homeChainReader  reader.HomeChain
+	estimateProvider gas.EstimateProvider
+	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
@@ -62,23 +64,34 @@ func NewPluginFactory(
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
+	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:            lggr,
-		ocrConfig:       ocrConfig,
-		execCodec:       execCodec,
-		msgHasher:       msgHasher,
-		homeChainReader: homeChainReader,
-		contractReaders: contractReaders,
-		chainWriters:    chainWriters,
+		lggr:             lggr,
+		ocrConfig:        ocrConfig,
+		execCodec:        execCodec,
+		msgHasher:        msgHasher,
+		homeChainReader:  homeChainReader,
+		estimateProvider: estimateProvider,
+		contractReaders:  contractReaders,
+		chainWriters:     chainWriters,
 	}
 }
 
 func (p PluginFactory) NewReportingPlugin(
 	config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
+	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
+	}
+
+	if err = offchainConfig.Validate(); err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
+	}
+
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
@@ -94,8 +107,8 @@ func (p PluginFactory) NewReportingPlugin(
 	return NewPlugin(
 			config,
 			pluginconfig.ExecutePluginConfig{
-				DestChain:                 p.ocrConfig.Config.ChainSelector,
-				MessageVisibilityInterval: 8 * time.Hour,
+				DestChain:      p.ocrConfig.Config.ChainSelector,
+				OffchainConfig: offchainConfig,
 			},
 			oracleIDToP2PID,
 			ccipReader,
@@ -103,6 +116,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.msgHasher,
 			p.homeChainReader,
 			nil, // TODO: token data reader
+			p.estimateProvider,
 			p.lggr,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",

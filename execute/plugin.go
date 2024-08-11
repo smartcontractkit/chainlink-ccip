@@ -13,16 +13,15 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
-	types2 "github.com/smartcontractkit/chainlink-ccip/execute/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // maxReportSizeBytes that should be returned as an execution report payload.
@@ -40,9 +39,10 @@ type Plugin struct {
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 
-	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader types2.TokenDataReader
-	lggr            logger.Logger
+	oracleIDToP2pID  map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataReader  exectypes.TokenDataReader
+	estimateProvider gas.EstimateProvider
+	lggr             logger.Logger
 }
 
 func NewPlugin(
@@ -53,11 +53,10 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataReader types2.TokenDataReader,
+	tokenDataReader exectypes.TokenDataReader,
+	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
-	// TODO: initialize tokenDataReader.
-
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
 		ccipReader,
@@ -69,16 +68,17 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		reportingCfg:    reportingCfg,
-		cfg:             cfg,
-		oracleIDToP2pID: oracleIDToP2pID,
-		ccipReader:      ccipReader,
-		readerSyncer:    readerSyncer,
-		reportCodec:     reportCodec,
-		msgHasher:       msgHasher,
-		homeChain:       homeChain,
-		tokenDataReader: tokenDataReader,
-		lggr:            lggr,
+		reportingCfg:     reportingCfg,
+		cfg:              cfg,
+		oracleIDToP2pID:  oracleIDToP2pID,
+		ccipReader:       ccipReader,
+		readerSyncer:     readerSyncer,
+		reportCodec:      reportCodec,
+		msgHasher:        msgHasher,
+		homeChain:        homeChain,
+		tokenDataReader:  tokenDataReader,
+		estimateProvider: estimateProvider,
+		lggr:             lggr,
 	}
 }
 
@@ -92,7 +92,7 @@ func getPendingExecutedReports(
 	dest cciptypes.ChainSelector,
 	ts time.Time,
 	lggr logger.Logger,
-) (plugintypes.ExecutePluginCommitObservations, error) {
+) (exectypes.CommitObservations, error) {
 	latestReportTS := time.Time{}
 	commitReports, err := ccipReader.CommitReportsGTETimestamp(ctx, dest, ts, 1000)
 	if err != nil {
@@ -157,21 +157,21 @@ func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
 	var err error
-	var previousOutcome plugintypes.ExecutePluginOutcome
+	var previousOutcome exectypes.Outcome
 
 	if outctx.PreviousOutcome != nil {
-		previousOutcome, err = plugintypes.DecodeExecutePluginOutcome(outctx.PreviousOutcome)
+		previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 		}
 	}
 
-	fetchFrom := time.Now().Add(-p.cfg.MessageVisibilityInterval).UTC()
+	fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
 	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
 	//          valid execution report.
-	var groupedCommits plugintypes.ExecutePluginCommitObservations
+	var groupedCommits exectypes.CommitObservations
 	supportsDest, err := p.supportsDestChain()
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
@@ -187,13 +187,13 @@ func (p *Plugin) Observation(
 	}
 
 	// Phase 2: Gather messages from the source chains and build the execution report.
-	messages := make(plugintypes.ExecutePluginMessageObservations)
+	messages := make(exectypes.MessageObservations)
 	if len(previousOutcome.PendingCommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
 	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]plugintypes.ExecutePluginCommitData)
+		commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
 		}
@@ -226,13 +226,13 @@ func (p *Plugin) Observation(
 
 	// TODO: Fire off messages for an attestation check service.
 
-	return plugintypes.NewExecutePluginObservation(groupedCommits, messages).Encode()
+	return exectypes.NewObservation(groupedCommits, messages).Encode()
 }
 
 func (p *Plugin) ValidateObservation(
 	outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
-	decodedObservation, err := plugintypes.DecodeExecutePluginObservation(ao.Observation)
+	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("unable to decode observation: %w", err)
 	}
@@ -269,15 +269,25 @@ func selectReport(
 	lggr logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
-	tokenDataReader types2.TokenDataReader,
-	commitReports []plugintypes.ExecutePluginCommitData,
+	tokenDataReader exectypes.TokenDataReader,
+	estimateProvider gas.EstimateProvider,
+	commitReports []exectypes.CommitData,
 	maxReportSizeBytes int,
-) ([]cciptypes.ExecutePluginReportSingleChain, []plugintypes.ExecutePluginCommitData, error) {
+	maxGas uint64,
+) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	builder := report.NewBuilder(ctx, lggr, hasher, tokenDataReader, encoder, uint64(maxReportSizeBytes), 99)
-	var stillPendingReports []plugintypes.ExecutePluginCommitData
+	builder := report.NewBuilder(
+		ctx,
+		lggr,
+		hasher,
+		tokenDataReader,
+		encoder,
+		estimateProvider,
+		uint64(maxReportSizeBytes),
+		maxGas)
+	var stillPendingReports []exectypes.CommitData
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
 		if len(report.Messages) == 0 {
@@ -345,12 +355,12 @@ func (p *Plugin) Outcome(
 		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", p.reportingCfg.OracleID),
 		"mergedMessageObservations", mergedMessageObservations)
 
-	observation := plugintypes.NewExecutePluginObservation(
+	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations)
 
 	// flatten commit reports and sort by timestamp.
-	var commitReports []plugintypes.ExecutePluginCommitData
+	var commitReports []exectypes.CommitData
 	for _, report := range observation.CommitReports {
 		commitReports = append(commitReports, report...)
 	}
@@ -375,8 +385,15 @@ func (p *Plugin) Outcome(
 
 	// TODO: this function should be pure, a context should not be needed.
 	outcomeReports, commitReports, err :=
-		selectReport(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.tokenDataReader,
-			commitReports, maxReportSizeBytes)
+		selectReport(
+			context.Background(),
+			p.lggr, p.msgHasher,
+			p.reportCodec,
+			p.tokenDataReader,
+			p.estimateProvider,
+			commitReports,
+			maxReportSizeBytes,
+			p.cfg.OffchainConfig.BatchGasLimit)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 	}
@@ -385,7 +402,7 @@ func (p *Plugin) Outcome(
 		ChainReports: outcomeReports,
 	}
 
-	outcome := plugintypes.NewExecutePluginOutcome(commitReports, execReport)
+	outcome := exectypes.NewOutcome(commitReports, execReport)
 	if outcome.IsEmpty() {
 		return nil, nil
 	}
@@ -403,7 +420,7 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		return nil, nil
 	}
 
-	decodedOutcome, err := plugintypes.DecodeExecutePluginOutcome(outcome)
+	decodedOutcome, err := exectypes.DecodeOutcome(outcome)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
