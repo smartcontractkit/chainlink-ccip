@@ -9,6 +9,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
@@ -16,6 +17,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -65,6 +67,11 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 }
 
 func Test_PollingWorking(t *testing.T) {
+	chainConfig := chainconfig.ChainConfig{
+		FinalityDepth: 1,
+	}
+	encodedChainConfig, err := chainconfig.EncodeChainConfig(chainConfig)
+	require.NoError(t, err)
 	onChainConfigs := []ChainConfigInfo{
 		{
 			ChainSelector: chainA,
@@ -75,7 +82,7 @@ func Test_PollingWorking(t *testing.T) {
 					p2pOracleBId,
 					p2pOracleCId,
 				},
-				Config: []byte{0},
+				Config: encodedChainConfig,
 			},
 		},
 		{
@@ -86,7 +93,7 @@ func Test_PollingWorking(t *testing.T) {
 					p2pOracleAId,
 					p2pOracleBId,
 				},
-				Config: []byte{0},
+				Config: encodedChainConfig,
 			},
 		},
 		{
@@ -96,7 +103,7 @@ func Test_PollingWorking(t *testing.T) {
 				Readers: []libocrtypes.PeerID{
 					p2pOracleCId,
 				},
-				Config: []byte{0},
+				Config: encodedChainConfig,
 			},
 		},
 	}
@@ -104,14 +111,17 @@ func Test_PollingWorking(t *testing.T) {
 		chainA: {
 			FChain:         1,
 			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId, p2pOracleCId),
+			Config:         chainConfig,
 		},
 		chainB: {
 			FChain:         2,
 			SupportedNodes: mapset.NewSet(p2pOracleAId, p2pOracleBId),
+			Config:         chainConfig,
 		},
 		chainC: {
 			FChain:         3,
 			SupportedNodes: mapset.NewSet(p2pOracleCId),
+			Config:         chainConfig,
 		},
 	}
 
