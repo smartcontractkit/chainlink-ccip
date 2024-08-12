@@ -19,3 +19,6 @@ debug.env
 # Ignore DevSpace cache and log folder
 .devspace/
 /components/atlas/init/output/*
+
+# local helm chart downloads
+/deployments/*/*.tgz
