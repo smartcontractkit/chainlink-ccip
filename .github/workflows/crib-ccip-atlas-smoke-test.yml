@@ -2,14 +2,9 @@
 name: CRIB CCIP/Atlas Smoke Test
 
 on:
-  workflow_dispatch:
-    inputs:
-      debug:
-        description: |
-          Enables debug mode to disable CRIB env teardown
-        default: false
-        required: false
-  push:
+  pull_request:
+    branches:
+      - "*" # Trigger on any branch in a PR
     paths:
       # Include common changes
       - "*"
@@ -19,7 +14,28 @@ on:
       - "deployments/ccip/**"
       - ".github/workflows/crib-ccip-atlas-smoke-test.yml"
       # Exclude doc updates
-      - '!**/*.md'  # Exclude doc updates
+      - "!**/*.md" # Exclude doc updates
+  push:
+    branches:
+      - main # Trigger only on pushes to the main branch
+    paths:
+      # Include common changes
+      - "*"
+      - "components/**"
+      - "scripts/**"
+      # Include crib ccip changes
+      - "deployments/ccip/**"
+      - ".github/workflows/crib-ccip-atlas-smoke-test.yml"
+      # Exclude doc updates
+      - "!**/*.md" # Exclude doc updates
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: |
+          Enables debug mode to disable CRIB env teardown
+        default: false
+        required: false
+
 jobs:
   run-crib-ccip-atlas-smoke-test:
     runs-on: ubuntu-24.04
@@ -43,6 +59,7 @@ jobs:
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           product: "ccip"
+
       - name: Assume role capable of fetching data from s3
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
@@ -50,11 +67,13 @@ jobs:
           mask-aws-account-id: true
           role-duration-seconds: 900
           role-to-assume: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
+
       - name: Setup Smoke Test Env for CCIP
         env:
           DEVSPACE_NAMESPACE: ${{ steps.deploy.outputs.devspace-namespace }}
         run: |
           aws s3 cp s3://cl-stage-ccip-scripts-deploy-output/${DEVSPACE_NAMESPACE}-testInput.toml override.toml
+
       - name: Checkout ccip git repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
@@ -65,6 +84,7 @@ jobs:
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
           go-version-file: "ccip/go.mod"
+
       - name: Run Smoke Tests (WIP)
         shell: bash
         run: |
@@ -77,6 +97,7 @@ jobs:
           # make test_load_ccip testimage="" testname=TestLoadCCIPStableRPS \
           #  override_toml="${GITHUB_WORKSPACE}/override.toml" \
           #  secret_toml="${GITHUB_WORKSPACE}/secrets.toml"
+
       - name: Destroy CRIB Environment
         id: destroy
         if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true'
