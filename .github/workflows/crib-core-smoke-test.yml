@@ -15,6 +15,8 @@ on:
       - ".github/workflows/crib-core-smoke-test.yml"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
+      # Exclude .gitignore
+      - '!.gitignore'
   push:
     branches:
       - main # Trigger only on pushes to the main branch
@@ -28,6 +30,8 @@ on:
       - ".github/workflows/crib-core-smoke-test.yml"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
+      # Exclude .gitignore
+      - '!.gitignore'
   workflow_dispatch:
     inputs:
       debug:
@@ -35,7 +39,6 @@ on:
           Enables debug mode to disable CRIB env teardown
         default: false
         required: false
-
 jobs:
   run-crib-core-smoke-test:
     runs-on: ubuntu-24.04
