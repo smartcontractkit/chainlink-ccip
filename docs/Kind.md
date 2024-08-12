@@ -48,14 +48,16 @@ Additionally, if you are deploying **CCIP** or **Atlas**, you will need to pull 
 
 2. Execute `nix develop` to set up the development environment with all necessary tools and enter the `Nix` shell.
 
-3. Configure the following two environment variables in the appropriate `.env` file within the product directory (e.g., `deployments/ccip/.env` or `deployments/core/.env`):
+3. After copying the .env file from the example (`.deployments/(core|ccip)/.env.example` to `.deployments/(core|ccip)/.env`), configure the following two environment variables in the relevant `.env` file within the product directory (e.g., `deployments/ccip/.env` or `deployments/core/.env`):
 
    ```
    DEVSPACE_IMAGE="localhost:5001/chainlink-devspace"
    DEVSPACE_CCIP_SCRIPTS_IMAGE="localhost:5001/ccip-scripts:latest"
    ```
 
-4. Depending on the product, change to the appropriate directory (e.g., `deployments/ccip` or `deployments/core`), and run `./cribbit.sh`. (can be ran multiple times, it’s idempotent) with your namespace name to configure provider and credentials:
+4. Note that the `CHAINLINK_CODE_DIR=../../..` environment variable configures the location where scripts will look for the source code to build images. For running CRIB locally, images need to be built and pushed to the local registry. Please make sure you have a fresh version of the [chainlink](https://github.com/smartcontractkit/chainlink) repo.
+
+5. Depending on the product, change to the appropriate directory (e.g., `deployments/ccip` or `deployments/core`), and run `./cribbit.sh`. (can be ran multiple times, it’s idempotent) with your namespace name to configure provider and credentials:
 
    ```bash
    ./cribbit.sh crib-<your name>
@@ -64,7 +66,7 @@ Additionally, if you are deploying **CCIP** or **Atlas**, you will need to pull 
    You will then be prompted to choose a provider. If you are deploying to an AWS EKS cluster, simply press Enter, and the script will proceed with the next steps. If you are using the Kind provider, type kind and press Enter.
    If the provider type is `kind`, the `crib-local` namespace will be auto-selected. This approach helps avoid the need to update the local hosts file for ingress each time, which requires an admin password.
 
-5. Deploy CRIB by executing the following command:
+6. Deploy CRIB by executing the following command:
 
    ```bash
    devspace deploy --profile kind
