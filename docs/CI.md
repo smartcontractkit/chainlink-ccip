@@ -19,9 +19,15 @@ Since you'll need to use the devspace tool with predefined environments in the C
 
 Please refer to the [GATI self-service guide](https://smartcontract-it.atlassian.net/wiki/spaces/RE/pages/696909854/Github+Action+Token+Issuer+GATI+-+Self+Service+Guide) and take a look on how to use the [global read-only GATI](https://smartcontract-it.atlassian.net/wiki/spaces/RE/pages/696909854/Github+Action+Token+Issuer+GATI+-+Self+Service+Guide#Use-global-read-only-GATI).
 
+To enable your application repo to clone the CRIB repository, you should:
+
+1. Add the repo name to [the list](https://github.com/smartcontractkit/infra/blob/50e6a359e0298764fd6aa586df0f09017f967c98/accounts/production/us-west-2/lambda/github-app-token-issuer-production/teams/releng/config.json#L7) of requestor repositories.
+
+2. Ping the RelEng team in the [#team-releng](https://chainlink.enterprise.slack.com/archives/C038Q8K1HTR) Slack channel for assistance with approving and deploying these changes.
+
 Once you have completed the GATI configuration, review the [setup-github-token](https://github.com/smartcontractkit/.github/tree/main/actions/setup-github-token) action. If you followed the self-service guide, you should have all the necessary parameters for the GitHub Action.
 
-Example:
+Example usage:
 
 ```yaml
 - name: Setup GitHub token using GATI
@@ -32,23 +38,7 @@ Example:
     aws-lambda-url: ${{ secrets.AWS_INFRA_RELENG_TOKEN_ISSUER_LAMBDA_URL }}
     aws-region: ${{ secrets.AWS_REGION }}
     aws-role-duration-seconds: "1800"
-- name: Debug workspace dir
-  shell: bash
-  run: |
-    echo ${{ github.workspace }}
-    echo $GITHUB_WORKSPACE
 ```
-
-#### Configuration Parameters for setup-github-token action
-
-| **Parameter**               | **Description**                                       | **Required** | **Default**                                                       |
-| --------------------------- | ----------------------------------------------------- | ------------ | ----------------------------------------------------------------- |
-| `aws-role-arn`              | ARN of the role capable of getting a token from GATI. | Yes          |                                                                   |
-| `aws-lambda-url`            | URL of the GATI Lambda function.                      | Yes          |                                                                   |
-| `aws-region`                | AWS region where resources are located.               | Yes          |                                                                   |
-| `aws-role-duration-seconds` | Duration of the role session in seconds.              | No           | `900`                                                             |
-| `role-session-name`         | Session name to use when assuming the role.           | No           | `${{ github.run_id }}-${{ github.run_number }}-${{ github.job }}` |
-| `set-git-config`            | Whether to set Git configuration.                     | No           | `false`                                                           |
 
 ### Configure Job Using Composite GitHub Actions
 
@@ -100,25 +90,9 @@ jobs:
           product: "core"
 ```
 
-Note: Once this step is completed, the full list of deployed Ingress services will be printed out. There is a default pattern for how they are configured. **Please be careful not to leak them into public repositories, such as in PR descriptions, workflows, etc. If you need to use them, please add them as GitHub secrets.**
+Please review the GitHub Action [input parameters](https://github.com/smartcontractkit/.github/blob/3da22843af54e81d2ccbd79903bbd28bd3098f3b/actions/crib-deploy-environment/action.yml#L6) to understand them better.
 
-##### Configuration Parameters
-
-| **Input**                    | **Description**                                                                                                                                                   | **Required** | **Default**           |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | --------------------- |
-| `api-gateway-host`           | API Gateway host for GAP, used to access the Kubernetes API.                                                                                                      | Yes          |                       |
-| `aws-region`                 | AWS region where resources will be deployed.                                                                                                                      | Yes          |                       |
-| `aws-role-arn`               | AWS Role ARN to be used for setting up GAP.                                                                                                                       | Yes          |                       |
-| `devspace-ingress-cidrs`     | DevSpace ingress CIDRs to control access.                                                                                                                         | No           | `0.0.0.0/0`           |
-| `devspace-profiles`          | Comma-separated list of DevSpace profiles to apply when running DevSpace commands. Example: `ci,values-dev-simulated-core-ocr1`.                                  | No           | `""`                  |
-| `ecr-private-registry`       | ECR private registry account ID for Production, needed for GAP.                                                                                                   | No           | `""`                  |
-| `ecr-private-registry-stage` | ECR private registry account ID for Staging.                                                                                                                      | No           | `""`                  |
-| `github-token`               | The `GITHUB_TOKEN` issued for the workflow.                                                                                                                       | No           | `${{ github.token }}` |
-| `image-tag`                  | Docker image tag for the product.                                                                                                                                 | No           | `latest`              |
-| `ingress-base-domain`        | Base domain for DevSpace ingress.                                                                                                                                 | Yes          |                       |
-| `k8s-cluster-name`           | Kubernetes cluster name.                                                                                                                                          | Yes          |                       |
-| `ns-ttl`                     | Namespace TTL, which defines how long a namespace will remain alive after creation, unless crib-purge-environment is configured to purge it once the job is done. | No           | `1h`                  |
-| `product`                    | The name of the product (e.g., `core`, `ccip`).                                                                                                                   | No           | `core`                |
+Note: Once this step is completed, the full list of deployed Ingress services will be printed out. There is a default pattern for how they are configured. **Please be careful not to leak them into public repositories, such as in PR descriptions, workflows, etc. If you need to use them, please add them as GitHub secrets.** |
 
 #### Configure and use crib-purge-environment
 
@@ -159,16 +133,7 @@ jobs:
           namespace: ${{ steps.deploy.outputs.devspace-namespace }}
 ```
 
-##### Configuration Parameters
-
-| **Input**          | **Description**                                                                                                            | **Required** | **Default** |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------- |
-| `namespace`        | The CRIB namespace that should be destroyed.                                                                               | Yes          |             |
-| `metrics-job-name` | The name of the Grafana metrics job. Required if other Grafana metrics inputs are provided.                                | No           |             |
-| `metrics-id`       | The Grafana metrics ID used for continuity of metrics during job name changes. Required if `metrics-job-name` is provided. | No           |             |
-| `gc-host`          | The Grafana hostname. Required if `metrics-job-name` is provided.                                                          | No           |             |
-| `gc-basic-auth`    | The basic authentication credentials for Grafana. Required if `metrics-job-name` is provided.                              | No           |             |
-| `gc-org-id`        | The Grafana organization or tenant ID. Required if `metrics-job-name` is provided.                                         | No           |             |
+Please review the GitHub Action [input parameters](https://github.com/smartcontractkit/.github/blob/3da22843af54e81d2ccbd79903bbd28bd3098f3b/actions/crib-purge-environment/action.yml#L7) to understand them better.
 
 ### Accessing services while running test
 
@@ -198,6 +163,6 @@ Example usage:
     gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
 ```
 
-### Advance usage example
+### Advanced usage example
 
 The following example from the [chainlink](https://github.com/smartcontractkit/chainlink/blob/develop/.github/workflows/crib-integration-test.yml) repo demonstrates how CI integration can be utilized to perform complex operations by accessing multiple services and running tests.
