@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -54,6 +55,7 @@ type PluginFactory struct {
 	msgHasher        cciptypes.MessageHasher
 	homeChainReader  reader.HomeChain
 	estimateProvider gas.EstimateProvider
+	tokenDataReader  exectypes.TokenDataReader
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
 }
@@ -65,6 +67,7 @@ func NewPluginFactory(
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	estimateProvider gas.EstimateProvider,
+	tokenDataReader exectypes.TokenDataReader,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
@@ -77,6 +80,7 @@ func NewPluginFactory(
 		estimateProvider: estimateProvider,
 		contractReaders:  contractReaders,
 		chainWriters:     chainWriters,
+		tokenDataReader:  tokenDataReader,
 	}
 }
 
@@ -115,7 +119,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.execCodec,
 			p.msgHasher,
 			p.homeChainReader,
-			nil, // TODO: token data reader
+			p.tokenDataReader,
 			p.estimateProvider,
 			p.lggr,
 		), ocr3types.ReportingPluginInfo{
