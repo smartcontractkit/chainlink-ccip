@@ -26,16 +26,16 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Display Go version
         run: go version
-      - name: Clone Repository B
+      - name: Clone CCIP repo
         run: |
           git clone https://github.com/smartcontractkit/ccip.git
           cd ccip
           git checkout ccip-develop
       - name: Update chainlink-ccip dependency in ccip
         run: |
-            cd ccip
-            go get github.com/smartcontractkit/chainlink-ccip@$GITHUB_SHA
-            make gomodtidy
+          cd ccip
+          go get github.com/smartcontractkit/chainlink-ccip@${{ github.event.pull_request.head.sha }}
+          make gomodtidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
       - name: Download Go vendor packages
