@@ -4,6 +4,7 @@ name: chainlink
 
 imports:
   - path: ../../components/don/don.yaml
+  - path: ../../components/beholder/beholder.yaml
   - path: ../../components/kind/kind.yaml
 
 vars:
