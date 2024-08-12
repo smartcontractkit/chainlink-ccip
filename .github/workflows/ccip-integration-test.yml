@@ -1,0 +1,65 @@
+name: "Run CCIP OCR3 Integration Test"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'ccip-develop'
+
+jobs:
+  integration-test-ccip-ocr3:
+    env:
+      # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
+      # when they should not be using it, while still allowing us to DRY up the setup
+      DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
+
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.22.5']
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Display Go version
+        run: go version
+      - name: Clone Repository B
+        run: |
+          git clone https://github.com/smartcontractkit/ccip.git
+          cd ccip
+          git checkout ccip-develop
+      - name: Update chainlink-ccip dependency in ccip
+        run: |
+            cd ccip
+            go get github.com/smartcontractkit/chainlink-ccip@$GITHUB_SHA
+            make gomodtidy
+      - name: Setup Postgres
+        uses: ./.github/actions/setup-postgres
+      - name: Download Go vendor packages
+        run: |
+          cd ccip
+          go mod download
+      - name: Build binary
+        run: |
+          cd ccip
+          go build -o ccip.test .
+      - name: Setup DB
+        run: |
+          cd ccip
+          ./ccip.test local db preparetest
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
+      - name: Run ccip ocr3 integration test
+        run: |
+          cd ccip
+          go test -v -timeout 3m -run "^TestIntegration_OCR3Nodes$" ./core/capabilities/ccip/ccip_integration_tests
+          EXITCODE=${PIPESTATUS[0]}
+          if [ $EXITCODE -ne 0 ]; then
+            echo "Integration test failed"
+          else
+            echo "Integration test passed!"
+          fi
+          exit $EXITCODE
