@@ -21,9 +21,9 @@ deployments:
           fsGroup: 999
 
         beholder-test-client:
-          args: 
+          args:
             - -otel-exporter-grpc-enpoint
-            # TODO: change this to the collector-agent when collector to 
+            # TODO: change this to the collector-agent when collector to
             # collector communication is working
             - crib-beholder-infra-otel-collector-gateway:4317
 
