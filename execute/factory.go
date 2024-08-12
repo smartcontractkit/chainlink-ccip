@@ -66,8 +66,8 @@ func NewPluginFactory(
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
-	estimateProvider gas.EstimateProvider,
 	tokenDataReader exectypes.TokenDataReader,
+	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
