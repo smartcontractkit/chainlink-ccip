@@ -10,7 +10,7 @@ If you're reading this documentation, you're likely interested in using CRIB in 
 
 Before you can use CRIB, ensure you have the following:
 
-- **GATI**: Make sure you have access to the Global Automated Testing Infrastructure (GATI).
+- **GATI**: Make sure your repo has GitHub App Token Issuer (GATI).
 - **Composite GitHub Actions**: Configure your GitHub Actions workflow to utilize the provided composite actions.
 
 ### GATI
