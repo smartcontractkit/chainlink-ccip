@@ -59,6 +59,7 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 	else
 		# Otherwise, ask the user for the namespace name
 		read -r -p "Enter the namespace name, it should be in format crib-<your-username>: " user_input
+		namespace_name=${user_input:-}
 	fi
 
 	##
