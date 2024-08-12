@@ -65,3 +65,5 @@ jobs:
             echo "Integration test passed!"
           fi
           exit $EXITCODE
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
