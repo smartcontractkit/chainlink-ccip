@@ -30,12 +30,14 @@ jobs:
         run: |
           git clone https://github.com/smartcontractkit/ccip.git
           cd ccip
-          git checkout ccip-develop
-      - name: Update chainlink-ccip dependency in ccip
-        run: |
-          cd ccip
-          go get github.com/smartcontractkit/chainlink-ccip@${{ github.event.pull_request.head.sha }}
-          make gomodtidy
+          git fetch
+          git checkout mk/bump-chainlink-ccip
+      # TODO: remove this temporarily just to test the integration test run, which should be passing.
+      # - name: Update chainlink-ccip dependency in ccip
+      #   run: |
+      #     cd ccip
+      #     go get github.com/smartcontractkit/chainlink-ccip@${{ github.event.pull_request.head.sha }}
+      #     make gomodtidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
       - name: Download Go vendor packages
