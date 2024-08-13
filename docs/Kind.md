@@ -55,7 +55,7 @@ Additionally, if you are deploying **CCIP** or **Atlas**, you will need to pull 
    DEVSPACE_CCIP_SCRIPTS_IMAGE="localhost:5001/ccip-scripts:latest"
    ```
 
-4. Note that the `CHAINLINK_CODE_DIR=../../..` environment variable configures the location where scripts will look for the source code to build images. For running CRIB locally, images need to be built and pushed to the local registry. Please make sure you have a fresh version of the [chainlink](https://github.com/smartcontractkit/chainlink) repo.
+4. Note that the `CHAINLINK_CODE_DIR=../../..` environment variable should be the parent directory that contains the [chainlink](https://github.com/smartcontractkit/chainlink) directory. For running CRIB locally, Docker images need to be built and pushed to the local registry. Please make sure you have a fresh version of the [chainlink](https://github.com/smartcontractkit/chainlink) repo.
 
 5. Depending on the product, change to the appropriate directory (e.g., `deployments/ccip` or `deployments/core`), and run `./cribbit.sh`. (can be ran multiple times, it’s idempotent) with your namespace name to configure provider and credentials:
 
