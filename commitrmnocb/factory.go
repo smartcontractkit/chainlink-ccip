@@ -23,6 +23,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
+const maxReportTransmissionCheckAttempts = 5
+
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
 type PluginFactoryConstructor struct{}
@@ -112,9 +114,10 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			config.OracleID,
 			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{
-				DestChain:           p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize: merklemulti.MaxNumberTreeLeaves,
-				OffchainConfig:      offchainConfig,
+				DestChain:                          p.ocrConfig.Config.ChainSelector,
+				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
+				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
+				OffchainConfig:                     offchainConfig,
 			},
 			ccipReader,
 			onChainTokenPricesReader,
@@ -122,6 +125,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.msgHasher,
 			p.lggr,
 			p.homeChainReader,
+			config,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

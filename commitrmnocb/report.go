@@ -2,6 +2,7 @@ package commitrmnocb
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -16,7 +17,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 	if err != nil {
 		// TODO: metrics
 		p.lggr.Errorw("failed to decode Outcome", "outcomeBytes", outcomeBytes, "err", err)
-		return nil, fmt.Errorf("failed to decode Outcome: %w", err)
+		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
 	}
 
 	if outcome.OutcomeType != ReportGenerated {

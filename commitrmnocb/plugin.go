@@ -32,9 +32,7 @@ type Plugin struct {
 	msgHasher         cciptypes.MessageHasher
 	lggr              logger.Logger
 	homeChain         reader.HomeChain
-
-	// TODO: add back
-	// reportingCfg ocr3types.ReportingPluginConfig
+	reportingCfg      ocr3types.ReportingPluginConfig
 }
 
 func NewPlugin(
@@ -48,7 +46,7 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
-	// reportingCfg ocr3types.ReportingPluginConfig,
+	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
@@ -61,7 +59,6 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		// reportingCfg:      reportingCfg,
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		lggr:              lggr,
@@ -72,6 +69,7 @@ func NewPlugin(
 		readerSyncer:      readerSyncer,
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
+		reportingCfg:      reportingCfg,
 	}
 }
 
@@ -119,7 +117,7 @@ func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
 	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
 }
 
-// Return the set of chains that the given Oracle is configured to access
+// Returns the set of chains that the given Oracle is configured to access
 func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
 	p2pID, exists := p.oracleIDToP2pID[oracleID]
 	if !exists {
@@ -134,7 +132,7 @@ func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[ccip
 	return supportedChains, nil
 }
 
-// supportsDestChain Returns true if the given oracle supports the dest chain, returns false otherwise
+// supportsDestChain returns true if the given oracle supports the dest chain, returns false otherwise
 func (p *Plugin) supportsDestChain(oracle commontypes.OracleID) (bool, error) {
 	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
 	if err != nil {

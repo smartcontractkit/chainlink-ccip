@@ -157,30 +157,22 @@ type ConsensusObservation struct {
 	FChain map[cciptypes.ChainSelector]int
 }
 
-// GasPricesSortedArray returns a sorted list of gas prices
-func (co ConsensusObservation) GasPricesSortedArray() []cciptypes.GasPriceChain {
+// GasPricesArray returns a list of gas prices
+func (co ConsensusObservation) GasPricesArray() []cciptypes.GasPriceChain {
 	gasPrices := make([]cciptypes.GasPriceChain, 0, len(co.GasPrices))
 	for chain, gasPrice := range co.GasPrices {
 		gasPrices = append(gasPrices, cciptypes.NewGasPriceChain(gasPrice.Int, chain))
 	}
 
-	sort.Slice(gasPrices, func(i, j int) bool {
-		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
-	})
-
 	return gasPrices
 }
 
-// TokenPricesSortedArray returns a sorted list of token prices
-func (co ConsensusObservation) TokenPricesSortedArray() []cciptypes.TokenPrice {
+// TokenPricesArray returns a list of token prices
+func (co ConsensusObservation) TokenPricesArray() []cciptypes.TokenPrice {
 	tokenPrices := make([]cciptypes.TokenPrice, 0, len(co.TokenPrices))
 	for tokenID, tokenPrice := range co.TokenPrices {
 		tokenPrices = append(tokenPrices, cciptypes.NewTokenPrice(tokenID, tokenPrice.Int))
 	}
-
-	sort.Slice(tokenPrices, func(i, j int) bool {
-		return tokenPrices[i].TokenID < tokenPrices[j].TokenID
-	})
 
 	return tokenPrices
 }
@@ -188,7 +180,7 @@ func (co ConsensusObservation) TokenPricesSortedArray() []cciptypes.TokenPrice {
 type OutcomeType int
 
 const (
-	ReportIntervalsSelected OutcomeType = iota
+	ReportIntervalsSelected OutcomeType = iota + 1
 	ReportGenerated
 	ReportEmpty
 	ReportInFlight
@@ -206,8 +198,31 @@ type Outcome struct {
 	ReportTransmissionCheckAttempts uint                        `json:"reportTransmissionCheckAttempts"`
 }
 
-// Encode TODO: sort all lists here to ensure deterministic serialization
+// Sort all fields of the given Outcome
+func (o Outcome) sort() {
+	sort.Slice(o.RangesSelectedForReport, func(i, j int) bool {
+		return o.RangesSelectedForReport[i].ChainSel < o.RangesSelectedForReport[j].ChainSel
+	})
+	sort.Slice(o.RootsToReport, func(i, j int) bool {
+		return o.RootsToReport[i].ChainSel < o.RootsToReport[j].ChainSel
+	})
+	sort.Slice(o.OffRampNextSeqNums, func(i, j int) bool {
+		return o.OffRampNextSeqNums[i].ChainSel < o.OffRampNextSeqNums[j].ChainSel
+	})
+	sort.Slice(o.TokenPrices, func(i, j int) bool {
+		return o.TokenPrices[i].TokenID < o.TokenPrices[j].TokenID
+	})
+	sort.Slice(o.GasPrices, func(i, j int) bool {
+		return o.GasPrices[i].ChainSel < o.GasPrices[j].ChainSel
+	})
+}
+
+// Encode encodes an Outcome deterministically
 func (o Outcome) Encode() ([]byte, error) {
+
+	// Sort all lists to ensure deterministic serialization
+	o.sort()
+
 	encodedOutcome, err := json.Marshal(o)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode Outcome: %w", err)
@@ -244,7 +259,7 @@ func (o Outcome) NextState() CommitPluginState {
 type CommitPluginState int
 
 const (
-	SelectingRangesForReport CommitPluginState = iota
+	SelectingRangesForReport CommitPluginState = iota + 1
 	BuildingReport
 	WaitingForReportTransmission
 )

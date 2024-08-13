@@ -59,7 +59,7 @@ func (p *Plugin) Observation(
 	return observation.Encode()
 }
 
-// ObserveOffRampNextSeqNums Observe the next sequence numbers for each source chain from the OffRamp
+// ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
 func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	supportsDestChain, err := p.supportsDestChain(p.nodeID)
 	if err != nil {
@@ -92,9 +92,9 @@ func (p *Plugin) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.Se
 	return nil
 }
 
-// ObserveMerkleRoots Compute the merkle roots for the given sequence number ranges
+// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
 func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []cciptypes.MerkleRootChain {
-	roots := make([]cciptypes.MerkleRootChain, 0)
+	var roots []cciptypes.MerkleRootChain
 	supportedChains, err := p.supportedChains(p.nodeID)
 	if err != nil {
 		p.lggr.Warnw("call to supportedChains failed", "err", err)
@@ -125,9 +125,9 @@ func (p *Plugin) ObserveMerkleRoots(ctx context.Context, ranges []ChainRange) []
 	return roots
 }
 
-// computeMerkleRoot Compute the merkle root of a list of messages
+// computeMerkleRoot computes the merkle root of a list of messages
 func (p *Plugin) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
-	hashes := make([][32]byte, 0)
+	var hashes [][32]byte
 	sort.Slice(msgs, func(i, j int) bool { return msgs[i].Header.SequenceNumber < msgs[j].Header.SequenceNumber })
 
 	for i, msg := range msgs {
@@ -142,8 +142,9 @@ func (p *Plugin) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message
 
 		msgHash, err := p.msgHasher.Hash(ctx, msg)
 		if err != nil {
-			p.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
-			return cciptypes.Bytes32{}, err
+			msgID := hex.EncodeToString(msg.Header.MessageID[:])
+			p.lggr.Warnw("failed to hash message", "msg", msg, "msg_id", msgID, "err", err)
+			return cciptypes.Bytes32{}, fmt.Errorf("failed to hash message with id %s: %w", msgID, err)
 		}
 
 		hashes = append(hashes, msgHash)

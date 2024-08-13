@@ -82,9 +82,6 @@ func (p *Plugin) ReportRangesOutcome(
 		}
 	}
 
-	// We sort here so that Outcome serializes deterministically
-	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
-
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
@@ -101,11 +98,6 @@ func (p *Plugin) buildReport(
 ) Outcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
-	// We sort here so that Outcome serializes deterministically
-	sort.Slice(roots, func(i, j int) bool {
-		return roots[i].ChainSel < roots[j].ChainSel
-	})
-
 	outcomeType := ReportGenerated
 	if len(roots) == 0 {
 		outcomeType = ReportEmpty
@@ -114,8 +106,8 @@ func (p *Plugin) buildReport(
 	outcome := Outcome{
 		OutcomeType:   outcomeType,
 		RootsToReport: roots,
-		GasPrices:     consensusObservation.GasPricesSortedArray(),
-		TokenPrices:   consensusObservation.TokenPricesSortedArray(),
+		GasPrices:     consensusObservation.GasPricesArray(),
+		TokenPrices:   consensusObservation.TokenPricesArray(),
 	}
 
 	return outcome
@@ -198,15 +190,15 @@ func (p *Plugin) merkleRootConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.MerkleRootChain)
 
 	for chain, roots := range rootsByChain {
-		if f, exists := fChains[chain]; exists {
+		if fChain, exists := fChains[chain]; exists {
 			root, count := mostFrequentElem(roots)
 
-			if count <= f {
+			if count <= fChain {
 				// TODO: metrics
 				p.lggr.Warnf("failed to reach consensus on a merkle root for chain %d "+
-					"because no single merkle root was observed more than the expected %d times, found merkle root %d "+
-					"observed by only %d oracles, all observed merkle roots: %v",
-					chain, f, root, count, roots)
+					"because no single merkle root was observed more than the expected fChain (%d) times, found "+
+					"merkle root %d observed by only %d oracles, all observed merkle roots: %v",
+					chain, fChain, root, count, roots)
 			}
 
 			consensus[chain] = root
@@ -229,21 +221,21 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, onRampMaxSeqNums := range onRampMaxSeqNumsByChain {
-		if f, exists := fChains[chain]; exists {
-			if len(onRampMaxSeqNums) < 2*f+1 {
+		if fChain, exists := fChains[chain]; exists {
+			if len(onRampMaxSeqNums) < 2*fChain+1 {
 				// TODO: metrics
 				p.lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
-					"because we did not receive more than 2f+1 observed sequence numbers, 2f+1: %d, "+
+					"because we did not receive more than 2fChain+1 observed sequence numbers, 2fChain+1: %d, "+
 					"len(onRampMaxSeqNums): %d, onRampMaxSeqNums: %v",
-					chain, 2*f+1, len(onRampMaxSeqNums), onRampMaxSeqNums)
+					chain, 2*fChain+1, len(onRampMaxSeqNums), onRampMaxSeqNums)
 			} else {
 				sort.Slice(onRampMaxSeqNums, func(i, j int) bool { return onRampMaxSeqNums[i] < onRampMaxSeqNums[j] })
-				consensus[chain] = onRampMaxSeqNums[f]
+				consensus[chain] = onRampMaxSeqNums[fChain]
 			}
 		} else {
 			// TODO: metrics
 			p.lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
-				"because there was no consensus f value for this chain", chain)
+				"because there was no consensus fChain value for this chain", chain)
 		}
 	}
 
@@ -264,7 +256,7 @@ func (p *Plugin) offRampMaxSeqNumsConsensus(
 		if count <= fDestChain {
 			// TODO: metrics
 			p.lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
-				"because we did not receive a sequence number that was observed by at least f (%d) oracles, "+
+				"because we did not receive a sequence number that was observed by at least fChain (%d) oracles, "+
 				"offRampMaxSeqNums: %v", chain, fDestChain, offRampMaxSeqNums)
 		} else {
 			consensus[chain] = seqNum
@@ -281,15 +273,14 @@ func (p *Plugin) fChainConsensus(fChainValues map[cciptypes.ChainSelector][]int)
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		f, _ := mostFrequentElem(fValues)
-		// TODO: uncomment when p.reportingCfg is added back
-		//if count < p.reportingCfg.F {
-		//	// TODO: metrics
-		//	p.lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single f "+
-		//		"value was observed more than the expected %d times, found f value %d observed by only %d oracles, "+
-		//		"f values: %v",
-		//		chain, p.reportingCfg.F, f, count, fValues)
-		//}
+		f, count := mostFrequentElem(fValues)
+		if count < p.reportingCfg.F {
+			// TODO: metrics
+			p.lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single f "+
+				"value was observed more than the expected %d times, found f value %d observed by only %d oracles, "+
+				"f values: %v",
+				chain, p.reportingCfg.F, f, count, fValues)
+		}
 
 		consensus[chain] = f
 	}
