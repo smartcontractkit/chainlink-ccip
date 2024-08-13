@@ -23,6 +23,7 @@ func NewHomeChainReader(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
+	ccipConfigBoundContract types.BoundContract,
 ) HomeChain {
-	return reader_internal.NewHomeChainConfigPoller(homeChainReader, lggr, pollingInterval)
+	return reader_internal.NewHomeChainConfigPoller(homeChainReader, lggr, pollingInterval, ccipConfigBoundContract)
 }

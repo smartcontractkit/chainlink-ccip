@@ -16,6 +16,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -423,6 +424,10 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 		// to prevent linting error because of logging after finishing tests, we close the poller after each test, having
 		// lower polling interval make it catch up faster
 		10*time.Millisecond,
+		types.BoundContract{
+			Address: "0xCCIPConfigFakeAddress",
+			Name:    consts.ContractNameCCIPConfig,
+		},
 	)
 
 	return homeChain
