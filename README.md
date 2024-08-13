@@ -2,7 +2,43 @@
 
 This is the repo that implements the OCR3 CCIP plugins. This includes the commit and execution plugins.
 
+## Getting Started
+
+### Go Version
+
+This repo uses Go 1.21. You can install Go from their [installation page](https://go.dev/doc/install).
+
+### Running the Linter
+
+We use golangci-lint as our linting tool. Run the linter like this:
+
+```sh
+make lint
+```
+
+### Running the Unit Tests
+
+```sh
+make test
+```
+
+### Generating the Mocks
+
+We use mockery to generate mocks and they're organized in the [mockery.yaml](./.mockery.yaml) file.
+
+```sh
+make generate
+```
+
 ## Development Cycle
+
+In order to keep the `ccip-develop` branch in working condition, we need to make sure the integration test
+[written in the CCIP repo](https://github.com/smartcontractkit/ccip/blob/03ae3bbed0e6020be5fa9be26d03af21f152d7dc/core/capabilities/ccip/ccip_integration_tests/ocr3_node_test.go#L37)
+will pass.
+
+As such, part of CI will run this integration test combined with your latest pushed change.
+
+Follow the steps below to ensure that we don't run into any unexpected breakages.
 
 1. Create a PR on chainlink-ccip with the changes you want to make.
 2. CI will run the integration test in the CCIP repo after applying your changes.
