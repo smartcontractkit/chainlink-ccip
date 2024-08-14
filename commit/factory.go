@@ -98,7 +98,8 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		reader.TokenPriceConfig{ // TODO: Inject config
 			StaticPrices: map[ocr2types.Account]big.Int{},
 		},
-		nil, // TODO: Inject this
+		nil,                                  // TODO: Inject this
+		make(map[string]types.BoundContract), // TODO: Inject this
 	)
 	ccipReader := reader.NewCCIPChainReader(
 		p.lggr,

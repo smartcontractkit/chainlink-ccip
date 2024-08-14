@@ -10,6 +10,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 )
 
+var _ types.ContractReader = (*ContractReaderMock)(nil)
+
 type ContractReaderMock struct {
 	*mock.Mock
 }
@@ -20,9 +22,9 @@ func NewContractReaderMock() *ContractReaderMock {
 	}
 }
 
-func (cr *ContractReaderMock) GetLatestValue(ctx context.Context, contractName, method string,
+func (cr *ContractReaderMock) GetLatestValue(ctx context.Context, readIdentifier string,
 	confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error {
-	args := cr.Called(ctx, contractName, method, confidenceLevel, params, returnVal)
+	args := cr.Called(ctx, readIdentifier, confidenceLevel, params, returnVal)
 	return args.Error(0)
 }
 
@@ -39,12 +41,12 @@ func (cr *ContractReaderMock) Bind(ctx context.Context, bindings []types.BoundCo
 
 func (cr *ContractReaderMock) QueryKey(
 	ctx context.Context,
-	contractName string,
+	contract types.BoundContract,
 	filter query.KeyFilter,
 	limitAndSort query.LimitAndSort,
 	sequenceDataType any,
 ) ([]types.Sequence, error) {
-	args := cr.Called(ctx, contractName, filter, limitAndSort, sequenceDataType)
+	args := cr.Called(ctx, contract, filter, limitAndSort, sequenceDataType)
 	return args.Get(0).([]types.Sequence), args.Error(1)
 }
 
@@ -59,8 +61,7 @@ func (cr *ContractReaderMock) Close() error {
 }
 
 func (cr *ContractReaderMock) Ready() error {
-	args := cr.Called()
-	return args.Error(0)
+	panic("unimplemented")
 }
 
 func (cr *ContractReaderMock) HealthReport() map[string]error {
@@ -69,5 +70,12 @@ func (cr *ContractReaderMock) HealthReport() map[string]error {
 }
 
 func (cr *ContractReaderMock) Name() string {
-	return "ContractReaderMock"
+	args := cr.Called()
+	return args.String(0)
+}
+
+// Unbind implements types.ContractReader.
+func (cr *ContractReaderMock) Unbind(ctx context.Context, bindings []types.BoundContract) error {
+	args := cr.Called(ctx, bindings)
+	return args.Error(0)
 }

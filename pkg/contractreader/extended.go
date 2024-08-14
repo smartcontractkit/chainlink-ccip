@@ -77,7 +77,7 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 
 	for _, boundContracts := range e.contractBindingsByName {
 		for _, boundContract := range boundContracts {
-			if boundContract.Binding.Key() == b.Key() {
+			if boundContract.Binding.String() == b.String() {
 				return true
 			}
 		}

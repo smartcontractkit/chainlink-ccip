@@ -7,13 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
@@ -27,14 +27,13 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	destCR.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameGetSourceChainConfig,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Run(func(args mock.Arguments) {
-		sourceChain := args.Get(4).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := args.Get(5).(*sourceChainConfig)
+		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
+		v := args.Get(4).(*sourceChainConfig)
 		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 
@@ -46,6 +45,13 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainC: destCR,
 		}, nil, chainC,
 	)
+
+	sourceCRs[chainA].On("Bind", mock.Anything, mock.Anything).Return(nil)
+	sourceCRs[chainB].On("Bind", mock.Anything, mock.Anything).Return(nil)
+	destCR.On("Bind", mock.Anything, mock.Anything).Return(nil)
+	require.NoError(t, ccipReader.contractReaders[chainA].Bind(context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
+	require.NoError(t, ccipReader.contractReaders[chainB].Bind(context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(context.Background(), []types.BoundContract{{Name: "OffRamp", Address: "0x3"}}))
 
 	ctx := context.Background()
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
