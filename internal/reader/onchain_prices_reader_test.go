@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -26,6 +28,11 @@ var (
 	ArbPrice = big.NewInt(1)
 )
 
+func TestContractName(t *testing.T) {
+	cn := getContractName(EthAcc)
+	require.Equal(t, "AggregatorV3Interface_ETH", cn)
+}
+
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -37,25 +44,11 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name:         "Static price only",
-			staticPrices: map[ocr2types.Account]big.Int{EthAcc: *EthPrice, OpAcc: *OpPrice},
-			inputTokens:  []ocr2types.Account{EthAcc, OpAcc},
-			mockPrices:   map[ocr2types.Account]*big.Int{},
-			want:         []*big.Int{EthPrice, OpPrice},
-		},
-		{
-			name:         "On-chain price only",
+			name:         "On-chain price",
 			staticPrices: map[ocr2types.Account]big.Int{},
 			inputTokens:  []ocr2types.Account{ArbAcc, OpAcc, EthAcc},
 			mockPrices:   map[ocr2types.Account]*big.Int{OpAcc: OpPrice, ArbAcc: ArbPrice, EthAcc: EthPrice},
 			want:         []*big.Int{ArbPrice, OpPrice, EthPrice},
-		},
-		{
-			name:         "Mix of static price and onchain price",
-			staticPrices: map[ocr2types.Account]big.Int{EthAcc: *EthPrice},
-			inputTokens:  []ocr2types.Account{EthAcc, OpAcc, ArbAcc},
-			mockPrices:   map[ocr2types.Account]*big.Int{ArbAcc: ArbPrice, OpAcc: OpPrice},
-			want:         []*big.Int{EthPrice, OpPrice, ArbPrice},
 		},
 		{
 			name:          "Missing price should error",
@@ -71,8 +64,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	for _, tc := range testCases {
 		contractReader := createMockReader(tc.mockPrices, tc.errorAccounts)
 		tokenPricesReader := OnchainTokenPricesReader{
-			TokenPriceConfig: TokenPriceConfig{StaticPrices: tc.staticPrices},
-			ContractReader:   contractReader,
+			ContractReader: contractreader.NewExtendedContractReader(contractReader),
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -97,9 +89,16 @@ func createMockReader(
 	for _, acc := range errorAccounts {
 		acc := acc
 		reader.On(
-			"GetLatestValue", mock.Anything, "PriceAggregator", "getTokenPrice", mock.Anything, acc, mock.Anything,
+			"GetLatestValue",
+			mock.Anything,
+			consts.ContractNamePriceAggregator,
+			consts.MethodNameGetLatestRoundData,
+			mock.Anything,
+			acc,
+			mock.Anything,
 		).Return(fmt.Errorf("error"))
 	}
+
 	for acc, price := range mockPrices {
 		acc := acc
 		price := price

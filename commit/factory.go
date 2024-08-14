@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -15,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -94,12 +93,16 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
-	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
-		reader.TokenPriceConfig{ // TODO: Inject config
-			StaticPrices: map[ocr2types.Account]big.Int{},
-		},
-		nil, // TODO: Inject this
-	)
+	var onChainTokenPricesReader reader.TokenPrices
+	// The node supports the chain that the token prices are on.
+	tokenPricesCr, ok := p.contractReaders[cciptypes.ChainSelector(offchainConfig.TokenPriceChainSelector)]
+	if ok {
+		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
+			contractreader.NewExtendedContractReader(tokenPricesCr),
+			offchainConfig.PriceSources,
+		)
+	}
+
 	ccipReader := reader.NewCCIPChainReader(
 		p.lggr,
 		p.contractReaders,
