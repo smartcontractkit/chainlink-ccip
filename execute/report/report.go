@@ -38,6 +38,12 @@ func buildSingleChainReportHelper(
 		}
 	}
 
+	if len(readyMessages) == 0 {
+		lggr.Infow("no messages ready for execution",
+			"sourceChain", report.SourceChain)
+		return cciptypes.ExecutePluginReportSingleChain{}, nil
+	}
+
 	numMsg := len(report.Messages)
 	if len(report.TokenData) != numMsg {
 		return cciptypes.ExecutePluginReportSingleChain{},
@@ -124,12 +130,13 @@ const (
 	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
 	TokenDataFetchError           messageStatus = "token_data_fetch_error"
 	InsufficientRemainingBatchGas messageStatus = "insufficient_remaining_batch_gas"
+	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
+	MissingNonce                  messageStatus = "missing_nonce"
+	InvalidNonce                  messageStatus = "invalid_nonce"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
 		InsufficientRemainingBatchDataLength messageStatus = "insufficient_remaining_batch_data_length"
-		MissingNonce                         messageStatus = "missing_nonce"
-		InvalidNonce                         messageStatus = "invalid_nonce"
 		AggregateTokenValueComputeError      messageStatus = "aggregate_token_value_compute_error"
 		AggregateTokenLimitExceeded          messageStatus = "aggregate_token_limit_exceeded"
 		TokenNotInDestTokenPrices            messageStatus = "token_not_in_dest_token_prices"
@@ -150,6 +157,8 @@ func (b *execReportBuilder) checkMessage(
 	ctx context.Context, idx int, execReport exectypes.CommitData,
 	// TODO: get rid of the nolint when the error is used
 ) (exectypes.CommitData, messageStatus, error) { // nolint this will use the error eventually
+	result := execReport
+
 	if idx >= len(execReport.Messages) {
 		b.lggr.Errorw("message index out of range", "index", idx, "numMessages", len(execReport.Messages))
 		return execReport, Unknown, fmt.Errorf("message index out of range")
@@ -157,17 +166,18 @@ func (b *execReportBuilder) checkMessage(
 
 	msg := execReport.Messages[idx]
 
-	// Check if the message has already been executed.
+	// 1. Check if the message has already been executed.
 	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {
 		b.lggr.Infow(
 			"message already executed",
 			"messageID", msg.Header.MessageID,
 			"sourceChain", execReport.SourceChain,
-			"seqNum", msg.Header.SequenceNumber)
+			"seqNum", msg.Header.SequenceNumber,
+			"messageState", AlreadyExecuted)
 		return execReport, AlreadyExecuted, nil
 	}
 
-	// Check if token data is ready.
+	// 2. Check if token data is ready.
 	if b.tokenDataReader == nil {
 		return execReport, Unknown, fmt.Errorf("token data reader must be initialized")
 	}
@@ -179,20 +189,22 @@ func (b *execReportBuilder) checkMessage(
 				"messageID", msg.Header.MessageID,
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
-				"error", err)
+				"error", err,
+				"messageState", TokenDataNotReady)
 			return execReport, TokenDataNotReady, nil
 		}
-		b.lggr.Infow(
+		b.lggr.Errorw(
 			"unable to read token data - unknown error",
 			"messageID", msg.Header.MessageID,
 			"sourceChain", execReport.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
-			"error", err)
+			"error", err,
+			"messageState", TokenDataFetchError)
 		return execReport, TokenDataFetchError, nil
 	}
 
-	execReport.TokenData = padSlice(execReport.TokenData, idx+1, nil)
-	execReport.TokenData[idx] = tokenData
+	result.TokenData = padSlice(execReport.TokenData, idx+1, nil)
+	result.TokenData[idx] = tokenData
 	b.lggr.Infow(
 		"read token data",
 		"messageID", msg.Header.MessageID,
@@ -200,10 +212,59 @@ func (b *execReportBuilder) checkMessage(
 		"seqNum", msg.Header.SequenceNumber,
 		"data", tokenData)
 
-	// TODO: Check for valid nonce
+	// 3. Check if the message has a valid nonce.
+	if msg.Header.Nonce != 0 && b.nonceCheckingEnabled {
+		// Sequenced messages have non-zero nonces.
+
+		if _, ok := b.sendersNonce[execReport.SourceChain]; !ok {
+			b.lggr.Errorw("Skipping message - nonces not available for chain",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", execReport.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", MissingNoncesForChain)
+			return execReport, MissingNoncesForChain, nil
+		}
+
+		chainNonces := b.sendersNonce[execReport.SourceChain]
+		sender := msg.Sender.String()
+		if _, ok := chainNonces[sender]; !ok {
+			b.lggr.Errorw("Skipping message - missing nonce",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", execReport.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", MissingNonce)
+			return execReport, MissingNonce, nil
+		}
+
+		if b.expectedNonce == nil {
+			// initialize expected nonce if needed.
+			b.expectedNonce = make(map[cciptypes.ChainSelector]map[string]uint64)
+		}
+		if _, ok := b.expectedNonce[execReport.SourceChain]; !ok {
+			// initialize expected nonce if needed.
+			b.expectedNonce[execReport.SourceChain] = make(map[string]uint64)
+		}
+		if _, ok := b.expectedNonce[execReport.SourceChain][sender]; !ok {
+			b.expectedNonce[execReport.SourceChain][sender] = chainNonces[sender] + 1
+		}
+
+		// Check expected nonce is valid for sequenced messages.
+		if msg.Header.Nonce != b.expectedNonce[execReport.SourceChain][sender] {
+			b.lggr.Warnw("Skipping message - invalid nonce",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", execReport.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"have", msg.Header.Nonce,
+				"want", b.expectedNonce[execReport.SourceChain][sender],
+				"messageState", InvalidNonce)
+			return execReport, InvalidNonce, nil
+		}
+		b.expectedNonce[execReport.SourceChain][sender] = b.expectedNonce[execReport.SourceChain][sender] + 1
+	}
+
 	// TODO: Check for fee boost
 
-	return execReport, ReadyToExecute, nil
+	return result, ReadyToExecute, nil
 }
 
 func (b *execReportBuilder) verifyReport(
@@ -282,6 +343,10 @@ func (b *execReportBuilder) buildSingleChainReport(
 		if status == ReadyToExecute {
 			readyMessages[i] = struct{}{}
 		}
+	}
+
+	if len(readyMessages) == 0 {
+		return cciptypes.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
 	}
 
 	// Attempt to include all messages in the report.

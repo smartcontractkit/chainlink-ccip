@@ -26,6 +26,7 @@ func NewBuilder(
 	tokenDataReader exectypes.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider gas.EstimateProvider,
+	nonces map[cciptypes.ChainSelector]map[string]uint64,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
 ) ExecReportBuilder {
@@ -37,6 +38,8 @@ func NewBuilder(
 		encoder:          encoder,
 		hasher:           hasher,
 		estimateProvider: estimateProvider,
+		sendersNonce:     nonces,
+		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
 
 		maxReportSizeBytes: maxReportSizeBytes,
 		maxGas:             maxGas,
@@ -65,6 +68,7 @@ type execReportBuilder struct {
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
 	estimateProvider gas.EstimateProvider
+	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
 
 	// Config
 	maxReportSizeBytes uint64
@@ -72,9 +76,14 @@ type execReportBuilder struct {
 
 	// State
 	accumulated validationMetadata
+	// expectedNonce is used to track nonces for multiple messages from the same sender.
+	expectedNonce map[cciptypes.ChainSelector]map[string]uint64
 
 	// Result
 	execReports []cciptypes.ExecutePluginReportSingleChain
+
+	// TODO: remove temporary feature flagging
+	nonceCheckingEnabled bool // defaults to disabled for backwards compatibility.
 }
 
 func (b *execReportBuilder) Add(

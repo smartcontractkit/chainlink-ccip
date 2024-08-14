@@ -23,6 +23,7 @@ import (
 	helpers "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -360,7 +361,7 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 
 type nodeSetup struct {
 	node        *Plugin
-	ccipReader  *mocks.CCIPReader
+	ccipReader  *reader_mock.MockCCIP
 	priceReader *mocks.TokenPricesReader
 	reportCodec *mocks.CommitPluginJSONReportCodec
 	msgHasher   *mocks.MessageHasher
@@ -368,14 +369,14 @@ type nodeSetup struct {
 
 func newNode(
 	_ context.Context,
-	_ *testing.T,
+	t *testing.T,
 	lggr logger.Logger,
 	id int,
 	cfg pluginconfig.CommitPluginConfig,
 	homeChain reader.HomeChain,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 ) nodeSetup {
-	ccipReader := mocks.NewCCIPReader()
+	ccipReader := reader_mock.NewMockCCIP(t)
 	priceReader := mocks.NewTokenPricesReader()
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
@@ -447,7 +448,7 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 // the gas prices are returned in the same order as the chains
 func mockGasPrices(
 	ctx context.Context,
-	ccipReader *mocks.CCIPReader,
+	ccipReader *reader_mock.MockCCIP,
 	chains []cciptypes.ChainSelector,
 	gasPrices []int64) {
 	gasPricesBigInt := make([]cciptypes.BigInt, len(gasPrices))
@@ -461,7 +462,7 @@ func mockGasPrices(
 
 func mockMsgsBetweenSeqNums(
 	ctx context.Context,
-	ccipReader *mocks.CCIPReader,
+	ccipReader *reader_mock.MockCCIP,
 	chain cciptypes.ChainSelector,
 	seqNum cciptypes.SeqNum,
 	msgs []cciptypes.Message) {

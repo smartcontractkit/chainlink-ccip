@@ -9,8 +9,9 @@ import (
 	"sync"
 	"time"
 
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
+
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -56,6 +57,13 @@ type CCIP interface {
 	// Returns the next expected sequence number for each one of the provided chains.
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
+
+	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address.
+	Nonces(
+		ctx context.Context,
+		source, dest cciptypes.ChainSelector,
+		addresses []string,
+	) (map[string]uint64, error)
 
 	// GasPrices reads the provided chains gas prices.
 	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)
@@ -399,6 +407,14 @@ func (r *CCIPChainReader) NextSeqNum(
 	}
 
 	return res, err
+}
+
+func (r *CCIPChainReader) Nonces(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	addresses []string,
+) (map[string]uint64, error) {
+	return nil, fmt.Errorf("implement me")
 }
 
 func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {

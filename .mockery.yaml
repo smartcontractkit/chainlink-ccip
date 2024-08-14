@@ -11,3 +11,4 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
+            CCIP:
