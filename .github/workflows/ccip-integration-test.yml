@@ -24,6 +24,8 @@ jobs:
         run: |
           echo "GITHUB_SHA: $GITHUB_SHA"
           echo "rev-parse HEAD: $(git rev-parse HEAD)"
+      - name: Check git log
+        run: git log -n 5 --oneline
       - name: Setup Go ${{ matrix.go-version }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
