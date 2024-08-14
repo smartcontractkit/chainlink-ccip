@@ -18,14 +18,14 @@ jobs:
       matrix:
         go-version: ['1.22.5']
     steps:
-      - name: Checkout the chainlink-ccip repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-      - name: Compare SHAs
+      - name: Clone chainlink-ccip and check out the current ref
         run: |
-          echo "GITHUB_SHA: $GITHUB_SHA"
-          echo "rev-parse HEAD: $(git rev-parse HEAD)"
-      - name: Check git log
-        run: git log -n 5 --oneline
+          cd $GITHUB_WORKSPACE
+          mkdir chainlink-ccip && cd chainlink-ccip
+          git init
+          git remote add origin ${{ github.repositoryUrl }}
+          git fetch origin ${{ github.ref }} --depth=1
+          git checkout FETCH_HEAD
       - name: Setup Go ${{ matrix.go-version }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
@@ -34,6 +34,7 @@ jobs:
         run: go version
       - name: Clone CCIP repo
         run: |
+          cd $GITHUB_WORKSPACE
           git clone https://github.com/smartcontractkit/ccip.git
           cd ccip
           git fetch
@@ -41,7 +42,7 @@ jobs:
       - name: Update the chainlink-ccip dependency in ccip
         run: |
           cd ccip
-          go get github.com/smartcontractkit/chainlink-ccip@$(git -C $GITHUB_WORKSPACE rev-parse HEAD)
+          go get github.com/smartcontractkit/chainlink-ccip@$(git -C $GITHUB_WORKSPACE/chainlink-ccip rev-parse HEAD)
           make gomodtidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
