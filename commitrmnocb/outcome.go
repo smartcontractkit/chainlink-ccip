@@ -10,6 +10,8 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // Outcome depending on the current state, either:
@@ -53,7 +55,7 @@ func (p *Plugin) ReportRangesOutcome(
 	query Query,
 	consensusObservation ConsensusObservation,
 ) Outcome {
-	rangesToReport := make([]ChainRange, 0)
+	rangesToReport := make([]plugintypes.ChainRange, 0)
 
 	rmnOnRampMaxSeqNumsMap := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	for _, seqNumChain := range query.RmnOnRampMaxSeqNums {
@@ -74,7 +76,7 @@ func (p *Plugin) ReportRangesOutcome(
 		}
 
 		if offRampNextSeqNum <= onRampMaxSeqNum {
-			chainRange := ChainRange{
+			chainRange := plugintypes.ChainRange{
 				ChainSel:    chainSel,
 				SeqNumRange: [2]cciptypes.SeqNum{offRampNextSeqNum, onRampMaxSeqNum},
 			}
@@ -163,7 +165,7 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 	fDestChain, exists := fChains[p.cfg.DestChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, DestChain: %d", p.cfg.DestChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.cfg.DestChain)
 	}
 
 	consensusObs := ConsensusObservation{

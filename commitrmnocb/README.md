@@ -1,7 +1,7 @@
-# CCIPv2 OCR3 Commit Plugin
+# OCR3 Commit Plugin
 
 ## Context
-The purpose of the CCIPv2 OCR3 Commit Plugin is to write reports to a configured destination chain. These reports
+The purpose of the OCR3 Commit Plugin is to write reports to a configured destination chain. These reports
 contain metadata of cross-chain messages, from a set of source chains, that can be executed on the destination chain.
 
 ## Commit Plugin Design

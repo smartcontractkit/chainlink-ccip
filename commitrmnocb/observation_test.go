@@ -6,11 +6,465 @@ import (
 	"fmt"
 	"testing"
 
+	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
+
+func Test_Observation(t *testing.T) {
+	merkleRoots := []cciptypes.MerkleRootChain{
+		{
+			ChainSel:     1,
+			SeqNumsRange: [2]cciptypes.SeqNum{5, 78},
+			MerkleRoot:   [32]byte{1},
+		},
+	}
+	gasPrices := []cciptypes.GasPriceChain{
+		{
+			GasPrice: cciptypes.NewBigIntFromInt64(99),
+			ChainSel: 8,
+		},
+	}
+	tokenPrices := []cciptypes.TokenPrice{
+		{
+			TokenID: "token23",
+			Price:   cciptypes.NewBigIntFromInt64(80761),
+		},
+	}
+	offRampNextSeqNums := []plugintypes.SeqNumChain{
+		{
+			ChainSel: 456,
+			SeqNum:   9987,
+		},
+	}
+	fChain := map[cciptypes.ChainSelector]int{
+		872: 3,
+	}
+
+	testCases := []struct {
+		name               string
+		previousOutcome    Outcome
+		merkleRoots        []cciptypes.MerkleRootChain
+		gasPrices          []cciptypes.GasPriceChain
+		tokenPrices        []cciptypes.TokenPrice
+		offRampNextSeqNums []plugintypes.SeqNumChain
+		fChain             map[cciptypes.ChainSelector]int
+		expObs             Observation
+	}{
+		{
+			name: "SelectingRangesForReport observation",
+			previousOutcome: Outcome{
+				OutcomeType: ReportTransmitted,
+			},
+			merkleRoots:        merkleRoots,
+			gasPrices:          gasPrices,
+			tokenPrices:        tokenPrices,
+			offRampNextSeqNums: offRampNextSeqNums,
+			fChain:             fChain,
+			expObs: Observation{
+				OnRampMaxSeqNums:   offRampNextSeqNums,
+				OffRampNextSeqNums: offRampNextSeqNums,
+				FChain:             fChain,
+			},
+		},
+		{
+			name: "BuildingReport observation",
+			previousOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+			},
+			merkleRoots:        merkleRoots,
+			gasPrices:          gasPrices,
+			tokenPrices:        tokenPrices,
+			offRampNextSeqNums: offRampNextSeqNums,
+			fChain:             fChain,
+			expObs: Observation{
+				MerkleRoots: merkleRoots,
+				GasPrices:   gasPrices,
+				TokenPrices: tokenPrices,
+				FChain:      fChain,
+			},
+		},
+		{
+			name: "WaitingForReportTransmission observation",
+			previousOutcome: Outcome{
+				OutcomeType: ReportInFlight,
+			},
+			merkleRoots:        merkleRoots,
+			gasPrices:          gasPrices,
+			tokenPrices:        tokenPrices,
+			offRampNextSeqNums: offRampNextSeqNums,
+			fChain:             fChain,
+			expObs: Observation{
+				OffRampNextSeqNums: offRampNextSeqNums,
+				FChain:             fChain,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+
+			observer := mocks.NewObserver()
+			observer.On(
+				"ObserveOffRampNextSeqNums", ctx,
+			).Return(tc.offRampNextSeqNums)
+			observer.On(
+				"ObserveMerkleRoots", ctx, mock.Anything,
+			).Return(tc.merkleRoots)
+			observer.On(
+				"ObserveTokenPrices", ctx,
+			).Return(tc.tokenPrices)
+			observer.On(
+				"ObserveGasPrices", ctx,
+			).Return(tc.gasPrices)
+			observer.On("ObserveFChain").Return(tc.fChain)
+
+			p := Plugin{
+				lggr:     logger.Test(t),
+				observer: observer,
+			}
+
+			previousOutcomeEncoded, err := tc.previousOutcome.Encode()
+			assert.NoError(t, err)
+
+			result, err := p.Observation(
+				ctx,
+				ocr3types.OutcomeContext{PreviousOutcome: previousOutcomeEncoded},
+				types.Query{},
+			)
+			assert.NoError(t, err)
+
+			actualObs, err := DecodeCommitPluginObservation(result)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.expObs, actualObs)
+		})
+	}
+}
+
+func Test_ObserveOffRampNextSeqNums(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		supportsDestChain      bool
+		supportsDestChainError error
+		knownSourceChains      []cciptypes.ChainSelector
+		knownSourceChainsError error
+		nextSeqNums            []cciptypes.SeqNum
+		nextSeqNumsError       error
+		expResult              []plugintypes.SeqNumChain
+	}{
+		{
+			name:                   "Happy path",
+			supportsDestChain:      true,
+			supportsDestChainError: nil,
+			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
+			knownSourceChainsError: nil,
+			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
+			nextSeqNumsError:       nil,
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(7, 608),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name:                   "nil is returned when supportsDestChain is false",
+			supportsDestChain:      false,
+			supportsDestChainError: nil,
+			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
+			knownSourceChainsError: nil,
+			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
+			nextSeqNumsError:       nil,
+			expResult:              nil,
+		},
+		{
+			name:                   "nil is returned when supportsDestChain errors",
+			supportsDestChain:      true,
+			supportsDestChainError: fmt.Errorf("error"),
+			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
+			knownSourceChainsError: nil,
+			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
+			nextSeqNumsError:       nil,
+			expResult:              nil,
+		},
+		{
+			name:                   "nil is returned when knownSourceChains errors",
+			supportsDestChain:      true,
+			supportsDestChainError: nil,
+			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
+			knownSourceChainsError: fmt.Errorf("error"),
+			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
+			nextSeqNumsError:       nil,
+			expResult:              nil,
+		},
+		{
+			name:                   "nil is returned when nextSeqNums returns incorrect number of seq nums",
+			supportsDestChain:      true,
+			supportsDestChainError: nil,
+			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
+			knownSourceChainsError: nil,
+			nextSeqNums:            []cciptypes.SeqNum{345, 608},
+			nextSeqNumsError:       nil,
+			expResult:              nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			var nodeID commontypes.OracleID = 1
+			reader := mocks.NewCCIPReader()
+			reader.On(
+				"NextSeqNum", ctx, tc.knownSourceChains,
+			).Return(tc.nextSeqNums, tc.nextSeqNumsError)
+
+			chainSupport := mocks.NewChainSupport()
+			chainSupport.On(
+				"SupportsDestChain", nodeID,
+			).Return(tc.supportsDestChain, tc.supportsDestChainError)
+			chainSupport.On(
+				"KnownSourceChainsSlice",
+			).Return(tc.knownSourceChains, tc.knownSourceChainsError)
+
+			o := ObserverImpl{
+				nodeID:       nodeID,
+				lggr:         logger.Test(t),
+				msgHasher:    NewMessageHasher(),
+				ccipReader:   reader,
+				chainSupport: chainSupport,
+			}
+
+			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
+		})
+	}
+}
+
+func Test_ObserveMerkleRoots(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		ranges                   []plugintypes.ChainRange
+		supportedChains          mapset.Set[cciptypes.ChainSelector]
+		supportedChainsFails     bool
+		msgsBetweenSeqNums       map[cciptypes.ChainSelector][]cciptypes.Message
+		msgsBetweenSeqNumsErrors map[cciptypes.ChainSelector]error
+		expMerkleRoots           map[cciptypes.ChainSelector]string
+	}{
+		{
+			name: "Success single chain",
+			ranges: []plugintypes.ChainRange{
+				{
+					ChainSel:    8,
+					SeqNumRange: cciptypes.SeqNumRange{10, 11},
+				},
+			},
+			supportedChains:      mapset.NewSet[cciptypes.ChainSelector](8),
+			supportedChainsFails: false,
+			msgsBetweenSeqNums: map[cciptypes.ChainSelector][]cciptypes.Message{
+				8: {{
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1a"),
+						SequenceNumber: 10},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1b"),
+						SequenceNumber: 11},
+				},
+				},
+			},
+			msgsBetweenSeqNumsErrors: map[cciptypes.ChainSelector]error{},
+			expMerkleRoots: map[cciptypes.ChainSelector]string{
+				8: "5b81aaf37240df67f3ab0e845f30e29f35fdf9169e2517c436c1c0c11224c97b",
+			},
+		},
+		{
+			name: "Success multiple chains",
+			ranges: []plugintypes.ChainRange{
+				{
+					ChainSel:    8,
+					SeqNumRange: cciptypes.SeqNumRange{10, 11},
+				},
+				{
+					ChainSel:    15,
+					SeqNumRange: cciptypes.SeqNumRange{53, 55},
+				},
+			},
+			supportedChains:      mapset.NewSet[cciptypes.ChainSelector](8, 15),
+			supportedChainsFails: false,
+			msgsBetweenSeqNums: map[cciptypes.ChainSelector][]cciptypes.Message{
+				8: {{
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1a"),
+						SequenceNumber: 10},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1b"),
+						SequenceNumber: 11}},
+				},
+				15: {{
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x2a"),
+						SequenceNumber: 53},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x2b"),
+						SequenceNumber: 54},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x2c"),
+						SequenceNumber: 55}},
+				},
+			},
+			msgsBetweenSeqNumsErrors: map[cciptypes.ChainSelector]error{},
+			expMerkleRoots: map[cciptypes.ChainSelector]string{
+				8:  "5b81aaf37240df67f3ab0e845f30e29f35fdf9169e2517c436c1c0c11224c97b",
+				15: "c7685b1be19745f244da890574cf554d75a3feeaf0e1181541c594d77ac1d6c4",
+			},
+		},
+		{
+			name: "Unsupported chain does not return a merkle root",
+			ranges: []plugintypes.ChainRange{
+				{
+					ChainSel:    8,
+					SeqNumRange: cciptypes.SeqNumRange{10, 11},
+				},
+				{
+					// Unsupported chain
+					ChainSel:    12,
+					SeqNumRange: cciptypes.SeqNumRange{50, 60},
+				},
+			},
+			supportedChains:      mapset.NewSet[cciptypes.ChainSelector](8),
+			supportedChainsFails: false,
+			msgsBetweenSeqNums: map[cciptypes.ChainSelector][]cciptypes.Message{
+				8: {{
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1a"),
+						SequenceNumber: 10},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1b"),
+						SequenceNumber: 11},
+				},
+				},
+			},
+			msgsBetweenSeqNumsErrors: map[cciptypes.ChainSelector]error{},
+			expMerkleRoots: map[cciptypes.ChainSelector]string{
+				8: "5b81aaf37240df67f3ab0e845f30e29f35fdf9169e2517c436c1c0c11224c97b",
+			},
+		},
+		{
+			name: "Call to supportedChains fails",
+			ranges: []plugintypes.ChainRange{
+				{
+					ChainSel:    8,
+					SeqNumRange: cciptypes.SeqNumRange{10, 11},
+				},
+			},
+			supportedChains:      mapset.NewSet[cciptypes.ChainSelector](8),
+			supportedChainsFails: true,
+			msgsBetweenSeqNums: map[cciptypes.ChainSelector][]cciptypes.Message{
+				8: {{
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1a"),
+						SequenceNumber: 10},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1b"),
+						SequenceNumber: 11},
+				},
+				},
+			},
+			msgsBetweenSeqNumsErrors: map[cciptypes.ChainSelector]error{},
+			expMerkleRoots:           nil,
+		},
+		{
+			name: "msgsBetweenSeqNums fails for a chain",
+			ranges: []plugintypes.ChainRange{
+				{
+					ChainSel:    8,
+					SeqNumRange: cciptypes.SeqNumRange{10, 11},
+				},
+				{
+					ChainSel:    12,
+					SeqNumRange: cciptypes.SeqNumRange{50, 60},
+				},
+			},
+			supportedChains:      mapset.NewSet[cciptypes.ChainSelector](8),
+			supportedChainsFails: false,
+			msgsBetweenSeqNums: map[cciptypes.ChainSelector][]cciptypes.Message{
+				8: {{
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1a"),
+						SequenceNumber: 10},
+				}, {
+					Header: cciptypes.RampMessageHeader{
+						MessageID:      mustNewMessageID("0x1b"),
+						SequenceNumber: 11}},
+				},
+				12: {},
+			},
+			msgsBetweenSeqNumsErrors: map[cciptypes.ChainSelector]error{
+				12: fmt.Errorf("error"),
+			},
+			expMerkleRoots: map[cciptypes.ChainSelector]string{
+				8: "5b81aaf37240df67f3ab0e845f30e29f35fdf9169e2517c436c1c0c11224c97b",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			var nodeID commontypes.OracleID = 1
+			reader := mocks.NewCCIPReader()
+			for _, r := range tc.ranges {
+				var err error
+				if e, exists := tc.msgsBetweenSeqNumsErrors[r.ChainSel]; exists {
+					err = e
+				}
+				reader.On(
+					"MsgsBetweenSeqNums", ctx, r.ChainSel, r.SeqNumRange,
+				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
+			}
+
+			chainSupport := mocks.NewChainSupport()
+			if tc.supportedChainsFails {
+				chainSupport.On("SupportedChains", nodeID).Return(
+					mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error"),
+				)
+			} else {
+				chainSupport.On("SupportedChains", nodeID).Return(tc.supportedChains, nil)
+			}
+
+			o := ObserverImpl{
+				nodeID:       nodeID,
+				lggr:         logger.Test(t),
+				msgHasher:    NewMessageHasher(),
+				ccipReader:   reader,
+				chainSupport: chainSupport,
+			}
+
+			roots := o.ObserveMerkleRoots(ctx, tc.ranges)
+			if tc.expMerkleRoots == nil {
+				assert.Nil(t, roots)
+			} else {
+				for _, root := range roots {
+					assert.Equal(t, tc.expMerkleRoots[root.ChainSel], hex.EncodeToString(root.MerkleRoot[:]))
+				}
+			}
+		})
+	}
+}
 
 func Test_computeMerkleRoot(t *testing.T) {
 	testCases := []struct {
@@ -21,7 +475,18 @@ func Test_computeMerkleRoot(t *testing.T) {
 		expErr         bool
 	}{
 		{
-			name: "Happy path",
+			name: "Single message success",
+			messageHeaders: []cciptypes.RampMessageHeader{
+				{
+					MessageID:      mustNewMessageID("0x1a"),
+					SequenceNumber: 112,
+				}},
+			messageHasher: NewMessageHasher(),
+			expMerkleRoot: "1a00000000000000000000000000000000000000000000000000000000000000",
+			expErr:        false,
+		},
+		{
+			name: "Multiple messages success",
 			messageHeaders: []cciptypes.RampMessageHeader{
 				{
 					MessageID:      mustNewMessageID("0x1a"),
@@ -84,7 +549,7 @@ func Test_computeMerkleRoot(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := Plugin{
+			p := ObserverImpl{
 				lggr:      logger.Test(t),
 				msgHasher: tc.messageHasher,
 			}

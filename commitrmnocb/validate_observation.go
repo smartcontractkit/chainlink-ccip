@@ -26,12 +26,12 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	observerSupportedChains, err := p.supportedChains(ao.Observer)
+	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("failed to get supported chains: %w", err)
 	}
 
-	supportsDestChain, err := p.supportsDestChain(ao.Observer)
+	supportsDestChain, err := p.chainSupport.SupportsDestChain(ao.Observer)
 	if err != nil {
 		return fmt.Errorf("call to supportsDestChain failed: %w", err)
 	}
