@@ -6,13 +6,14 @@ import (
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 )
@@ -25,13 +26,12 @@ type TokenPrices interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	// TODO: Using internal Extended Reader until we have the new changes for ChainReader that will allow us to choose the bound contract address
-	ContractReader contractreader.Extended
+	ContractReader commontyps.ContractReader
 	PriceSources   map[types.Account]pluginconfig.ArbitrumPriceSource
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader contractreader.Extended,
+	contractReader commontyps.ContractReader,
 	priceSources map[types.Account]pluginconfig.ArbitrumPriceSource,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
@@ -57,11 +57,13 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 		idx := idx
 		token := token
 		eg.Go(func() error {
-			//TODO: Once chainreader new changes are merged we'll need to use the bound contract
+			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
+			// are merged we'll need to use the bound contract
 			//boundContract := commontypes.BoundContract{
 			//	Address: pr.PriceSources[token].AggregatorAddress,
 			//	Name: consts.ContractNamePriceAggregator,
 			//}
+
 			latestRoundData := LatestRoundData{}
 			if err :=
 				pr.ContractReader.GetLatestValue(
@@ -70,7 +72,9 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 					consts.MethodNameGetLatestRoundData,
 					primitives.Finalized,
 					nil,
-					latestRoundData); err != nil {
+					latestRoundData,
+					//boundContract,
+				); err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
 			prices[idx] = latestRoundData.Answer
@@ -89,11 +93,6 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	}
 
 	return prices, nil
-}
-
-// TODO: Remove this once we have the new changes for ChainReader that will allow us to choose the bound contract address
-func getContractName(token ocr2types.Account) string {
-	return fmt.Sprintf("AggregatorV3Interface_%s", token)
 }
 
 // Ensure OnchainTokenPricesReader implements TokenPrices

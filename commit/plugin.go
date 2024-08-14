@@ -127,7 +127,8 @@ func (p *Plugin) Observation(
 	// observe token prices if the node supports the token price chain
 	// otherwise move on to gas prices.
 	var tokenPrices []cciptypes.TokenPrice
-	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
+	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain && p.tokenPricesReader != nil {
+		p.lggr.Infow("observing token prices")
 		tokenPrices, err = observeTokenPrices(
 			ctx,
 			p.tokenPricesReader,
