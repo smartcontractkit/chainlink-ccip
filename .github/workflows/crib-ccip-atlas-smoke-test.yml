@@ -37,7 +37,7 @@ on:
       debug:
         description: |
           Enables debug mode to disable CRIB env teardown
-        default: false
+        default: "false"
         required: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
 
       - name: Deploy and validate CRIB Environment for CCIP
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@da1c0099f3bab236660ccc10328a29e06950c69f # crib-deploy-environment@0.6.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@9a4954089045a765eca4bac68f396b2df5a5ea25 # crib-deploy-environment@0.7.1
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -63,6 +63,7 @@ jobs:
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           product: "ccip"
+          crib-alert-slack-webhook: ${{ secrets.CRIB_ALERT_SLACK_WEBHOOK }}
 
       - name: Assume role capable of fetching data from s3
         uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
