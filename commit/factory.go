@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -97,27 +96,6 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	// The node supports the chain that the token prices are on.
 	tokenPricesCr, ok := p.contractReaders[cciptypes.ChainSelector(offchainConfig.TokenPriceChainSelector)]
 	if ok {
-
-		// Only supporting one price source for now.
-		if len(offchainConfig.PriceSources) == 0 {
-			return nil, ocr3types.ReportingPluginInfo{}, errors.New("no price sources provided")
-		} else if len(offchainConfig.PriceSources) > 1 {
-			return nil, ocr3types.ReportingPluginInfo{}, errors.New("can't have more than one price source for now")
-		}
-
-		// Binding tokens
-		var bcs []types.BoundContract
-		for _, priceSource := range offchainConfig.PriceSources {
-			bcs = append(bcs, types.BoundContract{
-				Address: priceSource.AggregatorAddress,
-				Name:    consts.ContractNamePriceAggregator,
-			})
-		}
-
-		if err1 := tokenPricesCr.Bind(context.Background(), bcs); err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price aggregator: %w", err)
-		}
-
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
 			tokenPricesCr,
 			offchainConfig.PriceSources,
