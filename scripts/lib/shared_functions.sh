@@ -18,11 +18,11 @@ function is_custom_image() {
 	local DEVSPACE_IMAGE="${1:-}"
 
 	# Regular expression to match the desired image patterns
-	if [[ $DEVSPACE_NAMESPACE == "crib-local" && $DEVSPACE_IMAGE =~ ^localhost:5001/chainlink-[a-z]*-devspace(:[a-zA-Z0-9._-]+)?$ ]]; then
-		return 0
-	elif [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com/chainlink-[a-z]*-devspace(:[a-zA-Z0-9._-]+)?$ ]]; then
-		return 0
-	else
+	if [[ $DEVSPACE_NAMESPACE == "crib-local" && $DEVSPACE_IMAGE =~ ^localhost:5001\/chainlink-*[a-z]*-devspace(:[a-zA-Z0-9._-]+)?$ ]]; then
 		return 1
+	elif [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-*[a-z]*-devspace(:[a-zA-Z0-9._-]+)?$ ]]; then
+		return 1
+	else
+		return 0
 	fi
 }
