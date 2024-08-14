@@ -3,8 +3,8 @@ name: "Run CCIP OCR3 Integration Test"
 on:
   pull_request:
   push:
-    branches:
-      - 'ccip-develop'
+    # branches:
+    #   - 'ccip-develop'
 
 jobs:
   integration-test-ccip-ocr3:
