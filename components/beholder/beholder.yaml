@@ -20,6 +20,13 @@ deployments:
         podSecurityContext:
           fsGroup: 999
 
+        beholder-test-client:
+          args:
+            - -otel-exporter-grpc-enpoint
+            # TODO: change this to the collector-agent when collector to
+            # collector communication is working
+            - crib-beholder-infra-otel-collector-gateway:4317
+
   crib-beholder-infra:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
@@ -32,6 +39,20 @@ deployments:
       values:
         podSecurityContext:
           fsGroup: 999
+
+        otel-collector-agent:
+          config:
+            exporters:
+              otlp:
+                endpoint: crib-beholder-infra-otel-collector-gateway:4317
+
+        otel-collector-gateway:
+          config:
+            exporters:
+              kafka:
+                brokers:
+                  - crib-beholder-infra-kafka:9092
+
 
 profiles:
   - name: local-charts
