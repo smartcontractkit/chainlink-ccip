@@ -24,6 +24,7 @@ jobs:
           # Need this here otherwise the git rev-parse HEAD command below will return
           # a bogus value that is not usable as a commit.
           fetch-depth: 0
+          ref: ${{ github.ref }}  # Explicitly checkout the triggering ref
       - name: Setup Go ${{ matrix.go-version }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
