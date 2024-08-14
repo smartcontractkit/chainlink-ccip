@@ -164,69 +164,90 @@ func (p *Plugin) Observation(
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 		}
+		p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 	}
 
-	fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
-	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+	state := previousOutcome.State.Next()
+	switch state {
+	case exectypes.GetCommitReports:
+		fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
 
-	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build a
-	//          valid execution report.
-	var groupedCommits exectypes.CommitObservations
-	supportsDest, err := p.supportsDestChain()
-	if err != nil {
-		return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
-	}
-	if supportsDest {
-		groupedCommits, err = getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, fetchFrom, p.lggr)
+		// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
+		//          a valid execution report.
+		supportsDest, err := p.supportsDestChain()
 		if err != nil {
-			return types.Observation{}, err
+			return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 		}
-
-		// TODO: truncate grouped commits to a maximum observation size.
-		//       Cache everything which is not executed.
-	}
-
-	// Phase 2: Gather messages from the source chains and build the execution report.
-	messages := make(exectypes.MessageObservations)
-	if len(previousOutcome.PendingCommitReports) == 0 {
-		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
-		// No reports to execute.
-		// This is expected after a cold start.
-	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-		for _, report := range previousOutcome.PendingCommitReports {
-			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
-		}
-
-		for selector, reports := range commitReportCache {
-			if len(reports) == 0 {
-				continue
-			}
-
-			ranges, err := computeRanges(reports)
+		if supportsDest {
+			groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, fetchFrom, p.lggr)
 			if err != nil {
 				return types.Observation{}, err
 			}
 
-			// Read messages for each range.
-			for _, seqRange := range ranges {
-				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, selector, seqRange)
-				if err != nil {
-					return nil, err
+			// TODO: truncate grouped to a maximum observation size?
+			return exectypes.NewObservation(groupedCommits, nil).Encode()
+		}
+
+		// No observation for non-dest readers.
+		return types.Observation{}, nil
+	case exectypes.GetMessages:
+		// Phase 2: Gather messages from the source chains and build the execution report.
+		messages := make(exectypes.MessageObservations)
+		if len(previousOutcome.PendingCommitReports) == 0 {
+			p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
+			// No reports to execute.
+			// This is expected after a cold start.
+		} else {
+			commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
+			for _, report := range previousOutcome.PendingCommitReports {
+				commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
+			}
+
+			for selector, reports := range commitReportCache {
+				if len(reports) == 0 {
+					continue
 				}
-				for _, msg := range msgs {
-					if _, ok := messages[selector]; !ok {
-						messages[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
+
+				ranges, err := computeRanges(reports)
+				if err != nil {
+					return types.Observation{}, err
+				}
+
+				// Read messages for each range.
+				for _, seqRange := range ranges {
+					msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, selector, seqRange)
+					if err != nil {
+						return nil, err
 					}
-					messages[selector][msg.Header.SequenceNumber] = msg
+					for _, msg := range msgs {
+						if _, ok := messages[selector]; !ok {
+							messages[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
+						}
+						messages[selector][msg.Header.SequenceNumber] = msg
+					}
 				}
 			}
 		}
+
+		// Regroup the commit reports back into the observation format.
+		// TODO: use same format for Observation and Outcome.
+		groupedCommits := make(exectypes.CommitObservations)
+		for _, report := range previousOutcome.PendingCommitReports {
+			if _, ok := groupedCommits[report.SourceChain]; !ok {
+				groupedCommits[report.SourceChain] = []exectypes.CommitData{}
+			}
+			groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
+		}
+
+		// TODO: Fire off messages for an attestation check service.
+		return exectypes.NewObservation(groupedCommits, messages).Encode()
+
+	case exectypes.Filter:
+		// TODO: pass the previous two through, add in the nonces.
+		return types.Observation{}, fmt.Errorf("unknown state")
+	default:
+		return types.Observation{}, fmt.Errorf("unknown state")
 	}
-
-	// TODO: Fire off messages for an attestation check service.
-
-	return exectypes.NewObservation(groupedCommits, messages).Encode()
 }
 
 func (p *Plugin) ValidateObservation(
@@ -320,6 +341,18 @@ func selectReport(
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	var previousOutcome exectypes.Outcome
+	if outctx.PreviousOutcome != nil {
+		var err error
+		previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
+		}
+	}
+
+	/////////////////////////////////////////////
+	// Decode the observations and merge them. //
+	/////////////////////////////////////////////
 	decodedObservations, err := decodeAttributedObservations(aos)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
@@ -359,6 +392,10 @@ func (p *Plugin) Outcome(
 		mergedCommitObservations,
 		mergedMessageObservations)
 
+	//////////////////////////
+	// common preprocessing //
+	//////////////////////////
+
 	// flatten commit reports and sort by timestamp.
 	var commitReports []exectypes.CommitData
 	for _, report := range observation.CommitReports {
@@ -372,46 +409,57 @@ func (p *Plugin) Outcome(
 		fmt.Sprintf("[oracle %d] exec outcome: commit reports", p.reportingCfg.OracleID),
 		"commitReports", commitReports)
 
-	// add messages to their commitReports.
-	for i, report := range commitReports {
-		report.Messages = nil
-		for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
-			if msg, ok := observation.Messages[report.SourceChain][i]; ok {
-				report.Messages = append(report.Messages, msg)
+	state := previousOutcome.State.Next()
+	switch state {
+	case exectypes.GetCommitReports:
+		outcome := exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
+		return outcome.Encode()
+	case exectypes.GetMessages:
+		// add messages to their commitReports.
+		for i, report := range commitReports {
+			report.Messages = nil
+			for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
+				if msg, ok := observation.Messages[report.SourceChain][i]; ok {
+					report.Messages = append(report.Messages, msg)
+				}
 			}
+			commitReports[i].Messages = report.Messages
 		}
-		commitReports[i].Messages = report.Messages
+
+		// TODO: this function should be pure, a context should not be needed.
+		outcomeReports, commitReports, err :=
+			selectReport(
+				context.Background(),
+				p.lggr, p.msgHasher,
+				p.reportCodec,
+				p.tokenDataReader,
+				p.estimateProvider,
+				commitReports,
+				maxReportSizeBytes,
+				p.cfg.OffchainConfig.BatchGasLimit)
+		if err != nil {
+			return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
+		}
+
+		execReport := cciptypes.ExecutePluginReport{
+			ChainReports: outcomeReports,
+		}
+
+		outcome := exectypes.NewOutcome(state, commitReports, execReport)
+		if outcome.IsEmpty() {
+			return nil, nil
+		}
+
+		p.lggr.Infow(
+			fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
+			"outcome", outcome)
+
+		return outcome.Encode()
+	case exectypes.Filter:
+		panic("not implemented")
+	default:
+		panic("unknown state")
 	}
-
-	// TODO: this function should be pure, a context should not be needed.
-	outcomeReports, commitReports, err :=
-		selectReport(
-			context.Background(),
-			p.lggr, p.msgHasher,
-			p.reportCodec,
-			p.tokenDataReader,
-			p.estimateProvider,
-			commitReports,
-			maxReportSizeBytes,
-			p.cfg.OffchainConfig.BatchGasLimit)
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
-	}
-
-	execReport := cciptypes.ExecutePluginReport{
-		ChainReports: outcomeReports,
-	}
-
-	outcome := exectypes.NewOutcome(commitReports, execReport)
-	if outcome.IsEmpty() {
-		return nil, nil
-	}
-
-	p.lggr.Infow(
-		fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
-		"outcome", outcome)
-
-	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
