@@ -35,7 +35,7 @@ jobs:
       - name: Update the chainlink-ccip dependency in ccip
         run: |
           cd ccip
-          go get github.com/smartcontractkit/chainlink-ccip@$(git -C ../chainlink-ccip rev-parse HEAD)
+          go get github.com/smartcontractkit/chainlink-ccip@$(git -C $GITHUB_WORKSPACE rev-parse HEAD)
           make gomodtidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
