@@ -16,7 +16,7 @@ on:
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
       # Exclude .gitignore
-      - '!.gitignore'
+      - "!.gitignore"
   push:
     branches:
       - main # Trigger only on pushes to the main branch
@@ -31,7 +31,7 @@ on:
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
       # Exclude .gitignore
-      - '!.gitignore'
+      - "!.gitignore"
   workflow_dispatch:
     inputs:
       debug:
@@ -52,7 +52,7 @@ jobs:
 
       - name: Deploy and validate CRIB Environment for Core
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@c0b38e6c40d72d01b8d2f24f92623a2538b3dedb # v0.5.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@da1c0099f3bab236660ccc10328a29e06950c69f # crib-deploy-environment@0.6.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -66,6 +66,6 @@ jobs:
       - name: Destroy CRIB Environment
         id: destroy
         if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true'
-        uses: smartcontractkit/.github/actions/crib-purge-environment@c0b38e6c40d72d01b8d2f24f92623a2538b3dedb # v0.1.0
+        uses: smartcontractkit/.github/actions/crib-purge-environment@da1c0099f3bab236660ccc10328a29e06950c69f # crib-purge-environment@0.2.0
         with:
           namespace: ${{ steps.deploy.outputs.devspace-namespace }}
