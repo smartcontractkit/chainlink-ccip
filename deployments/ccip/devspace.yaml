@@ -463,6 +463,21 @@ profiles:
       - op: replace
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
+
+  - name: local-dev-ship
+    patches:
+      # Remove the global overridesToml field.
+      # This will be configured via a values file.
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value: 
+          - "./values-profiles/values-ship.yaml"
+          - "./values-profiles/new-chain.yaml"
+      - op: replace
+        path: deployments.app.helm.values.ccipScriptsDeployment.enabled
+        value: false
   # Resolve local chart versions for development
   - name: local-charts
     merge:
