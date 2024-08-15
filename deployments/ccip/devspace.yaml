@@ -192,16 +192,6 @@ deployments:
             nodes:
               node1:
                 image: ${runtime.images.app}
-                # default resources are 300m/1Gi
-                # first node need more resources to build faster inside container
-                # at least 2Gi of memory is required otherwise build will fail (OOM)
-                resources:
-                  requests:
-                    cpu: 2000m
-                    memory: 2048Mi
-                  limits:
-                    cpu: 2000m
-                    memory: 2048Mi
                 # override default config per node
                 # for example, use OCRv2 P2P setup, the whole config
                 #      toml: |
@@ -259,13 +249,6 @@ deployments:
               runAsNonRoot: true
               runAsUser: 999
               runAsGroup: 999
-            resources:
-              requests:
-                cpu: 1
-                memory: 1024Mi
-              limits:
-                cpu: 1
-                memory: 1024Mi
           # default cluster shipped with latest Geth ( dev mode by default )
           geth:
             statefulSet:
@@ -305,13 +288,6 @@ deployments:
                   LimitDefault = 6000000
                   FeeCapDefault = '200 gwei'
             blocktime: 1
-            resources:
-              requests:
-                cpu: 1
-                memory: 1024Mi
-              limits:
-                cpu: 1
-                memory: 1024Mi
           # mockserver is https://www.mock-server.com/where/kubernetes.html
           # used to stub External Adapters
           mockserver:
@@ -331,13 +307,6 @@ deployments:
               runAsUser: 999
               readOnlyRootFilesystem: false
             port: 1080
-            resources:
-              requests:
-                cpu: 1
-                memory: 1024Mi
-              limits:
-                cpu: 1
-                memory: 1024Mi
           # monitoring.coreos.com/v1 PodMonitor for each node
           prometheusMonitor: true
 
