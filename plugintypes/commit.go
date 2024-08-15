@@ -110,3 +110,8 @@ func NewSeqNumChain(chainSel cciptypes.ChainSelector, seqNum cciptypes.SeqNum) S
 		SeqNum:   seqNum,
 	}
 }
+
+type ChainRange struct {
+	ChainSel    cciptypes.ChainSelector `json:"chain"`
+	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
+}
