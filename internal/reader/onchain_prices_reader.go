@@ -6,16 +6,15 @@ import (
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
+	"golang.org/x/sync/errgroup"
 )
 
 type TokenPrices interface {
@@ -63,21 +62,16 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 			//	Address: pr.PriceSources[token].AggregatorAddress,
 			//	Name: consts.ContractNamePriceAggregator,
 			//}
-
-			latestRoundData := LatestRoundData{}
-			if err :=
-				pr.ContractReader.GetLatestValue(
-					ctx,
-					consts.ContractNamePriceAggregator,
-					consts.MethodNameGetLatestRoundData,
-					primitives.Finalized,
-					nil,
-					latestRoundData,
-					//boundContract,
-				); err != nil {
+			rawTokenPrice, err := pr.getRawTokenPrice(ctx, token)
+			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
-			prices[idx] = latestRoundData.Answer
+			decimals, err := pr.getTokenDecimals(ctx, token)
+			if err != nil {
+				return fmt.Errorf("failed to get decimals for %s: %w", token, err)
+			}
+
+			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, *decimals)
 			return nil
 		})
 	}
@@ -93,6 +87,54 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	}
 
 	return prices, nil
+}
+
+func (pr *OnchainTokenPricesReader) getRawTokenPrice(ctx context.Context, token types.Account) (*big.Int, error) {
+	latestRoundData := LatestRoundData{}
+	if err :=
+		pr.ContractReader.GetLatestValue(
+			ctx,
+			consts.ContractNamePriceAggregator,
+			consts.MethodNameGetLatestRoundData,
+			primitives.Finalized,
+			nil,
+			latestRoundData,
+			//boundContract,
+		); err != nil {
+		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
+	}
+
+	return latestRoundData.Answer, nil
+}
+
+func (pr *OnchainTokenPricesReader) getTokenDecimals(ctx context.Context, token types.Account) (*uint8, error) {
+	var decimals *uint8
+	if err :=
+		pr.ContractReader.GetLatestValue(
+			ctx,
+			consts.ContractNamePriceAggregator,
+			consts.MethodNameGetDecimals,
+			primitives.Finalized,
+			nil,
+			decimals,
+			//boundContract,
+		); err != nil {
+		return nil, fmt.Errorf("decimals call failed for token %s: %w", token, err)
+	}
+
+	return decimals, nil
+}
+
+// Input price is USD per full token, with 18 decimal precision
+// Result price is USD per 1e18 of smallest token denomination, with 18 decimal precision
+// Examples:
+//
+//	1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
+func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
+	tmp := big.NewInt(0).Mul(price, big.NewInt(1e18))
+	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
 // Ensure OnchainTokenPricesReader implements TokenPrices

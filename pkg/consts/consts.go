@@ -41,6 +41,7 @@ const (
 
 	// Aggregator methods
 	MethodNameGetLatestRoundData = "latestRoundData"
+	MethodNameGetDecimals        = "decimals"
 
 	/*
 		// On EVM:
