@@ -90,18 +90,22 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 }
 
 func (pr *OnchainTokenPricesReader) getRawTokenPrice(ctx context.Context, token types.Account) (*big.Int, error) {
-	latestRoundData := LatestRoundData{}
+	var latestRoundData *LatestRoundData
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
 			consts.ContractNamePriceAggregator,
 			consts.MethodNameGetLatestRoundData,
-			primitives.Finalized,
+			primitives.Unconfirmed,
 			nil,
-			latestRoundData,
+			&latestRoundData,
 			//boundContract,
 		); err != nil {
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
+	}
+
+	if latestRoundData == nil {
+		return nil, fmt.Errorf("latestRoundData is nil for token %s", token)
 	}
 
 	return latestRoundData.Answer, nil
@@ -114,9 +118,9 @@ func (pr *OnchainTokenPricesReader) getTokenDecimals(ctx context.Context, token 
 			ctx,
 			consts.ContractNamePriceAggregator,
 			consts.MethodNameGetDecimals,
-			primitives.Finalized,
+			primitives.Unconfirmed,
 			nil,
-			decimals,
+			&decimals,
 			//boundContract,
 		); err != nil {
 		return nil, fmt.Errorf("decimals call failed for token %s: %w", token, err)
