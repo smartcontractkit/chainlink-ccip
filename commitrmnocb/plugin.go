@@ -105,12 +105,12 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (Outcome, CommitPluginState) {
+func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (Outcome, State) {
 	if len(outcome) == 0 {
 		return Outcome{}, SelectingRangesForReport
 	}
 
-	decodedOutcome, err := DecodeCommitPluginOutcome(outcome)
+	decodedOutcome, err := DecodeOutcome(outcome)
 	if err != nil {
 		p.lggr.Errorw("Failed to decode Outcome", "outcome", outcome, "err", err)
 		return Outcome{}, SelectingRangesForReport

@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -24,7 +25,7 @@ func (p *Plugin) Outcome(
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 	commitQuery := Query{}
 
-	consensusObservation, err := p.getConsensusObservation(aos)
+	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.cfg.DestChain, aos)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
@@ -33,13 +34,14 @@ func (p *Plugin) Outcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		outcome = p.ReportRangesOutcome(commitQuery, consensusObservation)
+		outcome = ReportRangesOutcome(commitQuery, consensusObservation)
 
 	case BuildingReport:
-		outcome = p.buildReport(commitQuery, consensusObservation)
+		outcome = buildReport(commitQuery, consensusObservation)
 
 	case WaitingForReportTransmission:
-		outcome = p.checkForReportTransmission(previousOutcome, consensusObservation)
+		outcome = checkForReportTransmission(
+			p.lggr, p.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation)
 
 	default:
 		p.lggr.Warnw("Unexpected state in Outcome", "state", nextState)
@@ -51,7 +53,8 @@ func (p *Plugin) Outcome(
 }
 
 // ReportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
-func (p *Plugin) ReportRangesOutcome(
+// TODO: ensure each range is below a limit
+func ReportRangesOutcome(
 	query Query,
 	consensusObservation ConsensusObservation,
 ) Outcome {
@@ -94,7 +97,7 @@ func (p *Plugin) ReportRangesOutcome(
 
 // Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
 // to transmit on-chain
-func (p *Plugin) buildReport(
+func buildReport(
 	_ Query,
 	consensusObservation ConsensusObservation,
 ) Outcome {
@@ -122,7 +125,9 @@ func (p *Plugin) buildReport(
 // ReportTransmissionFailed to signify we stop checking for updates and start a new report generation phase. If no
 // update is detected, and we haven't exhausted our check attempts, output ReportInFlight to signify that we should
 // check again next round.
-func (p *Plugin) checkForReportTransmission(
+func checkForReportTransmission(
+	lggr logger.Logger,
+	maxReportTransmissionCheckAttempts uint,
 	previousOutcome Outcome,
 	consensusObservation ConsensusObservation,
 ) Outcome {
@@ -143,8 +148,8 @@ func (p *Plugin) checkForReportTransmission(
 		}
 	}
 
-	if previousOutcome.ReportTransmissionCheckAttempts+1 >= p.cfg.MaxReportTransmissionCheckAttempts {
-		p.lggr.Warnw("Failed to detect report transmission")
+	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
+		lggr.Warnw("Failed to detect report transmission")
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}
@@ -158,24 +163,29 @@ func (p *Plugin) checkForReportTransmission(
 }
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
-func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (ConsensusObservation, error) {
+func getConsensusObservation(
+	lggr logger.Logger,
+	F int,
+	destChain cciptypes.ChainSelector,
+	aos []types.AttributedObservation,
+) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
-	fChains := p.fChainConsensus(aggObs.FChain)
+	fChains := fChainConsensus(lggr, F, aggObs.FChain)
 
-	fDestChain, exists := fChains[p.cfg.DestChain]
+	fDestChain, exists := fChains[destChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.cfg.DestChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
 	consensusObs := ConsensusObservation{
-		MerkleRoots: p.merkleRootConsensus(aggObs.MerkleRoots, fChains),
+		MerkleRoots: merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
 		// TODO: use consensus of observed gas prices
 		GasPrices: make(map[cciptypes.ChainSelector]cciptypes.BigInt),
 		// TODO: use consensus of observed token prices
 		TokenPrices:        make(map[types.Account]cciptypes.BigInt),
-		OnRampMaxSeqNums:   p.onRampMaxSeqNumsConsensus(aggObs.OnRampMaxSeqNums, fChains),
-		OffRampNextSeqNums: p.offRampMaxSeqNumsConsensus(aggObs.OffRampNextSeqNums, fDestChain),
+		OnRampMaxSeqNums:   onRampMaxSeqNumsConsensus(lggr, aggObs.OnRampMaxSeqNums, fChains),
+		OffRampNextSeqNums: offRampMaxSeqNumsConsensus(lggr, aggObs.OffRampNextSeqNums, fDestChain),
 		FChain:             fChains,
 	}
 
@@ -185,7 +195,8 @@ func (p *Plugin) getConsensusObservation(aos []types.AttributedObservation) (Con
 // Given a mapping from chains to a list of merkle roots, return a mapping from chains to a single consensus merkle
 // root. The consensus merkle root for a given chain is the merkle root with the most observations that was observed at
 // least fChain times.
-func (p *Plugin) merkleRootConsensus(
+func merkleRootConsensus(
+	lggr logger.Logger,
 	rootsByChain map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain,
 	fChains map[cciptypes.ChainSelector]int,
 ) map[cciptypes.ChainSelector]cciptypes.MerkleRootChain {
@@ -197,16 +208,16 @@ func (p *Plugin) merkleRootConsensus(
 
 			if count <= fChain {
 				// TODO: metrics
-				p.lggr.Warnf("failed to reach consensus on a merkle root for chain %d "+
+				lggr.Warnf("failed to reach consensus on a merkle root for chain %d "+
 					"because no single merkle root was observed more than the expected fChain (%d) times, found "+
 					"merkle root %d observed by only %d oracles, all observed merkle roots: %v",
 					chain, fChain, root, count, roots)
+			} else {
+				consensus[chain] = root
 			}
-
-			consensus[chain] = root
 		} else {
 			// TODO: metrics
-			p.lggr.Warnf("merkleRootConsensus: fChain not found for chain %d", chain)
+			lggr.Warnf("merkleRootConsensus: fChain not found for chain %d", chain)
 		}
 	}
 
@@ -216,7 +227,8 @@ func (p *Plugin) merkleRootConsensus(
 // Given a mapping from chains to a list of max seq nums on their corresponding OnRamp, return a mapping from chains
 // to a single max seq num. The consensus max seq num for a given chain is the f'th lowest max seq num if the number
 // of max seq num observations is greater or equal than 2f+1, where f is the FChain of the corresponding source chain.
-func (p *Plugin) onRampMaxSeqNumsConsensus(
+func onRampMaxSeqNumsConsensus(
+	lggr logger.Logger,
 	onRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
 	fChains map[cciptypes.ChainSelector]int,
 ) map[cciptypes.ChainSelector]cciptypes.SeqNum {
@@ -226,7 +238,7 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 		if fChain, exists := fChains[chain]; exists {
 			if len(onRampMaxSeqNums) < 2*fChain+1 {
 				// TODO: metrics
-				p.lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
+				lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
 					"because we did not receive more than 2fChain+1 observed sequence numbers, 2fChain+1: %d, "+
 					"len(onRampMaxSeqNums): %d, onRampMaxSeqNums: %v",
 					chain, 2*fChain+1, len(onRampMaxSeqNums), onRampMaxSeqNums)
@@ -236,7 +248,7 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 			}
 		} else {
 			// TODO: metrics
-			p.lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
+			lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
 				"because there was no consensus fChain value for this chain", chain)
 		}
 	}
@@ -247,7 +259,8 @@ func (p *Plugin) onRampMaxSeqNumsConsensus(
 // Given a mapping from chains to a list of max seq nums on the OffRamp, return a mapping from chains
 // to a single max seq num. The consensus max seq num for a given chain is the max seq num with the most observations
 // that was observed at least f times, where f is the FChain of the dest chain.
-func (p *Plugin) offRampMaxSeqNumsConsensus(
+func offRampMaxSeqNumsConsensus(
+	lggr logger.Logger,
 	offRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
 	fDestChain int,
 ) map[cciptypes.ChainSelector]cciptypes.SeqNum {
@@ -257,7 +270,7 @@ func (p *Plugin) offRampMaxSeqNumsConsensus(
 		seqNum, count := mostFrequentElem(offRampMaxSeqNums)
 		if count <= fDestChain {
 			// TODO: metrics
-			p.lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
+			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
 				"because we did not receive a sequence number that was observed by at least fChain (%d) oracles, "+
 				"offRampMaxSeqNums: %v", chain, fDestChain, offRampMaxSeqNums)
 		} else {
@@ -271,20 +284,24 @@ func (p *Plugin) offRampMaxSeqNumsConsensus(
 // Given a mapping from chains to a list of FChain values for each chain, return a mapping from chains
 // to a single FChain. The consensus FChain for a given chain is the FChain with the most observations
 // that was observed at least f times, where f is the F of the DON (p.reportingCfg.F).
-func (p *Plugin) fChainConsensus(fChainValues map[cciptypes.ChainSelector][]int) map[cciptypes.ChainSelector]int {
+func fChainConsensus(
+	lggr logger.Logger,
+	F int,
+	fChainValues map[cciptypes.ChainSelector][]int,
+) map[cciptypes.ChainSelector]int {
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		f, count := mostFrequentElem(fValues)
-		if count < p.reportingCfg.F {
+		fChain, count := mostFrequentElem(fValues)
+		if count < F {
 			// TODO: metrics
-			p.lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single f "+
-				"value was observed more than the expected %d times, found f value %d observed by only %d oracles, "+
-				"f values: %v",
-				chain, p.reportingCfg.F, f, count, fValues)
+			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
+				"value was observed more than the expected %d times, found fChain value %d observed by only %d oracles, "+
+				"fChain values: %v",
+				chain, F, fChain, count, fValues)
 		}
 
-		consensus[chain] = f
+		consensus[chain] = fChain
 	}
 
 	return consensus

@@ -239,7 +239,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			o := ObserverImpl{
 				nodeID:       nodeID,
 				lggr:         logger.Test(t),
-				msgHasher:    NewMessageHasher(),
+				msgHasher:    mocks.NewMessageHasher(),
 				ccipReader:   reader,
 				chainSupport: chainSupport,
 			}
@@ -449,7 +449,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			o := ObserverImpl{
 				nodeID:       nodeID,
 				lggr:         logger.Test(t),
-				msgHasher:    NewMessageHasher(),
+				msgHasher:    mocks.NewMessageHasher(),
 				ccipReader:   reader,
 				chainSupport: chainSupport,
 			}
@@ -481,7 +481,7 @@ func Test_computeMerkleRoot(t *testing.T) {
 					MessageID:      mustNewMessageID("0x1a"),
 					SequenceNumber: 112,
 				}},
-			messageHasher: NewMessageHasher(),
+			messageHasher: mocks.NewMessageHasher(),
 			expMerkleRoot: "1a00000000000000000000000000000000000000000000000000000000000000",
 			expErr:        false,
 		},
@@ -500,7 +500,7 @@ func Test_computeMerkleRoot(t *testing.T) {
 					MessageID:      mustNewMessageID("0x87"),
 					SequenceNumber: 114,
 				}},
-			messageHasher: NewMessageHasher(),
+			messageHasher: mocks.NewMessageHasher(),
 			expMerkleRoot: "94c7e711e6f2acf41dca598ced55b6925e55aaed83520dc5ea6cbc054344564b",
 			expErr:        false,
 		},
@@ -515,14 +515,14 @@ func Test_computeMerkleRoot(t *testing.T) {
 					MessageID:      mustNewMessageID("0x12"),
 					SequenceNumber: 36,
 				}},
-			messageHasher: NewMessageHasher(),
+			messageHasher: mocks.NewMessageHasher(),
 			expMerkleRoot: "",
 			expErr:        true,
 		},
 		{
 			name:           "Empty messages",
 			messageHeaders: []cciptypes.RampMessageHeader{},
-			messageHasher:  NewMessageHasher(),
+			messageHasher:  mocks.NewMessageHasher(),
 			expMerkleRoot:  "",
 			expErr:         true,
 		},
@@ -578,19 +578,6 @@ func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
 		panic(err)
 	}
 	return msgID
-}
-
-type MessageHasher struct{}
-
-func NewMessageHasher() *MessageHasher {
-	return &MessageHasher{}
-}
-
-func (m *MessageHasher) Hash(ctx context.Context, msg cciptypes.Message) (cciptypes.Bytes32, error) {
-	// simply return the msg id as bytes32
-	var b32 [32]byte
-	copy(b32[:], msg.Header.MessageID[:])
-	return b32, nil
 }
 
 type BadMessageHasher struct{}

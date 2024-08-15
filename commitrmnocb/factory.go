@@ -24,6 +24,7 @@ import (
 )
 
 const maxReportTransmissionCheckAttempts = 5
+const maxQueryLength = 1024 * 1024 // 1MB
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -129,10 +130,10 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
-				MaxQueryLength:       1024 * 1024, // 1MB
-				MaxObservationLength: 20_000,      // 20kB
-				MaxOutcomeLength:     10_000,      // 10kB
-				MaxReportLength:      10_000,      // 10kB
+				MaxQueryLength:       maxQueryLength,
+				MaxObservationLength: 20_000, // 20kB
+				MaxOutcomeLength:     10_000, // 10kB
+				MaxReportLength:      10_000, // 10kB
 				MaxReportCount:       10,
 			},
 		}, nil

@@ -231,13 +231,13 @@ func (o Outcome) Encode() ([]byte, error) {
 	return encodedOutcome, nil
 }
 
-func DecodeCommitPluginOutcome(b []byte) (Outcome, error) {
+func DecodeOutcome(b []byte) (Outcome, error) {
 	o := Outcome{}
 	err := json.Unmarshal(b, &o)
 	return o, err
 }
 
-func (o Outcome) NextState() CommitPluginState {
+func (o Outcome) NextState() State {
 	switch o.OutcomeType {
 	case ReportIntervalsSelected:
 		return BuildingReport
@@ -256,10 +256,10 @@ func (o Outcome) NextState() CommitPluginState {
 	}
 }
 
-type CommitPluginState int
+type State int
 
 const (
-	SelectingRangesForReport CommitPluginState = iota + 1
+	SelectingRangesForReport State = iota + 1
 	BuildingReport
 	WaitingForReportTransmission
 )

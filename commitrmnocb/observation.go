@@ -34,6 +34,10 @@ func (p *Plugin) Observation(
 	case SelectingRangesForReport:
 		offRampNextSeqNums := p.observer.ObserveOffRampNextSeqNums(ctx)
 		observation = Observation{
+			// TODO: observe OnRamp max seq nums. The use of offRampNextSeqNums here effectively disables batching,
+			// e.g. the ranges selected for each chain will be [x, x] (e.g. [46, 46]), which means reports will only
+			// contain one message per chain. Querying the OnRamp contract requires changes to reader.CCIP, which will
+			// need to be done in a future change.
 			OnRampMaxSeqNums:   offRampNextSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             p.observer.ObserveFChain(),
@@ -54,7 +58,7 @@ func (p *Plugin) Observation(
 		}
 
 	default:
-		p.lggr.Warnw("Unexpected state", "state", nextState)
+		p.lggr.Errorw("Unexpected state", "state", nextState)
 		return observation.Encode()
 	}
 
@@ -93,33 +97,33 @@ func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	if supportsDestChain {
-		sourceChains, err := o.chainSupport.KnownSourceChainsSlice()
-		if err != nil {
-			o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-			return nil
-		}
-		offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
-		if err != nil {
-			o.lggr.Warnw("call to NextSeqNum failed", "err", err)
-			return nil
-		}
-
-		if len(offRampNextSeqNums) != len(sourceChains) {
-			o.lggr.Warnf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
-				len(offRampNextSeqNums), len(sourceChains))
-			return nil
-		}
-
-		result := make([]plugintypes.SeqNumChain, len(sourceChains))
-		for i := range sourceChains {
-			result[i] = plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]}
-		}
-
-		return result
+	if !supportsDestChain {
+		return nil
 	}
 
-	return nil
+	sourceChains, err := o.chainSupport.KnownSourceChainsSlice()
+	if err != nil {
+		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil
+	}
+	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
+	if err != nil {
+		o.lggr.Warnw("call to NextSeqNum failed", "err", err)
+		return nil
+	}
+
+	if len(offRampNextSeqNums) != len(sourceChains) {
+		o.lggr.Errorf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
+			len(offRampNextSeqNums), len(sourceChains))
+		return nil
+	}
+
+	result := make([]plugintypes.SeqNumChain, len(sourceChains))
+	for i := range sourceChains {
+		result[i] = plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]}
+	}
+
+	return result
 }
 
 // ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
@@ -139,19 +143,19 @@ func (o ObserverImpl) ObserveMerkleRoots(
 			msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
 			if err != nil {
 				o.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
-			} else {
-				root, err := o.computeMerkleRoot(ctx, msgs)
-				if err != nil {
-					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
-				} else {
-					merkleRoot := cciptypes.MerkleRootChain{
-						ChainSel:     chainRange.ChainSel,
-						SeqNumsRange: chainRange.SeqNumRange,
-						MerkleRoot:   root,
-					}
-					roots = append(roots, merkleRoot)
-				}
+				continue
 			}
+			root, err := o.computeMerkleRoot(ctx, msgs)
+			if err != nil {
+				o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+				continue
+			}
+			merkleRoot := cciptypes.MerkleRootChain{
+				ChainSel:     chainRange.ChainSel,
+				SeqNumsRange: chainRange.SeqNumRange,
+				MerkleRoot:   root,
+			}
+			roots = append(roots, merkleRoot)
 		}
 	}
 
@@ -183,6 +187,7 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 		hashes = append(hashes, msgHash)
 	}
 
+	// TODO: Do not hard code the hash function, it should be derived from the message hasher
 	tree, err := merklemulti.NewTree(hashutil.NewKeccak(), hashes)
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(hashes), err)

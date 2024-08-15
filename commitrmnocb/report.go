@@ -13,13 +13,14 @@ import (
 )
 
 func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
-	outcome, err := DecodeCommitPluginOutcome(outcomeBytes)
+	outcome, err := DecodeOutcome(outcomeBytes)
 	if err != nil {
 		// TODO: metrics
 		p.lggr.Errorw("failed to decode Outcome", "outcomeBytes", outcomeBytes, "err", err)
 		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
 	}
 
+	// Reports are only generated from "ReportGenerated" outcomes
 	if outcome.OutcomeType != ReportGenerated {
 		return []ocr3types.ReportWithInfo[[]byte]{}, nil
 	}
