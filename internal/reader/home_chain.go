@@ -22,10 +22,6 @@ import (
 
 const (
 	defaultConfigPageSize = uint64(100)
-	// pageIndexHardLimit is the maximum number of pages that the poller will fetch
-	// this is set as 1 so that we can get 100 chainConfigs with in 1 rpc call
-	// this can be increased once total chains reach 100 or more.
-	pageIndexHardLimit = 1
 )
 
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
@@ -133,7 +129,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 	var allChainConfigInfos []ChainConfigInfo
 	pageIndex := uint64(0)
 
-	for pageIndex < pageIndexHardLimit {
+	for {
 		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
 			ctx,
@@ -157,10 +153,6 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		}
 
 		pageIndex++
-	}
-
-	if pageIndex >= pageIndexHardLimit {
-		r.lggr.Warnw("pageIndex hard limit reached or exceeded", "limit", pageIndexHardLimit)
 	}
 
 	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, allChainConfigInfos))
