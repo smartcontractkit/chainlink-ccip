@@ -60,7 +60,7 @@ Additionally, if you are deploying **CCIP** or **Atlas**, you will need to pull 
 5. Depending on the product, change to the appropriate directory (e.g., `deployments/ccip` or `deployments/core`), and run `./cribbit.sh`. (can be ran multiple times, it’s idempotent) with your namespace name to configure provider and credentials:
 
    ```bash
-   ./cribbit.sh crib-<your name>
+   ./cribbit.sh crib-local
    ```
 
    You will then be prompted to choose a provider. If you are deploying to an AWS EKS cluster, simply press Enter, and the script will proceed with the next steps. If you are using the Kind provider, type kind and press Enter.
