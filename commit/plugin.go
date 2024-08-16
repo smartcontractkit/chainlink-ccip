@@ -277,7 +277,7 @@ func (p *Plugin) Outcome(
 	}
 	p.lggr.Infow("new messages consensus", "merkleRoots", merkleRoots)
 
-	tokenPrices := tokenPricesConsensus(decodedObservations, fChainDest)
+	tokenPrices := tokenPricesMedianized(decodedObservations, fChainDest)
 
 	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
 	p.lggr.Infow("gas prices consensus", "gasPrices", gasPrices)

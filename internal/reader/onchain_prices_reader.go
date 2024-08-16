@@ -66,7 +66,7 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
-			decimals, err := pr.getTokenDecimals(ctx, token)
+			decimals, err := pr.getFeedDecimals(ctx, token)
 			if err != nil {
 				return fmt.Errorf("failed to get decimals for %s: %w", token, err)
 			}
@@ -111,7 +111,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPrice(ctx context.Context, token 
 	return latestRoundData.Answer, nil
 }
 
-func (pr *OnchainTokenPricesReader) getTokenDecimals(ctx context.Context, token types.Account) (*uint8, error) {
+func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (*uint8, error) {
 	var decimals *uint8
 	if err :=
 		pr.ContractReader.GetLatestValue(
