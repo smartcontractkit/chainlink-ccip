@@ -175,7 +175,7 @@ func Test_PollingWorking(t *testing.T) {
 		}
 	}
 	// called at least 2 times, one for start and one for the first tick
-	require.GreaterOrEqual(t, callCount, 1)
+	require.GreaterOrEqual(t, callCount, 2)
 
 	configs, err := configPoller.GetAllChainConfigs()
 	require.NoError(t, err)
