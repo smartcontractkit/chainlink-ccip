@@ -1,26 +1,30 @@
-package execute
+package commitrmnocb
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
+
+const maxReportTransmissionCheckAttempts = 5
+const maxQueryLength = 1024 * 1024 // 1MB
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -49,51 +53,44 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr             logger.Logger
-	ocrConfig        reader.OCR3ConfigWithMeta
-	execCodec        cciptypes.ExecutePluginCodec
-	msgHasher        cciptypes.MessageHasher
-	homeChainReader  reader.HomeChain
-	estimateProvider gas.EstimateProvider
-	tokenDataReader  exectypes.TokenDataReader
-	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
+	lggr            logger.Logger
+	ocrConfig       reader.OCR3ConfigWithMeta
+	commitCodec     cciptypes.CommitPluginCodec
+	msgHasher       cciptypes.MessageHasher
+	homeChainReader reader.HomeChain
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
 	lggr logger.Logger,
 	ocrConfig reader.OCR3ConfigWithMeta,
-	execCodec cciptypes.ExecutePluginCodec,
+	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
-	tokenDataReader exectypes.TokenDataReader,
-	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:             lggr,
-		ocrConfig:        ocrConfig,
-		execCodec:        execCodec,
-		msgHasher:        msgHasher,
-		homeChainReader:  homeChainReader,
-		estimateProvider: estimateProvider,
-		contractReaders:  contractReaders,
-		chainWriters:     chainWriters,
-		tokenDataReader:  tokenDataReader,
+		lggr:            lggr,
+		ocrConfig:       ocrConfig,
+		commitCodec:     commitCodec,
+		msgHasher:       msgHasher,
+		homeChainReader: homeChainReader,
+		contractReaders: contractReaders,
+		chainWriters:    chainWriters,
 	}
 }
 
-func (p PluginFactory) NewReportingPlugin(
-	config ocr3types.ReportingPluginConfig,
+func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
+	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
 	if err != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
 
 	if err = offchainConfig.Validate(); err != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}
 
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
@@ -101,35 +98,42 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
+	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
+		reader.TokenPriceConfig{ // TODO: Inject config
+			StaticPrices: map[ocr2types.Account]big.Int{},
+		},
+		nil, // TODO: Inject this
+	)
 	ccipReader := reader.NewCCIPChainReader(
 		p.lggr,
 		p.contractReaders,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 	)
-
 	return NewPlugin(
-			config,
-			pluginconfig.ExecutePluginConfig{
-				DestChain:      p.ocrConfig.Config.ChainSelector,
-				OffchainConfig: offchainConfig,
-			},
+			context.Background(),
+			config.OracleID,
 			oracleIDToP2PID,
+			pluginconfig.CommitPluginConfig{
+				DestChain:                          p.ocrConfig.Config.ChainSelector,
+				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
+				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
+				OffchainConfig:                     offchainConfig,
+			},
 			ccipReader,
-			p.execCodec,
+			onChainTokenPricesReader,
+			p.commitCodec,
 			p.msgHasher,
-			p.homeChainReader,
-			p.tokenDataReader,
-			p.estimateProvider,
 			p.lggr,
+			p.homeChainReader,
+			config,
 		), ocr3types.ReportingPluginInfo{
-			Name: "CCIPRoleExecute",
+			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
-				// No query for this execute implementation.
-				MaxQueryLength:       0,
-				MaxObservationLength: 20_000,             // 20kB
-				MaxOutcomeLength:     20_000,             // 20kB
-				MaxReportLength:      maxReportSizeBytes, // 250kB
+				MaxQueryLength:       maxQueryLength,
+				MaxObservationLength: 20_000, // 20kB
+				MaxOutcomeLength:     10_000, // 10kB
+				MaxReportLength:      10_000, // 10kB
 				MaxReportCount:       10,
 			},
 		}, nil

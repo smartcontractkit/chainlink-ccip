@@ -63,6 +63,10 @@ type homeChainPoller struct {
 	mutex           *sync.RWMutex
 	state           state
 	failedPolls     uint
+	// TODO: currently unused but will be passed into GetLatestValue
+	// once the chainlink-common breaking change comes in
+	// (https://github.com/smartcontractkit/chainlink-common/pull/603).
+	ccipConfigBoundContract types.BoundContract
 	// How frequently the poller fetches the chain configs
 	pollingDuration time.Duration
 }
@@ -73,15 +77,17 @@ func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
+	ccipConfigBoundContract types.BoundContract,
 ) HomeChain {
 	return &homeChainPoller{
-		stopCh:          make(chan struct{}),
-		homeChainReader: homeChainReader,
-		state:           state{},
-		mutex:           &sync.RWMutex{},
-		failedPolls:     0,
-		lggr:            lggr,
-		pollingDuration: pollingInterval,
+		stopCh:                  make(chan struct{}),
+		homeChainReader:         homeChainReader,
+		state:                   state{},
+		mutex:                   &sync.RWMutex{},
+		failedPolls:             0,
+		lggr:                    lggr,
+		pollingDuration:         pollingInterval,
+		ccipConfigBoundContract: ccipConfigBoundContract,
 	}
 }
 

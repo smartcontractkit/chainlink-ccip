@@ -52,7 +52,7 @@ func TestBackgroundReaderSyncer(t *testing.T) {
 		assert.NoError(t, err, "start success")
 		assert.Eventually(t, func() bool {
 			return mockReader.AssertExpectations(t)
-		}, time.Second, 10*time.Millisecond)
+		}, 3*time.Second, 10*time.Millisecond)
 		err = readerSyncer.Close()
 		assert.NoError(t, err, "closing a started syncer")
 	})

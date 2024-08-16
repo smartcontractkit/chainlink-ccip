@@ -406,7 +406,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec}
-	report, err := exectypes.NewOutcome(nil, cciptypes.ExecutePluginReport{}).Encode()
+	report, err := exectypes.NewOutcome(exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}).Encode()
 	require.NoError(t, err)
 
 	_, err = p.Reports(0, report)
