@@ -1,0 +1,62 @@
+### Site metadata ###
+
+site_name: CRIB Docs
+site_description: Developer Docs for the internal tool CRIB
+site_url: https://docs.crib.cldev.sh/
+
+repo_url: https://github.com/smartcontractkit/crib
+edit_uri: edit/master/docs/docs
+
+### Build settings ###
+
+theme:
+  name: "material"
+  features:
+    - toc.integrate: true
+    - navigation.instant # Enable instant navigation
+
+  palette:
+    scheme: default
+    primary: green
+
+  toc:
+    depth: 5 # Only show up to h2 headings in the TOC
+    title: "On this page" # Custom title for the TOC
+
+  logo: assets/logo.png
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: false
+      type: "timeago"
+  - awesome-pages
+
+extra:
+  features:
+    - navigation.expand # Always expand all navigation sections
+
+markdown_extensions:
+  - admonition
+  - abbr
+  - footnotes
+  - attr_list
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - toc:
+      permalink: true
+  - pymdownx.snippets:
+      base_path: "docs"
+  - pymdownx.betterem:
+      smart_enable: all
+
+# The main navigation
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Deploying CRIB Locally with Kind: Kind.md
+      - CI Integration: CI.md
+  - Monitoring: Monitoring.md
+  - FAQ: Faq.md

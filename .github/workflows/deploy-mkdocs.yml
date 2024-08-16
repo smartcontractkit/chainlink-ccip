@@ -1,0 +1,42 @@
+name: Build and publish mkdocs
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**" # Trigger only if files in the docs/ directory change
+permissions:
+  contents: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # checkout@v4.1.7
+
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - uses: actions/setup-python@39cd14951b08e74b54015e9e001cdefcf80e669f # setup-python@v5.1.1
+        with:
+          python-version: 3.x
+
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+      - uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # cache@v4.0.2
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: .cache
+          restore-keys: |
+            mkdocs-material-
+
+      - run: pip install mkdocs-material mkdocs-git-revision-date-localized-plugin mkdocs-awesome-pages-plugin
+
+      - name: Copy MD files
+        working-directory: docs
+        run: |-
+          cp *.md mkdocs/docs/
+
+      - name: Publish
+        working-directory: docs/mkdocs
+        run: mkdocs gh-deploy --force
