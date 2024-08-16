@@ -29,7 +29,53 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 # shellcheck disable=SC1091
 source "${repo_root}/scripts/lib/shared_functions.sh"
 
+# Initialize variables
+provider=""
+default_provider="aws"
 DEVSPACE_NAMESPACE="${1:-}"
+
+if [[ $CRIB_CI_ENV != "true" ]]; then
+	# Prompt the user for the provider name if not set via environment variable
+	if [ -z "$provider" ]; then
+		read -r -p "Enter the provider name (supported are 'aws' and 'kind', default is 'aws'): " user_input
+		provider=${user_input:-$default_provider}
+	else
+		echo "Using PROVIDER environment variable: $PROVIDER"
+	fi
+
+	if ! [[ $provider == "aws" || $provider == "kind" ]]; then
+		echo "Error: Provider is not supported."
+		exit 1
+	fi
+	export PROVIDER=${provider}
+
+	# Check if the DEVSPACE_NAMESPACE environment variable is set
+	if [ -n "$DEVSPACE_NAMESPACE" ]; then
+		namespace_name=$DEVSPACE_NAMESPACE
+		echo "Using namespace name from DEVSPACE_NAMESPACE environment variable: $namespace_name"
+	elif [ "$provider" == "kind" ]; then
+		namespace_name="crib-local"
+		echo "Since the provider is 'kind', the suggested namespace name is 'crib-local'."
+	else
+		# Otherwise, ask the user for the namespace name
+		read -r -p "Enter the namespace name, it should be in format crib-<your-username>: " user_input
+		namespace_name=${user_input:-}
+	fi
+
+	##
+	# Deploy Kind cluster
+	##
+	if [ "$PROVIDER" = "kind" ]; then
+		# Execute the manage_kind.sh script
+		"${repo_root}/scripts/manage_kind.sh"
+
+		echo "Configured sucessfully"
+		export SETUP_EKS_CONFIG=false
+	fi
+fi
+
+# Use the first argument if provided, otherwise fall back to namespace_name
+DEVSPACE_NAMESPACE="${1:-${namespace_name}}"
 if [[ -z ${DEVSPACE_NAMESPACE} ]]; then
 	echo "Usage: $0 <DEVSPACE_NAMESPACE>"
 	exit 1
@@ -48,7 +94,7 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 
 	# Source .env file if it exists
 	if [[ -f ${env_file} ]]; then
-		echo "Sourcing the ${env_file} file..."
+		echo "Info: Sourcing the ${env_file} file..."
 		# shellcheck disable=SC1090
 		source "${env_file}"
 	else
@@ -58,8 +104,10 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 
 	# List of required environment variables
 	required_vars=(
+		"AWS_ACCOUNT_ID"
 		"DEVSPACE_IMAGE"
 		"HOME"
+		"PROVIDER"
 	)
 
 	missing_vars=0 # Counter for missing variables
@@ -138,6 +186,8 @@ EOF
 		echo "Error: AWS credentials still not detected. Exiting."
 		exit 1
 	fi
+else
+	echo "Info: The ENV variable SETUP_AWS_PROFILE is set to false, skipping the AWS profile setup."
 fi
 
 ##
@@ -231,5 +281,4 @@ fi
 ##
 # Setup DevSpace
 ##
-
 devspace use namespace "${DEVSPACE_NAMESPACE}"

@@ -4,6 +4,8 @@ name: chainlink
 
 imports:
   - path: ../../components/don/don.yaml
+  - path: ../../components/beholder/beholder.yaml
+  - path: ../../components/kind/kind.yaml
 
 vars:
   SCRIPTS_DIR:
@@ -30,7 +32,12 @@ pipelines:
         description: "If specified, keystone caches will be cleaned before deploying"
 
     run: |-
+      # Source the shared functions file.
+      # shellcheck disable=SC1091
+      source "../../scripts/lib/shared_functions.sh"
+
       tagOverride=$(get_flag "override-image-tag")
+
       run_dependencies --all
 
       if [[ -n "${tagOverride}" ]]; then
@@ -43,9 +50,8 @@ pipelines:
         done
         echo $args
 
-
         create_deployments app $args
-      elif ! [[ $DEVSPACE_IMAGE =~ ^323150190480\.dkr\.ecr\.us-west-2\.amazonaws\.com\/chainlink-devspace$  ]]; then
+      elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
         echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
         exit 1
@@ -172,16 +178,6 @@ deployments:
           nodes:
             node1:
               image: ${runtime.images.app}
-              # default resources are 300m/1Gi
-              # first node need more resources to build faster inside container
-              # at least 2Gi of memory is required otherwise build will fail (OOM)
-              resources:
-                requests:
-                  cpu: 2000m
-                  memory: 2048Mi
-                limits:
-                  cpu: 2000m
-                  memory: 2048Mi
               # override default config per node
               # for example, use OCRv2 P2P setup, the whole config
               #      toml: |
@@ -239,13 +235,6 @@ deployments:
             runAsNonRoot: true
             runAsUser: 999
             runAsGroup: 999
-          resources:
-            requests:
-              cpu: 1
-              memory: 1024Mi
-            limits:
-              cpu: 1
-              memory: 1024Mi
         # default cluster shipped with latest Geth ( dev mode by default )
         geth:
           securityContext:
@@ -263,13 +252,6 @@ deployments:
             - networkId: 1337
             - networkId: 2337
           blocktime: 1
-          resources:
-            requests:
-              cpu: 1
-              memory: 1024Mi
-            limits:
-              cpu: 1
-              memory: 1024Mi
         # mockserver is https://www.mock-server.com/where/kubernetes.html
         # used to stub External Adapters
         mockserver:
@@ -289,13 +271,6 @@ deployments:
             runAsUser: 999
             readOnlyRootFilesystem: false
           port: 1080
-          resources:
-            requests:
-              cpu: 1
-              memory: 1024Mi
-            limits:
-              cpu: 1
-              memory: 1024Mi
         # monitoring.coreos.com/v1 PodMonitor for each node
         prometheusMonitor: true
 
@@ -417,6 +392,23 @@ deployments:
         tolerations:
         affinity:
 profiles:
+  - name: kind
+    # This profile will be automatically activated
+    activation:
+      - env:
+          PROVIDER: "kind"
+    patches:
+      - op: remove
+        path: deployments.app.helm.values.chainlink.nodes.node1.resources
+      - op: remove
+        path: deployments.app.helm.values.geth.resources
+      - op: remove
+        path: deployments.app.helm.values.mockserver.resources
+      - op: remove
+        path: deployments.app.helm.values.db.resources
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value: ["./values-profiles/values-dev-kind.yaml"]
   - name: local-dev
     patches:
       # Remove the global overridesToml field.
