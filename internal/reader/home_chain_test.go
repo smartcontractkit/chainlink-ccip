@@ -131,7 +131,6 @@ func Test_PollingWorking(t *testing.T) {
 	}
 
 	homeChainReader := mocks.NewContractReaderMock()
-	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -143,19 +142,14 @@ func Test_PollingWorking(t *testing.T) {
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(5).(*[]ChainConfigInfo)
-			if firstCall {
-				*arg = onChainConfigs
-				firstCall = false
-			} else {
-				*arg = []ChainConfigInfo{} // return empty for other pages
-			}
+			*arg = onChainConfigs
 		}).Return(nil)
 
 	defer homeChainReader.AssertExpectations(t)
 
 	var (
 		tickTime       = 2 * time.Millisecond
-		totalSleepTime = tickTime * 0
+		totalSleepTime = tickTime * 4
 	)
 
 	configPoller := NewHomeChainConfigPoller(

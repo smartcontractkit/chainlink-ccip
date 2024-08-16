@@ -150,11 +150,12 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
 		}
 
+		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
+
 		if uint64(len(chainConfigInfos)) < defaultConfigPageSize {
 			break
 		}
 
-		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
 		pageIndex++
 	}
 
