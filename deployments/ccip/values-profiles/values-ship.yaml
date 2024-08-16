@@ -108,3 +108,4 @@ crib-chainlink-cluster:
         Name = 'celo-testnet'
         WSURL = 'wss://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/ws'
         HTTPURL = 'https://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/rpc'
+        
