@@ -99,6 +99,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
 			tokenPricesCr,
 			offchainConfig.PriceSources,
+			offchainConfig.TokenDecimals,
 		)
 	}
 

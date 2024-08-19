@@ -27,15 +27,18 @@ type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
 	ContractReader commontyps.ContractReader
 	PriceSources   map[types.Account]pluginconfig.ArbitrumPriceSource
+	TokenDecimals  map[types.Account]uint8
 }
 
 func NewOnchainTokenPricesReader(
 	contractReader commontyps.ContractReader,
 	priceSources map[types.Account]pluginconfig.ArbitrumPriceSource,
+	tokenDecimals map[types.Account]uint8,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
 		ContractReader: contractReader,
 		PriceSources:   priceSources,
+		TokenDecimals:  tokenDecimals,
 	}
 }
 
@@ -66,12 +69,12 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
-			decimals, err := pr.getFeedDecimals(ctx, token)
-			if err != nil {
+			decimals, ok := pr.TokenDecimals[token]
+			if !ok {
 				return fmt.Errorf("failed to get decimals for %s: %w", token, err)
 			}
 
-			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, *decimals)
+			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, decimals)
 			return nil
 		})
 	}
@@ -109,24 +112,6 @@ func (pr *OnchainTokenPricesReader) getRawTokenPrice(ctx context.Context, token 
 	}
 
 	return latestRoundData.Answer, nil
-}
-
-func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (*uint8, error) {
-	var decimals *uint8
-	if err :=
-		pr.ContractReader.GetLatestValue(
-			ctx,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetDecimals,
-			primitives.Unconfirmed,
-			nil,
-			&decimals,
-			//boundContract,
-		); err != nil {
-		return nil, fmt.Errorf("decimals call failed for token %s: %w", token, err)
-	}
-
-	return decimals, nil
 }
 
 // Input price is USD per full token, with 18 decimal precision

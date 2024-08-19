@@ -94,8 +94,15 @@ type CommitOffchainConfig struct {
 
 	// PriceSources is a map of Arbitrum price sources for each token.
 	// Note that the token address is that on the remote chain.
-	PriceSources  map[types.Account]ArbitrumPriceSource `json:"priceSources"`
-	TokenDecimals map[types.Account]uint8               `json:"decimals"`
+	PriceSources map[types.Account]ArbitrumPriceSource `json:"priceSources"`
+
+	// TokenDecimals is a map of token decimals for each token.
+	// As **not** each node supports both the
+	// 1. Token price feed chain (where we get the token price in USD)
+	// 2. Destination chain (where we can get the token decimals from PriceRegistry).
+	// So to be able to calculate the effective price we need both token decimals.
+	// This is why we need to store the token decimals in the config.
+	TokenDecimals map[types.Account]uint8 `json:"decimals"`
 
 	// TokenPriceChainSelector is the chain selector for the chain on which
 	// the token prices are read from.
