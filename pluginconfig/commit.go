@@ -126,6 +126,12 @@ func (c CommitOffchainConfig) Validate() error {
 			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
 	}
 
+	for token := range c.PriceSources {
+		if _, exists := c.TokenDecimals[token]; !exists {
+			return fmt.Errorf("missing TokenDecimals for account: %s", token)
+		}
+	}
+
 	// if len(c.PriceSources) == 0 the other fields are ignored.
 
 	return nil
