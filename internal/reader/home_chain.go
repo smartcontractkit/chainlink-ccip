@@ -20,6 +20,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
+const (
+	defaultConfigPageSize = uint64(100)
+)
+
+//go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 type HomeChain interface {
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
@@ -54,6 +59,10 @@ type homeChainPoller struct {
 	mutex           *sync.RWMutex
 	state           state
 	failedPolls     uint
+	// TODO: currently unused but will be passed into GetLatestValue
+	// once the chainlink-common breaking change comes in
+	// (https://github.com/smartcontractkit/chainlink-common/pull/603).
+	ccipConfigBoundContract types.BoundContract
 	// How frequently the poller fetches the chain configs
 	pollingDuration time.Duration
 }
@@ -64,15 +73,17 @@ func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
+	ccipConfigBoundContract types.BoundContract,
 ) HomeChain {
 	return &homeChainPoller{
-		stopCh:          make(chan struct{}),
-		homeChainReader: homeChainReader,
-		state:           state{},
-		mutex:           &sync.RWMutex{},
-		failedPolls:     0,
-		lggr:            lggr,
-		pollingDuration: pollingInterval,
+		stopCh:                  make(chan struct{}),
+		homeChainReader:         homeChainReader,
+		state:                   state{},
+		mutex:                   &sync.RWMutex{},
+		failedPolls:             0,
+		lggr:                    lggr,
+		pollingDuration:         pollingInterval,
+		ccipConfigBoundContract: ccipConfigBoundContract,
 	}
 }
 
@@ -115,24 +126,43 @@ func (r *homeChainPoller) poll() {
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	var chainConfigInfos []ChainConfigInfo
-	err := r.homeChainReader.GetLatestValue(
-		ctx,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
-		primitives.Unconfirmed,
-		nil,
-		&chainConfigInfos,
-	)
-	if err != nil {
-		return err
+	var allChainConfigInfos []ChainConfigInfo
+	pageIndex := uint64(0)
+
+	for {
+		var chainConfigInfos []ChainConfigInfo
+		err := r.homeChainReader.GetLatestValue(
+			ctx,
+			consts.ContractNameCCIPConfig,
+			consts.MethodNameGetAllChainConfigs,
+			primitives.Unconfirmed,
+			map[string]interface{}{
+				"pageIndex": pageIndex,
+				"pageSize":  defaultConfigPageSize,
+			},
+			&chainConfigInfos,
+		)
+		if err != nil {
+			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
+		}
+
+		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
+
+		if uint64(len(chainConfigInfos)) < defaultConfigPageSize {
+			break
+		}
+
+		pageIndex++
 	}
-	if len(chainConfigInfos) == 0 {
+
+	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, allChainConfigInfos))
+
+	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, chainConfigInfos))
+
 	return nil
 }
 

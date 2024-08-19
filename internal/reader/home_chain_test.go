@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/stretchr/testify/mock"
@@ -53,6 +54,10 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
+		types.BoundContract{
+			Address: "0xCCIPConfigFakeAddress",
+			Name:    consts.ContractNameCCIPConfig,
+		},
 	)
 	require.NoError(t, configPoller.Start(context.Background()))
 	// Initially it's healthy
@@ -151,6 +156,10 @@ func Test_PollingWorking(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
+		types.BoundContract{
+			Address: "0xCCIPConfigFakeAddress",
+			Name:    consts.ContractNameCCIPConfig,
+		},
 	)
 
 	require.NoError(t, configPoller.Start(context.Background()))
@@ -206,6 +215,10 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		10*time.Millisecond,
+		types.BoundContract{
+			Address: "0xCCIPConfigFakeAddress",
+			Name:    consts.ContractNameCCIPConfig,
+		},
 	)
 
 	configs, err := configPoller.GetOCRConfigs(context.Background(), donID, pluginType)

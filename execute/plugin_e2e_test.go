@@ -14,6 +14,7 @@ import (
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -82,18 +83,28 @@ type nodeSetup struct {
 
 func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
 	homeChainReader := mocks.NewContractReaderMock()
+	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
 		consts.ContractNameCCIPConfig,
 		consts.MethodNameGetAllChainConfigs,
 		mock.Anything,
-		mock.Anything,
+		mock.MatchedBy(func(input map[string]interface{}) bool {
+			_, pageIndexExists := input["pageIndex"]
+			_, pageSizeExists := input["pageSize"]
+			return pageIndexExists && pageSizeExists
+		}),
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(5).(*[]reader.ChainConfigInfo)
-			*arg = chainConfigInfos
+			if firstCall {
+				*arg = chainConfigInfos
+				firstCall = false
+			} else {
+				*arg = []reader.ChainConfigInfo{} // return empty for other pages
+			}
 		}).Return(nil)
 
 	homeChain := reader.NewHomeChainConfigPoller(
@@ -102,6 +113,10 @@ func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainCon
 		// to prevent linting error because of logging after finishing tests, we close the poller after each test, having
 		// lower polling interval make it catch up faster
 		time.Minute,
+		types.BoundContract{
+			Address: "0xCCIPConfigFakeAddress",
+			Name:    consts.ContractNameCCIPConfig,
+		},
 	)
 
 	return homeChain
