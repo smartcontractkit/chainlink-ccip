@@ -15,38 +15,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-type CommitPluginConfig struct {
-	// DestChain is the ccip destination chain configured for the commit plugin DON.
-	DestChain cciptypes.ChainSelector `json:"destChain"`
-
-	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
-	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
-
-	// The maximum number of times to check if the previous report has been transmitted
-	MaxReportTransmissionCheckAttempts uint
-
-	// SyncTimeout is the timeout for syncing the commit plugin reader.
-	SyncTimeout time.Duration `json:"syncTimeout"`
-
-	// SyncFrequency is the frequency at which the commit plugin reader should sync.
-	SyncFrequency time.Duration `json:"syncFrequency"`
-
-	// OffchainConfig is the offchain config set for the commit DON.
-	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
-}
-
-func (c CommitPluginConfig) Validate() error {
-	if c.DestChain == cciptypes.ChainSelector(0) {
-		return fmt.Errorf("destChain not set")
-	}
-
-	if c.NewMsgScanBatchSize == 0 {
-		return fmt.Errorf("newMsgScanBatchSize not set")
-	}
-
-	return c.OffchainConfig.Validate()
-}
-
 // ArbitrumPriceSource is the source of the TOKEN/USD price data of a particular token
 // on Arbitrum.
 // The commit plugin will use this to fetch prices for a particular token.
@@ -104,9 +72,25 @@ type CommitOffchainConfig struct {
 	// This will typically be an arbitrum testnet/mainnet chain depending on
 	// the deployment.
 	TokenPriceChainSelector uint64 `json:"tokenPriceChainSelector"`
+
+	// The maximum number of times to check if the previous report has been transmitted
+	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
+
+	// SyncTimeout is the timeout for syncing the commit plugin reader.
+	SyncTimeout time.Duration `json:"syncTimeout"`
+
+	// SyncFrequency is the frequency at which the commit plugin reader should sync.
+	SyncFrequency time.Duration `json:"syncFrequency"`
+
+	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
+	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
 }
 
 func (c CommitOffchainConfig) Validate() error {
+	if c.NewMsgScanBatchSize == 0 {
+		return fmt.Errorf("NewMsgScanBatchSize not set")
+	}
+
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		return errors.New("remoteGasPriceBatchWriteFrequency not set")
 	}

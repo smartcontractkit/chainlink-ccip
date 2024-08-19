@@ -33,7 +33,8 @@ import (
 type Plugin struct {
 	nodeID            commontypes.OracleID
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	cfg               pluginconfig.CommitPluginConfig
+	offchainConfig    pluginconfig.CommitOffchainConfig
+	destChain         cciptypes.ChainSelector
 	ccipReader        reader.CCIP
 	readerSyncer      *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader reader.TokenPrices
@@ -48,7 +49,8 @@ func NewPlugin(
 	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg pluginconfig.CommitPluginConfig,
+	destChain cciptypes.ChainSelector,
+	cfg pluginconfig.CommitOffchainConfig,
 	ccipReader reader.CCIP,
 	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,
@@ -69,7 +71,8 @@ func NewPlugin(
 	return &Plugin{
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
-		cfg:               cfg,
+		offchainConfig:    cfg,
+		destChain:         destChain,
 		ccipReader:        ccipReader,
 		readerSyncer:      readerSyncer,
 		tokenPricesReader: tokenPricesReader,
@@ -118,7 +121,7 @@ func (p *Plugin) Observation(
 
 	msgBaseDetails := make([]cciptypes.RampMessageHeader, 0)
 	latestCommittedSeqNumsObservation, err := observeLatestCommittedSeqNums(
-		ctx, p.lggr, p.ccipReader, supportedChains, p.cfg.DestChain, p.knownSourceChainsSlice(),
+		ctx, p.lggr, p.ccipReader, supportedChains, p.destChain, p.knownSourceChainsSlice(),
 	)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe latest committed sequence numbers: %w", err)
@@ -131,7 +134,7 @@ func (p *Plugin) Observation(
 		tokenPrices, err = observeTokenPrices(
 			ctx,
 			p.tokenPricesReader,
-			maps.Keys(p.cfg.OffchainConfig.PriceSources),
+			maps.Keys(p.offchainConfig.PriceSources),
 		)
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("observe token prices: %w", err)
@@ -175,7 +178,7 @@ func (p *Plugin) Observation(
 		p.msgHasher,
 		supportedChains,
 		prevOutcome.MaxSeqNums,
-		p.cfg.NewMsgScanBatchSize,
+		p.offchainConfig.NewMsgScanBatchSize,
 	)
 	if err != nil {
 		return types.Observation{}, fmt.Errorf("observe new messages: %w", err)
@@ -221,7 +224,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("error finding supported chains by node: %w", err)
 	}
 
-	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, observerSupportedChains, p.cfg.DestChain)
+	err = validateObserverReadingEligibility(obs.NewMsgs, obs.MaxSeqNums, observerSupportedChains, p.destChain)
 	if err != nil {
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
@@ -262,9 +265,9 @@ func (p *Plugin) Outcome(
 
 	fChains := fChainConsensus(decodedObservations)
 
-	fChainDest, ok := fChains[p.cfg.DestChain]
+	fChainDest, ok := fChains[p.destChain]
 	if !ok {
-		return ocr3types.Outcome{}, fmt.Errorf("missing destination chain %d in fChain config", p.cfg.DestChain)
+		return ocr3types.Outcome{}, fmt.Errorf("missing destination chain %d in fChain config", p.destChain)
 	}
 
 	maxSeqNums := maxSeqNumsConsensus(p.lggr, fChainDest, decodedObservations)
@@ -390,7 +393,7 @@ func (p *Plugin) knownSourceChainsSlice() []cciptypes.ChainSelector {
 		knownSourceChainsSlice,
 		func(i, j int) bool { return knownSourceChainsSlice[i] < knownSourceChainsSlice[j] },
 	)
-	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.cfg.DestChain })
+	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != p.destChain })
 }
 
 func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
@@ -409,7 +412,7 @@ func (p *Plugin) supportedChains(oracleID commontypes.OracleID) (mapset.Set[ccip
 
 // If current node is a writer for the destination chain.
 func (p *Plugin) supportsDestChain() (bool, error) {
-	destChainConfig, err := p.homeChain.GetChainConfig(p.cfg.DestChain)
+	destChainConfig, err := p.homeChain.GetChainConfig(p.destChain)
 	if err != nil {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
@@ -418,7 +421,7 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 
 func (p *Plugin) supportsTokenPriceChain() (bool, error) {
 	tokPriceChainConfig, err := p.homeChain.GetChainConfig(
-		cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector))
+		cciptypes.ChainSelector(p.offchainConfig.TokenPriceChainSelector))
 	if err != nil {
 		return false, fmt.Errorf("get token price chain config: %w", err)
 	}

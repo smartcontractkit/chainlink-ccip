@@ -29,8 +29,9 @@ const maxReportSizeBytes = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	reportingCfg ocr3types.ReportingPluginConfig
-	cfg          pluginconfig.ExecutePluginConfig
+	reportingCfg   ocr3types.ReportingPluginConfig
+	offchainConfig pluginconfig.ExecuteOffchainConfig
+	destChain      cciptypes.ChainSelector
 
 	// providers
 	ccipReader   reader.CCIP
@@ -46,8 +47,9 @@ type Plugin struct {
 }
 
 func NewPlugin(
+	destChain cciptypes.ChainSelector,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	cfg pluginconfig.ExecutePluginConfig,
+	offchainConfig pluginconfig.ExecuteOffchainConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader reader.CCIP,
 	reportCodec cciptypes.ExecutePluginCodec,
@@ -60,16 +62,17 @@ func NewPlugin(
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
 		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		syncFrequency(cfg.SyncFrequency),
+		syncTimeout(offchainConfig.SyncTimeout),
+		syncFrequency(offchainConfig.SyncFrequency),
 	)
 	if err := readerSyncer.Start(context.Background()); err != nil {
 		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
 	return &Plugin{
+		destChain:        destChain,
 		reportingCfg:     reportingCfg,
-		cfg:              cfg,
+		offchainConfig:   offchainConfig,
 		oracleIDToP2pID:  oracleIDToP2pID,
 		ccipReader:       ccipReader,
 		readerSyncer:     readerSyncer,
@@ -170,7 +173,7 @@ func (p *Plugin) Observation(
 	state := previousOutcome.State.Next()
 	switch state {
 	case exectypes.GetCommitReports:
-		fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
+		fetchFrom := time.Now().Add(-p.offchainConfig.MessageVisibilityInterval.Duration()).UTC()
 
 		// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 		//          a valid execution report.
@@ -179,7 +182,7 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 		}
 		if supportsDest {
-			groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, fetchFrom, p.lggr)
+			groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, p.lggr)
 			if err != nil {
 				return types.Observation{}, err
 			}
@@ -436,7 +439,7 @@ func (p *Plugin) Outcome(
 				p.estimateProvider,
 				commitReports,
 				maxReportSizeBytes,
-				p.cfg.OffchainConfig.BatchGasLimit)
+				p.offchainConfig.BatchGasLimit)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 		}
@@ -571,7 +574,7 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return chains.Contains(p.cfg.DestChain), nil
+	return chains.Contains(p.destChain), nil
 }
 
 func syncFrequency(configuredValue time.Duration) time.Duration {

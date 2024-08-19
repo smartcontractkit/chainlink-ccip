@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -110,11 +109,8 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			context.Background(),
 			config.OracleID,
 			oracleIDToP2PID,
-			pluginconfig.CommitPluginConfig{
-				DestChain:           p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize: merklemulti.MaxNumberTreeLeaves,
-				OffchainConfig:      offchainConfig,
-			},
+			p.ocrConfig.Config.ChainSelector,
+			offchainConfig,
 			ccipReader,
 			onChainTokenPricesReader,
 			p.commitCodec,

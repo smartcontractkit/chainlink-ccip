@@ -14,7 +14,6 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
@@ -110,16 +109,15 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 	)
+	if offchainConfig.MaxReportTransmissionCheckAttempts == 0 {
+		offchainConfig.MaxReportTransmissionCheckAttempts = maxReportTransmissionCheckAttempts
+	}
 	return NewPlugin(
 			context.Background(),
 			config.OracleID,
 			oracleIDToP2PID,
-			pluginconfig.CommitPluginConfig{
-				DestChain:                          p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
-				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
-				OffchainConfig:                     offchainConfig,
-			},
+			p.ocrConfig.Config.ChainSelector,
+			offchainConfig,
 			ccipReader,
 			onChainTokenPricesReader,
 			p.commitCodec,

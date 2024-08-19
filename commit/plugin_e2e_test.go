@@ -233,9 +233,9 @@ func setupEmptyOutcome(ctx context.Context, t *testing.T, lggr logger.Logger) []
 
 	oracleIDToP2pID := helpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, 1, destCfg, homeChain, oracleIDToP2pID),
-		newNode(ctx, t, lggr, 2, destCfg, homeChain, oracleIDToP2pID),
-		newNode(ctx, t, lggr, 3, destCfg, homeChain, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 1, offchainConfig, destChain, homeChain, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 2, offchainConfig, destChain, homeChain, oracleIDToP2pID),
+		newNode(ctx, t, lggr, 3, offchainConfig, destChain, homeChain, oracleIDToP2pID),
 	}
 
 	for _, n := range nodes {
@@ -265,7 +265,7 @@ func setupAllNodesReadAllChains(ctx context.Context, t *testing.T, lggr logger.L
 
 	var nodes []nodeSetup
 	for i := 1; i <= 3; i++ {
-		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
+		n := newNode(ctx, t, lggr, i, offchainConfig, destChain, homeChain, oracleIDToP2pID)
 		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
 		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
@@ -299,7 +299,7 @@ func setupNodesDoNotAgreeOnMsgs(ctx context.Context, t *testing.T, lggr logger.L
 
 	var nodes []nodeSetup
 	for i := 1; i <= 3; i++ {
-		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
+		n := newNode(ctx, t, lggr, i, offchainConfig, destChain, homeChain, oracleIDToP2pID)
 		nodes = append(nodes, n)
 		// all nodes observe the same sequence numbers lastCommittedSeqNumA for chainA and lastCommittedSeqNumB for chainB
 		n.ccipReader.On("NextSeqNum", ctx, []cciptypes.ChainSelector{chainA, chainB}).
@@ -337,7 +337,7 @@ func setupNodesDoNotReportGasPrices(ctx context.Context, t *testing.T, lggr logg
 
 	var nodes []nodeSetup
 	for i := 1; i <= 3; i++ {
-		n := newNode(ctx, t, lggr, i, destCfg, homeChain, oracleIDToP2pID)
+		n := newNode(ctx, t, lggr, i, offchainConfig, destChain, homeChain, oracleIDToP2pID)
 		nodes = append(nodes, n)
 		// then they fetch new msgs, there is nothing new on chainA
 		mockMsgsBetweenSeqNums(ctx, n.ccipReader, chainA, seqNumA, emptyMsgs)
@@ -371,7 +371,8 @@ func newNode(
 	_ *testing.T,
 	lggr logger.Logger,
 	id int,
-	cfg pluginconfig.CommitPluginConfig,
+	offchainConfig pluginconfig.CommitOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 ) nodeSetup {
@@ -384,7 +385,8 @@ func newNode(
 		context.Background(),
 		commontypes.OracleID(id),
 		oracleIDToP2pID,
-		cfg,
+		destChain,
+		offchainConfig,
 		ccipReader,
 		priceReader,
 		reportCodec,
@@ -469,7 +471,7 @@ func mockMsgsBetweenSeqNums(
 		"MsgsBetweenSeqNums",
 		ctx,
 		chain,
-		cciptypes.NewSeqNumRange(seqNum, cciptypes.SeqNum(int(seqNum)+destCfg.NewMsgScanBatchSize)),
+		cciptypes.NewSeqNumRange(seqNum, cciptypes.SeqNum(int(seqNum)+offchainConfig.NewMsgScanBatchSize)),
 	).Return(msgs, nil)
 }
 
@@ -524,8 +526,7 @@ var (
 
 	pIDs1_2_3 = []libocrtypes.PeerID{{1}, {2}, {3}}
 
-	destCfg = pluginconfig.CommitPluginConfig{
-		DestChain:           destChain,
+	offchainConfig = pluginconfig.CommitOffchainConfig{
 		NewMsgScanBatchSize: 256,
 	}
 )

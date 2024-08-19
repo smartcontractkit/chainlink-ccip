@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gen"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -480,7 +479,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	p := &Plugin{
 		lggr:         lggr,
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		homeChain:    setupHomeChainPoller(lggr, []reader.ChainConfigInfo{}),
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
@@ -507,7 +506,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         logger.Test(t),
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,
@@ -531,7 +530,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         lggr,
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,

@@ -189,12 +189,9 @@ func setupSimpleTest(
 		},
 	}
 
-	cfg := pluginconfig.ExecutePluginConfig{
-		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
-			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-			BatchGasLimit:             100000000,
-		},
-		DestChain: dstSelector,
+	offchainConfig := pluginconfig.ExecuteOffchainConfig{
+		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		BatchGasLimit:             100000000,
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
@@ -231,9 +228,12 @@ func setupSimpleTest(
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, lggr, offchainConfig, dstSelector,
+			msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, offchainConfig, dstSelector,
+			msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, offchainConfig, dstSelector,
+			msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -247,7 +247,8 @@ func newNode(
 	_ context.Context,
 	_ *testing.T,
 	lggr logger.Logger,
-	cfg pluginconfig.ExecutePluginConfig,
+	offchainConfig pluginconfig.ExecuteOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	msgHasher cciptypes.MessageHasher,
 	ccipReader reader.CCIP,
 	homeChain reader.HomeChain,
@@ -264,8 +265,9 @@ func newNode(
 	}
 
 	node1 := NewPlugin(
+		destChain,
 		rCfg,
-		cfg,
+		offchainConfig,
 		oracleIDToP2pID,
 		ccipReader,
 		reportCodec,

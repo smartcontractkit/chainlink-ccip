@@ -21,7 +21,8 @@ import (
 type Plugin struct {
 	nodeID            commontypes.OracleID
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	cfg               pluginconfig.CommitPluginConfig
+	destChain         cciptypes.ChainSelector
+	offchainConfig    pluginconfig.CommitOffchainConfig
 	ccipReader        reader.CCIP
 	readerSyncer      *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader reader.TokenPrices
@@ -37,7 +38,8 @@ func NewPlugin(
 	_ context.Context,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg pluginconfig.CommitPluginConfig,
+	destChain cciptypes.ChainSelector,
+	offchainConfig pluginconfig.CommitOffchainConfig,
 	ccipReader reader.CCIP,
 	tokenPricesReader reader.TokenPrices,
 	reportCodec cciptypes.CommitPluginCodec,
@@ -49,8 +51,8 @@ func NewPlugin(
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
 		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		syncFrequency(cfg.SyncFrequency),
+		syncTimeout(offchainConfig.SyncTimeout),
+		syncFrequency(offchainConfig.SyncFrequency),
 	)
 	if err := readerSyncer.Start(context.Background()); err != nil {
 		lggr.Errorw("error starting background reader syncer", "err", err)
@@ -61,7 +63,7 @@ func NewPlugin(
 		homeChain:       homeChain,
 		oracleIDToP2pID: oracleIDToP2pID,
 		nodeID:          nodeID,
-		destChain:       cfg.DestChain,
+		destChain:       destChain,
 	}
 
 	observer := ObserverImpl{
@@ -77,7 +79,7 @@ func NewPlugin(
 		nodeID:            nodeID,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		lggr:              lggr,
-		cfg:               cfg,
+		offchainConfig:    offchainConfig,
 		tokenPricesReader: tokenPricesReader,
 		ccipReader:        ccipReader,
 		homeChain:         homeChain,

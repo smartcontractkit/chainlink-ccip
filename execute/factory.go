@@ -109,11 +109,9 @@ func (p PluginFactory) NewReportingPlugin(
 	)
 
 	return NewPlugin(
+			p.ocrConfig.Config.ChainSelector,
 			config,
-			pluginconfig.ExecutePluginConfig{
-				DestChain:      p.ocrConfig.Config.ChainSelector,
-				OffchainConfig: offchainConfig,
-			},
+			offchainConfig,
 			oracleIDToP2PID,
 			ccipReader,
 			p.execCodec,

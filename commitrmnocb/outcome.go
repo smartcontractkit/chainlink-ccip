@@ -25,7 +25,7 @@ func (p *Plugin) Outcome(
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 	commitQuery := Query{}
 
-	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.cfg.DestChain, aos)
+	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
@@ -41,7 +41,7 @@ func (p *Plugin) Outcome(
 
 	case WaitingForReportTransmission:
 		outcome = checkForReportTransmission(
-			p.lggr, p.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation)
+			p.lggr, p.offchainConfig.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation)
 
 	default:
 		p.lggr.Warnw("Unexpected state in Outcome", "state", nextState)

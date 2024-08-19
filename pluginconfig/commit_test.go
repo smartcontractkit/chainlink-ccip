@@ -7,62 +7,8 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestCommitPluginConfigValidate(t *testing.T) {
-	testCases := []struct {
-		name   string
-		input  CommitPluginConfig
-		expErr bool
-	}{
-		{
-			name: "valid cfg",
-			input: CommitPluginConfig{
-				DestChain:           cciptypes.ChainSelector(1),
-				NewMsgScanBatchSize: 256,
-				OffchainConfig: CommitOffchainConfig{
-					RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-				},
-			},
-			expErr: false,
-		},
-		{
-			name: "dest chain is empty",
-			input: CommitPluginConfig{
-				NewMsgScanBatchSize: 256,
-			},
-			expErr: true,
-		},
-		{
-			name: "zero priced tokens",
-			input: CommitPluginConfig{
-				DestChain:           cciptypes.ChainSelector(1),
-				NewMsgScanBatchSize: 256,
-			},
-			expErr: true,
-		},
-		{
-			name: "empty batch scan size",
-			input: CommitPluginConfig{
-				DestChain: cciptypes.ChainSelector(1),
-			},
-			expErr: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			actual := tc.input.Validate()
-			if tc.expErr {
-				assert.Error(t, actual)
-				return
-			}
-			assert.NoError(t, actual)
-		})
-	}
-}
 
 func TestArbitrumPriceSource_Validate(t *testing.T) {
 	type fields struct {
@@ -146,6 +92,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 
 func TestCommitOffchainConfig_Validate(t *testing.T) {
 	type fields struct {
+		NewMsgScanBatchSize               int
 		RemoteGasPriceBatchWriteFrequency commonconfig.Duration
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
 		PriceSources                      map[types.Account]ArbitrumPriceSource
@@ -162,6 +109,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		{
 			"valid, with token price sources",
 			fields{
+				NewMsgScanBatchSize:               256,
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
 				PriceSources: map[types.Account]ArbitrumPriceSource{
@@ -177,6 +125,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		{
 			"valid, no token price sources",
 			fields{
+				NewMsgScanBatchSize:               256,
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
 				PriceSources:                      map[types.Account]ArbitrumPriceSource{},
@@ -186,6 +135,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		{
 			"invalid, token price sources with no frequency",
 			fields{
+				NewMsgScanBatchSize:               256,
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
 				PriceSources: map[types.Account]ArbitrumPriceSource{
@@ -200,6 +150,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		{
 			"invalid, price sources with no chain selector",
 			fields{
+				NewMsgScanBatchSize:               256,
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
 				PriceSources: map[types.Account]ArbitrumPriceSource{
@@ -211,10 +162,20 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			},
 			true,
 		},
+		{
+			"invalid, new msg scan batch size not provided",
+			fields{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
+				PriceSources:                      map[types.Account]ArbitrumPriceSource{},
+			},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := CommitOffchainConfig{
+				NewMsgScanBatchSize:               tt.fields.NewMsgScanBatchSize,
 				RemoteGasPriceBatchWriteFrequency: tt.fields.RemoteGasPriceBatchWriteFrequency,
 				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
 				PriceSources:                      tt.fields.PriceSources,
