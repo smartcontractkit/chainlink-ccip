@@ -80,5 +80,5 @@ const (
 const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
-	EventAttributeDestChain      = "DestChain"
+	EventAttributeDestChain      = "destChain"
 )

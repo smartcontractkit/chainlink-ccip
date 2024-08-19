@@ -22,6 +22,9 @@ type CommitPluginConfig struct {
 	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
 	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
 
+	// The maximum number of times to check if the previous report has been transmitted
+	MaxReportTransmissionCheckAttempts uint
+
 	// SyncTimeout is the timeout for syncing the commit plugin reader.
 	SyncTimeout time.Duration `json:"syncTimeout"`
 

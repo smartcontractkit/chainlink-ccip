@@ -227,11 +227,11 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
-	if err := validateObservedTokenPrices(obs.TokenPrices); err != nil {
+	if err := ValidateObservedTokenPrices(obs.TokenPrices); err != nil {
 		return fmt.Errorf("validate token prices: %w", err)
 	}
 
-	if err := validateObservedGasPrices(obs.GasPrices); err != nil {
+	if err := ValidateObservedGasPrices(obs.GasPrices); err != nil {
 		return fmt.Errorf("validate gas prices: %w", err)
 	}
 
@@ -348,7 +348,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	isValid, err := validateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
+	isValid, err := ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
 	if !isValid {
 		return false, nil
 	}
