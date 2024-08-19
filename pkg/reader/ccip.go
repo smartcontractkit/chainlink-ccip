@@ -40,6 +40,7 @@ type ccipChainReader struct {
 }
 
 func newCCIPChainReaderInternal(
+	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
@@ -64,7 +65,7 @@ func newCCIPChainReaderInternal(
 			destChain: offrampAddress,
 		},
 	}
-	if err := reader.Sync(context.Background(), contracts); err != nil {
+	if err := reader.Sync(ctx, contracts); err != nil {
 		lggr.Errorw("failed to sync contracts", "err", err)
 	}
 

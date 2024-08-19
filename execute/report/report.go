@@ -356,7 +356,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 	// Attempt to include all messages in the report.
 	finalReport, err :=
-		buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, report, readyMessages)
+		buildSingleChainReportHelper(ctx, b.lggr, b.hasher, report, readyMessages)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			exectypes.CommitData{},
@@ -381,7 +381,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err := buildSingleChainReportHelper(b.ctx, b.lggr, b.hasher, report, msgs)
+		finalReport2, err := buildSingleChainReportHelper(ctx, b.lggr, b.hasher, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},

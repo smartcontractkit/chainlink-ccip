@@ -90,7 +90,7 @@ func NewPluginFactory(
 	}
 }
 
-func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
+func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
 	if err != nil {
@@ -121,7 +121,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			Name:    consts.ContractNameRMNHome,
 		}
 
-		if err1 := rmnCr.Bind(context.Background(), []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
+		if err1 := rmnCr.Bind(ctx, []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
 		}
 		rmnHomeReader = reader.NewRMNHomePoller(
@@ -144,7 +144,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 				Name:    consts.ContractNamePriceAggregator,
 			})
 		}
-		if err1 := tokenPricesCr.Bind(context.Background(), bcs); err1 != nil {
+		if err1 := tokenPricesCr.Bind(ctx, bcs); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
 		}
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
@@ -160,6 +160,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	}
 
 	ccipReader := readerpkg.NewCCIPChainReader(
+		ctx,
 		p.lggr,
 		readers,
 		p.chainWriters,
@@ -167,7 +168,6 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		p.ocrConfig.Config.OfframpAddress,
 	)
 	return NewPlugin(
-			context.Background(),
 			p.donID,
 			config.OracleID,
 			oracleIDToP2PID,

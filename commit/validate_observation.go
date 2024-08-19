@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"context"
 	"fmt"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -11,6 +12,7 @@ import (
 
 // ValidateObservation validates an observation to ensure it is well-formed
 func (p *Plugin) ValidateObservation(
+	_ context.Context,
 	outCtx ocr3types.OutcomeContext,
 	q types.Query,
 	ao types.AttributedObservation,

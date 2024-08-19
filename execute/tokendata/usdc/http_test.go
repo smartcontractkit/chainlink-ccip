@@ -12,11 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -64,7 +65,7 @@ func Test_NewHTTPClient_New(t *testing.T) {
 func Test_HTTPClient_Get(t *testing.T) {
 	tt := []struct {
 		name               string
-		getTs              func() *httptest.Server
+		getTs              func(t *testing.T) *httptest.Server
 		timeout            time.Duration
 		messageHash        [32]byte
 		expectedError      error
@@ -73,7 +74,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 	}{
 		{
 			name: "server error",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
 				}))
@@ -84,7 +85,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "default timeout",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					time.Sleep(1 * time.Second)
 					_, err := w.Write(validAttestationResponse)
@@ -97,7 +98,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "200 but attestation response contains error",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					_, err := w.Write(failedAttestationResponse)
 					require.NoError(t, err)
@@ -109,7 +110,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "invalid status",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				attestationResponse := []byte(`
 				{
 					"status": "complete",
@@ -129,7 +130,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "invalid attestation",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				attestationResponse := []byte(`
 				{
 					"status": "",
@@ -147,7 +148,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "malformed response",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				attestationResponse := []byte(`
 				{
 					"field": 2137
@@ -164,7 +165,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "rate limit",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusTooManyRequests)
 				}))
@@ -175,7 +176,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "not found",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusNotFound)
 				}))
@@ -187,7 +188,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		},
 		{
 			name: "success",
-			getTs: func() *httptest.Server {
+			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					if r.RequestURI == "/v1/attestations/0x0102030400000000000000000000000000000000000000000000000000000000" {
 						_, err := w.Write(validAttestationResponse)
@@ -206,7 +207,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			ts := tc.getTs()
+			ts := tc.getTs(t)
 			defer ts.Close()
 
 			attestationURI, err := url.ParseRequestURI(ts.URL)

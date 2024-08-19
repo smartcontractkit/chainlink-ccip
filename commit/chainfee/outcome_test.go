@@ -5,17 +5,18 @@ import (
 	"testing"
 	"time"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 var ts = time.Now().UTC()
@@ -108,7 +109,7 @@ func TestGetConsensusObservation(t *testing.T) {
 }
 
 func TestProcessor_Outcome(t *testing.T) {
-	tests := []struct {
+	cases := []struct {
 		name                   string
 		chainFeeWriteFrequency commonconfig.Duration
 		feeInfo                map[cciptypes.ChainSelector]pluginconfig.FeeInfo
@@ -159,8 +160,9 @@ func TestProcessor_Outcome(t *testing.T) {
 		//TODO: Add test to check that deviated prices updates
 	}
 
-	for _, tt := range tests {
+	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := tests.Context(t)
 			p := &processor{
 				lggr:      logger.Test(t),
 				destChain: 1,
@@ -170,7 +172,7 @@ func TestProcessor_Outcome(t *testing.T) {
 				},
 			}
 
-			outcome, err := p.Outcome(Outcome{}, Query{}, tt.aos)
+			outcome, err := p.Outcome(ctx, Outcome{}, Query{}, tt.aos)
 			if tt.expectedError {
 				require.Error(t, err)
 			} else {

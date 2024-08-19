@@ -189,10 +189,12 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 
 	homeChain := setupHomeChainPoller(it.t, it.donID, logger.Test(it.t), chainConfigInfos)
-	err := homeChain.Start(tests.Context(it.t))
+	ctx := tests.Context(it.t)
+	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
+		ctx,
 		logger.Test(it.t),
 		it.dstSelector,
 		it.tokenObserverConfig,

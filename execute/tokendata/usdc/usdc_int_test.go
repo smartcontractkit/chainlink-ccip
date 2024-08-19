@@ -11,10 +11,13 @@ import (
 	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -202,6 +205,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
 
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
+		tests.Context(t),
 		logger.Test(t),
 		config,
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{

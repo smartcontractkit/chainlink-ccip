@@ -8,10 +8,10 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 // ReportInfo is the info data that will be sent with the along with the report
@@ -30,7 +30,9 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 	return json.Unmarshal(encodedReportInfo, ri)
 }
 
-func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+func (p *Plugin) Reports(
+	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
+) ([]ocr3types.ReportPlus[[]byte], error) {
 	outcome, err := DecodeOutcome(outcomeBytes)
 	if err != nil {
 		// TODO: metrics
@@ -40,7 +42,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 
 	// Until we start adding tokens and gas to the report, we don't need to report anything
 	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
-		return []ocr3types.ReportWithInfo[[]byte]{}, nil
+		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
 	p.lggr.Infow("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
@@ -60,7 +62,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		RMNRawVs:      outcome.MerkleRootOutcome.RMNRawVs,
 	}
 
-	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
+	encodedReport, err := p.reportCodec.Encode(ctx, rep)
 	if err != nil {
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
@@ -76,7 +78,10 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		return nil, fmt.Errorf("encode report info: %w", err)
 	}
 
-	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: infoBytes}}, nil
+	return []ocr3types.ReportPlus[[]byte]{
+		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+			Report: encodedReport, Info: infoBytes}},
+	}, nil
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(

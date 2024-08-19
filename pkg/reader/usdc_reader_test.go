@@ -11,6 +11,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -94,12 +95,13 @@ func Test_USDCMessageReader_New(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := tests.Context(t)
 			readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 			for k, v := range tc.readers() {
 				readers[k] = v
 			}
 
-			r, err := NewUSDCMessageReader(logger.Test(t), tc.tokensConfig, readers)
+			r, err := NewUSDCMessageReader(ctx, logger.Test(t), tc.tokensConfig, readers)
 			if tc.errorMessage != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMessage)
@@ -112,6 +114,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 }
 
 func Test_USDCMessageReader_MessageHashes(t *testing.T) {
+	ctx := tests.Context(t)
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
 	emptyReader := reader.NewMockContractReaderFacade(t)
 	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
@@ -179,7 +182,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 		},
 	}
 
-	usdcReader, err := NewUSDCMessageReader(logger.Test(t), tokensConfigs, contactReaders)
+	usdcReader, err := NewUSDCMessageReader(ctx, logger.Test(t), tokensConfigs, contactReaders)
 	require.NoError(t, err)
 
 	tt := []struct {
