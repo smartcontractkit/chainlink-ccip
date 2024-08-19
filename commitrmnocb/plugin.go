@@ -80,6 +80,7 @@ func NewPlugin(
 		oracleIDToP2pID:   oracleIDToP2pID,
 		lggr:              lggr,
 		offchainConfig:    offchainConfig,
+		destChain:         destChain,
 		tokenPricesReader: tokenPricesReader,
 		ccipReader:        ccipReader,
 		homeChain:         homeChain,
