@@ -50,7 +50,7 @@ jobs:
           go get github.com/smartcontractkit/chainlink-ccip@${{ steps.get_sha.outputs.sha }}
           make gomodtidy
       - name: Setup Postgres
-        uses: ./.github/actions/setup-postgres
+        uses: $GITHUB_WORKSPACE/chainlink-ccip/.github/actions/setup-postgres
       - name: Download Go vendor packages
         run: |
           cd $GITHUB_WORKSPACE/ccip
