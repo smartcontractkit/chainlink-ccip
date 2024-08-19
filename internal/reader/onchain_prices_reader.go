@@ -42,6 +42,8 @@ func NewOnchainTokenPricesReader(
 	}
 }
 
+// LatestRoundData is what AggregatorV3Interface returns for price feed
+// https://github.com/smartcontractkit/ccip/blob/8f3486ced41a414f724e6b12b1528db80b72346c/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol#L19
 type LatestRoundData struct {
 	RoundID         *big.Int
 	Answer          *big.Int
