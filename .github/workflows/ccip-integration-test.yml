@@ -18,8 +18,10 @@ jobs:
       matrix:
         go-version: ['1.22.5']
     steps:
-      - name: Checkout the repo
+      - name: Checkout the chainlink-ccip repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          path: chainlink-ccip
       - name: Setup Go ${{ matrix.go-version }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
@@ -27,11 +29,11 @@ jobs:
       - name: Display Go version
         run: go version
       - name: Clone CCIP repo
-        run: |
-          git clone https://github.com/smartcontractkit/ccip.git
-          cd ccip
-          git fetch
-          git checkout ccip-develop
+        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+        with:
+          repository: smartcontractkit/ccip
+          ref: ccip-develop
+          path: ccip
       - name: Get the correct commit SHA via GitHub API
         id: get_sha
         run: |
@@ -44,28 +46,28 @@ jobs:
           echo "::set-output name=sha::$COMMIT_SHA"
       - name: Update chainlink-ccip dependency in ccip
         run: |
-          cd ccip
+          cd $GITHUB_WORKSPACE/ccip
           go get github.com/smartcontractkit/chainlink-ccip@${{ steps.get_sha.outputs.sha }}
           make gomodtidy
       - name: Setup Postgres
         uses: ./.github/actions/setup-postgres
       - name: Download Go vendor packages
         run: |
-          cd ccip
+          cd $GITHUB_WORKSPACE/ccip
           go mod download
       - name: Build binary
         run: |
-          cd ccip
+          cd $GITHUB_WORKSPACE/ccip
           go build -o ccip.test .
       - name: Setup DB
         run: |
-          cd ccip
+          cd $GITHUB_WORKSPACE/ccip
           ./ccip.test local db preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Run ccip ocr3 integration test
         run: |
-          cd ccip
+          cd $GITHUB_WORKSPACE/ccip
           go test -v -timeout 3m -run "^TestIntegration_OCR3Nodes$" ./core/capabilities/ccip/ccip_integration_tests
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
