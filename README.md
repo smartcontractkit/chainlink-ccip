@@ -6,7 +6,7 @@ This is the repo that implements the OCR3 CCIP plugins. This includes the commit
 
 ### Go Version
 
-This repo uses Go 1.21. You can install Go from their [installation page](https://go.dev/doc/install).
+This repo uses Go 1.22. You can install Go from their [installation page](https://go.dev/doc/install).
 
 ### Running the Linter
 
