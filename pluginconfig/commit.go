@@ -129,7 +129,11 @@ func (c CommitOffchainConfig) Validate() error {
 			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
 	}
 
-	for token := range c.PriceSources {
+	for token, arbSource := range c.PriceSources {
+		if err := arbSource.Validate(); err != nil {
+			return fmt.Errorf("invalid price source for token %s: %w", token, err)
+		}
+
 		if _, exists := c.TokenDecimals[token]; !exists {
 			return fmt.Errorf("missing TokenDecimals for account: %s", token)
 		}
