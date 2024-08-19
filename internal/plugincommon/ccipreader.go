@@ -49,12 +49,12 @@ func NewBackgroundReaderSyncer(
 	}
 }
 
-func (b *BackgroundReaderSyncer) Start(ctx context.Context) error {
+func (b *BackgroundReaderSyncer) Start(_ context.Context) error {
 	if b.bgSyncCtx != nil {
 		return fmt.Errorf("background syncer already started")
 	}
 
-	b.bgSyncCtx, b.bgSyncCf = context.WithCancel(ctx)
+	b.bgSyncCtx, b.bgSyncCf = context.WithCancel(context.Background())
 	b.bgSyncWG = &sync.WaitGroup{}
 	b.bgSyncWG.Add(1)
 	b.bgSyncTicker = time.NewTicker(b.syncFrequency)

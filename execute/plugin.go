@@ -7,14 +7,16 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/quorumhelper"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -72,9 +74,6 @@ func NewPlugin(
 		syncTimeout(cfg.SyncTimeout),
 		syncFrequency(cfg.SyncFrequency),
 	)
-	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Errorw("error starting background reader syncer", "err", err)
-	}
 
 	return &Plugin{
 		reportingCfg:      reportingCfg,
@@ -96,6 +95,29 @@ func NewPlugin(
 			reportingCfg.F,
 		),
 	}
+}
+
+func (p *Plugin) Start(ctx context.Context) error {
+	if err := p.readerSyncer.Start(ctx); err != nil {
+		return fmt.Errorf("error starting background reader syncer: %w", err)
+	}
+	return nil
+}
+
+func (p *Plugin) Close() error {
+	timeout := 10 * time.Second // todo: cfg
+	ctx, cf := context.WithTimeout(context.Background(), timeout)
+	defer cf()
+
+	if err := p.readerSyncer.Close(); err != nil {
+		p.lggr.Warnw("error closing reader syncer", "err", err)
+	}
+
+	if err := p.ccipReader.Close(ctx); err != nil {
+		return fmt.Errorf("close ccip reader: %w", err)
+	}
+
+	return nil
 }
 
 func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (types.Query, error) {
@@ -313,7 +335,7 @@ func (p *Plugin) Observation(
 }
 
 func (p *Plugin) ValidateObservation(
-	outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
+	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
 	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
 	if err != nil {
@@ -337,9 +359,12 @@ func (p *Plugin) ValidateObservation(
 	return nil
 }
 
-func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.Query) (ocr3types.Quorum, error) {
+func (p *Plugin) ObservationQuorum(
+	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
+) (bool, error) {
 	// TODO: should we use f+1 (or less) instead of 2f+1 because it is not needed for security?
-	return ocr3types.QuorumFPlusOne, nil
+	return quorumhelper.ObservationCountReachesObservationQuorum(
+		quorumhelper.QuorumFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
 // selectReport takes a list of reports in execution order and selects the first reports that fit within the
@@ -387,7 +412,7 @@ func selectReport(
 // formed report that will be encoded for final transmission in the reporting phase.
 // nolint:gocyclo // todo
 func (p *Plugin) Outcome(
-	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
+	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	var previousOutcome exectypes.Outcome
 	if outctx.PreviousOutcome != nil {
@@ -412,7 +437,7 @@ func (p *Plugin) Outcome(
 				Observation: decodedAos[i].Observation.Contracts,
 			}
 		}
-		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
+		_, err = p.discovery.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryAos)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
 		}
@@ -516,7 +541,9 @@ func (p *Plugin) Outcome(
 	return outcome.Encode()
 }
 
-func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+func (p *Plugin) Reports(
+	ctx context.Context, seqNr uint64, outcome ocr3types.Outcome,
+) ([]ocr3types.ReportPlus[[]byte], error) {
 	if outcome == nil {
 		p.lggr.Warn("no outcome, skipping report generation")
 		return nil, nil
@@ -528,15 +555,17 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 	}
 
 	// TODO: this function should be pure, a context should not be needed.
-	encoded, err := p.reportCodec.Encode(context.Background(), decodedOutcome.Report)
+	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	report := []ocr3types.ReportWithInfo[[]byte]{{
-		Report: encoded,
-		Info:   nil,
-	}}
+	report := []ocr3types.ReportPlus[[]byte]{
+		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+			Report: encoded,
+			Info:   nil,
+		}},
+	}
 
 	return report, nil
 }
@@ -588,22 +617,6 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		"reports", decodedReport.ChainReports,
 	)
 	return true, nil
-}
-
-func (p *Plugin) Close() error {
-	timeout := 10 * time.Second // todo: cfg
-	ctx, cf := context.WithTimeout(context.Background(), timeout)
-	defer cf()
-
-	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Warnw("error closing reader syncer", "err", err)
-	}
-
-	if err := p.ccipReader.Close(ctx); err != nil {
-		return fmt.Errorf("close ccip reader: %w", err)
-	}
-
-	return nil
 }
 
 func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {

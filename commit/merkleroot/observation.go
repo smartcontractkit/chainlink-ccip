@@ -9,11 +9,13 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/sync/errgroup"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/sync/errgroup"
+	"github.com/smartcontractkit/libocr/quorumhelper"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -28,9 +30,12 @@ import (
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
-func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
+func (w *Processor) ObservationQuorum(
+	_ context.Context, _ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
+) (bool, error) {
 	// Across all chains we require at least 2F+1 observations.
-	return ocr3types.QuorumTwoFPlusOne, nil
+	return quorumhelper.ObservationCountReachesObservationQuorum(
+		quorumhelper.QuorumTwoFPlusOne, w.reportingCfg.N, w.reportingCfg.F, aos), nil
 }
 
 func (w *Processor) Observation(

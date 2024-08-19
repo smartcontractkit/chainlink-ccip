@@ -337,7 +337,6 @@ func setupNode(
 	}
 
 	p := NewPlugin(
-		ctx,
 		nodeID,
 		oracleIDToP2pID,
 		pluginCfg,
@@ -350,6 +349,7 @@ func setupNode(
 		reportingCfg,
 		rmn.Config{},
 	)
+	require.NoError(t, p.Start(ctx))
 
 	return nodeSetup{
 		node:        p,

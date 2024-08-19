@@ -84,7 +84,7 @@ func NewPluginFactory(
 	}
 }
 
-func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfig,
+func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
 	if err != nil {
@@ -134,34 +134,37 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 	)
-	return NewPlugin(
-			context.Background(),
-			config.OracleID,
-			oracleIDToP2PID,
-			pluginconfig.CommitPluginConfig{
-				DestChain:                          p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
-				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
-				OffchainConfig:                     offchainConfig,
-			},
-			ccipReader,
-			onChainTokenPricesReader,
-			p.commitCodec,
-			p.msgHasher,
-			p.lggr,
-			p.homeChainReader,
-			config,
-			rmn.Config{}, // todo
-		), ocr3types.ReportingPluginInfo{
-			Name: "CCIPRoleCommit",
-			Limits: ocr3types.ReportingPluginLimits{
-				MaxQueryLength:       maxQueryLength,
-				MaxObservationLength: 20_000, // 20kB
-				MaxOutcomeLength:     10_000, // 10kB
-				MaxReportLength:      10_000, // 10kB
-				MaxReportCount:       10,
-			},
-		}, nil
+	plugin := NewPlugin(
+		config.OracleID,
+		oracleIDToP2PID,
+		pluginconfig.CommitPluginConfig{
+			DestChain:                          p.ocrConfig.Config.ChainSelector,
+			NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
+			MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
+			OffchainConfig:                     offchainConfig,
+		},
+		ccipReader,
+		onChainTokenPricesReader,
+		p.commitCodec,
+		p.msgHasher,
+		p.lggr,
+		p.homeChainReader,
+		config,
+		rmn.Config{}, // todo
+	)
+	if err = plugin.Start(ctx); err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start plugin: %w", err)
+	}
+	return plugin, ocr3types.ReportingPluginInfo{
+		Name: "CCIPRoleCommit",
+		Limits: ocr3types.ReportingPluginLimits{
+			MaxQueryLength:       maxQueryLength,
+			MaxObservationLength: 20_000, // 20kB
+			MaxOutcomeLength:     10_000, // 10kB
+			MaxReportLength:      10_000, // 10kB
+			MaxReportCount:       10,
+		},
+	}, nil
 }
 
 func (p PluginFactory) Name() string {

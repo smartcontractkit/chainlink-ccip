@@ -83,7 +83,7 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 // Outcome comes to consensus on the contract addresses and updates the chainreader. It doesn't actually
 // return an Outcome.
 func (cdp *ContractDiscoveryProcessor) Outcome(
-	_ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
+	_ context.Context, _ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	// come to consensus on the onramp addresses and update the chainreader.
 

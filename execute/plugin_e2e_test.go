@@ -261,8 +261,8 @@ func setupSimpleTest(
 }
 
 func newNode(
-	_ context.Context,
-	_ *testing.T,
+	ctx context.Context,
+	t *testing.T,
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
 	msgHasher cciptypes.MessageHasher,
@@ -291,6 +291,9 @@ func newNode(
 		tokenDataObserver,
 		evm.EstimateProvider{},
 		lggr)
+	if err := node1.Start(ctx); err != nil {
+		t.Fatalf("failed to start plugin: %v", err)
+	}
 
 	return nodeSetup{
 		node:        node1,

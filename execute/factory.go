@@ -7,13 +7,14 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
@@ -86,7 +87,7 @@ func NewPluginFactory(
 }
 
 func (p PluginFactory) NewReportingPlugin(
-	config ocr3types.ReportingPluginConfig,
+	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
 	if err != nil {
@@ -121,31 +122,35 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.OfframpAddress,
 	)
 
-	return NewPlugin(
-			config,
-			pluginconfig.ExecutePluginConfig{
-				DestChain:      p.ocrConfig.Config.ChainSelector,
-				OffchainConfig: offchainConfig,
-			},
-			oracleIDToP2PID,
-			ccipReader,
-			p.execCodec,
-			p.msgHasher,
-			p.homeChainReader,
-			tokenDataObserver,
-			p.estimateProvider,
-			p.lggr,
-		), ocr3types.ReportingPluginInfo{
-			Name: "CCIPRoleExecute",
-			Limits: ocr3types.ReportingPluginLimits{
-				// No query for this execute implementation.
-				MaxQueryLength:       0,
-				MaxObservationLength: 20_000,             // 20kB
-				MaxOutcomeLength:     20_000,             // 20kB
-				MaxReportLength:      maxReportSizeBytes, // 250kB
-				MaxReportCount:       10,
-			},
-		}, nil
+	plugin := NewPlugin(
+		config,
+		pluginconfig.ExecutePluginConfig{
+			DestChain:      p.ocrConfig.Config.ChainSelector,
+			OffchainConfig: offchainConfig,
+		},
+		oracleIDToP2PID,
+		ccipReader,
+		p.execCodec,
+		p.msgHasher,
+		p.homeChainReader,
+		tokenDataObserver,
+		p.estimateProvider,
+		p.lggr,
+	)
+	if err = plugin.Start(ctx); err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start plugin: %w", err)
+	}
+	return plugin, ocr3types.ReportingPluginInfo{
+		Name: "CCIPRoleExecute",
+		Limits: ocr3types.ReportingPluginLimits{
+			// No query for this execute implementation.
+			MaxQueryLength:       0,
+			MaxObservationLength: 20_000,             // 20kB
+			MaxOutcomeLength:     20_000,             // 20kB
+			MaxReportLength:      maxReportSizeBytes, // 250kB
+			MaxReportCount:       10,
+		},
+	}, nil
 }
 
 func (p PluginFactory) Name() string {

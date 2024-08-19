@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -30,6 +31,7 @@ func (w *Processor) Observation(
 }
 
 func (w *Processor) Outcome(
+	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],

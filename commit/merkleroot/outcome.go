@@ -1,6 +1,7 @@
 package merkleroot
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -20,6 +21,7 @@ import (
 // - builds a report
 // - checks for the transmission of a previous report
 func (w *Processor) Outcome(
+	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],

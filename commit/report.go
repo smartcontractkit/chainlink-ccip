@@ -12,7 +12,9 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+func (p *Plugin) Reports(
+	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
+) ([]ocr3types.ReportPlus[[]byte], error) {
 	outcome, err := DecodeOutcome(outcomeBytes)
 	if err != nil {
 		// TODO: metrics
@@ -22,7 +24,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 
 	// Until we start adding tokens and gas to the report, we don't need to report anything
 	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
-		return []ocr3types.ReportWithInfo[[]byte]{}, nil
+		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
 
 	rep := cciptypes.CommitPluginReport{
@@ -34,12 +36,15 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
 	}
 
-	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
+	encodedReport, err := p.reportCodec.Encode(ctx, rep)
 	if err != nil {
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
-	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: nil}}, nil
+	return []ocr3types.ReportPlus[[]byte]{
+		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+			Report: encodedReport, Info: nil}},
+	}, nil
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(

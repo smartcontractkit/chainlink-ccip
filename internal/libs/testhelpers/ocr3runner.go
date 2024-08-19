@@ -72,7 +72,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		}
 
 		attrObs := types.AttributedObservation{Observation: obs, Observer: r.nodeIDs[i]}
-		err = leaderNode.ValidateObservation(outcomeCtx, q, attrObs)
+		err = leaderNode.ValidateObservation(ctx, outcomeCtx, q, attrObs)
 		if err != nil {
 			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err, ErrValidateObservation)
 		}
@@ -82,7 +82,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 
 	outcomes := make([]ocr3types.Outcome, len(r.nodes))
 	for i, n := range r.nodes {
-		outcome, err2 := n.Outcome(outcomeCtx, q, attributedObservations)
+		outcome, err2 := n.Outcome(ctx, outcomeCtx, q, attributedObservations)
 		if err2 != nil {
 			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrOutcome)
 		}
@@ -100,14 +100,14 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 
 	r.previousOutcome = outcomes[0]
 
-	allReports := make([][]ocr3types.ReportWithInfo[RI], len(r.nodes))
+	allReports := make([][]ocr3types.ReportPlus[RI], len(r.nodes))
 	for i, n := range r.nodes {
-		reportsWithInfo, err2 := n.Reports(seqNr, outcomes[0])
+		reportsPlus, err2 := n.Reports(ctx, seqNr, outcomes[0])
 		if err2 != nil {
 			return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrReports)
 		}
 
-		allReports[i] = reportsWithInfo
+		allReports[i] = reportsPlus
 	}
 
 	// check that all the reports are the same.
@@ -122,7 +122,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 	for _, report := range allReports[0] {
 		allShouldAccept := make([]bool, len(r.nodes))
 		for i, n := range r.nodes {
-			shouldAccept, err2 := n.ShouldAcceptAttestedReport(ctx, seqNr, report)
+			shouldAccept, err2 := n.ShouldAcceptAttestedReport(ctx, seqNr, report.ReportWithInfo)
 			if err2 != nil {
 				return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrShouldAcceptAttestedReport)
 			}
@@ -134,13 +134,13 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		}
 
 		if !allShouldAccept[0] {
-			notAccepted = append(notAccepted, report)
+			notAccepted = append(notAccepted, report.ReportWithInfo)
 			continue
 		}
 
 		allShouldTransmit := make([]bool, len(r.nodes))
 		for i, n := range r.nodes {
-			shouldTransmit, err2 := n.ShouldTransmitAcceptedReport(ctx, seqNr, report)
+			shouldTransmit, err2 := n.ShouldTransmitAcceptedReport(ctx, seqNr, report.ReportWithInfo)
 			if err2 != nil {
 				return RoundResult[RI]{}, fmt.Errorf("%w: %w", err2, ErrShouldTransmitAcceptedReport)
 			}
@@ -152,11 +152,11 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		}
 
 		if !allShouldTransmit[0] {
-			notTransmitted = append(notTransmitted, report)
+			notTransmitted = append(notTransmitted, report.ReportWithInfo)
 			continue
 		}
 
-		transmitted = append(transmitted, report)
+		transmitted = append(transmitted, report.ReportWithInfo)
 	}
 
 	return RoundResult[RI]{
@@ -200,11 +200,11 @@ func countUniqueOutcomes(outcomes []ocr3types.Outcome) int {
 	return slicelib.CountUnique(flattenedHashes)
 }
 
-func countUniqueReports[RI any](reports []ocr3types.ReportWithInfo[RI]) int {
+func countUniqueReports[RI any](reports []ocr3types.ReportPlus[RI]) int {
 	flattenedHashes := make([]string, 0, len(reports))
 	for _, report := range reports {
 		h := sha256.New()
-		h.Write(report.Report)
+		h.Write(report.ReportWithInfo.Report)
 		flattenedHashes = append(flattenedHashes, hex.EncodeToString(h.Sum(nil)))
 	}
 	return slicelib.CountUnique(flattenedHashes)
