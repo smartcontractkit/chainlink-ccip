@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -17,15 +18,17 @@ import (
 )
 
 const (
-	EthAcc = ocr2types.Account("ETH")
-	OpAcc  = ocr2types.Account("OP")
-	ArbAcc = ocr2types.Account("ARB")
+	EthAddr = ocr2types.Account("0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	OpAddr  = ocr2types.Account("0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	ArbAddr = ocr2types.Account("0x4e03388D351BF87CF2409EFf18C45Df59775Fbb2")
 )
 
 var (
-	EthPrice = big.NewInt(100)
-	OpPrice  = big.NewInt(10)
-	ArbPrice = big.NewInt(1)
+	EthPrice   = big.NewInt(1).Mul(big.NewInt(7), big.NewInt(1e18))
+	OpPrice    = big.NewInt(1).Mul(big.NewInt(6), big.NewInt(1e18))
+	ArbPrice   = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
+	OnlyPrice  = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
+	Decimals18 = uint8(18)
 )
 
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
@@ -34,33 +37,43 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		name          string
 		inputTokens   []ocr2types.Account
 		priceSources  map[ocr2types.Account]pluginconfig.ArbitrumPriceSource
-		mockPrices    map[ocr2types.Account]*big.Int
+		tokenDecimals map[ocr2types.Account]uint8
+		mockPrices    []*big.Int
 		want          []*big.Int
 		errorAccounts []ocr2types.Account
 		wantErr       bool
 	}{
 		{
-			name:         "On-chain price",
+			name: "On-chain price",
+			// No need to put sources as we're mocking the reader
 			priceSources: map[ocr2types.Account]pluginconfig.ArbitrumPriceSource{},
-			inputTokens:  []ocr2types.Account{ArbAcc, OpAcc, EthAcc},
-			mockPrices:   map[ocr2types.Account]*big.Int{OpAcc: OpPrice, ArbAcc: ArbPrice, EthAcc: EthPrice},
-			want:         []*big.Int{ArbPrice, OpPrice, EthPrice},
+			tokenDecimals: map[ocr2types.Account]uint8{
+				ArbAddr: Decimals18,
+				OpAddr:  Decimals18,
+				EthAddr: Decimals18,
+			},
+			inputTokens: []ocr2types.Account{ArbAddr, OpAddr, EthAddr},
+			//TODO: change once we have control to return different prices in mock depending on the token
+			mockPrices: []*big.Int{ArbPrice, OpPrice, EthPrice},
+			want:       []*big.Int{ArbPrice, OpPrice, EthPrice},
 		},
 		{
 			name:          "Missing price should error",
 			priceSources:  map[ocr2types.Account]pluginconfig.ArbitrumPriceSource{},
-			inputTokens:   []ocr2types.Account{ArbAcc, OpAcc, EthAcc},
-			mockPrices:    map[ocr2types.Account]*big.Int{OpAcc: OpPrice, ArbAcc: ArbPrice},
-			errorAccounts: []ocr2types.Account{EthAcc},
+			inputTokens:   []ocr2types.Account{ArbAddr, OpAddr, EthAddr},
+			mockPrices:    []*big.Int{ArbPrice, OpPrice},
+			errorAccounts: []ocr2types.Account{EthAddr},
 			want:          nil,
 			wantErr:       true,
 		},
 	}
 
 	for _, tc := range testCases {
-		contractReader := createMockReader(tc.mockPrices, tc.errorAccounts, tc.priceSources)
+		contractReader := createMockReader(tc.mockPrices, tc.errorAccounts)
 		tokenPricesReader := OnchainTokenPricesReader{
 			ContractReader: contractReader,
+			PriceSources:   tc.priceSources,
+			TokenDecimals:  tc.tokenDecimals,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -70,7 +83,6 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 				require.Error(t, err)
 				return
 			}
-
 			require.NoError(t, err)
 			require.Equal(t, tc.want, result)
 		})
@@ -118,15 +130,25 @@ func TestPriceService_calculateUsdPer1e18TokenAmount(t *testing.T) {
 	}
 }
 
+// nolint unparam
 func createMockReader(
-	mockPrices map[ocr2types.Account]*big.Int,
+	mockPrices []*big.Int,
 	errorAccounts []ocr2types.Account,
-	priceSources map[ocr2types.Account]pluginconfig.ArbitrumPriceSource,
 ) *mocks.ContractReaderMock {
 	reader := mocks.NewContractReaderMock()
-	println(errorAccounts)
-	println(priceSources)
 	// TODO: Create a list of bound contracts from priceSources and return the price given in mockPrices
+	reader.On("GetLatestValue",
+		mock.Anything,
+		consts.ContractNamePriceAggregator,
+		consts.MethodNameGetDecimals,
+		mock.Anything,
+		nil,
+		mock.Anything).Run(
+		func(args mock.Arguments) {
+			arg := args.Get(5).(*uint8)
+			*arg = Decimals18
+		}).Return(nil)
+
 	for _, price := range mockPrices {
 		price := price
 		reader.On("GetLatestValue",
@@ -137,9 +159,19 @@ func createMockReader(
 			nil,
 			mock.Anything).Run(
 			func(args mock.Arguments) {
-				arg := args.Get(5).(*big.Int)
-				arg.Set(price)
-			}).Return(nil)
+				arg := args.Get(5).(*LatestRoundData)
+				arg.Answer = big.NewInt(price.Int64())
+			}).Return(nil).Once()
+	}
+
+	for i := 0; i < len(errorAccounts); i++ {
+		reader.On("GetLatestValue",
+			mock.Anything,
+			consts.ContractNamePriceAggregator,
+			consts.MethodNameGetLatestRoundData,
+			mock.Anything,
+			nil,
+			mock.Anything).Return(fmt.Errorf("error")).Once()
 	}
 	return reader
 }

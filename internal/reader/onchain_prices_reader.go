@@ -96,8 +96,8 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (*uint8, error) {
-	var decimals *uint8
+func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (uint8, error) {
+	var decimals uint8
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
@@ -108,7 +108,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token t
 			&decimals,
 			//boundContract,
 		); err != nil {
-		return nil, fmt.Errorf("decimals call failed for token %s: %w", token, err)
+		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
 	}
 
 	return decimals, nil
@@ -118,7 +118,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
 	token types.Account,
 ) (*big.Int, error) {
-	var latestRoundData *LatestRoundData
+	var latestRoundData LatestRoundData
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
@@ -132,19 +132,15 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
 	}
 
-	if latestRoundData == nil {
-		return nil, fmt.Errorf("latestRoundData is nil for token %s", token)
-	}
-
 	decimals, err1 := pr.getFeedDecimals(ctx, token)
 	if err1 != nil {
 		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
 	}
 	answer := latestRoundData.Answer
-	if *decimals < 18 {
-		answer.Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(*decimals)), nil))
-	} else if *decimals > 18 {
-		answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(*decimals)-18), nil))
+	if decimals < 18 {
+		answer.Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals)), nil))
+	} else if decimals > 18 {
+		answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
 	}
 	return answer, nil
 }
