@@ -65,7 +65,7 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 			//	Address: pr.PriceSources[token].AggregatorAddress,
 			//	Name: consts.ContractNamePriceAggregator,
 			//}
-			rawTokenPrice, err := pr.getRawTokenPrice(ctx, token)
+			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token)
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
@@ -92,7 +92,25 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getRawTokenPrice(ctx context.Context, token types.Account) (*big.Int, error) {
+func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (*uint8, error) {
+	var decimals *uint8
+	if err :=
+		pr.ContractReader.GetLatestValue(
+			ctx,
+			consts.ContractNamePriceAggregator,
+			consts.MethodNameGetDecimals,
+			primitives.Unconfirmed,
+			nil,
+			&decimals,
+			//boundContract,
+		); err != nil {
+		return nil, fmt.Errorf("decimals call failed for token %s: %w", token, err)
+	}
+
+	return decimals, nil
+}
+
+func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(ctx context.Context, token types.Account) (*big.Int, error) {
 	var latestRoundData *LatestRoundData
 	if err :=
 		pr.ContractReader.GetLatestValue(
@@ -111,7 +129,17 @@ func (pr *OnchainTokenPricesReader) getRawTokenPrice(ctx context.Context, token 
 		return nil, fmt.Errorf("latestRoundData is nil for token %s", token)
 	}
 
-	return latestRoundData.Answer, nil
+	decimals, err1 := pr.getFeedDecimals(ctx, token)
+	if err1 != nil {
+		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
+	}
+	answer := latestRoundData.Answer
+	if *decimals < 18 {
+		answer.Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(*decimals)), nil))
+	} else if *decimals > 18 {
+		answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(*decimals)-18), nil))
+	}
+	return answer, nil
 }
 
 // Input price is USD per full token, with 18 decimal precision
