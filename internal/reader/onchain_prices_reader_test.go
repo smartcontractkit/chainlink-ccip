@@ -32,7 +32,6 @@ var (
 )
 
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
-	//t.Skip("Skipping until we have a full price reader implementation")
 	testCases := []struct {
 		name          string
 		inputTokens   []ocr2types.Account

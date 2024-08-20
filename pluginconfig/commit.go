@@ -137,6 +137,9 @@ func (c CommitOffchainConfig) Validate() error {
 		if _, exists := c.TokenDecimals[token]; !exists {
 			return fmt.Errorf("missing TokenDecimals for token: %s", token)
 		}
+		if c.TokenDecimals[token] == 0 {
+			return fmt.Errorf("invalid TokenDecimals for token: %s", token)
+		}
 	}
 
 	// if len(c.PriceSources) == 0 the other fields are ignored.
