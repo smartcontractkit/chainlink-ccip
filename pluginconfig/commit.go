@@ -67,6 +67,14 @@ type CommitOffchainConfig struct {
 	// Note that the token address is that on the remote chain.
 	PriceSources map[types.Account]ArbitrumPriceSource `json:"priceSources"`
 
+	// TokenDecimals is a map of token decimals for each token.
+	// As **not necessarily** each node supports both the
+	// 1. Token price feed chain (where we get the token price in USD)
+	// 2. Destination chain (where we can get the token decimals from PriceRegistry).
+	// So to be able to calculate the effective price we need both token decimals and feed decimals.
+	// This is why we need to store the token decimals in the config.
+	TokenDecimals map[types.Account]uint8 `json:"decimals"`
+
 	// TokenPriceChainSelector is the chain selector for the chain on which
 	// the token prices are read from.
 	// This will typically be an arbitrum testnet/mainnet chain depending on
@@ -103,6 +111,19 @@ func (c CommitOffchainConfig) Validate() error {
 		(c.TokenPriceBatchWriteFrequency.Duration() == 0 || c.TokenPriceChainSelector == 0) {
 		return fmt.Errorf("tokenPriceBatchWriteFrequency (%s) or tokenPriceChainSelector (%d) not set",
 			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
+	}
+
+	for token, arbSource := range c.PriceSources {
+		if err := arbSource.Validate(); err != nil {
+			return fmt.Errorf("invalid arbitrum price source for token %s: %w", token, err)
+		}
+
+		if _, exists := c.TokenDecimals[token]; !exists {
+			return fmt.Errorf("missing TokenDecimals for token: %s", token)
+		}
+		if c.TokenDecimals[token] == 0 {
+			return fmt.Errorf("invalid TokenDecimals for token: %s", token)
+		}
 	}
 
 	// if len(c.PriceSources) == 0 the other fields are ignored.

@@ -1404,7 +1404,7 @@ func Test_tokenPricesConsensus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			prices := tokenPricesConsensus(tc.observations, tc.fChain)
+			prices := tokenPricesMedianized(tc.observations, tc.fChain)
 			assert.Equal(t, tc.expPrices, prices)
 		})
 	}
