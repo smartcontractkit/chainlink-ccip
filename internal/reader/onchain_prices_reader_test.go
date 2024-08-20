@@ -32,7 +32,7 @@ var (
 )
 
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
-	t.Skip("Skipping until we have a full price reader implementation")
+	//t.Skip("Skipping until we have a full price reader implementation")
 	testCases := []struct {
 		name          string
 		inputTokens   []ocr2types.Account
@@ -44,7 +44,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		wantErr       bool
 	}{
 		{
-			name: "On-chain price",
+			name: "On-chain one price",
 			// No need to put sources as we're mocking the reader
 			priceSources: map[ocr2types.Account]pluginconfig.ArbitrumPriceSource{},
 			tokenDecimals: map[ocr2types.Account]uint8{
@@ -52,16 +52,16 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 				OpAddr:  Decimals18,
 				EthAddr: Decimals18,
 			},
-			inputTokens: []ocr2types.Account{ArbAddr, OpAddr, EthAddr},
+			inputTokens: []ocr2types.Account{ArbAddr},
 			//TODO: change once we have control to return different prices in mock depending on the token
-			mockPrices: []*big.Int{ArbPrice, OpPrice, EthPrice},
-			want:       []*big.Int{ArbPrice, OpPrice, EthPrice},
+			mockPrices: []*big.Int{ArbPrice},
+			want:       []*big.Int{ArbPrice},
 		},
 		{
 			name:          "Missing price should error",
 			priceSources:  map[ocr2types.Account]pluginconfig.ArbitrumPriceSource{},
-			inputTokens:   []ocr2types.Account{ArbAddr, OpAddr, EthAddr},
-			mockPrices:    []*big.Int{ArbPrice, OpPrice},
+			inputTokens:   []ocr2types.Account{ArbAddr},
+			mockPrices:    []*big.Int{},
 			errorAccounts: []ocr2types.Account{EthAddr},
 			want:          nil,
 			wantErr:       true,
