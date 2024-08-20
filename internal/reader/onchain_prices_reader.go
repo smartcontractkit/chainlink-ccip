@@ -17,8 +17,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type TokenPrices interface {
-	// GetTokenPricesUSD returns the prices of the provided tokens in USD.
+type PriceReader interface {
+	// GetTokenPricesUSD returns the prices of the provided tokens in USD normalized to e18.
 	// The order of the returned prices corresponds to the order of the provided tokens.
 	GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
 }
@@ -157,5 +157,5 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
-// Ensure OnchainTokenPricesReader implements TokenPrices
-var _ TokenPrices = (*OnchainTokenPricesReader)(nil)
+// Ensure OnchainTokenPricesReader implements PriceReader
+var _ PriceReader = (*OnchainTokenPricesReader)(nil)

@@ -27,7 +27,6 @@ var (
 	EthPrice   = big.NewInt(1).Mul(big.NewInt(7), big.NewInt(1e18))
 	OpPrice    = big.NewInt(1).Mul(big.NewInt(6), big.NewInt(1e18))
 	ArbPrice   = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
-	OnlyPrice  = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
 	Decimals18 = uint8(18)
 )
 
