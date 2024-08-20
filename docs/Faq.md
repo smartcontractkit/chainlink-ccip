@@ -56,3 +56,44 @@ If everything is set up correctly, the issue might be due to recent changes in t
 This issue can have multiple causes, but we recommend first trying to restart the Docker daemon and checking your internet connection. You may also want to disable [Filter content for Apple devices](https://support.apple.com/en-ca/guide/deployment/dep1129ff8d2/web) if applicable.
 
 For more details and suggestions on how to resolve this issue, refer to the related GitHub [issue](https://github.com/docker/for-mac/issues/7025).
+
+### CCIP Script Deployer Errors Related to `job ccip-scripts-deployer failed: BackoffLimitExceeded`
+
+This error can occur in several scenarios:
+
+- When attempting to deploy CCIP on CRIB in CI
+- When trying to deploy CCIP on CRIB using EKS or a local KIND cluster
+
+The primary reason for this issue is that the current mechanism for deploying jobs using the CCIP script deployer job is failing.
+
+To troubleshoot, follow these steps:
+
+1. Check the status of the deployer job:
+
+   ```bash
+   kubectl get pod -l job-name=ccip-scripts-deployer -n <your-crib-namespace-name>
+   ```
+
+   Example output:
+
+   ```
+   NAME                          READY   STATUS      RESTARTS   AGE
+   ccip-scripts-deployer-qc5pw   0/1     Error     0          22m
+   ```
+
+2. Review the pod logs for more details:
+
+   ```bash
+   kubectl logs ccip-scripts-deployer-qc5pw -n <your-crib-namespace-name>
+   ```
+
+If you see the error creating job on node [3] status code 500 Internal Server Error in the logs, please refer to the answer in the next section.
+
+### I've Tried Deploying CCIP on CRIB, and the CCIP Script Deployer Job Fails with the Error `creating job on node [3] status code 500 Internal Server Error`.
+
+This error is likely due to an incompatibility between the node and contract versions. To resolve this issue, please follow these steps:
+
+1. Pull the latest version of the [chainlink](https://github.com/smartcontractkit/chainlink) repository.
+2. Build a fresh copy of the node image and redeploy. Simply run devspace deploy without using the `--skip-build` and `-o` parameters.
+
+If the error persists, please reach out to us in the [#project-crib](https://chainlink.enterprise.slack.com/archives/C0637K4BBC2) Slack channel for further assistance.
