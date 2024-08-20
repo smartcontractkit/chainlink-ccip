@@ -15,7 +15,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/beholder-test-client
-        version: "0.0.1"
+        version: "0.0.3"
       values:
         podSecurityContext:
           fsGroup: 999
@@ -23,9 +23,7 @@ deployments:
         beholder-test-client:
           args:
             - -otel-exporter-grpc-enpoint
-            # TODO: change this to the collector-agent when collector to
-            # collector communication is working
-            - crib-beholder-infra-otel-collector-gateway:4317
+            - crib-beholder-infra-otel-collector-agent:4317
 
   crib-beholder-infra:
     updateImageTags: false
@@ -35,7 +33,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-beholder-infra
-        version: "0.0.1"
+        version: "0.0.4"
       values:
         podSecurityContext:
           fsGroup: 999
