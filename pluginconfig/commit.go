@@ -100,7 +100,7 @@ type CommitOffchainConfig struct {
 	PriceSources map[types.Account]ArbitrumPriceSource `json:"priceSources"`
 
 	// TokenDecimals is a map of token decimals for each token.
-	// As **not** each node supports both the
+	// As **not necessarily** each node supports both the
 	// 1. Token price feed chain (where we get the token price in USD)
 	// 2. Destination chain (where we can get the token decimals from PriceRegistry).
 	// So to be able to calculate the effective price we need both token decimals.
