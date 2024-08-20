@@ -103,7 +103,7 @@ type CommitOffchainConfig struct {
 	// As **not necessarily** each node supports both the
 	// 1. Token price feed chain (where we get the token price in USD)
 	// 2. Destination chain (where we can get the token decimals from PriceRegistry).
-	// So to be able to calculate the effective price we need both token decimals.
+	// So to be able to calculate the effective price we need both token decimals and feed decimals.
 	// This is why we need to store the token decimals in the config.
 	TokenDecimals map[types.Account]uint8 `json:"decimals"`
 
