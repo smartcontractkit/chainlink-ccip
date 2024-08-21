@@ -455,6 +455,7 @@ profiles:
       - op: add
         path: deployments.app.helm.valuesFiles
         value: ["./values-profiles/values-dev-kind.yaml"]
+
   - name: local-dev
     patches:
       # Remove the global overridesToml field.
@@ -468,7 +469,7 @@ profiles:
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
 
-  - name: local-dev-ship
+  - name: aws-ship
     patches:
       # Remove the global overridesToml field.
       # This will be configured via a values file.
@@ -476,9 +477,7 @@ profiles:
         path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: 
-          - "./values-profiles/values-ship.yaml"
-          - "./values-profiles/new-chain.yaml"
+        value: ["./values-profiles/values-dev-ship.yaml", "./values-profiles/new-chain.yaml"]
       - op: replace
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
@@ -492,3 +491,27 @@ profiles:
               name: crib-ccip
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip
               version: null
+
+  - name: kind-ship
+    description: The profile is supposed to be used with local deployment on a Kind cluster
+    # This profile will be automatically activated
+    activation:
+      - env:
+          PROVIDER: "kind"
+    patches:
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node1.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.mockserver.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.resources
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.db.resources
+      - op: replace
+        path: deployments.app.helm.values.ccipScriptsDeployment.enabled
+        value: false
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value: ["./values-profiles/values-dev-kind-ship.yaml", "./values-profiles/new-chain.yaml"]

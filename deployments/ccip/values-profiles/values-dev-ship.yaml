@@ -2,8 +2,6 @@ crib-chainlink-cluster:
   # Disable geth if using existing testnets.
   geth:
     enabled: false
-  ccipScriptsDeployment:
-    enabled: false
   db:
     statefulSet:
       enabled: true

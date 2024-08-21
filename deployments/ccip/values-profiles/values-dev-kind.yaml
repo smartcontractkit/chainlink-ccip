@@ -11,6 +11,124 @@ crib-chainlink-cluster:
           requests:
             cpu: 50m
             memory: 256Mi
+    global:
+      toml: |-
+        RootDir = './clroot'
+
+        [Log]
+        JSONConsole = true
+        Level = 'debug'
+
+        [WebServer]
+        AllowOrigins = '*'
+        SessionTimeout = '999h0m0s'
+        HTTPPort = 6688
+        SecureCookies = false
+        HTTPWriteTimeout = '1m'
+
+        [WebServer.RateLimit]
+        Authenticated = 2000
+        Unauthenticated = 1000
+
+        [Feature]
+        FeedsManager = true
+        LogPoller = true
+        UICSAKeys = true
+
+        [OCR]
+        Enabled = true
+        DefaultTransactionQueueDepth = 0
+
+        [OCR2]
+        Enabled = true
+        DefaultTransactionQueueDepth = 150
+        SimulateTransactions = false
+
+        [P2P]
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:6690']
+        AnnounceAddresses = ['0.0.0.0:6690']
+        DeltaDial = '500ms'
+        DeltaReconcile = '5s'
+
+        [[EVM]]
+        # Celo Testnet
+        ChainID = "44787"
+        MinContractPayment = '0'
+        AutoCreateKey = true
+        FinalityDepth = 1
+        [[EVM.Nodes]]
+        Name = 'celo-testnet'
+        WSURL = 'wss://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/ws'
+        HTTPURL = 'https://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/rpc'
+
+        [[EVM]]
+
+        ChainID = "168587773"
+
+        ChainType = "optimismBedrock"
+
+        FinalityDepth = 200
+
+        FinalityTagEnabled = true
+
+        LogPollInterval = "2s"
+
+        NoNewHeadsThreshold = "40s"
+
+        MinIncomingConfirmations = 1
+
+
+        [EVM.GasEstimator]
+
+        EIP1559DynamicFees = true
+
+        PriceMin = "1 wei"
+
+        BumpMin = "100 wei"
+
+
+        [EVM.GasEstimator.BlockHistory]
+
+        BlockHistorySize = 60
+
+
+        [EVM.Transactions]
+
+        ResendAfterThreshold = "30s"
+
+
+        [EVM.HeadTracker]
+
+        HistoryDepth = 300
+
+
+        [EVM.NodePool]
+
+        SyncThreshold = 10
+
+
+        [EVM.OCR]
+
+        ContractConfirmations = 1
+
+
+
+        [EVM.OCR2.Automation]
+
+        GasLimit = 6500000
+
+
+        [[EVM.Nodes]]
+
+        Name = "168587773_rpc1"
+
+        WSURL = "wss://lb.drpc.org/ogws?network=blast-sepolia&dkey=AuNcoSFTv0kXtni3qWOy79wDyLSM4GAR7qQNGtyyLTIM"
+
+        HTTPURL = "https://lb.drpc.org/ogrpc?network=blast-sepolia&dkey=AuNcoSFTv0kXtni3qWOy79wDyLSM4GAR7qQNGtyyLTIM"
+
+        SendOnly = false
   db:
     resources:
       requests:
@@ -19,7 +137,7 @@ crib-chainlink-cluster:
     statefulSet:
       enabled: false
   geth:
-    enabled: true
+    enabled: false
     resources:
       requests:
         cpu: 50m
@@ -33,3 +151,5 @@ crib-chainlink-cluster:
       requests:
         cpu: 50m
         memory: 256Mi
+  ccipScriptsDeployment:
+    enabled: false
