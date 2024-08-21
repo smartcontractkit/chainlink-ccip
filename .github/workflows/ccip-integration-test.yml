@@ -53,6 +53,8 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/ccip
           go mod download
+          cd $GITHUB_WORKSPACE/ccip/integration-tests
+          go mod download
       - name: Build binary
         run: |
           cd $GITHUB_WORKSPACE/ccip
@@ -61,6 +63,19 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/ccip
           ./ccip.test local db preparetest
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
+      - name: Run ccip v2 integration deployment test
+        run: |
+          cd $GITHUB_WORKSPACE/ccip
+          go test -v ./integration-tests/deployment/...
+          EXITCODE=${PIPESTATUS[0]}
+          if [ $EXITCODE -ne 0 ]; then
+            echo "Deployment test failed"
+          else
+            echo "Deployment test passed!"
+          fi
+          exit $EXITCODE
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Run ccip ocr3 integration test
