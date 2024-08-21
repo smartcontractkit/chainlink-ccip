@@ -67,8 +67,8 @@ jobs:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Run ccip v2 integration deployment test
         run: |
-          cd $GITHUB_WORKSPACE/ccip
-          go test -v ./integration-tests/deployment/...
+          cd $GITHUB_WORKSPACE/ccip/integration-tests
+          go test -v ./deployment/...
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Deployment test failed"
