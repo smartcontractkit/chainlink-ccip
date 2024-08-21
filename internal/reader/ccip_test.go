@@ -49,9 +49,12 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs[chainA].On("Bind", mock.Anything, mock.Anything).Return(nil)
 	sourceCRs[chainB].On("Bind", mock.Anything, mock.Anything).Return(nil)
 	destCR.On("Bind", mock.Anything, mock.Anything).Return(nil)
-	require.NoError(t, ccipReader.contractReaders[chainA].Bind(context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
-	require.NoError(t, ccipReader.contractReaders[chainB].Bind(context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
-	require.NoError(t, ccipReader.contractReaders[chainC].Bind(context.Background(), []types.BoundContract{{Name: "OffRamp", Address: "0x3"}}))
+	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
+		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
+	require.NoError(t, ccipReader.contractReaders[chainB].Bind(
+		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
+		context.Background(), []types.BoundContract{{Name: "OffRamp", Address: "0x3"}}))
 
 	ctx := context.Background()
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
