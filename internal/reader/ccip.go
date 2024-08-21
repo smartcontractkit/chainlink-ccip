@@ -80,6 +80,7 @@ type CCIPChainReader struct {
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
 	destChain       cciptypes.ChainSelector
+	offrampAddress  string
 }
 
 func NewCCIPChainReader(
@@ -88,24 +89,10 @@ func NewCCIPChainReader(
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
-) (*CCIPChainReader, error) {
+) *CCIPChainReader {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-	}
-
-	// if we support the dest chain, bind the offramp to the extended contract reader.
-	if _, exists := crs[destChain]; exists {
-		offrampAddressString := typeconv.AddressBytesToString(offrampAddress, uint64(destChain))
-		err := crs[destChain].Bind(context.Background(), []types.BoundContract{
-			{
-				Address: offrampAddressString,
-				Name:    consts.ContractNameOffRamp,
-			},
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to bind offRamp contract (%s): %w", offrampAddressString, err)
-		}
 	}
 
 	return &CCIPChainReader{
@@ -113,7 +100,8 @@ func NewCCIPChainReader(
 		contractReaders: crs,
 		contractWriters: contractWriters,
 		destChain:       destChain,
-	}, nil
+		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
+	}
 }
 
 // WithExtendedContractReader sets the extended contract reader for the provided chain.
@@ -350,14 +338,9 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		Message           cciptypes.Message
 	}
 
-	extendedBindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
 	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
 		ctx,
-		contractBinding,
+		bindings[0].Binding,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPSendRequested,
 			Expressions: []query.Expression{
@@ -457,6 +440,23 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
+	// if we support the dest chain, bind the offramp to the extended contract reader.
+	// If the same address exists -> no-op
+	// If the contract not binded -> binds to the new address
+	// Note that this must happen before getSourceChainsConfig because we can only
+	// getSourceChainsConfig if the offramp contract is bound.
+	if _, exists := r.contractReaders[r.destChain]; exists {
+		err := r.contractReaders[r.destChain].Bind(context.Background(), []types.BoundContract{
+			{
+				Address: r.offrampAddress,
+				Name:    consts.ContractNameOffRamp,
+			},
+		})
+		if err != nil {
+			return false, fmt.Errorf("failed to bind offRamp contract (%s): %w", r.offrampAddress, err)
+		}
+	}
+
 	chains := make([]cciptypes.ChainSelector, 0, len(r.contractReaders))
 	for chain := range r.contractReaders {
 		chains = append(chains, chain)

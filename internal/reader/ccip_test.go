@@ -15,7 +15,6 @@ import (
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
@@ -40,13 +39,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	}).Return(nil)
 
 	offrampAddress := []byte{0x3}
-	destCR.On("Bind", mock.Anything, []types.BoundContract{
-		{
-			Address: typeconv.AddressBytesToString(offrampAddress, 111_111),
-			Name:    consts.ContractNameOffRamp,
-		},
-	}).Return(nil)
-	ccipReader, err := NewCCIPChainReader(
+	ccipReader := NewCCIPChainReader(
 		logger.Test(t),
 		map[cciptypes.ChainSelector]types.ContractReader{
 			chainA: sourceCRs[chainA],
@@ -54,15 +47,17 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
 	)
-	require.NoError(t, err)
 
 	sourceCRs[chainA].On("Bind", mock.Anything, mock.Anything).Return(nil)
 	sourceCRs[chainB].On("Bind", mock.Anything, mock.Anything).Return(nil)
-
+	destCR.On("Bind", mock.Anything, mock.Anything).Return(nil)
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
 		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
 	require.NoError(t, ccipReader.contractReaders[chainB].Bind(
 		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
+		context.Background(), []types.BoundContract{{Name: "OffRamp",
+			Address: typeconv.AddressBytesToString(offrampAddress, 111_111)}}))
 
 	ctx := context.Background()
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})

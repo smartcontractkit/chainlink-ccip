@@ -107,16 +107,13 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		)
 	}
 
-	ccipReader, err := reader.NewCCIPChainReader(
+	ccipReader := reader.NewCCIPChainReader(
 		p.lggr,
 		p.contractReaders,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 	)
-	if err != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create CCIPChainReader: %w", err)
-	}
 	return NewPlugin(
 			context.Background(),
 			config.OracleID,
