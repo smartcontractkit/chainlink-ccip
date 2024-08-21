@@ -14,47 +14,6 @@ crib-chainlink-cluster:
         cpu: 2
         memory: 8Gi
   chainlink:
-    nodes:
-      node1:
-        resources:
-          requests:
-            cpu: 4
-            memory: 12Gi
-          limits:
-            cpu: 4
-            memory: 12Gi
-      node2:
-        resources:
-          requests:
-            cpu: 4
-            memory: 12Gi
-          limits:
-            cpu: 4
-            memory: 12Gi
-      node3:
-        resources:
-          requests:
-            cpu: 4
-            memory: 12Gi
-          limits:
-            cpu: 4
-            memory: 12Gi
-      node4:
-        resources:
-          requests:
-            cpu: 4
-            memory: 12Gi
-          limits:
-            cpu: 4
-            memory: 12Gi
-      node5:
-        resources:
-          requests:
-            cpu: 4
-            memory: 12Gi
-          limits:
-            cpu: 4
-            memory: 12Gi
     global:
       toml: |-
         RootDir = './clroot'
@@ -106,4 +65,3 @@ crib-chainlink-cluster:
         Name = 'celo-testnet'
         WSURL = 'wss://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/ws'
         HTTPURL = 'https://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/rpc'
-        

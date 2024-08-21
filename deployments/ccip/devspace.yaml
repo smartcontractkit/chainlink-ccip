@@ -500,18 +500,7 @@ profiles:
           PROVIDER: "kind"
     patches:
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.nodes.node1.resources
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.mockserver.resources
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.geth.resources
-      - op: remove
         path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.db.resources
-      - op: replace
-        path: deployments.app.helm.values.ccipScriptsDeployment.enabled
-        value: false
       - op: add
         path: deployments.app.helm.valuesFiles
         value: ["./values-profiles/values-dev-kind-ship.yaml", "./values-profiles/new-chain.yaml"]
