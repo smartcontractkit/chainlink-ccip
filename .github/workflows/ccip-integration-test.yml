@@ -65,10 +65,10 @@ jobs:
           ./ccip.test local db preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-      - name: Run ccip integration test
+      - name: Run ccip ocr3 integration test
         run: |
           cd $GITHUB_WORKSPACE/ccip/integration-tests
-          go test -v -run '^Test0001_InitialDeploy\$' -timeout 5m ./deployment/ccip
+          go test -v -run '^Test0001_InitialDeploy$' -timeout 5m ./deployment/ccip/migrations
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Integration test failed"
