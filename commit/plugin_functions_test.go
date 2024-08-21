@@ -647,7 +647,7 @@ func Test_validateObservedTokenPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedTokenPrices(tc.tokenPrices)
+			err := ValidateObservedTokenPrices(tc.tokenPrices)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -700,7 +700,7 @@ func Test_validateObservedGasPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := validateObservedGasPrices(tc.gasPrices)
+			err := ValidateObservedGasPrices(tc.gasPrices)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -1404,7 +1404,7 @@ func Test_tokenPricesConsensus(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			prices := tokenPricesConsensus(tc.observations, tc.fChain)
+			prices := tokenPricesMedianized(tc.observations, tc.fChain)
 			assert.Equal(t, tc.expPrices, prices)
 		})
 	}
@@ -1546,7 +1546,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				chains = append(chains, snc.ChainSel)
 			}
 			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainNextSeqNums, nil)
-			valid, err := validateMerkleRootsState(ctx, lggr, rep, reader)
+			valid, err := ValidateMerkleRootsState(ctx, lggr, rep, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return

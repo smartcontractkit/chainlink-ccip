@@ -20,6 +20,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
+const (
+	defaultConfigPageSize = uint64(100)
+)
+
+//go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 type HomeChain interface {
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
@@ -121,23 +126,42 @@ func (r *homeChainPoller) poll() {
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	var chainConfigInfos []ChainConfigInfo
-	err := r.homeChainReader.GetLatestValue(
-		ctx,
-		r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
-		primitives.Unconfirmed,
-		nil,
-		&chainConfigInfos,
-	)
-	if err != nil {
-		return err
+	var allChainConfigInfos []ChainConfigInfo
+	pageIndex := uint64(0)
+
+	for {
+		var chainConfigInfos []ChainConfigInfo
+		err := r.homeChainReader.GetLatestValue(
+			ctx,
+			r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
+			primitives.Unconfirmed,
+			map[string]interface{}{
+				"pageIndex": pageIndex,
+				"pageSize":  defaultConfigPageSize,
+			},
+			&chainConfigInfos,
+		)
+		if err != nil {
+			return fmt.Errorf("get config index:%d pagesize:%d: %w", pageIndex, defaultConfigPageSize, err)
+		}
+
+		allChainConfigInfos = append(allChainConfigInfos, chainConfigInfos...)
+
+		if uint64(len(chainConfigInfos)) < defaultConfigPageSize {
+			break
+		}
+
+		pageIndex++
 	}
-	if len(chainConfigInfos) == 0 {
+
+	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, allChainConfigInfos))
+
+	if len(allChainConfigInfos) == 0 {
 		// That's a legitimate case if there are no chain configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
-	r.setState(convertOnChainConfigToHomeChainConfig(r.lggr, chainConfigInfos))
+
 	return nil
 }
 

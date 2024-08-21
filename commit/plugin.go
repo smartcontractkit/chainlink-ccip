@@ -127,7 +127,8 @@ func (p *Plugin) Observation(
 	// observe token prices if the node supports the token price chain
 	// otherwise move on to gas prices.
 	var tokenPrices []cciptypes.TokenPrice
-	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain {
+	if supportTPChain, err := p.supportsTokenPriceChain(); err == nil && supportTPChain && p.tokenPricesReader != nil {
+		p.lggr.Infow("observing token prices")
 		tokenPrices, err = observeTokenPrices(
 			ctx,
 			p.tokenPricesReader,
@@ -226,11 +227,11 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observer %d reading eligibility: %w", ao.Observer, err)
 	}
 
-	if err := validateObservedTokenPrices(obs.TokenPrices); err != nil {
+	if err := ValidateObservedTokenPrices(obs.TokenPrices); err != nil {
 		return fmt.Errorf("validate token prices: %w", err)
 	}
 
-	if err := validateObservedGasPrices(obs.GasPrices); err != nil {
+	if err := ValidateObservedGasPrices(obs.GasPrices); err != nil {
 		return fmt.Errorf("validate gas prices: %w", err)
 	}
 
@@ -276,7 +277,7 @@ func (p *Plugin) Outcome(
 	}
 	p.lggr.Infow("new messages consensus", "merkleRoots", merkleRoots)
 
-	tokenPrices := tokenPricesConsensus(decodedObservations, fChainDest)
+	tokenPrices := tokenPricesMedianized(decodedObservations, fChainDest)
 
 	gasPrices := gasPricesConsensus(p.lggr, decodedObservations, fChainDest)
 	p.lggr.Infow("gas prices consensus", "gasPrices", gasPrices)
@@ -347,7 +348,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	isValid, err := validateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
+	isValid, err := ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
 	if !isValid {
 		return false, nil
 	}

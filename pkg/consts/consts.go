@@ -9,6 +9,7 @@ const (
 	ContractNamePriceRegistry        = "PriceRegistry"
 	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
 	ContractNameCCIPConfig           = "CCIPConfig"
+	ContractNamePriceAggregator      = "AggregatorV3Interface"
 )
 
 // Method Names
@@ -37,6 +38,10 @@ const (
 	MethodNameValidatePoolReturnData        = "ValidatePoolReturnData"
 	MethodNameGetValidatedTokenPrice        = "GetValidatedTokenPrice"
 	MethodNameGetFeeTokens                  = "GetFeeTokens"
+
+	// Aggregator methods
+	MethodNameGetLatestRoundData = "latestRoundData"
+	MethodNameGetDecimals        = "decimals"
 
 	/*
 		// On EVM:
@@ -75,5 +80,5 @@ const (
 const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
-	EventAttributeDestChain      = "DestChain"
+	EventAttributeDestChain      = "destChain"
 )
