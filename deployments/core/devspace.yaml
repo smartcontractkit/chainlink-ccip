@@ -398,14 +398,6 @@ profiles:
       - env:
           PROVIDER: "kind"
     patches:
-      - op: remove
-        path: deployments.app.helm.values.chainlink.nodes.node1.resources
-      - op: remove
-        path: deployments.app.helm.values.geth.resources
-      - op: remove
-        path: deployments.app.helm.values.mockserver.resources
-      - op: remove
-        path: deployments.app.helm.values.db.resources
       - op: replace
         path: deployments.beholder-test-client.helm.values.beholder-test-client
         value:
