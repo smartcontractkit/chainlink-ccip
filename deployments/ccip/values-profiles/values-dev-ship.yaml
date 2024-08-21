@@ -2,17 +2,6 @@ crib-chainlink-cluster:
   # Disable geth if using existing testnets.
   geth:
     enabled: false
-  db:
-    statefulSet:
-      enabled: true
-      capacity: 30Gi
-    resources:
-      requests:
-        cpu: 2
-        memory: 8Gi
-      limits:
-        cpu: 2
-        memory: 8Gi
   chainlink:
     global:
       toml: |-
