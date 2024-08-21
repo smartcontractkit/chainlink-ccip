@@ -87,10 +87,25 @@ func NewCCIPChainReader(
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
-) *CCIPChainReader {
+	offrampAddress []byte,
+) (*CCIPChainReader, error) {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
+	}
+
+	// if we support the dest chain, bind the offramp to the extended contract reader.
+	if _, exists := crs[destChain]; exists {
+		offrampAddressString := typeconv.AddressBytesToString(offrampAddress, uint64(destChain))
+		err := crs[destChain].Bind(context.Background(), []types.BoundContract{
+			{
+				Address: offrampAddressString,
+				Name:    consts.ContractNameOffRamp,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to bind offRamp contract (%s): %w", offrampAddressString, err)
+		}
 	}
 
 	return &CCIPChainReader{
@@ -98,7 +113,7 @@ func NewCCIPChainReader(
 		contractReaders: crs,
 		contractWriters: contractWriters,
 		destChain:       destChain,
-	}
+	}, nil
 }
 
 // WithExtendedContractReader sets the extended contract reader for the provided chain.
