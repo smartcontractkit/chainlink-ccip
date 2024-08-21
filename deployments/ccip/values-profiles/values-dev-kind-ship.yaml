@@ -6,12 +6,6 @@ ccipScriptsDeployment:
 
 crib-chainlink-cluster:
   chainlink:
-    nodes:
-      node1:
-        resources:
-          requests:
-            cpu: 50m
-            memory: 256Mi
     global:
       toml: |-
         RootDir = './clroot'
@@ -72,18 +66,5 @@ crib-chainlink-cluster:
       enabled: false
   geth:
     enabled: false
-    resources:
-      requests:
-        cpu: 50m
-        memory: 256Mi
-    statefulSet:
-      enabled: false
-  ingress:
-    ingressClassName: nginx
-  mockserver:
-    resources:
-      requests:
-        cpu: 50m
-        memory: 256Mi
   ccipScriptsDeployment:
     enabled: false

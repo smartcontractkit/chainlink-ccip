@@ -503,4 +503,4 @@ profiles:
         path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-kind-ship.yaml", "./values-profiles/new-chain.yaml"]
+        value: ["./values-profiles/values-dev-kind.yaml", "./values-profiles/values-dev-kind-ship.yaml", "./values-profiles/new-chain.yaml"]
