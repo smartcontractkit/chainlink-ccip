@@ -68,6 +68,9 @@ jobs:
       - name: Run ccip ocr3 integration test
         run: |
           cd $GITHUB_WORKSPACE/ccip/integration-tests
+          ls -lharti deployment
+          ls -lharti deployment/ccip
+          ls -lharti deployment/ccip/migrations
           go test -v -run '^Test0001_InitialDeploy$' -timeout 5m ./deployment/ccip/migrations
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
