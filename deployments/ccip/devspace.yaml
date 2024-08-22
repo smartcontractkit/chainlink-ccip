@@ -484,7 +484,7 @@ profiles:
       - op: replace
         path: deployments.app.helm.values.crib-chainlink-cluster.geth.enabled
         value: false
-            
+
   # Resolve local chart versions for development
   - name: local-charts
     merge:
