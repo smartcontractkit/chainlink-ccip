@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"golang.org/x/exp/maps"
 
@@ -27,7 +30,15 @@ func (p *Plugin) Outcome(
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 	commitQuery := Query{}
 
-	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.cfg.DestChain, aos)
+	consensusObservation, err := getConsensusObservation(
+		p.lggr,
+		p.reportingCfg.F,
+		p.cfg.DestChain,
+		p.cfg.OffchainConfig,
+		previousOutcome.LastPricesUpdate,
+		aos,
+	)
+
 	if err != nil {
 		return ocr3types.Outcome{}, err
 	}
@@ -169,10 +180,14 @@ func getConsensusObservation(
 	lggr logger.Logger,
 	F int,
 	destChain cciptypes.ChainSelector,
+	offchainCfg pluginconfig.CommitOffchainConfig,
+	//tokenUpdateFrequency commonconfig.Duration,
+	lastPricesUpdate time.Time,
 	aos []types.AttributedObservation,
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 	fChains := fChainConsensus(lggr, F, aggObs.FChain)
+	timestampConsensus := TimestampSortedMiddle(aggObs.Timestamps)
 
 	fDestChain, exists := fChains[destChain]
 	if !exists {
@@ -180,12 +195,22 @@ func getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
+	feedPricesConsensus := feedTokenPricesConsensus(lggr, aggObs.FeedTokenPrices, fDestChain)
+	registryPricesConsensus := priceRegistryTokenPricesConsensus(lggr, aggObs.PriceRegistryTokenUpdates, fDestChain)
+	tokePrices := selectTokens(
+		lggr,
+		feedPricesConsensus,
+		registryPricesConsensus,
+		timestampConsensus,
+		lastPricesUpdate,
+		offchainCfg.TokenPriceBatchWriteFrequency,
+		offchainCfg.PriceSources,
+	)
 	consensusObs := ConsensusObservation{
 		MerkleRoots: merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
 		// TODO: use consensus of observed gas prices
-		GasPrices: make(map[cciptypes.ChainSelector]cciptypes.BigInt),
-		// TODO: use consensus of observed token prices
-		TokenPrices:        tokenPricesConsensus(lggr, aggObs.FeedTokenPrices, aggObs.PriceRegistryTokenUpdates, fChains),
+		GasPrices:          make(map[cciptypes.ChainSelector]cciptypes.BigInt),
+		TokenPrices:        tokePrices,
 		OnRampMaxSeqNums:   onRampMaxSeqNumsConsensus(lggr, aggObs.OnRampMaxSeqNums, fChains),
 		OffRampNextSeqNums: offRampMaxSeqNumsConsensus(lggr, aggObs.OffRampNextSeqNums, fDestChain),
 		FChain:             fChains,
@@ -194,13 +219,82 @@ func getConsensusObservation(
 	return consensusObs, nil
 }
 
-func tokenPricesConsensus(
+// Checks which tokens need to be updated based on the observed token prices and the price registry updates
+// if time passed since the last update is greater than the stale threshold, update all tokens
+// otherwise calculate deviation between the price registry and feed and include deviated token prices
+func selectTokens(
+	lggr logger.Logger,
+	medianizedFeedTokenPrices map[types.Account]cciptypes.BigInt,
+	medianizedRegistryPrices map[types.Account]cciptypes.BigInt,
+	consensusTimestamp time.Time,
+	lastPricesUpdate time.Time,
+	updateFrequency commonconfig.Duration,
+	priceSources map[types.Account]pluginconfig.ArbitrumPriceSource,
+) map[types.Account]cciptypes.BigInt {
+	tokenPrices := make(map[types.Account]cciptypes.BigInt)
+	// if the time since the last update is greater than the update frequency, update all tokens
+	if consensusTimestamp.Sub(lastPricesUpdate) > updateFrequency.Duration() {
+		return medianizedFeedTokenPrices
+	}
+
+	// otherwise, calculate the deviation between the feed and the price registry
+	for token, feedPrice := range medianizedFeedTokenPrices {
+		registryPrice, exists := medianizedRegistryPrices[token]
+		if !exists {
+			lggr.Warnf("could not find registry price for token %s", token)
+			continue
+		}
+
+		if Deviates(feedPrice.Int, registryPrice.Int, 1e9) {
+			tokenPrices[token] = feedPrice
+		}
+	}
+
+	return make(map[types.Account]cciptypes.BigInt)
+}
+
+// feedTokenPricesConsensus returns the median of the feed token prices for each token given all observed prices
+func feedTokenPricesConsensus(
 	lggr logger.Logger,
 	feedTokenPrices map[types.Account][]cciptypes.BigInt,
-	priceRegistryTokenUpdates map[types.Account][]sharedtypes.NumericalUpdate,
-	fChains map[cciptypes.ChainSelector]int,
+	fDestChain int,
 ) map[types.Account]cciptypes.BigInt {
-	return make(map[types.Account]cciptypes.BigInt)
+	tokenPrices := make(map[types.Account]cciptypes.BigInt)
+	for token, prices := range feedTokenPrices {
+		if len(prices) < 2*fDestChain+1 {
+			lggr.Warnf("could not reach consensus on feed token prices for token %s ", token)
+			continue
+		}
+		tokenPrices[token] = BigIntSortedMiddle(prices)
+	}
+	return tokenPrices
+}
+
+// priceRegistryTokenPricesConsensus returns the median of the price registry token prices for each token given all observed updates
+func priceRegistryTokenPricesConsensus(
+	lggr logger.Logger,
+	priceRegistryTokenUpdates map[types.Account][]sharedtypes.NumericalUpdate,
+	fDestChain int,
+) map[types.Account]cciptypes.BigInt {
+	tokenPrices := make(map[types.Account]cciptypes.BigInt)
+	for token, updates := range priceRegistryTokenUpdates {
+		if len(updates) < 2*fDestChain+1 {
+			lggr.Warnf("could not reach consensus on price registry token updates for token %s ", token)
+			continue
+		}
+		// for each update get the median for the token price
+		var prices []cciptypes.BigInt
+		//var timestamps []time.Time
+		for _, update := range updates {
+			prices = append(prices, update.Value)
+			//timestamps = append(timestamps, update.Timestamp)
+		}
+		medianPrice := BigIntSortedMiddle(prices)
+		//medianTimestamp := TimestampSortedMiddle(timestamps)
+		tokenPrices[token] = cciptypes.NewBigInt(medianPrice.Int)
+	}
+
+	return tokenPrices
 }
 
 // Given a mapping from chains to a list of merkle roots, return a mapping from chains to a single consensus merkle
@@ -345,6 +439,19 @@ func counts[T comparable](elems []T) map[T]int {
 	return m
 }
 
+func TimestampSortedMiddle(timestamps []time.Time) time.Time {
+	if len(timestamps) == 0 {
+		return time.Time{}
+	}
+	valsCopy := make([]time.Time, len(timestamps))
+	copy(valsCopy[:], timestamps[:])
+	sort.Slice(valsCopy, func(i, j int) bool {
+		return valsCopy[i].Before(valsCopy[j])
+	})
+
+	return valsCopy[len(valsCopy)/2]
+}
+
 // Deviates checks if x1 and x2 deviates based on the provided ppb (parts per billion)
 // ppb is calculated based on the smaller value of the two
 // e.g, if x1 > x2, deviation_parts_per_billion = ((x1 - x2) / x2) * 1e9
@@ -367,15 +474,15 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 // BigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.
 // If length of the provided slice is even, the right-hand-side value of the middle 2 numbers is returned.
 // The objective of this function is to always pick within the range of values reported by honest nodes when we have 2f+1 values.
-func BigIntSortedMiddle(vals []*big.Int) *big.Int {
+func BigIntSortedMiddle(vals []cciptypes.BigInt) cciptypes.BigInt {
 	if len(vals) == 0 {
-		return nil
+		return cciptypes.BigInt{}
 	}
 
-	valsCopy := make([]*big.Int, len(vals))
+	valsCopy := make([]cciptypes.BigInt, len(vals))
 	copy(valsCopy[:], vals[:])
 	sort.Slice(valsCopy, func(i, j int) bool {
-		return valsCopy[i].Cmp(valsCopy[j]) == -1
+		return valsCopy[i].Cmp(valsCopy[j].Int) == -1
 	})
 	return valsCopy[len(valsCopy)/2]
 }

@@ -86,6 +86,9 @@ type AggregatedObservation struct {
 
 	// A map from chain selectors to the list of f (failure tolerance) observed for each chain
 	FChain map[cciptypes.ChainSelector][]int
+
+	// timestamps observed by each node
+	Timestamps []time.Time
 }
 
 // aggregateObservations takes a list of observations and produces an AggregatedObservation
@@ -98,6 +101,7 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 		OnRampMaxSeqNums:          make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums:        make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		FChain:                    make(map[cciptypes.ChainSelector][]int),
+		Timestamps:                make([]time.Time, 0),
 	}
 
 	for _, ao := range aos {
@@ -147,6 +151,9 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 		for chainSel, f := range obs.FChain {
 			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
 		}
+
+		// Timestamps
+		aggObs.Timestamps = append(aggObs.Timestamps, obs.Timestamp)
 	}
 
 	return aggObs
