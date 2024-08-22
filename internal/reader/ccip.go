@@ -58,7 +58,8 @@ type CCIP interface {
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
 
-	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address.
+	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
+	// it must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
 		source, dest cciptypes.ChainSelector,

@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -255,7 +256,8 @@ func (p *Plugin) Observation(
 				nonceRequestArgs[commitReport.SourceChainSelector] = make(map[string]struct{})
 			}
 			for _, msg := range commitReport.Messages {
-				nonceRequestArgs[commitReport.SourceChainSelector][msg.Sender.String()] = struct{}{}
+				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
+				nonceRequestArgs[commitReport.SourceChainSelector][sender] = struct{}{}
 			}
 		}
 
@@ -313,30 +315,13 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
 func selectReport(
-	ctx context.Context,
 	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
-	encoder cciptypes.ExecutePluginCodec,
-	tokenDataReader exectypes.TokenDataReader,
-	estimateProvider gas.EstimateProvider,
-	nonces map[cciptypes.ChainSelector]map[string]uint64,
 	commitReports []exectypes.CommitData,
-	maxReportSizeBytes int,
-	maxGas uint64,
+	builder report.ExecReportBuilder,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	builder := report.NewBuilder(
-		ctx,
-		lggr,
-		hasher,
-		tokenDataReader,
-		encoder,
-		estimateProvider,
-		nonces,
-		uint64(maxReportSizeBytes),
-		maxGas)
 	var stillPendingReports []exectypes.CommitData
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
@@ -458,17 +443,21 @@ func (p *Plugin) Outcome(
 		commitReports := previousOutcome.PendingCommitReports
 
 		// TODO: this function should be pure, a context should not be needed.
-		outcomeReports, commitReports, err := selectReport(
+		builder := report.NewBuilder(
 			context.Background(),
 			p.lggr,
 			p.msgHasher,
-			p.reportCodec,
 			p.tokenDataReader,
+			p.reportCodec,
 			p.estimateProvider,
 			observation.Nonces,
-			commitReports,
-			maxReportSizeBytes,
+			p.cfg.DestChain,
+			uint64(maxReportSizeBytes),
 			p.cfg.OffchainConfig.BatchGasLimit)
+		outcomeReports, commitReports, err := selectReport(
+			p.lggr,
+			commitReports,
+			builder)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 		}

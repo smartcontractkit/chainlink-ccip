@@ -27,6 +27,7 @@ func NewBuilder(
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider gas.EstimateProvider,
 	nonces map[cciptypes.ChainSelector]map[string]uint64,
+	destChainSelector cciptypes.ChainSelector,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
 ) ExecReportBuilder {
@@ -41,6 +42,7 @@ func NewBuilder(
 		sendersNonce:     nonces,
 		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
 
+		destChainSelector:  destChainSelector,
 		maxReportSizeBytes: maxReportSizeBytes,
 		maxGas:             maxGas,
 	}
@@ -71,6 +73,7 @@ type execReportBuilder struct {
 	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
 
 	// Config
+	destChainSelector  cciptypes.ChainSelector
 	maxReportSizeBytes uint64
 	maxGas             uint64
 

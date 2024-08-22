@@ -13,8 +13,9 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 // and sequence number.
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
-// NonceObsservations contain the latest nonce for senders in the previously observed messages.
-// Nonces are organized by source chain selector and the string encoded sender address.
+// NonceObservations contain the latest nonce for senders in the previously observed messages.
+// Nonces are organized by source chain selector and the string encoded sender address. The address
+// must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
 // Observation is the observation of the ExecutePlugin.

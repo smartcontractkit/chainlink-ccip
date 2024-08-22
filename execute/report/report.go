@@ -13,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 )
 
 // buildSingleChainReportHelper converts the on-chain event data stored in cciptypes.ExecutePluginCommitData into the
@@ -226,7 +227,7 @@ func (b *execReportBuilder) checkMessage(
 		}
 
 		chainNonces := b.sendersNonce[execReport.SourceChain]
-		sender := msg.Sender.String()
+		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(b.destChainSelector))
 		if _, ok := chainNonces[sender]; !ok {
 			b.lggr.Errorw("Skipping message - missing nonce",
 				"messageID", msg.Header.MessageID,
