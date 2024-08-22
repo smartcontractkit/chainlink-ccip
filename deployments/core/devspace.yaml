@@ -14,7 +14,9 @@ vars:
   COMPONENTS_DIR:
     source: env
     default: "../../components"
-  CHAINLINK_REPO_DIR: "${CHAINLINK_CODE_DIR}/chainlink"
+  CHAINLINK_REPO_DIR:
+    source: env
+    default: "${CHAINLINK_CODE_DIR}/chainlink"
   CHAINLINK_CLUSTER_HELM_CHART_URI:
     source: env
     default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
