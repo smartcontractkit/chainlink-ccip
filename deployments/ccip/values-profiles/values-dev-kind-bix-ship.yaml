@@ -1,9 +1,3 @@
-ccipScriptsDeployment:
-  enabled: false
-  extraEnvs:
-    - name: AWS_IAM_ENABLED
-      value: "false"
-
 crib-chainlink-cluster:
   chainlink:
     global:
@@ -57,14 +51,3 @@ crib-chainlink-cluster:
         Name = 'celo-testnet'
         WSURL = 'wss://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/ws'
         HTTPURL = 'https://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/rpc'
-  db:
-    resources:
-      requests:
-        cpu: 50m
-        memory: 256Mi
-    statefulSet:
-      enabled: false
-  geth:
-    enabled: false
-  ccipScriptsDeployment:
-    enabled: false

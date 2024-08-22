@@ -469,7 +469,7 @@ profiles:
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
 
-  - name: aws-ship
+  - name: eks-bix-ship
     patches:
       # Remove the global overridesToml field.
       # This will be configured via a values file.
@@ -477,10 +477,14 @@ profiles:
         path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-ship.yaml", "./values-profiles/new-chain.yaml"]
+        value: ["./values-profiles/values-dev-eks-bix-ship.yaml", "./values-profiles/new-chain.yaml"]
       - op: replace
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
+      - op: replace
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.enabled
+        value: false
+            
   # Resolve local chart versions for development
   - name: local-charts
     merge:
@@ -492,15 +496,24 @@ profiles:
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip
               version: null
 
-  - name: kind-ship
-    description: The profile is supposed to be used with local deployment on a Kind cluster
+  - name: kind-bix-ship
+    description: The profile is supposed to be used with local deployment on a Kind cluster for bix-ship
     # This profile will be automatically activated
     activation:
       - env:
           PROVIDER: "kind"
     patches:
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
+        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-kind.yaml", "./values-profiles/values-dev-kind-ship.yaml", "./values-profiles/new-chain.yaml"]
+        value: ["./values-profiles/values-dev-kind.yaml", "./values-profiles/values-dev-kind-bix-ship.yaml", "./values-profiles/new-chain.yaml"]
+      - op: remove
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
+      - op: replace
+        path: deployments.app.helm.values.crib-chainlink-cluster.geth.enabled
+        value: false
+      - op: replace
+        path: deployments.app.helm.values.ccipScriptsDeployment.enabled
+        value: false
+      
