@@ -181,7 +181,6 @@ func getConsensusObservation(
 	F int,
 	destChain cciptypes.ChainSelector,
 	offchainCfg pluginconfig.CommitOffchainConfig,
-	//tokenUpdateFrequency commonconfig.Duration,
 	lastPricesUpdate time.Time,
 	aos []types.AttributedObservation,
 ) (ConsensusObservation, error) {
@@ -195,12 +194,12 @@ func getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
-	feedPricesConsensus := feedTokenPricesConsensus(lggr, aggObs.FeedTokenPrices, fDestChain)
-	registryPricesConsensus := priceRegistryTokenPricesConsensus(lggr, aggObs.PriceRegistryTokenUpdates, fDestChain)
+	feedPrices := feedPricesConsensus(lggr, aggObs.FeedTokenPrices, fDestChain)
+	registryPrices := registryPricesConsensus(lggr, aggObs.PriceRegistryTokenUpdates, fDestChain)
 	tokePrices := selectTokens(
 		lggr,
-		feedPricesConsensus,
-		registryPricesConsensus,
+		feedPrices,
+		registryPrices,
 		timestampConsensus,
 		lastPricesUpdate,
 		offchainCfg.TokenPriceBatchWriteFrequency,
@@ -229,7 +228,7 @@ func selectTokens(
 	consensusTimestamp time.Time,
 	lastPricesUpdate time.Time,
 	updateFrequency commonconfig.Duration,
-	priceSources map[types.Account]pluginconfig.TokenInfo,
+	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) map[types.Account]cciptypes.BigInt {
 	tokenPrices := make(map[types.Account]cciptypes.BigInt)
 	// if the time since the last update is greater than the update frequency, update all tokens
@@ -245,7 +244,14 @@ func selectTokens(
 			continue
 		}
 
-		if Deviates(feedPrice.Int, registryPrice.Int, 1e9) {
+		ti, ok := tokenInfo[token]
+		if !ok {
+			lggr.Warnf("could not find token info for token %s", token)
+			continue
+		}
+
+		deviation := ti.DeviationPPB.Int64()
+		if Deviates(feedPrice.Int, registryPrice.Int, deviation) {
 			tokenPrices[token] = feedPrice
 		}
 	}
@@ -253,8 +259,8 @@ func selectTokens(
 	return make(map[types.Account]cciptypes.BigInt)
 }
 
-// feedTokenPricesConsensus returns the median of the feed token prices for each token given all observed prices
-func feedTokenPricesConsensus(
+// feedPricesConsensus returns the median of the feed token prices for each token given all observed prices
+func feedPricesConsensus(
 	lggr logger.Logger,
 	feedTokenPrices map[types.Account][]cciptypes.BigInt,
 	fDestChain int,
@@ -270,8 +276,8 @@ func feedTokenPricesConsensus(
 	return tokenPrices
 }
 
-// priceRegistryTokenPricesConsensus returns the median of the price registry token prices for each token given all observed updates
-func priceRegistryTokenPricesConsensus(
+// registryPricesConsensus returns the median of the price registry token prices for each token given all observed updates
+func registryPricesConsensus(
 	lggr logger.Logger,
 	priceRegistryTokenUpdates map[types.Account][]sharedtypes.NumericalUpdate,
 	fDestChain int,
