@@ -13,6 +13,9 @@ vars:
   COMPONENTS_DIR:
     source: env
     default: "../../components"
+  CHAINLINK_REPO_DIR:
+    source: env
+    default: "${CHAINLINK_CODE_DIR}/ccip"
   # Env Vars Required for ccip-scripts based contracts and jobs deployment
   # Image URI required for deploying CCIP Contracts and Jobs
   DEVSPACE_CCIP_SCRIPTS_IMAGE:
