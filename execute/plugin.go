@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -19,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -168,6 +170,7 @@ func (p *Plugin) Observation(
 	}
 
 	state := previousOutcome.State.Next()
+	p.lggr.Debugw("Execute plugin performing observation", "state", state)
 	switch state {
 	case exectypes.GetCommitReports:
 		fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
@@ -185,7 +188,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -203,7 +206,7 @@ func (p *Plugin) Observation(
 				commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
 			}
 
-			for selector, reports := range commitReportCache {
+			for srcChain, reports := range commitReportCache {
 				if len(reports) == 0 {
 					continue
 				}
@@ -215,15 +218,16 @@ func (p *Plugin) Observation(
 
 				// Read messages for each range.
 				for _, seqRange := range ranges {
-					msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, selector, seqRange)
+					// TODO: check if srcChain is supported.
+					msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqRange)
 					if err != nil {
 						return nil, err
 					}
 					for _, msg := range msgs {
-						if _, ok := messages[selector]; !ok {
-							messages[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
+						if _, ok := messages[srcChain]; !ok {
+							messages[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 						}
-						messages[selector][msg.Header.SequenceNumber] = msg
+						messages[srcChain][msg.Header.SequenceNumber] = msg
 					}
 				}
 			}
@@ -240,11 +244,36 @@ func (p *Plugin) Observation(
 		}
 
 		// TODO: Fire off messages for an attestation check service.
-		return exectypes.NewObservation(groupedCommits, messages).Encode()
+		return exectypes.NewObservation(groupedCommits, messages, nil).Encode()
 
 	case exectypes.Filter:
-		// TODO: pass the previous two through, add in the nonces.
-		return types.Observation{}, fmt.Errorf("unknown state")
+		// TODO: add in nonces, other data comes from previous outcome.
+		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
+
+		// Collect unique senders.
+		for _, commitReport := range previousOutcome.Report.ChainReports {
+			if _, ok := nonceRequestArgs[commitReport.SourceChainSelector]; !ok {
+				nonceRequestArgs[commitReport.SourceChainSelector] = make(map[string]struct{})
+			}
+			for _, msg := range commitReport.Messages {
+				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
+				nonceRequestArgs[commitReport.SourceChainSelector][sender] = struct{}{}
+			}
+		}
+
+		// Read args from chain.
+		nonceObservations := make(exectypes.NonceObservations)
+		for srcChain, addrSet := range nonceRequestArgs {
+			// TODO: check if srcSelector is supported.
+			addrs := maps.Keys(addrSet)
+			nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.cfg.DestChain, addrs)
+			if err != nil {
+				return types.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
+			}
+			nonceObservations[srcChain] = nonces
+		}
+
+		return exectypes.NewObservation(nil, nil, nonceObservations).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -286,28 +315,13 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
 func selectReport(
-	ctx context.Context,
 	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
-	encoder cciptypes.ExecutePluginCodec,
-	tokenDataReader exectypes.TokenDataReader,
-	estimateProvider gas.EstimateProvider,
 	commitReports []exectypes.CommitData,
-	maxReportSizeBytes int,
-	maxGas uint64,
+	builder report.ExecReportBuilder,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	builder := report.NewBuilder(
-		ctx,
-		lggr,
-		hasher,
-		tokenDataReader,
-		encoder,
-		estimateProvider,
-		uint64(maxReportSizeBytes),
-		maxGas)
 	var stillPendingReports []exectypes.CommitData
 	for i, report := range commitReports {
 		// Reports at the end may not have messages yet.
@@ -363,6 +377,7 @@ func (p *Plugin) Outcome(
 
 	p.lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", p.reportingCfg.OracleID),
+		"oracle", p.reportingCfg.OracleID,
 		"decodedObservations", decodedObservations)
 
 	fChain, err := p.homeChain.GetFChain()
@@ -377,6 +392,7 @@ func (p *Plugin) Outcome(
 
 	p.lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged commit observations", p.reportingCfg.OracleID),
+		"oracle", p.reportingCfg.OracleID,
 		"mergedCommitObservations", mergedCommitObservations)
 
 	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
@@ -386,35 +402,31 @@ func (p *Plugin) Outcome(
 
 	p.lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", p.reportingCfg.OracleID),
+		"oracle", p.reportingCfg.OracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
-		mergedMessageObservations)
+		mergedMessageObservations,
+		nil)
 
-	//////////////////////////
-	// common preprocessing //
-	//////////////////////////
-
-	// flatten commit reports and sort by timestamp.
-	var commitReports []exectypes.CommitData
-	for _, report := range observation.CommitReports {
-		commitReports = append(commitReports, report...)
-	}
-	sort.Slice(commitReports, func(i, j int) bool {
-		return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
-	})
-
-	p.lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: commit reports", p.reportingCfg.OracleID),
-		"commitReports", commitReports)
-
+	var outcome exectypes.Outcome
 	state := previousOutcome.State.Next()
 	switch state {
 	case exectypes.GetCommitReports:
-		outcome := exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
-		return outcome.Encode()
+		// flatten commit reports and sort by timestamp.
+		var commitReports []exectypes.CommitData
+		for _, report := range observation.CommitReports {
+			commitReports = append(commitReports, report...)
+		}
+		sort.Slice(commitReports, func(i, j int) bool {
+			return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
+		})
+
+		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
 	case exectypes.GetMessages:
+		commitReports := previousOutcome.PendingCommitReports
+
 		// add messages to their commitReports.
 		for i, report := range commitReports {
 			report.Messages = nil
@@ -426,17 +438,26 @@ func (p *Plugin) Outcome(
 			commitReports[i].Messages = report.Messages
 		}
 
+		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
+	case exectypes.Filter:
+		commitReports := previousOutcome.PendingCommitReports
+
 		// TODO: this function should be pure, a context should not be needed.
-		outcomeReports, commitReports, err :=
-			selectReport(
-				context.Background(),
-				p.lggr, p.msgHasher,
-				p.reportCodec,
-				p.tokenDataReader,
-				p.estimateProvider,
-				commitReports,
-				maxReportSizeBytes,
-				p.cfg.OffchainConfig.BatchGasLimit)
+		builder := report.NewBuilder(
+			context.Background(),
+			p.lggr,
+			p.msgHasher,
+			p.tokenDataReader,
+			p.reportCodec,
+			p.estimateProvider,
+			observation.Nonces,
+			p.cfg.DestChain,
+			uint64(maxReportSizeBytes),
+			p.cfg.OffchainConfig.BatchGasLimit)
+		outcomeReports, commitReports, err := selectReport(
+			p.lggr,
+			commitReports,
+			builder)
 		if err != nil {
 			return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
 		}
@@ -445,21 +466,22 @@ func (p *Plugin) Outcome(
 			ChainReports: outcomeReports,
 		}
 
-		outcome := exectypes.NewOutcome(state, commitReports, execReport)
-		if outcome.IsEmpty() {
-			return nil, nil
-		}
-
-		p.lggr.Infow(
-			fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
-			"outcome", outcome)
-
-		return outcome.Encode()
-	case exectypes.Filter:
-		panic("not implemented")
+		outcome = exectypes.NewOutcome(state, commitReports, execReport)
 	default:
 		panic("unknown state")
 	}
+
+	if outcome.IsEmpty() {
+		return nil, nil
+	}
+
+	p.lggr.Infow(
+		fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
+		"oracle", p.reportingCfg.OracleID,
+		"execPluginState", state,
+		"outcome", outcome)
+
+	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {

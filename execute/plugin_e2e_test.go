@@ -50,7 +50,8 @@ func TestPlugin(t *testing.T) {
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
-	// In the first round there is a pending commit report only.
+	// Round 1.
+	// One pending commit report only.
 	// Two of the messages are executed which should be indicated in the Outcome.
 	res, err := runner.RunRound(ctx)
 	require.NoError(t, err)
@@ -60,18 +61,26 @@ func TestPlugin(t *testing.T) {
 	require.Len(t, outcome.PendingCommitReports, 1)
 	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
-	// In the second round there is an exec report and the pending commit report is removed.
-	// The exec report should indicate the following messages are executed: 102, 103, 104, 105.
+	// Round 2.
+	// Messages now attached to the pending commit.
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
 	outcome, err = exectypes.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
-	require.Len(t, outcome.Report.ChainReports, 1)
-	require.Len(t, outcome.PendingCommitReports, 0)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.PendingCommitReports, 1)
+
+	// Round 3.
+	// An execute report with the following messages executed: 102, 103, 104, 105.
+	res, err = runner.RunRound(ctx)
+	require.NoError(t, err)
+	outcome, err = exectypes.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
 	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+
 }
 
 type nodeSetup struct {
