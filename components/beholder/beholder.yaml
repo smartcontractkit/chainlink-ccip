@@ -3,10 +3,18 @@ version: v2beta1
 pipelines:
   beholder:
     run: |-
+      create_deployments configs
+      create_deployments beholder-prometheus
+
       create_deployments crib-beholder-infra
       create_deployments beholder-test-client
 
 deployments:
+  configs:
+    kubectl:
+      manifests:
+      - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
+
   beholder-test-client:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
@@ -25,6 +33,37 @@ deployments:
             - -otel-exporter-grpc-enpoint
             - crib-beholder-infra-otel-collector-agent:4317
 
+  beholder-prometheus:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: prom/prometheus
+            args:
+            - "--config.file=/etc/prometheus/config/prometheus.yml"
+            volumeMounts:
+            - containerPath: /etc/prometheus/config
+              volume:
+                name: config-volume
+        podSecurityContext:
+          fsGroup: 65534
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          fsGroup: 65534
+        service:
+          name: beholder-prometheus
+          selector:
+            app: beholder-prometheus
+          ports:
+          - port: 9090
+        volumes:
+          - name: config-volume
+            configMap:
+              name: prometheus-config
   crib-beholder-infra:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
