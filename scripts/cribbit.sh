@@ -98,7 +98,7 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 	else
 		echo "Error: '.env' file not found at ${env_file}."
 		read -r -p "CRIB deployment requires several environment variables. Since you don’t have a custom '.env' file set up, would you like to use the predefined '.env' file instead? (yes/no): " choice
-		if [[ "$choice" == "yes" || "$choice" == "y" ]]; then
+		if [[ $choice == "yes" || $choice == "y" ]]; then
 			cp "${env_file}.example" "${env_file}"
 			echo "Info: Copied ${env_file}.example to ${env_file} path."
 		else
