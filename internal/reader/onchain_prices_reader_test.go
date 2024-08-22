@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -18,9 +19,12 @@ import (
 )
 
 const (
-	EthAddr = ocr2types.Account("0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2")
-	OpAddr  = ocr2types.Account("0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2")
-	ArbAddr = ocr2types.Account("0x4e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	ArbAddr           = ocr2types.Account("0x1e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	ArbAggregatorAddr = ocr2types.Account("024e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+
+	EthAddr = ocr2types.Account("0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+
+	OpAddr = ocr2types.Account("0x5e03388D351BF87CF2409EFf18C45Df59775Fbb2")
 )
 
 var (
@@ -34,7 +38,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	testCases := []struct {
 		name          string
 		inputTokens   []ocr2types.Account
-		priceSources  map[ocr2types.Account]pluginconfig.ArbitrumPriceSource
+		tokenInfo     map[ocr2types.Account]pluginconfig.TokenInfo
 		tokenDecimals map[ocr2types.Account]uint8
 		mockPrices    []*big.Int
 		want          []*big.Int
@@ -44,11 +48,12 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		{
 			name: "On-chain one price",
 			// No need to put sources as we're mocking the reader
-			priceSources: map[ocr2types.Account]pluginconfig.ArbitrumPriceSource{},
-			tokenDecimals: map[ocr2types.Account]uint8{
-				ArbAddr: Decimals18,
-				OpAddr:  Decimals18,
-				EthAddr: Decimals18,
+			tokenInfo: map[ocr2types.Account]pluginconfig.TokenInfo{
+				ArbAddr: {
+					AggregatorAddress: string(ArbAggregatorAddr),
+					DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
+					Decimals:          Decimals18,
+				},
 			},
 			inputTokens: []ocr2types.Account{ArbAddr},
 			//TODO: change once we have control to return different prices in mock depending on the token
@@ -57,7 +62,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		},
 		{
 			name:          "Missing price should error",
-			priceSources:  map[ocr2types.Account]pluginconfig.ArbitrumPriceSource{},
+			tokenInfo:     map[ocr2types.Account]pluginconfig.TokenInfo{},
 			inputTokens:   []ocr2types.Account{ArbAddr},
 			mockPrices:    []*big.Int{},
 			errorAccounts: []ocr2types.Account{EthAddr},
@@ -70,8 +75,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		contractReader := createMockReader(tc.mockPrices, tc.errorAccounts)
 		tokenPricesReader := OnchainTokenPricesReader{
 			ContractReader: contractReader,
-			PriceSources:   tc.priceSources,
-			TokenDecimals:  tc.tokenDecimals,
+			TokenInfo:      tc.tokenInfo,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -134,7 +138,7 @@ func createMockReader(
 	errorAccounts []ocr2types.Account,
 ) *mocks.ContractReaderMock {
 	reader := mocks.NewContractReaderMock()
-	// TODO: Create a list of bound contracts from priceSources and return the price given in mockPrices
+	// TODO: Create a list of bound contracts from tokenInfo and return the price given in mockPrices
 	reader.On("GetLatestValue",
 		mock.Anything,
 		consts.ContractNamePriceAggregator,

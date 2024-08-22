@@ -204,7 +204,7 @@ func getConsensusObservation(
 		timestampConsensus,
 		lastPricesUpdate,
 		offchainCfg.TokenPriceBatchWriteFrequency,
-		offchainCfg.PriceSources,
+		offchainCfg.TokenInfo,
 	)
 	consensusObs := ConsensusObservation{
 		MerkleRoots: merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
@@ -229,7 +229,7 @@ func selectTokens(
 	consensusTimestamp time.Time,
 	lastPricesUpdate time.Time,
 	updateFrequency commonconfig.Duration,
-	priceSources map[types.Account]pluginconfig.ArbitrumPriceSource,
+	priceSources map[types.Account]pluginconfig.TokenInfo,
 ) map[types.Account]cciptypes.BigInt {
 	tokenPrices := make(map[types.Account]cciptypes.BigInt)
 	// if the time since the last update is greater than the update frequency, update all tokens

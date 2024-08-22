@@ -73,7 +73,7 @@ func NewPlugin(
 		ccipReader:   ccipReader,
 
 		tokenPricesReader:  tokenPricesReader,
-		tokensToQuery:      maps.Keys(cfg.OffchainConfig.PriceSources),
+		tokensToQuery:      maps.Keys(cfg.OffchainConfig.TokenInfo),
 		tokenPriceChainSel: cciptypes.ChainSelector(cfg.OffchainConfig.TokenPriceChainSelector),
 
 		msgHasher: msgHasher,

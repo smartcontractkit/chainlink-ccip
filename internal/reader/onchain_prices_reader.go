@@ -26,19 +26,16 @@ type PriceReader interface {
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
 	ContractReader commontyps.ContractReader
-	PriceSources   map[types.Account]pluginconfig.ArbitrumPriceSource
-	TokenDecimals  map[types.Account]uint8
+	TokenInfo      map[types.Account]pluginconfig.TokenInfo
 }
 
 func NewOnchainTokenPricesReader(
 	contractReader commontyps.ContractReader,
-	priceSources map[types.Account]pluginconfig.ArbitrumPriceSource,
-	tokenDecimals map[types.Account]uint8,
+	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
 		ContractReader: contractReader,
-		PriceSources:   priceSources,
-		TokenDecimals:  tokenDecimals,
+		TokenInfo:      tokenInfo,
 	}
 }
 
@@ -66,19 +63,19 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
 			// are merged we'll need to use the bound contract
 			//boundContract := commontypes.BoundContract{
-			//	Address: pr.PriceSources[token].AggregatorAddress,
+			//	Address: pr.TokenInfo[token].AggregatorAddress,
 			//	Name: consts.ContractNamePriceAggregator,
 			//}
 			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token)
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
-			decimals, ok := pr.TokenDecimals[token]
+			tokenInfo, ok := pr.TokenInfo[token]
 			if !ok {
-				return fmt.Errorf("failed to get decimals for %s: %w", token, err)
+				return fmt.Errorf("failed to get tokenInfo for %s: %w", token, err)
 			}
 
-			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, decimals)
+			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, tokenInfo.Decimals)
 			return nil
 		})
 	}

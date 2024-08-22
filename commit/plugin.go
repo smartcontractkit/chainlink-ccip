@@ -132,7 +132,7 @@ func (p *Plugin) Observation(
 		tokenPrices, err = observeTokenPrices(
 			ctx,
 			p.tokenPricesReader,
-			maps.Keys(p.cfg.OffchainConfig.PriceSources),
+			maps.Keys(p.cfg.OffchainConfig.TokenInfo),
 		)
 		if err != nil {
 			return types.Observation{}, fmt.Errorf("observe token prices: %w", err)
