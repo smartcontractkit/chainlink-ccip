@@ -5,18 +5,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
@@ -45,10 +46,12 @@ func (p *Plugin) Observation(
 
 	case BuildingReport:
 		observation = Observation{
-			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			GasPrices:   p.observer.ObserveGasPrices(ctx),
-			TokenPrices: p.observer.ObserveTokenPrices(ctx),
-			FChain:      p.observer.ObserveFChain(),
+			MerkleRoots:               p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			GasPrices:                 p.observer.ObserveGasPrices(ctx),
+			FeedTokenPrices:           p.observer.ObserveFeedTokenPrices(ctx),
+			PriceRegistryTokenUpdates: p.observer.ObservePriceRegistryTokenUpdates(ctx),
+			FChain:                    p.observer.ObserveFChain(),
+			Timestamp:                 time.Now(),
 		}
 
 	case WaitingForReportTransmission:
@@ -73,7 +76,9 @@ type Observer interface {
 	// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
 
-	ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice
+	ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice
+
+	ObservePriceRegistryTokenUpdates(ctx context.Context) map[types.Account]sharedtypes.NumericalUpdate
 
 	ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain
 
@@ -86,7 +91,13 @@ type ObserverImpl struct {
 	nodeID       commontypes.OracleID
 	chainSupport ChainSupport
 	ccipReader   reader.CCIP
-	msgHasher    cciptypes.MessageHasher
+
+	// Token prices reader
+	tokenPricesReader  reader.PriceReader
+	tokensToQuery      []types.Account
+	tokenPriceChainSel cciptypes.ChainSelector
+
+	msgHasher cciptypes.MessageHasher
 }
 
 // ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
@@ -199,8 +210,46 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	return root, nil
 }
 
-func (o ObserverImpl) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
-	return []cciptypes.TokenPrice{}
+func (o ObserverImpl) ObservePriceRegistryTokenUpdates(ctx context.Context) map[types.Account]sharedtypes.NumericalUpdate {
+	return map[types.Account]sharedtypes.NumericalUpdate{}
+}
+
+func (o ObserverImpl) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
+	supportTPChain, err := o.chainSupport.SupportsChain(o.nodeID, o.tokenPriceChainSel)
+	if err != nil {
+		o.lggr.Warnw("call to SupportsChain failed", "err", err)
+		return []cciptypes.TokenPrice{}
+	}
+
+	if !supportTPChain {
+		o.lggr.Debugw("oracle does not support token price observation", "oracleID", o.nodeID)
+		return []cciptypes.TokenPrice{}
+	}
+
+	if o.tokenPricesReader == nil {
+		o.lggr.Warnw("no token price reader available")
+		return []cciptypes.TokenPrice{}
+	}
+
+	o.lggr.Infow("observing token prices")
+	tokenPrices, err := o.tokenPricesReader.GetTokenPricesUSD(ctx, o.tokensToQuery)
+	if err != nil {
+		o.lggr.Errorw("call to GetTokenPricesUSD failed", "err", err)
+		return []cciptypes.TokenPrice{}
+	}
+
+	//TODO: Should we consider returning only the available prices instead of empty Slice?
+	if len(tokenPrices) != len(o.tokensToQuery) {
+		o.lggr.Errorw("token prices length mismatch", "got", len(tokenPrices), "want", len(o.tokensToQuery))
+		return []cciptypes.TokenPrice{}
+	}
+
+	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokenPrices))
+	for i, token := range o.tokensToQuery {
+		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
+	}
+
+	return tokenPricesUSD
 }
 
 func (o ObserverImpl) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain {

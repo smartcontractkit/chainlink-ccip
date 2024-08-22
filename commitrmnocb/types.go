@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -35,12 +37,16 @@ func NewCommitQuery(rmnOnRampMaxSeqNums []plugintypes.SeqNumChain, merkleRoots [
 }
 
 type Observation struct {
-	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
-	GasPrices          []cciptypes.GasPriceChain       `json:"gasPrices"`
-	TokenPrices        []cciptypes.TokenPrice          `json:"tokenPrices"`
-	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
-	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
-	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
+	MerkleRoots []cciptypes.MerkleRootChain `json:"merkleRoots"`
+	GasPrices   []cciptypes.GasPriceChain   `json:"gasPrices"`
+	// Prices for tokens from the feed on the feed chain
+	FeedTokenPrices []cciptypes.TokenPrice `json:"feedTokenPrices"`
+	// Prices for tokens from the PriceRegistry on the dest chain
+	PriceRegistryTokenUpdates map[types.Account]sharedtypes.NumericalUpdate `json:"priceRegistryTokenPrices"`
+	OnRampMaxSeqNums          []plugintypes.SeqNumChain                     `json:"onRampMaxSeqNums"`
+	OffRampNextSeqNums        []plugintypes.SeqNumChain                     `json:"offRampNextSeqNums"`
+	FChain                    map[cciptypes.ChainSelector]int               `json:"fChain"`
+	Timestamp                 time.Time                                     `json:"timestamp"`
 }
 
 func (obs Observation) Encode() ([]byte, error) {
@@ -67,7 +73,10 @@ type AggregatedObservation struct {
 	GasPrices map[cciptypes.ChainSelector][]cciptypes.BigInt
 
 	// A map from token IDs to the list of prices observed for each token
-	TokenPrices map[types.Account][]cciptypes.BigInt
+	FeedTokenPrices map[types.Account][]cciptypes.BigInt
+
+	// A map from token IDs to the list of prices observed for each token
+	PriceRegistryTokenUpdates map[types.Account][]sharedtypes.NumericalUpdate
 
 	// A map from chain selectors to the list of OnRamp max sequence numbers observed for each chain
 	OnRampMaxSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
@@ -82,12 +91,13 @@ type AggregatedObservation struct {
 // aggregateObservations takes a list of observations and produces an AggregatedObservation
 func aggregateObservations(aos []types.AttributedObservation) AggregatedObservation {
 	aggObs := AggregatedObservation{
-		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
-		GasPrices:          make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
-		TokenPrices:        make(map[types.Account][]cciptypes.BigInt),
-		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
-		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
-		FChain:             make(map[cciptypes.ChainSelector][]int),
+		MerkleRoots:               make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
+		GasPrices:                 make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
+		FeedTokenPrices:           make(map[types.Account][]cciptypes.BigInt),
+		PriceRegistryTokenUpdates: make(map[types.Account][]sharedtypes.NumericalUpdate),
+		OnRampMaxSeqNums:          make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
+		OffRampNextSeqNums:        make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
+		FChain:                    make(map[cciptypes.ChainSelector][]int),
 	}
 
 	for _, ao := range aos {
@@ -109,10 +119,16 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 				append(aggObs.GasPrices[gasPriceChain.ChainSel], gasPriceChain.GasPrice)
 		}
 
-		// TokenPrices
-		for _, tokenPrice := range obs.TokenPrices {
-			aggObs.TokenPrices[tokenPrice.TokenID] =
-				append(aggObs.TokenPrices[tokenPrice.TokenID], tokenPrice.Price)
+		// FeedTokenPrices
+		for _, feedTokenPrice := range obs.FeedTokenPrices {
+			aggObs.FeedTokenPrices[feedTokenPrice.TokenID] =
+				append(aggObs.FeedTokenPrices[feedTokenPrice.TokenID], feedTokenPrice.Price)
+		}
+
+		// PriceRegistryTokenUpdates
+		for token, update := range obs.PriceRegistryTokenUpdates {
+			aggObs.PriceRegistryTokenUpdates[token] =
+				append(aggObs.PriceRegistryTokenUpdates[token], update)
 		}
 
 		// OnRampMaxSeqNums
@@ -155,6 +171,8 @@ type ConsensusObservation struct {
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
+	// Median timestamp of the observations
+	Timestamp time.Time
 }
 
 // GasPricesArray returns a list of gas prices
@@ -196,6 +214,7 @@ type Outcome struct {
 	TokenPrices                     []cciptypes.TokenPrice      `json:"tokenPrices"`
 	GasPrices                       []cciptypes.GasPriceChain   `json:"gasPrices"`
 	ReportTransmissionCheckAttempts uint                        `json:"reportTransmissionCheckAttempts"`
+	LastPricesUpdate                time.Time                   `json:"lastPricesUpdate"`
 }
 
 // Sort all fields of the given Outcome

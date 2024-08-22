@@ -20,6 +20,9 @@ type ChainSupport interface {
 	// SupportedChains returns the set of chains that the given Oracle is configured to access
 	SupportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error)
 
+	// SupportsChain returns true if the given oracle supports the given chain, returns false otherwise
+	SupportsChain(oracleID commontypes.OracleID, selector cciptypes.ChainSelector) (bool, error)
+
 	// SupportsDestChain returns true if the given oracle supports the dest chain, returns false otherwise
 	SupportsDestChain(oracle commontypes.OracleID) (bool, error)
 
@@ -58,6 +61,14 @@ func (c CCIPChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset
 	}
 
 	return supportedChains, nil
+}
+
+func (c CCIPChainSupport) SupportsChain(oracleID commontypes.OracleID, selector cciptypes.ChainSelector) (bool, error) {
+	supportedChains, err := c.SupportedChains(oracleID)
+	if err != nil {
+		return false, err
+	}
+	return supportedChains.Contains(selector), nil
 }
 
 // SupportsDestChain returns true if the given oracle supports the dest chain, returns false otherwise

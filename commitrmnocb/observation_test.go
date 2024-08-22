@@ -5,8 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"testing"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -40,6 +42,18 @@ func Test_Observation(t *testing.T) {
 			Price:   cciptypes.NewBigIntFromInt64(80761),
 		},
 	}
+	feedPrices := []cciptypes.TokenPrice{
+		{
+			TokenID: "token23",
+			Price:   cciptypes.NewBigIntFromInt64(80761),
+		},
+	}
+	registryUpdates := map[types.Account]sharedtypes.NumericalUpdate{
+		"token23": {
+			Timestamp: time.Unix(0, 0),
+			Value:     cciptypes.NewBigIntFromInt64(80761),
+		},
+	}
 	offRampNextSeqNums := []plugintypes.SeqNumChain{
 		{
 			ChainSel: 456,
@@ -56,6 +70,8 @@ func Test_Observation(t *testing.T) {
 		merkleRoots        []cciptypes.MerkleRootChain
 		gasPrices          []cciptypes.GasPriceChain
 		tokenPrices        []cciptypes.TokenPrice
+		feedPrices         []cciptypes.TokenPrice
+		registryUpdates    map[types.Account]sharedtypes.NumericalUpdate
 		offRampNextSeqNums []plugintypes.SeqNumChain
 		fChain             map[cciptypes.ChainSelector]int
 		expObs             Observation
@@ -68,6 +84,8 @@ func Test_Observation(t *testing.T) {
 			merkleRoots:        merkleRoots,
 			gasPrices:          gasPrices,
 			tokenPrices:        tokenPrices,
+			feedPrices:         feedPrices,
+			registryUpdates:    registryUpdates,
 			offRampNextSeqNums: offRampNextSeqNums,
 			fChain:             fChain,
 			expObs: Observation{
@@ -84,13 +102,16 @@ func Test_Observation(t *testing.T) {
 			merkleRoots:        merkleRoots,
 			gasPrices:          gasPrices,
 			tokenPrices:        tokenPrices,
+			feedPrices:         feedPrices,
+			registryUpdates:    registryUpdates,
 			offRampNextSeqNums: offRampNextSeqNums,
 			fChain:             fChain,
 			expObs: Observation{
-				MerkleRoots: merkleRoots,
-				GasPrices:   gasPrices,
-				TokenPrices: tokenPrices,
-				FChain:      fChain,
+				MerkleRoots:               merkleRoots,
+				GasPrices:                 gasPrices,
+				FeedTokenPrices:           feedPrices,
+				PriceRegistryTokenUpdates: registryUpdates,
+				FChain:                    fChain,
 			},
 		},
 		{
@@ -101,6 +122,8 @@ func Test_Observation(t *testing.T) {
 			merkleRoots:        merkleRoots,
 			gasPrices:          gasPrices,
 			tokenPrices:        tokenPrices,
+			feedPrices:         feedPrices,
+			registryUpdates:    registryUpdates,
 			offRampNextSeqNums: offRampNextSeqNums,
 			fChain:             fChain,
 			expObs: Observation{
@@ -122,8 +145,11 @@ func Test_Observation(t *testing.T) {
 				"ObserveMerkleRoots", ctx, mock.Anything,
 			).Return(tc.merkleRoots)
 			observer.On(
-				"ObserveTokenPrices", ctx,
+				"ObserveFeedTokenPrices", ctx,
 			).Return(tc.tokenPrices)
+			observer.On(
+				"ObservePriceRegistryTokenUpdates", ctx,
+			).Return(tc.registryUpdates)
 			observer.On(
 				"ObserveGasPrices", ctx,
 			).Return(tc.gasPrices)
@@ -147,6 +173,9 @@ func Test_Observation(t *testing.T) {
 			actualObs, err := DecodeCommitPluginObservation(result)
 			assert.NoError(t, err)
 
+			// We don't need to worry about comparing timestamps
+			// Observation will always return the current time
+			actualObs.Timestamp = tc.expObs.Timestamp
 			assert.Equal(t, tc.expObs, actualObs)
 		})
 	}

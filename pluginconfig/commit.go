@@ -9,10 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type CommitPluginConfig struct {
@@ -129,11 +128,14 @@ func (c CommitOffchainConfig) Validate() error {
 			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
 	}
 
+	if len(c.TokenDecimals) != len(c.PriceSources) {
+		return fmt.Errorf("mismatched sizes for token price sources and token decimals")
+	}
+
 	for token, arbSource := range c.PriceSources {
 		if err := arbSource.Validate(); err != nil {
 			return fmt.Errorf("invalid arbitrum price source for token %s: %w", token, err)
 		}
-
 		if _, exists := c.TokenDecimals[token]; !exists {
 			return fmt.Errorf("missing TokenDecimals for token: %s", token)
 		}

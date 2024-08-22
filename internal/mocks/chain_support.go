@@ -34,3 +34,9 @@ func (c ChainSupport) SupportsDestChain(oracleID commontypes.OracleID) (bool, er
 	args := c.Called(oracleID)
 	return args.Get(0).(bool), args.Error(1)
 }
+
+// SupportsChain returns true if the given oracle supports the given chain, returns false otherwise
+func (c ChainSupport) SupportsChain(oracleID commontypes.OracleID, selector cciptypes.ChainSelector) (bool, error) {
+	args := c.Called(oracleID, selector)
+	return args.Get(0).(bool), args.Error(1)
+}

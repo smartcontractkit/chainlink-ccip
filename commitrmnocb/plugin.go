@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	"golang.org/x/exp/maps"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -70,7 +71,12 @@ func NewPlugin(
 		nodeID:       nodeID,
 		chainSupport: chainSupport,
 		ccipReader:   ccipReader,
-		msgHasher:    msgHasher,
+
+		tokenPricesReader:  tokenPricesReader,
+		tokensToQuery:      maps.Keys(cfg.OffchainConfig.PriceSources),
+		tokenPriceChainSel: cciptypes.ChainSelector(cfg.OffchainConfig.TokenPriceChainSelector),
+
+		msgHasher: msgHasher,
 	}
 
 	return &Plugin{

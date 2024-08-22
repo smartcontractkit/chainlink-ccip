@@ -48,7 +48,7 @@ func (p *Plugin) ValidateObservation(_ ocr3types.OutcomeContext, _ types.Query, 
 		return fmt.Errorf("failed to validate OffRampNextSeqNums: %w", err)
 	}
 
-	if err := commit.ValidateObservedTokenPrices(obs.TokenPrices); err != nil {
+	if err := commit.ValidateObservedTokenPrices(obs.FeedTokenPrices); err != nil {
 		return fmt.Errorf("failed to validate token prices: %w", err)
 	}
 
@@ -120,7 +120,7 @@ func validateObservedOffRampMaxSeqNums(
 	}
 
 	if !supportsDestChain {
-		return fmt.Errorf("observer %d does not support dest chain, but has observed %d offRampMaxSeqNums",
+		return fmt.Errorf("observer.go %d does not support dest chain, but has observed %d offRampMaxSeqNums",
 			observer, len(offRampMaxSeqNums))
 	}
 
