@@ -5,6 +5,7 @@ pipelines:
     run: |-
       create_deployments configs
       create_deployments beholder-prometheus
+      create_deployments beholder-grafana
 
       create_deployments crib-beholder-infra
       create_deployments beholder-test-client
@@ -14,6 +15,7 @@ deployments:
     kubectl:
       manifests:
       - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
+      - ${COMPONENTS_DIR}/beholder/configmaps/grafana.yaml
 
   beholder-test-client:
     updateImageTags: false
@@ -64,6 +66,47 @@ deployments:
           - name: config-volume
             configMap:
               name: prometheus-config
+
+  beholder-grafana:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: grafana/grafana
+            volumeMounts:
+            - containerPath: /etc/grafana/provisioning
+              volume:
+                name: config-volume
+            env:
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Admin"
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: "true"
+            - name: GF_FEATURE_TOGGLES_ENABLE
+              value: "traceqlEditor traceQLStreaming metricsSummary"
+        volumes:
+          - name: config-volume
+            configMap:
+              name: grafana-config
+              items:
+              - key: datasources.yml
+                path: datasources/datasources.yml
+        service:
+          name: beholder-grafana
+          ports:
+          - port: 3000
+        podSecurityContext:
+          fsGroup: 999
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+          fsGroup: 999
+
   crib-beholder-infra:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
