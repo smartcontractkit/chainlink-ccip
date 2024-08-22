@@ -477,7 +477,11 @@ profiles:
         path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-eks-bix-ship.yaml", "./values-profiles/new-chain.yaml"]
+        value:
+          [
+            "./values-profiles/values-dev-eks-bix-ship.yaml",
+            "./values-profiles/new-chain.yaml",
+          ]
       - op: replace
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
@@ -507,7 +511,12 @@ profiles:
         path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-kind.yaml", "./values-profiles/values-dev-kind-bix-ship.yaml", "./values-profiles/new-chain.yaml"]
+        value:
+          [
+            "./values-profiles/values-dev-kind.yaml",
+            "./values-profiles/values-dev-kind-bix-ship.yaml",
+            "./values-profiles/new-chain.yaml",
+          ]
       - op: remove
         path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
       - op: replace
@@ -516,4 +525,3 @@ profiles:
       - op: replace
         path: deployments.app.helm.values.ccipScriptsDeployment.enabled
         value: false
-      
