@@ -56,7 +56,7 @@ commands:
       Expose Kubernetes services from the CRIB namespace to local machine for direct,
       secure access during development. It facilitates debugging and access to ports not exposed through Ingress.
   ttl:
-    command: ./${SCRIPTS_DIR}/manage_namespace.sh label $1 $2
+    command: ./${SCRIPTS_DIR}/manage_namespace.sh label $1 --overwrite
     description: Configure TTL for devspace resource cleanup. Default is 72h.
   workload:
     command: cd ../integration-tests/load/ocr && go test -v -run TestOCRLoad || cd -

@@ -92,7 +92,7 @@ label_namespace() {
 		print_info
 		exit 0
 	else
-		echo "Error: Failed to set cleanup.kyverno.io/ttl: $ttl label on namespace $namespace. If you are trying to overwrite the label, please pass the '--overwrite' argument."
+		echo "Error: Failed to set cleanup.kyverno.io/ttl: $ttl label on namespace $namespace."
 		"${SCRIPTS_DIR}"/man.sh "ttl"
 		exit 1
 	fi
