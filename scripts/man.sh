@@ -48,7 +48,7 @@ ttl)
 		        This command configures the TTL for devspace resource cleanup in the specified namespace. The default TTL is 72 hours.
 
 		SYNOPSIS
-		        -> devspace run ttl <NAMESPACE-NAME> <TTL>
+		        -> devspace run ttl <NAMESPACE-NAME> <TTL> <--overwrite>
 
 		        Example:
 		            -> devspace run ttl crib-test 48h
