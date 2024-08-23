@@ -551,7 +551,7 @@ func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
 	// If the contract not binded -> binds to the new address
 	if err := r.contractReaders[r.destChain].Bind(ctx, []types.BoundContract{
 		{
-			Address: typeconv.AddressBytesToString(staticConfig.nonceManager, uint64(r.destChain)),
+			Address: typeconv.AddressBytesToString(staticConfig.NonceManager, uint64(r.destChain)),
 			Name:    consts.ContractNameNonceManager,
 		},
 	}); err != nil {
@@ -672,10 +672,10 @@ func (r *CCIPChainReader) getOfframpStaticConfig(ctx context.Context) (offrampSt
 }
 
 type offrampStaticChainConfig struct {
-	chainSelector      uint64 `json:"chainSelector"`
-	rmnProxy           []byte `json:"rmnProxy"`
-	tokenAdminRegistry []byte `json:"tokenAdminRegistry"`
-	nonceManager       []byte `json:"nonceManager"`
+	ChainSelector      uint64 `json:"chainSelector"`
+	RmnProxy           []byte `json:"rmnProxy"`
+	TokenAdminRegistry []byte `json:"tokenAdminRegistry"`
+	NonceManager       []byte `json:"nonceManager"`
 }
 
 // Interface compliance check
