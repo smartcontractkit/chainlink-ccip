@@ -6,7 +6,7 @@ pipelines:
       create_deployments configs
       create_deployments beholder-prometheus
       create_deployments beholder-grafana
-
+      create_deployments beholder-loki
       create_deployments crib-beholder-infra
       create_deployments beholder-test-client
 
@@ -16,6 +16,7 @@ deployments:
       manifests:
       - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
       - ${COMPONENTS_DIR}/beholder/configmaps/grafana.yaml
+      - ${COMPONENTS_DIR}/beholder/configmaps/loki.yaml
 
   beholder-test-client:
     updateImageTags: false
@@ -106,6 +107,38 @@ deployments:
           runAsUser: 999
           runAsGroup: 999
           fsGroup: 999
+
+  beholder-loki:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: grafana/loki:3.1.0
+            args:
+              - "--config.file=/etc/loki/config/loki.yml"
+            volumeMounts:
+              - containerPath: /etc/loki/config
+                volume:
+                  name: config-volume
+        volumes:
+          - name: config-volume
+            configMap:
+              name: loki-config
+
+        service:
+          name: beholder-loki
+          ports:
+            - port: 3100
+        podSecurityContext:
+          fsGroup: 999
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+          fsGroup: 999
+
 
   crib-beholder-infra:
     updateImageTags: false

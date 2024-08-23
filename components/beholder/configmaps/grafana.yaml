@@ -11,3 +11,7 @@ data:
         type: prometheus
         access: proxy
         url: http://beholder-prometheus:9090
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://beholder-loki:3100
