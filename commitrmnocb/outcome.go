@@ -6,18 +6,19 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 )
 
 // Outcome depending on the current state, either:
@@ -276,7 +277,8 @@ func feedPricesConsensus(
 	return tokenPrices
 }
 
-// registryPricesConsensus returns the median of the price registry token prices for each token given all observed updates
+// registryPricesConsensus returns the median of the price registry token prices for each
+// token given all observed updates
 func registryPricesConsensus(
 	lggr logger.Logger,
 	priceRegistryTokenUpdates map[types.Account][]sharedtypes.NumericalUpdate,
@@ -477,9 +479,11 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 	return diff.CmpAbs(big.NewInt(ppb)) > 0 // abs(diff) > ppb
 }
 
-// BigIntSortedMiddle returns the middle number after sorting the provided numbers. nil is returned if the provided slice is empty.
+// BigIntSortedMiddle returns the middle number after sorting the provided numbers.
+// // nil is returned if the provided slice is empty.
 // If length of the provided slice is even, the right-hand-side value of the middle 2 numbers is returned.
-// The objective of this function is to always pick within the range of values reported by honest nodes when we have 2f+1 values.
+// The objective of this function is to always pick within the range of values reported
+// by honest nodes when we have 2f+1 values.
 func BigIntSortedMiddle(vals []cciptypes.BigInt) cciptypes.BigInt {
 	if len(vals) == 0 {
 		return cciptypes.BigInt{}

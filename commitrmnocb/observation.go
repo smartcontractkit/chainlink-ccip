@@ -7,13 +7,14 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
@@ -210,7 +211,10 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	return root, nil
 }
 
-func (o ObserverImpl) ObservePriceRegistryTokenUpdates(ctx context.Context) map[types.Account]sharedtypes.NumericalUpdate {
+func (o ObserverImpl) ObservePriceRegistryTokenUpdates(
+	ctx context.Context,
+) map[types.Account]sharedtypes.NumericalUpdate {
+	// TODO: Implement in later PR
 	return map[types.Account]sharedtypes.NumericalUpdate{}
 }
 

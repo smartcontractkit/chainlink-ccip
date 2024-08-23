@@ -3,7 +3,6 @@ package mocks
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/stretchr/testify/mock"
@@ -11,6 +10,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 )
 
 type Observer struct {

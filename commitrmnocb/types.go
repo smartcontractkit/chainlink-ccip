@@ -6,10 +6,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )

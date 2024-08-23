@@ -8,8 +8,8 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	
-  "github.com/stretchr/testify/assert"
+
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-  "github.com/smartcontractkit/chainlink-ccip/sharedtypes"
+	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 )
 
 func Test_Observation(t *testing.T) {
