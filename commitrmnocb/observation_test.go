@@ -8,18 +8,21 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
+	
+  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+  "github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 )
 
 func Test_Observation(t *testing.T) {
@@ -252,10 +255,12 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			var nodeID commontypes.OracleID = 1
-			reader := mocks.NewCCIPReader()
-			reader.On(
-				"NextSeqNum", ctx, tc.knownSourceChains,
-			).Return(tc.nextSeqNums, tc.nextSeqNumsError)
+			reader := reader_mock.NewMockCCIP(t)
+			if tc.supportsDestChain && tc.supportsDestChainError == nil && tc.knownSourceChainsError == nil {
+				reader.On(
+					"NextSeqNum", ctx, tc.knownSourceChains,
+				).Return(tc.nextSeqNums, tc.nextSeqNumsError)
+			}
 
 			chainSupport := mocks.NewChainSupport()
 			chainSupport.On(
@@ -455,8 +460,13 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			var nodeID commontypes.OracleID = 1
-			reader := mocks.NewCCIPReader()
+			reader := reader_mock.NewMockCCIP(t)
 			for _, r := range tc.ranges {
+				// Skip unexpected calls.
+				if tc.supportedChainsFails || !tc.supportedChains.Contains(r.ChainSel) {
+					continue
+				}
+
 				var err error
 				if e, exists := tc.msgsBetweenSeqNumsErrors[r.ChainSel]; exists {
 					err = e

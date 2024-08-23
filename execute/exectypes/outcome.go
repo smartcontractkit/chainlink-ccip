@@ -30,8 +30,7 @@ func (p PluginState) Next() PluginState {
 		return GetMessages
 
 	case GetMessages:
-		// TODO: go to Filter after GetMessages
-		return GetCommitReports
+		return Filter
 
 	case Unknown:
 		fallthrough

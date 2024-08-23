@@ -53,6 +53,8 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE/ccip
           go mod download
+          cd $GITHUB_WORKSPACE/ccip/integration-tests
+          go mod download
       - name: Build binary
         run: |
           cd $GITHUB_WORKSPACE/ccip
@@ -65,8 +67,8 @@ jobs:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Run ccip ocr3 integration test
         run: |
-          cd $GITHUB_WORKSPACE/ccip
-          go test -v -timeout 3m -run "^TestIntegration_OCR3Nodes$" ./core/capabilities/ccip/ccip_integration_tests
+          cd $GITHUB_WORKSPACE/ccip/integration-tests
+          go test -v -run '^Test0002_InitialDeploy$' -timeout 5m ./deployment/ccip/changeset
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Integration test failed"

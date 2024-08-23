@@ -9,19 +9,20 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 func Test_observeMaxSeqNumsPerChain(t *testing.T) {
@@ -71,7 +72,7 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			mockReader := mocks.NewCCIPReader()
+			mockReader := reader_mock.NewMockCCIP(t)
 			knownSourceChains := slicelib.Filter(
 				tc.readChains,
 				func(ch cciptypes.ChainSelector) bool { return ch != tc.destChain },
@@ -86,13 +87,16 @@ func Test_observeMaxSeqNumsPerChain(t *testing.T) {
 					onChainSeqNums = append(onChainSeqNums, v)
 				}
 			}
-			mockReader.On("NextSeqNum", ctx, knownSourceChains).Return(onChainSeqNums, nil)
+			readableChains := mapset.NewSet(tc.readChains...)
+			if readableChains.Contains(tc.destChain) {
+				mockReader.On("NextSeqNum", ctx, knownSourceChains).Return(onChainSeqNums, nil)
+			}
 
 			seqNums, err := observeLatestCommittedSeqNums(
 				ctx,
 				lggr,
 				mockReader,
-				mapset.NewSet(tc.readChains...),
+				readableChains,
 				tc.destChain,
 				knownSourceChains,
 			)
@@ -212,7 +216,7 @@ func Test_observeNewMsgs(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			mockReader := mocks.NewCCIPReader()
+			mockReader := reader_mock.NewMockCCIP(t)
 			msgHasher := mocks.NewMessageHasher()
 			for i := range tc.expMsgs { // make sure the hashes are populated
 				h, err := msgHasher.Hash(ctx, tc.expMsgs[i])
@@ -270,7 +274,7 @@ func Benchmark_observeNewMsgs(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ctx := context.Background()
 		lggr, _ := logger.New()
-		ccipReader := mocks.NewCCIPReader()
+		ccipReader := reader_mock.NewMockCCIP(b)
 		msgHasher := mocks.NewMessageHasher()
 
 		expNewMsgs := make([]cciptypes.Message, 0, newMsgsPerChain*numChains)
@@ -349,7 +353,7 @@ func Test_observeGasPrices(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("happy path", func(t *testing.T) {
-		mockReader := mocks.NewCCIPReader()
+		mockReader := reader_mock.NewMockCCIP(t)
 		chains := []cciptypes.ChainSelector{1, 2, 3}
 		mockGasPrices := []cciptypes.BigInt{
 			cciptypes.NewBigIntFromInt64(10),
@@ -367,7 +371,7 @@ func Test_observeGasPrices(t *testing.T) {
 	})
 
 	t.Run("gas reader internal issue", func(t *testing.T) {
-		mockReader := mocks.NewCCIPReader()
+		mockReader := reader_mock.NewMockCCIP(t)
 		chains := []cciptypes.ChainSelector{1, 2, 3}
 		mockGasPrices := []cciptypes.BigInt{
 			cciptypes.NewBigIntFromInt64(10),
@@ -1535,7 +1539,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reader := mocks.NewCCIPReader()
+			reader := reader_mock.NewMockCCIP(t)
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
 			for _, snc := range tc.reportSeqNums {

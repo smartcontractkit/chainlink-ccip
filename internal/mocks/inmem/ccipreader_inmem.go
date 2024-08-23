@@ -97,6 +97,14 @@ func (r InMemoryCCIPReader) NextSeqNum(
 	panic("implement me")
 }
 
+func (r InMemoryCCIPReader) Nonces(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	addresses []string,
+) (map[string]uint64, error) {
+	panic("implement me")
+}
+
 func (r InMemoryCCIPReader) GasPrices(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) ([]cciptypes.BigInt, error) {
