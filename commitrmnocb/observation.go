@@ -219,13 +219,13 @@ func (o ObserverImpl) ObservePriceRegistryTokenUpdates(
 }
 
 func (o ObserverImpl) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
-	supportTPChain, err := o.chainSupport.SupportsChain(o.nodeID, o.tokenPriceChainSel)
+	supportsFeedChain, err := o.chainSupport.SupportsChain(o.nodeID, o.tokenPriceChainSel)
 	if err != nil {
 		o.lggr.Warnw("call to SupportsChain failed", "err", err)
 		return []cciptypes.TokenPrice{}
 	}
 
-	if !supportTPChain {
+	if !supportsFeedChain {
 		o.lggr.Debugw("oracle does not support token price observation", "oracleID", o.nodeID)
 		return []cciptypes.TokenPrice{}
 	}

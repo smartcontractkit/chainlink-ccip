@@ -51,7 +51,7 @@ func (p *Plugin) Outcome(
 		outcome = ReportRangesOutcome(commitQuery, consensusObservation)
 
 	case BuildingReport:
-		outcome = buildReport(commitQuery, consensusObservation)
+		outcome = buildReport(commitQuery, consensusObservation, p.cfg.OffchainConfig, previousOutcome.LastPricesUpdate)
 
 	case WaitingForReportTransmission:
 		outcome = checkForReportTransmission(
@@ -114,6 +114,8 @@ func ReportRangesOutcome(
 func buildReport(
 	_ Query,
 	consensusObservation ConsensusObservation,
+	offchainCfg pluginconfig.CommitOffchainConfig,
+	lastUpdate time.Time,
 ) Outcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
@@ -122,11 +124,23 @@ func buildReport(
 		outcomeType = ReportEmpty
 	}
 
+	var lastPricesUpdate time.Time
+	tokenPrices := consensusObservation.TokenPricesArray()
+
+	// If we're updating all token prices, set the last prices update to the observed timestamp,
+	// otherwise keep it as the last update time.
+	if len(offchainCfg.TokenInfo) == len(tokenPrices) {
+		lastPricesUpdate = consensusObservation.Timestamp
+	} else {
+		lastPricesUpdate = lastUpdate
+	}
+
 	outcome := Outcome{
-		OutcomeType:   outcomeType,
-		RootsToReport: roots,
-		GasPrices:     consensusObservation.GasPricesArray(),
-		TokenPrices:   consensusObservation.TokenPricesArray(),
+		OutcomeType:      outcomeType,
+		RootsToReport:    roots,
+		GasPrices:        consensusObservation.GasPricesArray(),
+		TokenPrices:      consensusObservation.TokenPricesArray(),
+		LastPricesUpdate: lastPricesUpdate,
 	}
 
 	return outcome
@@ -187,7 +201,7 @@ func getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 	fChains := fChainConsensus(lggr, F, aggObs.FChain)
-	timestampConsensus := TimestampSortedMiddle(aggObs.Timestamps)
+	timestampConsensus := MedianTimestamp(aggObs.Timestamps)
 
 	fDestChain, exists := fChains[destChain]
 	if !exists {
@@ -197,7 +211,7 @@ func getConsensusObservation(
 
 	feedPrices := feedPricesConsensus(lggr, aggObs.FeedTokenPrices, fDestChain)
 	registryPrices := registryPricesConsensus(lggr, aggObs.PriceRegistryTokenUpdates, fDestChain)
-	tokePrices := selectTokens(
+	tokenPrices := selectTokens(
 		lggr,
 		feedPrices,
 		registryPrices,
@@ -210,10 +224,11 @@ func getConsensusObservation(
 		MerkleRoots: merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
 		// TODO: use consensus of observed gas prices
 		GasPrices:          make(map[cciptypes.ChainSelector]cciptypes.BigInt),
-		TokenPrices:        tokePrices,
+		TokenPrices:        tokenPrices,
 		OnRampMaxSeqNums:   onRampMaxSeqNumsConsensus(lggr, aggObs.OnRampMaxSeqNums, fChains),
 		OffRampNextSeqNums: offRampMaxSeqNumsConsensus(lggr, aggObs.OffRampNextSeqNums, fDestChain),
 		FChain:             fChains,
+		Timestamp:          timestampConsensus,
 	}
 
 	return consensusObs, nil
@@ -257,7 +272,7 @@ func selectTokens(
 		}
 	}
 
-	return make(map[types.Account]cciptypes.BigInt)
+	return tokenPrices
 }
 
 // feedPricesConsensus returns the median of the feed token prices for each token given all observed prices
@@ -272,7 +287,7 @@ func feedPricesConsensus(
 			lggr.Warnf("could not reach consensus on feed token prices for token %s ", token)
 			continue
 		}
-		tokenPrices[token] = BigIntSortedMiddle(prices)
+		tokenPrices[token] = MedianBigInt(prices)
 	}
 	return tokenPrices
 }
@@ -295,10 +310,10 @@ func registryPricesConsensus(
 		//var timestamps []time.Time
 		for _, update := range updates {
 			prices = append(prices, update.Value)
-			//timestamps = append(timestamps, update.Timestamp)
+			//timestamps = append(timestamps, update.LastPriceUpdate)
 		}
-		medianPrice := BigIntSortedMiddle(prices)
-		//medianTimestamp := TimestampSortedMiddle(timestamps)
+		medianPrice := MedianBigInt(prices)
+		//medianTimestamp := MedianTimestamp(timestamps)
 		tokenPrices[token] = cciptypes.NewBigInt(medianPrice.Int)
 	}
 
@@ -447,7 +462,9 @@ func counts[T comparable](elems []T) map[T]int {
 	return m
 }
 
-func TimestampSortedMiddle(timestamps []time.Time) time.Time {
+// MedianTimestamp returns the middle timestamp after sorting the provided timestamps.
+// empty/default is returned if the provided slice is empty.
+func MedianTimestamp(timestamps []time.Time) time.Time {
 	if len(timestamps) == 0 {
 		return time.Time{}
 	}
@@ -479,12 +496,12 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 	return diff.CmpAbs(big.NewInt(ppb)) > 0 // abs(diff) > ppb
 }
 
-// BigIntSortedMiddle returns the middle number after sorting the provided numbers.
-// // nil is returned if the provided slice is empty.
+// MedianBigInt returns the middle number after sorting the provided numbers.
+// nil is returned if the provided slice is empty.
 // If length of the provided slice is even, the right-hand-side value of the middle 2 numbers is returned.
 // The objective of this function is to always pick within the range of values reported
 // by honest nodes when we have 2f+1 values.
-func BigIntSortedMiddle(vals []cciptypes.BigInt) cciptypes.BigInt {
+func MedianBigInt(vals []cciptypes.BigInt) cciptypes.BigInt {
 	if len(vals) == 0 {
 		return cciptypes.BigInt{}
 	}

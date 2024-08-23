@@ -101,7 +101,7 @@ func aggregateObservations(aos []types.AttributedObservation) AggregatedObservat
 		OnRampMaxSeqNums:          make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums:        make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		FChain:                    make(map[cciptypes.ChainSelector][]int),
-		Timestamps:                make([]time.Time, 0),
+		Timestamps:                make([]time.Time, len(aos)),
 	}
 
 	for _, ao := range aos {
@@ -178,6 +178,7 @@ type ConsensusObservation struct {
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
+
 	// Median timestamp of the observations
 	Timestamp time.Time
 }
