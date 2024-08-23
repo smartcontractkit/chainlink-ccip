@@ -13,7 +13,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -79,7 +78,7 @@ type Observer interface {
 
 	ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice
 
-	ObservePriceRegistryTokenUpdates(ctx context.Context) map[types.Account]sharedtypes.NumericalUpdate
+	ObservePriceRegistryTokenUpdates(ctx context.Context) []cciptypes.TokenPrice
 
 	ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain
 
@@ -213,9 +212,9 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 
 func (o ObserverImpl) ObservePriceRegistryTokenUpdates(
 	ctx context.Context,
-) map[types.Account]sharedtypes.NumericalUpdate {
+) []cciptypes.TokenPrice {
 	// TODO: Implement in later PR
-	return map[types.Account]sharedtypes.NumericalUpdate{}
+	return []cciptypes.TokenPrice{}
 }
 
 func (o ObserverImpl) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {

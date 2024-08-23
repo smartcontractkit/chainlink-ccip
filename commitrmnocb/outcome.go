@@ -18,7 +18,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 )
 
 // Outcome depending on the current state, either:
@@ -210,7 +209,7 @@ func getConsensusObservation(
 	}
 
 	feedPrices := feedPricesConsensus(lggr, aggObs.FeedTokenPrices, fDestChain)
-	registryPrices := registryPricesConsensus(lggr, aggObs.PriceRegistryTokenUpdates, fDestChain)
+	registryPrices := registryPricesConsensus(lggr, aggObs.PriceRegistryTokenPrices, fDestChain)
 	tokenPrices := selectTokens(
 		lggr,
 		feedPrices,
@@ -296,24 +295,16 @@ func feedPricesConsensus(
 // token given all observed updates
 func registryPricesConsensus(
 	lggr logger.Logger,
-	priceRegistryTokenUpdates map[types.Account][]sharedtypes.NumericalUpdate,
+	priceRegistryPrices map[types.Account][]cciptypes.BigInt,
 	fDestChain int,
 ) map[types.Account]cciptypes.BigInt {
 	tokenPrices := make(map[types.Account]cciptypes.BigInt)
-	for token, updates := range priceRegistryTokenUpdates {
-		if len(updates) < 2*fDestChain+1 {
-			lggr.Warnf("could not reach consensus on price registry token updates for token %s ", token)
+	for token, prices := range priceRegistryPrices {
+		if len(prices) < 2*fDestChain+1 {
+			lggr.Warnf("could not reach consensus on price registry token prices for token %s ", token)
 			continue
 		}
-		// for each update get the median for the token price
-		var prices []cciptypes.BigInt
-		//var timestamps []time.Time
-		for _, update := range updates {
-			prices = append(prices, update.Value)
-			//timestamps = append(timestamps, update.LastPriceUpdate)
-		}
 		medianPrice := MedianBigInt(prices)
-		//medianTimestamp := MedianTimestamp(timestamps)
 		tokenPrices[token] = cciptypes.NewBigInt(medianPrice.Int)
 	}
 

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -22,7 +21,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/sharedtypes"
 )
 
 func Test_Observation(t *testing.T) {
@@ -51,10 +49,10 @@ func Test_Observation(t *testing.T) {
 			Price:   cciptypes.NewBigIntFromInt64(80761),
 		},
 	}
-	registryUpdates := map[types.Account]sharedtypes.NumericalUpdate{
-		"token23": {
-			Timestamp: time.Unix(0, 0),
-			Value:     cciptypes.NewBigIntFromInt64(80761),
+	registryUpdates := []cciptypes.TokenPrice{
+		{
+			TokenID: "token23",
+			Price:   cciptypes.NewBigIntFromInt64(80761),
 		},
 	}
 	offRampNextSeqNums := []plugintypes.SeqNumChain{
@@ -74,7 +72,7 @@ func Test_Observation(t *testing.T) {
 		gasPrices          []cciptypes.GasPriceChain
 		tokenPrices        []cciptypes.TokenPrice
 		feedPrices         []cciptypes.TokenPrice
-		registryUpdates    map[types.Account]sharedtypes.NumericalUpdate
+		registryUpdates    []cciptypes.TokenPrice
 		offRampNextSeqNums []plugintypes.SeqNumChain
 		fChain             map[cciptypes.ChainSelector]int
 		expObs             Observation
@@ -178,7 +176,7 @@ func Test_Observation(t *testing.T) {
 
 			// We don't need to worry about comparing timestamps
 			// Observation will always return the current time
-			actualObs.Timestamp = tc.expObs.Timestamp
+			tc.expObs.Timestamp = actualObs.Timestamp
 			assert.Equal(t, tc.expObs, actualObs)
 		})
 	}
