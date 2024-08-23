@@ -10,6 +10,7 @@ const (
 	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
 	ContractNameCCIPConfig           = "CCIPConfig"
 	ContractNamePriceAggregator      = "AggregatorV3Interface"
+	ContractNameNonceManager         = "NonceManager"
 )
 
 // Method Names
@@ -42,6 +43,10 @@ const (
 	// Aggregator methods
 	MethodNameGetLatestRoundData = "latestRoundData"
 	MethodNameGetDecimals        = "decimals"
+
+	// NonceManager methods
+	MethodNameGetInboundNonce  = "GetInboundNonce"
+	MethodNameGetOutboundNonce = "GetOutboundNonce"
 
 	/*
 		// On EVM:

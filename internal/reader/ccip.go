@@ -485,14 +485,17 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 	return gasPrices, nil
 }
 
-func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
+// bindOnRamps reads the onchain configuration to discover source ramp addresses.
+func (r *CCIPChainReader) bindOnramps(
+	ctx context.Context,
+) error {
 	chains := make([]cciptypes.ChainSelector, 0, len(r.contractReaders))
 	for chain := range r.contractReaders {
 		chains = append(chains, chain)
 	}
 	sourceConfigs, err := r.getSourceChainsConfig(ctx, chains)
 	if err != nil {
-		return false, fmt.Errorf("get onramps: %w", err)
+		return fmt.Errorf("get onramps: %w", err)
 	}
 
 	r.lggr.Infow("got source chain configs", "onramps", func() []string {
@@ -505,7 +508,7 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 
 	for chain, cfg := range sourceConfigs {
 		if len(cfg.OnRamp) == 0 {
-			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
+			return fmt.Errorf("onRamp address not found for chain %d", chain)
 		}
 
 		// We only want to produce reports for enabled source chains.
@@ -523,8 +526,50 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 				Name:    consts.ContractNameOnRamp,
 			},
 		}); err != nil {
-			return false, fmt.Errorf("bind onRamp: %w", err)
+			return fmt.Errorf("bind onRamp: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
+	staticConfig, err := r.getOfframpStaticConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get onramps: %w", err)
+	}
+
+	if _, ok := r.contractReaders[r.destChain]; !ok {
+		r.lggr.Debugw("skipping nonce manager, dest chain not configured for this deployment",
+			"destChain", r.destChain)
+		return nil
+	}
+
+	// Bind the onRamp contract address to the reader.
+	// If the same address exists -> no-op
+	// If the address is changed -> updates the address, overwrites the existing one
+	// If the contract not binded -> binds to the new address
+	if err := r.contractReaders[r.destChain].Bind(ctx, []types.BoundContract{
+		{
+			Address: typeconv.AddressBytesToString(staticConfig.nonceManager, uint64(r.destChain)),
+			Name:    consts.ContractNameNonceManager,
+		},
+	}); err != nil {
+		return fmt.Errorf("bind nonce manager: %w", err)
+	}
+
+	return nil
+}
+
+func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
+	err := r.bindOnramps(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	err = r.bindNonceManager(ctx)
+	if err != nil {
+		return false, err
 	}
 
 	return true, nil
@@ -603,6 +648,34 @@ func (r *CCIPChainReader) validateWriterExistence(chains ...cciptypes.ChainSelec
 		}
 	}
 	return nil
+}
+
+// getSourceChainsConfig returns the destination offRamp contract's static chain configuration.
+func (r *CCIPChainReader) getOfframpStaticConfig(ctx context.Context) (offrampStaticChainConfig, error) {
+	if err := r.validateReaderExistence(r.destChain); err != nil {
+		return offrampStaticChainConfig{}, err
+	}
+
+	resp := offrampStaticChainConfig{}
+	err := r.contractReaders[r.destChain].GetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOfframpGetStaticConfig,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&resp,
+	)
+	if err != nil {
+		return offrampStaticChainConfig{}, fmt.Errorf("failed to get source chain config: %w", err)
+	}
+	return resp, nil
+}
+
+type offrampStaticChainConfig struct {
+	chainSelector      uint64 `json:"chainSelector"`
+	rmnProxy           []byte `json:"rmnProxy"`
+	tokenAdminRegistry []byte `json:"tokenAdminRegistry"`
+	nonceManager       []byte `json:"nonceManager"`
 }
 
 // Interface compliance check
