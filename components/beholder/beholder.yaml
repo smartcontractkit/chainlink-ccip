@@ -7,6 +7,7 @@ pipelines:
       create_deployments beholder-prometheus
       create_deployments beholder-grafana
       create_deployments beholder-loki
+      create_deployments beholder-tempo
       create_deployments crib-beholder-infra
       create_deployments beholder-test-client
 
@@ -17,6 +18,7 @@ deployments:
       - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
       - ${COMPONENTS_DIR}/beholder/configmaps/grafana.yaml
       - ${COMPONENTS_DIR}/beholder/configmaps/loki.yaml
+      - ${COMPONENTS_DIR}/beholder/configmaps/tempo.yaml
 
   beholder-test-client:
     updateImageTags: false
@@ -97,6 +99,10 @@ deployments:
               items:
               - key: datasources.yml
                 path: datasources/datasources.yml
+              - key: main.yml
+                path: dashboards/main.yml
+              - key: beholder-demo-dashboard.json
+                path: dashboards/beholder-demo-dashboard.json
         service:
           name: beholder-grafana
           ports:
@@ -139,6 +145,38 @@ deployments:
           runAsGroup: 999
           fsGroup: 999
 
+  beholder-tempo:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: grafana/tempo:2.5.0
+            args:
+              - "-config.file=/etc/tempo/config/tempo.yml"
+
+            volumeMounts:
+              - containerPath: /etc/tempo/config
+                volume:
+                  name: config-volume
+        volumes:
+          - name: config-volume
+            configMap:
+              name: tempo-config
+
+        service:
+          name: beholder-tempo
+          ports:
+            - port: 4317
+            - port: 3200
+        podSecurityContext:
+          fsGroup: 10001
+        securityContext:
+          runAsUser: 10001
+          runAsGroup: 10001
+          fsGroup: 10001
 
   crib-beholder-infra:
     updateImageTags: false
