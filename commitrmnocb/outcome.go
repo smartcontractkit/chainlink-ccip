@@ -247,7 +247,8 @@ func selectTokens(
 ) map[types.Account]cciptypes.BigInt {
 	tokenPrices := make(map[types.Account]cciptypes.BigInt)
 	// if the time since the last update is greater than the update frequency, update all tokens
-	if consensusTimestamp.Sub(lastPricesUpdate) > updateFrequency.Duration() {
+	nextPricesUpdate := lastPricesUpdate.Add(updateFrequency.Duration())
+	if consensusTimestamp.After(nextPricesUpdate) {
 		return medianizedFeedTokenPrices
 	}
 
