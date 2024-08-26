@@ -7,180 +7,181 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+
+	observer_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commitrmnocb"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-func Test_Observation(t *testing.T) {
-	merkleRoots := []cciptypes.MerkleRootChain{
+var (
+	merkleRoots = []cciptypes.MerkleRootChain{
 		{
 			ChainSel:     1,
 			SeqNumsRange: [2]cciptypes.SeqNum{5, 78},
 			MerkleRoot:   [32]byte{1},
 		},
 	}
-	gasPrices := []cciptypes.GasPriceChain{
+
+	gasPrices = []cciptypes.GasPriceChain{
 		{
 			GasPrice: cciptypes.NewBigIntFromInt64(99),
 			ChainSel: 8,
 		},
 	}
-	tokenPrices := []cciptypes.TokenPrice{
+
+	tokenPrices = []cciptypes.TokenPrice{
 		{
 			TokenID: "token23",
 			Price:   cciptypes.NewBigIntFromInt64(80761),
 		},
 	}
-	feedPrices := []cciptypes.TokenPrice{
+
+	feedPrices = []cciptypes.TokenPrice{
 		{
 			TokenID: "token23",
 			Price:   cciptypes.NewBigIntFromInt64(80761),
 		},
 	}
-	registryUpdates := []cciptypes.TokenPrice{
+
+	registryUpdates = []cciptypes.TokenPrice{
 		{
 			TokenID: "token23",
 			Price:   cciptypes.NewBigIntFromInt64(80761),
 		},
 	}
-	offRampNextSeqNums := []plugintypes.SeqNumChain{
+
+	offRampNextSeqNums = []plugintypes.SeqNumChain{
 		{
 			ChainSel: 456,
 			SeqNum:   9987,
 		},
 	}
-	fChain := map[cciptypes.ChainSelector]int{
+
+	fChain = map[cciptypes.ChainSelector]int{
 		872: 3,
 	}
+)
 
-	testCases := []struct {
-		name               string
-		previousOutcome    Outcome
-		merkleRoots        []cciptypes.MerkleRootChain
-		gasPrices          []cciptypes.GasPriceChain
-		tokenPrices        []cciptypes.TokenPrice
-		feedPrices         []cciptypes.TokenPrice
-		registryUpdates    []cciptypes.TokenPrice
-		offRampNextSeqNums []plugintypes.SeqNumChain
-		fChain             map[cciptypes.ChainSelector]int
-		expObs             Observation
-	}{
-		{
-			name: "SelectingRangesForReport observation",
-			previousOutcome: Outcome{
-				OutcomeType: ReportTransmitted,
-			},
-			merkleRoots:        merkleRoots,
-			gasPrices:          gasPrices,
-			tokenPrices:        tokenPrices,
-			feedPrices:         feedPrices,
-			registryUpdates:    registryUpdates,
-			offRampNextSeqNums: offRampNextSeqNums,
-			fChain:             fChain,
-			expObs: Observation{
-				OnRampMaxSeqNums:   offRampNextSeqNums,
-				OffRampNextSeqNums: offRampNextSeqNums,
-				FChain:             fChain,
-			},
-		},
-		{
-			name: "BuildingReport observation",
-			previousOutcome: Outcome{
-				OutcomeType: ReportIntervalsSelected,
-			},
-			merkleRoots:        merkleRoots,
-			gasPrices:          gasPrices,
-			tokenPrices:        tokenPrices,
-			feedPrices:         feedPrices,
-			registryUpdates:    registryUpdates,
-			offRampNextSeqNums: offRampNextSeqNums,
-			fChain:             fChain,
-			expObs: Observation{
-				MerkleRoots:               merkleRoots,
-				GasPrices:                 gasPrices,
-				FeedTokenPrices:           feedPrices,
-				PriceRegistryTokenUpdates: registryUpdates,
-				FChain:                    fChain,
-			},
-		},
-		{
-			name: "WaitingForReportTransmission observation",
-			previousOutcome: Outcome{
-				OutcomeType: ReportInFlight,
-			},
-			merkleRoots:        merkleRoots,
-			gasPrices:          gasPrices,
-			tokenPrices:        tokenPrices,
-			feedPrices:         feedPrices,
-			registryUpdates:    registryUpdates,
-			offRampNextSeqNums: offRampNextSeqNums,
-			fChain:             fChain,
-			expObs: Observation{
-				OffRampNextSeqNums: offRampNextSeqNums,
-				FChain:             fChain,
-			},
-		},
+func Test_Observation_SelectingRangesForReport(t *testing.T) {
+	ctx := context.Background()
+
+	observer := observer_mock.NewMockObserver(t)
+	observer.On(
+		"ObserveOffRampNextSeqNums", ctx,
+	).Return(offRampNextSeqNums)
+	observer.On("ObserveFChain").Return(fChain)
+
+	previousOutcome := Outcome{
+		OutcomeType: ReportTransmitted,
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+	actualObs := observe(t, ctx, observer, previousOutcome)
 
-			observer := mocks.NewObserver()
-			observer.On(
-				"ObserveOffRampNextSeqNums", ctx,
-			).Return(tc.offRampNextSeqNums)
-			observer.On(
-				"ObserveMerkleRoots", ctx, mock.Anything,
-			).Return(tc.merkleRoots)
-			observer.On(
-				"ObserveFeedTokenPrices", ctx,
-			).Return(tc.tokenPrices)
-			observer.On(
-				"ObservePriceRegistryTokenUpdates", ctx,
-			).Return(tc.registryUpdates)
-			observer.On(
-				"ObserveGasPrices", ctx,
-			).Return(tc.gasPrices)
-			observer.On("ObserveFChain").Return(tc.fChain)
-
-			p := Plugin{
-				lggr:     logger.Test(t),
-				observer: observer,
-			}
-
-			previousOutcomeEncoded, err := tc.previousOutcome.Encode()
-			assert.NoError(t, err)
-
-			result, err := p.Observation(
-				ctx,
-				ocr3types.OutcomeContext{PreviousOutcome: previousOutcomeEncoded},
-				types.Query{},
-			)
-			assert.NoError(t, err)
-
-			actualObs, err := DecodeCommitPluginObservation(result)
-			assert.NoError(t, err)
-
-			// We don't need to worry about comparing timestamps
-			// Observation will always return the current time
-			tc.expObs.Timestamp = actualObs.Timestamp
-			assert.Equal(t, tc.expObs, actualObs)
-		})
+	// We don't need to worry about comparing timestamps
+	// Observation will always return the current time
+	expectedObs := Observation{
+		OnRampMaxSeqNums:   offRampNextSeqNums,
+		OffRampNextSeqNums: offRampNextSeqNums,
+		FChain:             fChain,
+		Timestamp:          actualObs.Timestamp,
 	}
+
+	assert.Equal(t, expectedObs, actualObs)
 }
+
+func Test_Observation_BuildingReport(t *testing.T) {
+	ctx := context.Background()
+
+	observer := observer_mock.NewMockObserver(t)
+	observer.On(
+		"ObserveMerkleRoots", ctx, mock.Anything,
+	).Return(merkleRoots)
+	observer.On(
+		"ObserveFeedTokenPrices", ctx,
+	).Return(tokenPrices)
+	observer.On(
+		"ObservePriceRegistryTokenUpdates", ctx,
+	).Return(registryUpdates)
+	observer.On(
+		"ObserveGasPrices", ctx,
+	).Return(gasPrices)
+	observer.On("ObserveFChain").Return(fChain)
+
+	previousOutcome := Outcome{
+		OutcomeType: ReportIntervalsSelected,
+	}
+
+	actualObs := observe(t, ctx, observer, previousOutcome)
+
+	expectedObs := Observation{
+		MerkleRoots:               merkleRoots,
+		GasPrices:                 gasPrices,
+		FeedTokenPrices:           feedPrices,
+		PriceRegistryTokenUpdates: registryUpdates,
+		FChain:                    fChain,
+		Timestamp:                 actualObs.Timestamp,
+	}
+
+	assert.Equal(t, expectedObs, actualObs)
+}
+
+func Test_Observation_WaitingForReportTransmission(t *testing.T) {
+	ctx := context.Background()
+
+	observer := observer_mock.NewMockObserver(t)
+	observer.On(
+		"ObserveOffRampNextSeqNums", ctx,
+	).Return(offRampNextSeqNums)
+	observer.On("ObserveFChain").Return(fChain)
+
+	previousOutcome := Outcome{
+		OutcomeType: ReportInFlight,
+	}
+
+	actualObs := observe(t, ctx, observer, previousOutcome)
+	expectedObs := Observation{
+		OffRampNextSeqNums: offRampNextSeqNums,
+		FChain:             fChain,
+		Timestamp:          actualObs.Timestamp,
+	}
+
+	assert.Equal(t, expectedObs, actualObs)
+}
+
+func observe(t *testing.T, ctx context.Context, observer *observer_mock.MockObserver, previousOutcome Outcome) Observation {
+	p := Plugin{
+		lggr:     logger.Test(t),
+		observer: observer,
+	}
+
+	previousOutcomeEncoded, err := previousOutcome.Encode()
+	assert.NoError(t, err)
+
+	result, err := p.Observation(
+		ctx,
+		ocr3types.OutcomeContext{PreviousOutcome: previousOutcomeEncoded},
+		types.Query{},
+	)
+	assert.NoError(t, err)
+
+	actualObs, err := DecodeCommitPluginObservation(result)
+	assert.NoError(t, err)
+
+	return actualObs
+}
+
+// Additional test functions can be written similarly by reusing the global variables.
 
 func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 	testCases := []struct {

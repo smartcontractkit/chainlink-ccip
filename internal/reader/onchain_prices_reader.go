@@ -18,7 +18,7 @@ import (
 )
 
 type PriceReader interface {
-	// GetTokenPricesUSD returns the prices of the provided tokens in USD normalized to e18.
+	// GetTokenPricesUSD returns the prices of the provided tokens in USD normalized to e18. 1USD=1e18USD.
 	// The order of the returned prices corresponds to the order of the provided tokens.
 	GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
 }

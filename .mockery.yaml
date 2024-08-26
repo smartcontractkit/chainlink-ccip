@@ -8,6 +8,9 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/gen:
         interfaces:
             ExecutePluginCodec:
+    github.com/smartcontractkit/chainlink-ccip/commitrmnocb:
+        interfaces:
+            Observer:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
