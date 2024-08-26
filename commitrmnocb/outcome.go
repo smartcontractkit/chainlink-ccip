@@ -233,7 +233,7 @@ func getConsensusObservation(
 	return consensusObs, nil
 }
 
-// Checks which tokens need to be updated based on the observed token prices and the price registry updates
+// selectTokens checks which tokens need to be updated based on the observed token prices and the price registry updates
 // if time passed since the last update is greater than the stale threshold, update all tokens
 // otherwise calculate deviation between the price registry and feed and include deviated token prices
 func selectTokens(
