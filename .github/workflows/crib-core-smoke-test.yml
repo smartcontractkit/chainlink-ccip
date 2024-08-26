@@ -48,12 +48,9 @@ jobs:
       contents: read
       actions: read
     steps:
-      - name: Checkout crib git repo
-        uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-
       - name: Deploy and validate CRIB Environment for Core
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@4dd21a9d6e3f1383ffe8b9650b55f6e6031d3d0a # crib-deploy-environment@1.0.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@dbc941018ee38fd3d47a382ea425e16d0f3d7edf # crib-deploy-environment@1.1.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -62,6 +59,8 @@ jobs:
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           product: "core"
+          # Send alerts only for push to main
+          send-alerts: ${{ github.event_name == 'push' && 'true' || 'false'}}
           crib-alert-slack-webhook: ${{ secrets.CRIB_ALERT_SLACK_WEBHOOK }}
           crib-repo-ref: ${{ github.ref }}
 
