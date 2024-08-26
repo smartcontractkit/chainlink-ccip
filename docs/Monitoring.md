@@ -15,12 +15,6 @@ Metrics from CRIB environments deployed on the AWS EKS main staging cluster are 
 
 Note: For CRIB environments deployed on the local `Kind` cluster, metrics are not currently shipped, as support for `Kind` is in the alpha phase.
 
-## Logging
-
-Application logs are automatically collected and shipped to the centralized stack, where they are available in [Grafana LOKI](https://grafana.ops.prod.cldev.sh/). Loki is a log aggregation system designed to work seamlessly with Grafana, allowing you to search, explore, and visualize logs alongside metrics and traces. For more details, please check the [LOKI documentation](https://smartcontract-it.atlassian.net/wiki/spaces/OBS/pages/676855845/Loki+Logs+Cheat+Sheet).
-
-Note: For CRIB environments deployed on the local Kind cluster, logs are not currently shipped, as support for Kind is in the alpha phase.
-
 ## Tracing
 
 **Tempo** is Grafana's distributed tracing backend, designed to receive, store, and query traces. It integrates seamlessly with `OTEL` and Grafana for full observability.
