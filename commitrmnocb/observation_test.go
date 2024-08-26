@@ -20,7 +20,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 
-	observer_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commitrmnocb"
+	commit_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commitrmnocb"
+
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -76,7 +77,7 @@ var (
 func Test_Observation_SelectingRangesForReport(t *testing.T) {
 	ctx := context.Background()
 
-	observer := observer_mock.NewMockObserver(t)
+	observer := commit_mock.NewMockObserver(t)
 	observer.On(
 		"ObserveOffRampNextSeqNums", ctx,
 	).Return(offRampNextSeqNums)
@@ -103,7 +104,7 @@ func Test_Observation_SelectingRangesForReport(t *testing.T) {
 func Test_Observation_BuildingReport(t *testing.T) {
 	ctx := context.Background()
 
-	observer := observer_mock.NewMockObserver(t)
+	observer := commit_mock.NewMockObserver(t)
 	observer.On(
 		"ObserveMerkleRoots", ctx, mock.Anything,
 	).Return(merkleRoots)
@@ -139,7 +140,7 @@ func Test_Observation_BuildingReport(t *testing.T) {
 func Test_Observation_WaitingForReportTransmission(t *testing.T) {
 	ctx := context.Background()
 
-	observer := observer_mock.NewMockObserver(t)
+	observer := commit_mock.NewMockObserver(t)
 	observer.On(
 		"ObserveOffRampNextSeqNums", ctx,
 	).Return(offRampNextSeqNums)
@@ -162,7 +163,7 @@ func Test_Observation_WaitingForReportTransmission(t *testing.T) {
 func observe(
 	ctx context.Context,
 	t *testing.T,
-	observer *observer_mock.MockObserver,
+	observer *commit_mock.MockObserver,
 	previousOutcome Outcome,
 ) Observation {
 	p := Plugin{
@@ -212,26 +213,6 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			},
 		},
 		{
-			name:                   "nil is returned when supportsDestChain is false",
-			supportsDestChain:      false,
-			supportsDestChainError: nil,
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: nil,
-			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
-			nextSeqNumsError:       nil,
-			expResult:              nil,
-		},
-		{
-			name:                   "nil is returned when supportsDestChain errors",
-			supportsDestChain:      true,
-			supportsDestChainError: fmt.Errorf("error"),
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: nil,
-			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
-			nextSeqNumsError:       nil,
-			expResult:              nil,
-		},
-		{
 			name:                   "nil is returned when knownSourceChains errors",
 			supportsDestChain:      true,
 			supportsDestChainError: nil,
@@ -264,10 +245,11 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				).Return(tc.nextSeqNums, tc.nextSeqNumsError)
 			}
 
-			chainSupport := mocks.NewChainSupport()
+			chainSupport := commit_mock.NewMockChainSupport(t)
 			chainSupport.On(
 				"SupportsDestChain", nodeID,
 			).Return(tc.supportsDestChain, tc.supportsDestChainError)
+
 			chainSupport.On(
 				"KnownSourceChainsSlice",
 			).Return(tc.knownSourceChains, tc.knownSourceChainsError)
@@ -283,6 +265,46 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
 		})
 	}
+}
+
+func Test_ObserveOffRampNextSeqNums_SupportsDestChainFalse(t *testing.T) {
+	ctx := context.Background()
+	var nodeID commontypes.OracleID = 1
+	reader := reader_mock.NewMockCCIP(t)
+	chainSupport := commit_mock.NewMockChainSupport(t)
+	chainSupport.On(
+		"SupportsDestChain", nodeID,
+	).Return(false, nil)
+
+	o := ObserverImpl{
+		nodeID:       nodeID,
+		lggr:         logger.Test(t),
+		msgHasher:    mocks.NewMessageHasher(),
+		ccipReader:   reader,
+		chainSupport: chainSupport,
+	}
+
+	assert.Nil(t, o.ObserveOffRampNextSeqNums(ctx))
+}
+
+func Test_ObserveOffRampNextSeqNums_SupportsDestChainError(t *testing.T) {
+	ctx := context.Background()
+	var nodeID commontypes.OracleID = 1
+	reader := reader_mock.NewMockCCIP(t)
+	chainSupport := commit_mock.NewMockChainSupport(t)
+	chainSupport.On(
+		"SupportsDestChain", nodeID,
+	).Return(true, fmt.Errorf("error"))
+
+	o := ObserverImpl{
+		nodeID:       nodeID,
+		lggr:         logger.Test(t),
+		msgHasher:    mocks.NewMessageHasher(),
+		ccipReader:   reader,
+		chainSupport: chainSupport,
+	}
+
+	assert.Nil(t, o.ObserveOffRampNextSeqNums(ctx))
 }
 
 func Test_ObserveMerkleRoots(t *testing.T) {
@@ -478,7 +500,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
 			}
 
-			chainSupport := mocks.NewChainSupport()
+			chainSupport := commit_mock.NewMockChainSupport(t)
 			if tc.supportedChainsFails {
 				chainSupport.On("SupportedChains", nodeID).Return(
 					mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error"),

@@ -11,6 +11,7 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/commitrmnocb:
         interfaces:
             Observer:
+            ChainSupport:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
