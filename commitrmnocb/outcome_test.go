@@ -6,10 +6,13 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,7 +86,13 @@ func Test_SelectTokens(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := selectTokens(lggr, tt.feedPrices, tt.registryPrices, tt.consensusTimestamp, tt.lastPricesUpdate, tt.updateFrequency, tt.tokenInfo)
+			result := selectTokens(lggr,
+				tt.feedPrices,
+				tt.registryPrices,
+				tt.consensusTimestamp,
+				tt.lastPricesUpdate,
+				tt.updateFrequency,
+				tt.tokenInfo)
 			assert.Equal(t, tt.expectedOutput, result)
 		})
 	}
@@ -172,7 +181,11 @@ func TestDeviates(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, Deviates(tt.args.x1, tt.args.x2, tt.args.ppb), "Deviates(%v, %v, %v)", tt.args.x1, tt.args.x2, tt.args.ppb)
+			assert.Equalf(t,
+				tt.want,
+				Deviates(tt.args.x1, tt.args.x2, tt.args.ppb),
+				"Deviates(%v, %v, %v)", tt.args.x1, tt.args.x2, tt.args.ppb,
+			)
 		})
 	}
 }

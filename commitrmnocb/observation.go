@@ -245,7 +245,6 @@ func (o ObserverImpl) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.To
 		return []cciptypes.TokenPrice{}
 	}
 
-	//TODO: Should we consider returning only the available prices instead of empty Slice?
 	if len(tokenPrices) != len(o.tokensToQuery) {
 		o.lggr.Errorw("token prices length mismatch", "got", len(tokenPrices), "want", len(o.tokensToQuery))
 		return []cciptypes.TokenPrice{}

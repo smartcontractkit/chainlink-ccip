@@ -86,7 +86,7 @@ func Test_Observation_SelectingRangesForReport(t *testing.T) {
 		OutcomeType: ReportTransmitted,
 	}
 
-	actualObs := observe(t, ctx, observer, previousOutcome)
+	actualObs := observe(ctx, t, observer, previousOutcome)
 
 	// We don't need to worry about comparing timestamps
 	// Observation will always return the current time
@@ -122,7 +122,7 @@ func Test_Observation_BuildingReport(t *testing.T) {
 		OutcomeType: ReportIntervalsSelected,
 	}
 
-	actualObs := observe(t, ctx, observer, previousOutcome)
+	actualObs := observe(ctx, t, observer, previousOutcome)
 
 	expectedObs := Observation{
 		MerkleRoots:               merkleRoots,
@@ -149,7 +149,7 @@ func Test_Observation_WaitingForReportTransmission(t *testing.T) {
 		OutcomeType: ReportInFlight,
 	}
 
-	actualObs := observe(t, ctx, observer, previousOutcome)
+	actualObs := observe(ctx, t, observer, previousOutcome)
 	expectedObs := Observation{
 		OffRampNextSeqNums: offRampNextSeqNums,
 		FChain:             fChain,
@@ -159,7 +159,12 @@ func Test_Observation_WaitingForReportTransmission(t *testing.T) {
 	assert.Equal(t, expectedObs, actualObs)
 }
 
-func observe(t *testing.T, ctx context.Context, observer *observer_mock.MockObserver, previousOutcome Outcome) Observation {
+func observe(
+	ctx context.Context,
+	t *testing.T,
+	observer *observer_mock.MockObserver,
+	previousOutcome Outcome,
+) Observation {
 	p := Plugin{
 		lggr:     logger.Test(t),
 		observer: observer,
@@ -180,8 +185,6 @@ func observe(t *testing.T, ctx context.Context, observer *observer_mock.MockObse
 
 	return actualObs
 }
-
-// Additional test functions can be written similarly by reusing the global variables.
 
 func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 	testCases := []struct {
