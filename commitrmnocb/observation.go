@@ -229,6 +229,7 @@ func (o ObserverImpl) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.To
 		return []cciptypes.TokenPrice{}
 	}
 
+	// TODO: make this required
 	if o.tokenPricesReader == nil {
 		o.lggr.Warnw("no token price reader available")
 		return []cciptypes.TokenPrice{}
