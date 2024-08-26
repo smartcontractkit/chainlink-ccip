@@ -3,7 +3,7 @@ version: v2beta1
 pipelines:
   beholder:
     run: |-
-      create_deployments configs
+      create_deployments beholder-configs
       create_deployments beholder-prometheus
       create_deployments beholder-grafana
       create_deployments beholder-loki
@@ -12,7 +12,7 @@ pipelines:
       create_deployments beholder-test-client
 
 deployments:
-  configs:
+  beholder-configs:
     kubectl:
       manifests:
         - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
