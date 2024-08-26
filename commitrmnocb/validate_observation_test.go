@@ -1,14 +1,18 @@
 package commitrmnocb
 
 import (
+	"context"
+	"math/big"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/assert"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -207,6 +211,191 @@ func Test_validateFChain(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func Test_validateObservedTokenPrices(t *testing.T) {
+	testCases := []struct {
+		name        string
+		tokenPrices []cciptypes.TokenPrice
+		expErr      bool
+	}{
+		{
+			name:        "empty is valid",
+			tokenPrices: []cciptypes.TokenPrice{},
+			expErr:      false,
+		},
+		{
+			name: "all valid",
+			tokenPrices: []cciptypes.TokenPrice{
+				cciptypes.NewTokenPrice("0x1", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0x2", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0x3", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			expErr: false,
+		},
+		{
+			name: "dup price",
+			tokenPrices: []cciptypes.TokenPrice{
+				cciptypes.NewTokenPrice("0x1", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0x2", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0x1", big.NewInt(1)), // dup
+				cciptypes.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			expErr: true,
+		},
+		{
+			name: "nil price",
+			tokenPrices: []cciptypes.TokenPrice{
+				cciptypes.NewTokenPrice("0x1", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0x2", big.NewInt(1)),
+				cciptypes.NewTokenPrice("0x3", nil), // nil price
+				cciptypes.NewTokenPrice("0xa", big.NewInt(1)),
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateObservedTokenPrices(tc.tokenPrices)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+
+	}
+}
+
+func Test_validateObservedGasPrices(t *testing.T) {
+	testCases := []struct {
+		name      string
+		gasPrices []cciptypes.GasPriceChain
+		expErr    bool
+	}{
+		{
+			name:      "empty is valid",
+			gasPrices: []cciptypes.GasPriceChain{},
+			expErr:    false,
+		},
+		{
+			name: "all valid",
+			gasPrices: []cciptypes.GasPriceChain{
+				cciptypes.NewGasPriceChain(big.NewInt(10), 1),
+				cciptypes.NewGasPriceChain(big.NewInt(20), 2),
+				cciptypes.NewGasPriceChain(big.NewInt(1312), 3),
+			},
+			expErr: false,
+		},
+		{
+			name: "duplicate gas price",
+			gasPrices: []cciptypes.GasPriceChain{
+				cciptypes.NewGasPriceChain(big.NewInt(10), 1),
+				cciptypes.NewGasPriceChain(big.NewInt(20), 2),
+				cciptypes.NewGasPriceChain(big.NewInt(1312), 1), // notice we already have a gas price for chain 1
+			},
+			expErr: true,
+		},
+		{
+			name: "empty gas price",
+			gasPrices: []cciptypes.GasPriceChain{
+				cciptypes.NewGasPriceChain(big.NewInt(10), 1),
+				cciptypes.NewGasPriceChain(big.NewInt(20), 2),
+				cciptypes.NewGasPriceChain(nil, 3), // nil
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateObservedGasPrices(tc.gasPrices)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func Test_validateMerkleRootsState(t *testing.T) {
+	testCases := []struct {
+		name               string
+		reportSeqNums      []plugintypes.SeqNumChain
+		onchainNextSeqNums []cciptypes.SeqNum
+		expValid           bool
+		expErr             bool
+	}{
+		{
+			name: "happy path",
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+			},
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
+			expValid:           true,
+			expErr:             false,
+		},
+		{
+			name: "one root is stale",
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+			},
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
+			expValid:           false,
+			expErr:             false,
+		},
+		{
+			name: "one root has gap",
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
+				plugintypes.NewSeqNumChain(20, 200),
+			},
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
+			expValid:           false,
+			expErr:             false,
+		},
+		{
+			name: "reader returned wrong number of seq nums",
+			reportSeqNums: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+			},
+			onchainNextSeqNums: []cciptypes.SeqNum{100, 200, 300},
+			expValid:           false,
+			expErr:             true,
+		},
+	}
+
+	ctx := context.Background()
+	lggr := logger.Test(t)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			reader := reader_mock.NewMockCCIP(t)
+			rep := cciptypes.CommitPluginReport{}
+			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
+			for _, snc := range tc.reportSeqNums {
+				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
+					ChainSel:     snc.ChainSel,
+					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
+				})
+				chains = append(chains, snc.ChainSel)
+			}
+			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainNextSeqNums, nil)
+			valid, err := validateMerkleRootsState(ctx, lggr, rep, reader)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }
