@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/utils"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -183,7 +184,7 @@ func TestDeviates(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t,
 				tt.want,
-				Deviates(tt.args.x1, tt.args.x2, tt.args.ppb),
+				utils.Deviates(tt.args.x1, tt.args.x2, tt.args.ppb),
 				"Deviates(%v, %v, %v)", tt.args.x1, tt.args.x2, tt.args.ppb,
 			)
 		})

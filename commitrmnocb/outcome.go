@@ -2,10 +2,10 @@ package commitrmnocb
 
 import (
 	"fmt"
-	"math/big"
 	"sort"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/utils"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -47,7 +47,7 @@ func (p *Plugin) Outcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		outcome = ReportRangesOutcome(commitQuery, consensusObservation)
+		outcome = ReportRangesOutcome(commitQuery, consensusObservation, previousOutcome)
 
 	case BuildingReport:
 		outcome = buildReport(commitQuery, consensusObservation, p.cfg.OffchainConfig, previousOutcome.LastPricesUpdate)
@@ -70,6 +70,7 @@ func (p *Plugin) Outcome(
 func ReportRangesOutcome(
 	query Query,
 	consensusObservation ConsensusObservation,
+	previousOutcome Outcome,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
@@ -103,6 +104,7 @@ func ReportRangesOutcome(
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
+		LastPricesUpdate:        previousOutcome.LastPricesUpdate,
 	}
 
 	return outcome
@@ -171,14 +173,16 @@ func checkForReportTransmission(
 
 	if offRampUpdated {
 		return Outcome{
-			OutcomeType: ReportTransmitted,
+			OutcomeType:      ReportTransmitted,
+			LastPricesUpdate: previousOutcome.LastPricesUpdate,
 		}
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
 		lggr.Warnw("Failed to detect report transmission")
 		return Outcome{
-			OutcomeType: ReportTransmissionFailed,
+			OutcomeType:      ReportTransmissionFailed,
+			LastPricesUpdate: previousOutcome.LastPricesUpdate,
 		}
 	}
 
@@ -186,6 +190,7 @@ func checkForReportTransmission(
 		OutcomeType:                     ReportInFlight,
 		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
+		LastPricesUpdate:                previousOutcome.LastPricesUpdate,
 	}
 }
 
@@ -200,7 +205,7 @@ func getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 	fChains := fChainConsensus(lggr, F, aggObs.FChain)
-	timestampConsensus := MedianTimestamp(aggObs.Timestamps)
+	timestampConsensus := utils.MedianTimestamp(aggObs.Timestamps)
 
 	fDestChain, exists := fChains[destChain]
 	if !exists {
@@ -267,7 +272,7 @@ func selectTokens(
 		}
 
 		deviation := ti.DeviationPPB.Int64()
-		if Deviates(feedPrice.Int, registryPrice.Int, deviation) {
+		if utils.Deviates(feedPrice.Int, registryPrice.Int, deviation) {
 			tokenPrices[token] = feedPrice
 		}
 	}
@@ -287,7 +292,7 @@ func feedPricesConsensus(
 			lggr.Warnf("could not reach consensus on feed token prices for token %s ", token)
 			continue
 		}
-		tokenPrices[token] = MedianBigInt(prices)
+		tokenPrices[token] = utils.MedianBigInt(prices)
 	}
 	return tokenPrices
 }
@@ -305,7 +310,7 @@ func registryPricesConsensus(
 			lggr.Warnf("could not reach consensus on price registry token prices for token %s ", token)
 			continue
 		}
-		medianPrice := MedianBigInt(prices)
+		medianPrice := utils.MedianBigInt(prices)
 		tokenPrices[token] = cciptypes.NewBigInt(medianPrice.Int)
 	}
 
@@ -324,7 +329,7 @@ func merkleRootConsensus(
 
 	for chain, roots := range rootsByChain {
 		if fChain, exists := fChains[chain]; exists {
-			root, count := mostFrequentElem(roots)
+			root, count := utils.MostFrequentElem(roots)
 
 			if count <= fChain {
 				// TODO: metrics
@@ -387,7 +392,7 @@ func offRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count := mostFrequentElem(offRampMaxSeqNums)
+		seqNum, count := utils.MostFrequentElem(offRampMaxSeqNums)
 		if count <= fDestChain {
 			// TODO: metrics
 			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
@@ -412,7 +417,7 @@ func fChainConsensus(
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		fChain, count := mostFrequentElem(fValues)
+		fChain, count := utils.MostFrequentElem(fValues)
 		if count < F {
 			// TODO: metrics
 			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
@@ -425,83 +430,4 @@ func fChainConsensus(
 	}
 
 	return consensus
-}
-
-// Given a list of elems, return the elem that occurs most frequently and how often it occurs
-func mostFrequentElem[T comparable](elems []T) (T, int) {
-	var mostFrequentElem T
-
-	counts := counts(elems)
-	maxCount := 0
-
-	for elem, count := range counts {
-		if count > maxCount {
-			mostFrequentElem = elem
-			maxCount = count
-		}
-	}
-
-	return mostFrequentElem, maxCount
-}
-
-// Given a list of elems, return a map from elems to how often they occur in the given list
-func counts[T comparable](elems []T) map[T]int {
-	m := make(map[T]int)
-	for _, elem := range elems {
-		m[elem]++
-	}
-
-	return m
-}
-
-// MedianTimestamp returns the middle timestamp after sorting the provided timestamps.
-// empty/default is returned if the provided slice is empty.
-func MedianTimestamp(timestamps []time.Time) time.Time {
-	if len(timestamps) == 0 {
-		return time.Time{}
-	}
-	valsCopy := make([]time.Time, len(timestamps))
-	copy(valsCopy[:], timestamps[:])
-	sort.Slice(valsCopy, func(i, j int) bool {
-		return valsCopy[i].Before(valsCopy[j])
-	})
-
-	return valsCopy[len(valsCopy)/2]
-}
-
-// Deviates checks if x1 and x2 deviates based on the provided ppb (parts per billion)
-// ppb is calculated based on the smaller value of the two
-// e.g, if x1 > x2, deviation_parts_per_billion = ((x1 - x2) / x2) * 1e9
-func Deviates(x1, x2 *big.Int, ppb int64) bool {
-	// if x1 == 0 or x2 == 0, deviates if x2 != x1, to avoid the relative division by 0 error
-	if x1.BitLen() == 0 || x2.BitLen() == 0 {
-		return x1.Cmp(x2) != 0
-	}
-	diff := big.NewInt(0).Sub(x1, x2) // diff = x1-x2
-	diff.Mul(diff, big.NewInt(1e9))   // diff = diff * 1e9
-	// dividing by the smaller value gives consistent ppb regardless of input order, and supports >100% deviation.
-	if x1.Cmp(x2) > 0 {
-		diff.Div(diff, x2)
-	} else {
-		diff.Div(diff, x1)
-	}
-	return diff.CmpAbs(big.NewInt(ppb)) > 0 // abs(diff) > ppb
-}
-
-// MedianBigInt returns the middle number after sorting the provided numbers.
-// nil is returned if the provided slice is empty.
-// If length of the provided slice is even, the right-hand-side value of the middle 2 numbers is returned.
-// The objective of this function is to always pick within the range of values reported
-// by honest nodes when we have 2f+1 values.
-func MedianBigInt(vals []cciptypes.BigInt) cciptypes.BigInt {
-	if len(vals) == 0 {
-		return cciptypes.BigInt{}
-	}
-
-	valsCopy := make([]cciptypes.BigInt, len(vals))
-	copy(valsCopy[:], vals[:])
-	sort.Slice(valsCopy, func(i, j int) bool {
-		return valsCopy[i].Cmp(valsCopy[j].Int) == -1
-	})
-	return valsCopy[len(valsCopy)/2]
 }

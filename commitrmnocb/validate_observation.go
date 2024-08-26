@@ -120,7 +120,7 @@ func validateObservedOffRampMaxSeqNums(
 	}
 
 	if !supportsDestChain {
-		return fmt.Errorf("observer.go %d does not support dest chain, but has observed %d offRampMaxSeqNums",
+		return fmt.Errorf("observer %d does not support dest chain, but has observed %d offRampMaxSeqNums",
 			observer, len(offRampMaxSeqNums))
 	}
 
