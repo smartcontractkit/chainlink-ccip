@@ -17,4 +17,3 @@ data:
         static_configs:
           - targets:
               - crib-beholder-infra-otel-collector-gateway:8889
-

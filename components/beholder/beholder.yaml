@@ -15,10 +15,10 @@ deployments:
   configs:
     kubectl:
       manifests:
-      - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
-      - ${COMPONENTS_DIR}/beholder/configmaps/grafana.yaml
-      - ${COMPONENTS_DIR}/beholder/configmaps/loki.yaml
-      - ${COMPONENTS_DIR}/beholder/configmaps/tempo.yaml
+        - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
+        - ${COMPONENTS_DIR}/beholder/configmaps/grafana.yaml
+        - ${COMPONENTS_DIR}/beholder/configmaps/loki.yaml
+        - ${COMPONENTS_DIR}/beholder/configmaps/tempo.yaml
 
   beholder-test-client:
     updateImageTags: false
@@ -48,11 +48,11 @@ deployments:
         containers:
           - image: prom/prometheus
             args:
-            - "--config.file=/etc/prometheus/config/prometheus.yml"
+              - "--config.file=/etc/prometheus/config/prometheus.yml"
             volumeMounts:
-            - containerPath: /etc/prometheus/config
-              volume:
-                name: config-volume
+              - containerPath: /etc/prometheus/config
+                volume:
+                  name: config-volume
         podSecurityContext:
           fsGroup: 65534
         securityContext:
@@ -64,7 +64,7 @@ deployments:
           selector:
             app: beholder-prometheus
           ports:
-          - port: 9090
+            - port: 9090
         volumes:
           - name: config-volume
             configMap:
@@ -80,33 +80,33 @@ deployments:
         containers:
           - image: grafana/grafana
             volumeMounts:
-            - containerPath: /etc/grafana/provisioning
-              volume:
-                name: config-volume
+              - containerPath: /etc/grafana/provisioning
+                volume:
+                  name: config-volume
             env:
-            - name: GF_AUTH_ANONYMOUS_ENABLED
-              value: "true"
-            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-              value: "Admin"
-            - name: GF_AUTH_DISABLE_LOGIN_FORM
-              value: "true"
-            - name: GF_FEATURE_TOGGLES_ENABLE
-              value: "traceqlEditor traceQLStreaming metricsSummary"
+              - name: GF_AUTH_ANONYMOUS_ENABLED
+                value: "true"
+              - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+                value: "Admin"
+              - name: GF_AUTH_DISABLE_LOGIN_FORM
+                value: "true"
+              - name: GF_FEATURE_TOGGLES_ENABLE
+                value: "traceqlEditor traceQLStreaming metricsSummary"
         volumes:
           - name: config-volume
             configMap:
               name: grafana-config
               items:
-              - key: datasources.yml
-                path: datasources/datasources.yml
-              - key: main.yml
-                path: dashboards/main.yml
-              - key: beholder-demo-dashboard.json
-                path: dashboards/beholder-demo-dashboard.json
+                - key: datasources.yml
+                  path: datasources/datasources.yml
+                - key: main.yml
+                  path: dashboards/main.yml
+                - key: beholder-demo-dashboard.json
+                  path: dashboards/beholder-demo-dashboard.json
         service:
           name: beholder-grafana
           ports:
-          - port: 3000
+            - port: 3000
         podSecurityContext:
           fsGroup: 999
         securityContext:
