@@ -87,6 +87,9 @@ func ReportRangesOutcome(
 		}
 	}
 
+	// deterministic outcome
+	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
+
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,

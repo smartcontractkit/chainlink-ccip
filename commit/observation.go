@@ -107,6 +107,7 @@ func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
+	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
 	if err != nil {
 		o.lggr.Warnw("call to NextSeqNum failed", "err", err)
