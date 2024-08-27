@@ -5,7 +5,7 @@ build: ensure_go_version
 	go build -v ./...
 
 generate: ensure_go_version
-	go install github.com/vektra/mockery/v2@v2.43.0
+	go install github.com/vektra/mockery/v2@v2.43.2
 	mockery
 
 test: ensure_go_version
