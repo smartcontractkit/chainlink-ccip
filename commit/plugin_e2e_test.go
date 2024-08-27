@@ -11,6 +11,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -26,13 +27,17 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-func TestPlugin_E2E(t *testing.T) {
-	destChain := ccipocr3.ChainSelector(1)
-	sourceChain1 := ccipocr3.ChainSelector(2)
-	sourceChain2 := ccipocr3.ChainSelector(3)
-	require.Len(t, mapset.NewSet(destChain, sourceChain1, sourceChain2).ToSlice(), 3)
+const (
+	destChain    = ccipocr3.ChainSelector(1)
+	sourceChain1 = ccipocr3.ChainSelector(2)
+	sourceChain2 = ccipocr3.ChainSelector(3)
+)
 
-	ctx := context.Background()
+func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
+	require.Len(t, mapset.NewSet(destChain, sourceChain1, sourceChain2).ToSlice(), 3)
+	require.Less(t, sourceChain1, sourceChain2, "test below expected source chain1 to be LT chain2")
+
+	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
 	oracleIDs := []commontypes.OracleID{1, 2, 3}
@@ -173,29 +178,35 @@ func setupNode(
 		}
 	}
 
-	homeChainReader.On("GetFChain").Return(fChain, nil)
+	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
 
 	for peerID, supportedChains := range supportedChainsForPeer {
-		homeChainReader.On("GetSupportedChainsForPeer", peerID).Return(supportedChains, nil).Maybe()
+		homeChainReader.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil).Maybe()
 	}
 
 	knownCCIPChains := mapset.NewSet[ccipocr3.ChainSelector]()
 
 	for chainSel, cfg := range chainCfg {
-		homeChainReader.On("GetChainConfig", chainSel).Return(cfg, nil).Maybe()
+		homeChainReader.EXPECT().GetChainConfig(chainSel).Return(cfg, nil).Maybe()
 		knownCCIPChains.Add(chainSel)
 	}
-	homeChainReader.On("GetKnownCCIPChains").Return(knownCCIPChains, nil).Maybe()
+	homeChainReader.EXPECT().GetKnownCCIPChains().Return(knownCCIPChains, nil).Maybe()
 
 	sourceChains := make([]ccipocr3.ChainSelector, 0)
-	seqNums := make([]ccipocr3.SeqNum, 0)
-	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
-	for chainSel, offRampNextSeqNum := range nextSeqNum {
+	for chainSel := range nextSeqNum {
 		sourceChains = append(sourceChains, chainSel)
-		seqNums = append(seqNums, offRampNextSeqNum)
+	}
+	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+
+	offRampNextSeqNums := make([]ccipocr3.SeqNum, 0)
+	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
+	for _, sourceChain := range sourceChains {
+		offRampNextSeqNum, ok := nextSeqNum[sourceChain]
+		assert.True(t, ok)
+		offRampNextSeqNums = append(offRampNextSeqNums, offRampNextSeqNum)
 
 		newMsgs := make([]ccipocr3.Message, 0)
-		numNewMsgs := (onRampLastSeqNum[chainSel] - offRampNextSeqNum) + 1
+		numNewMsgs := (onRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
 		for i := uint64(0); i < uint64(numNewMsgs); i++ {
 			messageID := sha256.Sum256([]byte(fmt.Sprintf("%d", uint64(offRampNextSeqNum)+i)))
 			newMsgs = append(newMsgs, ccipocr3.Message{
@@ -206,25 +217,23 @@ func setupNode(
 			})
 		}
 
-		ccipReader.On("MsgsBetweenSeqNums", ctx, chainSel,
+		ccipReader.EXPECT().MsgsBetweenSeqNums(ctx, sourceChain,
 			ccipocr3.NewSeqNumRange(offRampNextSeqNum, offRampNextSeqNum)).
 			Return(newMsgs, nil).Maybe()
 
 		if len(newMsgs) > 0 {
-			chainsWithNewMsgs = append(chainsWithNewMsgs, chainSel)
+			chainsWithNewMsgs = append(chainsWithNewMsgs, sourceChain)
 		}
 	}
 
-	sort.Slice(chainsWithNewMsgs, func(i, j int) bool { return chainsWithNewMsgs[i] < chainsWithNewMsgs[j] })
 	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
 	for _, chainSel := range chainsWithNewMsgs {
 		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, nextSeqNum[chainSel])
 	}
 	if len(chainsWithNewMsgs) > 0 {
-		ccipReader.On("NextSeqNum", ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
+		ccipReader.EXPECT().NextSeqNum(ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
 	}
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
-	ccipReader.On("NextSeqNum", ctx, sourceChains).Return(seqNums, nil).Maybe()
+	ccipReader.EXPECT().NextSeqNum(ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
 	p := NewPlugin(
 		ctx,
