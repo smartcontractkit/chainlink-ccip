@@ -9,7 +9,7 @@ generate: ensure_go_version
 	mockery
 
 test: ensure_go_version
-	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) ./...
+	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) `go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks'`
 
 lint: ensure_go_version
 	golangci-lint run -c .golangci.yml
