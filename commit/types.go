@@ -1,4 +1,4 @@
-package commitrmnocb
+package commit
 
 import (
 	"encoding/json"
