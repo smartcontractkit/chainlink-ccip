@@ -466,6 +466,11 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 			return false, fmt.Errorf("onRamp address not found for chain %d", chain)
 		}
 
+		// We only want to produce reports for enabled source chains.
+		if !cfg.IsEnabled {
+			continue
+		}
+
 		// Bind the onRamp contract address to the reader.
 		// If the same address exists -> no-op
 		// If the address is changed -> updates the address, overwrites the existing one
@@ -533,8 +538,9 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 }
 
 type sourceChainConfig struct {
-	OnRamp   []byte `json:"onRamp"`
-	MinSeqNr uint64 `json:"minSeqNr"`
+	IsEnabled bool
+	OnRamp    []byte
+	MinSeqNr  uint64
 }
 
 func (r *CCIPChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
