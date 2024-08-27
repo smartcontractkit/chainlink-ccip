@@ -107,7 +107,7 @@ func TestPlugin_E2E(t *testing.T) {
 type nodeSetup struct {
 	node        *Plugin
 	ccipReader  *reader_mock.MockCCIP
-	priceReader *mocks.TokenPricesReader
+	priceReader *reader_mock.MockTokenPrices
 	reportCodec *mocks.CommitPluginJSONReportCodec
 	msgHasher   *mocks.MessageHasher
 }
@@ -124,7 +124,7 @@ func setupNode(
 	nextSeqNum map[ccipocr3.ChainSelector]uint64,
 ) nodeSetup {
 	ccipReader := reader_mock.NewMockCCIP(t)
-	tokenPricesReader := mocks.NewTokenPricesReader()
+	tokenPricesReader := reader_mock.NewMockTokenPrices(t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)
