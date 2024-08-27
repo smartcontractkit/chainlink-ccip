@@ -57,7 +57,7 @@ type CCIP interface {
 	// in the onramp.
 	GetExpectedNextSequenceNumber(
 		ctx context.Context,
-		sourceChainSelector cciptypes.ChainSelector,
+		sourceChainSelector, destChainSelector cciptypes.ChainSelector,
 	) (cciptypes.SeqNum, error)
 
 	// NextSeqNum reads the destination chain.
@@ -397,7 +397,11 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 // GetExpectedNextSequenceNumber implements CCIP.
 func (r *CCIPChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	sourceChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	if destChainSelector != r.destChain {
+		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
+	}
+
 	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
 		return 0, err
 	}
@@ -414,7 +418,7 @@ func (r *CCIPChainReader) GetExpectedNextSequenceNumber(
 		consts.MethodNameGetExpectedNextSequenceNumber,
 		primitives.Unconfirmed,
 		map[string]any{
-			"destChainSelector": r.destChain,
+			"destChainSelector": destChainSelector,
 		},
 		&expectedNextSequenceNumber,
 	)

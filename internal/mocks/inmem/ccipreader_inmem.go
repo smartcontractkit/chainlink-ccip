@@ -31,7 +31,7 @@ type InMemoryCCIPReader struct {
 // GetExpectedNextSequenceNumber implements reader.CCIP.
 func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	chain cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	panic("unimplemented")
 }
 

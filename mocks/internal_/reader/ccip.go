@@ -254,9 +254,9 @@ func (_c *MockCCIP_GasPrices_Call) RunAndReturn(run func(context.Context, []ccip
 	return _c
 }
 
-// GetExpectedNextSequenceNumber provides a mock function with given fields: ctx, sourceChainSelector
-func (_m *MockCCIP) GetExpectedNextSequenceNumber(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
-	ret := _m.Called(ctx, sourceChainSelector)
+// GetExpectedNextSequenceNumber provides a mock function with given fields: ctx, sourceChainSelector, destChainSelector
+func (_m *MockCCIP) GetExpectedNextSequenceNumber(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector, destChainSelector ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
+	ret := _m.Called(ctx, sourceChainSelector, destChainSelector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetExpectedNextSequenceNumber")
@@ -264,17 +264,17 @@ func (_m *MockCCIP) GetExpectedNextSequenceNumber(ctx context.Context, sourceCha
 
 	var r0 ccipocr3.SeqNum
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)); ok {
-		return rf(ctx, sourceChainSelector)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)); ok {
+		return rf(ctx, sourceChainSelector, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) ccipocr3.SeqNum); ok {
-		r0 = rf(ctx, sourceChainSelector)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector) ccipocr3.SeqNum); ok {
+		r0 = rf(ctx, sourceChainSelector, destChainSelector)
 	} else {
 		r0 = ret.Get(0).(ccipocr3.SeqNum)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector) error); ok {
-		r1 = rf(ctx, sourceChainSelector)
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, sourceChainSelector, destChainSelector)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -290,13 +290,14 @@ type MockCCIP_GetExpectedNextSequenceNumber_Call struct {
 // GetExpectedNextSequenceNumber is a helper method to define mock.On call
 //   - ctx context.Context
 //   - sourceChainSelector ccipocr3.ChainSelector
-func (_e *MockCCIP_Expecter) GetExpectedNextSequenceNumber(ctx interface{}, sourceChainSelector interface{}) *MockCCIP_GetExpectedNextSequenceNumber_Call {
-	return &MockCCIP_GetExpectedNextSequenceNumber_Call{Call: _e.mock.On("GetExpectedNextSequenceNumber", ctx, sourceChainSelector)}
+//   - destChainSelector ccipocr3.ChainSelector
+func (_e *MockCCIP_Expecter) GetExpectedNextSequenceNumber(ctx interface{}, sourceChainSelector interface{}, destChainSelector interface{}) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+	return &MockCCIP_GetExpectedNextSequenceNumber_Call{Call: _e.mock.On("GetExpectedNextSequenceNumber", ctx, sourceChainSelector, destChainSelector)}
 }
 
-func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) Run(run func(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector)) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) Run(run func(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector, destChainSelector ccipocr3.ChainSelector)) *MockCCIP_GetExpectedNextSequenceNumber_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].(ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -306,7 +307,7 @@ func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) Return(_a0 ccipocr3.SeqNu
 	return _c
 }
 
-func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)) *MockCCIP_GetExpectedNextSequenceNumber_Call {
 	_c.Call.Return(run)
 	return _c
 }
