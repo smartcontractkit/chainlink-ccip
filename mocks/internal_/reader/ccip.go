@@ -254,6 +254,63 @@ func (_c *MockCCIP_GasPrices_Call) RunAndReturn(run func(context.Context, []ccip
 	return _c
 }
 
+// GetExpectedNextSequenceNumber provides a mock function with given fields: ctx, sourceChainSelector
+func (_m *MockCCIP) GetExpectedNextSequenceNumber(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
+	ret := _m.Called(ctx, sourceChainSelector)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExpectedNextSequenceNumber")
+	}
+
+	var r0 ccipocr3.SeqNum
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)); ok {
+		return rf(ctx, sourceChainSelector)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) ccipocr3.SeqNum); ok {
+		r0 = rf(ctx, sourceChainSelector)
+	} else {
+		r0 = ret.Get(0).(ccipocr3.SeqNum)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, sourceChainSelector)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIP_GetExpectedNextSequenceNumber_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetExpectedNextSequenceNumber'
+type MockCCIP_GetExpectedNextSequenceNumber_Call struct {
+	*mock.Call
+}
+
+// GetExpectedNextSequenceNumber is a helper method to define mock.On call
+//   - ctx context.Context
+//   - sourceChainSelector ccipocr3.ChainSelector
+func (_e *MockCCIP_Expecter) GetExpectedNextSequenceNumber(ctx interface{}, sourceChainSelector interface{}) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+	return &MockCCIP_GetExpectedNextSequenceNumber_Call{Call: _e.mock.On("GetExpectedNextSequenceNumber", ctx, sourceChainSelector)}
+}
+
+func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) Run(run func(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector)) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) Return(_a0 ccipocr3.SeqNum, _a1 error) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIP_GetExpectedNextSequenceNumber_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)) *MockCCIP_GetExpectedNextSequenceNumber_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MsgsBetweenSeqNums provides a mock function with given fields: ctx, chain, seqNumRange
 func (_m *MockCCIP) MsgsBetweenSeqNums(ctx context.Context, chain ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange) ([]ccipocr3.Message, error) {
 	ret := _m.Called(ctx, chain, seqNumRange)
