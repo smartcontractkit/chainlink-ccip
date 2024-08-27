@@ -13,6 +13,7 @@ import (
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
@@ -161,8 +162,13 @@ func setupNode(
 		sourceChains = append(sourceChains, chainSel)
 		seqNums = append(seqNums, ccipocr3.SeqNum(ns))
 	}
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
-	ccipReader.On("NextSeqNum", ctx, sourceChains).Return(seqNums, nil)
+
+	ccipReader.On("NextSeqNum", ctx, mock.Anything).Run(func(args mock.Arguments) {
+		providedChains := args[1].([]ccipocr3.ChainSelector)
+		sort.Slice(providedChains, func(i, j int) bool { return providedChains[i] < providedChains[j] })
+		sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+		assert.Equal(t, sourceChains, providedChains)
+	}).Return(seqNums, nil)
 
 	p := NewPlugin(
 		ctx,
