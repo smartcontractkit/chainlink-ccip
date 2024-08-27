@@ -135,15 +135,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	// The following types are used to decode the events
 	// but should be replaced by chain-reader modifiers and use the base cciptypes.CommitReport type.
 
-	type Interval struct {
-		Min uint64
-		Max uint64
-	}
-
 	type MerkleRoot struct {
 		SourceChainSelector uint64
-		Interval            Interval
+		MinSeqNr            uint64
+		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
+		OnRampAddress       []byte
 	}
 
 	type TokenPriceUpdate struct {
@@ -216,8 +213,8 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(mr.Interval.Min),
-					cciptypes.SeqNum(mr.Interval.Max),
+					cciptypes.SeqNum(mr.MinSeqNr),
+					cciptypes.SeqNum(mr.MaxSeqNr),
 				),
 				MerkleRoot: mr.MerkleRoot,
 			})
