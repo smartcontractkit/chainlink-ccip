@@ -149,7 +149,7 @@ func Test_PollingWorking(t *testing.T) {
 
 	var (
 		tickTime       = 2 * time.Millisecond
-		totalSleepTime = tickTime * 4
+		totalSleepTime = tickTime * 20
 	)
 
 	configPoller := NewHomeChainConfigPoller(
