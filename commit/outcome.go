@@ -122,6 +122,8 @@ func buildReport(
 		outcomeType = ReportEmpty
 	}
 
+	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
+
 	outcome := Outcome{
 		OutcomeType:        outcomeType,
 		RootsToReport:      roots,
