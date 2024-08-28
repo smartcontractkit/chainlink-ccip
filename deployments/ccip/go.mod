@@ -4,15 +4,15 @@ go 1.21.7
 
 require (
 	github.com/K-Phoen/grabana v0.22.1
+	github.com/smartcontractkit/chainlink-testing-framework/wasp v0.4.10
 	github.com/smartcontractkit/chainlink/dashboard-lib v0.0.0-00010101000000-000000000000
-	github.com/smartcontractkit/wasp v0.4.6
 )
 
 require (
 	github.com/K-Phoen/sdk v0.12.4 // indirect
 	github.com/gosimple/slug v1.13.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
-	github.com/grafana/grafana-foundation-sdk/go v0.0.0-00010101000000-000000000000 // indirect
+	github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240326122733-6f96a993222b // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
