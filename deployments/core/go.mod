@@ -4,8 +4,8 @@ go 1.21.7
 
 require (
 	github.com/K-Phoen/grabana v0.22.1
+	github.com/smartcontractkit/chainlink-testing-framework/wasp v0.4.10
 	github.com/smartcontractkit/chainlink/dashboard-lib v0.0.0-00010101000000-000000000000
-	github.com/smartcontractkit/wasp v0.4.6
 )
 
 require (

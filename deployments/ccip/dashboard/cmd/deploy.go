@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/K-Phoen/grabana/dashboard"
+	waspdb "github.com/smartcontractkit/chainlink-testing-framework/wasp/dashboard"
 	lib "github.com/smartcontractkit/chainlink/dashboard-lib"
 	atlas_don "github.com/smartcontractkit/chainlink/dashboard-lib/atlas-don"
 	ccipLoadTestView "github.com/smartcontractkit/chainlink/dashboard-lib/ccip-load-test-view"
@@ -11,7 +12,6 @@ import (
 	core_node_components "github.com/smartcontractkit/chainlink/dashboard-lib/core-node-components"
 	coreOCRv2ccip "github.com/smartcontractkit/chainlink/dashboard-lib/core-ocrv2-ccip"
 	k8spods "github.com/smartcontractkit/chainlink/dashboard-lib/k8s-pods"
-	waspdb "github.com/smartcontractkit/wasp/dashboard"
 )
 
 func main() {
