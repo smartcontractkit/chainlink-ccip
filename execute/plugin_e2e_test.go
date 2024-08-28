@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -90,8 +91,11 @@ type nodeSetup struct {
 	TokenDataReader *mock_types.MockTokenDataReader
 }
 
-func setupHomeChainPoller(lggr logger.Logger, chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
-	homeChainReader := mocks.NewContractReaderMock()
+func setupHomeChainPoller(
+	t *testing.T,
+	lggr logger.Logger,
+	chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
+	homeChainReader := chainreadermocks.NewMockChainReader(t)
 	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",
@@ -231,7 +235,7 @@ func setupSimpleTest(
 		},
 	}
 
-	homeChain := setupHomeChainPoller(lggr, chainConfigInfos)
+	homeChain := setupHomeChainPoller(t, lggr, chainConfigInfos)
 	err = homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 

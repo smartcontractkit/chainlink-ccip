@@ -10,7 +10,7 @@ import (
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"golang.org/x/sync/errgroup"
@@ -24,13 +24,13 @@ type TokenPrices interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader commontyps.ContractReader
+	ContractReader commontypes.ContractReader
 	PriceSources   map[ocr2types.Account]pluginconfig.ArbitrumPriceSource
 	TokenDecimals  map[ocr2types.Account]uint8
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontyps.ContractReader,
+	contractReader commontypes.ContractReader,
 	priceSources map[ocr2types.Account]pluginconfig.ArbitrumPriceSource,
 	tokenDecimals map[ocr2types.Account]uint8,
 ) *OnchainTokenPricesReader {
@@ -103,7 +103,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token o
 			consts.ContractNamePriceAggregator,
 			consts.MethodNameGetDecimals,
 			primitives.Unconfirmed,
-			nil,
+			map[string]any{},
 			&decimals,
 			//boundContract,
 		); err != nil {
@@ -124,7 +124,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 			consts.ContractNamePriceAggregator,
 			consts.MethodNameGetLatestRoundData,
 			primitives.Unconfirmed,
-			nil,
+			map[string]any{},
 			&latestRoundData,
 			//boundContract,
 		); err != nil {
