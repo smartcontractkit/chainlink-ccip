@@ -75,22 +75,18 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
-	var reportCodec ccipocr3.CommitPluginCodec
+
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
-	for i := range oracleIDs {
-		n := setupNode(ctx, t, lggr, oracleIDs[i], reportingCfg, oracleIDToPeerID,
-			cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
-		nodes[i] = n.node
-		if i == 0 {
-			reportCodec = n.reportCodec
-		}
-	}
 
 	outcomeIntervalsSelected := Outcome{
 		OutcomeType: ReportIntervalsSelected,
 		RangesSelectedForReport: []plugintypes.ChainRange{
 			{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
 			{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
+		},
+		OffRampNextSeqNums: []plugintypes.SeqNumChain{
+			{ChainSel: sourceChain1, SeqNum: 10},
+			{ChainSel: sourceChain2, SeqNum: 20},
 		},
 	}
 
@@ -102,6 +98,10 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
 				MerkleRoot:   merkleRoot1,
 			},
+		},
+		OffRampNextSeqNums: []plugintypes.SeqNumChain{
+			{ChainSel: sourceChain1, SeqNum: 10},
+			{ChainSel: sourceChain2, SeqNum: 20},
 		},
 		TokenPrices: make([]ccipocr3.TokenPrice, 0),
 		GasPrices:   make([]ccipocr3.GasPriceChain, 0),
@@ -115,6 +115,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		prevOutcome           Outcome
 		expOutcome            Outcome
 		expTransmittedReports []ccipocr3.CommitPluginReport
+
+		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
+		offRampNextSeqNumDefaultOverrideValues []ccipocr3.SeqNum
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
@@ -147,6 +150,10 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			expOutcome: Outcome{
 				OutcomeType:                     ReportInFlight,
 				ReportTransmissionCheckAttempts: 1,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: sourceChain1, SeqNum: 10},
+					{ChainSel: sourceChain2, SeqNum: 20},
+				},
 			},
 		},
 		{
@@ -157,10 +164,39 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				ReportTransmissionCheckAttempts: 0,
 			},
 		},
+		{
+			name:                                   "report generated in previous outcome, transmitted with success",
+			prevOutcome:                            outcomeReportGenerated,
+			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
+			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
+			expOutcome: Outcome{
+				OutcomeType:                     ReportTransmitted,
+				ReportTransmissionCheckAttempts: 0,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			var reportCodec ccipocr3.CommitPluginCodec
+			for i := range oracleIDs {
+				n := setupNode(ctx, t, lggr, oracleIDs[i], reportingCfg, oracleIDToPeerID,
+					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
+				nodes[i] = n.node
+				if i == 0 {
+					reportCodec = n.reportCodec
+				}
+
+				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
+					assert.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
+					n.ccipReader.EXPECT().NextSeqNum(ctx, tc.offRampNextSeqNumDefaultOverrideKeys).Unset()
+					n.ccipReader.EXPECT().
+						NextSeqNum(ctx, tc.offRampNextSeqNumDefaultOverrideKeys).
+						Return(tc.offRampNextSeqNumDefaultOverrideValues, nil).
+						Maybe()
+				}
+			}
+
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
@@ -198,7 +234,7 @@ func setupNode(
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	pluginCfg pluginconfig.CommitPluginConfig,
 	chainCfg map[ccipocr3.ChainSelector]reader.ChainConfig,
-	nextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
+	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 ) nodeSetup {
 	ccipReader := reader_mock.NewMockCCIP(t)
@@ -235,7 +271,7 @@ func setupNode(
 	homeChainReader.EXPECT().GetKnownCCIPChains().Return(knownCCIPChains, nil).Maybe()
 
 	sourceChains := make([]ccipocr3.ChainSelector, 0)
-	for chainSel := range nextSeqNum {
+	for chainSel := range offRampNextSeqNum {
 		sourceChains = append(sourceChains, chainSel)
 	}
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
@@ -243,7 +279,7 @@ func setupNode(
 	offRampNextSeqNums := make([]ccipocr3.SeqNum, 0)
 	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
 	for _, sourceChain := range sourceChains {
-		offRampNextSeqNum, ok := nextSeqNum[sourceChain]
+		offRampNextSeqNum, ok := offRampNextSeqNum[sourceChain]
 		assert.True(t, ok)
 		offRampNextSeqNums = append(offRampNextSeqNums, offRampNextSeqNum)
 
@@ -270,7 +306,7 @@ func setupNode(
 
 	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
 	for _, chainSel := range chainsWithNewMsgs {
-		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, nextSeqNum[chainSel])
+		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, offRampNextSeqNum[chainSel])
 	}
 	if len(chainsWithNewMsgs) > 0 {
 		ccipReader.EXPECT().NextSeqNum(ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
