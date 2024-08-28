@@ -69,7 +69,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:                          destChain,
 		NewMsgScanBatchSize:                100,
-		MaxReportTransmissionCheckAttempts: 0,
+		MaxReportTransmissionCheckAttempts: 2,
 		SyncTimeout:                        10 * time.Second,
 		SyncFrequency:                      time.Hour,
 	}
@@ -86,6 +86,30 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		}
 	}
 
+	outcomeIntervalsSelected := Outcome{
+		OutcomeType: ReportIntervalsSelected,
+		RangesSelectedForReport: []plugintypes.ChainRange{
+			{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
+			{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
+		},
+	}
+
+	outcomeReportGenerated := Outcome{
+		OutcomeType: ReportGenerated,
+		RootsToReport: []ccipocr3.MerkleRootChain{
+			{
+				ChainSel:     sourceChain1,
+				SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
+				MerkleRoot:   merkleRoot1,
+			},
+		},
+		TokenPrices: make([]ccipocr3.TokenPrice, 0),
+		GasPrices:   make([]ccipocr3.GasPriceChain, 0),
+	}
+
+	outcomeReportGeneratedOneInflightCheck := outcomeReportGenerated
+	outcomeReportGeneratedOneInflightCheck.ReportTransmissionCheckAttempts = 1
+
 	testCases := []struct {
 		name                  string
 		prevOutcome           Outcome
@@ -95,35 +119,12 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		{
 			name:        "empty previous outcome, should select ranges for report",
 			prevOutcome: Outcome{},
-			expOutcome: Outcome{
-				OutcomeType: ReportIntervalsSelected,
-				RangesSelectedForReport: []plugintypes.ChainRange{
-					{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
-					{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
-				},
-			},
+			expOutcome:  outcomeIntervalsSelected,
 		},
 		{
-			name: "selected ranges for report in previous outcome",
-			prevOutcome: Outcome{
-				OutcomeType: ReportIntervalsSelected,
-				RangesSelectedForReport: []plugintypes.ChainRange{
-					{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
-					{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
-				},
-			},
-			expOutcome: Outcome{
-				OutcomeType: ReportGenerated,
-				RootsToReport: []ccipocr3.MerkleRootChain{
-					{
-						ChainSel:     sourceChain1,
-						SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
-						MerkleRoot:   merkleRoot1,
-					},
-				},
-				TokenPrices: make([]ccipocr3.TokenPrice, 0),
-				GasPrices:   make([]ccipocr3.GasPriceChain, 0),
-			},
+			name:        "selected ranges for report in previous outcome",
+			prevOutcome: outcomeIntervalsSelected,
+			expOutcome:  outcomeReportGenerated,
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
 					MerkleRoots: []ccipocr3.MerkleRootChain{
@@ -138,6 +139,22 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 						GasPriceUpdates:   []ccipocr3.GasPriceChain{},
 					},
 				},
+			},
+		},
+		{
+			name:        "report generated in previous outcome, still inflight",
+			prevOutcome: outcomeReportGenerated,
+			expOutcome: Outcome{
+				OutcomeType:                     ReportInFlight,
+				ReportTransmissionCheckAttempts: 1,
+			},
+		},
+		{
+			name:        "report generated in previous outcome, still inflight, reached all inflight check attempts",
+			prevOutcome: outcomeReportGeneratedOneInflightCheck,
+			expOutcome: Outcome{
+				OutcomeType:                     ReportTransmissionFailed,
+				ReportTransmissionCheckAttempts: 0,
 			},
 		},
 	}
