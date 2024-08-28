@@ -577,7 +577,7 @@ func (r *CCIPChainReader) bindOnramps(
 func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
 	staticConfig, err := r.getOfframpStaticConfig(ctx)
 	if err != nil {
-		return fmt.Errorf("get onramps: %w", err)
+		return fmt.Errorf("get offramp static config: %w", err)
 	}
 
 	if _, ok := r.contractReaders[r.destChain]; !ok {
@@ -586,7 +586,7 @@ func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
 		return nil
 	}
 
-	// Bind the onRamp contract address to the reader.
+	// Bind the nonceManager contract address to the reader.
 	// If the same address exists -> no-op
 	// If the address is changed -> updates the address, overwrites the existing one
 	// If the contract not binded -> binds to the new address
