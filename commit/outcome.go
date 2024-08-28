@@ -37,7 +37,7 @@ func (p *Plugin) Outcome(
 		outcome = ReportRangesOutcome(commitQuery, consensusObservation)
 
 	case BuildingReport:
-		outcome = buildReport(commitQuery, consensusObservation)
+		outcome = buildReport(commitQuery, consensusObservation, previousOutcome)
 
 	case WaitingForReportTransmission:
 		outcome = checkForReportTransmission(
@@ -67,6 +67,7 @@ func ReportRangesOutcome(
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
 	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
+	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
@@ -85,14 +86,23 @@ func ReportRangesOutcome(
 			}
 			rangesToReport = append(rangesToReport, chainRange)
 		}
+
+		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
+			ChainSel: chainSel,
+			SeqNum:   offRampNextSeqNum,
+		})
 	}
 
 	// deterministic outcome
 	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
+	sort.Slice(offRampNextSeqNums, func(i, j int) bool {
+		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
+	})
 
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
+		OffRampNextSeqNums:      offRampNextSeqNums,
 	}
 
 	return outcome
@@ -103,6 +113,7 @@ func ReportRangesOutcome(
 func buildReport(
 	_ Query,
 	consensusObservation ConsensusObservation,
+	prevOutcome Outcome,
 ) Outcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
@@ -114,10 +125,11 @@ func buildReport(
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	outcome := Outcome{
-		OutcomeType:   outcomeType,
-		RootsToReport: roots,
-		GasPrices:     consensusObservation.GasPricesArray(),
-		TokenPrices:   consensusObservation.TokenPricesArray(),
+		OutcomeType:        outcomeType,
+		RootsToReport:      roots,
+		GasPrices:          consensusObservation.GasPricesArray(),
+		TokenPrices:        consensusObservation.TokenPricesArray(),
+		OffRampNextSeqNums: prevOutcome.OffRampNextSeqNums,
 	}
 
 	return outcome
