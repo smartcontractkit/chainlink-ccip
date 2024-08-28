@@ -454,10 +454,51 @@ func (r *CCIPChainReader) NextSeqNum(
 
 func (r *CCIPChainReader) Nonces(
 	ctx context.Context,
-	source, dest cciptypes.ChainSelector,
+	sourceChainSelector, destChainSelector cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
-	return nil, fmt.Errorf("implement me")
+	if err := r.validateReaderExistence(destChainSelector); err != nil {
+		return nil, err
+	}
+
+	res := make(map[string]uint64)
+	mu := new(sync.Mutex)
+	eg := new(errgroup.Group)
+
+	for _, address := range addresses {
+		address := address
+		eg.Go(func() error {
+			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
+			if err != nil {
+				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
+			}
+
+			var resp uint64
+			err = r.contractReaders[destChainSelector].GetLatestValue(
+				ctx,
+				consts.ContractNameNonceManager,
+				consts.MethodNameGetInboundNonce,
+				primitives.Unconfirmed,
+				map[string]any{
+					"sourceChainSelector": sourceChainSelector,
+					"sender":              sender,
+				},
+				&resp,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to get nonce for address %s: %w", address, err)
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			res[address] = resp
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
