@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
@@ -160,28 +159,22 @@ type ConsensusObservation struct {
 
 // GasPricesArray returns a list of gas prices
 func (co ConsensusObservation) GasPricesArray() []cciptypes.GasPriceChain {
-	chains := maps.Keys(co.GasPrices)
-	sort.Slice(chains, func(i, j int) bool { return chains[i] < chains[j] })
-
 	gasPrices := make([]cciptypes.GasPriceChain, 0, len(co.GasPrices))
-	for _, chain := range chains {
-		gasPrice := co.GasPrices[chain]
+	for chain, gasPrice := range co.GasPrices {
 		gasPrices = append(gasPrices, cciptypes.NewGasPriceChain(gasPrice.Int, chain))
 	}
+	sort.Slice(gasPrices, func(i, j int) bool { return gasPrices[i].ChainSel < gasPrices[j].ChainSel })
 
 	return gasPrices
 }
 
 // TokenPricesArray returns a list of token prices
 func (co ConsensusObservation) TokenPricesArray() []cciptypes.TokenPrice {
-	tokenIDs := maps.Keys(co.TokenPrices)
-	sort.Slice(tokenIDs, func(i, j int) bool { return tokenIDs[i] < tokenIDs[j] })
-
 	tokenPrices := make([]cciptypes.TokenPrice, 0, len(co.TokenPrices))
-	for _, tokenID := range tokenIDs {
-		tokenPrice := co.TokenPrices[tokenID]
+	for tokenID, tokenPrice := range co.TokenPrices {
 		tokenPrices = append(tokenPrices, cciptypes.NewTokenPrice(tokenID, tokenPrice.Int))
 	}
+	sort.Slice(tokenPrices, func(i, j int) bool { return tokenPrices[i].TokenID < tokenPrices[j].TokenID })
 
 	return tokenPrices
 }
