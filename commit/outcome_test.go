@@ -36,8 +36,8 @@ func Test_buildReport(t *testing.T) {
 		}
 
 		for i := 0; i < rounds; i++ {
-			report1 := buildReport(Query{}, obs)
-			report2 := buildReport(Query{}, obs)
+			report1 := buildReport(Query{}, obs, Outcome{})
+			report2 := buildReport(Query{}, obs, Outcome{})
 			require.Equal(t, report1, report2)
 		}
 	})
