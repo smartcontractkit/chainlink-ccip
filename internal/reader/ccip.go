@@ -665,6 +665,10 @@ func (r *CCIPChainReader) getSourceChainsConfig(
 	return res, nil
 }
 
+// sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
+//
+//nolint:lll // It's a URL.
 type sourceChainConfig struct {
 	IsEnabled bool
 	OnRamp    []byte
@@ -712,6 +716,10 @@ func (r *CCIPChainReader) getOfframpStaticConfig(ctx context.Context) (offrampSt
 	return resp, nil
 }
 
+// offrampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L86
+//
+//nolint:lll // It's a URL.
 type offrampStaticChainConfig struct {
 	ChainSelector      uint64 `json:"chainSelector"`
 	RmnProxy           []byte `json:"rmnProxy"`
