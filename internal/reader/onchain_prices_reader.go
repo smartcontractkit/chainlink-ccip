@@ -8,10 +8,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"golang.org/x/sync/errgroup"
@@ -25,15 +24,15 @@ type TokenPrices interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader commontyps.ContractReader
-	PriceSources   map[types.Account]pluginconfig.ArbitrumPriceSource
-	TokenDecimals  map[types.Account]uint8
+	ContractReader commontypes.ContractReader
+	PriceSources   map[ocr2types.Account]pluginconfig.ArbitrumPriceSource
+	TokenDecimals  map[ocr2types.Account]uint8
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontyps.ContractReader,
-	priceSources map[types.Account]pluginconfig.ArbitrumPriceSource,
-	tokenDecimals map[types.Account]uint8,
+	contractReader commontypes.ContractReader,
+	priceSources map[ocr2types.Account]pluginconfig.ArbitrumPriceSource,
+	tokenDecimals map[ocr2types.Account]uint8,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
 		ContractReader: contractReader,
@@ -96,7 +95,7 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (uint8, error) {
+func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token ocr2types.Account) (uint8, error) {
 	var decimals uint8
 	if err :=
 		pr.ContractReader.GetLatestValue(
@@ -104,7 +103,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token t
 			consts.ContractNamePriceAggregator,
 			consts.MethodNameGetDecimals,
 			primitives.Unconfirmed,
-			nil,
+			map[string]any{},
 			&decimals,
 			//boundContract,
 		); err != nil {
@@ -116,7 +115,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token t
 
 func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
-	token types.Account,
+	token ocr2types.Account,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
 	if err :=
@@ -125,7 +124,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 			consts.ContractNamePriceAggregator,
 			consts.MethodNameGetLatestRoundData,
 			primitives.Unconfirmed,
-			nil,
+			map[string]any{},
 			&latestRoundData,
 			//boundContract,
 		); err != nil {

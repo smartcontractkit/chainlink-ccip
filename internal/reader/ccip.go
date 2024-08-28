@@ -53,6 +53,13 @@ type CCIP interface {
 		seqNumRange cciptypes.SeqNumRange,
 	) ([]cciptypes.Message, error)
 
+	// GetExpectedNextSequenceNumber returns the next sequence number to be used
+	// in the onramp.
+	GetExpectedNextSequenceNumber(
+		ctx context.Context,
+		sourceChainSelector, destChainSelector cciptypes.ChainSelector,
+	) (cciptypes.SeqNum, error)
+
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
@@ -385,6 +392,41 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		"seqNumRange", seqNumRange.String())
 
 	return msgs, nil
+}
+
+// GetExpectedNextSequenceNumber implements CCIP.
+func (r *CCIPChainReader) GetExpectedNextSequenceNumber(
+	ctx context.Context,
+	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	if destChainSelector != r.destChain {
+		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
+	}
+
+	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
+		return 0, err
+	}
+
+	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
+	if len(bindings) != 1 {
+		return 0, fmt.Errorf("expected one binding for onRamp contract, got %d", len(bindings))
+	}
+
+	var expectedNextSequenceNumber uint64
+	err := r.contractReaders[sourceChainSelector].GetLatestValue(
+		ctx,
+		consts.ContractNameOnRamp,
+		consts.MethodNameGetExpectedNextSequenceNumber,
+		primitives.Unconfirmed,
+		map[string]any{
+			"destChainSelector": destChainSelector,
+		},
+		&expectedNextSequenceNumber,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get expected next sequence number from onramp: %w", err)
+	}
+
+	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
 func (r *CCIPChainReader) NextSeqNum(
