@@ -75,17 +75,22 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
+	var reportCodec ccipocr3.CommitPluginCodec
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
 	for i := range oracleIDs {
 		n := setupNode(ctx, t, lggr, oracleIDs[i], reportingCfg, oracleIDToPeerID,
 			cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
 		nodes[i] = n.node
+		if i == 0 {
+			reportCodec = n.reportCodec
+		}
 	}
 
 	testCases := []struct {
-		name        string
-		prevOutcome Outcome
-		expOutcome  Outcome
+		name                  string
+		prevOutcome           Outcome
+		expOutcome            Outcome
+		expTransmittedReports []ccipocr3.CommitPluginReport
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
@@ -113,13 +118,26 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 					{
 						ChainSel:     sourceChain1,
 						SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
-						MerkleRoot: ccipocr3.Bytes32{0x4a, 0x44, 0xdc, 0x15, 0x36, 0x42, 0x4, 0xa8, 0xf, 0xe8, 0xe,
-							0x90, 0x39, 0x45, 0x5c, 0xc1, 0x60, 0x82, 0x81, 0x82, 0xf, 0xe2, 0xb2, 0x4f, 0x1e, 0x52,
-							0x33, 0xad, 0xe6, 0xaf, 0x1d, 0xd5},
+						MerkleRoot:   merkleRoot1,
 					},
 				},
 				TokenPrices: make([]ccipocr3.TokenPrice, 0),
 				GasPrices:   make([]ccipocr3.GasPriceChain, 0),
+			},
+			expTransmittedReports: []ccipocr3.CommitPluginReport{
+				{
+					MerkleRoots: []ccipocr3.MerkleRootChain{
+						{
+							ChainSel:     sourceChain1,
+							SeqNumsRange: ccipocr3.NewSeqNumRange(0xa, 0xa),
+							MerkleRoot:   merkleRoot1,
+						},
+					},
+					PriceUpdates: ccipocr3.PriceUpdates{
+						TokenPriceUpdates: []ccipocr3.TokenPrice{},
+						GasPriceUpdates:   []ccipocr3.GasPriceChain{},
+					},
+				},
 			},
 		},
 	}
@@ -135,6 +153,13 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			decodedOutcome, err := DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expOutcome, decodedOutcome)
+
+			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
+			for i := range res.Transmitted {
+				decoded, err := reportCodec.Decode(ctx, res.Transmitted[i].Report)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expTransmittedReports[i], decoded)
+			}
 		})
 	}
 }
@@ -257,3 +282,9 @@ func setupNode(
 		msgHasher:   msgHasher,
 	}
 }
+
+// merkleRoot1 is the markle root that the test generates, the merkle root generation logic is not supposed to be
+// tested in this context, so we just assume it's correct.
+var merkleRoot1 = ccipocr3.Bytes32{0x4a, 0x44, 0xdc, 0x15, 0x36, 0x42, 0x4, 0xa8, 0xf, 0xe8, 0xe,
+	0x90, 0x39, 0x45, 0x5c, 0xc1, 0x60, 0x82, 0x81, 0x82, 0xf, 0xe2, 0xb2, 0x4f, 0x1e, 0x52,
+	0x33, 0xad, 0xe6, 0xaf, 0x1d, 0xd5}
