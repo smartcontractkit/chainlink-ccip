@@ -37,7 +37,7 @@ For the general deployment steps, refer to the [CRIB documentation](https://smar
    ```bash
    devspace run-pipeline beholder --profile local-charts
    ```
-7. Once the deployment is successful, you can access the beholder UI by port forwarding the service to your local machine:
+7. Once the deployment is successful, you can access the Beholder demo dashboard by port forwarding the service to your local machine:
 
    ```bash
    kubectl port-forward svc/beholder-grafana 8080:3000
