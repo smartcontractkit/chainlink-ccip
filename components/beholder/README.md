@@ -5,8 +5,10 @@ This document describes how to deploy Beholder with CRIB.
 
 To run Beholder on CRIB, ensure the following dependencies are met:
 - **ECR Helm Chart Repositories**: Access to these repositories, which requires AWS SSO.
-  - If you dont have access to this, then you can run with the below command(assuming you have access to the chanlink infra charts):
-  - `devspace run-pipeline beholder --profile local-charts`
+  - If you dont have access to this, then you can run with the below command(assuming you have access to the chainlink infra charts):
+    - `devspace run-pipeline beholder --profile local-charts`
+    - This will use the local charts instead of the ECR charts.
+    - Replace this with the command in step 6 below in case you dont have access to the ECR charts.
 ## Quick Start
 
 For the general deployment steps, refer to the [CRIB documentation](https://smartcontract-it.atlassian.net/wiki/spaces/CRIB/pages/678461474/How+to+Deploy+Access+CRIB)
@@ -29,13 +31,12 @@ For the general deployment steps, refer to the [CRIB documentation](https://smar
    ./cribbit.sh <namespace-name>
    ```
 
-   You will then be prompted to choose a provider. If you are deploying to an AWS EKS cluster, simply press Enter, and the script will proceed with the next steps. If you are using the Kind provider, type kind and press Enter.
-   If the provider type is `kind`, the `crib-local` namespace will be auto-selected. This approach helps avoid the need to update the local hosts file for ingress each time, which requires an admin password.
+   You will then be prompted to choose a provider. Currently, this step works only with aws so please choose `aws`.
 
 6. Deploy beholder on crib by executing the following command:
 
    ```bash
-   devspace run-pipeline beholder --profile local-charts
+   devspace run-pipeline beholder
    ```
 7. Once the deployment is successful, you can access the Beholder demo dashboard by port forwarding the service to your local machine:
 
@@ -44,3 +45,7 @@ For the general deployment steps, refer to the [CRIB documentation](https://smar
    ```
 
    You can now access the beholder dashboards at `http://localhost:8080/dashboards`
+
+## Kind Deployment
+There is currently an issue with kind and beholder as the beholder deployment is not able to pull the images from the ECR.
+Pulling the images from the ECR repo does not solve this issue as the architecture of the images is different from the one expected by Kind.
