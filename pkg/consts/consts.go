@@ -36,7 +36,7 @@ const (
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
 	MethodNameProcessMessageArgs            = "ProcessMessageArgs"
-	MethodNameValidatePoolReturnData        = "ValidatePoolReturnData"
+	MethodNameProcessPoolReturnData         = "ProcessPoolReturnData"
 	MethodNameGetValidatedTokenPrice        = "GetValidatedTokenPrice"
 	MethodNameGetFeeTokens                  = "GetFeeTokens"
 
