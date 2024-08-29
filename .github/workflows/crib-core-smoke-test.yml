@@ -50,7 +50,7 @@ jobs:
     steps:
       - name: Deploy and validate CRIB Environment for Core
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@8970549caf0b75b5d90f207e1339be0d516ef57e # crib-deploy-environment@1.1.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@623f95854f52d36f91310f8b896e90f62a473228 # crib-deploy-environment@1.1.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
