@@ -331,4 +331,3 @@ deployments:
               logs:
                 receivers: [otlp]
                 exporters: [debug, kafka]
-
