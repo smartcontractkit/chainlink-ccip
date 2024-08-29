@@ -201,6 +201,8 @@ deployments:
         config:
           cluster:
             auto_create_topics_enabled: true
+        external:
+          enabled: false
 
   beholder-otel-collector-agent:
     updateImageTags: false
