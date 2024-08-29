@@ -19,6 +19,15 @@ To learn more about CRIB please the general documentation in Confluence:
 
 ## Contributing
 
+### To Read
+If you want to be successful in contributing to CRIB, please read the following documents:
+1. https://www.devspace.sh/docs/configuration/imports/
+2. https://www.devspace.sh/docs/configuration/pipelines/
+3. https://www.devspace.sh/docs/configuration/deployments/
+4. https://www.devspace.sh/docs/configuration/dependencies/
+5. https://www.devspace.sh/docs/configuration/hooks/
+6. https://www.devspace.sh/docs/configuration/images/
+
 ### Dev Tooling Setup
 If you like to contribute to CRIB, install following tools in your dev environment:
 
