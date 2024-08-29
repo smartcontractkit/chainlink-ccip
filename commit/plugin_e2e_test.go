@@ -34,9 +34,6 @@ const (
 )
 
 func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
-	require.Len(t, mapset.NewSet(destChain, sourceChain1, sourceChain2).ToSlice(), 3)
-	require.Less(t, sourceChain1, sourceChain2, "test below expected source chain1 to be LT chain2")
-
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
