@@ -1,25 +1,39 @@
 version: v2beta1
 
+dependencies:
+  prometheus:
+    path: ${COMPONENTS_DIR}/prometheus
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  grafana:
+    path: ${COMPONENTS_DIR}/grafana
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  loki:
+    path: ${COMPONENTS_DIR}/loki
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  tempo:
+    path: ${COMPONENTS_DIR}/tempo
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+
 pipelines:
   beholder:
     run: |-
-      create_deployments beholder-configs
-      create_deployments beholder-prometheus
-      create_deployments beholder-grafana
-      create_deployments beholder-loki
-      create_deployments beholder-tempo
+      run_dependency_pipelines --all
       create_deployments crib-beholder-infra
       create_deployments beholder-test-client
 
 deployments:
-  beholder-configs:
-    kubectl:
-      manifests:
-        - ${COMPONENTS_DIR}/beholder/configmaps/prometheus.yaml
-        - ${COMPONENTS_DIR}/beholder/configmaps/grafana.yaml
-        - ${COMPONENTS_DIR}/beholder/configmaps/loki.yaml
-        - ${COMPONENTS_DIR}/beholder/configmaps/tempo.yaml
-
   beholder-test-client:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
@@ -37,146 +51,6 @@ deployments:
           args:
             - -otel-exporter-grpc-enpoint
             - crib-beholder-infra-otel-collector-agent:4317
-
-  beholder-prometheus:
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      chart:
-        name: component-chart
-        repo: https://charts.devspace.sh
-      values:
-        containers:
-          - image: prom/prometheus
-            args:
-              - "--config.file=/etc/prometheus/config/prometheus.yml"
-            volumeMounts:
-              - containerPath: /etc/prometheus/config
-                volume:
-                  name: config-volume
-        podSecurityContext:
-          fsGroup: 65534
-        securityContext:
-          runAsUser: 65534
-          runAsGroup: 65534
-          fsGroup: 65534
-        service:
-          name: beholder-prometheus
-          selector:
-            app: beholder-prometheus
-          ports:
-            - port: 9090
-        volumes:
-          - name: config-volume
-            configMap:
-              name: prometheus-config
-
-  beholder-grafana:
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      chart:
-        name: component-chart
-        repo: https://charts.devspace.sh
-      values:
-        containers:
-          - image: grafana/grafana
-            volumeMounts:
-              - containerPath: /etc/grafana/provisioning
-                volume:
-                  name: config-volume
-            env:
-              - name: GF_AUTH_ANONYMOUS_ENABLED
-                value: "true"
-              - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-                value: "Admin"
-              - name: GF_AUTH_DISABLE_LOGIN_FORM
-                value: "true"
-              - name: GF_FEATURE_TOGGLES_ENABLE
-                value: "traceqlEditor traceQLStreaming metricsSummary"
-        volumes:
-          - name: config-volume
-            configMap:
-              name: grafana-config
-              items:
-                - key: datasources.yml
-                  path: datasources/datasources.yml
-                - key: main.yml
-                  path: dashboards/main.yml
-                - key: beholder-demo-dashboard.json
-                  path: dashboards/beholder-demo-dashboard.json
-        service:
-          name: beholder-grafana
-          ports:
-            - port: 3000
-        podSecurityContext:
-          fsGroup: 999
-        securityContext:
-          runAsUser: 999
-          runAsGroup: 999
-          fsGroup: 999
-
-  beholder-loki:
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      chart:
-        name: component-chart
-        repo: https://charts.devspace.sh
-      values:
-        containers:
-          - image: grafana/loki:3.1.0
-            args:
-              - "--config.file=/etc/loki/config/loki.yml"
-            volumeMounts:
-              - containerPath: /etc/loki/config
-                volume:
-                  name: config-volume
-        volumes:
-          - name: config-volume
-            configMap:
-              name: loki-config
-
-        service:
-          name: beholder-loki
-          ports:
-            - port: 3100
-        podSecurityContext:
-          fsGroup: 999
-        securityContext:
-          runAsUser: 999
-          runAsGroup: 999
-          fsGroup: 999
-
-  beholder-tempo:
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      chart:
-        name: component-chart
-        repo: https://charts.devspace.sh
-      values:
-        containers:
-          - image: grafana/tempo:2.5.0
-            args:
-              - "-config.file=/etc/tempo/config/tempo.yml"
-
-            volumeMounts:
-              - containerPath: /etc/tempo/config
-                volume:
-                  name: config-volume
-        volumes:
-          - name: config-volume
-            configMap:
-              name: tempo-config
-
-        service:
-          name: beholder-tempo
-          ports:
-            - port: 4317
-            - port: 3200
-        podSecurityContext:
-          fsGroup: 10001
-        securityContext:
-          runAsUser: 10001
-          runAsGroup: 10001
-          fsGroup: 10001
 
   crib-beholder-infra:
     updateImageTags: false
