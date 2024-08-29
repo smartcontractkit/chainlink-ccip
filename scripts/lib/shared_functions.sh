@@ -26,3 +26,12 @@ function is_custom_image() {
 		return 0
 	fi
 }
+
+# Checks if the required repository dir exists and if it is a git repository.
+function check_repo_exists() {
+	local repo_dir="${1:-}"
+	if [[ ! -d "${repo_dir}/.git" ]]; then
+		return 1
+	fi
+	return 0
+}

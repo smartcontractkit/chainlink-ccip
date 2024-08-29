@@ -13,3 +13,11 @@ if is_custom_image "${DEVSPACE_IMAGE}"; then
 	echo "DEVSPACE_IMAGE var was set to $DEVSPACE_IMAGE, which is a non standard image, use --skip-build and -o <image_tag> options to skip the build entirely"
 	exit 1
 fi
+
+if [[ -z ${CHAINLINK_REPO_DIR:-} ]]; then echo "Error: the CHAINLINK_REPO_DIR environment variable is not set."; fi
+if check_repo_exists "${CHAINLINK_REPO_DIR}"; then
+	echo "Info: Repository exists at ${CHAINLINK_REPO_DIR}."
+else
+	echo "Error: repository does not exist at ${CHAINLINK_REPO_DIR}."
+	exit 1
+fi

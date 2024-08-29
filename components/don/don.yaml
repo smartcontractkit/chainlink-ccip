@@ -102,12 +102,6 @@ hooks:
     args: ["app"] # Ingress name.
     events: ["after:deploy:app"]
 
-  # Check that the namespace cleanup label is set successfully.
-  - name: "label-namespace-hook"
-    command: ./${SCRIPTS_DIR}/manage_namespace.sh
-    args: ["label", "${NS_TTL}", "--overwrite"]
-    events: ["after:deploy:app", "error:deploy:*"]
-
   # Prints man pages about available commands
   - command: ${SCRIPTS_DIR}/man.sh
     events: ["after:deploy:app"]

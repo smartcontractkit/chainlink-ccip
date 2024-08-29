@@ -92,15 +92,24 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 	# Path to the .env file
 	env_file="${repo_root}/deployments/${PRODUCT_DIR}/.env"
 
-	# Source .env file if it exists
+	# Check if the .env file exists
 	if [[ -f ${env_file} ]]; then
-		echo "Info: Sourcing the ${env_file} file..."
-		# shellcheck disable=SC1090
-		source "${env_file}"
+		echo "Info: Found ${env_file}."
 	else
-		echo "Error: .env file not found at $env_file"
-		exit 1
+		echo "Error: '.env' file not found at ${env_file}."
+		read -r -p "CRIB deployment requires several environment variables. Since you don’t have a custom '.env' file set up, would you like to use the predefined '.env' file instead? (yes/no): " choice
+		if [[ $choice == "yes" || $choice == "y" ]]; then
+			cp "${env_file}.example" "${env_file}"
+			echo "Info: Copied ${env_file}.example to ${env_file} path."
+		else
+			echo "Error: Exiting without sourcing any '.env' file."
+			exit 1
+		fi
 	fi
+
+	# Source the .env file at the end if it exists
+	# shellcheck disable=SC1090
+	source "${env_file}"
 
 	# List of required environment variables
 	required_vars=(
