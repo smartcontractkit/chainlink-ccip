@@ -5,15 +5,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"sync"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -133,33 +133,46 @@ func (o ObserverImpl) ObserveMerkleRoots(
 	ctx context.Context,
 	ranges []plugintypes.ChainRange,
 ) []cciptypes.MerkleRootChain {
-	var roots []cciptypes.MerkleRootChain
+
 	supportedChains, err := o.chainSupport.SupportedChains(o.nodeID)
 	if err != nil {
 		o.lggr.Warnw("call to supportedChains failed", "err", err)
 		return nil
 	}
 
+	var roots []cciptypes.MerkleRootChain
+	rootsMu := &sync.Mutex{}
+	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
 		if supportedChains.Contains(chainRange.ChainSel) {
-			msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
-			if err != nil {
-				o.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
-				continue
-			}
-			root, err := o.computeMerkleRoot(ctx, msgs)
-			if err != nil {
-				o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
-				continue
-			}
-			merkleRoot := cciptypes.MerkleRootChain{
-				ChainSel:     chainRange.ChainSel,
-				SeqNumsRange: chainRange.SeqNumRange,
-				MerkleRoot:   root,
-			}
-			roots = append(roots, merkleRoot)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
+				if err != nil {
+					o.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					return
+				}
+
+				root, err := o.computeMerkleRoot(ctx, msgs)
+				if err != nil {
+					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+					return
+				}
+
+				merkleRoot := cciptypes.MerkleRootChain{
+					ChainSel:     chainRange.ChainSel,
+					SeqNumsRange: chainRange.SeqNumRange,
+					MerkleRoot:   root,
+				}
+
+				rootsMu.Lock()
+				roots = append(roots, merkleRoot)
+				rootsMu.Unlock()
+			}()
 		}
 	}
+	wg.Wait()
 
 	return roots
 }
