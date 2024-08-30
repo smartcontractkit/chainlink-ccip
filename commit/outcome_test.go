@@ -68,18 +68,21 @@ func Test_majorElem(t *testing.T) {
 		input        []int
 		expectedElem int
 		expectedCnt  int
+		expErr       bool
 	}{
 		{
 			name:         "empty",
 			input:        []int{},
 			expectedElem: 0,
 			expectedCnt:  0,
+			expErr:       true,
 		},
 		{
 			name:         "empty",
 			input:        []int{},
 			expectedElem: 0,
 			expectedCnt:  0,
+			expErr:       true,
 		},
 		{
 			name:         "base",
@@ -92,6 +95,7 @@ func Test_majorElem(t *testing.T) {
 			input:        []int{1, 1, 1, 2, 2, 2, 3, 4, 3},
 			expectedElem: 0,
 			expectedCnt:  0,
+			expErr:       true,
 		},
 		{
 			name:         "happy path no overrides",
@@ -103,9 +107,15 @@ func Test_majorElem(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, cnt := majorElem(tc.input)
+			actual, cnt, err := majorElem(tc.input)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedElem, actual)
 			assert.Equal(t, tc.expectedCnt, cnt)
+
 		})
 	}
 }

@@ -221,7 +221,11 @@ func merkleRootConsensus(
 
 	for chain, roots := range rootsByChain {
 		if fChain, exists := fChains[chain]; exists {
-			root, count := majorElem(roots)
+			root, count, err := majorElem(roots)
+			if err != nil {
+				lggr.Errorf("cannot reach consensus on roots of %v: %s", chain, err)
+				continue
+			}
 
 			if count <= fChain {
 				// TODO: metrics
@@ -284,7 +288,12 @@ func offRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count := majorElem(offRampMaxSeqNums)
+		seqNum, count, err := majorElem(offRampMaxSeqNums)
+		if err != nil {
+			lggr.Errorf("cannot reach consensus on offRampMaxSeqNums for chain %d: %s", chain, err)
+			continue
+		}
+
 		if count <= fDestChain {
 			// TODO: metrics
 			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
@@ -309,7 +318,12 @@ func fChainConsensus(
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		fChain, count := majorElem(fValues)
+		fChain, count, err := majorElem(fValues)
+		if err != nil {
+			lggr.Errorf("cannot reach consensus on fChain values for chain %d: %s", chain, err)
+			continue
+		}
+
 		if count < F {
 			// TODO: metrics
 			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
@@ -326,30 +340,29 @@ func fChainConsensus(
 }
 
 // Given a list of elems, return the elem that occurs most frequently and how often it occurs.
-// If there is no major element (e.g. elements appear the same number of times), an empty value and zero is returned.
-func majorElem[T comparable](elems []T) (T, int) {
+func majorElem[T comparable](elems []T) (elem T, cnt int, err error) {
 	var mostFrequentElem T
 
 	counts := counts(elems)
 	maxCount := 0
-	isMajor := false
+	uniq := false
 
 	for elem, count := range counts {
 		if count == maxCount {
-			isMajor = false
+			uniq = false
 		}
 		if count > maxCount {
 			mostFrequentElem = elem
 			maxCount = count
-			isMajor = true
+			uniq = true
 		}
 	}
 
-	if !isMajor {
+	if !uniq {
 		var empty T
-		return empty, 0
+		return empty, 0, fmt.Errorf("no unique major element")
 	}
-	return mostFrequentElem, maxCount
+	return mostFrequentElem, maxCount, nil
 }
 
 // Given a list of elems, return a map from elems to how often they occur in the given list
