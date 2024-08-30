@@ -6,7 +6,9 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -626,6 +628,183 @@ func Test_decodeAttributedObservations(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "decodeAttributedObservations(%v)", tt.args)
+		})
+	}
+}
+
+func Test_getConsensusObservation(t *testing.T) {
+	type args struct {
+		observation []exectypes.Observation
+		oracleID    commontypes.OracleID
+		F           int
+		fChain      map[cciptypes.ChainSelector]int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    exectypes.Observation
+		wantErr assert.ErrorAssertionFunc
+	}{
+
+		{
+			name: "empty",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 1,
+				},
+				observation: nil,
+			},
+			want:    exectypes.Observation{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "one consensus observation",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 1,
+				},
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+							},
+						},
+					},
+				},
+			},
+			want: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					1: {
+						"0x1": 1,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "one ignored consensus observation",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 2,
+				},
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+							},
+						},
+					},
+				},
+			},
+			want:    exectypes.Observation{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "3 observers required to reach consensus on 4 sender values",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 2,
+				},
+				// Across 3 observers
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+								"0x2": 2,
+								"0x3": 3,
+								"0x4": 4,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+								"0x4": 4,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x2": 2,
+								"0x3": 3,
+							},
+						},
+					},
+				},
+			},
+			want: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					1: {
+						"0x1": 1,
+						"0x2": 2,
+						"0x3": 3,
+						"0x4": 4,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "3 observers but different nonce values. No consensus.",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 2,
+				},
+				// Across 3 observers
+				observation: []exectypes.Observation{
+					{
+						//
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 9,
+								"0x2": 9,
+								"0x3": 9,
+								"0x4": 9,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+								"0x4": 4,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x2": 2,
+								"0x3": 3,
+							},
+						},
+					},
+				},
+			},
+			want:    exectypes.Observation{},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Convert observations to the expected decoded type.
+			var ao []types.AttributedObservation
+			for i, observation := range tt.args.observation {
+				encodedObservation, err := observation.Encode()
+				require.NoError(t, err)
+				ao = append(ao, types.AttributedObservation{
+					Observation: encodedObservation,
+					Observer:    commontypes.OracleID(i),
+				})
+			}
+
+			lggr := logger.Test(t)
+			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain)
+			if !tt.wantErr(t, err, fmt.Sprintf("getConsensusObservation(...)")) {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "getConsensusObservation(...)")
 		})
 	}
 }
