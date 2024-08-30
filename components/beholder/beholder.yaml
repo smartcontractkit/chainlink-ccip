@@ -196,6 +196,53 @@ deployments:
           tag: 'v24.1.15'
         statefulset:
           replicas: 1
+          podTemplate:
+            spec:
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                runAsUser: 999
+                runAsGroup: 999
+                runAsNonRoot: true
+          sideCars:
+            configWatcher:
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                runAsUser: 999
+                runAsGroup: 999
+                runAsNonRoot: true
+            controllers:
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                runAsUser: 999
+                runAsGroup: 999
+                runAsNonRoot: true
+
+        post_install_job:
+          podTemplate:
+            spec:
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                runAsUser: 999
+                runAsGroup: 999
+                runAsNonRoot: true
+        post_upgrade_job:
+          podTemplate:
+            spec:
+              securityContext:
+                capabilities:
+                  drop:
+                    - ALL
+                runAsUser: 999
+                runAsGroup: 999
+                runAsNonRoot: true
         tls:
           enabled: false
         config:
@@ -203,6 +250,8 @@ deployments:
             auto_create_topics_enabled: true
         external:
           enabled: false
+        tuning:
+          tune_aio_events: false
 
   beholder-otel-collector-agent:
     updateImageTags: false
