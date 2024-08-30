@@ -221,7 +221,9 @@ func merkleRootConsensus(
 
 	for chain, roots := range rootsByChain {
 		if fChain, exists := fChains[chain]; exists {
-			root, count := mostFrequentElem(roots)
+			root, count := mostFrequentElem(roots, func(curr, new cciptypes.MerkleRootChain) bool {
+				return new.SeqNumsRange.Start() < curr.SeqNumsRange.Start()
+			})
 
 			if count <= fChain {
 				// TODO: metrics
@@ -284,7 +286,9 @@ func offRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count := mostFrequentElem(offRampMaxSeqNums)
+		seqNum, count := mostFrequentElem(offRampMaxSeqNums, func(curr, new cciptypes.SeqNum) bool {
+			return curr < new
+		})
 		if count <= fDestChain {
 			// TODO: metrics
 			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
@@ -309,13 +313,14 @@ func fChainConsensus(
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		fChain, count := mostFrequentElem(fValues)
+		fChain, count := mostFrequentElem(fValues, func(curr, new int) bool { return new < curr })
 		if count < F {
 			// TODO: metrics
 			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
 				"value was observed more than the expected %d times, found fChain value %d observed by only %d oracles, "+
 				"fChain values: %v",
 				chain, F, fChain, count, fValues)
+			continue
 		}
 
 		consensus[chain] = fChain
@@ -325,14 +330,15 @@ func fChainConsensus(
 }
 
 // Given a list of elems, return the elem that occurs most frequently and how often it occurs
-func mostFrequentElem[T comparable](elems []T) (T, int) {
+func mostFrequentElem[T comparable](elems []T, overrideOnEqual func(curr, new T) bool) (T, int) {
 	var mostFrequentElem T
 
 	counts := counts(elems)
 	maxCount := 0
 
 	for elem, count := range counts {
-		if count > maxCount {
+		if count > maxCount ||
+			(count == maxCount && overrideOnEqual != nil && overrideOnEqual(mostFrequentElem, elem)) {
 			mostFrequentElem = elem
 			maxCount = count
 		}
