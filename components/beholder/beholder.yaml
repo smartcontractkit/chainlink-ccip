@@ -252,3 +252,14 @@ deployments:
               logs:
                 receivers: [otlp]
                 exporters: [debug, kafka]
+
+profiles:
+  - name: local-charts
+    merge:
+      deployments:
+        beholder-test-client:
+          helm:
+            chart:
+              name: beholder-test-client
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/beholder-test-client
+              version: null
