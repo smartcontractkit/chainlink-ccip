@@ -214,7 +214,7 @@ func (b *execReportBuilder) checkMessage(
 		"data", tokenData)
 
 	// 3. Check if the message has a valid nonce.
-	if msg.Header.Nonce != 0 && b.nonceCheckingEnabled {
+	if msg.Header.Nonce != 0 {
 		// Sequenced messages have non-zero nonces.
 
 		if _, ok := b.sendersNonce[execReport.SourceChain]; !ok {

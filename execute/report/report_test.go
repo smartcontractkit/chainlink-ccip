@@ -734,35 +734,17 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			builder := &execReportBuilder{
-				ctx:  ctx,
-				lggr: lggr,
-
-				tokenDataReader:  tokenDataReader,
-				encoder:          codec,
-				hasher:           hasher,
-				estimateProvider: evm.EstimateProvider{},
-				sendersNonce:     tt.args.nonces,
-				expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
-
-				maxReportSizeBytes:   tt.args.maxReportSize,
-				maxGas:               tt.args.maxGasLimit,
-				nonceCheckingEnabled: true, // TODO: remove feature flag.
-			}
-
-			/*
-				// TODO: switch back to this when removing the feature flag.
-				builder := NewBuilder(
-					ctx,
-					lggr,
-					hasher,
-					tokenDataReader,
-					codec,
-					evm.EstimateProvider{},
-					tt.args.nonces,
-					tt.args.maxReportSize,
-					tt.args.maxGasLimit)
-			*/
+			builder := NewBuilder(
+				ctx,
+				lggr,
+				hasher,
+				tokenDataReader,
+				codec,
+				evm.EstimateProvider{},
+				tt.args.nonces,
+				1,
+				tt.args.maxReportSize,
+				tt.args.maxGasLimit)
 
 			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
@@ -946,14 +928,13 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				nonceCheckingEnabled: true, // TODO: remove feature flag.
-				ctx:                  context.Background(),
-				lggr:                 lggr,
-				encoder:              resolvedEncoder,
-				estimateProvider:     tt.fields.estimateProvider,
-				maxReportSizeBytes:   tt.fields.maxReportSizeBytes,
-				maxGas:               tt.fields.maxGas,
-				accumulated:          tt.fields.accumulated,
+				ctx:                context.Background(),
+				lggr:               lggr,
+				encoder:            resolvedEncoder,
+				estimateProvider:   tt.fields.estimateProvider,
+				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
+				maxGas:             tt.fields.maxGas,
+				accumulated:        tt.fields.accumulated,
 			}
 			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
 			if tt.expectedError != "" {
@@ -1215,12 +1196,11 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				nonceCheckingEnabled: true, // TODO: remove feature flag.
-				lggr:                 lggr,
-				tokenDataReader:      resolvedTokenDataReader,
-				estimateProvider:     evm.EstimateProvider{},
-				accumulated:          tt.fields.accumulated,
-				sendersNonce:         tt.args.nonces,
+				lggr:             lggr,
+				tokenDataReader:  resolvedTokenDataReader,
+				estimateProvider: evm.EstimateProvider{},
+				accumulated:      tt.fields.accumulated,
+				sendersNonce:     tt.args.nonces,
 			}
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
 			if tt.expectedError != "" {

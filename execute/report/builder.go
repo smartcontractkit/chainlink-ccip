@@ -84,9 +84,6 @@ type execReportBuilder struct {
 
 	// Result
 	execReports []cciptypes.ExecutePluginReportSingleChain
-
-	// TODO: remove temporary feature flagging
-	nonceCheckingEnabled bool // defaults to disabled for backwards compatibility.
 }
 
 func (b *execReportBuilder) Add(
