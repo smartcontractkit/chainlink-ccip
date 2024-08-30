@@ -1,0 +1,52 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments configs
+      create_deployments prometheus
+
+deployments:
+  configs:
+    kubectl:
+      manifests:
+        - ${COMPONENTS_DIR}/prometheus/configmaps/default.yaml
+
+  prometheus:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: prom/prometheus
+            args:
+              - "--config.file=/etc/prometheus/config/prometheus.yml"
+            volumeMounts:
+              - containerPath: /etc/prometheus/config
+                volume:
+                  name: config-volume
+        podSecurityContext:
+          fsGroup: 65534
+        securityContext:
+          runAsUser: 65534
+          runAsGroup: 65534
+          fsGroup: 65534
+        service:
+          name: prometheus
+          selector:
+            app: prometheus
+          ports:
+            - port: 9090
+        volumes:
+          - name: config-volume
+            configMap:
+              name: prometheus-config
+
+profiles:
+  - name: add-beholder-config
+    patches:
+      - op: replace
+        path: deployments.configs.kubectl.manifests[0]
+        value: ${COMPONENTS_DIR}/prometheus/configmaps/beholder.yaml

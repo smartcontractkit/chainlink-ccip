@@ -1,0 +1,53 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments configs
+      create_deployments tempo
+
+deployments:
+  configs:
+    kubectl:
+      manifests:
+        - ${COMPONENTS_DIR}/tempo/configmaps/default.yaml
+
+  tempo:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: grafana/tempo:2.5.0
+            args:
+              - "-config.file=/etc/tempo/config/tempo.yml"
+
+            volumeMounts:
+              - containerPath: /etc/tempo/config
+                volume:
+                  name: config-volume
+        volumes:
+          - name: config-volume
+            configMap:
+              name: tempo-config
+
+        service:
+          name: tempo
+          ports:
+            - port: 4317
+            - port: 3200
+        podSecurityContext:
+          fsGroup: 10001
+        securityContext:
+          runAsUser: 10001
+          runAsGroup: 10001
+          fsGroup: 10001
+
+profiles:
+  - name: add-beholder-config
+    patches:
+      - op: replace
+        path: deployments.configs.kubectl.manifests[0]
+        value: ${COMPONENTS_DIR}/tempo/configmaps/beholder.yaml
