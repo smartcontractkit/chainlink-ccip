@@ -221,9 +221,7 @@ func merkleRootConsensus(
 
 	for chain, roots := range rootsByChain {
 		if fChain, exists := fChains[chain]; exists {
-			root, count := mostFrequentElem(roots, func(curr, new cciptypes.MerkleRootChain) bool {
-				return new.SeqNumsRange.Start() < curr.SeqNumsRange.Start()
-			})
+			root, count := majorElem(roots)
 
 			if count <= fChain {
 				// TODO: metrics
@@ -286,9 +284,7 @@ func offRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count := mostFrequentElem(offRampMaxSeqNums, func(curr, new cciptypes.SeqNum) bool {
-			return curr < new
-		})
+		seqNum, count := majorElem(offRampMaxSeqNums)
 		if count <= fDestChain {
 			// TODO: metrics
 			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
@@ -313,7 +309,7 @@ func fChainConsensus(
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		fChain, count := mostFrequentElem(fValues, func(curr, new int) bool { return new < curr })
+		fChain, count := majorElem(fValues)
 		if count < F {
 			// TODO: metrics
 			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
@@ -329,21 +325,30 @@ func fChainConsensus(
 	return consensus
 }
 
-// Given a list of elems, return the elem that occurs most frequently and how often it occurs
-func mostFrequentElem[T comparable](elems []T, overrideOnEqual func(curr, new T) bool) (T, int) {
+// Given a list of elems, return the elem that occurs most frequently and how often it occurs.
+// If there is no major element (e.g. elements appear the same number of times), an empty value and zero is returned.
+func majorElem[T comparable](elems []T) (T, int) {
 	var mostFrequentElem T
 
 	counts := counts(elems)
 	maxCount := 0
+	isMajor := false
 
 	for elem, count := range counts {
-		if count > maxCount ||
-			(count == maxCount && overrideOnEqual != nil && overrideOnEqual(mostFrequentElem, elem)) {
+		if count == maxCount {
+			isMajor = false
+		}
+		if count > maxCount {
 			mostFrequentElem = elem
 			maxCount = count
+			isMajor = true
 		}
 	}
 
+	if !isMajor {
+		var empty T
+		return empty, 0
+	}
 	return mostFrequentElem, maxCount
 }
 
