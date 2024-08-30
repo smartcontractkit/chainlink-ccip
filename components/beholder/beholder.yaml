@@ -25,13 +25,16 @@ dependencies:
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
       - add-beholder-config
+  redpanda:
+    path: ${COMPONENTS_DIR}/redpanda
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
 
 pipelines:
   beholder:
     run: |-
       run_dependency_pipelines --all
-      create_deployments beholder-redpanda
-      create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway beholder-test-client
+      create_deployments --all
 
 deployments:
   beholder-test-client:
@@ -51,79 +54,6 @@ deployments:
           args:
             - -otel-exporter-grpc-enpoint
             - beholder-otel-collector-agent:4317
-
-  beholder-redpanda:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      releaseName: beholder-redpanda
-      displayOutput: true
-      chart:
-        name: redpanda
-        repo: https://charts.redpanda.com
-        version: "5.9.1"
-      values:
-        image:
-          repository: docker.redpanda.com/redpandadata/redpanda
-          tag: 'v24.1.15'
-        statefulset:
-          replicas: 1
-          podTemplate:
-            spec:
-              securityContext:
-                capabilities:
-                  drop:
-                    - ALL
-                runAsUser: 999
-                runAsGroup: 999
-                runAsNonRoot: true
-          sideCars:
-            configWatcher:
-              securityContext:
-                capabilities:
-                  drop:
-                    - ALL
-                runAsUser: 999
-                runAsGroup: 999
-                runAsNonRoot: true
-            controllers:
-              securityContext:
-                capabilities:
-                  drop:
-                    - ALL
-                runAsUser: 999
-                runAsGroup: 999
-                runAsNonRoot: true
-
-        post_install_job:
-          podTemplate:
-            spec:
-              securityContext:
-                capabilities:
-                  drop:
-                    - ALL
-                runAsUser: 999
-                runAsGroup: 999
-                runAsNonRoot: true
-        post_upgrade_job:
-          podTemplate:
-            spec:
-              securityContext:
-                capabilities:
-                  drop:
-                    - ALL
-                runAsUser: 999
-                runAsGroup: 999
-                runAsNonRoot: true
-        tls:
-          enabled: false
-        config:
-          cluster:
-            auto_create_topics_enabled: true
-        external:
-          enabled: false
-        tuning:
-          tune_aio_events: false
 
   beholder-otel-collector-agent:
     updateImageTags: false
@@ -177,7 +107,6 @@ deployments:
               logs:
                 receivers: [otlp]
                 exporters: [debug, otlp]
-
 
   beholder-otel-collector-gateway:
     updateImageTags: false
@@ -233,7 +162,7 @@ deployments:
               verbosity: detailed
             kafka:
               brokers:
-                - beholder-redpanda:9093
+                - redpanda:9093
               topic: beholder-test-client
               encoding: otlp_json
             prometheus:
