@@ -30,7 +30,7 @@ pipelines:
   beholder:
     run: |-
       run_dependency_pipelines --all
-      create_deployments beholder-redpanda 
+      create_deployments beholder-redpanda
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway beholder-test-client
 
 deployments:
