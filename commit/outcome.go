@@ -225,7 +225,7 @@ func merkleRootConsensus(
 
 	for chain, roots := range rootsByChain {
 		if fChain, exists := fChains[chain]; exists {
-			root, count, err := majorElem(roots)
+			root, count, err := mostFrequentElement(roots)
 			if err != nil {
 				lggr.Errorf("cannot reach consensus on roots of %v: %s", chain, err)
 				continue
@@ -292,7 +292,7 @@ func offRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count, err := majorElem(offRampMaxSeqNums)
+		seqNum, count, err := mostFrequentElement(offRampMaxSeqNums)
 		if err != nil {
 			lggr.Errorf("cannot reach consensus on offRampMaxSeqNums for chain %d: %s", chain, err)
 			continue
@@ -322,7 +322,7 @@ func fChainConsensus(
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		fChain, count, err := majorElem(fValues)
+		fChain, count, err := mostFrequentElement(fValues)
 		if err != nil {
 			lggr.Errorf("cannot reach consensus on fChain values for chain %d: %s", chain, err)
 			continue
@@ -344,7 +344,7 @@ func fChainConsensus(
 }
 
 // Given a list of elems, return the elem that occurs most frequently and how often it occurs.
-func majorElem[T comparable](elems []T) (res T, cnt int, err error) {
+func mostFrequentElement[T comparable](elems []T) (res T, cnt int, err error) {
 	counts := getCounts(elems)
 	maxCount := 0
 	uniq := false
