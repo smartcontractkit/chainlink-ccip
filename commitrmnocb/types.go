@@ -86,7 +86,7 @@ type AggregatedObservation struct {
 	// A map from chain selectors to the list of f (failure tolerance) observed for each chain
 	FChain map[cciptypes.ChainSelector][]int
 
-	// timestamps observed by each node
+	// UTC timestamps observed by each node
 	Timestamps []time.Time
 }
 
