@@ -5,15 +5,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"sync"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -27,13 +28,19 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
-	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
+	tStart := time.Now()
+	observation, nextState := p.getObservation(ctx, outCtx)
+	p.lggr.Infow("Sending Observation",
+		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
+	return observation.Encode()
+}
 
-	observation := Observation{}
+func (p *Plugin) getObservation(ctx context.Context, outCtx ocr3types.OutcomeContext) (Observation, State) {
+	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := p.observer.ObserveOffRampNextSeqNums(ctx)
-		observation = Observation{
+		return Observation{
 			// TODO: observe OnRamp max seq nums. The use of offRampNextSeqNums here effectively disables batching,
 			// e.g. the ranges selected for each chain will be [x, x] (e.g. [46, 46]), which means reports will only
 			// contain one message per chain. Querying the OnRamp contract requires changes to reader.CCIP, which will
@@ -41,29 +48,23 @@ func (p *Plugin) Observation(
 			OnRampMaxSeqNums:   offRampNextSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             p.observer.ObserveFChain(),
-		}
-
+		}, nextState
 	case BuildingReport:
-		observation = Observation{
+		return Observation{
 			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			GasPrices:   p.observer.ObserveGasPrices(ctx),
 			TokenPrices: p.observer.ObserveTokenPrices(ctx),
 			FChain:      p.observer.ObserveFChain(),
-		}
-
+		}, nextState
 	case WaitingForReportTransmission:
-		observation = Observation{
+		return Observation{
 			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
 			FChain:             p.observer.ObserveFChain(),
-		}
-
+		}, nextState
 	default:
 		p.lggr.Errorw("Unexpected state", "state", nextState)
-		return observation.Encode()
+		return Observation{}, nextState
 	}
-
-	p.lggr.Infow("Observation", "observation", observation)
-	return observation.Encode()
 }
 
 type Observer interface {
@@ -106,6 +107,8 @@ func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
 	}
+
+	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
 	if err != nil {
 		o.lggr.Warnw("call to NextSeqNum failed", "err", err)
@@ -131,33 +134,46 @@ func (o ObserverImpl) ObserveMerkleRoots(
 	ctx context.Context,
 	ranges []plugintypes.ChainRange,
 ) []cciptypes.MerkleRootChain {
-	var roots []cciptypes.MerkleRootChain
+
 	supportedChains, err := o.chainSupport.SupportedChains(o.nodeID)
 	if err != nil {
 		o.lggr.Warnw("call to supportedChains failed", "err", err)
 		return nil
 	}
 
+	var roots []cciptypes.MerkleRootChain
+	rootsMu := &sync.Mutex{}
+	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
 		if supportedChains.Contains(chainRange.ChainSel) {
-			msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
-			if err != nil {
-				o.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
-				continue
-			}
-			root, err := o.computeMerkleRoot(ctx, msgs)
-			if err != nil {
-				o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
-				continue
-			}
-			merkleRoot := cciptypes.MerkleRootChain{
-				ChainSel:     chainRange.ChainSel,
-				SeqNumsRange: chainRange.SeqNumRange,
-				MerkleRoot:   root,
-			}
-			roots = append(roots, merkleRoot)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				msgs, err := o.ccipReader.MsgsBetweenSeqNums(ctx, chainRange.ChainSel, chainRange.SeqNumRange)
+				if err != nil {
+					o.lggr.Warnw("call to MsgsBetweenSeqNums failed", "err", err)
+					return
+				}
+
+				root, err := o.computeMerkleRoot(ctx, msgs)
+				if err != nil {
+					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
+					return
+				}
+
+				merkleRoot := cciptypes.MerkleRootChain{
+					ChainSel:     chainRange.ChainSel,
+					SeqNumsRange: chainRange.SeqNumRange,
+					MerkleRoot:   root,
+				}
+
+				rootsMu.Lock()
+				roots = append(roots, merkleRoot)
+				rootsMu.Unlock()
+			}()
 		}
 	}
+	wg.Wait()
 
 	return roots
 }
