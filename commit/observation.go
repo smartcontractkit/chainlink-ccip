@@ -31,7 +31,7 @@ func (p *Plugin) Observation(
 	tStart := time.Now()
 	observation, nextState := p.getObservation(ctx, outCtx)
 	p.lggr.Infow("Sending Observation",
-		"observation", observation, "nextState", nextState, "duration", time.Since(tStart))
+		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation.Encode()
 }
 

@@ -26,7 +26,7 @@ func (p *Plugin) Outcome(
 	tStart := time.Now()
 	outcome, nextState := p.getOutcome(outCtx, aos)
 	p.lggr.Infow("Sending Outcome",
-		"outcome", outcome, "oid", p.nodeID, "nextState", nextState, "duration", time.Since(tStart))
+		"outcome", outcome, "oid", p.nodeID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome.Encode()
 }
 
