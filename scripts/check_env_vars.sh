@@ -11,7 +11,6 @@ required_vars_common=(
 	"DEVSPACE_INGRESS_BASE_DOMAIN"
 	"DEVSPACE_INGRESS_CERT_ARN"
 	"DEVSPACE_K8S_POD_WAIT_TIMEOUT"
-	"NS_TTL"
 )
 
 # Function to check environment variables
