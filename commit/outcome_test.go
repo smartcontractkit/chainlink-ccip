@@ -62,7 +62,7 @@ func Test_fChainConsensus(t *testing.T) {
 	}, fChainFinal)
 }
 
-func Test_majorElem(t *testing.T) {
+func Test_mostFrequentElement(t *testing.T) {
 	testCases := []struct {
 		name         string
 		input        []int
@@ -107,7 +107,7 @@ func Test_majorElem(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, cnt, err := majorElem(tc.input)
+			actual, cnt, err := mostFrequentElement(tc.input)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
