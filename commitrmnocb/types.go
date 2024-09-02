@@ -38,7 +38,7 @@ func NewCommitQuery(rmnOnRampMaxSeqNums []plugintypes.SeqNumChain, merkleRoots [
 type Observation struct {
 	MerkleRoots []cciptypes.MerkleRootChain `json:"merkleRoots"`
 	GasPrices   []cciptypes.GasPriceChain   `json:"gasPrices"`
-	// FeedTokenPrices for tokens from the feed on the feed chain
+	// FeedTokenPrices for tokens from the feeds on the feed chain
 	FeedTokenPrices []cciptypes.TokenPrice `json:"feedTokenPrices"`
 	// PriceRegistryTokenUpdates for tokens from the PriceRegistry on the dest chain
 	PriceRegistryTokenUpdates []cciptypes.TokenPrice          `json:"priceRegistryTokenPrices"`
