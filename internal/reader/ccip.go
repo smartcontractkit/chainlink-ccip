@@ -151,7 +151,8 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	}
 
 	type CommitReportAcceptedEvent struct {
-		Report CommitReportAccepted
+		MerkleRoots  []MerkleRoot
+		PriceUpdates PriceUpdates
 	}
 	// ---------------------------------------------------
 
@@ -188,15 +189,15 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Debugw("commit report too old, skipping", "report", ev.Report, "item", item,
+			r.lggr.Debugw("commit report too old, skipping", "MerkleRoots", ev.MerkleRoots, "PriceUpdates", ev.PriceUpdates, "item", item,
 				"destChain", dest,
 				"ts", ts,
 				"limit", limit)
 			continue
 		}
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.Report.MerkleRoots))
-		for _, mr := range ev.Report.MerkleRoots {
+		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.MerkleRoots))
+		for _, mr := range ev.MerkleRoots {
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
@@ -212,14 +213,14 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
 		}
 
-		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
+		for _, tokenPriceUpdate := range ev.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
 				TokenID: types2.Account(typconv.HexEncode(tokenPriceUpdate.SourceToken)),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
 
-		for _, gasPriceUpdate := range ev.Report.PriceUpdates.GasPriceUpdates {
+		for _, gasPriceUpdate := range ev.PriceUpdates.GasPriceUpdates {
 			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, cciptypes.GasPriceChain{
 				ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
 				GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
