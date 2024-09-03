@@ -1,4 +1,4 @@
-package commit
+package shared
 
 import (
 	"fmt"
@@ -31,9 +31,25 @@ type ChainSupport interface {
 type CCIPChainSupport struct {
 	lggr            logger.Logger
 	homeChain       reader.HomeChain
-	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID
+	oracleIDToP2PID map[commontypes.OracleID]libocrtypes.PeerID
 	nodeID          commontypes.OracleID
 	destChain       cciptypes.ChainSelector
+}
+
+func NewCCIPChainSupport(
+	lggr logger.Logger,
+	homeChain reader.HomeChain,
+	oracleIDToP2PID map[commontypes.OracleID]libocrtypes.PeerID,
+	nodeID commontypes.OracleID,
+	destChain cciptypes.ChainSelector,
+) CCIPChainSupport {
+	return CCIPChainSupport{
+		lggr:            lggr,
+		homeChain:       homeChain,
+		oracleIDToP2PID: oracleIDToP2PID,
+		nodeID:          nodeID,
+		destChain:       destChain,
+	}
 }
 
 func (c CCIPChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, error) {
@@ -53,9 +69,9 @@ func (c CCIPChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, e
 
 // SupportedChains returns the set of chains that the given Oracle is configured to access
 func (c CCIPChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
-	p2pID, exists := c.oracleIDToP2pID[oracleID]
+	p2pID, exists := c.oracleIDToP2PID[oracleID]
 	if !exists {
-		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", c.nodeID)
+		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2PID", c.nodeID)
 	}
 	supportedChains, err := c.homeChain.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
@@ -73,9 +89,9 @@ func (c CCIPChainSupport) SupportsDestChain(oracle commontypes.OracleID) (bool, 
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
 
-	peerID, ok := c.oracleIDToP2pID[oracle]
+	peerID, ok := c.oracleIDToP2PID[oracle]
 	if !ok {
-		return false, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", oracle)
+		return false, fmt.Errorf("oracle ID %d not found in oracleIDToP2PID", oracle)
 	}
 
 	return destChainConfig.SupportedNodes.Contains(peerID), nil

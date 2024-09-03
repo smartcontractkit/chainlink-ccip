@@ -7,7 +7,14 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -18,19 +25,25 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
+type MerkleRootObservation = shared.AttributedObservation[merkleroot.Observation]
+type TokenPricesObservation = shared.AttributedObservation[tokenprice.Observation]
+type ChainFeeObservation = shared.AttributedObservation[chainfee.Observation]
+
 type Plugin struct {
-	nodeID            commontypes.OracleID
-	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	cfg               pluginconfig.CommitPluginConfig
-	ccipReader        reader.CCIP
-	readerSyncer      *plugincommon.BackgroundReaderSyncer
-	tokenPricesReader reader.TokenPrices
-	reportCodec       cciptypes.CommitPluginCodec
-	lggr              logger.Logger
-	homeChain         reader.HomeChain
-	reportingCfg      ocr3types.ReportingPluginConfig
-	chainSupport      ChainSupport
-	observer          Observer
+	nodeID              commontypes.OracleID
+	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
+	cfg                 pluginconfig.CommitPluginConfig
+	ccipReader          reader.CCIP
+	readerSyncer        *plugincommon.BackgroundReaderSyncer
+	tokenPricesReader   reader.TokenPrices
+	reportCodec         cciptypes.CommitPluginCodec
+	lggr                logger.Logger
+	homeChain           reader.HomeChain
+	reportingCfg        ocr3types.ReportingPluginConfig
+	chainSupport        shared.ChainSupport
+	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
+	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
+	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 }
 
 func NewPlugin(
@@ -56,37 +69,161 @@ func NewPlugin(
 		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
-	chainSupport := CCIPChainSupport{
-		lggr:            lggr,
-		homeChain:       homeChain,
-		oracleIDToP2pID: oracleIDToP2pID,
-		nodeID:          nodeID,
-		destChain:       cfg.DestChain,
-	}
+	chainSupport := shared.NewCCIPChainSupport(
+		lggr,
+		homeChain,
+		oracleIDToP2pID,
+		nodeID,
+		cfg.DestChain,
+	)
 
-	observer := ObserverImpl{
-		lggr:         lggr,
-		homeChain:    homeChain,
-		nodeID:       nodeID,
-		chainSupport: chainSupport,
-		ccipReader:   ccipReader,
-		msgHasher:    msgHasher,
-	}
+	merkleRootProcessor := merkleroot.NewProcessor(
+		nodeID,
+		lggr,
+		cfg,
+		homeChain,
+		ccipReader,
+		msgHasher,
+		reportingCfg,
+		chainSupport,
+	)
 
 	return &Plugin{
-		nodeID:            nodeID,
-		oracleIDToP2pID:   oracleIDToP2pID,
-		lggr:              lggr,
-		cfg:               cfg,
-		tokenPricesReader: tokenPricesReader,
-		ccipReader:        ccipReader,
-		homeChain:         homeChain,
-		readerSyncer:      readerSyncer,
-		reportCodec:       reportCodec,
-		reportingCfg:      reportingCfg,
-		chainSupport:      chainSupport,
-		observer:          observer,
+		nodeID:              nodeID,
+		oracleIDToP2pID:     oracleIDToP2pID,
+		lggr:                lggr,
+		cfg:                 cfg,
+		tokenPricesReader:   tokenPricesReader,
+		ccipReader:          ccipReader,
+		homeChain:           homeChain,
+		readerSyncer:        readerSyncer,
+		reportCodec:         reportCodec,
+		reportingCfg:        reportingCfg,
+		chainSupport:        chainSupport,
+		merkleRootProcessor: merkleRootProcessor,
+		tokenPriceProcessor: tokenprice.NewProcessor(),
+		chainFeeProcessor:   chainfee.NewProcessor(),
 	}
+}
+
+func (p *Plugin) Query(_ context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
+	return types.Query{}, nil
+}
+
+func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
+	// Across all chains we require at least 2F+1 observations.
+	return ocr3types.QuorumTwoFPlusOne, nil
+}
+
+func (p *Plugin) Observation(
+	ctx context.Context, outCtx ocr3types.OutcomeContext, _ types.Query,
+) (types.Observation, error) {
+	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
+	fChain := p.ObserveFChain()
+	//TODO: Move fchain to a new processor instead of computing it inside MerkleProcessor
+	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, merkleroot.Query{})
+	if err != nil {
+		p.lggr.Errorw("failed to get merkle observation", "err", err)
+	}
+	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, tokenprice.Query{})
+	if err != nil {
+		//log error
+		p.lggr.Errorw("failed to get token prices", "err", err)
+	}
+	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, chainfee.Query{})
+	if err != nil {
+		p.lggr.Errorw("failed to get gas prices", "err", err)
+	}
+
+	obs := Observation{
+		MerkleRootObs: merkleRootObs,
+		TokenPriceObs: tokenPriceObs,
+		ChainFeeObs:   chainFeeObs,
+		FChain:        fChain,
+	}
+	return obs.Encode()
+}
+
+func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
+	fChain, err := p.homeChain.GetFChain()
+	if err != nil {
+		// TODO: metrics
+		p.lggr.Warnw("call to GetFChain failed", "err", err)
+		return map[cciptypes.ChainSelector]int{}
+	}
+	return fChain
+}
+
+// Outcome depending on the current state, either:
+// - chooses the seq num ranges for the next round
+// - builds a report
+// - checks for the transmission of a previous report
+func (p *Plugin) Outcome(
+	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
+) (ocr3types.Outcome, error) {
+	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
+
+	var merkleObservations []MerkleRootObservation
+	var tokensObservations []TokenPricesObservation
+	var feeObservations []ChainFeeObservation
+
+	for _, ao := range aos {
+		obs, err := DecodeCommitPluginObservation(ao.Observation)
+		if err != nil {
+			p.lggr.Errorw("failed to decode observation", "err", err)
+			continue
+		}
+		merkleObservations = append(merkleObservations,
+			MerkleRootObservation{
+				OracleID:    ao.Observer,
+				Observation: obs.MerkleRootObs,
+			},
+		)
+
+		tokensObservations = append(tokensObservations,
+			TokenPricesObservation{
+				OracleID:    ao.Observer,
+				Observation: obs.TokenPriceObs,
+			},
+		)
+
+		feeObservations = append(feeObservations,
+			ChainFeeObservation{
+				OracleID:    ao.Observer,
+				Observation: obs.ChainFeeObs,
+			},
+		)
+	}
+
+	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
+		prevOutcome.MerkleRootOutcome,
+		merkleroot.Query{},
+		merkleObservations,
+	)
+	if err != nil {
+		p.lggr.Errorw("failed to get merkle outcome", "err", err)
+	}
+
+	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
+		prevOutcome.TokenPriceOutcome,
+		tokenprice.Query{},
+		tokensObservations,
+	)
+
+	if err != nil {
+		p.lggr.Errorw("failed to get token prices outcome", "err", err)
+	}
+
+	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(prevOutcome.ChainFeeOutcome, chainfee.Query{}, feeObservations)
+	if err != nil {
+		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
+	}
+
+	return Outcome{
+		MerkleRootOutcome: merkleRootOutcome,
+		TokenPriceOutcome: tokenPriceOutcome,
+		ChainFeeOutcome:   chainFeeOutcome,
+	}.Encode()
 }
 
 func (p *Plugin) Close() error {
@@ -105,18 +242,18 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) (Outcome, State) {
+func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
 	if len(outcome) == 0 {
-		return Outcome{}, SelectingRangesForReport
+		return Outcome{}
 	}
 
 	decodedOutcome, err := DecodeOutcome(outcome)
 	if err != nil {
 		p.lggr.Errorw("Failed to decode Outcome", "outcome", outcome, "err", err)
-		return Outcome{}, SelectingRangesForReport
+		return Outcome{}
 	}
 
-	return decodedOutcome, decodedOutcome.NextState()
+	return decodedOutcome
 }
 
 func syncFrequency(configuredValue time.Duration) time.Duration {
