@@ -40,6 +40,10 @@ pipelines:
 
       tagOverride=$(get_flag "override-image-tag")
 
+      if [[ ${PROVIDER:-} == "kind" ]]; then
+        ensure_pull_secrets --all
+      fi
+
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image"
