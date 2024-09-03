@@ -34,7 +34,7 @@ pipelines:
   beholder:
     run: |-
       run_dependency_pipelines --all
-      create_deployments --all
+      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
 
 deployments:
   beholder-test-client:
