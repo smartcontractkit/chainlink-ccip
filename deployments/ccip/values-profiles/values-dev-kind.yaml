@@ -2,6 +2,8 @@ ccipScriptsDeployment:
   extraEnvs:
     - name: AWS_IAM_ENABLED
       value: "false"
+  imagePullSecrets:
+    - name: regcred-ccip
 
 crib-chainlink-cluster:
   chainlink:
@@ -11,6 +13,7 @@ crib-chainlink-cluster:
           requests:
             cpu: 50m
             memory: 256Mi
+
   db:
     resources:
       requests:

@@ -42,6 +42,13 @@ pipelines:
     run: |-
       kubectl delete ns ${DEVSPACE_NAMESPACE}
 
+pullSecrets:
+  regcred-don:
+    registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-don
+    serviceAccounts:
+      - default
+
 commands:
   ingress-hosts:
     command: >-

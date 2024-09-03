@@ -41,6 +41,11 @@ vars:
     source: env
     default: false
 
+pullSecrets:
+  regcred-ccip:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-ccip
+
 pipelines:
   deploy:
     flags:
@@ -53,8 +58,11 @@ pipelines:
       # shellcheck disable=SC1091
       source "../../scripts/lib/shared_functions.sh"
 
-      tagOverride=$(get_flag "override-image-tag")
+      if [[ ${PROVIDER:-} == "kind" ]]; then
+        ensure_pull_secrets --all
+      fi
 
+      tagOverride=$(get_flag "override-image-tag")
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image"
