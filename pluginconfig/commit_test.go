@@ -150,6 +150,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
 		PriceSources                      map[types.Account]ArbitrumPriceSource
 		TokenPriceChainSelector           uint64
+		TokenDecimals                     map[types.Account]uint8
 	}
 	//nolint:gosec
 	const remoteTokenAddress = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
@@ -171,6 +172,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 					},
 				},
 				TokenPriceChainSelector: 10,
+				TokenDecimals:           map[types.Account]uint8{remoteTokenAddress: 18},
 			},
 			false,
 		},
@@ -180,6 +182,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
 				PriceSources:                      map[types.Account]ArbitrumPriceSource{},
+				TokenDecimals:                     map[types.Account]uint8{},
 			},
 			false,
 		},
@@ -194,6 +197,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
 					},
 				},
+				TokenDecimals: map[types.Account]uint8{remoteTokenAddress: 18},
 			},
 			true,
 		},
@@ -208,6 +212,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
 					},
 				},
+				TokenDecimals: map[types.Account]uint8{remoteTokenAddress: 18},
 			},
 			true,
 		},
@@ -219,6 +224,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
 				PriceSources:                      tt.fields.PriceSources,
 				TokenPriceChainSelector:           tt.fields.TokenPriceChainSelector,
+				TokenDecimals:                     tt.fields.TokenDecimals,
 			}
 			err := c.Validate()
 			if tt.wantErr {

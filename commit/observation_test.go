@@ -1,22 +1,27 @@
-package commitrmnocb
+package commit
 
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	commitmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -51,25 +56,22 @@ func Test_Observation(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name               string
-		previousOutcome    Outcome
-		merkleRoots        []cciptypes.MerkleRootChain
-		gasPrices          []cciptypes.GasPriceChain
-		tokenPrices        []cciptypes.TokenPrice
-		offRampNextSeqNums []plugintypes.SeqNumChain
-		fChain             map[cciptypes.ChainSelector]int
-		expObs             Observation
+		name            string
+		previousOutcome Outcome
+		getObserver     func(t *testing.T) *commitmocks.MockObserver
+		expObs          Observation
 	}{
 		{
 			name: "SelectingRangesForReport observation",
 			previousOutcome: Outcome{
 				OutcomeType: ReportTransmitted,
 			},
-			merkleRoots:        merkleRoots,
-			gasPrices:          gasPrices,
-			tokenPrices:        tokenPrices,
-			offRampNextSeqNums: offRampNextSeqNums,
-			fChain:             fChain,
+			getObserver: func(t *testing.T) *commitmocks.MockObserver {
+				observer := commitmocks.NewMockObserver(t)
+				observer.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Once().Return(offRampNextSeqNums)
+				observer.EXPECT().ObserveFChain().Once().Return(fChain)
+				return observer
+			},
 			expObs: Observation{
 				OnRampMaxSeqNums:   offRampNextSeqNums,
 				OffRampNextSeqNums: offRampNextSeqNums,
@@ -80,12 +82,26 @@ func Test_Observation(t *testing.T) {
 			name: "BuildingReport observation",
 			previousOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{
+						ChainSel:    1,
+						SeqNumRange: cciptypes.SeqNumRange{5, 78},
+					},
+				},
 			},
-			merkleRoots:        merkleRoots,
-			gasPrices:          gasPrices,
-			tokenPrices:        tokenPrices,
-			offRampNextSeqNums: offRampNextSeqNums,
-			fChain:             fChain,
+			getObserver: func(t *testing.T) *commitmocks.MockObserver {
+				observer := commitmocks.NewMockObserver(t)
+				observer.EXPECT().ObserveMerkleRoots(mock.Anything, []plugintypes.ChainRange{
+					{
+						ChainSel:    1,
+						SeqNumRange: cciptypes.SeqNumRange{5, 78},
+					},
+				}).Once().Return(merkleRoots)
+				observer.EXPECT().ObserveGasPrices(mock.Anything).Once().Return(gasPrices)
+				observer.EXPECT().ObserveTokenPrices(mock.Anything).Once().Return(tokenPrices)
+				observer.EXPECT().ObserveFChain().Once().Return(fChain)
+				return observer
+			},
 			expObs: Observation{
 				MerkleRoots: merkleRoots,
 				GasPrices:   gasPrices,
@@ -98,11 +114,12 @@ func Test_Observation(t *testing.T) {
 			previousOutcome: Outcome{
 				OutcomeType: ReportInFlight,
 			},
-			merkleRoots:        merkleRoots,
-			gasPrices:          gasPrices,
-			tokenPrices:        tokenPrices,
-			offRampNextSeqNums: offRampNextSeqNums,
-			fChain:             fChain,
+			getObserver: func(t *testing.T) *commitmocks.MockObserver {
+				observer := commitmocks.NewMockObserver(t)
+				observer.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Once().Return(offRampNextSeqNums)
+				observer.EXPECT().ObserveFChain().Once().Return(fChain)
+				return observer
+			},
 			expObs: Observation{
 				OffRampNextSeqNums: offRampNextSeqNums,
 				FChain:             fChain,
@@ -112,22 +129,9 @@ func Test_Observation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-
-			observer := mocks.NewObserver()
-			observer.On(
-				"ObserveOffRampNextSeqNums", ctx,
-			).Return(tc.offRampNextSeqNums)
-			observer.On(
-				"ObserveMerkleRoots", ctx, mock.Anything,
-			).Return(tc.merkleRoots)
-			observer.On(
-				"ObserveTokenPrices", ctx,
-			).Return(tc.tokenPrices)
-			observer.On(
-				"ObserveGasPrices", ctx,
-			).Return(tc.gasPrices)
-			observer.On("ObserveFChain").Return(tc.fChain)
+			ctx := tests.Context(t)
+			observer := tc.getObserver(t)
+			defer observer.AssertExpectations(t)
 
 			p := Plugin{
 				lggr:     logger.Test(t),
@@ -153,24 +157,25 @@ func Test_Observation(t *testing.T) {
 }
 
 func Test_ObserveOffRampNextSeqNums(t *testing.T) {
+	const nodeID commontypes.OracleID = 1
+	knownSourceChains := []cciptypes.ChainSelector{4, 7, 19}
+	nextSeqNums := []cciptypes.SeqNum{345, 608, 7713}
+
 	testCases := []struct {
-		name                   string
-		supportsDestChain      bool
-		supportsDestChainError error
-		knownSourceChains      []cciptypes.ChainSelector
-		knownSourceChainsError error
-		nextSeqNums            []cciptypes.SeqNum
-		nextSeqNumsError       error
-		expResult              []plugintypes.SeqNumChain
+		name      string
+		expResult []plugintypes.SeqNumChain
+		getDeps   func(t *testing.T) (*commitmocks.MockChainSupport, *reader_mock.MockCCIP)
 	}{
 		{
-			name:                   "Happy path",
-			supportsDestChain:      true,
-			supportsDestChainError: nil,
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: nil,
-			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
-			nextSeqNumsError:       nil,
+			name: "Happy path",
+			getDeps: func(t *testing.T) (*commitmocks.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := commitmocks.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIP(t)
+				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums, nil)
+				return chainSupport, ccipReader
+			},
 			expResult: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(4, 345),
 				plugintypes.NewSeqNumChain(7, 608),
@@ -178,69 +183,64 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			},
 		},
 		{
-			name:                   "nil is returned when supportsDestChain is false",
-			supportsDestChain:      false,
-			supportsDestChainError: nil,
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: nil,
-			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
-			nextSeqNumsError:       nil,
-			expResult:              nil,
+			name: "nil is returned when supportsDestChain is false",
+			getDeps: func(t *testing.T) (*commitmocks.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := commitmocks.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(false, nil)
+				ccipReader := reader_mock.NewMockCCIP(t)
+				return chainSupport, ccipReader
+			},
+			expResult: nil,
 		},
 		{
-			name:                   "nil is returned when supportsDestChain errors",
-			supportsDestChain:      true,
-			supportsDestChainError: fmt.Errorf("error"),
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: nil,
-			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
-			nextSeqNumsError:       nil,
-			expResult:              nil,
+			name: "nil is returned when supportsDestChain errors",
+			getDeps: func(t *testing.T) (*commitmocks.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := commitmocks.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(false, errors.New("some error"))
+				ccipReader := reader_mock.NewMockCCIP(t)
+				return chainSupport, ccipReader
+			},
+			expResult: nil,
 		},
 		{
-			name:                   "nil is returned when knownSourceChains errors",
-			supportsDestChain:      true,
-			supportsDestChainError: nil,
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: fmt.Errorf("error"),
-			nextSeqNums:            []cciptypes.SeqNum{345, 608, 7713},
-			nextSeqNumsError:       nil,
-			expResult:              nil,
+			name: "nil is returned when knownSourceChains errors",
+			getDeps: func(t *testing.T) (*commitmocks.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := commitmocks.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(nil, errors.New("some error"))
+				ccipReader := reader_mock.NewMockCCIP(t)
+				return chainSupport, ccipReader
+			},
+			expResult: nil,
 		},
 		{
-			name:                   "nil is returned when nextSeqNums returns incorrect number of seq nums",
-			supportsDestChain:      true,
-			supportsDestChainError: nil,
-			knownSourceChains:      []cciptypes.ChainSelector{4, 7, 19},
-			knownSourceChainsError: nil,
-			nextSeqNums:            []cciptypes.SeqNum{345, 608},
-			nextSeqNumsError:       nil,
-			expResult:              nil,
+			name: "nil is returned when nextSeqNums returns incorrect number of seq nums",
+			getDeps: func(t *testing.T) (*commitmocks.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := commitmocks.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIP(t)
+				// return a smaller slice, should trigger validation condition
+				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums[1:], nil)
+				return chainSupport, ccipReader
+			},
+			expResult: nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
-			var nodeID commontypes.OracleID = 1
-			reader := mocks.NewCCIPReader()
-			reader.On(
-				"NextSeqNum", ctx, tc.knownSourceChains,
-			).Return(tc.nextSeqNums, tc.nextSeqNumsError)
+			ctx := tests.Context(t)
 
-			chainSupport := mocks.NewChainSupport()
-			chainSupport.On(
-				"SupportsDestChain", nodeID,
-			).Return(tc.supportsDestChain, tc.supportsDestChainError)
-			chainSupport.On(
-				"KnownSourceChainsSlice",
-			).Return(tc.knownSourceChains, tc.knownSourceChainsError)
+			chainSupport, ccipReader := tc.getDeps(t)
+			defer chainSupport.AssertExpectations(t)
+			defer ccipReader.AssertExpectations(t)
 
 			o := ObserverImpl{
 				nodeID:       nodeID,
 				lggr:         logger.Test(t),
 				msgHasher:    mocks.NewMessageHasher(),
-				ccipReader:   reader,
+				ccipReader:   ccipReader,
 				chainSupport: chainSupport,
 			}
 
@@ -426,8 +426,13 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			var nodeID commontypes.OracleID = 1
-			reader := mocks.NewCCIPReader()
+			reader := reader_mock.NewMockCCIP(t)
 			for _, r := range tc.ranges {
+				// Skip unexpected calls.
+				if tc.supportedChainsFails || !tc.supportedChains.Contains(r.ChainSel) {
+					continue
+				}
+
 				var err error
 				if e, exists := tc.msgsBetweenSeqNumsErrors[r.ChainSel]; exists {
 					err = e
@@ -437,7 +442,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
 			}
 
-			chainSupport := mocks.NewChainSupport()
+			chainSupport := commitmocks.NewMockChainSupport(t)
 			if tc.supportedChainsFails {
 				chainSupport.On("SupportedChains", nodeID).Return(
 					mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error"),

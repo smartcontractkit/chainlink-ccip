@@ -7,14 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 )
 
 func TestExtendedContractReader(t *testing.T) {
 	const contractName = "testContract"
-	cr := mocks.NewContractReaderMock()
+	cr := chainreadermocks.NewMockChainReader(t)
 	extCr := NewExtendedContractReader(cr)
 
 	bindings := extCr.GetBindings(contractName)

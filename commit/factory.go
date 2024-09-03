@@ -4,23 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"google.golang.org/grpc"
+
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
+
+const maxReportTransmissionCheckAttempts = 5
+const maxQueryLength = 1024 * 1024 // 1MB
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -94,12 +96,17 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
-	onChainTokenPricesReader := reader.NewOnchainTokenPricesReader(
-		reader.TokenPriceConfig{ // TODO: Inject config
-			StaticPrices: map[ocr2types.Account]big.Int{},
-		},
-		nil, // TODO: Inject this
-	)
+	var onChainTokenPricesReader reader.TokenPrices
+	// The node supports the chain that the token prices are on.
+	tokenPricesCr, ok := p.contractReaders[cciptypes.ChainSelector(offchainConfig.TokenPriceChainSelector)]
+	if ok {
+		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
+			tokenPricesCr,
+			offchainConfig.PriceSources,
+			offchainConfig.TokenDecimals,
+		)
+	}
+
 	ccipReader := reader.NewCCIPChainReader(
 		p.lggr,
 		p.contractReaders,
@@ -111,9 +118,10 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			config.OracleID,
 			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{
-				DestChain:           p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize: merklemulti.MaxNumberTreeLeaves,
-				OffchainConfig:      offchainConfig,
+				DestChain:                          p.ocrConfig.Config.ChainSelector,
+				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
+				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
+				OffchainConfig:                     offchainConfig,
 			},
 			ccipReader,
 			onChainTokenPricesReader,
@@ -121,11 +129,11 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.msgHasher,
 			p.lggr,
 			p.homeChainReader,
+			config,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
-				// No query for this commit implementation.
-				MaxQueryLength:       0,
+				MaxQueryLength:       maxQueryLength,
 				MaxObservationLength: 20_000, // 20kB
 				MaxOutcomeLength:     10_000, // 10kB
 				MaxReportLength:      10_000, // 10kB

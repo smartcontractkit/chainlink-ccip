@@ -24,8 +24,13 @@ func TestPluginState_Next(t *testing.T) {
 			want: GetMessages,
 		},
 		{
-			name: "Phase 2 to 1",
+			name: "Phase 2 to 3",
 			p:    GetMessages,
+			want: Filter,
+		},
+		{
+			name: "Phase 3 to 1",
+			p:    Filter,
 			want: GetCommitReports,
 		},
 		{

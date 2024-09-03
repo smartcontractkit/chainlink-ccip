@@ -9,6 +9,8 @@ const (
 	ContractNamePriceRegistry        = "PriceRegistry"
 	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
 	ContractNameCCIPConfig           = "CCIPConfig"
+	ContractNamePriceAggregator      = "AggregatorV3Interface"
+	ContractNameNonceManager         = "NonceManager"
 )
 
 // Method Names
@@ -34,9 +36,17 @@ const (
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
 	MethodNameProcessMessageArgs            = "ProcessMessageArgs"
-	MethodNameValidatePoolReturnData        = "ValidatePoolReturnData"
+	MethodNameProcessPoolReturnData         = "ProcessPoolReturnData"
 	MethodNameGetValidatedTokenPrice        = "GetValidatedTokenPrice"
 	MethodNameGetFeeTokens                  = "GetFeeTokens"
+
+	// Aggregator methods
+	MethodNameGetLatestRoundData = "latestRoundData"
+	MethodNameGetDecimals        = "decimals"
+
+	// NonceManager methods
+	MethodNameGetInboundNonce  = "GetInboundNonce"
+	MethodNameGetOutboundNonce = "GetOutboundNonce"
 
 	/*
 		// On EVM:
