@@ -161,11 +161,6 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		GasPriceUpdates   []GasPriceUpdate
 	}
 
-	type CommitReportAccepted struct {
-		PriceUpdates PriceUpdates
-		MerkleRoots  []MerkleRoot
-	}
-
 	type CommitReportAcceptedEvent struct {
 		MerkleRoots  []MerkleRoot
 		PriceUpdates PriceUpdates
@@ -205,7 +200,8 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Debugw("commit report too old, skipping", "MerkleRoots", ev.MerkleRoots, "PriceUpdates", ev.PriceUpdates, "item", item,
+			r.lggr.Debugw("commit report too old, skipping", "MerkleRoots", ev.MerkleRoots,
+				"PriceUpdates", ev.PriceUpdates, "item", item,
 				"destChain", dest,
 				"ts", ts,
 				"limit", limit)
