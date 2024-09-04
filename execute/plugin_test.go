@@ -297,7 +297,9 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
-	p := &Plugin{lggr: logger.Test(t)}
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetFChain().Return(nil, nil)
+	p := &Plugin{lggr: logger.Test(t), homeChain: homeChain}
 	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{
 			{
@@ -310,7 +312,10 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetFChain().Return(nil, nil)
 	p := &Plugin{
+		homeChain: homeChain,
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			F: 1,
 		},
