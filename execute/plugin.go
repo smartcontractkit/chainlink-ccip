@@ -247,7 +247,7 @@ func (p *Plugin) Observation(
 		return exectypes.NewObservation(groupedCommits, messages, nil).Encode()
 
 	case exectypes.Filter:
-		// TODO: add in nonces, other data comes from previous outcome.
+		// Phase 3: observe nonce for each unique source/sender pair.
 		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
 
 		// Collect unique senders.
