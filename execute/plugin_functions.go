@@ -308,8 +308,9 @@ func mergeCommitObservations(
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeNonceObservations(
-	daos []decodedAttributedObservation, dest cciptypes.ChainSelector, fChainDest int,
-) (exectypes.NonceObservations, error) {
+	daos []decodedAttributedObservation,
+	fChainDest int,
+) exectypes.NonceObservations {
 	// Nonces store context in a map key, so a different container type is needed for the observation filter.
 	type NonceTriplet struct {
 		source cciptypes.ChainSelector
@@ -348,10 +349,10 @@ func mergeNonceObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 // getConsensusObservation merges all attributed observations into a single observation based on which values have
@@ -395,7 +396,8 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
-	mergedNonceObservations, err := mergeNonceObservations(decodedObservations, destChainSelector, fChain[destChainSelector])
+	mergedNonceObservations :=
+		mergeNonceObservations(decodedObservations, fChain[destChainSelector])
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to merge nonce observations: %w", err)
 	}

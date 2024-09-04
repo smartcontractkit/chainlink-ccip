@@ -635,7 +635,6 @@ func Test_decodeAttributedObservations(t *testing.T) {
 func Test_getConsensusObservation(t *testing.T) {
 	type args struct {
 		observation []exectypes.Observation
-		oracleID    commontypes.OracleID
 		F           int
 		fChain      map[cciptypes.ChainSelector]int
 	}
@@ -801,7 +800,7 @@ func Test_getConsensusObservation(t *testing.T) {
 
 			lggr := logger.Test(t)
 			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain)
-			if !tt.wantErr(t, err, fmt.Sprintf("getConsensusObservation(...)")) {
+			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "getConsensusObservation(...)")
