@@ -5,11 +5,11 @@ build: ensure_go_version
 	go build -v ./...
 
 generate: ensure_go_version
-	go install github.com/vektra/mockery/v2@v2.43.0
+	go install github.com/vektra/mockery/v2@v2.43.2
 	mockery
 
 test: ensure_go_version
-	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) ./...
+	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) `go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks'`
 
 lint: ensure_go_version
 	golangci-lint run -c .golangci.yml

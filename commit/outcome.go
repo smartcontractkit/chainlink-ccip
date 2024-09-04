@@ -1,8 +1,9 @@
-package commitrmnocb
+package commit
 
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"golang.org/x/exp/maps"
@@ -22,39 +23,42 @@ import (
 func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	tStart := time.Now()
+	outcome, nextState := p.getOutcome(outCtx, aos)
+	p.lggr.Infow("Sending Outcome",
+		"outcome", outcome, "oid", p.nodeID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
+	return outcome.Encode()
+}
+
+func (p *Plugin) getOutcome(
+	outCtx ocr3types.OutcomeContext, aos []types.AttributedObservation,
+) (Outcome, State) {
 	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
 	commitQuery := Query{}
 
 	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.cfg.DestChain, aos)
 	if err != nil {
-		return ocr3types.Outcome{}, err
+		p.lggr.Warnw("Get consensus observation failed, empty outcome", "error", err)
+		return Outcome{}, nextState
 	}
-
-	outcome := Outcome{}
 
 	switch nextState {
 	case SelectingRangesForReport:
-		outcome = ReportRangesOutcome(commitQuery, consensusObservation)
-
+		return reportRangesOutcome(commitQuery, consensusObservation), nextState
 	case BuildingReport:
-		outcome = buildReport(commitQuery, consensusObservation)
-
+		return buildReport(commitQuery, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
-		outcome = checkForReportTransmission(
-			p.lggr, p.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation)
-
+		return checkForReportTransmission(
+			p.lggr, p.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
 	default:
-		p.lggr.Warnw("Unexpected state in Outcome", "state", nextState)
-		return outcome.Encode()
+		p.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
+		return Outcome{}, nextState
 	}
-
-	p.lggr.Infow("Commit Plugin Outcome", "outcome", outcome, "oid", p.nodeID)
-	return outcome.Encode()
 }
 
-// ReportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
+// reportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 // TODO: ensure each range is below a limit
-func ReportRangesOutcome(
+func reportRangesOutcome(
 	query Query,
 	consensusObservation ConsensusObservation,
 ) Outcome {
@@ -67,6 +71,7 @@ func ReportRangesOutcome(
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
 	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
+	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
@@ -85,11 +90,23 @@ func ReportRangesOutcome(
 			}
 			rangesToReport = append(rangesToReport, chainRange)
 		}
+
+		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
+			ChainSel: chainSel,
+			SeqNum:   offRampNextSeqNum,
+		})
 	}
+
+	// deterministic outcome
+	sort.Slice(rangesToReport, func(i, j int) bool { return rangesToReport[i].ChainSel < rangesToReport[j].ChainSel })
+	sort.Slice(offRampNextSeqNums, func(i, j int) bool {
+		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
+	})
 
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
+		OffRampNextSeqNums:      offRampNextSeqNums,
 	}
 
 	return outcome
@@ -100,6 +117,7 @@ func ReportRangesOutcome(
 func buildReport(
 	_ Query,
 	consensusObservation ConsensusObservation,
+	prevOutcome Outcome,
 ) Outcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
@@ -108,11 +126,14 @@ func buildReport(
 		outcomeType = ReportEmpty
 	}
 
+	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
+
 	outcome := Outcome{
-		OutcomeType:   outcomeType,
-		RootsToReport: roots,
-		GasPrices:     consensusObservation.GasPricesArray(),
-		TokenPrices:   consensusObservation.TokenPricesArray(),
+		OutcomeType:        outcomeType,
+		RootsToReport:      roots,
+		GasPrices:          consensusObservation.GasPricesArray(),
+		TokenPrices:        consensusObservation.TokenPricesArray(),
+		OffRampNextSeqNums: prevOutcome.OffRampNextSeqNums,
 	}
 
 	return outcome
@@ -204,7 +225,11 @@ func merkleRootConsensus(
 
 	for chain, roots := range rootsByChain {
 		if fChain, exists := fChains[chain]; exists {
-			root, count := mostFrequentElem(roots)
+			root, count, err := mostFrequentElement(roots)
+			if err != nil {
+				lggr.Errorf("cannot reach consensus on roots of %v: %s", chain, err)
+				continue
+			}
 
 			if count <= fChain {
 				// TODO: metrics
@@ -267,7 +292,12 @@ func offRampMaxSeqNumsConsensus(
 	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 
 	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count := mostFrequentElem(offRampMaxSeqNums)
+		seqNum, count, err := mostFrequentElement(offRampMaxSeqNums)
+		if err != nil {
+			lggr.Errorf("cannot reach consensus on offRampMaxSeqNums for chain %d: %s", chain, err)
+			continue
+		}
+
 		if count <= fDestChain {
 			// TODO: metrics
 			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
@@ -292,13 +322,19 @@ func fChainConsensus(
 	consensus := make(map[cciptypes.ChainSelector]int)
 
 	for chain, fValues := range fChainValues {
-		fChain, count := mostFrequentElem(fValues)
+		fChain, count, err := mostFrequentElement(fValues)
+		if err != nil {
+			lggr.Errorf("cannot reach consensus on fChain values for chain %d: %s", chain, err)
+			continue
+		}
+
 		if count < F {
 			// TODO: metrics
 			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
 				"value was observed more than the expected %d times, found fChain value %d observed by only %d oracles, "+
 				"fChain values: %v",
 				chain, F, fChain, count, fValues)
+			continue
 		}
 
 		consensus[chain] = fChain
@@ -307,25 +343,32 @@ func fChainConsensus(
 	return consensus
 }
 
-// Given a list of elems, return the elem that occurs most frequently and how often it occurs
-func mostFrequentElem[T comparable](elems []T) (T, int) {
-	var mostFrequentElem T
-
-	counts := counts(elems)
+// Given a list of elems, return the elem that occurs most frequently and how often it occurs.
+func mostFrequentElement[T comparable](elems []T) (res T, cnt int, err error) {
+	counts := getCounts(elems)
 	maxCount := 0
+	uniq := false
 
-	for elem, count := range counts {
+	for el, count := range counts {
+		if count == maxCount {
+			uniq = false
+		}
 		if count > maxCount {
-			mostFrequentElem = elem
+			res = el
 			maxCount = count
+			uniq = true
 		}
 	}
 
-	return mostFrequentElem, maxCount
+	if !uniq {
+		var empty T
+		return empty, 0, fmt.Errorf("no unique major element")
+	}
+	return res, maxCount, nil
 }
 
 // Given a list of elems, return a map from elems to how often they occur in the given list
-func counts[T comparable](elems []T) map[T]int {
+func getCounts[T comparable](elems []T) map[T]int {
 	m := make(map[T]int)
 	for _, elem := range elems {
 		m[elem]++

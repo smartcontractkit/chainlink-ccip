@@ -2,6 +2,7 @@ package report
 
 import (
 	"context"
+	crand "crypto/rand"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -24,6 +25,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 )
+
+func randomAddress() string {
+	b := make([]byte, 20)
+	_, _ = crand.Read(b) // Assignment for errcheck. Only used in tests so we can ignore.
+	return cciptypes.Bytes(b).String()
+}
 
 // mustMakeBytes parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
 // random byte array.
@@ -169,8 +176,35 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 			SourceChainSelector: src,
 			SequenceNumber:      num,
 			MsgHash:             cciptypes.Bytes32{},
+			Nonce:               nonce,
 		},
 	}
+}
+
+// makeTestCommitReportWithSenders is the same as makeTestCommitReport but overrides the senders.
+func makeTestCommitReportWithSenders(
+	hasher cciptypes.MessageHasher,
+	numMessages,
+	srcChain,
+	firstSeqNum,
+	block int,
+	timestamp int64,
+	senders []cciptypes.Bytes,
+	rootOverride cciptypes.Bytes32,
+	executed []cciptypes.SeqNum,
+) exectypes.CommitData {
+	if len(senders) == 0 || len(senders) != numMessages {
+		panic("wrong number of senders provided")
+	}
+
+	data := makeTestCommitReport(hasher, numMessages, srcChain, firstSeqNum,
+		block, timestamp, senders[0], rootOverride, executed)
+
+	for i := range data.Messages {
+		data.Messages[i].Sender = senders[i]
+	}
+
+	return data
 }
 
 // makeTestCommitReport creates a basic commit report with messages given different parameters. This function
@@ -182,6 +216,7 @@ func makeTestCommitReport(
 	firstSeqNum,
 	block int,
 	timestamp int64,
+	sender cciptypes.Bytes,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
 ) exectypes.CommitData {
@@ -195,10 +230,12 @@ func makeTestCommitReport(
 	}
 	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		messages = append(messages, makeMessage(
+		msg := makeMessage(
 			cciptypes.ChainSelector(srcChain),
 			cciptypes.SeqNum(i+firstSeqNum),
-			uint64(i)))
+			uint64(i)+1)
+		msg.Sender = sender
+		messages = append(messages, msg)
 	}
 
 	commitReport := exectypes.CommitData{
@@ -263,10 +300,14 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 	}{
 		{
 			name:    "token data mismatch",
-			wantErr: "token data length mismatch: got 2, expected 0",
+			wantErr: "token data length mismatch: got 2, expected 1",
 			args: args{
 				report: exectypes.CommitData{
-					TokenData: make([][][]byte, 2),
+					TokenData:           make([][][]byte, 2),
+					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
+					Messages: []cciptypes.Message{
+						{Header: cciptypes.RampMessageHeader{}},
+					},
 				},
 			},
 		},
@@ -384,9 +425,25 @@ func Test_Builder_Build(t *testing.T) {
 	codec := mocks.NewExecutePluginJSONReportCodec()
 	lggr := logger.Test(t)
 	tokenDataReader := tdr{mode: good}
+	sender, err := cciptypes.NewBytesFromString(randomAddress())
+	require.NoError(t, err)
+	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
+		1: {
+			sender.String(): 0,
+		},
+		2: {
+			sender.String(): 0,
+		},
+	}
+	tenSenders := make([]cciptypes.Bytes, 10)
+	for i := range tenSenders {
+		tenSenders[i], err = cciptypes.NewBytesFromString(randomAddress())
+		require.NoError(t, err)
+	}
 
 	type args struct {
 		reports       []exectypes.CommitData
+		nonces        map[cciptypes.ChainSelector]map[string]uint64
 		maxReportSize uint64
 		maxGasLimit   uint64
 	}
@@ -410,10 +467,12 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2300,
+				maxReportSize: 2529,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 				},
@@ -428,8 +487,10 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 				},
@@ -443,11 +504,14 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 15000,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 				},
@@ -459,13 +523,16 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "one and half reports",
 			args: args{
-				maxReportSize: 8500,
+				maxReportSize: 9500,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 				},
@@ -478,13 +545,16 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "exactly one report",
 			args: args{
-				maxReportSize: 4200,
+				maxReportSize: 4600,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil),
 				},
@@ -497,10 +567,16 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2500,
+				maxReportSize: 2600,
 				maxGasLimit:   10000000,
+				nonces: map[cciptypes.ChainSelector]map[string]uint64{
+					1: {
+						sender.String(): 5,
+					},
+				},
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
@@ -512,10 +588,16 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2050,
+				maxReportSize: 2200,
 				maxGasLimit:   10000000,
+				nonces: map[cciptypes.ChainSelector]map[string]uint64{
+					1: {
+						sender.String(): 5,
+					},
+				},
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 101, 102, 103, 104}),
 				},
@@ -530,8 +612,18 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 3500,
 				maxGasLimit:   10000000,
+				nonces: map[cciptypes.ChainSelector]map[string]uint64{
+					1: {
+						tenSenders[1].String(): 1,
+						tenSenders[3].String(): 3,
+						tenSenders[5].String(): 5,
+						tenSenders[7].String(): 7,
+						tenSenders[9].String(): 9,
+					},
+				},
 				reports: []exectypes.CommitData{
-					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+					makeTestCommitReportWithSenders(hasher, 10, 1, 100, 999, 10101010101,
+						tenSenders,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
@@ -543,10 +635,20 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
-				maxReportSize: 2050,
+				maxReportSize: 2250,
 				maxGasLimit:   10000000,
+				nonces: map[cciptypes.ChainSelector]map[string]uint64{
+					1: {
+						tenSenders[1].String(): 1,
+						tenSenders[3].String(): 3,
+						tenSenders[5].String(): 5,
+						tenSenders[7].String(): 7,
+						tenSenders[9].String(): 9,
+					},
+				},
 				reports: []exectypes.CommitData{
-					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+					makeTestCommitReportWithSenders(hasher, 10, 1, 100, 999, 10101010101,
+						tenSenders,
 						cciptypes.Bytes32{}, // generate a correct root.
 						[]cciptypes.SeqNum{100, 102, 104, 106, 108}),
 				},
@@ -561,8 +663,10 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					breakCommitReport(makeTestCommitReport(hasher, 10, 1, 101, 1000, 10101010102,
+						sender,
 						cciptypes.Bytes32{}, // generate a correct root.
 						nil)),
 				},
@@ -572,8 +676,10 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "invalid merkle root",
 			args: args{
+				nonces: defaultNonces,
 				reports: []exectypes.CommitData{
 					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
 						mustMakeBytes(""), // random root
 						nil),
 				},
@@ -585,9 +691,11 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					setMessageData(5, 20000,
 						makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+							sender,
 							cciptypes.Bytes32{}, // generate a correct root.
 							nil)),
 				},
@@ -602,10 +710,12 @@ func Test_Builder_Build(t *testing.T) {
 			args: args{
 				maxReportSize: 10000,
 				maxGasLimit:   10000000,
+				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
 					setMessageData(8, 20000,
 						setMessageData(5, 20000,
 							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+								sender,
 								cciptypes.Bytes32{}, // generate a correct root.
 								nil))),
 				},
@@ -624,15 +734,36 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			builder := NewBuilder(
-				ctx,
-				lggr,
-				hasher,
-				tokenDataReader,
-				codec,
-				evm.EstimateProvider{},
-				tt.args.maxReportSize,
-				tt.args.maxGasLimit)
+			builder := &execReportBuilder{
+				ctx:  ctx,
+				lggr: lggr,
+
+				tokenDataReader:  tokenDataReader,
+				encoder:          codec,
+				hasher:           hasher,
+				estimateProvider: evm.EstimateProvider{},
+				sendersNonce:     tt.args.nonces,
+				expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
+
+				maxReportSizeBytes:   tt.args.maxReportSize,
+				maxGas:               tt.args.maxGasLimit,
+				nonceCheckingEnabled: true, // TODO: remove feature flag.
+			}
+
+			/*
+				// TODO: switch back to this when removing the feature flag.
+				builder := NewBuilder(
+					ctx,
+					lggr,
+					hasher,
+					tokenDataReader,
+					codec,
+					evm.EstimateProvider{},
+					tt.args.nonces,
+					tt.args.maxReportSize,
+					tt.args.maxGasLimit)
+			*/
+
 			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
 				updatedMessage, err := builder.Add(report)
@@ -815,13 +946,14 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				ctx:                context.Background(),
-				lggr:               lggr,
-				encoder:            resolvedEncoder,
-				estimateProvider:   tt.fields.estimateProvider,
-				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
-				maxGas:             tt.fields.maxGas,
-				accumulated:        tt.fields.accumulated,
+				nonceCheckingEnabled: true, // TODO: remove feature flag.
+				ctx:                  context.Background(),
+				lggr:                 lggr,
+				encoder:              resolvedEncoder,
+				estimateProvider:     tt.fields.estimateProvider,
+				maxReportSizeBytes:   tt.fields.maxReportSizeBytes,
+				maxGas:               tt.fields.maxGas,
+				accumulated:          tt.fields.accumulated,
 			}
 			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
 			if tt.expectedError != "" {
@@ -880,6 +1012,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 	}
 	type args struct {
 		idx        int
+		nonces     map[cciptypes.ChainSelector]map[string]uint64
 		execReport exectypes.CommitData
 	}
 	tests := []struct {
@@ -1010,6 +1143,62 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				TokenData: [][][]byte{nil, nil},
 			},
 		},
+		{
+			name: "missing chain nonce",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					SourceChain: 1,
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 1),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: MissingNoncesForChain,
+		},
+		{
+			name: "missing sender nonce",
+			args: args{
+				idx: 0,
+				nonces: map[cciptypes.ChainSelector]map[string]uint64{
+					1: {},
+				},
+				execReport: exectypes.CommitData{
+					SourceChain: 1,
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 1),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: MissingNonce,
+		},
+		{
+			name: "invalid sender nonce",
+			args: args{
+				idx: 0,
+				nonces: map[cciptypes.ChainSelector]map[string]uint64{
+					1: {
+						"0x": 99,
+					},
+				},
+				execReport: exectypes.CommitData{
+					SourceChain: 1,
+					Messages: []cciptypes.Message{
+						makeMessage(1, 100, 1),
+					},
+				},
+			},
+			fields: fields{
+				tokenDataReader: tdr{mode: noop},
+			},
+			expectedStatus: InvalidNonce,
+		},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -1026,10 +1215,12 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				lggr:             lggr,
-				tokenDataReader:  resolvedTokenDataReader,
-				estimateProvider: evm.EstimateProvider{},
-				accumulated:      tt.fields.accumulated,
+				nonceCheckingEnabled: true, // TODO: remove feature flag.
+				lggr:                 lggr,
+				tokenDataReader:      resolvedTokenDataReader,
+				estimateProvider:     evm.EstimateProvider{},
+				accumulated:          tt.fields.accumulated,
+				sendersNonce:         tt.args.nonces,
 			}
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
 			if tt.expectedError != "" {

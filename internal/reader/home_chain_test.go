@@ -10,7 +10,6 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -21,6 +20,8 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 )
 
 var (
@@ -36,7 +37,7 @@ var (
 )
 
 func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
-	homeChainReader := mocks.NewContractReaderMock()
+	homeChainReader := chainreadermocks.NewMockChainReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -129,7 +130,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
-	homeChainReader := mocks.NewContractReaderMock()
+	homeChainReader := chainreadermocks.NewMockChainReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -147,7 +148,7 @@ func Test_PollingWorking(t *testing.T) {
 
 	var (
 		tickTime       = 2 * time.Millisecond
-		totalSleepTime = tickTime * 4
+		totalSleepTime = tickTime * 20
 	)
 
 	configPoller := NewHomeChainConfigPoller(
@@ -183,7 +184,7 @@ func Test_PollingWorking(t *testing.T) {
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	donID := uint32(1)
 	pluginType := uint8(1) // execution
-	homeChainReader := mocks.NewContractReaderMock()
+	homeChainReader := chainreadermocks.NewMockChainReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,

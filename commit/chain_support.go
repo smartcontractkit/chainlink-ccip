@@ -1,7 +1,8 @@
-package commitrmnocb
+package commit
 
 import (
 	"fmt"
+	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -36,13 +37,18 @@ type CCIPChainSupport struct {
 }
 
 func (c CCIPChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, error) {
-	knownSourceChains, err := c.homeChain.GetKnownCCIPChains()
+	allChainsSet, err := c.homeChain.GetKnownCCIPChains()
 	if err != nil {
 		c.lggr.Errorw("error getting known chains", "err", err)
 		return nil, fmt.Errorf("error getting known chains: %w", err)
 	}
-	knownSourceChainsSlice := knownSourceChains.ToSlice()
-	return slicelib.Filter(knownSourceChainsSlice, func(ch cciptypes.ChainSelector) bool { return ch != c.destChain }), nil
+
+	allChains := allChainsSet.ToSlice()
+	sort.Slice(allChains, func(i, j int) bool { return allChains[i] < allChains[j] })
+
+	sourceChains := slicelib.Filter(allChains, func(ch cciptypes.ChainSelector) bool { return ch != c.destChain })
+
+	return sourceChains, nil
 }
 
 // SupportedChains returns the set of chains that the given Oracle is configured to access
@@ -66,7 +72,13 @@ func (c CCIPChainSupport) SupportsDestChain(oracle commontypes.OracleID) (bool, 
 	if err != nil {
 		return false, fmt.Errorf("get chain config: %w", err)
 	}
-	return destChainConfig.SupportedNodes.Contains(c.oracleIDToP2pID[oracle]), nil
+
+	peerID, ok := c.oracleIDToP2pID[oracle]
+	if !ok {
+		return false, fmt.Errorf("oracle ID %d not found in oracleIDToP2pID", oracle)
+	}
+
+	return destChainConfig.SupportedNodes.Contains(peerID), nil
 }
 
 // Interface compliance check

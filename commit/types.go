@@ -1,4 +1,4 @@
-package commitrmnocb
+package commit
 
 import (
 	"encoding/json"
@@ -163,6 +163,7 @@ func (co ConsensusObservation) GasPricesArray() []cciptypes.GasPriceChain {
 	for chain, gasPrice := range co.GasPrices {
 		gasPrices = append(gasPrices, cciptypes.NewGasPriceChain(gasPrice.Int, chain))
 	}
+	sort.Slice(gasPrices, func(i, j int) bool { return gasPrices[i].ChainSel < gasPrices[j].ChainSel })
 
 	return gasPrices
 }
@@ -173,6 +174,7 @@ func (co ConsensusObservation) TokenPricesArray() []cciptypes.TokenPrice {
 	for tokenID, tokenPrice := range co.TokenPrices {
 		tokenPrices = append(tokenPrices, cciptypes.NewTokenPrice(tokenID, tokenPrice.Int))
 	}
+	sort.Slice(tokenPrices, func(i, j int) bool { return tokenPrices[i].TokenID < tokenPrices[j].TokenID })
 
 	return tokenPrices
 }

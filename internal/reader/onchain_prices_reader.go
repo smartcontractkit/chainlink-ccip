@@ -104,7 +104,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
-			nil,
+			map[string]any{},
 			&decimals,
 		); err != nil {
 		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
@@ -124,7 +124,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData),
 			primitives.Unconfirmed,
-			nil,
+			map[string]any{},
 			&latestRoundData,
 		); err != nil {
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)

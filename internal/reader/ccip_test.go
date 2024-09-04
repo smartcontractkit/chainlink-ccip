@@ -14,16 +14,16 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*mocks.ContractReaderMock)
+	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockChainReader)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = mocks.NewContractReaderMock()
+		sourceCRs[chain] = chainreadermocks.NewMockChainReader(t)
 	}
 
-	destCR := mocks.NewContractReaderMock()
+	destCR := chainreadermocks.NewMockChainReader(t)
 
 	destCR.On(
 		"GetLatestValue",

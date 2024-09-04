@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - 'ccip-develop'
+      - 'main'
 
 jobs:
   build-lint-test:
@@ -35,7 +35,6 @@ jobs:
       - name: Generate coverage report
         if: github.event_name == 'pull_request'
         run: |
-          go tool cover -func=coverage.out > coverage.txt
           total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
           echo "coverage=$total" >> $GITHUB_ENV
       - name: Coverage on target branch
@@ -43,8 +42,7 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}
           git checkout ${{ github.base_ref }}
-          go test -coverprofile=coverage_target.out ./...
-          go tool cover -func=coverage_target.out > coverage_target.txt
+          TEST_COUNT=1 COVERAGE_FILE=coverage_target.out make test
           total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
           echo "coverage_target=$total" >> $GITHUB_ENV
       - name: Remove previous coverage comments

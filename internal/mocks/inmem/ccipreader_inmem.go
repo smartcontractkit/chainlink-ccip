@@ -28,6 +28,13 @@ type InMemoryCCIPReader struct {
 	Dest cciptypes.ChainSelector
 }
 
+// GetExpectedNextSequenceNumber implements reader.CCIP.
+func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
+	ctx context.Context,
+	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	panic("unimplemented")
+}
+
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
 ) ([]plugintypes.CommitPluginReportWithMeta, error) {
@@ -94,6 +101,14 @@ func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 func (r InMemoryCCIPReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) (seqNum []cciptypes.SeqNum, err error) {
+	panic("implement me")
+}
+
+func (r InMemoryCCIPReader) Nonces(
+	ctx context.Context,
+	source, dest cciptypes.ChainSelector,
+	addresses []string,
+) (map[string]uint64, error) {
 	panic("implement me")
 }
 
