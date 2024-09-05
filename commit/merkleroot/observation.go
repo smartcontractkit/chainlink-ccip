@@ -3,7 +3,6 @@ package merkleroot
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -18,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 
@@ -28,54 +26,6 @@ import (
 func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
 	// Across all chains we require at least 2F+1 observations.
 	return ocr3types.QuorumTwoFPlusOne, nil
-}
-
-func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
-	if !w.cfg.RMNEnabled {
-		return Query{}, nil
-	}
-
-	nextState := prevOutcome.NextState(Query{})
-	if nextState != BuildingReport {
-		return Query{}, nil
-	}
-
-	ctxQuery, cancel := context.WithTimeout(ctx, 5*time.Second) // TODO: MaxQueryDuration-e
-	defer cancel()
-
-	offRampAddress := []byte{} // TODO: fetch from contractReader
-	onRampAddress := []byte{}  // TODO: fetch from contractReader
-
-	dstChainInfo := rmn.DestChainInfo{
-		Chain:          w.cfg.DestChain,
-		OffRampAddress: offRampAddress,
-	}
-
-	reqUpdates := make([]rmn.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
-	for _, rangeSelected := range prevOutcome.RangesSelectedForReport {
-		reqUpdates = append(reqUpdates, rmn.FixedDestLaneUpdateRequest{
-			SourceChainInfo: rmn.SourceChainInfo{
-				Chain:         rangeSelected.ChainSel,
-				OnRampAddress: onRampAddress,
-			},
-			Interval: rmn.ClosedInterval{
-				Min: rangeSelected.SeqNumRange.Start(),
-				Max: rangeSelected.SeqNumRange.End(),
-			},
-		})
-	}
-
-	sigs, err := w.rmnClient.ComputeSignatures(ctxQuery, dstChainInfo, reqUpdates)
-	if err != nil {
-		if errors.Is(err, rmn.ErrTimeout) {
-			w.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
-				len(reqUpdates), dstChainInfo)
-			return Query{RetryRMNSignatures: true}, nil
-		}
-		return Query{}, fmt.Errorf("compute RMN signatures: %w", err)
-	}
-
-	return Query{RetryRMNSignatures: false, RMNSignatures: sigs}, nil
 }
 
 func (w *Processor) Observation(

@@ -36,6 +36,10 @@ type CommitPluginConfig struct {
 
 	// RMNEnabled is a flag to enable/disable RMN signature verification.
 	RMNEnabled bool `json:"rmnEnabled"`
+
+	// RMNSignaturesTimeout is the timeout for RMN signature verification.
+	// Typically set to `MaxQueryDuration - e`, where e some small duration.
+	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
 }
 
 func (c CommitPluginConfig) Validate() error {
@@ -45,6 +49,10 @@ func (c CommitPluginConfig) Validate() error {
 
 	if c.NewMsgScanBatchSize == 0 {
 		return fmt.Errorf("newMsgScanBatchSize not set")
+	}
+
+	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
+		return fmt.Errorf("rmnSignaturesTimeout not set")
 	}
 
 	return c.OffchainConfig.Validate()
