@@ -565,22 +565,27 @@ func (r *CCIPChainReader) bindOnramps(
 }
 
 func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
+	destReader, ok := r.contractReaders[r.destChain]
+	if !ok {
+		r.lggr.Debugw("skipping nonce manager, dest chain not configured for this deployment",
+			"destChain", r.destChain)
+		return nil
+	}
+
 	staticConfig, err := r.getOfframpStaticConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get offramp static config: %w", err)
 	}
 
-	if _, ok := r.contractReaders[r.destChain]; !ok {
-		r.lggr.Debugw("skipping nonce manager, dest chain not configured for this deployment",
-			"destChain", r.destChain)
-		return nil
+	if staticConfig.ChainSelector != r.destChain {
+		return fmt.Errorf("invalid configuration detected, somehow reading from non-dest offramp")
 	}
 
 	// Bind the nonceManager contract address to the reader.
 	// If the same address exists -> no-op
 	// If the address is changed -> updates the address, overwrites the existing one
 	// If the contract not binded -> binds to the new address
-	if err := r.contractReaders[r.destChain].Bind(ctx, []types.BoundContract{
+	if err := destReader.Bind(ctx, []types.BoundContract{
 		{
 			Address: typeconv.AddressBytesToString(staticConfig.NonceManager, uint64(r.destChain)),
 			Name:    consts.ContractNameNonceManager,
@@ -593,13 +598,11 @@ func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
-	err := r.bindOnramps(ctx)
-	if err != nil {
+	if err := r.bindOnramps(ctx); err != nil {
 		return false, err
 	}
 
-	err = r.bindNonceManager(ctx)
-	if err != nil {
+	if err := r.bindNonceManager(ctx); err != nil {
 		return false, err
 	}
 
@@ -725,10 +728,10 @@ func (r *CCIPChainReader) getOfframpStaticConfig(ctx context.Context) (offrampSt
 //
 //nolint:lll // It's a URL.
 type offrampStaticChainConfig struct {
-	ChainSelector      uint64 `json:"chainSelector"`
-	RmnProxy           []byte `json:"rmnProxy"`
-	TokenAdminRegistry []byte `json:"tokenAdminRegistry"`
-	NonceManager       []byte `json:"nonceManager"`
+	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
+	RmnProxy           []byte                  `json:"rmnProxy"`
+	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
+	NonceManager       []byte                  `json:"nonceManager"`
 }
 
 // Interface compliance check

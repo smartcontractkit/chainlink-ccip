@@ -113,7 +113,7 @@ func (r InMemoryCCIPReader) Nonces(
 	source, dest cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
-	panic("implement me")
+	return nil, nil
 }
 
 func (r InMemoryCCIPReader) GasPrices(
