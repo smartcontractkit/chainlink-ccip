@@ -30,10 +30,18 @@ dependencies:
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
 
+pullSecrets:
+  regcred-beholder:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-beholder
+
 pipelines:
   beholder:
     run: |-
       run_dependency_pipelines --all
+      if [[ ${PROVIDER:-} == "kind" ]]; then
+        ensure_pull_secrets regcred-beholder
+      fi
       create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
 
 deployments:
@@ -45,7 +53,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/beholder-test-client
-        version: "0.0.3"
+        version: "0.0.4"
       values:
         podSecurityContext:
           fsGroup: 999
@@ -96,7 +104,7 @@ deployments:
           service:
             telemetry:
               logs:
-                level: 'debug'
+                level: "debug"
             pipelines:
               traces:
                 receivers: [otlp]
@@ -149,14 +157,14 @@ deployments:
             prometheus:
               config:
                 scrape_configs:
-                  - job_name: 'otel-collector'
+                  - job_name: "otel-collector"
                     scrape_interval: 5s
                     static_configs:
-                      - targets: ['127.0.0.1:8888']
-                  - job_name: 'beholder-demo'
+                      - targets: ["127.0.0.1:8888"]
+                  - job_name: "beholder-demo"
                     scrape_interval: 5s
                     static_configs:
-                      - targets: ['beholder-test-client:9091']
+                      - targets: ["beholder-test-client:9091"]
           exporters:
             debug:
               verbosity: detailed
@@ -166,11 +174,11 @@ deployments:
               topic: beholder-test-client
               encoding: otlp_json
             prometheus:
-              endpoint: '0.0.0.0:8889'
+              endpoint: "0.0.0.0:8889"
           service:
             telemetry:
               logs:
-                level: 'debug'
+                level: "debug"
             pipelines:
               traces:
                 receivers: [otlp]

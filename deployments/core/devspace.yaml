@@ -405,8 +405,10 @@ profiles:
       - op: replace
         path: deployments.beholder-test-client.helm.values.beholder-test-client
         value:
-          affinity: {}
-          topologySpreadConstraints: {}
+          affinity: []
+          topologySpreadConstraints: []
+          imagePullSecrets:
+            - name: regcred-beholder
       - op: add
         path: deployments.app.helm.valuesFiles
         value: ["./values-profiles/values-dev-kind.yaml"]
