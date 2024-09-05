@@ -4,12 +4,11 @@ import (
 	"math/big"
 	"testing"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestCommitPluginConfigValidate(t *testing.T) {
@@ -69,6 +68,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 	type fields struct {
 		AggregatorAddress string
 		DeviationPPB      cciptypes.BigInt
+		Decimals          uint8
 	}
 	tests := []struct {
 		name    string
@@ -80,6 +80,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				Decimals:          18,
 			},
 			false,
 		},
@@ -88,6 +89,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "2e03388D351BF87CF2409EFf18C45Df59775Fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				Decimals:          18,
 			},
 			false,
 		},
@@ -96,6 +98,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "0x2e03388d351bf87cf2409eff18c45df59775fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				Decimals:          18,
 			},
 			false,
 		},
@@ -104,6 +107,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				Decimals:          18,
 			},
 			true,
 		},
@@ -112,6 +116,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "0x2e03388D351BF87CF2409EFf18C45Df59775b",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				Decimals:          18,
 			},
 			true,
 		},
@@ -120,6 +125,7 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(-1)},
+				Decimals:          18,
 			},
 			true,
 		},
@@ -128,18 +134,29 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 			fields{
 				AggregatorAddress: "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(0)},
+				Decimals:          18,
+			},
+			true,
+		},
+		{
+			"invalid, zero decimals",
+			fields{
+				AggregatorAddress: "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2",
+				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+				Decimals:          0,
 			},
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := ArbitrumPriceSource{
+			a := TokenInfo{
 				AggregatorAddress: tt.fields.AggregatorAddress,
 				DeviationPPB:      tt.fields.DeviationPPB,
+				Decimals:          tt.fields.Decimals,
 			}
 			if err := a.Validate(); (err != nil) != tt.wantErr {
-				t.Errorf("ArbitrumPriceSource.Validate() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("TokenInfo.Validate() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -149,7 +166,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 	type fields struct {
 		RemoteGasPriceBatchWriteFrequency commonconfig.Duration
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
-		PriceSources                      map[types.Account]ArbitrumPriceSource
+		TokenInfo                         map[types.Account]TokenInfo
 		TokenPriceChainSelector           uint64
 		TokenDecimals                     map[types.Account]uint8
 	}
@@ -166,14 +183,14 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				PriceSources: map[types.Account]ArbitrumPriceSource{
+				TokenInfo: map[types.Account]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
 					},
 				},
 				TokenPriceChainSelector: 10,
-				TokenDecimals:           map[types.Account]uint8{remoteTokenAddress: 18},
 			},
 			false,
 		},
@@ -182,8 +199,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-				PriceSources:                      map[types.Account]ArbitrumPriceSource{},
-				TokenDecimals:                     map[types.Account]uint8{},
+				TokenInfo:                         map[types.Account]TokenInfo{},
 			},
 			false,
 		},
@@ -192,13 +208,13 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-				PriceSources: map[types.Account]ArbitrumPriceSource{
+				TokenInfo: map[types.Account]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
 					},
 				},
-				TokenDecimals: map[types.Account]uint8{remoteTokenAddress: 18},
 			},
 			true,
 		},
@@ -207,13 +223,13 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				PriceSources: map[types.Account]ArbitrumPriceSource{
+				TokenInfo: map[types.Account]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
 					},
 				},
-				TokenDecimals: map[types.Account]uint8{remoteTokenAddress: 18},
 			},
 			true,
 		},
@@ -223,9 +239,8 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			c := CommitOffchainConfig{
 				RemoteGasPriceBatchWriteFrequency: tt.fields.RemoteGasPriceBatchWriteFrequency,
 				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
-				PriceSources:                      tt.fields.PriceSources,
+				TokenInfo:                         tt.fields.TokenInfo,
 				TokenPriceChainSelector:           tt.fields.TokenPriceChainSelector,
-				TokenDecimals:                     tt.fields.TokenDecimals,
 			}
 			err := c.Validate()
 			if tt.wantErr {
@@ -241,7 +256,7 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 	type fields struct {
 		RemoteGasPriceBatchWriteFrequency commonconfig.Duration
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
-		PriceSources                      map[types.Account]ArbitrumPriceSource
+		PriceSources                      map[types.Account]TokenInfo
 	}
 	//nolint:gosec
 	const (
@@ -259,7 +274,7 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				PriceSources: map[types.Account]ArbitrumPriceSource{
+				PriceSources: map[types.Account]TokenInfo{
 					remoteTokenAddress1: {
 						AggregatorAddress: aggregatorAddress1,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
@@ -276,7 +291,7 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-				PriceSources:                      map[types.Account]ArbitrumPriceSource{},
+				PriceSources:                      map[types.Account]TokenInfo{},
 			},
 		},
 	}
@@ -285,7 +300,7 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 			c := CommitOffchainConfig{
 				RemoteGasPriceBatchWriteFrequency: tt.fields.RemoteGasPriceBatchWriteFrequency,
 				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
-				PriceSources:                      tt.fields.PriceSources,
+				TokenInfo:                         tt.fields.PriceSources,
 			}
 
 			encoded, err := EncodeCommitOffchainConfig(c)
