@@ -5,20 +5,14 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 type Query struct {
-	RmnOnRampMaxSeqNums []plugintypes.SeqNumChain
-	MerkleRoots         []cciptypes.MerkleRootChain
-}
-
-func NewCommitQuery(rmnOnRampMaxSeqNums []plugintypes.SeqNumChain, merkleRoots []cciptypes.MerkleRootChain) Query {
-	return Query{
-		RmnOnRampMaxSeqNums: rmnOnRampMaxSeqNums,
-		MerkleRoots:         merkleRoots,
-	}
+	RetryRMNSignatures bool
+	RMNSignatures      *rmn.NodeSignatures
 }
 
 type Observation struct {
@@ -128,9 +122,12 @@ func (o *Outcome) Sort() {
 	})
 }
 
-func (o *Outcome) NextState() State {
+func (o *Outcome) NextState(q Query) State {
 	switch o.OutcomeType {
 	case ReportIntervalsSelected:
+		if q.RetryRMNSignatures {
+			return RetryRMNSignatures
+		}
 		return BuildingReport
 	case ReportGenerated:
 		return WaitingForReportTransmission
@@ -151,6 +148,7 @@ type State int
 
 const (
 	SelectingRangesForReport State = iota + 1
+	RetryRMNSignatures
 	BuildingReport
 	WaitingForReportTransmission
 )

@@ -33,6 +33,9 @@ type CommitPluginConfig struct {
 
 	// OffchainConfig is the offchain config set for the commit DON.
 	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
+
+	// RMNEnabled is a flag to enable/disable RMN signature verification.
+	RMNEnabled bool `json:"rmnEnabled"`
 }
 
 func (c CommitPluginConfig) Validate() error {

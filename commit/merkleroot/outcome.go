@@ -33,10 +33,10 @@ func (w *Processor) Outcome(
 
 func (w *Processor) getOutcome(
 	previousOutcome Outcome,
-	commitQuery Query,
+	q Query,
 	aos []shared.AttributedObservation[Observation],
 ) (Outcome, State) {
-	nextState := previousOutcome.NextState()
+	nextState := previousOutcome.NextState(q)
 
 	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
 	if err != nil {
@@ -46,9 +46,11 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(commitQuery, consensusObservation), nextState
+		return reportRangesOutcome(q, consensusObservation), nextState
+	case RetryRMNSignatures:
+		return previousOutcome, BuildingReport
 	case BuildingReport:
-		return buildReport(commitQuery, consensusObservation, previousOutcome), nextState
+		return buildReport(q, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
 		return checkForReportTransmission(
 			w.lggr, w.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
@@ -61,15 +63,10 @@ func (w *Processor) getOutcome(
 // reportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 // TODO: ensure each range is below a limit
 func reportRangesOutcome(
-	query Query,
+	_ Query,
 	consensusObservation ConsensusObservation,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
-
-	rmnOnRampMaxSeqNumsMap := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-	for _, seqNumChain := range query.RmnOnRampMaxSeqNums {
-		rmnOnRampMaxSeqNumsMap[seqNumChain.ChainSel] = seqNumChain.SeqNum
-	}
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
 	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
@@ -79,10 +76,6 @@ func reportRangesOutcome(
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
 		if !exists {
 			continue
-		}
-
-		if rmnOnRampMaxSeqNum, exists := rmnOnRampMaxSeqNumsMap[chainSel]; exists {
-			onRampMaxSeqNum = min(onRampMaxSeqNum, rmnOnRampMaxSeqNum)
 		}
 
 		if offRampNextSeqNum <= onRampMaxSeqNum {

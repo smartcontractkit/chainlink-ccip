@@ -3,6 +3,7 @@ package merkleroot
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -17,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 
@@ -29,23 +31,67 @@ func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query)
 }
 
 func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
-	return Query{}, nil
+	if !w.cfg.RMNEnabled {
+		return Query{}, nil
+	}
+
+	nextState := prevOutcome.NextState(Query{})
+	if nextState != BuildingReport {
+		return Query{}, nil
+	}
+
+	ctxQuery, cancel := context.WithTimeout(ctx, 5*time.Second) // TODO: MaxQueryDuration-e
+	defer cancel()
+
+	offRampAddress := []byte{} // TODO: fetch from contractReader
+	onRampAddress := []byte{}  // TODO: fetch from contractReader
+
+	dstChainInfo := rmn.DestChainInfo{
+		Chain:          w.cfg.DestChain,
+		OffRampAddress: offRampAddress,
+	}
+
+	reqUpdates := make([]rmn.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
+	for _, rangeSelected := range prevOutcome.RangesSelectedForReport {
+		reqUpdates = append(reqUpdates, rmn.FixedDestLaneUpdateRequest{
+			SourceChainInfo: rmn.SourceChainInfo{
+				Chain:         rangeSelected.ChainSel,
+				OnRampAddress: onRampAddress,
+			},
+			Interval: rmn.ClosedInterval{
+				Min: rangeSelected.SeqNumRange.Start(),
+				Max: rangeSelected.SeqNumRange.End(),
+			},
+		})
+	}
+
+	sigs, err := w.rmnClient.ComputeSignatures(ctxQuery, dstChainInfo, reqUpdates)
+	if err != nil {
+		if errors.Is(err, rmn.ErrTimeout) {
+			w.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
+				len(reqUpdates), dstChainInfo)
+			return Query{RetryRMNSignatures: true}, nil
+		}
+		return Query{}, fmt.Errorf("compute RMN signatures: %w", err)
+	}
+
+	return Query{RetryRMNSignatures: false, RMNSignatures: sigs}, nil
 }
 
 func (w *Processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
-	_ Query,
+	q Query,
 ) (Observation, error) {
 	tStart := time.Now()
-	observation, nextState := w.getObservation(ctx, prevOutcome)
+	observation, nextState := w.getObservation(ctx, q, prevOutcome)
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
 }
 
-func (w *Processor) getObservation(ctx context.Context, previousOutcome Outcome) (Observation, State) {
-	nextState := previousOutcome.NextState()
+func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
+	nextState := previousOutcome.NextState(q)
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
@@ -58,6 +104,8 @@ func (w *Processor) getObservation(ctx context.Context, previousOutcome Outcome)
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             w.observer.ObserveFChain(),
 		}, nextState
+	case RetryRMNSignatures:
+		return Observation{}, nextState
 	case BuildingReport:
 		return Observation{
 			MerkleRoots: w.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
