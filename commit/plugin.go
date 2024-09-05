@@ -106,8 +106,28 @@ func NewPlugin(
 	}
 }
 
-func (p *Plugin) Query(_ context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
-	return types.Query{}, nil
+func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
+	var err error
+	var q Query
+
+	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
+
+	q.MerkleRootQuery, err = p.merkleRootProcessor.Query(ctx, prevOutcome.MerkleRootOutcome)
+	if err != nil {
+		p.lggr.Errorw("get merkle roots query", "err", err)
+	}
+
+	q.TokenPriceQuery, err = p.tokenPriceProcessor.Query(ctx, prevOutcome.TokenPriceOutcome)
+	if err != nil {
+		p.lggr.Errorw("get token prices query", "err", err)
+	}
+
+	q.ChainFeeQuery, err = p.chainFeeProcessor.Query(ctx, prevOutcome.ChainFeeOutcome)
+	if err != nil {
+		p.lggr.Errorw("get chain fee query", "err", err)
+	}
+
+	return q.Encode()
 }
 
 func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
@@ -120,14 +140,13 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 	fChain := p.ObserveFChain()
-	//TODO: Move fchain to a new processor instead of computing it inside MerkleProcessor
+
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, merkleroot.Query{})
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
 	}
 	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, tokenprice.Query{})
 	if err != nil {
-		//log error
 		p.lggr.Errorw("failed to get token prices", "err", err)
 	}
 	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, chainfee.Query{})
