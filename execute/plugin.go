@@ -252,11 +252,9 @@ func (p *Plugin) Observation(
 
 		// Collect unique senders.
 		for _, commitReport := range previousOutcome.PendingCommitReports {
-			if _, ok := nonceRequestArgs[commitReport.SourceChain]; ok {
-				return types.Observation{}, fmt.Errorf("duplicate source chain in commit reports")
+			if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
+				nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
 			}
-
-			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
 
 			for _, msg := range commitReport.Messages {
 				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
