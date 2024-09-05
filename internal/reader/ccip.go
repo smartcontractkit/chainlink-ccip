@@ -339,7 +339,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
-			Key: consts.EventNameCCIPSendRequested,
+			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
 				query.Confidence(primitives.Finalized),
 			},
