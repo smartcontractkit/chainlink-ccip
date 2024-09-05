@@ -36,7 +36,7 @@ func (w *Processor) getOutcome(
 	q Query,
 	aos []shared.AttributedObservation[Observation],
 ) (Outcome, State) {
-	nextState := previousOutcome.NextState(q)
+	nextState := previousOutcome.NextState()
 
 	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
 	if err != nil {
@@ -47,9 +47,12 @@ func (w *Processor) getOutcome(
 	switch nextState {
 	case SelectingRangesForReport:
 		return reportRangesOutcome(q, consensusObservation), nextState
-	case RetryRMNSignatures:
-		return previousOutcome, BuildingReport
 	case BuildingReport:
+		if q.RetryRMNSignatures {
+			// We want to retry getting the RMN signatures on the exact same outcome we had before.
+			// The current observations should all be empty.
+			return previousOutcome, BuildingReport
+		}
 		return buildReport(q, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
 		return checkForReportTransmission(

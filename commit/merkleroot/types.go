@@ -122,12 +122,9 @@ func (o *Outcome) Sort() {
 	})
 }
 
-func (o *Outcome) NextState(q Query) State {
+func (o *Outcome) NextState() State {
 	switch o.OutcomeType {
 	case ReportIntervalsSelected:
-		if q.RetryRMNSignatures {
-			return RetryRMNSignatures
-		}
 		return BuildingReport
 	case ReportGenerated:
 		return WaitingForReportTransmission
@@ -148,7 +145,6 @@ type State int
 
 const (
 	SelectingRangesForReport State = iota + 1
-	RetryRMNSignatures
 	BuildingReport
 	WaitingForReportTransmission
 )

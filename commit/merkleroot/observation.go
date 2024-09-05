@@ -41,7 +41,7 @@ func (w *Processor) Observation(
 }
 
 func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
-	nextState := previousOutcome.NextState(q)
+	nextState := previousOutcome.NextState()
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
@@ -54,9 +54,12 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             w.observer.ObserveFChain(),
 		}, nextState
-	case RetryRMNSignatures:
-		return Observation{}, nextState
 	case BuildingReport:
+		if q.RetryRMNSignatures {
+			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
+			// So there's nothing to observe, i.e. we don't want to build the report yet.
+			return Observation{}, nextState
+		}
 		return Observation{
 			MerkleRoots: w.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			FChain:      w.observer.ObserveFChain(),

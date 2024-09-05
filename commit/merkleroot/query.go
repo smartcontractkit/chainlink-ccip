@@ -14,7 +14,7 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, nil
 	}
 
-	nextState := prevOutcome.NextState(Query{})
+	nextState := prevOutcome.NextState()
 	if nextState != BuildingReport {
 		return Query{}, nil
 	}
