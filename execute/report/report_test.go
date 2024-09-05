@@ -114,7 +114,8 @@ func TestMustMakeBytes(t *testing.T) {
 	}
 }
 
-// assertMerkleRoot computes the source messages merkle root, then computes a verification with the proof, then compares
+// assertMerkleRoot computes the source messages merkle root,
+// then computes a verification with the proof, then compares
 // the roots.
 func assertMerkleRoot(
 	t *testing.T,
