@@ -28,23 +28,19 @@ func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query)
 	return ocr3types.QuorumTwoFPlusOne, nil
 }
 
-func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
-	return Query{}, nil
-}
-
 func (w *Processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
-	_ Query,
+	q Query,
 ) (Observation, error) {
 	tStart := time.Now()
-	observation, nextState := w.getObservation(ctx, prevOutcome)
+	observation, nextState := w.getObservation(ctx, q, prevOutcome)
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
 }
 
-func (w *Processor) getObservation(ctx context.Context, previousOutcome Outcome) (Observation, State) {
+func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
 	nextState := previousOutcome.NextState()
 	switch nextState {
 	case SelectingRangesForReport:
@@ -59,6 +55,11 @@ func (w *Processor) getObservation(ctx context.Context, previousOutcome Outcome)
 			FChain:             w.observer.ObserveFChain(),
 		}, nextState
 	case BuildingReport:
+		if q.RetryRMNSignatures {
+			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
+			// So there's nothing to observe, i.e. we don't want to build the report yet.
+			return Observation{}, nextState
+		}
 		return Observation{
 			MerkleRoots: w.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			FChain:      w.observer.ObserveFChain(),

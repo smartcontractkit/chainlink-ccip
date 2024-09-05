@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
@@ -24,6 +25,7 @@ type Processor struct {
 	ccipReader   reader.CCIP
 	reportingCfg ocr3types.ReportingPluginConfig
 	chainSupport shared.ChainSupport
+	rmnClient    rmn.Client
 }
 
 // NewProcessor creates a new Processor

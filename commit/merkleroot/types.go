@@ -5,20 +5,14 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 type Query struct {
-	RmnOnRampMaxSeqNums []plugintypes.SeqNumChain
-	MerkleRoots         []cciptypes.MerkleRootChain
-}
-
-func NewCommitQuery(rmnOnRampMaxSeqNums []plugintypes.SeqNumChain, merkleRoots []cciptypes.MerkleRootChain) Query {
-	return Query{
-		RmnOnRampMaxSeqNums: rmnOnRampMaxSeqNums,
-		MerkleRoots:         merkleRoots,
-	}
+	RetryRMNSignatures bool
+	RMNSignatures      *rmn.ReportSignatures
 }
 
 type Observation struct {
@@ -26,6 +20,13 @@ type Observation struct {
 	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
 	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
 	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
+}
+
+func (o Observation) IsEmpty() bool {
+	return len(o.MerkleRoots) == 0 &&
+		len(o.OnRampMaxSeqNums) == 0 &&
+		len(o.OffRampNextSeqNums) == 0 &&
+		len(o.FChain) == 0
 }
 
 // MerkleAggregatedObservation is the aggregation of a list of observations

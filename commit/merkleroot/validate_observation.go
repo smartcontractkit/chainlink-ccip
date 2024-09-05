@@ -19,8 +19,13 @@ import (
 
 func (w *Processor) ValidateObservation(
 	_ Outcome,
-	_ Query,
+	q Query,
 	ao shared.AttributedObservation[Observation]) error {
+
+	if q.RetryRMNSignatures && !ao.Observation.IsEmpty() {
+		return fmt.Errorf("observation should be empty when retrying getting rmn signature")
+	}
+
 	obs := ao.Observation
 	if err := validateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
