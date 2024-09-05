@@ -47,7 +47,7 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	ctxQuery, cancel := context.WithTimeout(ctx, w.cfg.RMNSignaturesTimeout)
 	defer cancel()
 
-	sigs, err := w.rmnClient.ComputeSignatures(ctxQuery, dstChainInfo, reqUpdates)
+	sigs, err := w.rmnClient.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates)
 	if err != nil {
 		if errors.Is(err, rmn.ErrTimeout) {
 			w.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",

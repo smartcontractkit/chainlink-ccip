@@ -31,7 +31,7 @@ func TestProcessor_Query(t *testing.T) {
 		dstChain:  {consts.ContractNameOffRamp: []byte("0x1234567890123456789012345678901234567892")},
 	}
 
-	expSigs1 := &rmn.NodeSignatures{
+	expSigs1 := &rmn.ReportSignatures{
 		Signatures: []rmn.ECDSASignature{
 			{R: []byte("r1"), S: []byte("s1")},
 			{R: []byte("r2"), S: []byte("s2")},
@@ -69,7 +69,7 @@ func TestProcessor_Query(t *testing.T) {
 			rmnClient: func(t *testing.T) *rmn2.MockClient {
 				cl := rmn2.NewMockClient(t)
 				cl.EXPECT().
-					ComputeSignatures(
+					ComputeReportSignatures(
 						mock.Anything,
 						rmn.DestChainInfo{
 							Chain:          dstChain,
@@ -119,7 +119,7 @@ func TestProcessor_Query(t *testing.T) {
 			rmnClient: func(t *testing.T) *rmn2.MockClient {
 				cl := rmn2.NewMockClient(t)
 				time.Sleep(time.Millisecond)
-				cl.EXPECT().ComputeSignatures(mock.Anything, mock.Anything, mock.Anything).
+				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, rmn.ErrTimeout) // <------------------------------------ timeout error
 				return cl
 			},
@@ -147,7 +147,7 @@ func TestProcessor_Query(t *testing.T) {
 			rmnClient: func(t *testing.T) *rmn2.MockClient {
 				cl := rmn2.NewMockClient(t)
 				time.Sleep(time.Millisecond)
-				cl.EXPECT().ComputeSignatures(mock.Anything, mock.Anything, mock.Anything).
+				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, fmt.Errorf("some error")) // <------------------------- some random error
 				return cl
 			},
