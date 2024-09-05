@@ -79,16 +79,6 @@ pipelines:
         exit 1
       else
         build_images --all
-
-        # TODO: Add a function to lib.sh to check if the image already exist
-        # and move the sync step to a function
-        if [[ "${PROVIDER}" == "kind" ]]; then
-          echo "Info: It appears you are deploying to a local Kind cluster. Let's ensure that the latest CCIP job deploy image is in the local registry."
-          docker pull "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest" --platform linux/amd64
-          docker tag "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest" "localhost:5001/ccip-scripts:latest"
-          docker push "localhost:5001/ccip-scripts:latest"
-        fi
-
         create_deployments app
       fi
 
