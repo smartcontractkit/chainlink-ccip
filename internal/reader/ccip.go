@@ -143,6 +143,7 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 		MinSeqNr            uint64
 		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
+		OnRampAddress       []byte
 	}
 
 	type TokenPriceUpdate struct {
