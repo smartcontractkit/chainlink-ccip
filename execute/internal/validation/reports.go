@@ -1,6 +1,10 @@
 package validation
 
 import (
+	"fmt"
+
+	"golang.org/x/crypto/sha3"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -29,6 +33,11 @@ type minObservationValidator[T any] struct {
 // NewMinObservationValidator constructs a concrete MinObservationFilter object. The
 // supplied idFunc is used to generate a uniqueID for the type being observed.
 func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) MinObservationFilter[T] {
+	if idFunc == nil {
+		idFunc = func(data T) [32]byte {
+			return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
+		}
+	}
 	return &minObservationValidator[T]{
 		minObservation: min,
 		cache:          make(map[cciptypes.Bytes32]*counter[T]),
