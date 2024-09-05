@@ -256,8 +256,8 @@ extract_ecr_host_uri() {
 skip_docker_ecr_login=${CRIB_SKIP_DOCKER_ECR_LOGIN:-}
 
 # Check if the string starts with AWS ACCOUNT_ID
-if is_custom_image "${DEVSPACE_IMAGE}"; then
-	echo "DEVSPACE_IMAGE is set to use pre-built image $DEVSPACE_IMAGE, building from source is disabled, skipping ECR Login"
+if is_custom_image "${DEVSPACE_IMAGE}" && [[ ${PROVIDER:-} != "kind" ]]; then
+	echo "Using pre-built image: ${DEVSPACE_IMAGE}. Building from source is disabled. Skipping ECR login."
 	skip_docker_ecr_login=true
 fi
 
