@@ -126,6 +126,8 @@ func buildReport(
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
+	// TODO: use q.RMNSignatures in the generated outcome and eventually report. - Blocked by onchain work.
+
 	outcome := Outcome{
 		OutcomeType:        outcomeType,
 		RootsToReport:      roots,
