@@ -140,14 +140,13 @@ func (p *Plugin) Observation(
 ) (types.Observation, error) {
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 	fChain := p.ObserveFChain()
-	// TODO: Move fchain to a new processor instead of computing it inside MerkleProcessor
+
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, merkleroot.Query{})
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
 	}
 	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, tokenprice.Query{})
 	if err != nil {
-		// log error
 		p.lggr.Errorw("failed to get token prices", "err", err)
 	}
 	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, chainfee.Query{})
