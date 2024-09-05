@@ -124,7 +124,7 @@ func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (ty
 
 	q.ChainFeeQuery, err = p.chainFeeProcessor.Query(ctx, prevOutcome.ChainFeeOutcome)
 	if err != nil {
-		p.lggr.Errorw("get gas prices query", "err", err)
+		p.lggr.Errorw("get chain fee query", "err", err)
 	}
 
 	return q.Encode()
