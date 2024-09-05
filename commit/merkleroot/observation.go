@@ -1,4 +1,4 @@
-package commit
+package merkleroot
 
 import (
 	"context"
@@ -8,38 +8,47 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 )
 
-func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
+func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
 	// Across all chains we require at least 2F+1 observations.
 	return ocr3types.QuorumTwoFPlusOne, nil
 }
 
-func (p *Plugin) Observation(
-	ctx context.Context, outCtx ocr3types.OutcomeContext, _ types.Query,
-) (types.Observation, error) {
-	tStart := time.Now()
-	observation, nextState := p.getObservation(ctx, outCtx)
-	p.lggr.Infow("Sending Observation",
-		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
-	return observation.Encode()
+func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+	return Query{}, nil
 }
 
-func (p *Plugin) getObservation(ctx context.Context, outCtx ocr3types.OutcomeContext) (Observation, State) {
-	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
+func (w *Processor) Observation(
+	ctx context.Context,
+	prevOutcome Outcome,
+	_ Query,
+) (Observation, error) {
+	tStart := time.Now()
+	observation, nextState := w.getObservation(ctx, prevOutcome)
+	w.lggr.Infow("Sending MerkleRootObs",
+		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
+	return observation, nil
+}
+
+func (w *Processor) getObservation(ctx context.Context, previousOutcome Outcome) (Observation, State) {
+	nextState := previousOutcome.NextState()
 	switch nextState {
 	case SelectingRangesForReport:
-		offRampNextSeqNums := p.observer.ObserveOffRampNextSeqNums(ctx)
+		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
 		return Observation{
 			// TODO: observe OnRamp max seq nums. The use of offRampNextSeqNums here effectively disables batching,
 			// e.g. the ranges selected for each chain will be [x, x] (e.g. [46, 46]), which means reports will only
@@ -47,22 +56,20 @@ func (p *Plugin) getObservation(ctx context.Context, outCtx ocr3types.OutcomeCon
 			// need to be done in a future change.
 			OnRampMaxSeqNums:   offRampNextSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
-			FChain:             p.observer.ObserveFChain(),
+			FChain:             w.observer.ObserveFChain(),
 		}, nextState
 	case BuildingReport:
 		return Observation{
-			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
-			GasPrices:   p.observer.ObserveGasPrices(ctx),
-			TokenPrices: p.observer.ObserveTokenPrices(ctx),
-			FChain:      p.observer.ObserveFChain(),
+			MerkleRoots: w.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
+			FChain:      w.observer.ObserveFChain(),
 		}, nextState
 	case WaitingForReportTransmission:
 		return Observation{
-			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
-			FChain:             p.observer.ObserveFChain(),
+			OffRampNextSeqNums: w.observer.ObserveOffRampNextSeqNums(ctx),
+			FChain:             w.observer.ObserveFChain(),
 		}, nextState
 	default:
-		p.lggr.Errorw("Unexpected state", "state", nextState)
+		w.lggr.Errorw("Unexpected state", "state", nextState)
 		return Observation{}, nextState
 	}
 }
@@ -74,10 +81,6 @@ type Observer interface {
 	// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
 
-	ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice
-
-	ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain
-
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
 
@@ -85,7 +88,7 @@ type ObserverImpl struct {
 	lggr         logger.Logger
 	homeChain    reader.HomeChain
 	nodeID       commontypes.OracleID
-	chainSupport ChainSupport
+	chainSupport shared.ChainSupport
 	ccipReader   reader.CCIP
 	msgHasher    cciptypes.MessageHasher
 }
@@ -215,14 +218,6 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	return root, nil
 }
 
-func (o ObserverImpl) ObserveTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
-	return []cciptypes.TokenPrice{}
-}
-
-func (o ObserverImpl) ObserveGasPrices(ctx context.Context) []cciptypes.GasPriceChain {
-	return []cciptypes.GasPriceChain{}
-}
-
 func (o ObserverImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
@@ -232,6 +227,3 @@ func (o ObserverImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	}
 	return fChain
 }
-
-// Interface compliance check
-var _ Observer = (*ObserverImpl)(nil)

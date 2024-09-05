@@ -14,6 +14,8 @@ test: ensure_go_version
 lint: ensure_go_version
 	golangci-lint run -c .golangci.yml
 
+checks: test lint
+
 ensure_go_version:
 	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
 

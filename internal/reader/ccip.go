@@ -65,6 +65,9 @@ type CCIP interface {
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
 
+	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
+	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
+
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
 	// it must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 	Nonces(
@@ -323,14 +326,9 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
-	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for onRamp contract, got %d", len(bindings))
-	}
-
-	onRampAddressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(sourceChainSelector))
+	onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert onRamp address to bytes: %w", err)
+		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
 	type SendRequestedEvent struct {
@@ -342,7 +340,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
-			Key: consts.EventNameCCIPSendRequested,
+			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
 				query.Confidence(primitives.Finalized),
 			},
@@ -377,7 +375,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			msg.Message.Header.SequenceNumber >= seqNumRange.Start() &&
 			msg.Message.Header.SequenceNumber <= seqNumRange.End()
 
-		msg.Message.Header.OnRamp = onRampAddressBytes
+		msg.Message.Header.OnRamp = onRampAddress
 
 		if valid {
 			msgs = append(msgs, msg.Message)
@@ -401,11 +399,6 @@ func (r *CCIPChainReader) GetExpectedNextSequenceNumber(
 
 	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
 		return 0, err
-	}
-
-	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(bindings) != 1 {
-		return 0, fmt.Errorf("expected one binding for onRamp contract, got %d", len(bindings))
 	}
 
 	var expectedNextSequenceNumber uint64
@@ -615,6 +608,20 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 
 func (r *CCIPChainReader) Close(ctx context.Context) error {
 	return nil
+}
+
+func (r *CCIPChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+	bindings := r.contractReaders[chain].GetBindings(contractName)
+	if len(bindings) != 1 {
+		return nil, fmt.Errorf("expected one binding for the contract, got %d", len(bindings))
+	}
+
+	addressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(chain))
+	if err != nil {
+		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
+	}
+
+	return addressBytes, nil
 }
 
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.

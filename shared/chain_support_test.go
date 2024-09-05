@@ -1,15 +1,16 @@
-package commit
+package shared
 
 import (
 	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -52,7 +53,7 @@ func TestCCIPChainSupport_SupportedChains(t *testing.T) {
 	cs := &CCIPChainSupport{
 		lggr:            lggr,
 		homeChain:       homeChainReader,
-		oracleIDToP2pID: map[commontypes.OracleID]types.PeerID{1: [32]byte{1}},
+		oracleIDToP2PID: map[commontypes.OracleID]types.PeerID{1: [32]byte{1}},
 	}
 
 	t.Run("happy path", func(t *testing.T) {
@@ -83,7 +84,7 @@ func TestCCIPChainSupport_SupportsDestChain(t *testing.T) {
 		lggr:            lggr,
 		homeChain:       homeChainReader,
 		destChain:       dstChain,
-		oracleIDToP2pID: map[commontypes.OracleID]types.PeerID{1: [32]byte{1}},
+		oracleIDToP2PID: map[commontypes.OracleID]types.PeerID{1: [32]byte{1}},
 	}
 
 	t.Run("happy path", func(t *testing.T) {
