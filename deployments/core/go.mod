@@ -1,10 +1,10 @@
 module github.com/smartcontractkit/crib/deployments/core
 
-go 1.21.7
+go 1.22.5
 
 require (
 	github.com/K-Phoen/grabana v0.22.1
-	github.com/smartcontractkit/chainlink-testing-framework/wasp v0.4.10
+	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.50.0
 	github.com/smartcontractkit/chainlink/dashboard-lib v0.0.0-00010101000000-000000000000
 )
 
@@ -15,9 +15,11 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/common v0.45.0 // indirect
-	github.com/rs/zerolog v1.32.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	github.com/prometheus/client_model v0.6.1 // indirect
+	github.com/prometheus/common v0.55.0 // indirect
+	github.com/rs/zerolog v1.33.0 // indirect
+	golang.org/x/sys v0.22.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 )
 
 replace (

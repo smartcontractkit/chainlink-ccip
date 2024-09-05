@@ -1,9 +1,9 @@
-go 1.21.7
+go 1.22.5
 
 toolchain go1.21.11
 
 use (
+	dashboard-lib
 	deployments/ccip
 	deployments/core
-	dashboard-lib
 )
