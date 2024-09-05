@@ -102,12 +102,14 @@ images:
     custom:
       skipImageArg: true
       command: |-
-        cd ${CHAINLINK_REPO_DIR}
-
         image=${runtime.images.app}
-        MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
-        release --snapshot --clean --config .goreleaser.devspace.yaml
-        docker push $image
+        (
+          cd ${CHAINLINK_REPO_DIR} && \
+          nix develop -c \
+            bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
+              release --snapshot --clean --config .goreleaser.devspace.yaml" && \
+          docker push $image
+        )
 
 hooks:
   - command: ${SCRIPTS_DIR}/check_env_vars.sh
