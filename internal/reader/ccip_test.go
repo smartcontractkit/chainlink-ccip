@@ -18,12 +18,12 @@ import (
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockChainReader)
+	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockContractReader)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = chainreadermocks.NewMockChainReader(t)
+		sourceCRs[chain] = chainreadermocks.NewMockContractReader(t)
 	}
 
-	destCR := chainreadermocks.NewMockChainReader(t)
+	destCR := chainreadermocks.NewMockContractReader(t)
 
 	destCR.On(
 		"GetLatestValue",

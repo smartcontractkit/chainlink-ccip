@@ -94,8 +94,9 @@ type nodeSetup struct {
 func setupHomeChainPoller(
 	t *testing.T,
 	lggr logger.Logger,
-	chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	chainConfigInfos []reader.ChainConfigInfo,
+) reader.HomeChain {
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",

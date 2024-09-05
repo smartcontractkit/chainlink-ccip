@@ -19,6 +19,6 @@ packages:
             TokenPrices:
     github.com/smartcontractkit/chainlink-common/pkg/types:
         interfaces:
-            ChainReader:
+            ContractReader:
                 config:
                     dir: mocks/cl-common/chainreader

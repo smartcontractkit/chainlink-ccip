@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -37,7 +38,7 @@ var (
 )
 
 func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -130,7 +131,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -184,7 +185,7 @@ func Test_PollingWorking(t *testing.T) {
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	donID := uint32(1)
 	pluginType := uint8(1) // execution
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
