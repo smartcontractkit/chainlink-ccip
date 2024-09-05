@@ -1,13 +1,13 @@
-package commit
+package merkleroot
 
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func Test_buildReport(t *testing.T) {
@@ -26,14 +26,6 @@ func Test_buildReport(t *testing.T) {
 					SeqNumsRange: cciptypes.NewSeqNumRange(20, 30),
 					MerkleRoot:   cciptypes.Bytes32{2},
 				},
-			},
-			GasPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
-				cciptypes.ChainSelector(1): cciptypes.NewBigIntFromInt64(1000),
-				cciptypes.ChainSelector(2): cciptypes.NewBigIntFromInt64(2000),
-			},
-			TokenPrices: map[types.Account]cciptypes.BigInt{
-				types.Account("1"): cciptypes.NewBigIntFromInt64(1000),
-				types.Account("2"): cciptypes.NewBigIntFromInt64(2000),
 			},
 		}
 

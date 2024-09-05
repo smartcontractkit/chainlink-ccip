@@ -7,6 +7,8 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -18,12 +20,16 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
 	}
 
-	// Reports are only generated from "ReportGenerated" outcomes
-	if outcome.OutcomeType != ReportGenerated {
+	// Until we start adding tokens and gas to the report, we don't need to report anything
+	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
 		return []ocr3types.ReportWithInfo[[]byte]{}, nil
 	}
 
-	rep := cciptypes.NewCommitPluginReport(outcome.RootsToReport, outcome.TokenPrices, outcome.GasPrices)
+	rep := cciptypes.NewCommitPluginReport(
+		outcome.MerkleRootOutcome.RootsToReport,
+		outcome.TokenPriceOutcome.TokenPrices,
+		outcome.ChainFeeOutcome.GasPrices,
+	)
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
 	if err != nil {
@@ -67,7 +73,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	isValid, err := validateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
+	isValid, err := merkleroot.ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
 	if !isValid {
 		return false, nil
 	}

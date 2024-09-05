@@ -9,14 +9,17 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
@@ -76,36 +79,38 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
 
 	outcomeIntervalsSelected := Outcome{
-		OutcomeType: ReportIntervalsSelected,
-		RangesSelectedForReport: []plugintypes.ChainRange{
-			{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
-			{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
-		},
-		OffRampNextSeqNums: []plugintypes.SeqNumChain{
-			{ChainSel: sourceChain1, SeqNum: 10},
-			{ChainSel: sourceChain2, SeqNum: 20},
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType: merkleroot.ReportIntervalsSelected,
+			RangesSelectedForReport: []plugintypes.ChainRange{
+				{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
+				{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
+			},
+			OffRampNextSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: sourceChain1, SeqNum: 10},
+				{ChainSel: sourceChain2, SeqNum: 20},
+			},
 		},
 	}
 
 	outcomeReportGenerated := Outcome{
-		OutcomeType: ReportGenerated,
-		RootsToReport: []ccipocr3.MerkleRootChain{
-			{
-				ChainSel:     sourceChain1,
-				SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
-				MerkleRoot:   merkleRoot1,
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType: merkleroot.ReportGenerated,
+			RootsToReport: []ccipocr3.MerkleRootChain{
+				{
+					ChainSel:     sourceChain1,
+					SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
+					MerkleRoot:   merkleRoot1,
+				},
+			},
+			OffRampNextSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: sourceChain1, SeqNum: 10},
+				{ChainSel: sourceChain2, SeqNum: 20},
 			},
 		},
-		OffRampNextSeqNums: []plugintypes.SeqNumChain{
-			{ChainSel: sourceChain1, SeqNum: 10},
-			{ChainSel: sourceChain2, SeqNum: 20},
-		},
-		TokenPrices: make([]ccipocr3.TokenPrice, 0),
-		GasPrices:   make([]ccipocr3.GasPriceChain, 0),
 	}
 
 	outcomeReportGeneratedOneInflightCheck := outcomeReportGenerated
-	outcomeReportGeneratedOneInflightCheck.ReportTransmissionCheckAttempts = 1
+	outcomeReportGeneratedOneInflightCheck.MerkleRootOutcome.ReportTransmissionCheckAttempts = 1
 
 	testCases := []struct {
 		name                  string
@@ -134,10 +139,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 							MerkleRoot:   merkleRoot1,
 						},
 					},
-					PriceUpdates: ccipocr3.PriceUpdates{
-						TokenPriceUpdates: []ccipocr3.TokenPrice{},
-						GasPriceUpdates:   []ccipocr3.GasPriceChain{},
-					},
+					PriceUpdates: ccipocr3.PriceUpdates{},
 				},
 			},
 		},
@@ -145,11 +147,13 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			name:        "report generated in previous outcome, still inflight",
 			prevOutcome: outcomeReportGenerated,
 			expOutcome: Outcome{
-				OutcomeType:                     ReportInFlight,
-				ReportTransmissionCheckAttempts: 1,
-				OffRampNextSeqNums: []plugintypes.SeqNumChain{
-					{ChainSel: sourceChain1, SeqNum: 10},
-					{ChainSel: sourceChain2, SeqNum: 20},
+				MerkleRootOutcome: merkleroot.Outcome{
+					OutcomeType:                     merkleroot.ReportInFlight,
+					ReportTransmissionCheckAttempts: 1,
+					OffRampNextSeqNums: []plugintypes.SeqNumChain{
+						{ChainSel: sourceChain1, SeqNum: 10},
+						{ChainSel: sourceChain2, SeqNum: 20},
+					},
 				},
 			},
 		},
@@ -157,8 +161,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			name:        "report generated in previous outcome, still inflight, reached all inflight check attempts",
 			prevOutcome: outcomeReportGeneratedOneInflightCheck,
 			expOutcome: Outcome{
-				OutcomeType:                     ReportTransmissionFailed,
-				ReportTransmissionCheckAttempts: 0,
+				MerkleRootOutcome: merkleroot.Outcome{
+					OutcomeType: merkleroot.ReportTransmissionFailed,
+				},
 			},
 		},
 		{
@@ -167,8 +172,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
 			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
 			expOutcome: Outcome{
-				OutcomeType:                     ReportTransmitted,
-				ReportTransmissionCheckAttempts: 0,
+				MerkleRootOutcome: merkleroot.Outcome{
+					OutcomeType: merkleroot.ReportTransmitted,
+				},
 			},
 		},
 	}
