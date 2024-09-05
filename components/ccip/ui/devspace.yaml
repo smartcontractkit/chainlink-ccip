@@ -54,6 +54,7 @@ deployments:
           NEXT_PRIVATE_CL_SUPABASE_URL: ""
           NEXT_PRIVATE_CL_SUPABASE_KEY: ""
           NEXT_PUBLIC_CL_WALLET_CONNECT_PROJECT_ID: ""
+          NEXT_PRIVATE_CL_ONCHAIN_DATA_V2_API_KEY: ""
         podSecurityContext:
           runAsUser: 1001
           runAsGroup: 1001
