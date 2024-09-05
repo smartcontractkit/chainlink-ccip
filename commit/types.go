@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type Query struct {
-	RmnOnRampMaxSeqNums []plugintypes.SeqNumChain
-	MerkleRoots         []cciptypes.MerkleRootChain
+	MerkleRootQuery merkleroot.Query `json:"merkleRootQuery"`
+	TokenPriceQuery tokenprice.Query `json:"tokenPriceQuery"`
+	ChainFeeQuery   chainfee.Query   `json:"chainFeeQuery"`
 }
 
 func (q Query) Encode() ([]byte, error) {
@@ -30,7 +30,7 @@ func DecodeCommitPluginQuery(encodedQuery []byte) (Query, error) {
 type Observation struct {
 	MerkleRootObs merkleroot.Observation          `json:"merkleObs"`
 	TokenPriceObs tokenprice.Observation          `json:"tokenObs"`
-	ChainFeeObs   chainfee.Observation            `json:"gasObs"`
+	ChainFeeObs   chainfee.Observation            `json:"chainFeeObs"`
 	FChain        map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
@@ -50,9 +50,9 @@ func DecodeCommitPluginObservation(encodedObservation []byte) (Observation, erro
 }
 
 type Outcome struct {
-	MerkleRootOutcome merkleroot.Outcome `json:"merkleOutcome"`
-	TokenPriceOutcome tokenprice.Outcome `json:"tokensOutcome"`
-	ChainFeeOutcome   chainfee.Outcome   `json:"gasOutcome"`
+	MerkleRootOutcome merkleroot.Outcome `json:"merkleRootOutcome"`
+	TokenPriceOutcome tokenprice.Outcome `json:"tokenPriceOutcome"`
+	ChainFeeOutcome   chainfee.Outcome   `json:"chainFeeOutcome"`
 }
 
 // Encode encodes an Outcome deterministically
