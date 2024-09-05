@@ -28,6 +28,10 @@ type InMemoryCCIPReader struct {
 	Dest cciptypes.ChainSelector
 }
 
+func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+	panic("not implemented")
+}
+
 // GetExpectedNextSequenceNumber implements reader.CCIP.
 func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
