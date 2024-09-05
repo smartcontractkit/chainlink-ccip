@@ -5,21 +5,21 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 )
 
 // ValidateObservation validates an observation to ensure it is well-formed
 func (p *Plugin) ValidateObservation(
 	outCtx ocr3types.OutcomeContext,
-	_ types.Query,
+	q types.Query,
 	ao types.AttributedObservation,
 ) error {
+	decodedQ, err := DecodeCommitPluginQuery(q)
+	if err != nil {
+		return fmt.Errorf("decode query: %w", err)
+	}
+
 	obs, err := DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("failed to decode commit plugin observation: %w", err)
@@ -35,7 +35,7 @@ func (p *Plugin) ValidateObservation(
 		Observation: obs.MerkleRootObs,
 	}
 
-	err = p.merkleRootProcessor.ValidateObservation(prevOutcome.MerkleRootOutcome, merkleroot.Query{}, merkleObs)
+	err = p.merkleRootProcessor.ValidateObservation(prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery, merkleObs)
 	if err != nil {
 		return fmt.Errorf("validate merkle roots observation: %w", err)
 	}
@@ -44,7 +44,7 @@ func (p *Plugin) ValidateObservation(
 		OracleID:    ao.Observer,
 		Observation: obs.TokenPriceObs,
 	}
-	err = p.tokenPriceProcessor.ValidateObservation(prevOutcome.TokenPriceOutcome, tokenprice.Query{}, tokenObs)
+	err = p.tokenPriceProcessor.ValidateObservation(prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery, tokenObs)
 	if err != nil {
 		return fmt.Errorf("validate token prices observation: %w", err)
 	}
@@ -53,7 +53,8 @@ func (p *Plugin) ValidateObservation(
 		OracleID:    ao.Observer,
 		Observation: obs.ChainFeeObs,
 	}
-	if err := p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, chainfee.Query{}, gasObs); err != nil {
+	err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
+	if err != nil {
 		return fmt.Errorf("validate chain fee observation: %w", err)
 	}
 
