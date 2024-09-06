@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"google.golang.org/protobuf/proto"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
@@ -211,7 +213,7 @@ observationsLoop:
 			}
 			for _, o := range rmnObservationResponses {
 				for _, obsUpdates := range o.SO.Observation.FixedDestLaneUpdates {
-					cnts[obsUpdates.LaneSource.SourceChainSelector]++ // todo: validate response
+					cnts[obsUpdates.LaneSource.SourceChainSelector]++
 				}
 			}
 			allSufficient := true
@@ -287,9 +289,15 @@ observationsLoop:
 	sort.Slice(attributedSignedObs, func(i, j int) bool {
 		return attributedSignedObs[i].SignerNodeIndex < attributedSignedObs[j].SignerNodeIndex
 	})
+
+	chainInfo, exists := chainsel.ChainBySelector(destChain.DestChainSelector)
+	if !exists {
+		return nil, fmt.Errorf("unknown chain selector %d", destChain.DestChainSelector)
+	}
+
 	reportSigReq := rmnpb.ReportSignatureRequest{
 		Context: &rmnpb.ReportContext{
-			EvmDestChainId:              0, // todo: import chain selectors and provide it
+			EvmDestChainId:              chainInfo.EvmChainID,
 			RmnRemoteContractAddress:    c.rmnRemoteAddress,
 			RmnHomeContractConfigDigest: c.rmnHomeConfigDigest,
 			LaneDest:                    destChain,
