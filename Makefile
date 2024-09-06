@@ -19,7 +19,7 @@ clean-generate: ensure_go_version
 	rm -rf ./mocks/
 
 test: ensure_go_version
-	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) `go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks'`
+	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) `go list ./... | grep -Ev '(chainlink-ccip/internal/mocks|chainlink-ccip/mocks)|\.pb\.go'`
 
 lint: ensure_go_version ensure_golangcilint_1_59
 	golangci-lint run -c .golangci.yml
