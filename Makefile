@@ -1,6 +1,19 @@
 TEST_COUNT ?= 10
 COVERAGE_FILE ?= coverage.out
 
+# Detect the system architecture
+ARCH := $(shell uname -m)
+
+# Find 'protoc' download URL based on the architecture
+ifeq ($(ARCH),x86_64)
+  PROTOC_ZIP := protoc-28.0-linux-x86_64.zip
+else ifeq ($(ARCH),arm64)
+  PROTOC_ZIP := protoc-28.0-osx-aarch_64.zip
+else
+  $(error Unsupported architecture: $(ARCH))
+endif
+PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v28.0/$(PROTOC_ZIP)
+
 build: ensure_go_version
 	go build -v ./...
 
@@ -27,6 +40,16 @@ lint: ensure_go_version ensure_golangcilint_1_59
 
 checks: test lint
 
+install-protoc:
+	@echo "Downloading and installing protoc for $(ARCH)..."
+	curl -OL $(PROTOC_URL)
+	sudo unzip -o $(PROTOC_ZIP) -d /usr/local bin/protoc
+	sudo unzip -o $(PROTOC_ZIP) -d /usr/local 'include/*'
+	rm -f $(PROTOC_ZIP)
+	sudo chmod +x /usr/local/bin/protoc
+	@echo "Installed protoc version:"
+	protoc --version
+
 ensure_go_version:
 	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
 
@@ -34,4 +57,4 @@ ensure_golangcilint_1_59:
 	@golangci-lint --version | grep -q '1.59' || (echo "Please use golangci-lint 1.59" && exit 1)
 
 ensure_protoc_28_0:
-	@protoc --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0" && exit 1)
+	@protoc --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0, (make install-protoc)" && exit 1)
