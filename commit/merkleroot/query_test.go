@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmn2 "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmnmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -32,13 +33,23 @@ func TestProcessor_Query(t *testing.T) {
 	}
 
 	expSigs1 := &rmn.ReportSignatures{
-		Signatures: []rmn.ECDSASignature{
+		Signatures: []rmnpb.EcdsaSignature{
 			{R: []byte("r1"), S: []byte("s1")},
 			{R: []byte("r2"), S: []byte("s2")},
 		},
-		LaneUpdates: []rmn.FixedDestLaneUpdate{
-			{SourceChain: rmn.SourceChainInfo{Chain: srcChain1}},
-			{SourceChain: rmn.SourceChainInfo{Chain: srcChain2}},
+		LaneUpdates: []rmnpb.FixedDestLaneUpdate{
+			{
+				LaneSource: &rmnpb.LaneSource{
+					SourceChainSelector: uint64(srcChain1),
+					OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
+				},
+			},
+			{
+				LaneSource: &rmnpb.LaneSource{
+					SourceChainSelector: uint64(srcChain2),
+					OnrampAddress:       contractAddrs[srcChain2][consts.ContractNameOnRamp],
+				},
+			},
 		},
 	}
 
@@ -47,7 +58,7 @@ func TestProcessor_Query(t *testing.T) {
 		prevOutcome       Outcome
 		contractAddresses map[ccipocr3.ChainSelector]map[string][]byte
 		cfg               pluginconfig.CommitPluginConfig
-		rmnClient         func(t *testing.T) *rmn2.MockClient
+		rmnClient         func(t *testing.T) *rmnmocks.MockClient
 		expQuery          Query
 		expErr            bool
 	}{
@@ -66,29 +77,29 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: 5 * time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmn2.MockClient {
-				cl := rmn2.NewMockClient(t)
+			rmnClient: func(t *testing.T) *rmnmocks.MockClient {
+				cl := rmnmocks.NewMockClient(t)
 				cl.EXPECT().
 					ComputeReportSignatures(
 						mock.Anything,
-						rmn.DestChainInfo{
-							Chain:          dstChain,
-							OffRampAddress: contractAddrs[dstChain][consts.ContractNameOffRamp],
+						&rmnpb.LaneDest{
+							DestChainSelector: uint64(dstChain),
+							OfframpAddress:    contractAddrs[dstChain][consts.ContractNameOffRamp],
 						},
-						[]rmn.FixedDestLaneUpdateRequest{
+						[]rmnpb.FixedDestLaneUpdateRequest{
 							{
-								SourceChainInfo: rmn.SourceChainInfo{
-									Chain:         srcChain1,
-									OnRampAddress: contractAddrs[srcChain1][consts.ContractNameOnRamp],
+								LaneSource: &rmnpb.LaneSource{
+									SourceChainSelector: uint64(srcChain1),
+									OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
 								},
-								SeqNumRange: ccipocr3.NewSeqNumRange(10, 20),
+								ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
 							},
 							{
-								SourceChainInfo: rmn.SourceChainInfo{
-									Chain:         srcChain2,
-									OnRampAddress: contractAddrs[srcChain2][consts.ContractNameOnRamp],
+								LaneSource: &rmnpb.LaneSource{
+									SourceChainSelector: uint64(srcChain2),
+									OnrampAddress:       contractAddrs[srcChain2][consts.ContractNameOnRamp],
 								},
-								SeqNumRange: ccipocr3.NewSeqNumRange(50, 51),
+								ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 50, MaxMsgNr: 51},
 							},
 						},
 					).
@@ -116,8 +127,8 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmn2.MockClient {
-				cl := rmn2.NewMockClient(t)
+			rmnClient: func(t *testing.T) *rmnmocks.MockClient {
+				cl := rmnmocks.NewMockClient(t)
 				time.Sleep(time.Millisecond)
 				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, rmn.ErrTimeout) // <------------------------------------ timeout error
@@ -144,8 +155,8 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmn2.MockClient {
-				cl := rmn2.NewMockClient(t)
+			rmnClient: func(t *testing.T) *rmnmocks.MockClient {
+				cl := rmnmocks.NewMockClient(t)
 				time.Sleep(time.Millisecond)
 				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, fmt.Errorf("some error")) // <------------------------- some random error
@@ -164,7 +175,7 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: 5 * time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmn2.MockClient { return rmn2.NewMockClient(t) },
+			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
 			expQuery:  Query{},
 			expErr:    false,
 		},
@@ -178,7 +189,7 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: 5 * time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmn2.MockClient { return rmn2.NewMockClient(t) },
+			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
 			expQuery:  Query{},
 			expErr:    false,
 		},
