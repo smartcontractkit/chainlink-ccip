@@ -19,6 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
+// TODO: sanity check all responses - make sure they match their requests.
+// TODO: code cleanup - some library for requests / responses - etc...
+// TODO: testing - unit tests, integration tests, etc...
+// TODO: computeLaneUpdatesFromASOs implementation
+// TODO: use the populated Query / sig verification / etc..
+
 // ErrTimeout is returned when the signature computation times out.
 var ErrTimeout = errors.New("signature computation timeout")
 
@@ -38,32 +44,32 @@ type Client interface {
 type ReportSignatures struct {
 	// ReportSignatures are the ECDSA signatures for the lane updates for each node.
 	Signatures []*rmnpb.EcdsaSignature
+	// LaneUpdates are the lane updates for each source chain that we got the signatures for.
+	// NOTE: A signature[i] corresponds to the whole LaneUpdates slice and NOT LaneUpdates[i].
+	LaneUpdates []*rmnpb.FixedDestLaneUpdate
 }
 
 // PBClient is the base RMN Client implementation.
 type PBClient struct {
-	rawRmnClient        rawRmnClient
-	rmnNodes            []RMNNodeInfo
+	rawRmnClient rawRmnClient
+	rmnNodes     []RMNNodeInfo
+
 	rmnRemoteAddress    []byte
 	rmnHomeConfigDigest []byte
-	minObservers        int
-	minSigners          int
+
+	minObservers int
+	minSigners   int
 
 	lggr logger.Logger
 
-	observationsInitialRequestTimeout time.Duration
-	reportsInitialRequestTimeout      time.Duration
+	observationsInitialRequestTimer time.Duration
+	reportsInitialRequestTimer      time.Duration
 }
 
 type RMNNodeInfo struct {
 	ID                    uint32 // ID is the index of this node in the RMN config
 	SupportedSourceChains mapset.Set[uint64]
 	IsSigner              bool
-}
-
-type laneUpdateRequestWithStatus struct {
-	request *rmnpb.FixedDestLaneUpdateRequest
-	sent    bool
 }
 
 func (c *PBClient) ComputeReportSignatures(
@@ -116,6 +122,7 @@ func (c *PBClient) ComputeReportSignatures(
 
 		for i, req := range nodeLaneUpdateRequests[node.ID] {
 			if requestCounts[req.request.LaneSource.SourceChainSelector] >= c.minObservers {
+				// We have sent enough initial observation requests for this source chain.
 				continue
 			}
 			requestCounts[req.request.LaneSource.SourceChainSelector]++
@@ -123,20 +130,23 @@ func (c *PBClient) ComputeReportSignatures(
 				observationRequest.FixedDestLaneUpdateRequests,
 				req.request,
 			)
+			// Mark that for this specific rmn node the request for this source chain was sent.
+			// That way after the timer expires we don't resubmit to this node.
 			nodeLaneUpdateRequests[node.ID][i].sent = true
 		}
 
 		if len(observationRequest.FixedDestLaneUpdateRequests) == 0 {
+			// There's nothing for this RMN node to observe, let's move to the next one.
 			continue
 		}
 
+		// Send the request and keep track of it.
 		req := &rmnpb.Request{
 			RequestId: newRequestID(),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: observationRequest,
 			},
 		}
-
 		reqBytes, err := proto.Marshal(req)
 		if err != nil {
 			return nil, fmt.Errorf("proto marshal: %w", err)
@@ -144,7 +154,6 @@ func (c *PBClient) ComputeReportSignatures(
 		if err := c.rawRmnClient.Send(node.ID, reqBytes); err != nil {
 			return nil, fmt.Errorf("send rmn request: %w", err)
 		}
-
 		if requestIDs.Contains(req.RequestId) {
 			return nil, fmt.Errorf("request id %d is duplicated, newRequestID fn bug", req.RequestId)
 		}
@@ -160,7 +169,7 @@ func (c *PBClient) ComputeReportSignatures(
 	respChan := c.rawRmnClient.Recv()
 
 	// Wait for the responses
-	tInitialRequest := time.NewTimer(c.observationsInitialRequestTimeout)
+	tInitialRequest := time.NewTimer(c.observationsInitialRequestTimer)
 	defer tInitialRequest.Stop()
 
 	type rmnObservationResponse struct {
@@ -177,17 +186,18 @@ observationsLoop:
 			responseTyp := &rmnpb.Response{}
 			err := proto.Unmarshal(resp.Body, responseTyp)
 			if err != nil {
-				return nil, fmt.Errorf("proto unmarshal: %w", err)
+				c.lggr.Errorf("proto unmarshal failed: %s", err)
+				continue
 			}
 
 			if !requestIDs.Contains(responseTyp.RequestId) {
-				continue // not something we are waiting for
+				c.lggr.Debugf("got an RMN response that we are not waiting for: %d", responseTyp.RequestId)
+				continue
 			}
 			if finishedRequests.Contains(responseTyp.RequestId) {
 				c.lggr.Warnw("got an RMN duplicate response", "request_id", responseTyp.RequestId)
-				continue // already got this response
+				continue
 			}
-
 			finishedRequests.Add(responseTyp.RequestId)
 
 			signedObs := responseTyp.GetSignedObservation()
@@ -202,7 +212,7 @@ observationsLoop:
 
 			// We got all the responses we were waiting for.
 			if finishedRequests.Equal(requestIDs) {
-				break
+				break observationsLoop
 			}
 
 			// We got sufficient number of responses for every source chain.
@@ -250,10 +260,6 @@ observationsLoop:
 						ObservationRequest: observationRequest,
 					},
 				}
-				if requestIDs.Contains(req.RequestId) {
-					return nil, fmt.Errorf("request id %d is duplicated, newRequestID fn bug", req.RequestId)
-				}
-				requestIDs.Add(req.RequestId)
 				reqBytes, err := proto.Marshal(req)
 				if err != nil {
 					return nil, fmt.Errorf("proto marshal: %w", err)
@@ -261,6 +267,10 @@ observationsLoop:
 				if err := c.rawRmnClient.Send(node.ID, reqBytes); err != nil {
 					return nil, fmt.Errorf("send rmn request: %w", err)
 				}
+				if requestIDs.Contains(req.RequestId) {
+					return nil, fmt.Errorf("request id %d is duplicated, newRequestID fn bug", req.RequestId)
+				}
+				requestIDs.Add(req.RequestId)
 			}
 		case <-ctx.Done():
 			return nil, ErrTimeout
@@ -339,7 +349,7 @@ observationsLoop:
 		}
 	}
 
-	tReportsInitialRequest := time.NewTimer(c.reportsInitialRequestTimeout)
+	tReportsInitialRequest := time.NewTimer(c.reportsInitialRequestTimer)
 	reportSigs := make([]*rmnpb.ReportSignature, 0)
 	finishedRequests = mapset.NewSet[uint64]()
 
@@ -370,11 +380,11 @@ observationsLoop:
 			if len(reportSigs) >= c.minSigners {
 				ecdsaSigs := make([]*rmnpb.EcdsaSignature, 0)
 				for _, rs := range reportSigs {
-					ecdsaSigs = append(ecdsaSigs, rs.Signature)
+					ecdsaSigs = append(ecdsaSigs, rs.Signature) // nolint:staticcheck // bug?
 				}
-
 				return &ReportSignatures{
-					Signatures: ecdsaSigs,
+					Signatures:  ecdsaSigs,
+					LaneUpdates: c.computeLaneUpdatesFromASOs(attributedSignedObs),
 				}, nil
 			}
 		case <-tReportsInitialRequest.C:
@@ -408,6 +418,15 @@ observationsLoop:
 			return nil, ErrTimeout
 		}
 	}
+}
+
+func (c *PBClient) computeLaneUpdatesFromASOs(asos []*rmnpb.AttributedSignedObservation) []*rmnpb.FixedDestLaneUpdate {
+	return nil
+}
+
+type laneUpdateRequestWithStatus struct {
+	request *rmnpb.FixedDestLaneUpdateRequest
+	sent    bool
 }
 
 type rawRmnClient interface {
