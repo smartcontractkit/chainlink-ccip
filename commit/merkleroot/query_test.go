@@ -37,6 +37,20 @@ func TestProcessor_Query(t *testing.T) {
 			{R: []byte("r1"), S: []byte("s1")},
 			{R: []byte("r2"), S: []byte("s2")},
 		},
+		LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+			{
+				LaneSource: &rmnpb.LaneSource{
+					SourceChainSelector: uint64(srcChain1),
+					OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
+				},
+			},
+			{
+				LaneSource: &rmnpb.LaneSource{
+					SourceChainSelector: uint64(srcChain2),
+					OnrampAddress:       contractAddrs[srcChain2][consts.ContractNameOnRamp],
+				},
+			},
+		},
 	}
 
 	testCases := []struct {
