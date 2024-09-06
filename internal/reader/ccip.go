@@ -486,7 +486,7 @@ func (r *CCIPChainReader) Nonces(
 				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 			}
 
-			extendedBindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameNonceManager)
+			extendedBindings := r.contractReaders[destChainSelector].GetBindings(consts.ContractNameNonceManager)
 			if len(extendedBindings) != 1 {
 				return fmt.Errorf("expected one binding for NonceManager contract, got %d", len(extendedBindings))
 			}
