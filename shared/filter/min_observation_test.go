@@ -1,4 +1,4 @@
-package validation
+package filter
 
 import (
 	"fmt"
@@ -91,11 +91,11 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Initialize the minObservationValidator
+			// Initialize the minObservation
 			idFunc := func(data exectypes.CommitData) [32]byte {
 				return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 			}
-			validator := NewMinObservationValidator[exectypes.CommitData](tt.min, idFunc)
+			validator := NewMinObservation[exectypes.CommitData](tt.min, idFunc)
 			for _, report := range tt.reports {
 				validator.Add(report)
 			}
@@ -114,11 +114,11 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 		number int
 	}
 
-	// Initialize the minObservationValidator
+	// Initialize the minObservation
 	idFunc := func(data Generic) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
-	validator := NewMinObservationValidator[Generic](2, idFunc)
+	validator := NewMinObservation[Generic](2, idFunc)
 
 	wantValue := Generic{number: 1}
 	otherValue := Generic{number: 2}

@@ -8,7 +8,6 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/shared"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -189,185 +188,30 @@ func getConsensusObservation(
 	aos []shared.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
-	fChains := fChainConsensus(lggr, F, aggObs.FChain)
 
-	fDestChain, exists := fChains[destChain]
+	fMin := make(map[cciptypes.ChainSelector]int)
+	for chain := range aggObs.FChain {
+		fMin[chain] = F
+	}
+	fChains := shared.GetConsensusMap(lggr, "fChain", aggObs.FChain, fMin)
+
+	_, exists := fChains[destChain]
 	if !exists {
 		return ConsensusObservation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
+	twoFPlus1 := make(map[cciptypes.ChainSelector]int)
+	for chain, f := range fChains {
+		twoFPlus1[chain] = 2*f + 1
+	}
+
 	consensusObs := ConsensusObservation{
-		MerkleRoots:        merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
-		OnRampMaxSeqNums:   onRampMaxSeqNumsConsensus(lggr, aggObs.OnRampMaxSeqNums, fChains),
-		OffRampNextSeqNums: offRampMaxSeqNumsConsensus(lggr, aggObs.OffRampNextSeqNums, fDestChain),
+		MerkleRoots:        shared.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, fChains),
+		OnRampMaxSeqNums:   shared.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
+		OffRampNextSeqNums: shared.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, fChains),
 		FChain:             fChains,
 	}
 
 	return consensusObs, nil
-}
-
-// Given a mapping from chains to a list of merkle roots,
-// return a mapping from chains to a single consensus merkle root.
-// The consensus merkle root for a given chain is the merkle root with the
-// most observations that was observed at least fChain times.
-func merkleRootConsensus(
-	lggr logger.Logger,
-	rootsByChain map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain,
-	fChains map[cciptypes.ChainSelector]int,
-) map[cciptypes.ChainSelector]cciptypes.MerkleRootChain {
-	consensus := make(map[cciptypes.ChainSelector]cciptypes.MerkleRootChain)
-
-	for chain, roots := range rootsByChain {
-		if fChain, exists := fChains[chain]; exists {
-			root, count, err := mostFrequentElement(roots)
-			if err != nil {
-				lggr.Errorf("cannot reach consensus on roots of %v: %s", chain, err)
-				continue
-			}
-
-			if count <= fChain {
-				// TODO: metrics
-				lggr.Warnf("failed to reach consensus on a merkle root for chain %d "+
-					"because no single merkle root was observed more than the expected fChain (%d) times, found "+
-					"merkle root %d observed by only %d oracles, all observed merkle roots: %v",
-					chain, fChain, root, count, roots)
-			} else {
-				consensus[chain] = root
-			}
-		} else {
-			// TODO: metrics
-			lggr.Warnf("merkleRootConsensus: fChain not found for chain %d", chain)
-		}
-	}
-
-	return consensus
-}
-
-// Given a mapping from chains to a list of max seq nums on their corresponding OnRamp, return a mapping from chains
-// to a single max seq num. The consensus max seq num for a given chain is the f'th lowest max seq num if the number
-// of max seq num observations is greater or equal than 2f+1, where f is the FChain of the corresponding source chain.
-func onRampMaxSeqNumsConsensus(
-	lggr logger.Logger,
-	onRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
-	fChains map[cciptypes.ChainSelector]int,
-) map[cciptypes.ChainSelector]cciptypes.SeqNum {
-	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-
-	for chain, onRampMaxSeqNums := range onRampMaxSeqNumsByChain {
-		if fChain, exists := fChains[chain]; exists {
-			if len(onRampMaxSeqNums) < 2*fChain+1 {
-				// TODO: metrics
-				lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
-					"because we did not receive more than 2fChain+1 observed sequence numbers, 2fChain+1: %d, "+
-					"len(onRampMaxSeqNums): %d, onRampMaxSeqNums: %v",
-					chain, 2*fChain+1, len(onRampMaxSeqNums), onRampMaxSeqNums)
-			} else {
-				sort.Slice(onRampMaxSeqNums, func(i, j int) bool { return onRampMaxSeqNums[i] < onRampMaxSeqNums[j] })
-				consensus[chain] = onRampMaxSeqNums[fChain]
-			}
-		} else {
-			// TODO: metrics
-			lggr.Warnf("could not reach consensus on onRampMaxSeqNums for chain %d "+
-				"because there was no consensus fChain value for this chain", chain)
-		}
-	}
-
-	return consensus
-}
-
-// Given a mapping from chains to a list of max seq nums on the OffRamp, return a mapping from chains
-// to a single max seq num. The consensus max seq num for a given chain is the max seq num with the most observations
-// that was observed at least f times, where f is the FChain of the dest chain.
-func offRampMaxSeqNumsConsensus(
-	lggr logger.Logger,
-	offRampMaxSeqNumsByChain map[cciptypes.ChainSelector][]cciptypes.SeqNum,
-	fDestChain int,
-) map[cciptypes.ChainSelector]cciptypes.SeqNum {
-	consensus := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-
-	for chain, offRampMaxSeqNums := range offRampMaxSeqNumsByChain {
-		seqNum, count, err := mostFrequentElement(offRampMaxSeqNums)
-		if err != nil {
-			lggr.Errorf("cannot reach consensus on offRampMaxSeqNums for chain %d: %s", chain, err)
-			continue
-		}
-
-		if count <= fDestChain {
-			// TODO: metrics
-			lggr.Warnf("could not reach consensus on offRampMaxSeqNums for chain %d "+
-				"because we did not receive a sequence number that was observed by at least fChain (%d) oracles, "+
-				"offRampMaxSeqNums: %v", chain, fDestChain, offRampMaxSeqNums)
-		} else {
-			consensus[chain] = seqNum
-		}
-	}
-
-	return consensus
-}
-
-// Given a mapping from chains to a list of FChain values for each chain, return a mapping from chains
-// to a single FChain. The consensus FChain for a given chain is the FChain with the most observations
-// that was observed at least f times, where f is the F of the DON (p.reportingCfg.F).
-func fChainConsensus(
-	lggr logger.Logger,
-	F int,
-	fChainValues map[cciptypes.ChainSelector][]int,
-) map[cciptypes.ChainSelector]int {
-	consensus := make(map[cciptypes.ChainSelector]int)
-
-	for chain, fValues := range fChainValues {
-		fChain, count, err := mostFrequentElement(fValues)
-		if err != nil {
-			lggr.Errorf("cannot reach consensus on fChain values for chain %d: %s", chain, err)
-			continue
-		}
-
-		if count < F {
-			// TODO: metrics
-			lggr.Warnf("failed to reach consensus on fChain values for chain %d because no single fChain "+
-				"value was observed more than the expected %d times, found fChain value %d observed by only %d oracles, "+
-				"fChain values: %v",
-				chain, F, fChain, count, fValues)
-			continue
-		}
-
-		consensus[chain] = fChain
-	}
-
-	return consensus
-}
-
-// Given a list of elems, return the elem that occurs most frequently and how often it occurs.
-func mostFrequentElement[T comparable](elems []T) (res T, cnt int, err error) {
-	counts := getCounts(elems)
-	maxCount := 0
-	uniq := false
-
-	for el, count := range counts {
-		if count == maxCount {
-			uniq = false
-		}
-		if count > maxCount {
-			res = el
-			maxCount = count
-			uniq = true
-		}
-	}
-
-	if !uniq {
-		var empty T
-		return empty, 0, fmt.Errorf("no unique major element")
-	}
-	return res, maxCount, nil
-}
-
-// Given a list of elems, return a map from elems to how often they occur in the given list
-func getCounts[T comparable](elems []T) map[T]int {
-	m := make(map[T]int)
-	for _, elem := range elems {
-		m[elem]++
-	}
-
-	return m
 }

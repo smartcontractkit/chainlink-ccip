@@ -1,4 +1,4 @@
-package validation
+package filter
 
 import (
 	"fmt"
@@ -13,39 +13,39 @@ type counter[T any] struct {
 	count int
 }
 
-// MinObservationFilter provides a way to ensure a minimum number of observations for
+// MinObservation provides a way to ensure a minimum number of observations for
 // some piece of data have occurred. It maintains an internal cache and provides a list
 // of valid or invalid data points.
-type MinObservationFilter[T any] interface {
+type MinObservation[T any] interface {
 	Add(data T)
 	GetValid() []T
 }
 
-// minObservationValidator is a helper object to validate reports for a single chain.
-// It keeps track of all reports and determines if they observations are consistent
-// with one another and whether they meet the required fChain threshold.
-type minObservationValidator[T any] struct {
+// minObservation is a helper object to filter data based on observation counts.
+// It keeps track of all inputs, determines if they are consistent
+// with one another, and whether they meet the required count threshold.
+type minObservation[T any] struct {
 	minObservation int
 	cache          map[cciptypes.Bytes32]*counter[T]
 	idFunc         func(T) [32]byte
 }
 
-// NewMinObservationValidator constructs a concrete MinObservationFilter object. The
+// NewMinObservation constructs a concrete MinObservation object. The
 // supplied idFunc is used to generate a uniqueID for the type being observed.
-func NewMinObservationValidator[T any](min int, idFunc func(T) [32]byte) MinObservationFilter[T] {
+func NewMinObservation[T any](min int, idFunc func(T) [32]byte) MinObservation[T] {
 	if idFunc == nil {
 		idFunc = func(data T) [32]byte {
 			return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 		}
 	}
-	return &minObservationValidator[T]{
+	return &minObservation[T]{
 		minObservation: min,
 		cache:          make(map[cciptypes.Bytes32]*counter[T]),
 		idFunc:         idFunc,
 	}
 }
 
-func (cv *minObservationValidator[T]) Add(data T) {
+func (cv *minObservation[T]) Add(data T) {
 	id := cv.idFunc(data)
 	if _, ok := cv.cache[id]; ok {
 		cv.cache[id].count++
@@ -54,7 +54,7 @@ func (cv *minObservationValidator[T]) Add(data T) {
 	}
 }
 
-func (cv *minObservationValidator[T]) GetValid() []T {
+func (cv *minObservation[T]) GetValid() []T {
 	var validated []T
 	for _, rc := range cv.cache {
 		if rc.count >= cv.minObservation {
