@@ -48,7 +48,7 @@ install-protoc:
 	sudo chmod +x /usr/local/bin/protoc
 	@echo "Installed protoc version:"
 	protoc --version
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
 
 ensure_go_version:
 	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
