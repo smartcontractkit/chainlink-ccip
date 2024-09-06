@@ -7,11 +7,11 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 // Outcome depending on the current state, either:

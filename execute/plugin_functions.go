@@ -7,7 +7,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared/filter"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -16,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared/filter"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
