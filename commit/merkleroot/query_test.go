@@ -32,6 +32,7 @@ func TestProcessor_Query(t *testing.T) {
 	}
 
 	expSigs1 := &rmn.ReportSignatures{
+<<<<<<< Updated upstream
 		Signatures: []rmn.ECDSASignature{
 			{R: []byte("r1"), S: []byte("s1")},
 			{R: []byte("r2"), S: []byte("s2")},
@@ -40,6 +41,12 @@ func TestProcessor_Query(t *testing.T) {
 			{SourceChain: rmn.SourceChainInfo{Chain: srcChain1}},
 			{SourceChain: rmn.SourceChainInfo{Chain: srcChain2}},
 		},
+=======
+		Signatures: []*rmnpb.EcdsaSignature{
+			{R: []byte("r1"), S: []byte("s1")},
+			{R: []byte("r2"), S: []byte("s2")},
+		}
+>>>>>>> Stashed changes
 	}
 
 	testCases := []struct {

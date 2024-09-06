@@ -28,17 +28,32 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		OffRampAddress: offRampAddress,
 	}
 
+<<<<<<< Updated upstream
 	reqUpdates := make([]rmn.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
+=======
+	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
+>>>>>>> Stashed changes
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
 			return Query{}, fmt.Errorf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 		}
 
+<<<<<<< Updated upstream
 		reqUpdates = append(reqUpdates, rmn.FixedDestLaneUpdateRequest{
 			SourceChainInfo: rmn.SourceChainInfo{
 				Chain:         sourceChainRange.ChainSel,
 				OnRampAddress: onRampAddress,
+=======
+		reqUpdates = append(reqUpdates, &rmnpb.FixedDestLaneUpdateRequest{
+			LaneSource: &rmnpb.LaneSource{
+				SourceChainSelector: uint64(sourceChainRange.ChainSel),
+				OnrampAddress:       onRampAddress,
+			},
+			ClosedInterval: &rmnpb.ClosedInterval{
+				MinMsgNr: uint64(sourceChainRange.SeqNumRange.Start()),
+				MaxMsgNr: uint64(sourceChainRange.SeqNumRange.End()),
+>>>>>>> Stashed changes
 			},
 			SeqNumRange: sourceChainRange.SeqNumRange,
 		})
