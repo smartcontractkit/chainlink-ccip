@@ -16,7 +16,14 @@ type Client interface {
 	// necessary steps to compute the signatures, like retrying and caching which are handled by the implementation.
 	ComputeReportSignatures(
 		ctx context.Context,
-		destChain DestChainInfo,
+		destChain *LaneDest,
 		requestedUpdates []FixedDestLaneUpdateRequest,
 	) (*ReportSignatures, error)
+}
+
+type ReportSignatures struct {
+	// ReportSignatures are the ECDSA signatures for the lane updates for each node.
+	// NOTE: A signature[i] corresponds to the whole LaneUpdates slice and NOT LaneUpdates[i].
+	Signatures  []EcdsaSignature
+	LaneUpdates []FixedDestLaneUpdate
 }

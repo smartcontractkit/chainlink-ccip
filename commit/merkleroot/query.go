@@ -23,9 +23,9 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	if err != nil {
 		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
 	}
-	dstChainInfo := rmn.DestChainInfo{
-		Chain:          w.cfg.DestChain,
-		OffRampAddress: offRampAddress,
+	dstChainInfo := &rmn.LaneDest{
+		DestChainSelector: uint64(w.cfg.DestChain),
+		OfframpAddress:    offRampAddress,
 	}
 
 	reqUpdates := make([]rmn.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
@@ -36,11 +36,14 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		}
 
 		reqUpdates = append(reqUpdates, rmn.FixedDestLaneUpdateRequest{
-			SourceChainInfo: rmn.SourceChainInfo{
-				Chain:         sourceChainRange.ChainSel,
-				OnRampAddress: onRampAddress,
+			LaneSource: &rmn.LaneSource{
+				SourceChainSelector: uint64(sourceChainRange.ChainSel),
+				OnrampAddress:       onRampAddress,
 			},
-			SeqNumRange: sourceChainRange.SeqNumRange,
+			ClosedInterval: &rmn.ClosedInterval{
+				MinMsgNr: uint64(sourceChainRange.SeqNumRange.Start()),
+				MaxMsgNr: uint64(sourceChainRange.SeqNumRange.End()),
+			},
 		})
 	}
 

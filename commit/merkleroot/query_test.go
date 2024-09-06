@@ -32,13 +32,13 @@ func TestProcessor_Query(t *testing.T) {
 	}
 
 	expSigs1 := &rmn.ReportSignatures{
-		Signatures: []rmn.ECDSASignature{
+		Signatures: []rmn.EcdsaSignature{
 			{R: []byte("r1"), S: []byte("s1")},
 			{R: []byte("r2"), S: []byte("s2")},
 		},
 		LaneUpdates: []rmn.FixedDestLaneUpdate{
-			{SourceChain: rmn.SourceChainInfo{Chain: srcChain1}},
-			{SourceChain: rmn.SourceChainInfo{Chain: srcChain2}},
+			{LaneSource: &rmn.LaneSource{SourceChainSelector: uint64(srcChain1)}},
+			{LaneSource: &rmn.LaneSource{SourceChainSelector: uint64(srcChain2)}},
 		},
 	}
 
@@ -71,24 +71,24 @@ func TestProcessor_Query(t *testing.T) {
 				cl.EXPECT().
 					ComputeReportSignatures(
 						mock.Anything,
-						rmn.DestChainInfo{
-							Chain:          dstChain,
-							OffRampAddress: contractAddrs[dstChain][consts.ContractNameOffRamp],
+						&rmn.LaneDest{
+							DestChainSelector: uint64(dstChain),
+							OfframpAddress:    contractAddrs[dstChain][consts.ContractNameOffRamp],
 						},
 						[]rmn.FixedDestLaneUpdateRequest{
 							{
-								SourceChainInfo: rmn.SourceChainInfo{
-									Chain:         srcChain1,
-									OnRampAddress: contractAddrs[srcChain1][consts.ContractNameOnRamp],
+								LaneSource: &rmn.LaneSource{
+									SourceChainSelector: uint64(srcChain1),
+									OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
 								},
-								SeqNumRange: ccipocr3.NewSeqNumRange(10, 20),
+								ClosedInterval: &rmn.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
 							},
 							{
-								SourceChainInfo: rmn.SourceChainInfo{
-									Chain:         srcChain2,
-									OnRampAddress: contractAddrs[srcChain2][consts.ContractNameOnRamp],
+								LaneSource: &rmn.LaneSource{
+									SourceChainSelector: uint64(srcChain2),
+									OnrampAddress:       contractAddrs[srcChain2][consts.ContractNameOnRamp],
 								},
-								SeqNumRange: ccipocr3.NewSeqNumRange(50, 51),
+								ClosedInterval: &rmn.ClosedInterval{MinMsgNr: 50, MaxMsgNr: 51},
 							},
 						},
 					).

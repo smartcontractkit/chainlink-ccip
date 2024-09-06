@@ -23,7 +23,7 @@ func (_m *MockClient) EXPECT() *MockClient_Expecter {
 }
 
 // ComputeReportSignatures provides a mock function with given fields: ctx, destChain, requestedUpdates
-func (_m *MockClient) ComputeReportSignatures(ctx context.Context, destChain rmn.DestChainInfo, requestedUpdates []rmn.FixedDestLaneUpdateRequest) (*rmn.ReportSignatures, error) {
+func (_m *MockClient) ComputeReportSignatures(ctx context.Context, destChain *rmn.LaneDest, requestedUpdates []rmn.FixedDestLaneUpdateRequest) (*rmn.ReportSignatures, error) {
 	ret := _m.Called(ctx, destChain, requestedUpdates)
 
 	if len(ret) == 0 {
@@ -32,10 +32,10 @@ func (_m *MockClient) ComputeReportSignatures(ctx context.Context, destChain rmn
 
 	var r0 *rmn.ReportSignatures
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, rmn.DestChainInfo, []rmn.FixedDestLaneUpdateRequest) (*rmn.ReportSignatures, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *rmn.LaneDest, []rmn.FixedDestLaneUpdateRequest) (*rmn.ReportSignatures, error)); ok {
 		return rf(ctx, destChain, requestedUpdates)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, rmn.DestChainInfo, []rmn.FixedDestLaneUpdateRequest) *rmn.ReportSignatures); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *rmn.LaneDest, []rmn.FixedDestLaneUpdateRequest) *rmn.ReportSignatures); ok {
 		r0 = rf(ctx, destChain, requestedUpdates)
 	} else {
 		if ret.Get(0) != nil {
@@ -43,7 +43,7 @@ func (_m *MockClient) ComputeReportSignatures(ctx context.Context, destChain rmn
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, rmn.DestChainInfo, []rmn.FixedDestLaneUpdateRequest) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *rmn.LaneDest, []rmn.FixedDestLaneUpdateRequest) error); ok {
 		r1 = rf(ctx, destChain, requestedUpdates)
 	} else {
 		r1 = ret.Error(1)
@@ -59,15 +59,15 @@ type MockClient_ComputeReportSignatures_Call struct {
 
 // ComputeReportSignatures is a helper method to define mock.On call
 //   - ctx context.Context
-//   - destChain rmn.DestChainInfo
+//   - destChain *rmn.LaneDest
 //   - requestedUpdates []rmn.FixedDestLaneUpdateRequest
 func (_e *MockClient_Expecter) ComputeReportSignatures(ctx interface{}, destChain interface{}, requestedUpdates interface{}) *MockClient_ComputeReportSignatures_Call {
 	return &MockClient_ComputeReportSignatures_Call{Call: _e.mock.On("ComputeReportSignatures", ctx, destChain, requestedUpdates)}
 }
 
-func (_c *MockClient_ComputeReportSignatures_Call) Run(run func(ctx context.Context, destChain rmn.DestChainInfo, requestedUpdates []rmn.FixedDestLaneUpdateRequest)) *MockClient_ComputeReportSignatures_Call {
+func (_c *MockClient_ComputeReportSignatures_Call) Run(run func(ctx context.Context, destChain *rmn.LaneDest, requestedUpdates []rmn.FixedDestLaneUpdateRequest)) *MockClient_ComputeReportSignatures_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(rmn.DestChainInfo), args[2].([]rmn.FixedDestLaneUpdateRequest))
+		run(args[0].(context.Context), args[1].(*rmn.LaneDest), args[2].([]rmn.FixedDestLaneUpdateRequest))
 	})
 	return _c
 }
@@ -77,7 +77,7 @@ func (_c *MockClient_ComputeReportSignatures_Call) Return(_a0 *rmn.ReportSignatu
 	return _c
 }
 
-func (_c *MockClient_ComputeReportSignatures_Call) RunAndReturn(run func(context.Context, rmn.DestChainInfo, []rmn.FixedDestLaneUpdateRequest) (*rmn.ReportSignatures, error)) *MockClient_ComputeReportSignatures_Call {
+func (_c *MockClient_ComputeReportSignatures_Call) RunAndReturn(run func(context.Context, *rmn.LaneDest, []rmn.FixedDestLaneUpdateRequest) (*rmn.ReportSignatures, error)) *MockClient_ComputeReportSignatures_Call {
 	_c.Call.Return(run)
 	return _c
 }
