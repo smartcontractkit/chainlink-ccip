@@ -10,7 +10,7 @@ generate-mocks: ensure_go_version
 	go install github.com/vektra/mockery/v2@v2.43.2
 	mockery
 
-generate-protobuf: ensure_go_version
+generate-protobuf: ensure_go_version ensure_protoc_28_0
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	protoc --go_out=./commit/merkleroot/rmn --go_opt=paths=source_relative rmn_offchain.proto
 
@@ -31,3 +31,6 @@ ensure_go_version:
 
 ensure_golangcilint_1_59:
 	@golangci-lint --version | grep -q '1.59' || (echo "Please use golangci-lint 1.59" && exit 1)
+
+ensure_protoc_28_0:
+	@protoc --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0" && exit 1)
