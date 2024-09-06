@@ -37,7 +37,6 @@ type Client interface {
 
 type ReportSignatures struct {
 	// ReportSignatures are the ECDSA signatures for the lane updates for each node.
-	// NOTE: A signature[i] corresponds to the whole LaneUpdates slice and NOT LaneUpdates[i].
 	Signatures []*rmnpb.EcdsaSignature
 }
 
