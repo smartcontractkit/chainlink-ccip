@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -12,15 +13,30 @@ import (
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"golang.org/x/sync/errgroup"
 )
 
 type PriceReader interface {
-	// GetTokenPricesUSD returns the prices of the provided tokens in USD normalized to e18. 1USD=1e18USD.
+	// GetTokenFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18. 1USD=1e18USD.
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+
+	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
+	GetFeeQuoterTokenUpdates(
+		ctx context.Context,
+		tokens []ocr2types.Account,
+	) (map[ocr2types.Account]NumericalUpdate, error)
+}
+
+// NumericalUpdate On-chain struct `TimestampedPackedUint224`:
+// nolint:lll
+// https://github.com/smartcontractkit/chainlink/blob/2d77ff4623d0a0032533c89f32fc251400382455/contracts/src/v0.8/ccip/libraries/Internal.sol#L43-L47
+type NumericalUpdate struct {
+	Timestamp time.Time        `json:"timestamp"`
+	Value     cciptypes.BigInt `json:"value"`
 }
 
 type OnchainTokenPricesReader struct {
@@ -51,7 +67,39 @@ type LatestRoundData struct {
 	AnsweredInRound *big.Int
 }
 
-func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
+func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
+	ctx context.Context,
+	tokens []ocr2types.Account,
+) (map[ocr2types.Account]NumericalUpdate, error) {
+	var updates []NumericalUpdate
+
+	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
+	// a timestamp and price of 0 if the token is not found
+	if err :=
+		pr.ContractReader.GetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrices,
+			primitives.Unconfirmed,
+			tokens,
+			&updates,
+		); err != nil {
+		return nil, fmt.Errorf("failed to get token prices: %w", err)
+	}
+
+	updateMap := make(map[ocr2types.Account]NumericalUpdate)
+	for i, token := range tokens {
+		// token not available on fee quoter
+		if updates[i].Timestamp == time.Unix(0, 0) {
+			continue
+		}
+		updateMap[token] = updates[i]
+	}
+
+	return updateMap, nil
+}
+
+func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
 	prices := make([]*big.Int, len(tokens))

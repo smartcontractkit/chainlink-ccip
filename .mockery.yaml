@@ -19,7 +19,7 @@ packages:
         interfaces:
             HomeChain:
             CCIP:
-            TokenPrices:
+            PriceReader:
     github.com/smartcontractkit/chainlink-common/pkg/types:
         interfaces:
             ChainReader:

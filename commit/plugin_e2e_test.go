@@ -11,6 +11,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,6 +29,8 @@ import (
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+
+	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -198,6 +201,12 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 						Return(tc.offRampNextSeqNumDefaultOverrideValues, nil).
 						Maybe()
 				}
+				n.priceReader.EXPECT().
+					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
+					Return(
+						map[ocr2types.Account]reader.NumericalUpdate{}, nil,
+					).
+					Maybe()
 			}
 
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
@@ -223,7 +232,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 type nodeSetup struct {
 	node        *Plugin
 	ccipReader  *reader_mock.MockCCIP
-	priceReader *reader_mock.MockTokenPrices
+	priceReader *reader_mock.MockPriceReader
 	reportCodec *mocks.CommitPluginJSONReportCodec
 	msgHasher   *mocks.MessageHasher
 }
@@ -241,7 +250,7 @@ func setupNode(
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 ) nodeSetup {
 	ccipReader := reader_mock.NewMockCCIP(t)
-	tokenPricesReader := reader_mock.NewMockTokenPrices(t)
+	tokenPricesReader := reader_mock.NewMockPriceReader(t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)

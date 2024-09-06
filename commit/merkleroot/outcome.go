@@ -27,7 +27,7 @@ func (w *Processor) Outcome(
 	tStart := time.Now()
 	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
 	w.lggr.Infow("Sending Outcome",
-		"outcome", outcome, "oid", w.nodeID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
+		"outcome", outcome, "oid", w.oracleID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
 

@@ -87,6 +87,14 @@ func NewPlugin(
 		reportingCfg,
 		chainSupport,
 	)
+	tokenPriceProcessor := tokenprice.NewProcessor(
+		nodeID,
+		lggr,
+		cfg,
+		chainSupport,
+		tokenPricesReader,
+		homeChain,
+	)
 
 	return &Plugin{
 		nodeID:              nodeID,
@@ -101,7 +109,7 @@ func NewPlugin(
 		reportingCfg:        reportingCfg,
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
-		tokenPriceProcessor: tokenprice.NewProcessor(),
+		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainfee.NewProcessor(),
 	}
 }

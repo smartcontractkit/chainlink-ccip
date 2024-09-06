@@ -80,7 +80,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			result, err := tokenPricesReader.GetTokenPricesUSD(ctx, tc.inputTokens)
+			result, err := tokenPricesReader.GetTokenFeedPricesUSD(ctx, tc.inputTokens)
 
 			if tc.wantErr {
 				require.Error(t, err)
