@@ -12,14 +12,14 @@ generate-mocks: ensure_go_version
 
 generate-protobuf: ensure_go_version ensure_protoc_28_0
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-	protoc --go_out=./commit/merkleroot/rmn --go_opt=paths=source_relative rmn_offchain.proto
+	protoc --go_out=./commit/merkleroot/rmn/rmnpb --go_opt=paths=source_relative rmn_offchain.proto
 
 clean-generate: ensure_go_version
-	rm -rf ./commit/merkleroot/rmn/rmn_offchain.pb.go
+	rm -rf ./commit/merkleroot/rmn/rmnpb/*
 	rm -rf ./mocks/
 
 test: ensure_go_version
-	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) `go list ./... | grep -Ev '(chainlink-ccip/internal/mocks|chainlink-ccip/mocks)|\.pb\.go'`
+	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) `go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks'`
 
 lint: ensure_go_version ensure_golangcilint_1_59
 	golangci-lint run -c .golangci.yml

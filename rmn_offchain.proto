@@ -1,7 +1,7 @@
 syntax="proto3";
 
 package rmn_offchain;
-option go_package = "./;rmn";
+option go_package = "./;rmnpb";
 
 message LaneSource {
   uint64 source_chain_selector = 1;

@@ -3,6 +3,8 @@ package rmn
 import (
 	"context"
 	"errors"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
 // ErrTimeout is returned when the signature computation times out.
@@ -16,14 +18,14 @@ type Client interface {
 	// necessary steps to compute the signatures, like retrying and caching which are handled by the implementation.
 	ComputeReportSignatures(
 		ctx context.Context,
-		destChain *LaneDest,
-		requestedUpdates []FixedDestLaneUpdateRequest,
+		destChain *rmnpb.LaneDest,
+		requestedUpdates []rmnpb.FixedDestLaneUpdateRequest,
 	) (*ReportSignatures, error)
 }
 
 type ReportSignatures struct {
 	// ReportSignatures are the ECDSA signatures for the lane updates for each node.
 	// NOTE: A signature[i] corresponds to the whole LaneUpdates slice and NOT LaneUpdates[i].
-	Signatures  []EcdsaSignature
-	LaneUpdates []FixedDestLaneUpdate
+	Signatures  []rmnpb.EcdsaSignature
+	LaneUpdates []rmnpb.FixedDestLaneUpdate
 }
