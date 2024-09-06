@@ -3,8 +3,9 @@ package pluginconfig
 import (
 	"testing"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/stretchr/testify/require"
+
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 )
 
 func TestExecuteOffchainConfig_Validate(t *testing.T) {

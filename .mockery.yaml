@@ -8,15 +8,24 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/gen:
         interfaces:
             ExecutePluginCodec:
-    github.com/smartcontractkit/chainlink-ccip/commit:
+    github.com/smartcontractkit/chainlink-ccip/commit/merkleroot:
         interfaces:
             Observer:
+    github.com/smartcontractkit/chainlink-ccip/shared:
+        interfaces:
+            PluginProcessor:
             ChainSupport:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
             CCIP:
             TokenPrices:
+    github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
+        interfaces:
+            Client:
+    github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
+        interfaces:
+            Extended:
     github.com/smartcontractkit/chainlink-common/pkg/types:
         interfaces:
             ChainReader:

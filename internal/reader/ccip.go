@@ -65,6 +65,9 @@ type CCIP interface {
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
 
+	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
+	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
+
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
 	// it must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 	Nonces(
@@ -135,15 +138,12 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 	// The following types are used to decode the events
 	// but should be replaced by chain-reader modifiers and use the base cciptypes.CommitReport type.
 
-	type Interval struct {
-		Min uint64
-		Max uint64
-	}
-
 	type MerkleRoot struct {
 		SourceChainSelector uint64
-		Interval            Interval
+		MinSeqNr            uint64
+		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
+		OnRampAddress       []byte
 	}
 
 	type TokenPriceUpdate struct {
@@ -213,8 +213,8 @@ func (r *CCIPChainReader) CommitReportsGTETimestamp(
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel: cciptypes.ChainSelector(mr.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(mr.Interval.Min),
-					cciptypes.SeqNum(mr.Interval.Max),
+					cciptypes.SeqNum(mr.MinSeqNr),
+					cciptypes.SeqNum(mr.MaxSeqNr),
 				),
 				MerkleRoot: mr.MerkleRoot,
 			})
@@ -323,14 +323,9 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		return nil, err
 	}
 
-	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for onRamp contract, got %d", len(bindings))
-	}
-
-	onRampAddressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(sourceChainSelector))
+	onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, sourceChainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert onRamp address to bytes: %w", err)
+		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
 	type SendRequestedEvent struct {
@@ -342,7 +337,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 		ctx,
 		consts.ContractNameOnRamp,
 		query.KeyFilter{
-			Key: consts.EventNameCCIPSendRequested,
+			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
 				query.Confidence(primitives.Finalized),
 			},
@@ -377,7 +372,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 			msg.Message.Header.SequenceNumber >= seqNumRange.Start() &&
 			msg.Message.Header.SequenceNumber <= seqNumRange.End()
 
-		msg.Message.Header.OnRamp = onRampAddressBytes
+		msg.Message.Header.OnRamp = onRampAddress
 
 		if valid {
 			msgs = append(msgs, msg.Message)
@@ -401,11 +396,6 @@ func (r *CCIPChainReader) GetExpectedNextSequenceNumber(
 
 	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
 		return 0, err
-	}
-
-	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(bindings) != 1 {
-		return 0, fmt.Errorf("expected one binding for onRamp contract, got %d", len(bindings))
 	}
 
 	var expectedNextSequenceNumber uint64
@@ -572,22 +562,27 @@ func (r *CCIPChainReader) bindOnramps(
 }
 
 func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
+	destReader, ok := r.contractReaders[r.destChain]
+	if !ok {
+		r.lggr.Debugw("skipping nonce manager, dest chain not configured for this deployment",
+			"destChain", r.destChain)
+		return nil
+	}
+
 	staticConfig, err := r.getOfframpStaticConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get offramp static config: %w", err)
 	}
 
-	if _, ok := r.contractReaders[r.destChain]; !ok {
-		r.lggr.Debugw("skipping nonce manager, dest chain not configured for this deployment",
-			"destChain", r.destChain)
-		return nil
+	if staticConfig.ChainSelector != r.destChain {
+		return fmt.Errorf("invalid configuration detected, somehow reading from non-dest offramp")
 	}
 
 	// Bind the nonceManager contract address to the reader.
 	// If the same address exists -> no-op
 	// If the address is changed -> updates the address, overwrites the existing one
 	// If the contract not binded -> binds to the new address
-	if err := r.contractReaders[r.destChain].Bind(ctx, []types.BoundContract{
+	if err := destReader.Bind(ctx, []types.BoundContract{
 		{
 			Address: typeconv.AddressBytesToString(staticConfig.NonceManager, uint64(r.destChain)),
 			Name:    consts.ContractNameNonceManager,
@@ -600,13 +595,11 @@ func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
-	err := r.bindOnramps(ctx)
-	if err != nil {
+	if err := r.bindOnramps(ctx); err != nil {
 		return false, err
 	}
 
-	err = r.bindNonceManager(ctx)
-	if err != nil {
+	if err := r.bindNonceManager(ctx); err != nil {
 		return false, err
 	}
 
@@ -615,6 +608,20 @@ func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
 
 func (r *CCIPChainReader) Close(ctx context.Context) error {
 	return nil
+}
+
+func (r *CCIPChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+	bindings := r.contractReaders[chain].GetBindings(contractName)
+	if len(bindings) != 1 {
+		return nil, fmt.Errorf("expected one binding for the contract, got %d", len(bindings))
+	}
+
+	addressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(chain))
+	if err != nil {
+		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
+	}
+
+	return addressBytes, nil
 }
 
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
@@ -718,10 +725,10 @@ func (r *CCIPChainReader) getOfframpStaticConfig(ctx context.Context) (offrampSt
 //
 //nolint:lll // It's a URL.
 type offrampStaticChainConfig struct {
-	ChainSelector      uint64 `json:"chainSelector"`
-	RmnProxy           []byte `json:"rmnProxy"`
-	TokenAdminRegistry []byte `json:"tokenAdminRegistry"`
-	NonceManager       []byte `json:"nonceManager"`
+	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
+	RmnProxy           []byte                  `json:"rmnProxy"`
+	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
+	NonceManager       []byte                  `json:"nonceManager"`
 }
 
 // Interface compliance check
