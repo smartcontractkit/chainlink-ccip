@@ -46,7 +46,7 @@ message Observation {
 
 message SignedObservation {
   Observation observation = 1;
-  bytes signature = 2; // sign("chainlink ccip 1.6 rmn observation"|observation)
+  bytes signature = 2; // sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
 }
 
 message AttributedSignedObservation {
@@ -69,7 +69,7 @@ message ReportSignatureRequest {
 
 message ReportSignature {
   // bytes signed_hash = 1; // needless since we have a request_id
-  bytes signature = 2; // signed with onchain public key
+  EcdsaSignature signature = 2;
 }
 
 // CCIP -> RMN
