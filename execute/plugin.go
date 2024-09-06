@@ -247,17 +247,18 @@ func (p *Plugin) Observation(
 		return exectypes.NewObservation(groupedCommits, messages, nil).Encode()
 
 	case exectypes.Filter:
-		// TODO: add in nonces, other data comes from previous outcome.
+		// Phase 3: observe nonce for each unique source/sender pair.
 		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
 
 		// Collect unique senders.
-		for _, commitReport := range previousOutcome.Report.ChainReports {
-			if _, ok := nonceRequestArgs[commitReport.SourceChainSelector]; !ok {
-				nonceRequestArgs[commitReport.SourceChainSelector] = make(map[string]struct{})
+		for _, commitReport := range previousOutcome.PendingCommitReports {
+			if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
+				nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
 			}
+
 			for _, msg := range commitReport.Messages {
 				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
-				nonceRequestArgs[commitReport.SourceChainSelector][sender] = struct{}{}
+				nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 			}
 		}
 
@@ -364,51 +365,16 @@ func (p *Plugin) Outcome(
 		}
 	}
 
-	/////////////////////////////////////////////
-	// Decode the observations and merge them. //
-	/////////////////////////////////////////////
-	decodedObservations, err := decodeAttributedObservations(aos)
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to decode observations: %w", err)
-	}
-	if len(decodedObservations) < p.reportingCfg.F {
-		return ocr3types.Outcome{}, fmt.Errorf("below F threshold")
-	}
-
-	p.lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", p.reportingCfg.OracleID),
-		"oracle", p.reportingCfg.OracleID,
-		"decodedObservations", decodedObservations)
-
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
 	}
 
-	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, fChain)
+	observation, err := getConsensusObservation(
+		p.lggr, aos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
 	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to merge commit report observations: %w", err)
+		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
-
-	p.lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged commit observations", p.reportingCfg.OracleID),
-		"oracle", p.reportingCfg.OracleID,
-		"mergedCommitObservations", mergedCommitObservations)
-
-	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to merge message observations: %w", err)
-	}
-
-	p.lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", p.reportingCfg.OracleID),
-		"oracle", p.reportingCfg.OracleID,
-		"mergedMessageObservations", mergedMessageObservations)
-
-	observation := exectypes.NewObservation(
-		mergedCommitObservations,
-		mergedMessageObservations,
-		nil)
 
 	var outcome exectypes.Outcome
 	state := previousOutcome.State.Next()

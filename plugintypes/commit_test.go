@@ -5,9 +5,10 @@ import (
 	"math/big"
 	"testing"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestCommitPluginObservation_EncodeAndDecode(t *testing.T) {

@@ -1,0 +1,102 @@
+syntax="proto3";
+
+package rmn_offchain;
+option go_package = "./;rmnpb";
+
+message LaneSource {
+  uint64 source_chain_selector = 1;
+  bytes onramp_address = 2;
+}
+
+message LaneDest {
+  uint64 dest_chain_selector = 1;
+  bytes offramp_address = 2;
+}
+
+message ClosedInterval {
+  uint64 min_msg_nr = 1;
+  uint64 max_msg_nr = 2;
+}
+
+message FixedDestLaneUpdateRequest {
+  LaneSource lane_source = 1;
+  ClosedInterval closed_interval = 2;
+}
+
+message FixedDestLaneUpdate {
+  LaneSource lane_source = 1;
+  ClosedInterval closed_interval = 2;
+  bytes root = 3;
+}
+
+message ObservationRequest {
+  LaneDest lane_dest = 1; // could be implied
+  repeated FixedDestLaneUpdateRequest fixed_dest_lane_update_requests = 2;
+}
+
+// TODO: For terseness, we might want to split this into two messages down the line:
+// An observation containing only the things that cannot be inferred
+// An observation representing the exact message that is signed by the RMN node
+message Observation {
+  bytes rmn_home_contract_config_digest = 1; // could be implied
+  LaneDest lane_dest = 2; // could be implied
+  repeated FixedDestLaneUpdate fixed_dest_lane_updates = 3;
+  uint64 timestamp = 4;
+}
+
+message SignedObservation {
+  Observation observation = 1;
+  bytes signature = 2; // sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
+}
+
+message AttributedSignedObservation {
+  SignedObservation signed_observation = 1;
+  uint32 signer_node_index = 2;
+}
+
+// Signed along with the report
+message ReportContext {
+  uint64 evm_dest_chain_id = 1;
+  bytes rmn_remote_contract_address = 2;
+  bytes rmn_home_contract_config_digest = 3; // can lag behind home chain to support blue/green
+  LaneDest lane_dest = 4;
+}
+
+message ReportSignatureRequest {
+  ReportContext context = 1;
+  repeated AttributedSignedObservation attributed_signed_observations = 2;
+}
+
+message ReportSignature {
+  // bytes signed_hash = 1; // needless since we have a request_id
+  EcdsaSignature signature = 2;
+}
+
+// CCIP -> RMN
+message Request {
+  uint64 request_id = 1;
+  oneof request {
+    ObservationRequest observation_request = 2;
+    ReportSignatureRequest report_signature_request = 3;
+  }
+}
+
+// RMN -> CCIP
+message Response {
+  uint64 request_id = 1;
+  oneof response {
+    SignedObservation signed_observation = 2;
+    ReportSignature report_signature = 3;
+  }
+}
+
+message EcdsaSignature {
+  bytes r = 1;
+  bytes s = 2;
+}
+
+// To be sent by the OCR leader in a "BuildingReports" round.
+message ReportingPluginQuery {
+  repeated FixedDestLaneUpdate fixed_dest_lane_updates = 1;
+  repeated EcdsaSignature ecdsa_signatures = 2;
+}

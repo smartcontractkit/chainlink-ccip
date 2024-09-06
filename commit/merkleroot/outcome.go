@@ -1,14 +1,13 @@
-package commit
+package merkleroot
 
 import (
 	"fmt"
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -20,38 +19,46 @@ import (
 // - chooses the seq num ranges for the next round
 // - builds a report
 // - checks for the transmission of a previous report
-func (p *Plugin) Outcome(
-	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
-) (ocr3types.Outcome, error) {
+func (w *Processor) Outcome(
+	prevOutcome Outcome,
+	query Query,
+	aos []shared.AttributedObservation[Observation],
+) (Outcome, error) {
 	tStart := time.Now()
-	outcome, nextState := p.getOutcome(outCtx, aos)
-	p.lggr.Infow("Sending Outcome",
-		"outcome", outcome, "oid", p.nodeID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
-	return outcome.Encode()
+	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
+	w.lggr.Infow("Sending Outcome",
+		"outcome", outcome, "oid", w.nodeID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
+	return outcome, nil
 }
 
-func (p *Plugin) getOutcome(
-	outCtx ocr3types.OutcomeContext, aos []types.AttributedObservation,
+func (w *Processor) getOutcome(
+	previousOutcome Outcome,
+	q Query,
+	aos []shared.AttributedObservation[Observation],
 ) (Outcome, State) {
-	previousOutcome, nextState := p.decodeOutcome(outCtx.PreviousOutcome)
-	commitQuery := Query{}
+	nextState := previousOutcome.NextState()
 
-	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.cfg.DestChain, aos)
+	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
 	if err != nil {
-		p.lggr.Warnw("Get consensus observation failed, empty outcome", "error", err)
+		w.lggr.Warnw("Get consensus observation failed, empty outcome", "error", err)
 		return Outcome{}, nextState
 	}
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(commitQuery, consensusObservation), nextState
+		return reportRangesOutcome(q, consensusObservation), nextState
 	case BuildingReport:
-		return buildReport(commitQuery, consensusObservation, previousOutcome), nextState
+		if q.RetryRMNSignatures {
+			// We want to retry getting the RMN signatures on the exact same outcome we had before.
+			// The current observations should all be empty.
+			return previousOutcome, BuildingReport
+		}
+		return buildReport(q, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
 		return checkForReportTransmission(
-			p.lggr, p.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
+			w.lggr, w.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
 	default:
-		p.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
+		w.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
 		return Outcome{}, nextState
 	}
 }
@@ -59,15 +66,10 @@ func (p *Plugin) getOutcome(
 // reportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 // TODO: ensure each range is below a limit
 func reportRangesOutcome(
-	query Query,
+	_ Query,
 	consensusObservation ConsensusObservation,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
-
-	rmnOnRampMaxSeqNumsMap := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-	for _, seqNumChain := range query.RmnOnRampMaxSeqNums {
-		rmnOnRampMaxSeqNumsMap[seqNumChain.ChainSel] = seqNumChain.SeqNum
-	}
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
 	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
@@ -77,10 +79,6 @@ func reportRangesOutcome(
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
 		if !exists {
 			continue
-		}
-
-		if rmnOnRampMaxSeqNum, exists := rmnOnRampMaxSeqNumsMap[chainSel]; exists {
-			onRampMaxSeqNum = min(onRampMaxSeqNum, rmnOnRampMaxSeqNum)
 		}
 
 		if offRampNextSeqNum <= onRampMaxSeqNum {
@@ -128,11 +126,11 @@ func buildReport(
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
+	// TODO: use q.RMNSignatures in the generated outcome and eventually report. - Blocked by onchain work.
+
 	outcome := Outcome{
 		OutcomeType:        outcomeType,
 		RootsToReport:      roots,
-		GasPrices:          consensusObservation.GasPricesArray(),
-		TokenPrices:        consensusObservation.TokenPricesArray(),
 		OffRampNextSeqNums: prevOutcome.OffRampNextSeqNums,
 	}
 
@@ -188,7 +186,7 @@ func getConsensusObservation(
 	lggr logger.Logger,
 	F int,
 	destChain cciptypes.ChainSelector,
-	aos []types.AttributedObservation,
+	aos []shared.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 	fChains := fChainConsensus(lggr, F, aggObs.FChain)
@@ -200,11 +198,7 @@ func getConsensusObservation(
 	}
 
 	consensusObs := ConsensusObservation{
-		MerkleRoots: merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
-		// TODO: use consensus of observed gas prices
-		GasPrices: make(map[cciptypes.ChainSelector]cciptypes.BigInt),
-		// TODO: use consensus of observed token prices
-		TokenPrices:        make(map[types.Account]cciptypes.BigInt),
+		MerkleRoots:        merkleRootConsensus(lggr, aggObs.MerkleRoots, fChains),
 		OnRampMaxSeqNums:   onRampMaxSeqNumsConsensus(lggr, aggObs.OnRampMaxSeqNums, fChains),
 		OffRampNextSeqNums: offRampMaxSeqNumsConsensus(lggr, aggObs.OffRampNextSeqNums, fDestChain),
 		FChain:             fChains,
@@ -213,9 +207,10 @@ func getConsensusObservation(
 	return consensusObs, nil
 }
 
-// Given a mapping from chains to a list of merkle roots, return a mapping from chains to a single consensus merkle
-// root. The consensus merkle root for a given chain is the merkle root with the most observations that was observed at
-// least fChain times.
+// Given a mapping from chains to a list of merkle roots,
+// return a mapping from chains to a single consensus merkle root.
+// The consensus merkle root for a given chain is the merkle root with the
+// most observations that was observed at least fChain times.
 func merkleRootConsensus(
 	lggr logger.Logger,
 	rootsByChain map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain,
