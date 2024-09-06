@@ -24,7 +24,6 @@ generate-mocks: ensure_go_version
 	mockery
 
 generate-protobuf: ensure_go_version ensure_protoc_28_0
-	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	protoc --go_out=./commit/merkleroot/rmn/rmnpb --go_opt=paths=source_relative rmn_offchain.proto
 
 clean-generate: ensure_go_version
@@ -49,6 +48,7 @@ install-protoc:
 	sudo chmod +x /usr/local/bin/protoc
 	@echo "Installed protoc version:"
 	protoc --version
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
 ensure_go_version:
 	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
