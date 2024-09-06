@@ -5,8 +5,6 @@ import (
 	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
-<<<<<<< Updated upstream
-=======
 	"fmt"
 	"math/rand"
 	"sort"
@@ -17,7 +15,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
->>>>>>> Stashed changes
 )
 
 // ErrTimeout is returned when the signature computation times out.
@@ -31,12 +28,6 @@ type Client interface {
 	// necessary steps to compute the signatures, like retrying and caching which are handled by the implementation.
 	ComputeReportSignatures(
 		ctx context.Context,
-<<<<<<< Updated upstream
-		destChain DestChainInfo,
-		requestedUpdates []FixedDestLaneUpdateRequest,
-	) (*ReportSignatures, error)
-}
-=======
 		destChain *rmnpb.LaneDest,
 		requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
 	) (*ReportSignatures, error)
@@ -447,4 +438,3 @@ func newRequestID() uint64 {
 	randPart := uint64(binary.LittleEndian.Uint32(randBytes[:]))
 	return (now << 32) | randPart
 }
->>>>>>> Stashed changes

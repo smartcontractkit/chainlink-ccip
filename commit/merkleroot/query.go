@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
@@ -23,28 +24,18 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	if err != nil {
 		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
 	}
-	dstChainInfo := rmn.DestChainInfo{
-		Chain:          w.cfg.DestChain,
-		OffRampAddress: offRampAddress,
+	dstChainInfo := &rmnpb.LaneDest{
+		DestChainSelector: uint64(w.cfg.DestChain),
+		OfframpAddress:    offRampAddress,
 	}
 
-<<<<<<< Updated upstream
-	reqUpdates := make([]rmn.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
-=======
 	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
->>>>>>> Stashed changes
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
 			return Query{}, fmt.Errorf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 		}
 
-<<<<<<< Updated upstream
-		reqUpdates = append(reqUpdates, rmn.FixedDestLaneUpdateRequest{
-			SourceChainInfo: rmn.SourceChainInfo{
-				Chain:         sourceChainRange.ChainSel,
-				OnRampAddress: onRampAddress,
-=======
 		reqUpdates = append(reqUpdates, &rmnpb.FixedDestLaneUpdateRequest{
 			LaneSource: &rmnpb.LaneSource{
 				SourceChainSelector: uint64(sourceChainRange.ChainSel),
@@ -53,9 +44,7 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 			ClosedInterval: &rmnpb.ClosedInterval{
 				MinMsgNr: uint64(sourceChainRange.SeqNumRange.Start()),
 				MaxMsgNr: uint64(sourceChainRange.SeqNumRange.End()),
->>>>>>> Stashed changes
 			},
-			SeqNumRange: sourceChainRange.SeqNumRange,
 		})
 	}
 
