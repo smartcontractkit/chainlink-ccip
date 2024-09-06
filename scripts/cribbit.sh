@@ -30,7 +30,7 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 source "${repo_root}/scripts/lib/shared_functions.sh"
 
 # Initialize variables
-provider=""
+provider=${PROVIDER:-""}
 default_provider="aws"
 DEVSPACE_NAMESPACE="${1:-}"
 
