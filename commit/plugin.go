@@ -144,20 +144,25 @@ func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (o
 }
 
 func (p *Plugin) Observation(
-	ctx context.Context, outCtx ocr3types.OutcomeContext, _ types.Query,
+	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 	fChain := p.ObserveFChain()
 
-	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, merkleroot.Query{})
+	decodedQ, err := DecodeCommitPluginQuery(q)
+	if err != nil {
+		return nil, fmt.Errorf("decode query: %w", err)
+	}
+
+	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
 	}
-	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, tokenprice.Query{})
+	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get token prices", "err", err)
 	}
-	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, chainfee.Query{})
+	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get gas prices", "err", err)
 	}
@@ -186,9 +191,14 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 // - builds a report
 // - checks for the transmission of a previous report
 func (p *Plugin) Outcome(
-	outCtx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
+	outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
+
+	decodedQ, err := DecodeCommitPluginQuery(q)
+	if err != nil {
+		return nil, fmt.Errorf("decode query: %w", err)
+	}
 
 	var merkleObservations []MerkleRootObservation
 	var tokensObservations []TokenPricesObservation
@@ -224,7 +234,7 @@ func (p *Plugin) Outcome(
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
 		prevOutcome.MerkleRootOutcome,
-		merkleroot.Query{},
+		decodedQ.MerkleRootQuery,
 		merkleObservations,
 	)
 	if err != nil {
@@ -233,7 +243,7 @@ func (p *Plugin) Outcome(
 
 	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
 		prevOutcome.TokenPriceOutcome,
-		tokenprice.Query{},
+		decodedQ.TokenPriceQuery,
 		tokensObservations,
 	)
 
@@ -241,7 +251,11 @@ func (p *Plugin) Outcome(
 		p.lggr.Errorw("failed to get token prices outcome", "err", err)
 	}
 
-	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(prevOutcome.ChainFeeOutcome, chainfee.Query{}, feeObservations)
+	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
+		prevOutcome.ChainFeeOutcome,
+		decodedQ.ChainFeeQuery,
+		feeObservations,
+	)
 	if err != nil {
 		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
 	}

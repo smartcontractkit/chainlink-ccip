@@ -254,6 +254,65 @@ func (_c *MockCCIP_GasPrices_Call) RunAndReturn(run func(context.Context, []ccip
 	return _c
 }
 
+// GetContractAddress provides a mock function with given fields: contractName, chain
+func (_m *MockCCIP) GetContractAddress(contractName string, chain ccipocr3.ChainSelector) ([]byte, error) {
+	ret := _m.Called(contractName, chain)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContractAddress")
+	}
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, ccipocr3.ChainSelector) ([]byte, error)); ok {
+		return rf(contractName, chain)
+	}
+	if rf, ok := ret.Get(0).(func(string, ccipocr3.ChainSelector) []byte); ok {
+		r0 = rf(contractName, chain)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string, ccipocr3.ChainSelector) error); ok {
+		r1 = rf(contractName, chain)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIP_GetContractAddress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContractAddress'
+type MockCCIP_GetContractAddress_Call struct {
+	*mock.Call
+}
+
+// GetContractAddress is a helper method to define mock.On call
+//   - contractName string
+//   - chain ccipocr3.ChainSelector
+func (_e *MockCCIP_Expecter) GetContractAddress(contractName interface{}, chain interface{}) *MockCCIP_GetContractAddress_Call {
+	return &MockCCIP_GetContractAddress_Call{Call: _e.mock.On("GetContractAddress", contractName, chain)}
+}
+
+func (_c *MockCCIP_GetContractAddress_Call) Run(run func(contractName string, chain ccipocr3.ChainSelector)) *MockCCIP_GetContractAddress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIP_GetContractAddress_Call) Return(_a0 []byte, _a1 error) *MockCCIP_GetContractAddress_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIP_GetContractAddress_Call) RunAndReturn(run func(string, ccipocr3.ChainSelector) ([]byte, error)) *MockCCIP_GetContractAddress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetExpectedNextSequenceNumber provides a mock function with given fields: ctx, sourceChainSelector, destChainSelector
 func (_m *MockCCIP) GetExpectedNextSequenceNumber(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector, destChainSelector ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
 	ret := _m.Called(ctx, sourceChainSelector, destChainSelector)

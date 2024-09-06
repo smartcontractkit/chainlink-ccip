@@ -20,6 +20,12 @@ packages:
             HomeChain:
             CCIP:
             PriceReader:
+    github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
+        interfaces:
+            Client:
+    github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
+        interfaces:
+            Extended:
     github.com/smartcontractkit/chainlink-common/pkg/types:
         interfaces:
             ChainReader:

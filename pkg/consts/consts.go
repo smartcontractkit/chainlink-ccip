@@ -77,7 +77,7 @@ const (
 
 // Event Names
 const (
-	EventNameCCIPSendRequested     = "CCIPSendRequested"
+	EventNameCCIPMessageSent       = "CCIPMessageSent"
 	EventNameExecutionStateChanged = "ExecutionStateChanged"
 	EventNameCommitReportAccepted  = "CommitReportAccepted"
 )
