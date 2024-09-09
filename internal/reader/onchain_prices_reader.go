@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"golang.org/x/sync/errgroup"
@@ -36,15 +36,16 @@ type PriceReader interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader commontyps.ContractReader
-	TokenInfo      map[types.Account]pluginconfig.TokenInfo
+	ContractReader   commontypes.ContractReader
+	TokenInfo        map[types.Account]pluginconfig.TokenInfo
+	FeeQuoterAddress types.Account
 	// If not enabled just return empty prices
 	// TODO: Remove completely once integration tests are updated
 	enabled bool
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontyps.ContractReader,
+	contractReader commontypes.ContractReader,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
@@ -74,13 +75,16 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 		return map[types.Account]shared.TimestampedBig{}, nil
 	}
 
+	boundContract := commontypes.BoundContract{
+		Address: string(pr.FeeQuoterAddress),
+		Name:    consts.ContractNamePriceRegistry,
+	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			consts.ContractNamePriceRegistry,
-			consts.MethodNameFeeQuoterGetTokenPrices,
+			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
 			tokens,
 			&updates,
@@ -114,11 +118,11 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		eg.Go(func() error {
 			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
 			// are merged we'll need to use the bound contract
-			//boundContract := commontypes.BoundContract{
-			//	Address: pr.TokenInfo[token].AggregatorAddress,
-			//	Name: consts.ContractNamePriceAggregator,
-			//}
-			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token)
+			boundContract := commontypes.BoundContract{
+				Address: pr.TokenInfo[token].AggregatorAddress,
+				Name:    consts.ContractNamePriceAggregator,
+			}
+			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
@@ -145,17 +149,19 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token types.Account) (uint8, error) {
+func (pr *OnchainTokenPricesReader) getFeedDecimals(
+	ctx context.Context,
+	token ocr2types.Account,
+	boundContract commontypes.BoundContract,
+) (uint8, error) {
 	var decimals uint8
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetDecimals,
+			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
 			nil,
 			&decimals,
-			//boundContract,
 		); err != nil {
 		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
 	}
@@ -165,23 +171,22 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token t
 
 func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
-	token types.Account,
+	token ocr2types.Account,
+	boundContract commontypes.BoundContract,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetLatestRoundData,
+			boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData),
 			primitives.Unconfirmed,
 			nil,
 			&latestRoundData,
-			//boundContract,
 		); err != nil {
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
 	}
 
-	decimals, err1 := pr.getFeedDecimals(ctx, token)
+	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract)
 	if err1 != nil {
 		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
 	}
