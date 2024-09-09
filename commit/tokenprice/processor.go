@@ -92,7 +92,7 @@ func (p *Processor) ObserveFDestChain() (*int, error) {
 	if err != nil {
 		// TODO: metrics
 		p.lggr.Warnw("call to GetFChain failed", "err", err)
-		return nil, nil
+		return nil, fmt.Errorf("failed to get FChain")
 	}
 
 	fDestChain, ok := fChain[p.cfg.DestChain]

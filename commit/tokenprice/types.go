@@ -2,6 +2,7 @@ package tokenprice
 
 import (
 	"context"
+	"math/big"
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -36,4 +37,19 @@ type Observer interface {
 type NumericalUpdate struct {
 	Timestamp time.Time        `json:"timestamp"`
 	Value     cciptypes.BigInt `json:"value"`
+}
+
+func NewNumericalUpdate(value int64, timestamp time.Time) NumericalUpdate {
+	return NumericalUpdate{
+		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
+		Timestamp: timestamp,
+	}
+}
+
+// NewNumericalUpdateNow NewNumericalUpdate Returns an update with timestamp now as UTC
+func NewNumericalUpdateNow(value int64) NumericalUpdate {
+	return NumericalUpdate{
+		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
+		Timestamp: time.Now().UTC(),
+	}
 }

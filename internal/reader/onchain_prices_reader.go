@@ -39,6 +39,21 @@ type NumericalUpdate struct {
 	Value     cciptypes.BigInt `json:"value"`
 }
 
+func NewNumericalUpdate(value int64, timestamp time.Time) NumericalUpdate {
+	return NumericalUpdate{
+		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
+		Timestamp: timestamp,
+	}
+}
+
+// NewNumericalUpdateNow NewNumericalUpdate Returns an update with timestamp now as UTC
+func NewNumericalUpdateNow(value int64) NumericalUpdate {
+	return NumericalUpdate{
+		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
+		Timestamp: time.Now().UTC(),
+	}
+}
+
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
 	ContractReader commontyps.ContractReader
