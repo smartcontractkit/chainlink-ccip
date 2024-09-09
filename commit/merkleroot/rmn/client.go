@@ -152,6 +152,8 @@ func (c *PBClient) getRmnSignedObservations(
 	requestedNodes := make(map[uint64]mapset.Set[uint32])                   // sourceChain -> requested rmnNodeIDs
 	requestsPerNode := make(map[uint32][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
+	c.lggr.Infof("update requests per chain: %v", updateRequestsPerChain)
+
 	// For each lane update request send an observation request to at most 'minObservers' number of rmn nodes.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
 		requestedNodes[sourceChain] = mapset.NewSet[uint32]()
@@ -169,6 +171,9 @@ func (c *PBClient) getRmnSignedObservations(
 			requestsPerNode[nodeID] = append(requestsPerNode[nodeID], updateRequest.data)
 		}
 	}
+
+	c.lggr.Infof("requested nodes %v", requestedNodes)
+	c.lggr.Infof("sending observation request to node %v", requestsPerNode)
 
 	requestIDs := c.sendObservationRequests(destChain, requestsPerNode)
 	signedObservations, err := c.listenForRmnObservationResponses(
@@ -203,6 +208,7 @@ func (c *PBClient) sendObservationRequests(
 			},
 		}
 
+		c.lggr.Infof("sending observation request to node %v", nodeID)
 		if err := c.marshalAndSend(req, nodeID); err != nil {
 			c.lggr.Errorw("failed to send observation request", "node_id", nodeID, "err", err)
 			continue
@@ -276,7 +282,7 @@ func (c *PBClient) listenForRmnObservationResponses(
 			// Timer expired, send the observation requests to the rest of the RMN nodes.
 			requestsPerNode := make(map[uint32][]*rmnpb.FixedDestLaneUpdateRequest)
 			for sourceChain, lur := range lursPerChain {
-				for nodeID := range lur.rmnNodes.Iter() {
+				for nodeID := range randomIter(lur.rmnNodes.ToSlice()) {
 					if requestedNodes[sourceChain].Contains(nodeID) {
 						continue
 					}
