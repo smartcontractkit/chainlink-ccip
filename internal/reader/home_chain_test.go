@@ -73,9 +73,7 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 }
 
 func Test_PollingWorking(t *testing.T) {
-	chainConfig := chainconfig.ChainConfig{
-		FinalityDepth: 1,
-	}
+	chainConfig := chainconfig.ChainConfig{}
 	encodedChainConfig, err := chainconfig.EncodeChainConfig(chainConfig)
 	require.NoError(t, err)
 	onChainConfigs := []ChainConfigInfo{
