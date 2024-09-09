@@ -4,7 +4,7 @@ go 1.22.5
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240906173742-4e5b3d32c1ea
+	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240909141252-663388d38293
 	github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
