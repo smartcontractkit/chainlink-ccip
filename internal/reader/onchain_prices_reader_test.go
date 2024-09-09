@@ -9,9 +9,11 @@ import (
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+
 	"github.com/stretchr/testify/require"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"

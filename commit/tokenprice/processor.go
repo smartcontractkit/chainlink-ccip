@@ -22,7 +22,7 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type Processor struct {
+type processor struct {
 	oracleID         commontypes.OracleID
 	lggr             logger.Logger
 	cfg              pluginconfig.CommitPluginConfig
@@ -31,6 +31,7 @@ type Processor struct {
 	homeChain        reader.HomeChain
 }
 
+// nolint: revive
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	lggr logger.Logger,
@@ -38,8 +39,8 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	tokenPriceReader reader.PriceReader,
 	homeChain reader.HomeChain,
-) *Processor {
-	return &Processor{
+) *processor {
+	return &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
 		cfg:              cfg,
@@ -49,11 +50,11 @@ func NewProcessor(
 	}
 }
 
-func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
 }
 
-func (p *Processor) Observation(
+func (p *processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
@@ -72,7 +73,7 @@ func (p *Processor) Observation(
 	}, nil
 }
 
-func (p *Processor) Outcome(
+func (p *processor) Outcome(
 	prevOutcome Outcome,
 	query Query,
 	aos []shared.AttributedObservation[Observation],
@@ -80,7 +81,7 @@ func (p *Processor) Outcome(
 	return Outcome{}, nil
 }
 
-func (p *Processor) ValidateObservation(
+func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,
 	ao shared.AttributedObservation[Observation],
@@ -89,7 +90,7 @@ func (p *Processor) ValidateObservation(
 	return nil
 }
 
-func (p *Processor) ObserveFDestChain() (int, error) {
+func (p *processor) ObserveFDestChain() (int, error) {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
@@ -105,7 +106,7 @@ func (p *Processor) ObserveFDestChain() (int, error) {
 	return fDestChain, nil
 }
 
-func (p *Processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
+func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
 	supportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
 	if err != nil {
 		p.lggr.Warnw("call to SupportedChains failed", "err", err)
@@ -146,7 +147,7 @@ func (p *Processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	return tokenPricesUSD
 }
 
-func (p *Processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]shared.TimestampedBig {
+func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]shared.TimestampedBig {
 	supportsDestChain, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
 		p.lggr.Warnw("call to SupportsDestChain failed", "err", err)
@@ -199,4 +200,4 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	return nil
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+var _ shared.PluginProcessor[Query, Observation, Outcome] = &processor{}

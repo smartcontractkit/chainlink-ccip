@@ -48,13 +48,13 @@ func Test_Observation(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		getProcessor func(t *testing.T) *Processor
+		getProcessor func(t *testing.T) *processor
 		expObs       Observation
 		expErr       error
 	}{
 		{
 			name: "Successful observation",
-			getProcessor: func(t *testing.T) *Processor {
+			getProcessor: func(t *testing.T) *processor {
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
 					mapset.NewSet[cciptypes.ChainSelector](tokenPriceChainSel, destChainSel), nil,
@@ -79,7 +79,7 @@ func Test_Observation(t *testing.T) {
 					nil,
 				)
 
-				return &Processor{
+				return &processor{
 					oracleID:         1,
 					lggr:             logger.Test(t),
 					chainSupport:     chainSupport,
@@ -98,14 +98,14 @@ func Test_Observation(t *testing.T) {
 		},
 		{
 			name: "Failed to get FDestChain",
-			getProcessor: func(t *testing.T) *Processor {
+			getProcessor: func(t *testing.T) *processor {
 				homeChain := readermock.NewMockHomeChain(t)
 				homeChain.EXPECT().GetFChain().Return(nil, errors.New("failed to get FChain"))
 
 				chainSupport := common_mock.NewMockChainSupport(t)
 				tokenPriceReader := readermock.NewMockPriceReader(t)
 
-				return &Processor{
+				return &processor{
 					oracleID:         1,
 					lggr:             logger.Test(t),
 					chainSupport:     chainSupport,
