@@ -16,8 +16,15 @@ func NewCCIPReader(
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
+	offrampAddress []byte,
 ) CCIPReader {
-	return readerinternal.NewCCIPChainReader(lggr, contractReaders, contractWriters, destChain)
+	return readerinternal.NewCCIPChainReader(
+		lggr,
+		contractReaders,
+		contractWriters,
+		destChain,
+		offrampAddress,
+	)
 }
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
@@ -26,8 +33,9 @@ func NewCCIPReaderWithExtendedContractReaders(
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
+	offrampAddress []byte,
 ) CCIPReader {
-	cr := readerinternal.NewCCIPChainReader(lggr, nil, contractWriters, destChain)
+	cr := readerinternal.NewCCIPChainReader(lggr, nil, contractWriters, destChain, offrampAddress)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}

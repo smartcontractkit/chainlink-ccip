@@ -107,6 +107,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.contractReaders,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
+		p.ocrConfig.Config.OfframpAddress,
 	)
 
 	return NewPlugin(

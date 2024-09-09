@@ -61,14 +61,12 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	for idx, token := range tokens {
 		idx := idx
 		token := token
+		boundContract := commontypes.BoundContract{
+			Address: pr.PriceSources[token].AggregatorAddress,
+			Name:    consts.ContractNamePriceAggregator,
+		}
 		eg.Go(func() error {
-			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
-			// are merged we'll need to use the bound contract
-			//boundContract := commontypes.BoundContract{
-			//	Address: pr.PriceSources[token].AggregatorAddress,
-			//	Name: consts.ContractNamePriceAggregator,
-			//}
-			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token)
+			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
@@ -95,17 +93,19 @@ func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token ocr2types.Account) (uint8, error) {
+func (pr *OnchainTokenPricesReader) getFeedDecimals(
+	ctx context.Context,
+	token ocr2types.Account,
+	boundContract commontypes.BoundContract,
+) (uint8, error) {
 	var decimals uint8
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetDecimals,
+			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
 			map[string]any{},
 			&decimals,
-			//boundContract,
 		); err != nil {
 		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
 	}
@@ -116,22 +116,21 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(ctx context.Context, token o
 func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
 	token ocr2types.Account,
+	boundContract commontypes.BoundContract,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetLatestRoundData,
+			boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData),
 			primitives.Unconfirmed,
 			map[string]any{},
 			&latestRoundData,
-			//boundContract,
 		); err != nil {
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
 	}
 
-	decimals, err1 := pr.getFeedDecimals(ctx, token)
+	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract)
 	if err1 != nil {
 		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
 	}

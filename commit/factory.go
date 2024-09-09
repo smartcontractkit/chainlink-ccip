@@ -112,6 +112,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		p.contractReaders,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
+		p.ocrConfig.Config.OfframpAddress,
 	)
 	return NewPlugin(
 			context.Background(),
