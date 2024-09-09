@@ -61,7 +61,9 @@ func Test_Observation(t *testing.T) {
 				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 
 				tokenPriceReader := readermock.NewMockPriceReader(t)
-				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, mock.Anything).Return([]*big.Int{bi100, bi200}, nil)
+				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, []types.Account{tokenA, tokenB}).
+					Return([]*big.Int{bi100, bi200}, nil)
+
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
 					map[types.Account]reader.NumericalUpdate{
 						tokenA: reader.NewNumericalUpdate(bi100.Int64(), timestamp),
@@ -132,6 +134,14 @@ func Test_Observation(t *testing.T) {
 				actualObs.Timestamp = tc.expObs.Timestamp
 				assert.Equal(t, tc.expObs, actualObs)
 			}
+		})
+	}
+}
+
+func TestManyTimes(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		t.Run("", func(t *testing.T) {
+			Test_Observation(t)
 		})
 	}
 }

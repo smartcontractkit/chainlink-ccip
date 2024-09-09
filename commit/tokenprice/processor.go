@@ -3,6 +3,7 @@ package tokenprice
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -122,6 +123,8 @@ func (p *Processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	}
 
 	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
+	//sort tokens to query to ensure deterministic order
+	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing feed token prices")
 	tokenPrices, err := p.tokenPriceReader.GetTokenFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
@@ -159,6 +162,8 @@ func (p *Processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 	}
 
 	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
+	//sort tokens to query to ensure deterministic order
+	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing price registry token updates")
 	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery)
 	if err != nil {
