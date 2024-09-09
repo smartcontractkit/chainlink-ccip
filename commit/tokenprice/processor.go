@@ -67,7 +67,7 @@ func (p *Processor) Observation(
 	return Observation{
 		FeedTokenPrices:       p.ObserveFeedTokenPrices(ctx),
 		FeeQuoterTokenUpdates: p.ObserveFeeQuoterTokenUpdates(ctx),
-		FDestChain:            *fDestChain,
+		FDestChain:            fDestChain,
 		Timestamp:             time.Now().UTC(),
 	}, nil
 }
@@ -89,20 +89,20 @@ func (p *Processor) ValidateObservation(
 	return nil
 }
 
-func (p *Processor) ObserveFDestChain() (*int, error) {
+func (p *Processor) ObserveFDestChain() (int, error) {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
 		p.lggr.Warnw("call to GetFChain failed", "err", err)
-		return nil, fmt.Errorf("failed to get FChain")
+		return 0, fmt.Errorf("failed to get FChain")
 	}
 
 	fDestChain, ok := fChain[p.cfg.DestChain]
 	if !ok {
-		return nil, fmt.Errorf("fChain does not have dest chain")
+		return 0, fmt.Errorf("fChain does not have dest chain")
 	}
 
-	return &fDestChain, nil
+	return fDestChain, nil
 }
 
 func (p *Processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
@@ -133,7 +133,7 @@ func (p *Processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 		return []cciptypes.TokenPrice{}
 	}
 
-	// Continue if we couldn't fetch all prices
+	// If we couldn't fetch all prices log and return only the ones we could fetch
 	if len(tokenPrices) != len(tokensToQuery) {
 		p.lggr.Errorw("token prices length mismatch", "got", len(tokenPrices), "want", len(tokensToQuery))
 	}

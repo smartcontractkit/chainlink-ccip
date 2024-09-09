@@ -20,7 +20,10 @@ import (
 )
 
 type PriceReader interface {
-	// GetTokenFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18. 1USD=1e18USD.
+	// GetTokenFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18.
+	//	1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
 	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
 
@@ -30,29 +33,6 @@ type PriceReader interface {
 		tokens []ocr2types.Account,
 	) (map[ocr2types.Account]shared.TimestampedBig, error)
 }
-
-// TimestampedBig On-chain struct `TimestampedPackedUint224`:
-// nolint:lll
-// https://github.com/smartcontractkit/chainlink/blob/2d77ff4623d0a0032533c89f32fc251400382455/contracts/src/v0.8/ccip/libraries/Internal.sol#L43-L47
-//type TimestampedBig struct {
-//	Timestamp time.Time        `json:"timestamp"`
-//	Value     cciptypes.BigInt `json:"value"`
-//}
-//
-//func NewTimestampedBig(value int64, timestamp time.Time) TimestampedBig {
-//	return TimestampedBig{
-//		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
-//		Timestamp: timestamp,
-//	}
-//}
-//
-//// NewTimestampedBigNow NewTimestampedBig Returns an update with timestamp now as UTC
-//func NewTimestampedBigNow(value int64) TimestampedBig {
-//	return TimestampedBig{
-//		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
-//		Timestamp: time.Now().UTC(),
-//	}
-//}
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain

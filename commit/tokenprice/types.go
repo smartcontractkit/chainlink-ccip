@@ -32,25 +32,5 @@ type Observer interface {
 	// ObserveFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain
 	ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]shared.TimestampedBig
 
-	ObserveFDestChain() (*int, error)
+	ObserveFDestChain() (int, error)
 }
-
-//type TimestampedBig struct {
-//	Timestamp time.Time        `json:"timestamp"`
-//	Value     cciptypes.BigInt `json:"value"`
-//}
-//
-//func NewTimestampedBig(value int64, timestamp time.Time) TimestampedBig {
-//	return TimestampedBig{
-//		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
-//		Timestamp: timestamp,
-//	}
-//}
-//
-//// NewTimestampedBigNow NewTimestampedBig Returns an update with timestamp now as UTC
-//func NewTimestampedBigNow(value int64) TimestampedBig {
-//	return TimestampedBig{
-//		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
-//		Timestamp: time.Now().UTC(),
-//	}
-//}
