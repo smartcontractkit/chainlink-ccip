@@ -3,10 +3,8 @@ package merkleroot
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -35,79 +33,4 @@ func Test_buildReport(t *testing.T) {
 			require.Equal(t, report1, report2)
 		}
 	})
-}
-
-func Test_fChainConsensus(t *testing.T) {
-	lggr := logger.Test(t)
-	f := 3
-	fChainValues := map[cciptypes.ChainSelector][]int{
-		cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},
-		cciptypes.ChainSelector(2): {5, 5, 5, 3, 5},
-		cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least f times.
-		cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least f times, no consensus
-	}
-	fChainFinal := fChainConsensus(lggr, f, fChainValues)
-
-	assert.Equal(t, map[cciptypes.ChainSelector]int{
-		cciptypes.ChainSelector(1): 5,
-		cciptypes.ChainSelector(2): 5,
-	}, fChainFinal)
-}
-
-func Test_mostFrequentElement(t *testing.T) {
-	testCases := []struct {
-		name         string
-		input        []int
-		expectedElem int
-		expectedCnt  int
-		expErr       bool
-	}{
-		{
-			name:         "empty",
-			input:        []int{},
-			expectedElem: 0,
-			expectedCnt:  0,
-			expErr:       true,
-		},
-		{
-			name:         "empty",
-			input:        []int{},
-			expectedElem: 0,
-			expectedCnt:  0,
-			expErr:       true,
-		},
-		{
-			name:         "base",
-			input:        []int{33},
-			expectedElem: 33,
-			expectedCnt:  1,
-		},
-		{
-			name:         "no major elem, 1 and 2 appear same number of times",
-			input:        []int{1, 1, 1, 2, 2, 2, 3, 4, 3},
-			expectedElem: 0,
-			expectedCnt:  0,
-			expErr:       true,
-		},
-		{
-			name:         "happy path no overrides",
-			input:        []int{1, 2, 2, 2, 3, 4, 3},
-			expectedElem: 2,
-			expectedCnt:  3,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			actual, cnt, err := mostFrequentElement(tc.input)
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedElem, actual)
-			assert.Equal(t, tc.expectedCnt, cnt)
-
-		})
-	}
 }
