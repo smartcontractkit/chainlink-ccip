@@ -77,6 +77,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		tokenPricesReader := OnchainTokenPricesReader{
 			ContractReader: contractReader,
 			TokenInfo:      tc.tokenInfo,
+			enabled:        true,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()

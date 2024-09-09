@@ -152,6 +152,12 @@ func (p *Processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 		p.lggr.Debugw("oracle does not support price registry observation", "oracleID", p.oracleID)
 		return map[types.Account]NumericalUpdate{}
 	}
+
+	if p.tokenPriceReader == nil {
+		p.lggr.Errorw("no token price reader available")
+		return map[types.Account]NumericalUpdate{}
+	}
+
 	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
 	p.lggr.Infow("observing price registry token updates")
 	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery)

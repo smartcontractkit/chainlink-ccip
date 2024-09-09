@@ -43,6 +43,9 @@ type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
 	ContractReader commontyps.ContractReader
 	TokenInfo      map[types.Account]pluginconfig.TokenInfo
+	// If not enabled just return empty prices
+	// TODO: Remove completely once integration tests are updated
+	enabled bool
 }
 
 func NewOnchainTokenPricesReader(
@@ -72,6 +75,9 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	tokens []ocr2types.Account,
 ) (map[ocr2types.Account]NumericalUpdate, error) {
 	var updates []NumericalUpdate
+	if !pr.enabled {
+		return map[types.Account]NumericalUpdate{}, nil
+	}
 
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
@@ -102,6 +108,9 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
+	if !pr.enabled {
+		return []*big.Int{}, nil
+	}
 	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
