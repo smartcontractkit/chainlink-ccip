@@ -175,10 +175,11 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	boundContract commontypes.BoundContract,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
+	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData),
+			identifier,
 			primitives.Unconfirmed,
 			nil,
 			&latestRoundData,

@@ -9,30 +9,40 @@ import (
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/stretchr/testify/require"
 
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 const (
 	ArbAddr           = ocr2types.Account("0x1e03388D351BF87CF2409EFf18C45Df59775Fbb2")
 	ArbAggregatorAddr = ocr2types.Account("024e03388D351BF87CF2409EFf18C45Df59775Fbb2")
 
-	EthAddr = ocr2types.Account("0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2")
-
-	OpAddr = ocr2types.Account("0x5e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	EthAddr           = ocr2types.Account("0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	EthAggregatorAddr = ocr2types.Account("0x4e03388D351BF87CF2409EFf18C45Df59775Fbb2")
 )
 
 var (
 	EthPrice   = big.NewInt(1).Mul(big.NewInt(7), big.NewInt(1e18))
-	OpPrice    = big.NewInt(1).Mul(big.NewInt(6), big.NewInt(1e18))
 	ArbPrice   = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
 	Decimals18 = uint8(18)
+
+	ArbInfo = pluginconfig.TokenInfo{
+		AggregatorAddress: string(ArbAggregatorAddr),
+		DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
+		Decimals:          Decimals18,
+	}
+	EthInfo = pluginconfig.TokenInfo{
+		AggregatorAddress: string(EthAggregatorAddr),
+		DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
+		Decimals:          Decimals18,
+	}
 )
 
 func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
@@ -40,32 +50,38 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		name          string
 		inputTokens   []ocr2types.Account
 		tokenInfo     map[ocr2types.Account]pluginconfig.TokenInfo
-		tokenDecimals map[ocr2types.Account]uint8
-		mockPrices    []*big.Int
+		mockPrices    map[ocr2types.Account]*big.Int
 		want          []*big.Int
 		errorAccounts []ocr2types.Account
 		wantErr       bool
 	}{
 		{
 			name: "On-chain one price",
-			// No need to put sources as we're mocking the reader
 			tokenInfo: map[ocr2types.Account]pluginconfig.TokenInfo{
-				ArbAddr: {
-					AggregatorAddress: string(ArbAggregatorAddr),
-					DeviationPPB:      cciptypes.NewBigInt(big.NewInt(1e5)),
-					Decimals:          Decimals18,
-				},
+				ArbAddr: ArbInfo,
 			},
 			inputTokens: []ocr2types.Account{ArbAddr},
-			//TODO: change once we have control to return different prices in mock depending on the token
-			mockPrices: []*big.Int{ArbPrice},
-			want:       []*big.Int{ArbPrice},
+			mockPrices:  map[ocr2types.Account]*big.Int{ArbAddr: ArbPrice},
+			want:        []*big.Int{ArbPrice},
 		},
 		{
-			name:          "Missing price should error",
-			tokenInfo:     map[ocr2types.Account]pluginconfig.TokenInfo{},
-			inputTokens:   []ocr2types.Account{ArbAddr},
-			mockPrices:    []*big.Int{},
+			name: "On-chain multiple prices",
+			tokenInfo: map[ocr2types.Account]pluginconfig.TokenInfo{
+				ArbAddr: ArbInfo,
+				EthAddr: EthInfo,
+			},
+			inputTokens: []ocr2types.Account{ArbAddr, EthAddr},
+			mockPrices:  map[ocr2types.Account]*big.Int{ArbAddr: ArbPrice, EthAddr: EthPrice},
+			want:        []*big.Int{ArbPrice, EthPrice},
+		},
+		{
+			name: "Missing price should error",
+			tokenInfo: map[ocr2types.Account]pluginconfig.TokenInfo{
+				ArbAddr: ArbInfo,
+				EthAddr: EthInfo,
+			},
+			inputTokens:   []ocr2types.Account{ArbAddr, EthAddr},
+			mockPrices:    map[ocr2types.Account]*big.Int{ArbAddr: ArbPrice},
 			errorAccounts: []ocr2types.Account{EthAddr},
 			want:          nil,
 			wantErr:       true,
@@ -73,7 +89,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts)
+		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
 		tokenPricesReader := OnchainTokenPricesReader{
 			ContractReader: contractReader,
 			TokenInfo:      tc.tokenInfo,
@@ -91,7 +107,6 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			require.Equal(t, tc.want, result)
 		})
 	}
-
 }
 
 func TestPriceService_calculateUsdPer1e18TokenAmount(t *testing.T) {
@@ -137,47 +152,56 @@ func TestPriceService_calculateUsdPer1e18TokenAmount(t *testing.T) {
 // nolint unparam
 func createMockReader(
 	t *testing.T,
-	mockPrices []*big.Int,
+	mockPrices map[ocr2types.Account]*big.Int,
 	errorAccounts []ocr2types.Account,
-) *readermock.MockChainReader {
-	reader := readermock.NewMockChainReader(t)
-	// TODO: Create a list of bound contracts from tokenInfo and return the price given in mockPrices
+	tokenInfo map[ocr2types.Account]pluginconfig.TokenInfo,
+) *readermock.MockContractReader {
+	reader := readermock.NewMockContractReader(t)
 
-	for _, price := range mockPrices {
-		price := price
+	for token, price := range mockPrices {
+		info := tokenInfo[token]
+		boundContract := commontypes.BoundContract{
+			Address: info.AggregatorAddress,
+			Name:    consts.ContractNamePriceAggregator,
+		}
+
+		identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 		reader.On("GetLatestValue",
 			mock.Anything,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetLatestRoundData,
-			mock.Anything,
+			identifier,
+			primitives.Unconfirmed,
 			nil,
 			mock.Anything).Run(
 			func(args mock.Arguments) {
-				arg := args.Get(5).(*LatestRoundData)
+				arg := args.Get(4).(*LatestRoundData)
 				arg.Answer = big.NewInt(price.Int64())
 			}).Return(nil).Once()
 
 		reader.On("GetLatestValue",
 			mock.Anything,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetDecimals,
-			mock.Anything,
+			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
+			primitives.Unconfirmed,
 			nil,
 			mock.Anything).Run(
 			func(args mock.Arguments) {
-				arg := args.Get(5).(*uint8)
-				*arg = Decimals18
+				arg := args.Get(4).(*uint8)
+				*arg = info.Decimals
 			}).Return(nil)
 	}
 
-	for i := 0; i < len(errorAccounts); i++ {
+	for _, account := range errorAccounts {
+		info := tokenInfo[account]
+		boundContract := commontypes.BoundContract{
+			Address: info.AggregatorAddress,
+			Name:    consts.ContractNamePriceAggregator,
+		}
 		reader.On("GetLatestValue",
 			mock.Anything,
-			consts.ContractNamePriceAggregator,
-			consts.MethodNameGetLatestRoundData,
-			mock.Anything,
+			boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData),
+			primitives.Unconfirmed,
 			nil,
 			mock.Anything).Return(fmt.Errorf("error")).Once()
 	}
+
 	return reader
 }
