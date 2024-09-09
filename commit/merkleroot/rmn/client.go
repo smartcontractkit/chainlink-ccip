@@ -22,7 +22,13 @@ import (
 // TODO: use the populated Query / sig verification / etc..
 // TODO: rmn config watcher
 
-var ErrTimeout = errors.New("signature computation timeout")
+var (
+	// ErrTimeout is returned when the signature computation times out.
+	ErrTimeout = errors.New("signature computation timeout")
+
+	// ErrNothingToDo is returned when there are no source chains with enough RMN nodes.
+	ErrNothingToDo = errors.New("nothing to observe from the existing RMN nodes")
+)
 
 // Client contains the methods required by the plugin to interact with the RMN nodes.
 type Client interface {
@@ -38,7 +44,7 @@ type Client interface {
 }
 
 type ReportSignatures struct {
-	// ReportSignatures are the ECDSA signatures for the lane updates for each node.
+	// Signatures are the ECDSA signatures for the lane updates for each node.
 	Signatures []*rmnpb.EcdsaSignature
 	// LaneUpdates are the lane updates for each source chain that we got the signatures for.
 	// NOTE: A signature[i] corresponds to the whole LaneUpdates slice and NOT LaneUpdates[i].
@@ -90,41 +96,42 @@ func NewPBClient(
 	}
 }
 
+// ComputeReportSignatures sends a request to each rmn node to handle requests and build signatures.
 func (c *PBClient) ComputeReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
-	requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
+	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
 ) (*ReportSignatures, error) {
 	// Group the lane update requests by their source chain.
-	lursPerChain := make(map[uint64]lurWithMeta)
-	for _, updateReq := range requestedUpdates {
-		if _, exists := lursPerChain[updateReq.LaneSource.SourceChainSelector]; exists {
+	updatesPerChain := make(map[uint64]updateRequestWithMeta)
+	for _, updateReq := range updateRequests {
+		if _, exists := updatesPerChain[updateReq.LaneSource.SourceChainSelector]; exists {
 			return nil, errors.New("this Client implementation assumes each lane update is for a different chain")
 		}
 
-		lursPerChain[updateReq.LaneSource.SourceChainSelector] = lurWithMeta{
-			lur:      updateReq,
+		updatesPerChain[updateReq.LaneSource.SourceChainSelector] = updateRequestWithMeta{
+			data:     updateReq,
 			rmnNodes: mapset.NewSet[uint32](),
 		}
 		for _, node := range c.rmnNodes {
 			if node.SupportedSourceChains.Contains(updateReq.LaneSource.SourceChainSelector) {
-				lursPerChain[updateReq.LaneSource.SourceChainSelector].rmnNodes.Add(node.ID)
+				updatesPerChain[updateReq.LaneSource.SourceChainSelector].rmnNodes.Add(node.ID)
 			}
 		}
 	}
 
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
-	for chain, l := range lursPerChain {
+	for chain, l := range updatesPerChain {
 		if l.rmnNodes.Cardinality() < c.minObservers {
-			delete(lursPerChain, chain)
+			delete(updatesPerChain, chain)
 		}
 	}
 
-	if len(lursPerChain) == 0 {
-		return nil, errors.New("no source chains with enough RMN nodes, nothing to do")
+	if len(updatesPerChain) == 0 {
+		return nil, ErrNothingToDo
 	}
 
-	rmnSignedObservations, err := c.getRmnSignedObservations(ctx, destChain, lursPerChain)
+	rmnSignedObservations, err := c.getRmnSignedObservations(ctx, destChain, updatesPerChain)
 	if err != nil {
 		return nil, fmt.Errorf("get rmn signed observations: %w", err)
 	}
@@ -140,17 +147,17 @@ func (c *PBClient) ComputeReportSignatures(
 func (c *PBClient) getRmnSignedObservations(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
-	lursPerChain map[uint64]lurWithMeta,
+	updateRequestsPerChain map[uint64]updateRequestWithMeta,
 ) ([]rmnSignedObservationWithMeta, error) {
 	requestedNodes := make(map[uint64]mapset.Set[uint32])                   // sourceChain -> requested rmnNodeIDs
 	requestsPerNode := make(map[uint32][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
 	// For each lane update request send an observation request to at most 'minObservers' number of rmn nodes.
-	for sourceChain, lur := range lursPerChain {
+	for sourceChain, updateRequest := range updateRequestsPerChain {
 		requestedNodes[sourceChain] = mapset.NewSet[uint32]()
 
 		// At this point we assume at least minObservers RMN nodes are available for each source chain.
-		for nodeID := range lur.rmnNodes.Iter() {
+		for nodeID := range updateRequest.rmnNodes.Iter() {
 			if requestedNodes[sourceChain].Cardinality() >= c.minObservers {
 				break
 			}
@@ -159,12 +166,13 @@ func (c *PBClient) getRmnSignedObservations(
 			if _, exists := requestsPerNode[nodeID]; !exists {
 				requestsPerNode[nodeID] = make([]*rmnpb.FixedDestLaneUpdateRequest, 0)
 			}
-			requestsPerNode[nodeID] = append(requestsPerNode[nodeID], lur.lur)
+			requestsPerNode[nodeID] = append(requestsPerNode[nodeID], updateRequest.data)
 		}
 	}
 
 	requestIDs := c.sendObservationRequests(destChain, requestsPerNode)
-	signedObservations, err := c.listenForRmnObservationResponses(ctx, destChain, requestIDs, lursPerChain, requestedNodes)
+	signedObservations, err := c.listenForRmnObservationResponses(
+		ctx, destChain, requestIDs, updateRequestsPerChain, requestedNodes)
 	if err != nil {
 		return nil, fmt.Errorf("listen for rmn observation responses: %w", err)
 	}
@@ -184,13 +192,13 @@ func (c *PBClient) sendObservationRequests(
 ) (requestIDs mapset.Set[uint64]) {
 	requestIDs = mapset.NewSet[uint64]()
 
-	for nodeID, lurs := range requestsPerNode {
+	for nodeID, requests := range requestsPerNode {
 		req := &rmnpb.Request{
 			RequestId: newRequestID(),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: &rmnpb.ObservationRequest{
 					LaneDest:                    destChain,
-					FixedDestLaneUpdateRequests: lurs,
+					FixedDestLaneUpdateRequests: requests,
 				},
 			},
 		}
@@ -209,7 +217,7 @@ func (c *PBClient) listenForRmnObservationResponses(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	requestIDs mapset.Set[uint64],
-	lursPerChain map[uint64]lurWithMeta,
+	lursPerChain map[uint64]updateRequestWithMeta,
 	requestedNodes map[uint64]mapset.Set[uint32],
 ) ([]rmnSignedObservationWithMeta, error) {
 	respChan := c.rawRmnClient.Recv()
@@ -276,7 +284,7 @@ func (c *PBClient) listenForRmnObservationResponses(
 					if _, ok := requestsPerNode[nodeID]; !ok {
 						requestsPerNode[nodeID] = make([]*rmnpb.FixedDestLaneUpdateRequest, 0)
 					}
-					requestsPerNode[nodeID] = append(requestsPerNode[nodeID], lur.lur)
+					requestsPerNode[nodeID] = append(requestsPerNode[nodeID], lur.data)
 				}
 			}
 			newRequestIDs := c.sendObservationRequests(destChain, requestsPerNode)
@@ -289,12 +297,15 @@ func (c *PBClient) listenForRmnObservationResponses(
 
 func (c *PBClient) validateSignedObservationResponse(
 	rmnNodeID uint32,
-	lurs map[uint64]lurWithMeta,
+	lurs map[uint64]updateRequestWithMeta,
 	signedObs *rmnpb.SignedObservation,
 	destChain *rmnpb.LaneDest,
 ) error {
-	if signedObs.Observation.LaneDest != destChain {
-		return fmt.Errorf("unexpected lane dest %v", signedObs.Observation.LaneDest)
+	if signedObs.Observation.LaneDest.DestChainSelector != destChain.DestChainSelector {
+		return fmt.Errorf("unexpected lane dest chain selector %v", signedObs.Observation.LaneDest)
+	}
+	if !bytes.Equal(signedObs.Observation.LaneDest.OfframpAddress, destChain.OfframpAddress) {
+		return fmt.Errorf("unexpected lane dest offramp %v", signedObs.Observation.LaneDest)
 	}
 
 	if !bytes.Equal(signedObs.Observation.RmnHomeContractConfigDigest, c.rmnHomeConfigDigest) {
@@ -313,12 +324,20 @@ func (c *PBClient) validateSignedObservationResponse(
 				rmnNodeID, signedObsLu.LaneSource.SourceChainSelector)
 		}
 
-		if lur.lur.ClosedInterval != signedObsLu.ClosedInterval {
+		if lur.data.ClosedInterval.MinMsgNr != signedObsLu.ClosedInterval.MinMsgNr {
 			return fmt.Errorf("unexpected closed interval %v", signedObsLu.ClosedInterval)
 		}
-		if lur.lur.LaneSource != signedObsLu.LaneSource {
+		if lur.data.ClosedInterval.MaxMsgNr != signedObsLu.ClosedInterval.MaxMsgNr {
+			return fmt.Errorf("unexpected closed interval %v", signedObsLu.ClosedInterval)
+		}
+
+		if lur.data.LaneSource.SourceChainSelector != signedObsLu.LaneSource.SourceChainSelector {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
+		if !bytes.Equal(lur.data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
+			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
+		}
+
 		if signedObsLu.Root == nil {
 			return errors.New("root is nil")
 		}
@@ -528,8 +547,8 @@ type RawRmnResponse struct {
 	Body      []byte // pb
 }
 
-type lurWithMeta struct {
-	lur      *rmnpb.FixedDestLaneUpdateRequest
+type updateRequestWithMeta struct {
+	data     *rmnpb.FixedDestLaneUpdateRequest
 	rmnNodes mapset.Set[uint32]
 }
 
