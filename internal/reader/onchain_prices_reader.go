@@ -84,7 +84,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			consts.ContractNameFeeQuoter,
+			consts.ContractNamePriceRegistry,
 			consts.MethodNameFeeQuoterGetTokenPrices,
 			primitives.Unconfirmed,
 			tokens,

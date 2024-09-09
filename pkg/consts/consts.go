@@ -6,7 +6,7 @@ package consts
 const (
 	ContractNameOffRamp              = "OffRamp"
 	ContractNameOnRamp               = "OnRamp"
-	ContractNameFeeQuoter            = "FeeQuoter"
+	ContractNamePriceRegistry        = "FeeQuoter"
 	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
 	ContractNameCCIPConfig           = "CCIPConfig"
 	ContractNamePriceAggregator      = "AggregatorV3Interface"
@@ -32,7 +32,7 @@ const (
 
 	// FeeQuoter view/pure methods
 	MethodNameFeeQuoterGetTokenPrices       = "GetTokenPrices"
-	MethodNameFeeQuoterGetStaticConfig      = "GetStaticConfig"
+	MethodNamePriceRegistryGetStaticConfig  = "GetStaticConfig"
 	MethodNameGetDestChainConfig            = "GetDestChainConfig"
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
