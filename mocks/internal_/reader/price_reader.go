@@ -8,7 +8,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	reader "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	shared "github.com/smartcontractkit/chainlink-ccip/shared"
 
 	types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -27,23 +27,23 @@ func (_m *MockPriceReader) EXPECT() *MockPriceReader_Expecter {
 }
 
 // GetFeeQuoterTokenUpdates provides a mock function with given fields: ctx, tokens
-func (_m *MockPriceReader) GetFeeQuoterTokenUpdates(ctx context.Context, tokens []types.Account) (map[types.Account]reader.NumericalUpdate, error) {
+func (_m *MockPriceReader) GetFeeQuoterTokenUpdates(ctx context.Context, tokens []types.Account) (map[types.Account]shared.TimestampedBig, error) {
 	ret := _m.Called(ctx, tokens)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFeeQuoterTokenUpdates")
 	}
 
-	var r0 map[types.Account]reader.NumericalUpdate
+	var r0 map[types.Account]shared.TimestampedBig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) (map[types.Account]reader.NumericalUpdate, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) (map[types.Account]shared.TimestampedBig, error)); ok {
 		return rf(ctx, tokens)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) map[types.Account]reader.NumericalUpdate); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) map[types.Account]shared.TimestampedBig); ok {
 		r0 = rf(ctx, tokens)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[types.Account]reader.NumericalUpdate)
+			r0 = ret.Get(0).(map[types.Account]shared.TimestampedBig)
 		}
 	}
 
@@ -75,12 +75,12 @@ func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) Return(_a0 map[types.Account]reader.NumericalUpdate, _a1 error) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
+func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) Return(_a0 map[types.Account]shared.TimestampedBig, _a1 error) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(context.Context, []types.Account) (map[types.Account]reader.NumericalUpdate, error)) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
+func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(context.Context, []types.Account) (map[types.Account]shared.TimestampedBig, error)) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
 	_c.Call.Return(run)
 	return _c
 }

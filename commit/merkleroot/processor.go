@@ -8,6 +8,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
@@ -24,7 +25,7 @@ type Processor struct {
 	observer     Observer
 	ccipReader   reader.CCIP
 	reportingCfg ocr3types.ReportingPluginConfig
-	chainSupport shared.ChainSupport
+	chainSupport plugincommon.ChainSupport
 	rmnClient    rmn.Client
 }
 
@@ -37,7 +38,7 @@ func NewProcessor(
 	ccipReader reader.CCIP,
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	chainSupport shared.ChainSupport,
+	chainSupport plugincommon.ChainSupport,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,

@@ -9,10 +9,11 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/shared"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -40,9 +41,9 @@ func Test_Observation(t *testing.T) {
 		cciptypes.NewTokenPrice(tokenA, bi100),
 		cciptypes.NewTokenPrice(tokenB, bi200),
 	}
-	feeQuoterTokenUpdates := map[types.Account]NumericalUpdate{
-		tokenA: NewNumericalUpdate(bi100.Int64(), timestamp),
-		tokenB: NewNumericalUpdate(bi200.Int64(), timestamp),
+	feeQuoterTokenUpdates := map[types.Account]shared.TimestampedBig{
+		tokenA: shared.NewTimestampedBig(bi100.Int64(), timestamp),
+		tokenB: shared.NewTimestampedBig(bi200.Int64(), timestamp),
 	}
 
 	testCases := []struct {
@@ -54,7 +55,7 @@ func Test_Observation(t *testing.T) {
 		{
 			name: "Successful observation",
 			getProcessor: func(t *testing.T) *Processor {
-				chainSupport := shared.NewMockChainSupport(t)
+				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
 					mapset.NewSet[cciptypes.ChainSelector](tokenPriceChainSel, destChainSel), nil,
 				)
@@ -65,9 +66,9 @@ func Test_Observation(t *testing.T) {
 					Return([]*big.Int{bi100, bi200}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
-					map[types.Account]reader.NumericalUpdate{
-						tokenA: reader.NewNumericalUpdate(bi100.Int64(), timestamp),
-						tokenB: reader.NewNumericalUpdate(bi200.Int64(), timestamp),
+					map[types.Account]shared.TimestampedBig{
+						tokenA: shared.NewTimestampedBig(bi100.Int64(), timestamp),
+						tokenB: shared.NewTimestampedBig(bi200.Int64(), timestamp),
 					},
 					nil,
 				)
@@ -101,7 +102,7 @@ func Test_Observation(t *testing.T) {
 				homeChain := readermock.NewMockHomeChain(t)
 				homeChain.EXPECT().GetFChain().Return(nil, errors.New("failed to get FChain"))
 
-				chainSupport := shared.NewMockChainSupport(t)
+				chainSupport := common_mock.NewMockChainSupport(t)
 				tokenPriceReader := readermock.NewMockPriceReader(t)
 
 				return &Processor{

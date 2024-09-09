@@ -8,12 +8,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontyps "github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"golang.org/x/sync/errgroup"
@@ -28,31 +28,31 @@ type PriceReader interface {
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
 		tokens []ocr2types.Account,
-	) (map[ocr2types.Account]NumericalUpdate, error)
+	) (map[ocr2types.Account]shared.TimestampedBig, error)
 }
 
-// NumericalUpdate On-chain struct `TimestampedPackedUint224`:
+// TimestampedBig On-chain struct `TimestampedPackedUint224`:
 // nolint:lll
 // https://github.com/smartcontractkit/chainlink/blob/2d77ff4623d0a0032533c89f32fc251400382455/contracts/src/v0.8/ccip/libraries/Internal.sol#L43-L47
-type NumericalUpdate struct {
-	Timestamp time.Time        `json:"timestamp"`
-	Value     cciptypes.BigInt `json:"value"`
-}
-
-func NewNumericalUpdate(value int64, timestamp time.Time) NumericalUpdate {
-	return NumericalUpdate{
-		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
-		Timestamp: timestamp,
-	}
-}
-
-// NewNumericalUpdateNow NewNumericalUpdate Returns an update with timestamp now as UTC
-func NewNumericalUpdateNow(value int64) NumericalUpdate {
-	return NumericalUpdate{
-		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
-		Timestamp: time.Now().UTC(),
-	}
-}
+//type TimestampedBig struct {
+//	Timestamp time.Time        `json:"timestamp"`
+//	Value     cciptypes.BigInt `json:"value"`
+//}
+//
+//func NewTimestampedBig(value int64, timestamp time.Time) TimestampedBig {
+//	return TimestampedBig{
+//		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
+//		Timestamp: timestamp,
+//	}
+//}
+//
+//// NewTimestampedBigNow NewTimestampedBig Returns an update with timestamp now as UTC
+//func NewTimestampedBigNow(value int64) TimestampedBig {
+//	return TimestampedBig{
+//		Value:     cciptypes.BigInt{Int: big.NewInt(value)},
+//		Timestamp: time.Now().UTC(),
+//	}
+//}
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
@@ -88,10 +88,10 @@ type LatestRoundData struct {
 func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
-) (map[ocr2types.Account]NumericalUpdate, error) {
-	var updates []NumericalUpdate
+) (map[ocr2types.Account]shared.TimestampedBig, error) {
+	var updates []shared.TimestampedBig
 	if !pr.enabled {
-		return map[types.Account]NumericalUpdate{}, nil
+		return map[types.Account]shared.TimestampedBig{}, nil
 	}
 
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
@@ -108,7 +108,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 		return nil, fmt.Errorf("failed to get token prices: %w", err)
 	}
 
-	updateMap := make(map[ocr2types.Account]NumericalUpdate)
+	updateMap := make(map[ocr2types.Account]shared.TimestampedBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == time.Unix(0, 0) {

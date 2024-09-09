@@ -9,6 +9,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -20,15 +21,15 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -204,7 +205,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
 					Return(
-						map[ocr2types.Account]reader.NumericalUpdate{}, nil,
+						map[ocr2types.Account]shared.TimestampedBig{}, nil,
 					).
 					Maybe()
 			}

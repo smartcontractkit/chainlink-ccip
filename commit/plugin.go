@@ -40,7 +40,7 @@ type Plugin struct {
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
 	reportingCfg        ocr3types.ReportingPluginConfig
-	chainSupport        shared.ChainSupport
+	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
@@ -69,7 +69,7 @@ func NewPlugin(
 		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
-	chainSupport := shared.NewCCIPChainSupport(
+	chainSupport := plugincommon.NewCCIPChainSupport(
 		lggr,
 		homeChain,
 		oracleIDToP2pID,
