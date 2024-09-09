@@ -8,17 +8,20 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/shared"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/shared"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 var (
@@ -52,18 +55,26 @@ func Test_Observation(t *testing.T) {
 			name: "Successful observation",
 			getProcessor: func(t *testing.T) *Processor {
 				chainSupport := shared.NewMockChainSupport(t)
-				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(mapset.NewSet[cciptypes.ChainSelector](tokenPriceChainSel, destChainSel), nil)
+				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
+					mapset.NewSet[cciptypes.ChainSelector](tokenPriceChainSel, destChainSel), nil,
+				)
 				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 
 				tokenPriceReader := readermock.NewMockPriceReader(t)
 				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, mock.Anything).Return([]*big.Int{bi100, bi200}, nil)
-				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(map[types.Account]reader.NumericalUpdate{
-					tokenA: reader.NewNumericalUpdate(bi100.Int64(), timestamp),
-					tokenB: reader.NewNumericalUpdate(bi200.Int64(), timestamp),
-				}, nil)
+				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
+					map[types.Account]reader.NumericalUpdate{
+						tokenA: reader.NewNumericalUpdate(bi100.Int64(), timestamp),
+						tokenB: reader.NewNumericalUpdate(bi200.Int64(), timestamp),
+					},
+					nil,
+				)
 
 				homeChain := readermock.NewMockHomeChain(t)
-				homeChain.EXPECT().GetFChain().Return(map[cciptypes.ChainSelector]int{destChainSel: fDestChain}, nil)
+				homeChain.EXPECT().GetFChain().Return(
+					map[cciptypes.ChainSelector]int{destChainSel: fDestChain},
+					nil,
+				)
 
 				return &Processor{
 					oracleID:         1,
@@ -129,8 +140,15 @@ var defaultCfg = pluginconfig.CommitPluginConfig{
 	DestChain: destChainSel,
 	OffchainConfig: pluginconfig.CommitOffchainConfig{
 		TokenInfo: map[types.Account]pluginconfig.TokenInfo{
-			tokenA: {Decimals: 18, AggregatorAddress: "0x1111111111111111111111Ff18C45Df59775Fbb2", DeviationPPB: cciptypes.BigInt{Int: big.NewInt(1)}},
-			tokenB: {Decimals: 18, AggregatorAddress: "0x2222222222222222222222Ff18C45Df59775Fbb2", DeviationPPB: cciptypes.BigInt{Int: big.NewInt(1)}},
+			tokenA: {
+				Decimals:          18,
+				AggregatorAddress: "0x1111111111111111111111Ff18C45Df59775Fbb2",
+				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+			},
+			tokenB: {
+				Decimals:          18,
+				AggregatorAddress: "0x2222222222222222222222Ff18C45Df59775Fbb2",
+				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)}},
 		},
 		TokenPriceChainSelector: uint64(tokenPriceChainSel),
 	},
