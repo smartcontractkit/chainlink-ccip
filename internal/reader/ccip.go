@@ -351,7 +351,7 @@ func (r *CCIPChainReader) MsgsBetweenSeqNums(
 
 	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
 	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the contract, got %d", len(bindings))
+		return nil, fmt.Errorf("expected one binding for the OnRamp contract, got %d", len(bindings))
 	}
 
 	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
@@ -421,7 +421,7 @@ func (r *CCIPChainReader) GetExpectedNextSequenceNumber(
 
 	extendedBindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
 	if len(extendedBindings) != 1 {
-		return 0, fmt.Errorf("expected one binding for onRamp contract, got %d", len(extendedBindings))
+		return 0, fmt.Errorf("expected one binding for the OnRamp contract, got %d", len(extendedBindings))
 	}
 	contractBinding := extendedBindings[0].Binding
 
@@ -488,7 +488,7 @@ func (r *CCIPChainReader) Nonces(
 
 			extendedBindings := r.contractReaders[destChainSelector].GetBindings(consts.ContractNameNonceManager)
 			if len(extendedBindings) != 1 {
-				return fmt.Errorf("expected one binding for NonceManager contract, got %d", len(extendedBindings))
+				return fmt.Errorf("expected one binding for the NonceManager contract, got %d", len(extendedBindings))
 			}
 			contractBinding := extendedBindings[0].Binding
 
@@ -542,6 +542,27 @@ func (r *CCIPChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 		return nil, err
 	}
 	return gasPrices, nil
+}
+
+func (r *CCIPChainReader) bindOfframp(ctx context.Context) error {
+	if err := r.validateReaderExistence(r.destChain); err != nil {
+		return err
+	}
+
+	// Bind the offRamp contract address to the reader.
+	// If the same address exists -> no-op
+	// If the address is changed -> updates the address, overwrites the existing one
+	// If the contract not binded -> binds to the new address
+	if err := r.contractReaders[r.destChain].Bind(ctx, []types.BoundContract{
+		{
+			Address: r.offrampAddress,
+			Name:    consts.ContractNameOffRamp,
+		},
+	}); err != nil {
+		return fmt.Errorf("bind offRamp: %w", err)
+	}
+
+	return nil
 }
 
 // bindOnRamps reads the onchain configuration to discover source ramp addresses.
@@ -626,6 +647,12 @@ func (r *CCIPChainReader) bindNonceManager(ctx context.Context) error {
 }
 
 func (r *CCIPChainReader) Sync(ctx context.Context) (bool, error) {
+	// Note: offramp must be bound first, otherwise onramp bindings
+	// will fail.
+	if err := r.bindOfframp(ctx); err != nil {
+		return false, err
+	}
+
 	if err := r.bindOnramps(ctx); err != nil {
 		return false, err
 	}
@@ -644,7 +671,7 @@ func (r *CCIPChainReader) Close(ctx context.Context) error {
 func (r *CCIPChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	bindings := r.contractReaders[chain].GetBindings(contractName)
 	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the contract, got %d", len(bindings))
+		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
 	}
 
 	addressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(chain))
