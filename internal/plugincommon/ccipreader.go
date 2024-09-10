@@ -121,16 +121,12 @@ func syncReader(
 	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
 	defer cf()
 
-	updated, err := reader.Sync(timeoutCtx)
+	err := reader.Sync(timeoutCtx, nil)
 	if err != nil {
 		return err
 	}
 
-	if !updated {
-		lggr.Debug("no updates found after trying to sync")
-	} else {
-		lggr.Info("ccip reader sync success")
-	}
+	lggr.Info("ccip reader sync success")
 
 	return nil
 }

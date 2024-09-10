@@ -11,6 +11,8 @@ import (
 
 	plugintypes "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
+	reader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+
 	time "time"
 )
 
@@ -130,6 +132,65 @@ func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) Return(_a0 []plugintype
 }
 
 func (_c *MockCCIPReader_CommitReportsGTETimestamp_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, time.Time, int) ([]plugintypes.CommitPluginReportWithMeta, error)) *MockCCIPReader_CommitReportsGTETimestamp_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DiscoverContracts provides a mock function with given fields: ctx, destChain
+func (_m *MockCCIPReader) DiscoverContracts(ctx context.Context, destChain ccipocr3.ChainSelector) (reader.ContractAddresses, error) {
+	ret := _m.Called(ctx, destChain)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DiscoverContracts")
+	}
+
+	var r0 reader.ContractAddresses
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (reader.ContractAddresses, error)); ok {
+		return rf(ctx, destChain)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) reader.ContractAddresses); ok {
+		r0 = rf(ctx, destChain)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(reader.ContractAddresses)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, destChain)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_DiscoverContracts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DiscoverContracts'
+type MockCCIPReader_DiscoverContracts_Call struct {
+	*mock.Call
+}
+
+// DiscoverContracts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - destChain ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) DiscoverContracts(ctx interface{}, destChain interface{}) *MockCCIPReader_DiscoverContracts_Call {
+	return &MockCCIPReader_DiscoverContracts_Call{Call: _e.mock.On("DiscoverContracts", ctx, destChain)}
+}
+
+func (_c *MockCCIPReader_DiscoverContracts_Call) Run(run func(ctx context.Context, destChain ccipocr3.ChainSelector)) *MockCCIPReader_DiscoverContracts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_DiscoverContracts_Call) Return(_a0 reader.ContractAddresses, _a1 error) *MockCCIPReader_DiscoverContracts_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_DiscoverContracts_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (reader.ContractAddresses, error)) *MockCCIPReader_DiscoverContracts_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -551,32 +612,22 @@ func (_c *MockCCIPReader_Nonces_Call) RunAndReturn(run func(context.Context, cci
 	return _c
 }
 
-// Sync provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) Sync(ctx context.Context) (bool, error) {
-	ret := _m.Called(ctx)
+// Sync provides a mock function with given fields: ctx, contracts
+func (_m *MockCCIPReader) Sync(ctx context.Context, contracts reader.ContractAddresses) error {
+	ret := _m.Called(ctx, contracts)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Sync")
 	}
 
-	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context) (bool, error)); ok {
-		return rf(ctx)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context) bool); ok {
-		r0 = rf(ctx)
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, reader.ContractAddresses) error); ok {
+		r0 = rf(ctx, contracts)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = rf(ctx)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // MockCCIPReader_Sync_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Sync'
@@ -586,23 +637,24 @@ type MockCCIPReader_Sync_Call struct {
 
 // Sync is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockCCIPReader_Expecter) Sync(ctx interface{}) *MockCCIPReader_Sync_Call {
-	return &MockCCIPReader_Sync_Call{Call: _e.mock.On("Sync", ctx)}
+//   - contracts reader.ContractAddresses
+func (_e *MockCCIPReader_Expecter) Sync(ctx interface{}, contracts interface{}) *MockCCIPReader_Sync_Call {
+	return &MockCCIPReader_Sync_Call{Call: _e.mock.On("Sync", ctx, contracts)}
 }
 
-func (_c *MockCCIPReader_Sync_Call) Run(run func(ctx context.Context)) *MockCCIPReader_Sync_Call {
+func (_c *MockCCIPReader_Sync_Call) Run(run func(ctx context.Context, contracts reader.ContractAddresses)) *MockCCIPReader_Sync_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].(reader.ContractAddresses))
 	})
 	return _c
 }
 
-func (_c *MockCCIPReader_Sync_Call) Return(_a0 bool, _a1 error) *MockCCIPReader_Sync_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockCCIPReader_Sync_Call) Return(_a0 error) *MockCCIPReader_Sync_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCCIPReader_Sync_Call) RunAndReturn(run func(context.Context) (bool, error)) *MockCCIPReader_Sync_Call {
+func (_c *MockCCIPReader_Sync_Call) RunAndReturn(run func(context.Context, reader.ContractAddresses) error) *MockCCIPReader_Sync_Call {
 	_c.Call.Return(run)
 	return _c
 }
