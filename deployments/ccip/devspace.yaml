@@ -516,9 +516,6 @@ profiles:
   - name: kind-bix-ship
     description: The profile is supposed to be used with local deployment on a Kind cluster for bix-ship
     # This profile will be automatically activated
-    activation:
-      - env:
-          PROVIDER: "kind"
     patches:
       - op: remove
         path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
@@ -527,8 +524,8 @@ profiles:
         value:
           [
             "./values-profiles/values-dev-kind.yaml",
-            "./values-profiles/values-dev-kind-bix-ship.yaml",
-            "./values-profiles/new-chain.yaml",
+            "./values-profiles/values-kind-bix-ship.yaml",
+            "./values-profiles/values-bix-ship-new-chain.yaml",
           ]
       - op: remove
         path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
