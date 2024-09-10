@@ -5,14 +5,15 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -270,7 +271,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reader := reader_mock.NewMockCCIP(t)
+			reader := reader_mock.NewMockCCIPReader(t)
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
 			for _, snc := range tc.reportSeqNums {

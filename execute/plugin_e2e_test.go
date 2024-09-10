@@ -29,6 +29,7 @@ import (
 	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -258,7 +259,7 @@ func newNode(
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
 	msgHasher cciptypes.MessageHasher,
-	ccipReader reader.CCIP,
+	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
 	tokenDataReader exectypes.TokenDataReader,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
