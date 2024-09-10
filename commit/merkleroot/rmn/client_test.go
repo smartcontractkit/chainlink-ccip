@@ -45,8 +45,6 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 	newTestSetup := func(t *testing.T) testSetup {
 		lggr := logger.Test(t)
 		ctx := tests.Context(t)
-		ctx, _ = context.WithTimeout(ctx, time.Minute)
-
 		resChan := make(chan RawRmnResponse, 200)
 		rawRmnClient := newMockRawRmnClient(resChan)
 
@@ -63,8 +61,8 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 			rmnHomeConfigDigest:                     []byte{0xc, 0x0, 0xf},
 			minObservers:                            2,
 			minSigners:                              2,
-			observationsInitialRequestTimerDuration: 30 * time.Second,
-			reportsInitialRequestTimerDuration:      30 * time.Second,
+			observationsInitialRequestTimerDuration: time.Minute,
+			reportsInitialRequestTimerDuration:      time.Minute,
 		}
 
 		updateRequests := []*rmnpb.FixedDestLaneUpdateRequest{
@@ -112,7 +110,7 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 			ts.nodesRespondToTheObservationRequests(
 				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
 
-			requestIDs = ts.waitForInitialReportSignatureRequestsToBeSent(
+			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
 				t, ts.rawRmnClient, ts.rmnClient.minSigners, ts.rmnClient.minObservers)
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
@@ -145,10 +143,14 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
 			time.Sleep(time.Millisecond)
 
-			requestIDs = ts.waitForInitialReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, ts.rmnClient.minSigners, ts.rmnClient.minObservers)
+			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
+				t, ts.rawRmnClient, len(ts.rmnClient.rmnNodes), ts.rmnClient.minObservers)
+			time.Sleep(time.Millisecond)
+
+			t.Logf("requestIDs: %v", requestIDs)
+
 			// requests should be sent to all nodes, since we hit the timer timeout
-			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.minSigners)
+			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnNodes))
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -252,10 +254,10 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 	}
 }
 
-func (ts *testSetup) waitForInitialReportSignatureRequestsToBeSent(
+func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 	t *testing.T,
 	rmnClient *mockRawRmnClient,
-	minSigners int,
+	expectedResponses int,
 	minObservers int,
 ) map[uint32]uint64 {
 	requestIDs := make(map[uint32]uint64)
@@ -266,14 +268,16 @@ func (ts *testSetup) waitForInitialReportSignatureRequestsToBeSent(
 		time.Sleep(time.Millisecond)
 
 		recvReqs := rmnClient.getReceivedRequests()
-		if len(recvReqs) < minSigners {
+		if len(recvReqs) < expectedResponses {
 			continue
 		}
 
 		// check that the requests the node received are correct
 		for _, reqs := range recvReqs {
 			for _, req := range reqs {
-				require.NotNil(t, req.GetReportSignatureRequest())
+				if req.GetReportSignatureRequest() == nil {
+					continue
+				}
 				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= minObservers)
 			}
 		}

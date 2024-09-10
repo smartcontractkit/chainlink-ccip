@@ -523,13 +523,14 @@ func (c *client) listenForRmnReportSignatures(
 	finishedRequests := mapset.NewSet[uint64]()
 	respChan := c.rawRmnClient.Recv()
 	requestIDs = requestIDs.Clone()
+	c.lggr.Infof("Waiting for report signatures, requestIDs: %s", requestIDs.String())
 
 	for {
 		select {
 		case resp := <-respChan:
 			responseTyp, err := c.parseResponse(&resp, requestIDs, finishedRequests)
 			if err != nil {
-				c.lggr.Errorw("failed to parse RMN signature response", "err", err)
+				c.lggr.Infow("failed to parse RMN signature response", "err", err)
 				continue
 			}
 
