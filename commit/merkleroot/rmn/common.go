@@ -36,7 +36,8 @@ func (c *PBClient) parseResponse(
 	}
 
 	if !requestIDs.Contains(responseTyp.RequestId) {
-		return nil, fmt.Errorf("got an RMN response that we are not waiting for: %d (%s)", responseTyp.RequestId, requestIDs.String())
+		return nil, fmt.Errorf(
+			"got an RMN response that we are not waiting for: %d (%s)", responseTyp.RequestId, requestIDs.String())
 	}
 
 	if gotResponses.Contains(responseTyp.RequestId) {

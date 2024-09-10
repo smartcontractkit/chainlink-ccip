@@ -94,14 +94,14 @@ type nodeSetup struct {
 func setupHomeChainPoller(
 	t *testing.T,
 	lggr logger.Logger,
-	chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	chainConfigInfos []reader.ChainConfigInfo,
+) reader.HomeChain {
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
+		mock.Anything,
 		mock.Anything,
 		mock.MatchedBy(func(input map[string]interface{}) bool {
 			_, pageIndexExists := input["pageIndex"]
@@ -111,7 +111,7 @@ func setupHomeChainPoller(
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(5).(*[]reader.ChainConfigInfo)
+			arg := args.Get(4).(*[]reader.ChainConfigInfo)
 			if firstCall {
 				*arg = chainConfigInfos
 				firstCall = false
@@ -217,9 +217,7 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
-					FinalityDepth: 1,
-				}),
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
 			},
 		}, {
 			ChainSelector: dstSelector,
@@ -228,9 +226,7 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
-					FinalityDepth: 1,
-				}),
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
 			},
 		},
 	}

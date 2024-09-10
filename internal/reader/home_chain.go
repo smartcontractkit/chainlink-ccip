@@ -133,8 +133,7 @@ func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
 		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
 			ctx,
-			consts.ContractNameCCIPConfig,
-			consts.MethodNameGetAllChainConfigs,
+			r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
 			primitives.Unconfirmed,
 			map[string]interface{}{
 				"pageIndex": pageIndex,
@@ -228,8 +227,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	var ocrConfigs []OCR3ConfigWithMeta
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetOCRConfig,
+		r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetOCRConfig),
 		primitives.Unconfirmed,
 		map[string]any{
 			"donId":      donID,

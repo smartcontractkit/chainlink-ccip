@@ -227,17 +227,17 @@ func (_c *MockExtended_GetBindings_Call) RunAndReturn(run func(string) []contrac
 	return _c
 }
 
-// GetLatestValue provides a mock function with given fields: ctx, contractName, method, confidenceLevel, params, returnVal
-func (_m *MockExtended) GetLatestValue(ctx context.Context, contractName string, method string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{}) error {
-	ret := _m.Called(ctx, contractName, method, confidenceLevel, params, returnVal)
+// GetLatestValue provides a mock function with given fields: ctx, readIdentifier, confidenceLevel, params, returnVal
+func (_m *MockExtended) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{}) error {
+	ret := _m.Called(ctx, readIdentifier, confidenceLevel, params, returnVal)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetLatestValue")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, primitives.ConfidenceLevel, interface{}, interface{}) error); ok {
-		r0 = rf(ctx, contractName, method, confidenceLevel, params, returnVal)
+	if rf, ok := ret.Get(0).(func(context.Context, string, primitives.ConfidenceLevel, interface{}, interface{}) error); ok {
+		r0 = rf(ctx, readIdentifier, confidenceLevel, params, returnVal)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -252,18 +252,17 @@ type MockExtended_GetLatestValue_Call struct {
 
 // GetLatestValue is a helper method to define mock.On call
 //   - ctx context.Context
-//   - contractName string
-//   - method string
+//   - readIdentifier string
 //   - confidenceLevel primitives.ConfidenceLevel
 //   - params interface{}
 //   - returnVal interface{}
-func (_e *MockExtended_Expecter) GetLatestValue(ctx interface{}, contractName interface{}, method interface{}, confidenceLevel interface{}, params interface{}, returnVal interface{}) *MockExtended_GetLatestValue_Call {
-	return &MockExtended_GetLatestValue_Call{Call: _e.mock.On("GetLatestValue", ctx, contractName, method, confidenceLevel, params, returnVal)}
+func (_e *MockExtended_Expecter) GetLatestValue(ctx interface{}, readIdentifier interface{}, confidenceLevel interface{}, params interface{}, returnVal interface{}) *MockExtended_GetLatestValue_Call {
+	return &MockExtended_GetLatestValue_Call{Call: _e.mock.On("GetLatestValue", ctx, readIdentifier, confidenceLevel, params, returnVal)}
 }
 
-func (_c *MockExtended_GetLatestValue_Call) Run(run func(ctx context.Context, contractName string, method string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{})) *MockExtended_GetLatestValue_Call {
+func (_c *MockExtended_GetLatestValue_Call) Run(run func(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{})) *MockExtended_GetLatestValue_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(primitives.ConfidenceLevel), args[4].(interface{}), args[5].(interface{}))
+		run(args[0].(context.Context), args[1].(string), args[2].(primitives.ConfidenceLevel), args[3].(interface{}), args[4].(interface{}))
 	})
 	return _c
 }
@@ -273,7 +272,7 @@ func (_c *MockExtended_GetLatestValue_Call) Return(_a0 error) *MockExtended_GetL
 	return _c
 }
 
-func (_c *MockExtended_GetLatestValue_Call) RunAndReturn(run func(context.Context, string, string, primitives.ConfidenceLevel, interface{}, interface{}) error) *MockExtended_GetLatestValue_Call {
+func (_c *MockExtended_GetLatestValue_Call) RunAndReturn(run func(context.Context, string, primitives.ConfidenceLevel, interface{}, interface{}) error) *MockExtended_GetLatestValue_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -370,9 +369,9 @@ func (_c *MockExtended_Name_Call) RunAndReturn(run func() string) *MockExtended_
 	return _c
 }
 
-// QueryKey provides a mock function with given fields: ctx, contractName, filter, limitAndSort, sequenceDataType
-func (_m *MockExtended) QueryKey(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{}) ([]types.Sequence, error) {
-	ret := _m.Called(ctx, contractName, filter, limitAndSort, sequenceDataType)
+// QueryKey provides a mock function with given fields: ctx, contract, filter, limitAndSort, sequenceDataType
+func (_m *MockExtended) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{}) ([]types.Sequence, error) {
+	ret := _m.Called(ctx, contract, filter, limitAndSort, sequenceDataType)
 
 	if len(ret) == 0 {
 		panic("no return value specified for QueryKey")
@@ -380,19 +379,19 @@ func (_m *MockExtended) QueryKey(ctx context.Context, contractName string, filte
 
 	var r0 []types.Sequence
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)); ok {
-		return rf(ctx, contractName, filter, limitAndSort, sequenceDataType)
+	if rf, ok := ret.Get(0).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)); ok {
+		return rf(ctx, contract, filter, limitAndSort, sequenceDataType)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) []types.Sequence); ok {
-		r0 = rf(ctx, contractName, filter, limitAndSort, sequenceDataType)
+	if rf, ok := ret.Get(0).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) []types.Sequence); ok {
+		r0 = rf(ctx, contract, filter, limitAndSort, sequenceDataType)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]types.Sequence)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) error); ok {
-		r1 = rf(ctx, contractName, filter, limitAndSort, sequenceDataType)
+	if rf, ok := ret.Get(1).(func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) error); ok {
+		r1 = rf(ctx, contract, filter, limitAndSort, sequenceDataType)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -407,17 +406,17 @@ type MockExtended_QueryKey_Call struct {
 
 // QueryKey is a helper method to define mock.On call
 //   - ctx context.Context
-//   - contractName string
+//   - contract types.BoundContract
 //   - filter query.KeyFilter
 //   - limitAndSort query.LimitAndSort
 //   - sequenceDataType interface{}
-func (_e *MockExtended_Expecter) QueryKey(ctx interface{}, contractName interface{}, filter interface{}, limitAndSort interface{}, sequenceDataType interface{}) *MockExtended_QueryKey_Call {
-	return &MockExtended_QueryKey_Call{Call: _e.mock.On("QueryKey", ctx, contractName, filter, limitAndSort, sequenceDataType)}
+func (_e *MockExtended_Expecter) QueryKey(ctx interface{}, contract interface{}, filter interface{}, limitAndSort interface{}, sequenceDataType interface{}) *MockExtended_QueryKey_Call {
+	return &MockExtended_QueryKey_Call{Call: _e.mock.On("QueryKey", ctx, contract, filter, limitAndSort, sequenceDataType)}
 }
 
-func (_c *MockExtended_QueryKey_Call) Run(run func(ctx context.Context, contractName string, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{})) *MockExtended_QueryKey_Call {
+func (_c *MockExtended_QueryKey_Call) Run(run func(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{})) *MockExtended_QueryKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(query.KeyFilter), args[3].(query.LimitAndSort), args[4].(interface{}))
+		run(args[0].(context.Context), args[1].(types.BoundContract), args[2].(query.KeyFilter), args[3].(query.LimitAndSort), args[4].(interface{}))
 	})
 	return _c
 }
@@ -427,7 +426,7 @@ func (_c *MockExtended_QueryKey_Call) Return(_a0 []types.Sequence, _a1 error) *M
 	return _c
 }
 
-func (_c *MockExtended_QueryKey_Call) RunAndReturn(run func(context.Context, string, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)) *MockExtended_QueryKey_Call {
+func (_c *MockExtended_QueryKey_Call) RunAndReturn(run func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)) *MockExtended_QueryKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -519,6 +518,53 @@ func (_c *MockExtended_Start_Call) Return(_a0 error) *MockExtended_Start_Call {
 }
 
 func (_c *MockExtended_Start_Call) RunAndReturn(run func(context.Context) error) *MockExtended_Start_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Unbind provides a mock function with given fields: ctx, bindings
+func (_m *MockExtended) Unbind(ctx context.Context, bindings []types.BoundContract) error {
+	ret := _m.Called(ctx, bindings)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Unbind")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []types.BoundContract) error); ok {
+		r0 = rf(ctx, bindings)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockExtended_Unbind_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Unbind'
+type MockExtended_Unbind_Call struct {
+	*mock.Call
+}
+
+// Unbind is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bindings []types.BoundContract
+func (_e *MockExtended_Expecter) Unbind(ctx interface{}, bindings interface{}) *MockExtended_Unbind_Call {
+	return &MockExtended_Unbind_Call{Call: _e.mock.On("Unbind", ctx, bindings)}
+}
+
+func (_c *MockExtended_Unbind_Call) Run(run func(ctx context.Context, bindings []types.BoundContract)) *MockExtended_Unbind_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]types.BoundContract))
+	})
+	return _c
+}
+
+func (_c *MockExtended_Unbind_Call) Return(_a0 error) *MockExtended_Unbind_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockExtended_Unbind_Call) RunAndReturn(run func(context.Context, []types.BoundContract) error) *MockExtended_Unbind_Call {
 	_c.Call.Return(run)
 	return _c
 }

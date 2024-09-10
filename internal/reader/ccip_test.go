@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -22,35 +22,46 @@ import (
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockChainReader)
+	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockContractReader)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = chainreadermocks.NewMockChainReader(t)
+		sourceCRs[chain] = chainreadermocks.NewMockContractReader(t)
 	}
 
-	destCR := chainreadermocks.NewMockChainReader(t)
+	destCR := chainreadermocks.NewMockContractReader(t)
 
 	destCR.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameGetSourceChainConfig,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Run(func(args mock.Arguments) {
-		sourceChain := args.Get(4).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := args.Get(5).(*sourceChainConfig)
+		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
+		v := args.Get(4).(*sourceChainConfig)
 		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 
+	offrampAddress := []byte{0x3}
 	ccipReader := NewCCIPChainReader(
 		logger.Test(t),
 		map[cciptypes.ChainSelector]types.ContractReader{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
-		}, nil, chainC,
+		}, nil, chainC, offrampAddress,
 	)
+
+	sourceCRs[chainA].On("Bind", mock.Anything, mock.Anything).Return(nil)
+	sourceCRs[chainB].On("Bind", mock.Anything, mock.Anything).Return(nil)
+	destCR.On("Bind", mock.Anything, mock.Anything).Return(nil)
+	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
+		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
+	require.NoError(t, ccipReader.contractReaders[chainB].Bind(
+		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x2"}}))
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
+		context.Background(), []types.BoundContract{{Name: "OffRamp",
+			Address: typeconv.AddressBytesToString(offrampAddress, 111_111)}}))
 
 	ctx := context.Background()
 	cfgs, err := ccipReader.getSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
@@ -70,7 +81,7 @@ func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	}
 
 	someAddr := "0x1234567890123456789012345678901234567890"
-	someAddrBytes, err := typconv.AddressStringToBytes(someAddr, uint64(chainA))
+	someAddrBytes, err := typeconv.AddressStringToBytes(someAddr, uint64(chainA))
 	require.NoError(t, err)
 
 	t.Run("happy path", func(t *testing.T) {

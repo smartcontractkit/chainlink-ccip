@@ -50,6 +50,9 @@ install-protoc:
 	protoc --version
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
 
+install-golangcilint:
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59
+
 ensure_go_version:
 	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
 
