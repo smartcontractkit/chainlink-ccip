@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -28,63 +27,50 @@ func (p *processor) getConsensusObservation(
 		return a < b
 	})
 
+	twoFPlus1 := 2*fDestChain + 1
+
+	feedPricesConsensus := shared.GetConsensusMapAggregator(
+		p.lggr,
+		"FeedTokenPrices",
+		aggObs.FeedTokenPrices,
+		twoFPlus1,
+		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
+			return shared.Median(vals, shared.TokenPriceComparator)
+		},
+	)
+
+	feeQuoterUpdatesConsensus := shared.GetConsensusMapAggregator(
+		p.lggr,
+		"FeeQuoterUpdates",
+		aggObs.FeeQuoterTokenUpdates,
+		twoFPlus1,
+		feeQuoterAggregator,
+	)
+
 	consensusObs := ConsensusObservation{
 		FDestChain:            fDestChain,
 		Timestamp:             shared.Median(aggObs.Timestamps, shared.TimestampComparator),
-		FeedTokenPrices:       feedPricesConsensus(p.lggr, aggObs.FeedTokenPrices, fDestChain),
-		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus(p.lggr, aggObs.FeeQuoterTokenUpdates, fDestChain),
+		FeedTokenPrices:       feedPricesConsensus,
+		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus,
 	}
 
 	return consensusObs, nil
 }
 
-// feedPricesConsensus returns the median of the feed token prices for each token given all observed prices
-func feedPricesConsensus(
-	lggr logger.Logger,
-	feedTokenPrices map[types.Account][]cciptypes.TokenPrice,
-	fDestChain int,
-) map[types.Account]cciptypes.TokenPrice {
-	tokenPrices := make(map[types.Account]cciptypes.TokenPrice)
-	for token, prices := range feedTokenPrices {
-		if len(prices) < 2*fDestChain+1 {
-			lggr.Warnf("could not reach consensus on feed token prices for token %s ", token)
-			continue
-		}
-		tokenPrices[token] = shared.Median(prices, func(a, b cciptypes.TokenPrice) bool {
-			return a.Price.Int.Cmp(b.Price.Int) < 0
-		})
+// feeQuoterAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
+var feeQuoterAggregator = func(updates []shared.TimestampedBig) shared.TimestampedBig {
+	timestamps := make([]time.Time, len(updates))
+	prices := make([]cciptypes.BigInt, len(updates))
+	for i := range updates {
+		timestamps[i] = updates[i].Timestamp
+		prices[i] = updates[i].Value
 	}
-	return tokenPrices
-}
-
-// feeQuoterUpdatesConsensus returns the median of the price registry token prices for each
-// token given all observed updates
-func feeQuoterUpdatesConsensus(
-	lggr logger.Logger,
-	feeQuoterUpdates map[types.Account][]shared.TimestampedBig,
-	fDestChain int,
-) map[types.Account]shared.TimestampedBig {
-	tokenUpdates := make(map[types.Account]shared.TimestampedBig)
-	for token, updates := range feeQuoterUpdates {
-		if len(updates) < 2*fDestChain+1 {
-			lggr.Warnf("could not reach consensus on fee quoter token updates for token %s ", token)
-			continue
-		}
-		timestamps := make([]time.Time, len(updates))
-		prices := make([]cciptypes.BigInt, len(updates))
-		for i := range updates {
-			timestamps[i] = updates[i].Timestamp
-			prices[i] = updates[i].Value
-		}
-		medianPrice := shared.Median(prices, shared.BigIntComparator)
-		medianTimestamp := shared.Median(timestamps, shared.TimestampComparator)
-		tokenUpdates[token] = shared.TimestampedBig{
-			Value:     medianPrice,
-			Timestamp: medianTimestamp,
-		}
+	medianPrice := shared.Median(prices, shared.BigIntComparator)
+	medianTimestamp := shared.Median(timestamps, shared.TimestampComparator)
+	return shared.TimestampedBig{
+		Value:     medianPrice,
+		Timestamp: medianTimestamp,
 	}
-
-	return tokenUpdates
 }
 
 // selectTokensForUpdate checks which tokens need to be updated based on the observed token prices and

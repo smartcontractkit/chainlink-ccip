@@ -46,12 +46,15 @@ func GetConsensusMap[T any](
 	return consensus
 }
 
-func GetConsensusMapMedian[K comparable, T any](
+// Aggregator is a function type that aggregates a slice of values into a single value.
+type Aggregator[T any] func(vals []T) T
+
+func GetConsensusMapAggregator[K comparable, T any](
 	lggr logger.Logger,
 	objectName string,
 	items map[K][]T,
 	f int,
-	comp func(a, b T) bool,
+	agg Aggregator[T],
 ) map[K]T {
 	consensus := make(map[K]T)
 
@@ -60,7 +63,7 @@ func GetConsensusMapMedian[K comparable, T any](
 			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
 			continue
 		}
-		consensus[key] = Median(values, comp)
+		consensus[key] = agg(values)
 	}
 	return consensus
 }
@@ -86,4 +89,8 @@ var TimestampComparator = func(a, b time.Time) bool {
 
 var BigIntComparator = func(a, b cciptypes.BigInt) bool {
 	return a.Cmp(b.Int) == -1
+}
+
+var TokenPriceComparator = func(a, b cciptypes.TokenPrice) bool {
+	return a.Price.Int.Cmp(b.Price.Int) == -1
 }
