@@ -68,7 +68,8 @@ type client struct {
 
 // RMNNodeInfo contains the information about an RMN node.
 type RMNNodeInfo struct {
-	ID                    uint32 // ID is the index of this node in the RMN config
+	// ID is the index of this node in the RMN config
+	ID                    uint32
 	SupportedSourceChains mapset.Set[cciptypes.ChainSelector]
 	IsSigner              bool
 }
