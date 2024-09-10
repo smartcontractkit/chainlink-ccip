@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -106,7 +107,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		)
 	}
 
-	ccipReader := reader.NewCCIPChainReader(
+	ccipReader := readerpkg.NewCCIPChainReader(
 		p.lggr,
 		p.contractReaders,
 		p.chainWriters,

@@ -6,14 +6,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 type BackgroundReaderSyncer struct {
 	lggr          logger.Logger
-	reader        reader.CCIP
+	reader        reader.CCIPReader
 	syncTimeout   time.Duration
 	syncFrequency time.Duration
 
@@ -28,7 +28,7 @@ var syncFrequencyRecommendedRange = [2]time.Duration{time.Second, time.Hour}
 
 func NewBackgroundReaderSyncer(
 	lggr logger.Logger,
-	reader reader.CCIP,
+	reader reader.CCIPReader,
 	syncTimeout time.Duration,
 	syncFrequency time.Duration,
 ) *BackgroundReaderSyncer {
@@ -86,12 +86,12 @@ func (b *BackgroundReaderSyncer) Close() error {
 	return nil
 }
 
-// backgroundReaderSync runs a background process that periodically syncs the provider CCIP reader.
+// backgroundReaderSync runs a background process that periodically syncs the provided CCIPReader.
 func backgroundReaderSync(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	lggr logger.Logger,
-	reader reader.CCIP,
+	reader reader.CCIPReader,
 	syncTimeout time.Duration,
 	ticker <-chan time.Time,
 ) {
@@ -115,7 +115,7 @@ func backgroundReaderSync(
 func syncReader(
 	ctx context.Context,
 	lggr logger.Logger,
-	reader reader.CCIP,
+	reader reader.CCIPReader,
 	syncTimeout time.Duration,
 ) error {
 	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)

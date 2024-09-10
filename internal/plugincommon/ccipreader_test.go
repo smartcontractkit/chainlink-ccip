@@ -12,12 +12,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 )
 
 func TestBackgroundReaderSyncer(t *testing.T) {
 	lggr := logger.Test(t)
-	mockReader := reader_mock.NewMockCCIP(t)
+	mockReader := reader_mock.NewMockCCIPReader(t)
 
 	t.Run("start/stop checks", func(t *testing.T) {
 		readerSyncer := NewBackgroundReaderSyncer(lggr, mockReader, time.Hour, time.Hour)
@@ -61,7 +61,7 @@ func TestBackgroundReaderSyncer(t *testing.T) {
 func Test_backgroundReaderSync(t *testing.T) {
 	ctx, cf := context.WithCancel(context.Background())
 	lggr := logger.Test(t)
-	reader := reader_mock.NewMockCCIP(t)
+	reader := reader_mock.NewMockCCIPReader(t)
 	syncTimeout := 50 * time.Millisecond
 	ticker := make(chan time.Time)
 	wg := &sync.WaitGroup{}

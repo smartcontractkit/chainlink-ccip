@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -47,8 +48,8 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 		return Observation{
 			// TODO: observe OnRamp max seq nums. The use of offRampNextSeqNums here effectively disables batching,
 			// e.g. the ranges selected for each chain will be [x, x] (e.g. [46, 46]), which means reports will only
-			// contain one message per chain. Querying the OnRamp contract requires changes to reader.CCIP, which will
-			// need to be done in a future change.
+			// contain one message per chain. Querying the OnRamp contract requires changes to reader.CCIPReader,
+			// which will need to be done in a future change.
 			OnRampMaxSeqNums:   offRampNextSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             w.observer.ObserveFChain(),
@@ -89,7 +90,7 @@ type ObserverImpl struct {
 	homeChain    reader.HomeChain
 	nodeID       commontypes.OracleID
 	chainSupport plugincommon.ChainSupport
-	ccipReader   reader.CCIP
+	ccipReader   readerpkg.CCIPReader
 	msgHasher    cciptypes.MessageHasher
 }
 
