@@ -9,13 +9,12 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -23,6 +22,7 @@ import (
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -35,7 +35,7 @@ type Plugin struct {
 	cfg          pluginconfig.ExecutePluginConfig
 
 	// providers
-	ccipReader   reader.CCIP
+	ccipReader   readerpkg.CCIPReader
 	readerSyncer *plugincommon.BackgroundReaderSyncer
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
@@ -51,7 +51,7 @@ func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg pluginconfig.ExecutePluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	ccipReader reader.CCIP,
+	ccipReader readerpkg.CCIPReader,
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
@@ -90,7 +90,7 @@ func (p *Plugin) Query(ctx context.Context, outctx ocr3types.OutcomeContext) (ty
 
 func getPendingExecutedReports(
 	ctx context.Context,
-	ccipReader reader.CCIP,
+	ccipReader readerpkg.CCIPReader,
 	dest cciptypes.ChainSelector,
 	ts time.Time,
 	lggr logger.Logger,

@@ -10,19 +10,17 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
+	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 type MerkleRootObservation = shared.AttributedObservation[merkleroot.Observation]
@@ -33,7 +31,7 @@ type Plugin struct {
 	nodeID              commontypes.OracleID
 	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
-	ccipReader          reader.CCIP
+	ccipReader          readerpkg.CCIPReader
 	readerSyncer        *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader   reader.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
@@ -51,7 +49,7 @@ func NewPlugin(
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg pluginconfig.CommitPluginConfig,
-	ccipReader reader.CCIP,
+	ccipReader readerpkg.CCIPReader,
 	tokenPricesReader reader.PriceReader,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
