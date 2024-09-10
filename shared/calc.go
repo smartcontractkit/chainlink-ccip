@@ -2,47 +2,7 @@ package shared
 
 import (
 	"math/big"
-	"time"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
-
-// MedianTimestamp returns the middle timestamp after sorting the provided timestamps.
-func MedianTimestamp(timestamps []time.Time) time.Time {
-	return Median(timestamps, func(a, b time.Time) bool {
-		return a.Before(b)
-	})
-}
-
-// MedianBigInt returns the middle number after sorting the provided numbers.
-func MedianBigInt(vals []cciptypes.BigInt) cciptypes.BigInt {
-	return Median(vals, func(a, b cciptypes.BigInt) bool {
-		return a.Cmp(b.Int) == -1
-	})
-}
-
-var TimestampComparator = func(a, b time.Time) bool {
-	return a.Before(b)
-}
-
-var BigIntComparator = func(a, b cciptypes.BigInt) bool {
-	return a.Cmp(b.Int) == -1
-}
-
-// MedianTimestampedBig returns median of the provided TimestampedBig values.
-// It calculates the median of the timestamps and the median of the values.
-func MedianTimestampedBig(vals []TimestampedBig) TimestampedBig {
-	timestamps := make([]time.Time, len(vals))
-	prices := make([]cciptypes.BigInt, len(vals))
-	for i := range vals {
-		timestamps[i] = vals[i].Timestamp
-		prices[i] = vals[i].Value
-	}
-	return TimestampedBig{
-		Timestamp: MedianTimestamp(timestamps),
-		Value:     MedianBigInt(prices),
-	}
-}
 
 // Deviates checks if x1 and x2 deviates based on the provided ppb (parts per billion)
 // ppb is calculated based on the smaller value of the two

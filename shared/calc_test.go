@@ -4,47 +4,8 @@ import (
 	"math/big"
 	"testing"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
 )
-
-var BI = func(x int64) cciptypes.BigInt {
-	return cciptypes.NewBigIntFromInt64(x)
-}
-
-func TestMedianBigInt(t *testing.T) {
-	tests := []struct {
-		name string
-		vals []cciptypes.BigInt
-		want cciptypes.BigInt
-	}{
-		{
-			name: "base case",
-			vals: []cciptypes.BigInt{BI(1), BI(2), BI(4), BI(5)},
-			want: BI(4),
-		},
-		{
-			name: "not sorted",
-			vals: []cciptypes.BigInt{BI(100), BI(50), BI(30), BI(110)},
-			want: cciptypes.NewBigIntFromInt64(100),
-		},
-		{
-			name: "empty slice",
-			vals: []cciptypes.BigInt{},
-			want: cciptypes.BigInt{},
-		},
-		{
-			name: "one item",
-			vals: []cciptypes.BigInt{BI(123)},
-			want: BI(123),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, MedianBigInt(tt.vals), "BigIntSortedMiddle(%v)", tt.vals)
-		})
-	}
-}
 
 func TestDeviates(t *testing.T) {
 	type args struct {

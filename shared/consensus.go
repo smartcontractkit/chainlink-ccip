@@ -2,6 +2,7 @@ package shared
 
 import (
 	"sort"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -54,12 +55,12 @@ func GetConsensusMapMedian[K comparable, T any](
 ) map[K]T {
 	consensus := make(map[K]T)
 
-	for key, items := range items {
-		if len(items) < f {
+	for key, values := range items {
+		if len(values) < f {
 			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
 			continue
 		}
-		consensus[key] = Median(items, comp)
+		consensus[key] = Median(values, comp)
 	}
 	return consensus
 }
@@ -77,4 +78,12 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 		return less(valsCopy[i], valsCopy[j])
 	})
 	return valsCopy[len(valsCopy)/2]
+}
+
+var TimestampComparator = func(a, b time.Time) bool {
+	return a.Before(b)
+}
+
+var BigIntComparator = func(a, b cciptypes.BigInt) bool {
+	return a.Cmp(b.Int) == -1
 }
