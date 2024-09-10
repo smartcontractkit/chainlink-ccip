@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -16,28 +19,38 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type TokenPrices interface {
-	// GetTokenPricesUSD returns the prices of the provided tokens in USD.
+type PriceReader interface {
+	// GetTokenFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18.
+	//	1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetTokenPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+
+	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
+	GetFeeQuoterTokenUpdates(
+		ctx context.Context,
+		tokens []ocr2types.Account,
+	) (map[ocr2types.Account]shared.TimestampedBig, error)
 }
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader commontypes.ContractReader
-	PriceSources   map[ocr2types.Account]pluginconfig.ArbitrumPriceSource
-	TokenDecimals  map[ocr2types.Account]uint8
+	ContractReader   commontypes.ContractReader
+	TokenInfo        map[types.Account]pluginconfig.TokenInfo
+	FeeQuoterAddress types.Account
+	// If not enabled just return empty prices
+	// TODO: Remove completely once integration tests are updated
+	enabled bool
 }
 
 func NewOnchainTokenPricesReader(
 	contractReader commontypes.ContractReader,
-	priceSources map[ocr2types.Account]pluginconfig.ArbitrumPriceSource,
-	tokenDecimals map[ocr2types.Account]uint8,
+	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
 		ContractReader: contractReader,
-		PriceSources:   priceSources,
-		TokenDecimals:  tokenDecimals,
+		TokenInfo:      tokenInfo,
 	}
 }
 
@@ -53,29 +66,72 @@ type LatestRoundData struct {
 	AnsweredInRound *big.Int
 }
 
-func (pr *OnchainTokenPricesReader) GetTokenPricesUSD(
+func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
+	ctx context.Context,
+	tokens []ocr2types.Account,
+) (map[ocr2types.Account]shared.TimestampedBig, error) {
+	var updates []shared.TimestampedBig
+	if !pr.enabled {
+		return map[types.Account]shared.TimestampedBig{}, nil
+	}
+
+	boundContract := commontypes.BoundContract{
+		Address: string(pr.FeeQuoterAddress),
+		Name:    consts.ContractNamePriceRegistry,
+	}
+	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
+	// a timestamp and price of 0 if the token is not found
+	if err :=
+		pr.ContractReader.GetLatestValue(
+			ctx,
+			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
+			primitives.Unconfirmed,
+			tokens,
+			&updates,
+		); err != nil {
+		return nil, fmt.Errorf("failed to get token prices: %w", err)
+	}
+
+	updateMap := make(map[ocr2types.Account]shared.TimestampedBig)
+	for i, token := range tokens {
+		// token not available on fee quoter
+		if updates[i].Timestamp == time.Unix(0, 0) {
+			continue
+		}
+		updateMap[token] = updates[i]
+	}
+
+	return updateMap, nil
+}
+
+func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
+	if !pr.enabled {
+		return []*big.Int{}, nil
+	}
 	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
 		idx := idx
 		token := token
-		boundContract := commontypes.BoundContract{
-			Address: pr.PriceSources[token].AggregatorAddress,
-			Name:    consts.ContractNamePriceAggregator,
-		}
 		eg.Go(func() error {
+			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
+			// are merged we'll need to use the bound contract
+			boundContract := commontypes.BoundContract{
+				Address: pr.TokenInfo[token].AggregatorAddress,
+				Name:    consts.ContractNamePriceAggregator,
+			}
 			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
-			decimals, ok := pr.TokenDecimals[token]
+			tokenInfo, ok := pr.TokenInfo[token]
 			if !ok {
-				return fmt.Errorf("failed to get decimals for %s: %w", token, err)
+				return fmt.Errorf("failed to get tokenInfo for %s: %w", token, err)
 			}
 
-			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, decimals)
+			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, tokenInfo.Decimals)
 			return nil
 		})
 	}
@@ -104,7 +160,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
-			map[string]any{},
+			nil,
 			&decimals,
 		); err != nil {
 		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
@@ -119,12 +175,13 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	boundContract commontypes.BoundContract,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
+	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 	if err :=
 		pr.ContractReader.GetLatestValue(
 			ctx,
-			boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData),
+			identifier,
 			primitives.Unconfirmed,
-			map[string]any{},
+			nil,
 			&latestRoundData,
 		); err != nil {
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
@@ -155,5 +212,5 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
-// Ensure OnchainTokenPricesReader implements TokenPrices
-var _ TokenPrices = (*OnchainTokenPricesReader)(nil)
+// Ensure OnchainTokenPricesReader implements PriceReader
+var _ PriceReader = (*OnchainTokenPricesReader)(nil)

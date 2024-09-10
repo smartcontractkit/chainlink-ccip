@@ -96,14 +96,13 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
-	var onChainTokenPricesReader reader.TokenPrices
+	var onChainTokenPricesReader reader.PriceReader
 	// The node supports the chain that the token prices are on.
 	tokenPricesCr, ok := p.contractReaders[cciptypes.ChainSelector(offchainConfig.TokenPriceChainSelector)]
 	if ok {
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
 			tokenPricesCr,
-			offchainConfig.PriceSources,
-			offchainConfig.TokenDecimals,
+			offchainConfig.TokenInfo,
 		)
 	}
 

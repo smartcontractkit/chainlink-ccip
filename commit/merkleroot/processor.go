@@ -8,6 +8,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
@@ -18,13 +19,13 @@ import (
 // It's setup to use RMN to query which messages to include in the merkle root and ensures
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
-	nodeID       commontypes.OracleID
+	oracleID     commontypes.OracleID
 	cfg          pluginconfig.CommitPluginConfig
 	lggr         logger.Logger
 	observer     Observer
 	ccipReader   reader.CCIP
 	reportingCfg ocr3types.ReportingPluginConfig
-	chainSupport shared.ChainSupport
+	chainSupport plugincommon.ChainSupport
 	rmnClient    rmn.Client
 }
 
@@ -37,7 +38,7 @@ func NewProcessor(
 	ccipReader reader.CCIP,
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	chainSupport shared.ChainSupport,
+	chainSupport plugincommon.ChainSupport,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,
@@ -48,7 +49,7 @@ func NewProcessor(
 		msgHasher,
 	}
 	return &Processor{
-		nodeID:       oracleID,
+		oracleID:     oracleID,
 		cfg:          cfg,
 		lggr:         lggr,
 		ccipReader:   ccipReader,
