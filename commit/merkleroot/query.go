@@ -29,14 +29,14 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		OfframpAddress:    offRampAddress,
 	}
 
-	reqUpdates := make([]rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
+	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
 			return Query{}, fmt.Errorf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 		}
 
-		reqUpdates = append(reqUpdates, rmnpb.FixedDestLaneUpdateRequest{
+		reqUpdates = append(reqUpdates, &rmnpb.FixedDestLaneUpdateRequest{
 			LaneSource: &rmnpb.LaneSource{
 				SourceChainSelector: uint64(sourceChainRange.ChainSel),
 				OnrampAddress:       onRampAddress,

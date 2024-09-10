@@ -33,11 +33,11 @@ func TestProcessor_Query(t *testing.T) {
 	}
 
 	expSigs1 := &rmn.ReportSignatures{
-		Signatures: []rmnpb.EcdsaSignature{
+		Signatures: []*rmnpb.EcdsaSignature{
 			{R: []byte("r1"), S: []byte("s1")},
 			{R: []byte("r2"), S: []byte("s2")},
 		},
-		LaneUpdates: []rmnpb.FixedDestLaneUpdate{
+		LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
 			{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: uint64(srcChain1),
@@ -86,7 +86,7 @@ func TestProcessor_Query(t *testing.T) {
 							DestChainSelector: uint64(dstChain),
 							OfframpAddress:    contractAddrs[dstChain][consts.ContractNameOffRamp],
 						},
-						[]rmnpb.FixedDestLaneUpdateRequest{
+						[]*rmnpb.FixedDestLaneUpdateRequest{
 							{
 								LaneSource: &rmnpb.LaneSource{
 									SourceChainSelector: uint64(srcChain1),
