@@ -86,7 +86,7 @@ func (b *BackgroundReaderSyncer) Close() error {
 	return nil
 }
 
-// backgroundReaderSync runs a background process that periodically syncs the provider CCIPReader.
+// backgroundReaderSync runs a background process that periodically syncs the provided CCIPReader.
 func backgroundReaderSync(
 	ctx context.Context,
 	wg *sync.WaitGroup,
