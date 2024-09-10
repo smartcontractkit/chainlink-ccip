@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
@@ -23,7 +24,7 @@ type Processor struct {
 	cfg          pluginconfig.CommitPluginConfig
 	lggr         logger.Logger
 	observer     Observer
-	ccipReader   reader.CCIP
+	ccipReader   readerpkg.CCIPReader
 	reportingCfg ocr3types.ReportingPluginConfig
 	chainSupport plugincommon.ChainSupport
 	rmnClient    rmn.Client
@@ -35,7 +36,7 @@ func NewProcessor(
 	lggr logger.Logger,
 	cfg pluginconfig.CommitPluginConfig,
 	homeChain reader.HomeChain,
-	ccipReader reader.CCIP,
+	ccipReader readerpkg.CCIPReader,
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	chainSupport plugincommon.ChainSupport,
