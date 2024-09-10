@@ -6,8 +6,11 @@ import (
 	"sort"
 
 	"github.com/smartcontractkit/chainlink-ccip/shared"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"golang.org/x/exp/maps"
 )
 
