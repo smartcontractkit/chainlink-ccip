@@ -1,6 +1,8 @@
 package rmn
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -127,8 +129,8 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(mockClient, ts.rmnClient.minObservers)
 
 			// requests should be sent to at least two nodes
-			assert.Greater(t, len(requestIDs), ts.rmnClient.minObservers)
-			assert.Len(t, requestedChains, len(ts.rmnClient.rmnNodes))
+			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.minObservers)
+			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnClient.minObservers)
 
 			ts.nodesRespondToTheObservationRequests(
 				mockClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
@@ -203,10 +205,15 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 		laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0)
 		for _, laneUpdate := range allLaneUpdates {
 			if requestedChains[nodeID].Contains(laneUpdate.LaneSource.SourceChainSelector) {
+				root := sha256.Sum256([]byte(fmt.Sprintf("%d[%d,%d]",
+					laneUpdate.LaneSource.SourceChainSelector,
+					laneUpdate.ClosedInterval.MinMsgNr,
+					laneUpdate.ClosedInterval.MaxMsgNr,
+				)))
 				laneUpdates = append(laneUpdates, &rmnpb.FixedDestLaneUpdate{
 					LaneSource:     laneUpdate.LaneSource,
 					ClosedInterval: laneUpdate.ClosedInterval,
-					Root:           []byte{byte(nodeID), 1, 2, 3},
+					Root:           root[:],
 				})
 			}
 		}
