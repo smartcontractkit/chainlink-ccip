@@ -41,7 +41,7 @@ type testSetup struct {
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
 }
 
-func TestPBClientComputeReportSignatures(t *testing.T) {
+func TestClient_ComputeReportSignatures(t *testing.T) {
 	newTestSetup := func(t *testing.T) testSetup {
 		lggr := logger.Test(t)
 		ctx := tests.Context(t)
@@ -169,9 +169,9 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockRawRmnClient,
 	minObservers int,
-) (map[uint32]uint64, map[uint32]mapset.Set[uint64]) {
-	requestIDs := make(map[uint32]uint64)
-	requestedChains := make(map[uint32]mapset.Set[uint64])
+) (map[NodeID]uint64, map[NodeID]mapset.Set[uint64]) {
+	requestIDs := make(map[NodeID]uint64)
+	requestedChains := make(map[NodeID]mapset.Set[uint64])
 
 	for {
 		time.Sleep(time.Millisecond)
@@ -205,8 +205,8 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 
 func (ts *testSetup) nodesRespondToTheObservationRequests(
 	rmnClient *mockRawRmnClient,
-	requestIDs map[uint32]uint64,
-	requestedChains map[uint32]mapset.Set[uint64],
+	requestIDs map[NodeID]uint64,
+	requestedChains map[NodeID]mapset.Set[uint64],
 	rmnHomeConfigDigest []byte,
 	destChain *rmnpb.LaneDest,
 ) {
@@ -259,8 +259,8 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 	rmnClient *mockRawRmnClient,
 	expectedResponses int,
 	minObservers int,
-) map[uint32]uint64 {
-	requestIDs := make(map[uint32]uint64)
+) map[NodeID]uint64 {
+	requestIDs := make(map[NodeID]uint64)
 	// plugin now has received the observation responses and should send
 	// the report requests to the nodes, wait for them to be received by the nodes
 	// should a total of minSigners requests each one containing the observation requests
@@ -295,7 +295,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 
 func (ts *testSetup) nodesRespondToTheSignatureRequests(
 	rmnClient *mockRawRmnClient,
-	requestIDs map[uint32]uint64,
+	requestIDs map[NodeID]uint64,
 ) {
 	// now the plugin is waiting for rmn node responses for all this requests
 	for nodeID, reqID := range requestIDs {
@@ -322,7 +322,7 @@ func (ts *testSetup) nodesRespondToTheSignatureRequests(
 
 type mockRawRmnClient struct {
 	resChan          chan RawRmnResponse
-	receivedRequests map[uint32][]*rmnpb.Request
+	receivedRequests map[NodeID][]*rmnpb.Request
 	mu               *sync.RWMutex
 }
 
@@ -333,8 +333,8 @@ func newMockRawRmnClient(resChan chan RawRmnResponse) *mockRawRmnClient {
 	}
 }
 
-func (m *mockRawRmnClient) getReceivedRequests() map[uint32][]*rmnpb.Request {
-	cp := make(map[uint32][]*rmnpb.Request)
+func (m *mockRawRmnClient) getReceivedRequests() map[NodeID][]*rmnpb.Request {
+	cp := make(map[NodeID][]*rmnpb.Request)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for k, v := range m.receivedRequests {
@@ -346,15 +346,15 @@ func (m *mockRawRmnClient) getReceivedRequests() map[uint32][]*rmnpb.Request {
 func (m *mockRawRmnClient) resetReceivedRequests() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.receivedRequests = make(map[uint32][]*rmnpb.Request)
+	m.receivedRequests = make(map[NodeID][]*rmnpb.Request)
 }
 
-func (m *mockRawRmnClient) Send(rmnNodeID uint32, request []byte) error {
+func (m *mockRawRmnClient) Send(rmnNodeID NodeID, request []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.receivedRequests == nil {
-		m.receivedRequests = map[uint32][]*rmnpb.Request{}
+		m.receivedRequests = map[NodeID][]*rmnpb.Request{}
 	}
 
 	if _, ok := m.receivedRequests[rmnNodeID]; !ok {
