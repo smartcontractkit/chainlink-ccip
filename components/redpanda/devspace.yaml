@@ -78,3 +78,19 @@ deployments:
           enabled: false
         tuning:
           tune_aio_events: false
+        console:
+          ingress:
+            enabled: true
+            className: "alb"
+            annotations:
+              alb.ingress.kubernetes.io/backend-protocol: HTTP
+              alb.ingress.kubernetes.io/certificate-arn: "${DEVSPACE_INGRESS_CERT_ARN}"
+              alb.ingress.kubernetes.io/group.name: "${DEVSPACE_NAMESPACE}"
+              alb.ingress.kubernetes.io/scheme: internal
+              alb.ingress.kubernetes.io/target-type: ip
+              external-dns.alpha.kubernetes.io/ttl: "120"
+            hosts:
+              - host: ${DEVSPACE_NAMESPACE}-redpanda-console.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                paths:
+                  - path: /
+                    pathType: Prefix
