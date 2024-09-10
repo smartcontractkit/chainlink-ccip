@@ -125,6 +125,7 @@ func (c *client) ComputeReportSignatures(
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
 	for chain, l := range updatesPerChain {
 		if l.rmnNodes.Cardinality() < c.minObservers {
+			c.lggr.Warnw("not enough RMN nodes for chain", "chain", chain, "minObservers", c.minObservers)
 			delete(updatesPerChain, chain)
 		}
 	}
@@ -174,9 +175,6 @@ func (c *client) getRmnSignedObservations(
 		}
 	}
 
-	c.lggr.Infof("requested nodes %v", requestedNodes)
-	c.lggr.Infof("sending observation request to node %v", requestsPerNode)
-
 	requestIDs := c.sendObservationRequests(destChain, requestsPerNode)
 	signedObservations, err := c.listenForRmnObservationResponses(
 		ctx, destChain, requestIDs, updateRequestsPerChain, requestedNodes)
@@ -210,15 +208,13 @@ func (c *client) sendObservationRequests(
 			},
 		}
 
-		c.lggr.Infof("sending observation request to node %v", nodeID)
+		c.lggr.Infow("sending observation request", "node", nodeID, "requestID", req.RequestId)
 		if err := c.marshalAndSend(req, nodeID); err != nil {
 			c.lggr.Errorw("failed to send observation request", "node_id", nodeID, "err", err)
 			continue
 		}
 		requestIDs.Add(req.RequestId)
 	}
-
-	c.lggr.Infof("sent observation requests %s", requestIDs.String())
 	return requestIDs
 }
 
@@ -229,20 +225,19 @@ func (c *client) listenForRmnObservationResponses(
 	lursPerChain map[uint64]updateRequestWithMeta,
 	requestedNodes map[uint64]mapset.Set[uint32],
 ) ([]rmnSignedObservationWithMeta, error) {
+	c.lggr.Infow("Waiting for observation requests", "requestIDs", requestIDs.String())
+
 	respChan := c.rawRmnClient.Recv()
 
 	finishedRequestIDs := mapset.NewSet[uint64]()
 	rmnObservationResponses := make([]rmnSignedObservationWithMeta, 0)
 	merkleRootsCount := make(map[uint64]map[string]int) // sourceChain -> merkleRoot -> count
 
-	c.lggr.Infof("waiting for requests to finish: %s", requestIDs.String())
 	initialObservationRequestTimer := time.NewTimer(c.observationsInitialRequestTimerDuration)
 	defer initialObservationRequestTimer.Stop()
 	for {
 		select {
 		case resp := <-respChan:
-			c.lggr.Infof("waiting for observation requests to finish: %s - got a response", requestIDs.String())
-
 			parsedResp, err := c.parseResponse(&resp, requestIDs, finishedRequestIDs)
 			if err != nil {
 				c.lggr.Warnw("failed to parse RMN observation response", "err", err)
@@ -252,13 +247,16 @@ func (c *client) listenForRmnObservationResponses(
 
 			signedObs := parsedResp.GetSignedObservation()
 			if signedObs == nil {
-				c.lggr.Errorf("RMN node returned an unexpected type of response: %+v", parsedResp.Response)
+				c.lggr.Infof("RMN node returned an unexpected type of response: %+v", parsedResp.Response)
 			} else {
 				err := c.validateSignedObservationResponse(resp.RMNNodeID, lursPerChain, signedObs, destChain)
 				if err != nil {
-					c.lggr.Errorw("failed to validate signed observation response", "err", err)
+					c.lggr.Warnw("failed to validate signed observation response", "err", err)
 					continue
 				}
+
+				c.lggr.Infow("received signed observation",
+					"node", resp.RMNNodeID, "requestID", parsedResp.RequestId)
 
 				rmnObservationResponses = append(rmnObservationResponses, rmnSignedObservationWithMeta{
 					RMNNodeID:         resp.RMNNodeID,
@@ -302,7 +300,7 @@ func (c *client) listenForRmnObservationResponses(
 				return rmnObservationResponses, nil
 			}
 		case <-initialObservationRequestTimer.C:
-			c.lggr.Info("initial observation request timer expired")
+			c.lggr.Warn("initial observation request timer expired, sending additional requests")
 			// Timer expired, send the observation requests to the rest of the RMN nodes.
 			requestsPerNode := make(map[uint32][]*rmnpb.FixedDestLaneUpdateRequest)
 			for sourceChain, updateReq := range lursPerChain {
@@ -449,6 +447,8 @@ func (c *client) getRmnReportSignatures(
 			},
 		}
 
+		c.lggr.Infow("sending report signature request", "node", node.ID, "requestID", req.RequestId)
+
 		err := c.marshalAndSend(req, node.ID)
 		if err != nil {
 			return nil, fmt.Errorf("send rmn report signature request: %w", err)
@@ -534,8 +534,9 @@ func (c *client) listenForRmnReportSignatures(
 
 			reportSig := responseTyp.GetReportSignature()
 			if reportSig == nil {
-				c.lggr.Errorf("RMN node returned an unexpected type of response: %+v", responseTyp.Response)
+				c.lggr.Infof("RMN node returned an unexpected type of response: %+v", responseTyp.Response)
 			} else {
+				c.lggr.Infow("received report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
 				reportSigs = append(reportSigs, reportSig)
 			}
 
@@ -547,7 +548,7 @@ func (c *client) listenForRmnReportSignatures(
 				return ecdsaSigs, nil
 			}
 		case <-tReportsInitialRequest.C:
-			c.lggr.Info("initial report request timer expired")
+			c.lggr.Warnw("initial report signatures request timer expired, sending additional requests")
 			// Send to the rest of the signers
 			for _, node := range randomShuffle(c.rmnNodes) {
 				if !node.IsSigner || signersRequested.Contains(node.ID) {
