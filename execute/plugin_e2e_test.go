@@ -217,9 +217,7 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
-					FinalityDepth: 1,
-				}),
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
 			},
 		}, {
 			ChainSelector: dstSelector,
@@ -228,9 +226,7 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
-					FinalityDepth: 1,
-				}),
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
 			},
 		},
 	}

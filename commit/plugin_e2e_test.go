@@ -55,9 +55,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 	peerIDsMap := mapset.NewSet(peerIDs...)
 	homeChainConfig := map[ccipocr3.ChainSelector]reader.ChainConfig{
-		destChain:    {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{FinalityDepth: 1}},
-		sourceChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{FinalityDepth: 1}},
-		sourceChain2: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{FinalityDepth: 1}},
+		destChain:    {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		sourceChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		sourceChain2: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
 	}
 
 	offRampNextSeqNum := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
