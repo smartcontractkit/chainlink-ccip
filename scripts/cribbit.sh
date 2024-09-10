@@ -48,6 +48,7 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 		exit 1
 	fi
 	export PROVIDER=${provider}
+	devspace set var PROVIDER="${provider}"
 
 	# Check if the DEVSPACE_NAMESPACE environment variable is set
 	if [ -n "$DEVSPACE_NAMESPACE" ]; then
