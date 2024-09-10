@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"sort"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -40,6 +42,39 @@ func GetConsensusMap[T any](
 			lggr.Warnf("getConsensus(%s): min not found for chain %d", objectName, chain)
 		}
 	}
-
 	return consensus
+}
+
+func GetConsensusMapMedian[K comparable, T any](
+	lggr logger.Logger,
+	objectName string,
+	items map[K][]T,
+	f int,
+	comp func(a, b T) bool,
+) map[K]T {
+	consensus := make(map[K]T)
+
+	for key, items := range items {
+		if len(items) < f {
+			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
+			continue
+		}
+		consensus[key] = Median(items, comp)
+	}
+	return consensus
+}
+
+// Median returns the middle element after sorting the provided slice.
+// For an empty slice, it returns the zero value of the type.
+func Median[T any](vals []T, less func(T, T) bool) T {
+	if len(vals) == 0 {
+		var zero T
+		return zero
+	}
+	valsCopy := make([]T, len(vals))
+	copy(valsCopy[:], vals[:])
+	sort.Slice(valsCopy, func(i, j int) bool {
+		return less(valsCopy[i], valsCopy[j])
+	})
+	return valsCopy[len(valsCopy)/2]
 }

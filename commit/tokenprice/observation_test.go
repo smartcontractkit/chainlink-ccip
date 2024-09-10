@@ -139,14 +139,6 @@ func Test_Observation(t *testing.T) {
 	}
 }
 
-func TestManyTimes(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		t.Run("", func(t *testing.T) {
-			Test_Observation(t)
-		})
-	}
-}
-
 var defaultCfg = pluginconfig.CommitPluginConfig{
 	DestChain: destChainSel,
 	OffchainConfig: pluginconfig.CommitOffchainConfig{

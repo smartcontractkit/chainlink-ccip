@@ -25,6 +25,22 @@ type Observation struct {
 	Timestamp             time.Time                               `json:"timestamp"`
 }
 
+// AggregateObservation is the aggregation of a list of observations
+type AggregateObservation struct {
+	FeedTokenPrices       map[types.Account][]cciptypes.TokenPrice
+	FeeQuoterTokenUpdates map[types.Account][]shared.TimestampedBig
+	FDestChain            []int
+	Timestamps            []time.Time
+}
+
+// ConsensusObservation holds the consensus values for all observations in a round
+type ConsensusObservation struct {
+	FeedTokenPrices       map[types.Account]cciptypes.TokenPrice
+	FeeQuoterTokenUpdates map[types.Account]shared.TimestampedBig
+	FDestChain            int
+	Timestamp             time.Time
+}
+
 type Observer interface {
 	// ObserveFeedTokenPrices returns the latest token prices from the feed chain
 	ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice
