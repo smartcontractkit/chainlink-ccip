@@ -14,6 +14,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
@@ -216,6 +217,7 @@ func (c *PBClient) sendObservationRequests(
 		requestIDs.Add(req.RequestId)
 	}
 
+	c.lggr.Infof("sent observation requests %s", requestIDs.String())
 	return requestIDs
 }
 
@@ -230,16 +232,19 @@ func (c *PBClient) listenForRmnObservationResponses(
 
 	finishedRequestIDs := mapset.NewSet[uint64]()
 	rmnObservationResponses := make([]rmnSignedObservationWithMeta, 0)
-	chainObservationsCount := make(map[uint64]int)
+	merkleRootsCount := make(map[uint64]map[string]int) // sourceChain -> merkleRoot -> count
 
+	c.lggr.Infof("waiting for requests to finish: %s", requestIDs.String())
 	initialObservationRequestTimer := time.NewTimer(c.observationsInitialRequestTimerDuration)
 	defer initialObservationRequestTimer.Stop()
 	for {
 		select {
 		case resp := <-respChan:
+			c.lggr.Infof("waiting for observation requests to finish: %s - got a response", requestIDs.String())
+
 			parsedResp, err := c.parseResponse(&resp, requestIDs, finishedRequestIDs)
 			if err != nil {
-				c.lggr.Warnw("failed to parse RMN response", "err", err)
+				c.lggr.Warnw("failed to parse RMN observation response", "err", err)
 				continue
 			}
 			finishedRequestIDs.Add(parsedResp.RequestId)
@@ -253,32 +258,50 @@ func (c *PBClient) listenForRmnObservationResponses(
 					c.lggr.Errorw("failed to validate signed observation response", "err", err)
 					continue
 				}
+
 				rmnObservationResponses = append(rmnObservationResponses, rmnSignedObservationWithMeta{
 					RMNNodeID:         resp.RMNNodeID,
 					SignedObservation: signedObs,
 				})
 				for _, lu := range signedObs.Observation.FixedDestLaneUpdates {
-					chainObservationsCount[lu.LaneSource.SourceChainSelector]++
+					if _, exists := merkleRootsCount[lu.LaneSource.SourceChainSelector]; !exists {
+						merkleRootsCount[lu.LaneSource.SourceChainSelector] = make(map[string]int)
+					}
+					merkleRootsCount[lu.LaneSource.SourceChainSelector][cciptypes.Bytes(lu.Root).String()]++
 				}
 			}
 
 			// We got all the responses we were waiting for.
 			if finishedRequestIDs.Equal(requestIDs) {
+				c.lggr.Infof("all observation requests were finished")
 				return rmnObservationResponses, nil
 			}
 
-			// We got sufficient number of observation responses for every source chain.
+			// We got sufficient number of observation responses with matching roots for every source chain.
 			allChainsHaveEnoughResponses := true
-			for _, count := range chainObservationsCount {
-				if count < c.minObservers {
+			for chainRequest := range lursPerChain {
+				var merkleRoot []byte
+				for merkleRootStr, count := range merkleRootsCount[chainRequest] {
+					if count >= c.minObservers {
+						merkleRoot, err = cciptypes.NewBytesFromString(merkleRootStr)
+						if err != nil {
+							return nil, fmt.Errorf("failed to parse merkle root: %w", err)
+						}
+						break
+					}
+				}
+				if merkleRoot == nil {
 					allChainsHaveEnoughResponses = false
 					break
 				}
 			}
+
 			if allChainsHaveEnoughResponses {
+				c.lggr.Infof("all chains have enough observation responses with matching roots")
 				return rmnObservationResponses, nil
 			}
 		case <-initialObservationRequestTimer.C:
+			c.lggr.Info("initial observation request timer expired")
 			// Timer expired, send the observation requests to the rest of the RMN nodes.
 			requestsPerNode := make(map[uint32][]*rmnpb.FixedDestLaneUpdateRequest)
 			for sourceChain, lur := range lursPerChain {
@@ -440,20 +463,44 @@ func (c *PBClient) getRmnReportSignatures(
 
 	// At this point we expect that attributed observations are correct, but we might have different roots
 	// coming from different RMN nodes. In that case we return an error since something is breached.
-	rootsPerSourceChain := make(map[uint64][]byte)
-	fixedDestLaneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0)
+	merkleRootCounts := make(map[uint64]map[string]int)
 	for _, signedObs := range sigObservations {
 		for _, lu := range signedObs.SignedObservation.Observation.FixedDestLaneUpdates {
-			existingRoot, exists := rootsPerSourceChain[lu.LaneSource.SourceChainSelector]
-			if !exists {
-				rootsPerSourceChain[lu.LaneSource.SourceChainSelector] = lu.Root
-				fixedDestLaneUpdates = append(fixedDestLaneUpdates, lu)
+			if _, exists := merkleRootCounts[lu.LaneSource.SourceChainSelector]; !exists {
+				merkleRootCounts[lu.LaneSource.SourceChainSelector] = make(map[string]int)
+			}
+			merkleRootCounts[lu.LaneSource.SourceChainSelector][cciptypes.Bytes(lu.Root).String()]++
+		}
+	}
+
+	rootsPerSourceChain := make(map[uint64][]byte)
+	for chain, counts := range merkleRootCounts {
+		var root []byte
+		for merkleRootStr, count := range counts {
+			if count >= c.minSigners {
+				root, err = cciptypes.NewBytesFromString(merkleRootStr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse merkle root: %w", err)
+				}
+				break
+			}
+		}
+		if root == nil {
+			return nil, fmt.Errorf("not enough roots for chain %d", chain)
+		}
+		rootsPerSourceChain[chain] = root
+	}
+
+	fixedDestLaneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0)
+	addedUpdates := mapset.NewSet[string]()
+	for _, signedObs := range sigObservations {
+		for _, lu := range signedObs.SignedObservation.Observation.FixedDestLaneUpdates {
+			rootStr := cciptypes.Bytes(lu.Root).String()
+			if addedUpdates.Contains(rootStr) {
 				continue
 			}
-			if !bytes.Equal(existingRoot, lu.Root) {
-				return nil, fmt.Errorf("found different roots (%x, %x) for the same source chain %d",
-					existingRoot, lu.Root, lu.LaneSource.SourceChainSelector)
-			}
+			addedUpdates.Add(rootStr)
+			fixedDestLaneUpdates = append(fixedDestLaneUpdates, lu)
 		}
 	}
 
@@ -473,13 +520,14 @@ func (c *PBClient) listenForRmnReportSignatures(
 	reportSigs := make([]*rmnpb.ReportSignature, 0)
 	finishedRequests := mapset.NewSet[uint64]()
 	respChan := c.rawRmnClient.Recv()
+	requestIDs = requestIDs.Clone()
 
 	for {
 		select {
 		case resp := <-respChan:
 			responseTyp, err := c.parseResponse(&resp, requestIDs, finishedRequests)
 			if err != nil {
-				c.lggr.Errorw("failed to parse RMN response", "err", err)
+				c.lggr.Errorw("failed to parse RMN signature response", "err", err)
 				continue
 			}
 
@@ -498,6 +546,7 @@ func (c *PBClient) listenForRmnReportSignatures(
 				return ecdsaSigs, nil
 			}
 		case <-tReportsInitialRequest.C:
+			c.lggr.Info("initial report request timer expired")
 			// Send to the rest of the signers
 			for node := range randomIter(c.rmnNodes) {
 				if !node.IsSigner || signersRequested.Contains(node.ID) {
@@ -576,15 +625,11 @@ func randomIter[T any](s []T) chan T {
 }
 
 func newRequestID() uint64 {
-	now := uint64(time.Now().UTC().UnixNano())
-
-	// Generate a random 32-bit number
-	var randBytes [4]byte
-	_, err := crand.Read(randBytes[:])
+	b := make([]byte, 8)
+	_, err := crand.Read(b)
 	if err != nil {
-		panic("failed to generate a random number")
+		panic(err)
 	}
-
-	randPart := uint64(binary.LittleEndian.Uint32(randBytes[:]))
-	return (now << 32) | randPart
+	randomUint64 := binary.LittleEndian.Uint64(b)
+	return randomUint64
 }

@@ -26,6 +26,9 @@ func (c *PBClient) marshalAndSend(req *rmnpb.Request, nodeID uint32) error {
 // Validates that the response is expected and not a duplicate.
 func (c *PBClient) parseResponse(
 	resp *RawRmnResponse, requestIDs, gotResponses mapset.Set[uint64]) (*rmnpb.Response, error) {
+
+	c.lggr.Infof("requests we are waiting for: %s", requestIDs.String())
+
 	responseTyp := &rmnpb.Response{}
 	err := proto.Unmarshal(resp.Body, responseTyp)
 	if err != nil {
@@ -33,7 +36,7 @@ func (c *PBClient) parseResponse(
 	}
 
 	if !requestIDs.Contains(responseTyp.RequestId) {
-		return nil, fmt.Errorf("got an RMN response that we are not waiting for: %d", responseTyp.RequestId)
+		return nil, fmt.Errorf("got an RMN response that we are not waiting for: %d (%s)", responseTyp.RequestId, requestIDs.String())
 	}
 
 	if gotResponses.Contains(responseTyp.RequestId) {
