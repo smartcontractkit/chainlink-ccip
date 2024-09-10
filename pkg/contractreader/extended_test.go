@@ -14,7 +14,7 @@ import (
 
 func TestExtendedContractReader(t *testing.T) {
 	const contractName = "testContract"
-	cr := chainreadermocks.NewMockChainReader(t)
+	cr := chainreadermocks.NewMockContractReader(t)
 	extCr := NewExtendedContractReader(cr)
 
 	bindings := extCr.GetBindings(contractName)

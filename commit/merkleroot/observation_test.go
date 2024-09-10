@@ -12,8 +12,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/mocks/shared"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -22,7 +20,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
+	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -142,12 +142,12 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 	testCases := []struct {
 		name      string
 		expResult []plugintypes.SeqNumChain
-		getDeps   func(t *testing.T) (*shared.MockChainSupport, *reader_mock.MockCCIP)
+		getDeps   func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIP)
 	}{
 		{
 			name: "Happy path",
-			getDeps: func(t *testing.T) (*shared.MockChainSupport, *reader_mock.MockCCIP) {
-				chainSupport := shared.NewMockChainSupport(t)
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIP(t)
@@ -162,8 +162,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "nil is returned when supportsDestChain is false",
-			getDeps: func(t *testing.T) (*shared.MockChainSupport, *reader_mock.MockCCIP) {
-				chainSupport := shared.NewMockChainSupport(t)
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(false, nil)
 				ccipReader := reader_mock.NewMockCCIP(t)
 				return chainSupport, ccipReader
@@ -172,8 +172,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "nil is returned when supportsDestChain errors",
-			getDeps: func(t *testing.T) (*shared.MockChainSupport, *reader_mock.MockCCIP) {
-				chainSupport := shared.NewMockChainSupport(t)
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(false, errors.New("some error"))
 				ccipReader := reader_mock.NewMockCCIP(t)
 				return chainSupport, ccipReader
@@ -182,8 +182,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "nil is returned when knownSourceChains errors",
-			getDeps: func(t *testing.T) (*shared.MockChainSupport, *reader_mock.MockCCIP) {
-				chainSupport := shared.NewMockChainSupport(t)
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(nil, errors.New("some error"))
 				ccipReader := reader_mock.NewMockCCIP(t)
@@ -193,8 +193,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 		},
 		{
 			name: "nil is returned when nextSeqNums returns incorrect number of seq nums",
-			getDeps: func(t *testing.T) (*shared.MockChainSupport, *reader_mock.MockCCIP) {
-				chainSupport := shared.NewMockChainSupport(t)
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIP) {
+				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIP(t)
@@ -420,7 +420,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
 			}
 
-			chainSupport := shared.NewMockChainSupport(t)
+			chainSupport := common_mock.NewMockChainSupport(t)
 			if tc.supportedChainsFails {
 				chainSupport.On("SupportedChains", nodeID).Return(
 					mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error"),

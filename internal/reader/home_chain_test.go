@@ -7,6 +7,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -37,12 +38,11 @@ var (
 )
 
 func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything).Return(fmt.Errorf("error"))
@@ -129,18 +129,17 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(5).(*[]ChainConfigInfo)
+			arg := args.Get(4).(*[]ChainConfigInfo)
 			*arg = onChainConfigs
 		}).Return(nil)
 
@@ -184,12 +183,11 @@ func Test_PollingWorking(t *testing.T) {
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	donID := uint32(1)
 	pluginType := uint8(1) // execution
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetOCRConfig,
+		mock.Anything,
 		mock.Anything,
 		map[string]any{
 			"donId":      donID,
@@ -197,7 +195,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 		},
 		mock.AnythingOfType("*[]reader.OCR3ConfigWithMeta"),
 	).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(5).(*[]OCR3ConfigWithMeta)
+		arg := args.Get(4).(*[]OCR3ConfigWithMeta)
 		*arg = append(*arg, OCR3ConfigWithMeta{
 			ConfigCount: 1,
 			Config: OCR3Config{

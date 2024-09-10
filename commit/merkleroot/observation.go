@@ -17,10 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
@@ -89,7 +88,7 @@ type ObserverImpl struct {
 	lggr         logger.Logger
 	homeChain    reader.HomeChain
 	nodeID       commontypes.OracleID
-	chainSupport shared.ChainSupport
+	chainSupport plugincommon.ChainSupport
 	ccipReader   reader.CCIP
 	msgHasher    cciptypes.MessageHasher
 }

@@ -14,12 +14,14 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/shared:
         interfaces:
             PluginProcessor:
-            ChainSupport:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
             CCIP:
-            TokenPrices:
+            PriceReader:
+    github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
+        interfaces:
+            ChainSupport:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
             Client:
@@ -28,6 +30,6 @@ packages:
             Extended:
     github.com/smartcontractkit/chainlink-common/pkg/types:
         interfaces:
-            ChainReader:
+            ContractReader:
                 config:
                     dir: mocks/cl-common/chainreader
