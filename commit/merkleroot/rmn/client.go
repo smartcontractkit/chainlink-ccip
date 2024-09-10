@@ -3,6 +3,7 @@ package rmn
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	crand "crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -71,9 +72,11 @@ type client struct {
 // RMNNodeInfo contains the information about an RMN node.
 type RMNNodeInfo struct {
 	// ID is the index of this node in the RMN config
-	ID                    NodeID
-	SupportedSourceChains mapset.Set[cciptypes.ChainSelector]
-	IsSigner              bool
+	ID                        NodeID
+	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
+	IsSigner                  bool
+	SignReportsPublicKey      *ecdsa.PublicKey
+	SignObservationsPublicKey *ecdsa.PublicKey
 }
 
 // NewClient creates a new RMN Client to be used by the plugin.
@@ -252,7 +255,7 @@ func (c *client) listenForRmnObservationResponses(
 			if signedObs == nil {
 				c.lggr.Infof("RMN node returned an unexpected type of response: %+v", parsedResp.Response)
 			} else {
-				err := validateSignedObservationResponse(
+				err := c.validateSignedObservationResponse(
 					resp.RMNNodeID, lursPerChain, signedObs, destChain, c.rmnHomeConfigDigest)
 				if err != nil {
 					c.lggr.Warnw("failed to validate signed observation response", "err", err)
@@ -327,7 +330,7 @@ func (c *client) listenForRmnObservationResponses(
 	}
 }
 
-func validateSignedObservationResponse(
+func (c *client) validateSignedObservationResponse(
 	rmnNodeID NodeID,
 	lurs map[uint64]updateRequestWithMeta,
 	signedObs *rmnpb.SignedObservation,
@@ -375,6 +378,11 @@ func validateSignedObservationResponse(
 			return errors.New("root is nil")
 		}
 	}
+
+	// signedObs.Signature
+	// ed25519 - sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
+	// verify with rmn node pub key, found at [c.rmnNodes where rmnNodeID]
+
 	return nil
 }
 
@@ -545,6 +553,11 @@ func (c *client) listenForRmnReportSignatures(
 				c.lggr.Infow("received report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
 				reportSigs = append(reportSigs, reportSig)
 			}
+
+			// Use reportSigReq to construct the message to verify using
+			// reportSig.Signature.R
+			// reportSig.Signature.S
+			// and resp.RMNNodeID
 
 			if len(reportSigs) >= c.minSigners {
 				ecdsaSigs := make([]*rmnpb.EcdsaSignature, 0)
