@@ -57,8 +57,8 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 			rmnHomeConfigDigest:                     []byte{0xc, 0x0, 0xf},
 			minObservers:                            2,
 			minSigners:                              2,
-			observationsInitialRequestTimerDuration: 30 * time.Hour,
-			reportsInitialRequestTimerDuration:      30 * time.Hour,
+			observationsInitialRequestTimerDuration: 30 * time.Second,
+			reportsInitialRequestTimerDuration:      30 * time.Second,
 		}
 
 		updateRequests := []*rmnpb.FixedDestLaneUpdateRequest{
