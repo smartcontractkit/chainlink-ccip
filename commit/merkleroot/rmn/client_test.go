@@ -8,6 +8,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,20 +18,20 @@ import (
 )
 
 var (
-	chainS1       = chainsel.TEST_90000002.Selector
+	chainS1       = cciptypes.ChainSelector(chainsel.TEST_90000002.Selector)
 	chainS1OnRamp = []byte{0, 0xf, 0xf, 0xa, 0x0}
 
-	chainS2       = chainsel.TEST_90000003.Selector
+	chainS2       = cciptypes.ChainSelector(chainsel.TEST_90000003.Selector)
 	chainS2OnRamp = []byte{0, 0xf, 0xf, 0xa, 0x1}
 
-	chainD1        = chainsel.TEST_90000004.Selector
+	chainD1        = cciptypes.ChainSelector(chainsel.TEST_90000004.Selector)
 	chainD1OffRamp = []byte{0, 0xf, 0xf, 0xa, 0x2}
 )
 
 type testSetup struct {
 	name           string
 	t              *testing.T
-	rmnClient      *PBClient
+	rmnClient      *client
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
 }
 
@@ -41,7 +42,7 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 	ctx := tests.Context(t)
 
 	newTestSetup := func(t *testing.T) testSetup {
-		client := &PBClient{
+		client := &client{
 			lggr:         lggr,
 			rawRmnClient: mockClient,
 			rmnNodes: []RMNNodeInfo{
@@ -60,11 +61,11 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 
 		updateRequests := []*rmnpb.FixedDestLaneUpdateRequest{
 			{
-				LaneSource:     &rmnpb.LaneSource{SourceChainSelector: chainS1, OnrampAddress: chainS1OnRamp},
+				LaneSource:     &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1), OnrampAddress: chainS1OnRamp},
 				ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
 			},
 			{
-				LaneSource:     &rmnpb.LaneSource{SourceChainSelector: chainS2, OnrampAddress: chainS2OnRamp},
+				LaneSource:     &rmnpb.LaneSource{SourceChainSelector: uint64(chainS2), OnrampAddress: chainS2OnRamp},
 				ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 100, MaxMsgNr: 110},
 			},
 		}
@@ -78,7 +79,7 @@ func TestPBClientComputeReportSignatures(t *testing.T) {
 	}
 
 	destChain := &rmnpb.LaneDest{
-		DestChainSelector: chainD1,
+		DestChainSelector: uint64(chainD1),
 		OfframpAddress:    chainD1OffRamp,
 	}
 
@@ -170,7 +171,7 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 				}
 			}
 		}
-		if requestsPerChain[chainS1] >= minObservers && requestsPerChain[chainS2] >= minObservers {
+		if requestsPerChain[uint64(chainS1)] >= minObservers && requestsPerChain[uint64(chainS2)] >= minObservers {
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
@@ -196,24 +197,17 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 	rmnHomeConfigDigest []byte,
 	destChain *rmnpb.LaneDest,
 ) {
-	allLaneUpdates := []*rmnpb.FixedDestLaneUpdate{
-		{
-			LaneSource:     &rmnpb.LaneSource{SourceChainSelector: chainS1, OnrampAddress: chainS1OnRamp},
-			ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
-			Root:           []byte{1, 10, 20},
-		},
-		{
-			LaneSource:     &rmnpb.LaneSource{SourceChainSelector: chainS2, OnrampAddress: chainS2OnRamp},
-			ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 100, MaxMsgNr: 110},
-			Root:           []byte{2, 100, 110},
-		},
-	}
+	allLaneUpdates := ts.updateRequests
 
 	for nodeID, requestID := range requestIDs {
 		laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0)
 		for _, laneUpdate := range allLaneUpdates {
 			if requestedChains[nodeID].Contains(laneUpdate.LaneSource.SourceChainSelector) {
-				laneUpdates = append(laneUpdates, laneUpdate)
+				laneUpdates = append(laneUpdates, &rmnpb.FixedDestLaneUpdate{
+					LaneSource:     laneUpdate.LaneSource,
+					ClosedInterval: laneUpdate.ClosedInterval,
+					Root:           []byte{byte(nodeID), 1, 2, 3},
+				})
 			}
 		}
 

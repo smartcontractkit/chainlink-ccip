@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
-// TODO: testing - unit tests, integration tests, etc...
+// TODO: testing - more unit tests and some code cleanup.
 // TODO: use the populated Query / sig verification / etc..
 // TODO: rmn config watcher
 
@@ -28,7 +28,8 @@ var (
 	ErrTimeout = errors.New("signature computation timeout")
 
 	// ErrNothingToDo is returned when there are no source chains with enough RMN nodes.
-	ErrNothingToDo = errors.New("nothing to observe from the existing RMN nodes")
+	ErrNothingToDo = errors.New("nothing to observe from the existing RMN nodes, make " +
+		"sure RMN is enabled, nodes configured correctly, minObservers value is correct")
 )
 
 // Client contains the methods required by the plugin to interact with the RMN nodes.
@@ -52,13 +53,13 @@ type ReportSignatures struct {
 	LaneUpdates []*rmnpb.FixedDestLaneUpdate
 }
 
-// PBClient is the base RMN Client implementation.
-type PBClient struct {
+// client is the base RMN Client implementation.
+type client struct {
 	lggr                                    logger.Logger
 	rawRmnClient                            RawRmnClient
 	rmnNodes                                []RMNNodeInfo
-	rmnRemoteAddress                        []byte
-	rmnHomeConfigDigest                     []byte
+	rmnRemoteAddress                        cciptypes.Bytes
+	rmnHomeConfigDigest                     cciptypes.Bytes
 	minObservers                            int
 	minSigners                              int
 	observationsInitialRequestTimerDuration time.Duration
@@ -68,23 +69,23 @@ type PBClient struct {
 // RMNNodeInfo contains the information about an RMN node.
 type RMNNodeInfo struct {
 	ID                    uint32 // ID is the index of this node in the RMN config
-	SupportedSourceChains mapset.Set[uint64]
+	SupportedSourceChains mapset.Set[cciptypes.ChainSelector]
 	IsSigner              bool
 }
 
-// NewPBClient creates a new RMN Client to be used by the plugin.
-func NewPBClient(
+// Newclient creates a new RMN Client to be used by the plugin.
+func Newclient(
 	lggr logger.Logger,
 	rawRmnClient RawRmnClient,
 	rmnNodes []RMNNodeInfo,
-	rmnRemoteAddress []byte,
-	rmnHomeConfigDigest []byte,
+	rmnRemoteAddress cciptypes.Bytes,
+	rmnHomeConfigDigest cciptypes.Bytes,
 	minObservers int,
 	minSigners int,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
-) *PBClient {
-	return &PBClient{
+) Client {
+	return &client{
 		lggr:                                    lggr,
 		rawRmnClient:                            rawRmnClient,
 		rmnNodes:                                rmnNodes,
@@ -98,7 +99,7 @@ func NewPBClient(
 }
 
 // ComputeReportSignatures sends a request to each rmn node to handle requests and build signatures.
-func (c *PBClient) ComputeReportSignatures(
+func (c *client) ComputeReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
@@ -115,7 +116,7 @@ func (c *PBClient) ComputeReportSignatures(
 			rmnNodes: mapset.NewSet[uint32](),
 		}
 		for _, node := range c.rmnNodes {
-			if node.SupportedSourceChains.Contains(updateReq.LaneSource.SourceChainSelector) {
+			if node.SupportedSourceChains.Contains(cciptypes.ChainSelector(updateReq.LaneSource.SourceChainSelector)) {
 				updatesPerChain[updateReq.LaneSource.SourceChainSelector].rmnNodes.Add(node.ID)
 			}
 		}
@@ -145,7 +146,7 @@ func (c *PBClient) ComputeReportSignatures(
 	return rmnReportSignatures, nil
 }
 
-func (c *PBClient) getRmnSignedObservations(
+func (c *client) getRmnSignedObservations(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	updateRequestsPerChain map[uint64]updateRequestWithMeta,
@@ -192,7 +193,7 @@ func (c *PBClient) getRmnSignedObservations(
 	return signedObservations, nil
 }
 
-func (c *PBClient) sendObservationRequests(
+func (c *client) sendObservationRequests(
 	destChain *rmnpb.LaneDest,
 	requestsPerNode map[uint32][]*rmnpb.FixedDestLaneUpdateRequest,
 ) (requestIDs mapset.Set[uint64]) {
@@ -221,7 +222,7 @@ func (c *PBClient) sendObservationRequests(
 	return requestIDs
 }
 
-func (c *PBClient) listenForRmnObservationResponses(
+func (c *client) listenForRmnObservationResponses(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	requestIDs mapset.Set[uint64],
@@ -280,7 +281,7 @@ func (c *PBClient) listenForRmnObservationResponses(
 			// We got sufficient number of observation responses with matching roots for every source chain.
 			allChainsHaveEnoughResponses := true
 			for chainRequest := range lursPerChain {
-				var merkleRoot []byte
+				var merkleRoot cciptypes.Bytes
 				for merkleRootStr, count := range merkleRootsCount[chainRequest] {
 					if count >= c.minObservers {
 						merkleRoot, err = cciptypes.NewBytesFromString(merkleRootStr)
@@ -304,8 +305,8 @@ func (c *PBClient) listenForRmnObservationResponses(
 			c.lggr.Info("initial observation request timer expired")
 			// Timer expired, send the observation requests to the rest of the RMN nodes.
 			requestsPerNode := make(map[uint32][]*rmnpb.FixedDestLaneUpdateRequest)
-			for sourceChain, lur := range lursPerChain {
-				for nodeID := range randomIter(lur.rmnNodes.ToSlice()) {
+			for sourceChain, updateReq := range lursPerChain {
+				for _, nodeID := range randomShuffle(updateReq.rmnNodes.ToSlice()) {
 					if requestedNodes[sourceChain].Contains(nodeID) {
 						continue
 					}
@@ -313,7 +314,7 @@ func (c *PBClient) listenForRmnObservationResponses(
 					if _, ok := requestsPerNode[nodeID]; !ok {
 						requestsPerNode[nodeID] = make([]*rmnpb.FixedDestLaneUpdateRequest, 0)
 					}
-					requestsPerNode[nodeID] = append(requestsPerNode[nodeID], lur.data)
+					requestsPerNode[nodeID] = append(requestsPerNode[nodeID], updateReq.data)
 				}
 			}
 			newRequestIDs := c.sendObservationRequests(destChain, requestsPerNode)
@@ -324,7 +325,7 @@ func (c *PBClient) listenForRmnObservationResponses(
 	}
 }
 
-func (c *PBClient) validateSignedObservationResponse(
+func (c *client) validateSignedObservationResponse(
 	rmnNodeID uint32,
 	lurs map[uint64]updateRequestWithMeta,
 	signedObs *rmnpb.SignedObservation,
@@ -338,32 +339,32 @@ func (c *PBClient) validateSignedObservationResponse(
 	}
 
 	if !bytes.Equal(signedObs.Observation.RmnHomeContractConfigDigest, c.rmnHomeConfigDigest) {
-		return fmt.Errorf("unexpected rmn home contract config digest %v",
+		return fmt.Errorf("unexpected rmn home contract config digest %x",
 			signedObs.Observation.RmnHomeContractConfigDigest)
 	}
 
 	for _, signedObsLu := range signedObs.Observation.FixedDestLaneUpdates {
-		lur, exists := lurs[signedObsLu.LaneSource.SourceChainSelector]
+		updateReq, exists := lurs[signedObsLu.LaneSource.SourceChainSelector]
 		if !exists {
 			return fmt.Errorf("unexpected source chain selector %d", signedObsLu.LaneSource.SourceChainSelector)
 		}
 
-		if !lur.rmnNodes.Contains(rmnNodeID) {
+		if !updateReq.rmnNodes.Contains(rmnNodeID) {
 			return fmt.Errorf("rmn node %d not expected to read chain %d",
 				rmnNodeID, signedObsLu.LaneSource.SourceChainSelector)
 		}
 
-		if lur.data.ClosedInterval.MinMsgNr != signedObsLu.ClosedInterval.MinMsgNr {
+		if updateReq.data.ClosedInterval.MinMsgNr != signedObsLu.ClosedInterval.MinMsgNr {
 			return fmt.Errorf("unexpected closed interval %v", signedObsLu.ClosedInterval)
 		}
-		if lur.data.ClosedInterval.MaxMsgNr != signedObsLu.ClosedInterval.MaxMsgNr {
+		if updateReq.data.ClosedInterval.MaxMsgNr != signedObsLu.ClosedInterval.MaxMsgNr {
 			return fmt.Errorf("unexpected closed interval %v", signedObsLu.ClosedInterval)
 		}
 
-		if lur.data.LaneSource.SourceChainSelector != signedObsLu.LaneSource.SourceChainSelector {
+		if updateReq.data.LaneSource.SourceChainSelector != signedObsLu.LaneSource.SourceChainSelector {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
-		if !bytes.Equal(lur.data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
+		if !bytes.Equal(updateReq.data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 
@@ -374,7 +375,7 @@ func (c *PBClient) validateSignedObservationResponse(
 	return nil
 }
 
-func (c *PBClient) getRmnReportSignatures(
+func (c *client) getRmnReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	rmnSignedObservations []rmnSignedObservationWithMeta,
@@ -391,7 +392,7 @@ func (c *PBClient) getRmnReportSignatures(
 	// node3: getObservations(2,3)        ->     responds_ok
 	// node3: getObservations(1)          ->                         responds_ok (after timeout we made a new request)
 
-	sigObservations := make([]*rmnpb.AttributedSignedObservation, 0)
+	var sigObservations []*rmnpb.AttributedSignedObservation
 	for _, resp := range rmnSignedObservations {
 		// order observations by source chain
 		sort.Slice(resp.SignedObservation.Observation.FixedDestLaneUpdates, func(i, j int) bool {
@@ -473,9 +474,9 @@ func (c *PBClient) getRmnReportSignatures(
 		}
 	}
 
-	rootsPerSourceChain := make(map[uint64][]byte)
+	rootsPerSourceChain := make(map[uint64]cciptypes.Bytes)
 	for chain, counts := range merkleRootCounts {
-		var root []byte
+		var root cciptypes.Bytes
 		for merkleRootStr, count := range counts {
 			if count >= c.minSigners {
 				root, err = cciptypes.NewBytesFromString(merkleRootStr)
@@ -510,7 +511,7 @@ func (c *PBClient) getRmnReportSignatures(
 	}, nil
 }
 
-func (c *PBClient) listenForRmnReportSignatures(
+func (c *client) listenForRmnReportSignatures(
 	ctx context.Context,
 	requestIDs mapset.Set[uint64],
 	reportSigReq *rmnpb.ReportSignatureRequest,
@@ -548,7 +549,7 @@ func (c *PBClient) listenForRmnReportSignatures(
 		case <-tReportsInitialRequest.C:
 			c.lggr.Info("initial report request timer expired")
 			// Send to the rest of the signers
-			for node := range randomIter(c.rmnNodes) {
+			for _, node := range randomShuffle(c.rmnNodes) {
 				if !node.IsSigner || signersRequested.Contains(node.ID) {
 					continue
 				}
@@ -571,7 +572,7 @@ func (c *PBClient) listenForRmnReportSignatures(
 	}
 }
 
-func (c *PBClient) ensureEnoughSignedObservations(rmnSignedObservations []rmnSignedObservationWithMeta) error {
+func (c *client) ensureEnoughSignedObservations(rmnSignedObservations []rmnSignedObservationWithMeta) error {
 	counts := make(map[uint64]int)
 	for _, so := range rmnSignedObservations {
 		for _, lu := range so.SignedObservation.Observation.FixedDestLaneUpdates {
@@ -612,16 +613,12 @@ type rmnSignedObservationWithMeta struct {
 	RMNNodeID         uint32
 }
 
-func randomIter[T any](s []T) chan T {
-	ch := make(chan T)
-	go func() {
-		defer close(ch)
-		perm := rand.Perm(len(s))
-		for _, i := range perm {
-			ch <- s[i]
-		}
-	}()
-	return ch
+func randomShuffle[T any](s []T) []T {
+	ret := make([]T, len(s))
+	for i, randIndex := range rand.Perm(len(s)) {
+		ret[i] = s[randIndex]
+	}
+	return ret
 }
 
 func newRequestID() uint64 {

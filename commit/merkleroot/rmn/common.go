@@ -9,10 +9,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
-func (c *PBClient) marshalAndSend(req *rmnpb.Request, nodeID uint32) error {
+func (c *client) marshalAndSend(req *rmnpb.Request, nodeID uint32) error {
 	reqBytes, err := proto.Marshal(req)
 	if err != nil {
-		return fmt.Errorf("proto marshal: %w", err)
+		return fmt.Errorf("proto marshal RMN request: %w", err)
 	}
 
 	if err := c.rawRmnClient.Send(nodeID, reqBytes); err != nil {
@@ -24,7 +24,7 @@ func (c *PBClient) marshalAndSend(req *rmnpb.Request, nodeID uint32) error {
 
 // parseResponse parses the response from the RMN and returns the response.
 // Validates that the response is expected and not a duplicate.
-func (c *PBClient) parseResponse(
+func (c *client) parseResponse(
 	resp *RawRmnResponse, requestIDs, gotResponses mapset.Set[uint64]) (*rmnpb.Response, error) {
 
 	c.lggr.Infof("requests we are waiting for: %s", requestIDs.String())
