@@ -1,13 +1,13 @@
 package rmn
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/protobuf/proto"
 
@@ -21,7 +21,7 @@ func verifyObservationSignature(
 	rmnNode RMNNodeInfo,
 	signedObs *rmnpb.SignedObservation,
 ) error {
-	observationBytes, err := proto.Marshal(signedObs.GetObservation()) // todo: should match rmn signed msg
+	observationBytes, err := proto.Marshal(signedObs.GetObservation())
 	if err != nil {
 		return fmt.Errorf("failed to marshal observation: %w", err)
 	}
@@ -57,7 +57,9 @@ func VerifyRmnReportSignatures(
 		return fmt.Errorf("no lane updates provided")
 	}
 
-	msg, err := json.Marshal(laneUpdates) // todo: should match rmn signed msg
+	// todo: should match rmn signed msg but that's abi encoded
+	// so we need to add a chain agnostic interface for computing this hash
+	msg, err := json.Marshal(laneUpdates)
 	if err != nil {
 		return fmt.Errorf("failed to marshal lane updates: %w", err)
 	}
@@ -91,7 +93,7 @@ func VerifyRmnReportSignatures(
 }
 
 // Recover public key from ECDSA signature using r, s, v, and the hash of the message
-func recoverPublicKeyFromSignature(v int, r, s *big.Int, hash []byte) (*secp256k1.PublicKey, error) {
+func recoverPublicKeyFromSignature(v int, r, s *big.Int, hash []byte) (*ecdsa.PublicKey, error) {
 	recoveryID := v - 27
 	if recoveryID != 0 && recoveryID != 1 {
 		return nil, fmt.Errorf("invalid v value: %d", v)
@@ -103,15 +105,62 @@ func recoverPublicKeyFromSignature(v int, r, s *big.Int, hash []byte) (*secp256k
 	copy(signature[32:64], s.Bytes()) // s (32 bytes)
 	signature[64] = byte(recoveryID)  // v (recovery id)
 
-	sigPublicKey, err := crypto.Ecrecover(hash, signature)
+	sigPublicKey, err := crypto.SigToPub(hash, signature)
 	if err != nil {
 		return nil, fmt.Errorf("failed to recover public key from signature: %w", err)
 	}
 
-	pubKey, err := secp256k1.ParsePubKey(sigPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key: %w", err)
-	}
-
-	return pubKey, nil
+	return sigPublicKey, nil
 }
+
+/*
+	obs: Observation{
+			rmn_home_contract_config_digest: Bytes32(0x0000000000000000000000000000000000000000000000000000000000000000),
+			lane_dest: LaneDest {
+				dest_chain_selector: 1,
+				offramp_address: Bytes20(0x0000000000000000000000000000000000000000)
+			},
+			fixed_dest_lane_updates: [
+				FixedDestLaneUpdate {
+					lane_source: LaneSource {
+						source_chain_selector: 2,
+						onramp_address: Bytes20(0x0000000000000000000000000000000000000000)
+					},
+					closed_interval: ClosedInterval {
+						min_msg_nr: 0,
+						max_msg_nr: 0
+					}, root:
+					Bytes32(0x0000000000000000000000000000000000000000000000000000000000000000)
+				}
+			],
+			timestamp: 0
+		}
+	sig: Bytes([102, 77, 250, 250, 244, 144, 68, 19, 5, 27, 237, 229, 27, 62, 159, 150, 30, 74, 126, 47, 190, 158, 249,
+		207, 177, 116, 34, 169, 63, 167, 248, 115, 175, 25, 22, 42, 152, 26, 57, 36, 204, 175, 238, 33, 173, 49, 96, 41,
+		5, 251, 153, 217, 20, 254, 109, 198, 29, 32, 0, 123, 182, 177, 21, 13])
+
+	rep: OnchainReport {
+		dest_chain_id: 1,
+		dest_chain_selector: 2,
+		rmn_remote_contract_address: Bytes20(0x0000000000000000000000000000000000000000),
+		offramp_address: Bytes20(0x0000000000000000000000000000000000000000),
+		rmn_home_contract_config_digest: Bytes32(0x0000000000000000000000000000000000000000000000000000000000000000),
+		dest_lane_updates: [
+			FixedDestLaneUpdate {
+				lane_source: LaneSource {
+					source_chain_selector: 2,
+					onramp_address: Bytes20(0x0000000000000000000000000000000000000000)
+				},
+				closed_interval: ClosedInterval {
+					min_msg_nr: 0,
+					max_msg_nr: 0
+				},
+				root: Bytes32(0x0000000000000000000000000000000000000000000000000000000000000000)
+			}
+		]
+	}
+	sig: EcdsaSignature {
+		r: Bytes32(0x76c5fffc0076c9c5fedb48b0af0ca226629991f9fca8773c6cdc642bbb5f12c7),
+		s: Bytes32(0x6ce5a0119516789a05e20ffbe664757fafd2c67c73c07daef8bc29494cfb617d)
+	}
+*/

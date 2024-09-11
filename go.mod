@@ -4,7 +4,6 @@ go 1.22.5
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/smartcontractkit/chain-selectors v1.0.23
 	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240909141252-663388d38293
@@ -26,6 +25,7 @@ require (
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
