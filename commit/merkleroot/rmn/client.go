@@ -76,9 +76,9 @@ type RMNNodeInfo struct {
 	ID                        NodeID
 	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
 	IsSigner                  bool
-	SignReportsPublicKey      *ecdsa.PublicKey
-	SignObservationsPublicKey *ed25519.PublicKey
-	SignObservationPrefix     string // e.g. "chainlink ccip 1.6 rmn observation"
+	SignReportsPublicKey      *ecdsa.PublicKey   // evmOnChainPublicKey
+	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
+	SignObservationPrefix     string             // e.g. "chainlink ccip 1.6 rmn observation"
 }
 
 // NewClient creates a new RMN Client to be used by the plugin.
