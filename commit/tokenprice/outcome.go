@@ -18,11 +18,6 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	if len(aggObs.FChain) < p.bigF {
-		return ConsensusObservation{},
-			fmt.Errorf("not enough observations for FChain")
-	}
-
 	fMin := make(map[cciptypes.ChainSelector]int)
 	for chain := range aggObs.FChain {
 		fMin[chain] = p.bigF
