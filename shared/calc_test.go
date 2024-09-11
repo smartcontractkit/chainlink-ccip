@@ -55,7 +55,7 @@ func TestDeviates(t *testing.T) {
 		},
 		{
 			name: "does not deviate with high ppb when x1 is greater",
-			args: args{x1: big.NewInt(10), x2: big.NewInt(5), ppb: 2e9},
+			args: args{x1: big.NewInt(10), x2: big.NewInt(5), ppb: 1e9},
 			want: false,
 		},
 		{
