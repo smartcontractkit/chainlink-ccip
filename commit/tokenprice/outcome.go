@@ -100,7 +100,11 @@ func (p *processor) selectTokensForUpdate(
 	for token, feedPrice := range obs.FeedTokenPrices {
 		lastUpdate, exists := obs.FeeQuoterTokenUpdates[token]
 		if !exists {
-			p.lggr.Warnf("could not find fee quoter update for token %s", token)
+			// if the token is not in the fee quoter updates, then we should update it
+			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
+				TokenID: token,
+				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
+			})
 			continue
 		}
 
