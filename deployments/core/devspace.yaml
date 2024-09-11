@@ -508,3 +508,10 @@ profiles:
           Name = 'primary'
           WSURL = "${KEYSTONE_ETH_WS_URL}"
           HTTPURL = "${KEYSTONE_ETH_HTTP_URL}"
+  - name: deploy-beholder
+    patches:
+      - op: replace
+        path: pipelines.deploy.run
+        value: |-
+          # Running the beholder pipeline
+          devspace run-pipeline beholder --skip-build
