@@ -113,12 +113,8 @@ func (p *processor) selectTokensForUpdate(
 		}
 
 		nextUpdateTime := lastUpdate.Timestamp.Add(cfg.TokenPriceBatchWriteFrequency.Duration())
-		if obs.Timestamp.After(nextUpdateTime) {
-			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
-				TokenID: token,
-				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
-			})
-		} else if shared.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64()) {
+		shouldUpdate := obs.Timestamp.After(nextUpdateTime) || shared.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
+		if shouldUpdate {
 			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
 				TokenID: token,
 				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
