@@ -22,3 +22,7 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 	}
 	return diff.CmpAbs(big.NewInt(ppb)) > 0 // abs(diff) > ppb
 }
+
+func TwoFPlus1(f int) int {
+	return 2*f + 1
+}

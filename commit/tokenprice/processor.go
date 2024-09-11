@@ -60,15 +60,15 @@ func (p *processor) Observation(
 	query Query,
 ) (Observation, error) {
 
-	fDestChain, err := p.ObserveFDestChain()
-	if err != nil {
-		return Observation{}, err
+	fChain := p.ObserveFChain()
+	if len(fChain) == 0 {
+		return Observation{}, nil
 	}
 
 	return Observation{
 		FeedTokenPrices:       p.ObserveFeedTokenPrices(ctx),
 		FeeQuoterTokenUpdates: p.ObserveFeeQuoterTokenUpdates(ctx),
-		FDestChain:            fDestChain,
+		FChain:                fChain,
 		Timestamp:             time.Now().UTC(),
 	}, nil
 }

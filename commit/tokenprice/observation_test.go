@@ -32,10 +32,14 @@ var (
 	tokenB             = types.Account("0xBBBBBBBBBBBBBBBb75C1216873Ec4F88C11E57E3")
 	tokenPriceChainSel = cciptypes.ChainSelector(1)
 	destChainSel       = cciptypes.ChainSelector(2)
+	f                  = 1
 )
 
 func Test_Observation(t *testing.T) {
-	fDestChain := 3
+	fChains := map[cciptypes.ChainSelector]int{
+		tokenPriceChainSel: f,
+		destChainSel:       f,
+	}
 	timestamp := time.Now().UTC()
 	feedTokenPrices := []cciptypes.TokenPrice{
 		cciptypes.NewTokenPrice(tokenA, bi100),
@@ -75,7 +79,7 @@ func Test_Observation(t *testing.T) {
 
 				homeChain := readermock.NewMockHomeChain(t)
 				homeChain.EXPECT().GetFChain().Return(
-					map[cciptypes.ChainSelector]int{destChainSel: fDestChain},
+					map[cciptypes.ChainSelector]int{destChainSel: f, tokenPriceChainSel: f},
 					nil,
 				)
 
@@ -86,15 +90,15 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
+					bigF:             f,
 				}
 			},
 			expObs: Observation{
 				FeedTokenPrices:       feedTokenPrices,
 				FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
-				FDestChain:            fDestChain,
+				FChain:                fChains,
 				Timestamp:             time.Now().UTC(),
 			},
-			expErr: nil,
 		},
 		{
 			name: "Failed to get FDestChain",
@@ -112,10 +116,10 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
+					bigF:             f,
 				}
 			},
 			expObs: Observation{},
-			expErr: errors.New("failed to get FChain"),
 		},
 	}
 

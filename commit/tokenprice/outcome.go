@@ -18,22 +18,34 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	if len(aggObs.FDestChain) < p.bigF {
+	if len(aggObs.FChain) < p.bigF {
 		return ConsensusObservation{},
-			fmt.Errorf("not enough observations for fDestChain")
+			fmt.Errorf("not enough observations for FChain")
 	}
 
-	fDestChain := shared.Median(aggObs.FDestChain, func(a, b int) bool {
-		return a < b
-	})
+	fMin := make(map[cciptypes.ChainSelector]int)
+	for chain := range aggObs.FChain {
+		fMin[chain] = p.bigF
+	}
+	fChains := shared.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
 
-	twoFPlus1 := 2*fDestChain + 1
+	fDestChain, exists := fChains[p.cfg.DestChain]
+	if !exists {
+		return ConsensusObservation{},
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.cfg.DestChain)
+	}
+
+	fFeedChain, exists := fChains[cciptypes.ChainSelector(p.cfg.OffchainConfig.TokenPriceChainSelector)]
+	if !exists {
+		return ConsensusObservation{},
+			fmt.Errorf("no consensus value for f for FeedChain: %d", p.cfg.OffchainConfig.TokenPriceChainSelector)
+	}
 
 	feedPricesConsensus := shared.GetConsensusMapAggregator(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		twoFPlus1,
+		shared.TwoFPlus1(fFeedChain),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
 			return shared.Median(vals, shared.TokenPriceComparator)
 		},
@@ -43,12 +55,12 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		twoFPlus1,
+		shared.TwoFPlus1(fDestChain),
 		feeQuoterAggregator,
 	)
 
 	consensusObs := ConsensusObservation{
-		FDestChain:            fDestChain,
+		FChain:                fChains,
 		Timestamp:             shared.Median(aggObs.Timestamps, shared.TimestampComparator),
 		FeedTokenPrices:       feedPricesConsensus,
 		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus,
@@ -124,7 +136,7 @@ func aggregateObservations(aos []shared.AttributedObservation[Observation]) Aggr
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
 		FeeQuoterTokenUpdates: make(map[types.Account][]shared.TimestampedBig),
-		FDestChain:            []int{},
+		FChain:                make(map[cciptypes.ChainSelector][]int),
 		Timestamps:            []time.Time{},
 	}
 
@@ -140,8 +152,10 @@ func aggregateObservations(aos []shared.AttributedObservation[Observation]) Aggr
 			aggObs.FeeQuoterTokenUpdates[account] = append(aggObs.FeeQuoterTokenUpdates[account], update)
 		}
 
-		// FDestChain
-		aggObs.FDestChain = append(aggObs.FDestChain, obs.FDestChain)
+		// FChain
+		for chainSel, f := range obs.FChain {
+			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
+		}
 
 		// Timestamps
 		aggObs.Timestamps = append(aggObs.Timestamps, obs.Timestamp)
