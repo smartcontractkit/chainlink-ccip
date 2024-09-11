@@ -6,11 +6,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	crand "crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"sort"
 	"time"
@@ -19,7 +17,6 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
@@ -342,6 +339,11 @@ func (c *client) validateSignedObservationResponse(
 	destChain *rmnpb.LaneDest,
 	rmnHomeConfigDigest cciptypes.Bytes,
 ) error {
+	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
+	if !exists {
+		return fmt.Errorf("rmn node %d not found", rmnNodeID)
+	}
+
 	if signedObs.Observation.LaneDest.DestChainSelector != destChain.DestChainSelector {
 		return fmt.Errorf("unexpected lane dest chain selector %v", signedObs.Observation.LaneDest)
 	}
@@ -384,39 +386,9 @@ func (c *client) validateSignedObservationResponse(
 		}
 	}
 
-	if err := c.verifyObservationSignature(rmnNodeID, signedObs); err != nil {
+	if err := verifyObservationSignature(rmnNode, signedObs); err != nil {
 		return fmt.Errorf("failed to verify observation signature: %w", err)
 	}
-
-	return nil
-}
-
-// verifyObservationSignature verifies the signature of the observation.
-//
-//	e.g. ed25519.sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
-func (c *client) verifyObservationSignature(
-	rmnNodeID NodeID,
-	signedObs *rmnpb.SignedObservation,
-) error {
-	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
-	if !exists {
-		return fmt.Errorf("rmn node %d not found", rmnNodeID)
-	}
-
-	observationBytes, err := proto.Marshal(signedObs.GetObservation()) // todo: construct msg similar to rmn
-	if err != nil {
-		return fmt.Errorf("failed to marshal observation: %w", err)
-	}
-
-	observationBytesSha256 := sha256.Sum256(observationBytes)
-	msg := append([]byte(rmnNode.SignObservationPrefix), observationBytesSha256[:]...)
-	msgSha256 := sha256.Sum256(msg)
-
-	isValid := ed25519.Verify(*rmnNode.SignObservationsPublicKey, msgSha256[:], signedObs.Signature)
-	if !isValid {
-		return fmt.Errorf("observation signature does not match node %d public key", rmnNodeID)
-	}
-
 	return nil
 }
 
@@ -504,11 +476,6 @@ func (c *client) getRmnReportSignatures(
 		signersRequested.Add(node.ID)
 	}
 
-	ecdsaSignatures, err := c.listenForRmnReportSignatures(ctx, requestIDs, reportSigReq, signersRequested)
-	if err != nil {
-		return nil, fmt.Errorf("listen for rmn report signatures: %w", err)
-	}
-
 	// At this point we expect that attributed observations are correct, but we might have different roots
 	// coming from different RMN nodes. In that case we return an error since something is breached.
 	merkleRootCounts := make(map[uint64]map[string]int)
@@ -524,6 +491,7 @@ func (c *client) getRmnReportSignatures(
 	rootsPerSourceChain := make(map[uint64]cciptypes.Bytes)
 	for chain, counts := range merkleRootCounts {
 		var root cciptypes.Bytes
+		var err error
 		for merkleRootStr, count := range counts {
 			if count >= c.minSigners {
 				root, err = cciptypes.NewBytesFromString(merkleRootStr)
@@ -552,6 +520,12 @@ func (c *client) getRmnReportSignatures(
 		}
 	}
 
+	ecdsaSignatures, err := c.listenForRmnReportSignatures(
+		ctx, requestIDs, fixedDestLaneUpdates, reportSigReq, signersRequested)
+	if err != nil {
+		return nil, fmt.Errorf("listen for rmn report signatures: %w", err)
+	}
+
 	return &ReportSignatures{
 		Signatures:  ecdsaSignatures,
 		LaneUpdates: fixedDestLaneUpdates,
@@ -561,6 +535,7 @@ func (c *client) getRmnReportSignatures(
 func (c *client) listenForRmnReportSignatures(
 	ctx context.Context,
 	requestIDs mapset.Set[uint64],
+	fixedDestLaneUpdates []*rmnpb.FixedDestLaneUpdate,
 	reportSigReq *rmnpb.ReportSignatureRequest,
 	signersRequested mapset.Set[NodeID],
 ) ([]*rmnpb.EcdsaSignature, error) {
@@ -586,7 +561,18 @@ func (c *client) listenForRmnReportSignatures(
 				continue
 			}
 
-			if err := c.verifyReportSignature(resp.RMNNodeID, reportSig); err != nil {
+			rmnNode, exists := c.getRmnNodeByID(resp.RMNNodeID)
+			if !exists {
+				c.lggr.Warnw("rmn node that appears in report signature does not exist", "nodeID", resp.RMNNodeID)
+				continue
+			}
+
+			err = VerifyRmnReportSignatures(
+				fixedDestLaneUpdates,
+				[]*rmnpb.EcdsaSignature{reportSig.Signature},
+				[]RMNNodeInfo{rmnNode},
+			)
+			if err != nil {
 				c.lggr.Warnw("failed to verify report signature", "err", err)
 				continue
 			}
@@ -642,34 +628,6 @@ func (c *client) ensureEnoughSignedObservations(rmnSignedObservations []rmnSigne
 		}
 	}
 
-	return nil
-}
-
-func (c *client) verifyReportSignature(
-	rmnNodeID NodeID,
-	reportSig *rmnpb.ReportSignature,
-) error {
-	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
-	if !exists {
-		return fmt.Errorf("rmn node %d not found", rmnNodeID)
-	}
-
-	observationBytes, err := proto.Marshal(reportSig) // todo: construct msg similar to rmn
-	if err != nil {
-		return fmt.Errorf("failed to marshal observation: %w", err)
-	}
-	observationBytesSha256 := sha256.Sum256(observationBytes)
-
-	isValid := ecdsa.Verify(
-		rmnNode.SignReportsPublicKey,
-		observationBytesSha256[:],
-		big.NewInt(0).SetBytes(reportSig.Signature.R),
-		big.NewInt(0).SetBytes(reportSig.Signature.S),
-	)
-
-	if !isValid {
-		return fmt.Errorf("report signature does not match node %d public key", rmnNodeID)
-	}
 	return nil
 }
 

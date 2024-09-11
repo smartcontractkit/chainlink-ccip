@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -84,6 +85,7 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
+		[]rmn.RMNNodeInfo{},
 	)
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,

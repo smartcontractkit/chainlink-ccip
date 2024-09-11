@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -33,6 +34,13 @@ func (w *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
+	if q.RMNSignatures != nil {
+		err := rmn.VerifyRmnReportSignatures(q.RMNSignatures.LaneUpdates, q.RMNSignatures.Signatures, w.rmnNodeInfo)
+		if err != nil {
+			return Observation{}, fmt.Errorf("failed to verify RMN signatures provided by leader: %w", err)
+		}
+	}
+
 	tStart := time.Now()
 	observation, nextState := w.getObservation(ctx, q, prevOutcome)
 	w.lggr.Infow("Sending MerkleRootObs",

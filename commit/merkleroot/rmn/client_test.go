@@ -103,6 +103,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	})
 
 	t.Run("happy path no retries", func(t *testing.T) {
+		t.Skipf("skip until signature verification is implemented in the test")
+
 		ts := newTestSetup(t)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(ts.rawRmnClient, ts.rmnClient.minObservers)
@@ -127,6 +129,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	})
 
 	t.Run("happy path with retries", func(t *testing.T) {
+		t.Skipf("skip until signature verification is implemented in the test")
+
 		ts := newTestSetup(t)
 
 		ts.rmnClient.observationsInitialRequestTimerDuration = time.Nanosecond

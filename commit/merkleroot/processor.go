@@ -28,6 +28,7 @@ type Processor struct {
 	reportingCfg ocr3types.ReportingPluginConfig
 	chainSupport plugincommon.ChainSupport
 	rmnClient    rmn.Client
+	rmnNodeInfo  []rmn.RMNNodeInfo
 }
 
 // NewProcessor creates a new Processor
@@ -40,6 +41,7 @@ func NewProcessor(
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	chainSupport plugincommon.ChainSupport,
+	rmnNodeInfo []rmn.RMNNodeInfo,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,
@@ -57,6 +59,7 @@ func NewProcessor(
 		observer:     observer,
 		reportingCfg: reportingCfg,
 		chainSupport: chainSupport,
+		rmnNodeInfo:  rmnNodeInfo,
 	}
 }
 
