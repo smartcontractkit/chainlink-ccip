@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"sort"
 	"time"
@@ -402,7 +403,7 @@ func (c *client) verifyObservationSignature(
 		return fmt.Errorf("rmn node %d not found", rmnNodeID)
 	}
 
-	observationBytes, err := proto.Marshal(signedObs.GetObservation())
+	observationBytes, err := proto.Marshal(signedObs.GetObservation()) // todo: construct msg similar to rmn
 	if err != nil {
 		return fmt.Errorf("failed to marshal observation: %w", err)
 	}
@@ -582,15 +583,16 @@ func (c *client) listenForRmnReportSignatures(
 			reportSig := responseTyp.GetReportSignature()
 			if reportSig == nil {
 				c.lggr.Infof("RMN node returned an unexpected type of response: %+v", responseTyp.Response)
-			} else {
-				c.lggr.Infow("received report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
-				reportSigs = append(reportSigs, reportSig)
+				continue
 			}
 
-			// Use reportSigReq to construct the message to verify using
-			// reportSig.Signature.R
-			// reportSig.Signature.S
-			// and resp.RMNNodeID
+			if err := c.verifyReportSignature(resp.RMNNodeID, reportSig); err != nil {
+				c.lggr.Warnw("failed to verify report signature", "err", err)
+				continue
+			}
+
+			c.lggr.Infow("received report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
+			reportSigs = append(reportSigs, reportSig)
 
 			if len(reportSigs) >= c.minSigners {
 				ecdsaSigs := make([]*rmnpb.EcdsaSignature, 0)
@@ -640,6 +642,34 @@ func (c *client) ensureEnoughSignedObservations(rmnSignedObservations []rmnSigne
 		}
 	}
 
+	return nil
+}
+
+func (c *client) verifyReportSignature(
+	rmnNodeID NodeID,
+	reportSig *rmnpb.ReportSignature,
+) error {
+	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
+	if !exists {
+		return fmt.Errorf("rmn node %d not found", rmnNodeID)
+	}
+
+	observationBytes, err := proto.Marshal(reportSig) // todo: construct msg similar to rmn
+	if err != nil {
+		return fmt.Errorf("failed to marshal observation: %w", err)
+	}
+	observationBytesSha256 := sha256.Sum256(observationBytes)
+
+	isValid := ecdsa.Verify(
+		rmnNode.SignReportsPublicKey,
+		observationBytesSha256[:],
+		big.NewInt(0).SetBytes(reportSig.Signature.R),
+		big.NewInt(0).SetBytes(reportSig.Signature.S),
+	)
+
+	if !isValid {
+		return fmt.Errorf("report signature does not match node %d public key", rmnNodeID)
+	}
 	return nil
 }
 
