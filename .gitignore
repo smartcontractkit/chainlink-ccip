@@ -1,7 +1,7 @@
 # Log files
 *.log
 
-# misc
+# Misc
 .DS_Store
 .envrc
 .env*
@@ -14,11 +14,11 @@
 *.iml
 debug.env
 *.txt
-
+repos
 
 # Ignore DevSpace cache and log folder
 .devspace/
 /components/atlas/init/output/*
 
-# local helm chart downloads
+# Local helm chart downloads
 /deployments/*/*.tgz

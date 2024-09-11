@@ -1,0 +1,6 @@
+---
+common:
+  image:
+    repository: localhost:5001/chainlink
+    tag: local
+    pullPolicy: Always

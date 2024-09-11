@@ -1,0 +1,29 @@
+---
+common:
+  chainlink:
+    v2Config:
+      01-network-ava-spruce-calm-conf.toml: |
+        [[EVM]]
+        ChainID = '424242'
+        NoNewHeadsThreshold = '0m'
+        # must use finality tag because blocks are not produced empty and
+        # the last block is always marked as finalized
+        FinalityTagEnabled = true
+
+        [EVM.GasEstimator]
+        EIP1559DynamicFees = false
+        Mode = 'BlockHistory'
+        PriceMin = '20 gwei'
+
+        [EVM.GasEstimator.BlockHistory]
+        BlockHistorySize = 8
+        TransactionPercentile = 50
+      01-network-ava-spruce-calm-rpc.toml: |
+        [[EVM]]
+        ChainID = "424242"
+
+        [[EVM.Nodes]]
+        Name = "private-testnet-mitre"
+        HTTPURL = "https://subnets.avax.network/insti-1/testnet/rpc"
+        WSURL = "wss://subnets.avax.network/insti-1/testnet/ws"
+        SendOnly = false

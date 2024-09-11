@@ -1,0 +1,57 @@
+---
+version: v2beta1
+name: chainlink-config-keystone
+
+require:
+  devspace: '>= 6.0'
+
+vars:
+  # helm
+  HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  # local
+  LOCAL_CHARTS_DIR:
+    source: env
+    default: ./repos/infra-charts
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+
+pipelines:
+  chainlink-config-keystone:
+    run: |-
+      create_deployments chainlink-config-keystone
+
+deployments:
+  chainlink-config-keystone:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      displayOutput: true
+      chart:
+        name: ${HELM_REGISTRY_URI}/generic-job
+        version: "0.1.20"
+      valuesFiles: []
+      values: {}
+
+profiles:
+  # charts
+  - name: local-charts
+    merge:
+      deployments:
+        chainlink-don:
+          helm:
+            chart:
+              name: generic-job
+              path: ${LOCAL_CHARTS_DIR}/generic-job
+              version: null
+  # TODO
+  - name: tmp
+    patches:
+      - op: add
+        path: deployments.chainlink-config-ccip.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/generic-job/chainlink-config-keystone.base.yaml

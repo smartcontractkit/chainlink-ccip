@@ -1,0 +1,22 @@
+---
+nodeCount: 1
+bootNodeCount: 0
+
+fullnameOverride: null
+
+common:
+  chainlink:
+    v2Config:
+      02-common.toml: |
+        [Log]
+        Level = 'info'
+
+  requiredLabels:
+    app.kubernetes.io/component: chainlink
+    app.chain.link/team: infra
+    app.chain.link/product: development
+    app.chain.link/blockchain: multichain
+    app.chain.link/network: multichain
+    app.chain.link/network-type: testnet
+
+overrides: []

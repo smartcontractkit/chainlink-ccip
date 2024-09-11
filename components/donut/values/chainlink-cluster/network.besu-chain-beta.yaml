@@ -1,0 +1,36 @@
+---
+common:
+  chainlink:
+    v2Config:
+      01-network-besu-chain-beta-conf.toml: |
+        [[EVM]]
+        ChainID = "2337"
+
+        [EVM.GasEstimator]
+        Mode = 'BlockHistory'
+        BumpThreshold = 60
+        BumpPercent = 20
+        BumpMin = '100 wei'
+        PriceMin = '0.5 gwei'
+        PriceMax = '1000 gwei'
+        LimitDefault = 8000000
+        FeeCapDefault = '1000 gwei'
+
+        [EVM.GasEstimator.BlockHistory]
+        # Default is 24, which leads to bumpy gas prices. In CCIP
+        # we want to smooth out the gas prices, so we increase the sample size.
+        BlockHistorySize = 200
+        # The formula for FeeCap is (current block base fee * (1.125 ^ EIP1559FeeCapBufferBlocks) + tipcap)
+        # where tipcap is managed by the block history estimators. In the context of CCIP,
+        # the gas price is relayed to other changes for quotes so we want accurate/avg not pessimistic values.
+        # So we set this to zero so FeeCap = baseFee + tipcap.
+        EIP1559FeeCapBufferBlocks = 0
+      01-network-besu-chain-beta-rpc.toml: |
+        [[EVM]]
+        ChainID = "2337"
+
+        [[EVM.Nodes]]
+        HTTPURL = "http://besu-node-rpc-1.chain-beta.svc.cluster.local:8545"
+        Name = "2337_primary_chainlink_0"
+        SendOnly = false
+        WSURL = "ws://besu-node-rpc-1.chain-beta.svc.cluster.local:8546"

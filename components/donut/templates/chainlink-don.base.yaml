@@ -1,0 +1,60 @@
+---
+in: |
+  deployments:
+    chainlink-don:
+      helm:
+        valuesFiles:
+          - ${LOCAL_VALUES_DIR}/chainlink-cluster/type.base.yaml
+        values:
+          fullnameOverride: ${DON_TYPE}
+          nodeCount: {{ .Env.DON_NODE_COUNT }}
+          bootNodeCount: {{ .Env.DON_BOOT_NODE_COUNT }}
+          overrides:
+          {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
+          {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}
+            - chainlinkNode:
+                spec:
+                  database:
+                    config:
+                      host: ${DON_TYPE}-db-bt-{{ $i }}
+          {{- end }}
+          {{- end }}
+          {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
+          {{- range $i := seq 0 (math.Sub .Env.DON_NODE_COUNT 1) }}
+            - chainlinkNode:
+                spec:
+                  database:
+                    config:
+                      host: ${DON_TYPE}-db-{{ $i }}
+          {{- end }}
+          {{- end }}
+    {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
+    {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}
+    chainlink-don-db-bt-{{ $i }}:
+      updateImageTags: false
+      namespace: ${DEVSPACE_NAMESPACE}
+      helm:
+        chart:
+          name: oci://registry-1.docker.io/bitnamicharts/postgresql
+        valuesFiles:
+          - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
+          - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
+        values:
+          fullnameOverride: ${DON_TYPE}-db-bt-{{ $i }}
+    {{- end }}
+    {{- end }}
+    {{- if gt (conv.ToInt .Env.DON_NODE_COUNT) 0 }}
+    {{- range $i := seq 0 (math.Sub .Env.DON_NODE_COUNT 1) }}
+    chainlink-don-db-{{ $i }}:
+      updateImageTags: false
+      namespace: ${DEVSPACE_NAMESPACE}
+      helm:
+        chart:
+          name: oci://registry-1.docker.io/bitnamicharts/postgresql
+        valuesFiles:
+          - ${LOCAL_VALUES_DIR}/postgresql/type.dev.yaml
+          - ${LOCAL_VALUES_DIR}/postgresql/pvc.dev.yaml
+        values:
+          fullnameOverride: ${DON_TYPE}-db-{{ $i }}
+    {{- end }}
+    {{- end }}

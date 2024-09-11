@@ -1,0 +1,37 @@
+---
+# overrides
+
+# docker image
+# common:
+#   image:
+#     repository: <aws-account>.dkr.ecr.<aws-region>.amazonaws.com/<docker-name>
+#     tag: <docker-tag>
+#     pullPolicy: <Always|IfNotPresent>
+
+# chainlink toml config
+# common:
+#   chainlink:
+#     v2Config:
+#       99-override: |
+#         [Log]
+#         Level = 'debug'
+
+common:
+  service:
+    private:
+      type: NodePort
+
+  ingress:
+    enabled: true
+    ingressClassName: alb
+    annotations:
+      alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:us-west-2:389435844244:certificate/b8586286-56fb-4f3f-be7d-7af9c1ac03b0'
+      alb.ingress.kubernetes.io/group.name: sandbox
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
+      alb.ingress.kubernetes.io/ssl-redirect: '443'
+    hosts:
+      - host: "%s.nodeops.sand.cldev.sh"
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+        useNodeName: true

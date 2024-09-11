@@ -1,0 +1,12 @@
+---
+primary:
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: gp2
+  persistentVolumeClaimRetentionPolicy:
+    enabled: true
+    whenScaled: Delete
+    whenDeleted: Delete
+    # whenScaled: Retain
+    # whenDeleted: Retain

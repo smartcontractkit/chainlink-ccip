@@ -1,0 +1,6 @@
+---
+common:
+  image:
+    repository: public.ecr.aws/chainlink/chainlink
+    tag: 2.15.0
+    pullPolicy: Always

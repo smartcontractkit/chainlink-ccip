@@ -1,0 +1,39 @@
+---
+common:
+  chainlink:
+    v2Config:
+      01-network-arbitrum-sepolia-conf.toml: |
+        # todo
+      01-network-arbitrum-sepolia-rpc.toml: |
+        [[EVM]]
+          ChainID = "421614"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://arbitrum-sepolia-cll.public.linkpool.io/HWa4CnmuGbJmuGAu8x7DEuUqQWiN3fj5"
+            Name = "421614_primary_LinkPool_0"
+            SendOnly = false
+            WSURL = "wss://arbitrum-sepolia-cll.public.linkpool.io/ws/HWa4CnmuGbJmuGAu8x7DEuUqQWiN3fj5"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://nd-023-623-611.p2pify.com/ad0ef61b01da699d13f1cd920c32d547"
+            Name = "421614_primary_Chainstack_1"
+            SendOnly = false
+            WSURL = "wss://ws-nd-023-623-611.p2pify.com/ad0ef61b01da699d13f1cd920c32d547"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://nd-340-835-749.p2pify.com/ffb49468498a06f0bd6dfd1b0e140742"
+            Name = "421614_primary_Chainstack_2"
+            SendOnly = false
+            WSURL = "wss://ws-nd-340-835-749.p2pify.com/ffb49468498a06f0bd6dfd1b0e140742"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://arbitrum-sepolia.gateway.tenderly.co/6QuLBOLgpIHde5GmjJjfC4"
+            Name = "421614_primary_Tenderly_3"
+            SendOnly = false
+            WSURL = "wss://arbitrum-sepolia.gateway.tenderly.co/6QuLBOLgpIHde5GmjJjfC4"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://arb-sepolia.nirvanalabs.xyz/arbsepoliafullCL37?apikey=81e8b6d64b52502ffbe1db02a6bb83f43720"
+            Name = "421614_primary_NirvanaLabs_4"
+            SendOnly = false
+            WSURL = "wss://arb-sepolia.nirvanalabs.xyz/arbsepoliafullCL37?apikey=81e8b6d64b52502ffbe1db02a6bb83f43720"

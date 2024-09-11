@@ -1,0 +1,28 @@
+---
+# chart: https://github.com/bitnami/charts/tree/master/bitnami/postgresql
+architecture: standalone
+auth:
+  enablePostgresUser: true
+  postgresPassword: postgres
+  username: chainlink
+  password: JGVgp7M2Emcg7Av8KKVUgMZb
+  database: chainlink
+  existingSecret: ''
+image:
+  registry: docker.io
+  repository: bitnami/postgresql
+tls:
+  enabled: false
+containerPorts:
+  postgresql: 5432
+primary:
+  persistence:
+    enabled: false
+    size: 8Gi
+    storageClass: gp2
+networkPolicy:
+  enabled: false
+volumePermissions:
+  enabled: false
+metrics:
+  enabled: false

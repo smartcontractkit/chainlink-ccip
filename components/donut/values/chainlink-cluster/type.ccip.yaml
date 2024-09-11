@@ -1,0 +1,41 @@
+---
+nodeCount: 4
+bootNodeCount: 1
+
+fullnameOverride: null
+
+common:
+  chainlink:
+    v2Config:
+      02-common.toml: |
+        [Feature]
+        LogPoller = true
+
+        [P2P]
+        TraceLogging = true
+
+        [P2P.V2]
+        Enabled = true
+        ListenAddresses = ['0.0.0.0:5001']
+
+        [OCR2]
+        Enabled = true
+        SimulateTransactions = false
+        # The default is 1, meaning new OCR reports generated overwrite subsequent ones.
+        # in CCIP, we do not want that behaviour we just want to queue reports.
+        DefaultTransactionQueueDepth = 150
+
+  image:
+    repository: public.ecr.aws/w0i8p0z9/chainlink-ccip
+    tag: null
+    pullPolicy: Always
+
+  requiredLabels:
+    app.kubernetes.io/component: chainlink-ccip
+    app.chain.link/team: infra
+    app.chain.link/product: ccip
+    app.chain.link/blockchain: multichain
+    app.chain.link/network: multichain
+    app.chain.link/network-type: testnet
+
+overrides: []

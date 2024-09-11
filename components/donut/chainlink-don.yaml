@@ -1,0 +1,136 @@
+---
+version: v2beta1
+name: chainlink-don
+
+require:
+  devspace: '>= 6.0'
+
+vars:
+  # helm
+  HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  # local
+  LOCAL_CHARTS_DIR:
+    source: env
+    default: ./repos/infra-charts
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  LOCAL_VALUES_DIR:
+    source: env
+    default: ./values
+  # don
+  DON_TYPE:
+    source: env
+    default: dev
+  DON_VERSION:
+    source: env
+    default: latest
+  DON_BOOT_NODE_COUNT:
+    source: env
+    default: 0
+  DON_NODE_COUNT:
+    source: env
+    default: 1
+  # switch
+  ENABLE_DON_BASE:
+    source: env
+    default: "true"
+
+pipelines:
+  chainlink-don:
+    run: |-
+      # temp
+      create_deployments --all
+
+deployments:
+  chainlink-don:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      displayOutput: true
+      chart:
+        name: ${HELM_REGISTRY_URI}/chainlink-cluster
+        version: "2.1.5"
+      valuesFiles: []
+      values: {}
+
+profiles:
+  # charts
+  - name: local-charts
+    merge:
+      deployments:
+        chainlink-don:
+          helm:
+            chart:
+              name: chainlink-cluster
+              path: ${LOCAL_CHARTS_DIR}/chainlink-cluster
+              version: null
+  # base
+  - name: don-base-tmpl
+    activation: &enableDonBase
+      - vars:
+          ENABLE_DON_BASE: "true"
+    merge: |-
+      $(
+        DON_NODE_COUNT=${DON_NODE_COUNT} \
+        DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
+      )
+  - name: don-base-type
+    activation: *enableDonBase
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/type.${DON_TYPE}.yaml
+  - name: don-base-version
+    activation: *enableDonBase
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/version.${DON_VERSION}.yaml
+  # networks
+  - name: network-arbitrum-sepolia
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.arbitrum-sepolia.yaml
+  - name: network-ethereum-sepolia
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ethereum-sepolia.yaml
+  - name: network-besu-chain-alpha
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.besu-chain-alpha.yaml
+  - name: network-besu-chain-beta
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.besu-chain-beta.yaml
+  - name: network-ava-spruce-calm
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ava-spruce-calm.yaml
+  # versions
+  - name: version-latest
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/version.latest.yaml
+  - name: version-local
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/version.k3d-local.yaml
+  # overrides
+  - name: overrides
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/overrides.yaml

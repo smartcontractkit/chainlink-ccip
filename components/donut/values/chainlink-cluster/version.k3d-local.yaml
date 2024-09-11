@@ -1,0 +1,6 @@
+---
+common:
+  image:
+    repository: k3d-chainlink.localhost:5001/chainlink
+    tag: local
+    pullPolicy: Always

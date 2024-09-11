@@ -1,0 +1,6 @@
+---
+common:
+  image:
+    repository: public.ecr.aws/w0i8p0z9/chainlink-ccip
+    tag: 2.14.0-ccip1.5.1
+    pullPolicy: IfNotPresent

@@ -1,0 +1,33 @@
+---
+common:
+  chainlink:
+    v2Config:
+      01-network-ethereum-sepolia-conf.toml: |
+        # todo
+      01-network-ethereum-sepolia-rpc.toml: |
+        [[EVM]]
+          ChainID = "11155111"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://nd-611-802-295.p2pify.com/05541dd996d9d812e580c32477f70b1a"
+            Name = "11155111_primary_Chainstack_0"
+            SendOnly = false
+            WSURL = "wss://ws-nd-611-802-295.p2pify.com/05541dd996d9d812e580c32477f70b1a"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://chainlinklabs-sepolia-geth-fullnode-01.bdnodes.net/?auth=rfYtwQpvOpCmcnOROp9jT8AZIn3_iHvnSYNRiEbhTvA"
+            Name = "11155111_primary_Blockdaemon_1"
+            SendOnly = false
+            WSURL = "wss://chainlinklabs-sepolia-geth-fullnode-01.bdnodes.net:8443/websocket?auth=rfYtwQpvOpCmcnOROp9jT8AZIn3_iHvnSYNRiEbhTvA"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://ethereum-sepolia-1.simplystaking.xyz/DFKJSDFKJNSD/rpc/"
+            Name = "11155111_primary_SimplyVC_2"
+            SendOnly = false
+            WSURL = "wss://ethereum-sepolia-1.simplystaking.xyz/DFKJSDFKJNSD/ws/"
+
+          [[EVM.Nodes]]
+            HTTPURL = "https://eth-rpc.nethermind.io/rpc-sepolia?x-apikey=0pK4y5m2A98i2qv92CA0"
+            Name = "11155111_primary_Nethermind_3"
+            SendOnly = false
+            WSURL = "wss://eth-rpc.nethermind.io/ws-sepolia?x-apikey=0pK4y5m2A98i2qv92CA0"
