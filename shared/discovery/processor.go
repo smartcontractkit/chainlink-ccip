@@ -37,7 +37,7 @@ type Observation struct {
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
 	lggr      logger.Logger
-	reader    reader.CCIPReader
+	reader    *reader.CCIPReader
 	homechain reader.HomeChain
 	dest      cciptypes.ChainSelector
 	bigF      int
@@ -53,10 +53,11 @@ func (cdp *ContractDiscoveryProcessor) Query(_ context.Context, _ Outcome) (Quer
 func (cdp *ContractDiscoveryProcessor) Observation(
 	ctx context.Context, _ Outcome, _ Query,
 ) (Observation, error) {
-	contracts, err := cdp.reader.DiscoverContracts(ctx, cdp.dest)
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, cdp.dest)
 	if err != nil {
 		if errors.Is(err, reader.ErrContractReaderNotFound) {
-			// not a dest reader, no observations (disable entire processor?).
+			// Not a dest reader, no observations will be made.
+			// Processor is not disabled because the outcome phase will bind observed contracts.
 			return Observation{}, nil
 		}
 		return Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
@@ -74,13 +75,14 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 }
 
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
-	_ Outcome, _ Query, ao shared.AttributedObservation[Observation],
+	_ Outcome, _ Query, _ shared.AttributedObservation[Observation],
 ) error {
-	// TODO:
+	// TODO: make sure all observations come from dest readers.
 	return nil
 }
 
-// Outcome
+// Outcome comes to consensus on the contract addresses and updates the chainreader. It doesn't actually
+// return an Outcome.
 func (cdp *ContractDiscoveryProcessor) Outcome(
 	_ Outcome, _ Query, aos []shared.AttributedObservation[Observation],
 ) (Outcome, error) {
@@ -108,9 +110,10 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		}
 	}
 
+	// call Sync to bind contracts.
 	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
 	contracts[consts.ContractNameOnRamp] = shared.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
-	if err := cdp.reader.Sync(context.Background(), contracts); err != nil {
+	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
 		return Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}
 
