@@ -46,13 +46,13 @@ func Test_Observation(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		previousOutcome Outcome
+		previousOutcome MerkleRootOutcome
 		getObserver     func(t *testing.T) *merkleroot.MockObserver
-		expObs          Observation
+		expObs          MerkleRootObservation
 	}{
 		{
 			name: "SelectingRangesForReport observation",
-			previousOutcome: Outcome{
+			previousOutcome: MerkleRootOutcome{
 				OutcomeType: ReportTransmitted,
 			},
 			getObserver: func(t *testing.T) *merkleroot.MockObserver {
@@ -61,7 +61,7 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
-			expObs: Observation{
+			expObs: MerkleRootObservation{
 				OnRampMaxSeqNums:   offRampNextSeqNums,
 				OffRampNextSeqNums: offRampNextSeqNums,
 				FChain:             fChain,
@@ -69,7 +69,7 @@ func Test_Observation(t *testing.T) {
 		},
 		{
 			name: "BuildingReport observation",
-			previousOutcome: Outcome{
+			previousOutcome: MerkleRootOutcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{
@@ -89,14 +89,14 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
-			expObs: Observation{
+			expObs: MerkleRootObservation{
 				MerkleRoots: merkleRoots,
 				FChain:      fChain,
 			},
 		},
 		{
 			name: "WaitingForReportTransmission observation",
-			previousOutcome: Outcome{
+			previousOutcome: MerkleRootOutcome{
 				OutcomeType: ReportInFlight,
 			},
 			getObserver: func(t *testing.T) *merkleroot.MockObserver {
@@ -105,7 +105,7 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
-			expObs: Observation{
+			expObs: MerkleRootObservation{
 				OffRampNextSeqNums: offRampNextSeqNums,
 				FChain:             fChain,
 			},
@@ -126,7 +126,7 @@ func Test_Observation(t *testing.T) {
 			actualObs, err := p.Observation(
 				ctx,
 				tc.previousOutcome,
-				Query{},
+				MerkleRootQuery{},
 			)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expObs, actualObs)

@@ -14,7 +14,7 @@ import (
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *processor) getConsensusObservation(
-	aos []shared.AttributedObservation[Observation],
+	aos []shared.AttributedObservation[TokenPriceObservation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
@@ -132,7 +132,7 @@ func (p *processor) selectTokensForUpdate(
 }
 
 // aggregateObservations takes a list of observations and produces an AggregateObservation
-func aggregateObservations(aos []shared.AttributedObservation[Observation]) AggregateObservation {
+func aggregateObservations(aos []shared.AttributedObservation[TokenPriceObservation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
 		FeeQuoterTokenUpdates: make(map[types.Account][]shared.TimestampedBig),

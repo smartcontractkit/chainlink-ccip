@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -13,7 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -23,9 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
-type MerkleRootObservation = shared.AttributedObservation[merkleroot.Observation]
-type TokenPricesObservation = shared.AttributedObservation[tokenprice.Observation]
-type ChainFeeObservation = shared.AttributedObservation[chainfee.Observation]
+type CommitProcessor = shared.PluginProcessor[committypes.Query, committypes.Observation, committypes.Outcome]
 
 type Plugin struct {
 	nodeID              commontypes.OracleID
@@ -39,9 +37,9 @@ type Plugin struct {
 	homeChain           reader.HomeChain
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
-	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
-	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
-	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
+	merkleRootProcessor CommitProcessor
+	tokenPriceProcessor CommitProcessor
+	//chainFeeProcessor   CommitProcessor
 }
 
 func NewPlugin(
@@ -109,29 +107,19 @@ func NewPlugin(
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
-		chainFeeProcessor:   chainfee.NewProcessor(),
+		//chainFeeProcessor:   chainfee.NewProcessor(),
 	}
 }
 
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
 	var err error
-	var q Query
+	var q committypes.Query
 
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 
 	q.MerkleRootQuery, err = p.merkleRootProcessor.Query(ctx, prevOutcome.MerkleRootOutcome)
 	if err != nil {
 		p.lggr.Errorw("get merkle roots query", "err", err)
-	}
-
-	q.TokenPriceQuery, err = p.tokenPriceProcessor.Query(ctx, prevOutcome.TokenPriceOutcome)
-	if err != nil {
-		p.lggr.Errorw("get token prices query", "err", err)
-	}
-
-	q.ChainFeeQuery, err = p.chainFeeProcessor.Query(ctx, prevOutcome.ChainFeeOutcome)
-	if err != nil {
-		p.lggr.Errorw("get chain fee query", "err", err)
 	}
 
 	return q.Encode()
@@ -148,7 +136,7 @@ func (p *Plugin) Observation(
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 	fChain := p.ObserveFChain()
 
-	decodedQ, err := DecodeCommitPluginQuery(q)
+	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
 	if err != nil {
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
@@ -157,20 +145,20 @@ func (p *Plugin) Observation(
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
 	}
-	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
-	if err != nil {
-		p.lggr.Errorw("failed to get token prices", "err", err)
-	}
-	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
-	if err != nil {
-		p.lggr.Errorw("failed to get gas prices", "err", err)
-	}
+	//tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
+	//if err != nil {
+	//	p.lggr.Errorw("failed to get token prices", "err", err)
+	//}
+	//chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
+	//if err != nil {
+	//	p.lggr.Errorw("failed to get gas prices", "err", err)
+	//}
 
-	obs := Observation{
+	obs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
-		TokenPriceObs: tokenPriceObs,
-		ChainFeeObs:   chainFeeObs,
-		FChain:        fChain,
+		//TokenPriceObs: tokenPriceObs,
+		//ChainFeeObs: chainFeeObs,
+		FChain: fChain,
 	}
 	return obs.Encode()
 }
@@ -194,7 +182,7 @@ func (p *Plugin) Outcome(
 ) (ocr3types.Outcome, error) {
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 
-	decodedQ, err := DecodeCommitPluginQuery(q)
+	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
 	if err != nil {
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
@@ -204,7 +192,7 @@ func (p *Plugin) Outcome(
 	var feeObservations []ChainFeeObservation
 
 	for _, ao := range aos {
-		obs, err := DecodeCommitPluginObservation(ao.Observation)
+		obs, err := committypes.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			p.lggr.Errorw("failed to decode observation", "err", err)
 			continue
@@ -259,7 +247,7 @@ func (p *Plugin) Outcome(
 		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
 	}
 
-	return Outcome{
+	return committypes.Outcome{
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
@@ -282,15 +270,15 @@ func (p *Plugin) Close() error {
 	return nil
 }
 
-func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
+func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) committypes.Outcome {
 	if len(outcome) == 0 {
-		return Outcome{}
+		return committypes.Outcome{}
 	}
 
-	decodedOutcome, err := DecodeOutcome(outcome)
+	decodedOutcome, err := committypes.DecodeOutcome(outcome)
 	if err != nil {
-		p.lggr.Errorw("Failed to decode Outcome", "outcome", outcome, "err", err)
-		return Outcome{}
+		p.lggr.Errorw("Failed to decode TokenPriceOutcome", "outcome", outcome, "err", err)
+		return committypes.Outcome{}
 	}
 
 	return decodedOutcome

@@ -11,20 +11,6 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-type Query struct {
-}
-
-type Outcome struct {
-	TokenPrices []cciptypes.TokenPrice `json:"tokenPrices"`
-}
-
-type Observation struct {
-	FeedTokenPrices       []cciptypes.TokenPrice                  `json:"feedTokenPrices"`
-	FeeQuoterTokenUpdates map[types.Account]shared.TimestampedBig `json:"feeQuoterTokenUpdates"`
-	FChain                map[cciptypes.ChainSelector]int         `json:"fChain"`
-	Timestamp             time.Time                               `json:"timestamp"`
-}
-
 // AggregateObservation is the aggregation of a list of observations
 type AggregateObservation struct {
 	FeedTokenPrices       map[types.Account][]cciptypes.TokenPrice

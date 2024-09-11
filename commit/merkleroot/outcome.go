@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	ct "github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -14,60 +15,61 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
-// Outcome depending on the current state, either:
+// Outcome ct.MerkleRootOutcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
 // - builds a report
 // - checks for the transmission of a previous report
 func (w *Processor) Outcome(
-	prevOutcome Outcome,
-	query Query,
-	aos []shared.AttributedObservation[Observation],
-) (Outcome, error) {
+	prevOutcome ct.Outcome,
+	query ct.Query,
+	aos []shared.AttributedObservation[ct.Observation],
+) (ct.Outcome, error) {
 	tStart := time.Now()
-	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
-	w.lggr.Infow("Sending Outcome",
+	merkleAos := mapAttributedObs(aos)
+	outcome, nextState := w.getOutcome(prevOutcome.MerkleRootOutcome, query.MerkleRootQuery, merkleAos)
+	w.lggr.Infow("Sending ct.MerkleRootOutcome",
 		"outcome", outcome, "oid", w.oracleID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
-	return outcome, nil
+	return ct.Outcome{MerkleRootOutcome: outcome}, nil
 }
 
 func (w *Processor) getOutcome(
-	previousOutcome Outcome,
-	q Query,
-	aos []shared.AttributedObservation[Observation],
-) (Outcome, State) {
+	previousOutcome ct.MerkleRootOutcome,
+	q ct.MerkleRootQuery,
+	aos []shared.AttributedObservation[ct.MerkleRootObservation],
+) (ct.MerkleRootOutcome, ct.MerkleRootState) {
 	nextState := previousOutcome.NextState()
 
 	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
 	if err != nil {
 		w.lggr.Warnw("Get consensus observation failed, empty outcome", "error", err)
-		return Outcome{}, nextState
+		return ct.MerkleRootOutcome{}, nextState
 	}
 
 	switch nextState {
-	case SelectingRangesForReport:
+	case ct.SelectingRangesForReport:
 		return reportRangesOutcome(q, consensusObservation), nextState
-	case BuildingReport:
+	case ct.BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
 			// The current observations should all be empty.
-			return previousOutcome, BuildingReport
+			return previousOutcome, ct.BuildingReport
 		}
 		return buildReport(q, consensusObservation, previousOutcome), nextState
-	case WaitingForReportTransmission:
+	case ct.WaitingForReportTransmission:
 		return checkForReportTransmission(
 			w.lggr, w.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
 	default:
-		w.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
-		return Outcome{}, nextState
+		w.lggr.Warnw("Unexpected next state in MerkleRootOutcome", "state", nextState)
+		return ct.MerkleRootOutcome{}, nextState
 	}
 }
 
 // reportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
 // TODO: ensure each range is below a limit
 func reportRangesOutcome(
-	_ Query,
+	_ ct.MerkleRootQuery,
 	consensusObservation ConsensusObservation,
-) Outcome {
+) ct.MerkleRootOutcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
@@ -100,8 +102,8 @@ func reportRangesOutcome(
 		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
 	})
 
-	outcome := Outcome{
-		OutcomeType:             ReportIntervalsSelected,
+	outcome := ct.MerkleRootOutcome{
+		OutcomeType:             ct.ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
 		OffRampNextSeqNums:      offRampNextSeqNums,
 	}
@@ -112,22 +114,22 @@ func reportRangesOutcome(
 // Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
 // to transmit on-chain
 func buildReport(
-	_ Query,
+	_ ct.MerkleRootQuery,
 	consensusObservation ConsensusObservation,
-	prevOutcome Outcome,
-) Outcome {
+	prevOutcome ct.MerkleRootOutcome,
+) ct.MerkleRootOutcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
-	outcomeType := ReportGenerated
+	outcomeType := ct.ReportGenerated
 	if len(roots) == 0 {
-		outcomeType = ReportEmpty
+		outcomeType = ct.ReportEmpty
 	}
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	// TODO: use q.RMNSignatures in the generated outcome and eventually report. - Blocked by onchain work.
 
-	outcome := Outcome{
+	outcome := ct.MerkleRootOutcome{
 		OutcomeType:        outcomeType,
 		RootsToReport:      roots,
 		OffRampNextSeqNums: prevOutcome.OffRampNextSeqNums,
@@ -146,9 +148,9 @@ func buildReport(
 func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
-	previousOutcome Outcome,
+	previousOutcome ct.MerkleRootOutcome,
 	consensusObservation ConsensusObservation,
-) Outcome {
+) ct.MerkleRootOutcome {
 
 	offRampUpdated := false
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
@@ -161,20 +163,20 @@ func checkForReportTransmission(
 	}
 
 	if offRampUpdated {
-		return Outcome{
-			OutcomeType: ReportTransmitted,
+		return ct.MerkleRootOutcome{
+			OutcomeType: ct.ReportTransmitted,
 		}
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
 		lggr.Warnw("Failed to detect report transmission")
-		return Outcome{
-			OutcomeType: ReportTransmissionFailed,
+		return ct.MerkleRootOutcome{
+			OutcomeType: ct.ReportTransmissionFailed,
 		}
 	}
 
-	return Outcome{
-		OutcomeType:                     ReportInFlight,
+	return ct.MerkleRootOutcome{
+		OutcomeType:                     ct.ReportInFlight,
 		OffRampNextSeqNums:              previousOutcome.OffRampNextSeqNums,
 		ReportTransmissionCheckAttempts: previousOutcome.ReportTransmissionCheckAttempts + 1,
 	}
@@ -185,7 +187,7 @@ func getConsensusObservation(
 	lggr logger.Logger,
 	F int,
 	destChain cciptypes.ChainSelector,
-	aos []shared.AttributedObservation[Observation],
+	aos []shared.AttributedObservation[ct.MerkleRootObservation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 

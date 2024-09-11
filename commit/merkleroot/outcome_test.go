@@ -28,8 +28,8 @@ func Test_buildReport(t *testing.T) {
 		}
 
 		for i := 0; i < rounds; i++ {
-			report1 := buildReport(Query{}, obs, Outcome{})
-			report2 := buildReport(Query{}, obs, Outcome{})
+			report1 := buildReport(MerkleRootQuery{}, obs, MerkleRootOutcome{})
+			report2 := buildReport(MerkleRootQuery{}, obs, MerkleRootOutcome{})
 			require.Equal(t, report1, report2)
 		}
 	})

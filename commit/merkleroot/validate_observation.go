@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -16,9 +17,9 @@ import (
 )
 
 func (w *Processor) ValidateObservation(
-	_ Outcome,
-	q Query,
-	ao shared.AttributedObservation[Observation]) error {
+	_ committypes.Outcome,
+	q committypes.Query,
+	ao shared.AttributedObservation[committypes.Observation]) error {
 
 	if q.RetryRMNSignatures && !ao.Observation.IsEmpty() {
 		return fmt.Errorf("observation should be empty when retrying getting rmn signature")

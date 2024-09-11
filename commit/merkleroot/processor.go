@@ -1,6 +1,8 @@
 package merkleroot
 
 import (
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
@@ -60,4 +62,13 @@ func NewProcessor(
 	}
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+func mapAttributedObs(obs []shared.AttributedObservation[committypes.Observation]) []shared.AttributedObservation[committypes.MerkleRootObservation] {
+	return slicelib.Map(obs, func(ao shared.AttributedObservation[committypes.Observation]) shared.AttributedObservation[committypes.MerkleRootObservation] {
+		return shared.AttributedObservation[committypes.MerkleRootObservation]{
+			OracleID:    ao.OracleID,
+			Observation: ao.Observation.MerkleRootObs,
+		}
+	})
+}
+
+var _ shared.PluginProcessor[committypes.Query, committypes.Observation, committypes.Outcome] = &Processor{}

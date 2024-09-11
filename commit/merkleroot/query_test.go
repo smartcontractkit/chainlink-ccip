@@ -56,16 +56,16 @@ func TestProcessor_Query(t *testing.T) {
 
 	testCases := []struct {
 		name              string
-		prevOutcome       Outcome
+		prevOutcome       MerkleRootOutcome
 		contractAddresses map[ccipocr3.ChainSelector]map[string][]byte
 		cfg               pluginconfig.CommitPluginConfig
 		rmnClient         func(t *testing.T) *rmnmocks.MockClient
-		expQuery          Query
+		expQuery          MerkleRootQuery
 		expErr            bool
 	}{
 		{
 			name: "happy path",
-			prevOutcome: Outcome{
+			prevOutcome: MerkleRootOutcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
@@ -107,7 +107,7 @@ func TestProcessor_Query(t *testing.T) {
 					Return(expSigs1, nil)
 				return cl
 			},
-			expQuery: Query{
+			expQuery: MerkleRootQuery{
 				RetryRMNSignatures: false,
 				RMNSignatures:      expSigs1,
 			},
@@ -115,7 +115,7 @@ func TestProcessor_Query(t *testing.T) {
 		},
 		{
 			name: "rmn timeout",
-			prevOutcome: Outcome{
+			prevOutcome: MerkleRootOutcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
@@ -135,7 +135,7 @@ func TestProcessor_Query(t *testing.T) {
 					Return(expSigs1, rmn.ErrTimeout) // <------------------------------------ timeout error
 				return cl
 			},
-			expQuery: Query{
+			expQuery: MerkleRootQuery{
 				RetryRMNSignatures: true,
 				RMNSignatures:      nil,
 			},
@@ -143,7 +143,7 @@ func TestProcessor_Query(t *testing.T) {
 		},
 		{
 			name: "rmn random error",
-			prevOutcome: Outcome{
+			prevOutcome: MerkleRootOutcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
@@ -163,12 +163,12 @@ func TestProcessor_Query(t *testing.T) {
 					Return(expSigs1, fmt.Errorf("some error")) // <------------------------- some random error
 				return cl
 			},
-			expQuery: Query{},
+			expQuery: MerkleRootQuery{},
 			expErr:   true,
 		},
 		{
 			name: "not in building reports state",
-			prevOutcome: Outcome{
+			prevOutcome: MerkleRootOutcome{
 				OutcomeType: ReportInFlight,
 			},
 			cfg: pluginconfig.CommitPluginConfig{
@@ -177,12 +177,12 @@ func TestProcessor_Query(t *testing.T) {
 				DestChain:            dstChain,
 			},
 			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
-			expQuery:  Query{},
+			expQuery:  MerkleRootQuery{},
 			expErr:    false,
 		},
 		{
 			name: "rmn sig checks disabled",
-			prevOutcome: Outcome{
+			prevOutcome: MerkleRootOutcome{
 				OutcomeType: ReportIntervalsSelected,
 			},
 			cfg: pluginconfig.CommitPluginConfig{
@@ -191,7 +191,7 @@ func TestProcessor_Query(t *testing.T) {
 				DestChain:            dstChain,
 			},
 			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
-			expQuery:  Query{},
+			expQuery:  MerkleRootQuery{},
 			expErr:    false,
 		},
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -13,11 +14,11 @@ import (
 )
 
 func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
-	outcome, err := DecodeOutcome(outcomeBytes)
+	outcome, err := committypes.DecodeOutcome(outcomeBytes)
 	if err != nil {
 		// TODO: metrics
-		p.lggr.Errorw("failed to decode Outcome", "outcomeBytes", outcomeBytes, "err", err)
-		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
+		p.lggr.Errorw("failed to decode MerkleRootOutcome", "outcomeBytes", outcomeBytes, "err", err)
+		return nil, fmt.Errorf("failed to decode MerkleRootOutcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
 	}
 
 	// Until we start adding tokens and gas to the report, we don't need to report anything

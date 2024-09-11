@@ -41,7 +41,7 @@ var fChains = map[cciptypes.ChainSelector]int{
 	destChainSel: 1,
 	feedChainSel: 2,
 }
-var obs = Observation{
+var obs = TokenPriceObservation{
 	FeedTokenPrices:       feedTokenPrices,
 	FeeQuoterTokenUpdates: feeQuoterUpdates,
 	FChain:                fChains,
@@ -71,7 +71,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
-	aos := []shared.AttributedObservation[Observation]{
+	aos := []shared.AttributedObservation[TokenPriceObservation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},
@@ -89,7 +89,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	assert.Len(t, consensusObs.FeedTokenPrices, 0)
 
 	// Same but with 5 oracles, will have consensus on both feedprice and feequoter
-	aos = []shared.AttributedObservation[Observation]{
+	aos = []shared.AttributedObservation[TokenPriceObservation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},
@@ -136,7 +136,7 @@ func TestSelectTokensForUpdate(t *testing.T) {
 	assert.Equal(t, conObs.FeedTokenPrices[tokenC], tokenPrices[2])
 }
 
-// Test Plugin Outcome method returns the correct token prices
+// Test Plugin TokenPriceOutcome method returns the correct token prices
 func TestOutcome(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
@@ -148,7 +148,7 @@ func TestOutcome(t *testing.T) {
 		bigF: 1,
 	}
 
-	outcome, err := p.Outcome(Outcome{}, Query{}, []shared.AttributedObservation[Observation]{
+	outcome, err := p.Outcome(TokenPriceOutcome{}, TokenPriceQuery{}, []shared.AttributedObservation[TokenPriceObservation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},

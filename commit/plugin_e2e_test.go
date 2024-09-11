@@ -9,6 +9,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,8 +85,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
 
-	outcomeIntervalsSelected := Outcome{
-		MerkleRootOutcome: merkleroot.Outcome{
+	outcomeIntervalsSelected := committypes.Outcome{
+		MerkleRootOutcome: merkleroot.MerkleRootOutcome{
 			OutcomeType: merkleroot.ReportIntervalsSelected,
 			RangesSelectedForReport: []plugintypes.ChainRange{
 				{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
@@ -98,8 +99,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		},
 	}
 
-	outcomeReportGenerated := Outcome{
-		MerkleRootOutcome: merkleroot.Outcome{
+	outcomeReportGenerated := committypes.Outcome{
+		MerkleRootOutcome: merkleroot.MerkleRootOutcome{
 			OutcomeType: merkleroot.ReportGenerated,
 			RootsToReport: []ccipocr3.MerkleRootChain{
 				{
@@ -120,8 +121,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 	testCases := []struct {
 		name                  string
-		prevOutcome           Outcome
-		expOutcome            Outcome
+		prevOutcome           committypes.Outcome
+		expOutcome            committypes.Outcome
 		expTransmittedReports []ccipocr3.CommitPluginReport
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
@@ -129,7 +130,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
-			prevOutcome: Outcome{},
+			prevOutcome: committypes.Outcome{},
 			expOutcome:  outcomeIntervalsSelected,
 		},
 		{
@@ -152,8 +153,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		{
 			name:        "report generated in previous outcome, still inflight",
 			prevOutcome: outcomeReportGenerated,
-			expOutcome: Outcome{
-				MerkleRootOutcome: merkleroot.Outcome{
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.MerkleRootOutcome{
 					OutcomeType:                     merkleroot.ReportInFlight,
 					ReportTransmissionCheckAttempts: 1,
 					OffRampNextSeqNums: []plugintypes.SeqNumChain{
@@ -166,8 +167,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		{
 			name:        "report generated in previous outcome, still inflight, reached all inflight check attempts",
 			prevOutcome: outcomeReportGeneratedOneInflightCheck,
-			expOutcome: Outcome{
-				MerkleRootOutcome: merkleroot.Outcome{
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.MerkleRootOutcome{
 					OutcomeType: merkleroot.ReportTransmissionFailed,
 				},
 			},
@@ -177,8 +178,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			prevOutcome:                            outcomeReportGenerated,
 			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
 			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
-			expOutcome: Outcome{
-				MerkleRootOutcome: merkleroot.Outcome{
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleroot.MerkleRootOutcome{
 					OutcomeType: merkleroot.ReportTransmitted,
 				},
 			},
@@ -218,7 +219,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			res, err := runner.RunRound(ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := DecodeOutcome(res.Outcome)
+			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expOutcome, decodedOutcome)
 

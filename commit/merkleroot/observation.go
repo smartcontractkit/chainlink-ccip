@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -30,48 +31,55 @@ func (w *Processor) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query)
 
 func (w *Processor) Observation(
 	ctx context.Context,
-	prevOutcome Outcome,
-	q Query,
-) (Observation, error) {
+	prevOutcome committypes.Outcome,
+	q committypes.Query,
+) (committypes.Observation, error) {
 	tStart := time.Now()
-	observation, nextState := w.getObservation(ctx, q, prevOutcome)
+	observation, nextState := w.getObservation(ctx, q, prevOutcome.MerkleRootOutcome)
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
 }
 
-func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
+func (w *Processor) getObservation(ctx context.Context, q committypes.Query, previousOutcome committypes.MerkleRootOutcome) (committypes.Observation, committypes.MerkleRootState) {
 	nextState := previousOutcome.NextState()
 	switch nextState {
-	case SelectingRangesForReport:
+	case committypes.SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
-		return Observation{
+		return committypes.Observation{
 			// TODO: observe OnRamp max seq nums. The use of offRampNextSeqNums here effectively disables batching,
 			// e.g. the ranges selected for each chain will be [x, x] (e.g. [46, 46]), which means reports will only
 			// contain one message per chain. Querying the OnRamp contract requires changes to reader.CCIPReader,
 			// which will need to be done in a future change.
-			OnRampMaxSeqNums:   offRampNextSeqNums,
-			OffRampNextSeqNums: offRampNextSeqNums,
-			FChain:             w.observer.ObserveFChain(),
+			MerkleRootObs: committypes.MerkleRootObservation{
+				OnRampMaxSeqNums:   offRampNextSeqNums,
+				OffRampNextSeqNums: offRampNextSeqNums,
+				FChain:             w.observer.ObserveFChain(),
+			},
 		}, nextState
-	case BuildingReport:
-		if q.RetryRMNSignatures {
+	case committypes.BuildingReport:
+		if q.MerkleRootQuery.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
 			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState
+			return committypes.Observation{}, nextState
 		}
-		return Observation{
+		merkleRootObs := committypes.MerkleRootObservation{
 			MerkleRoots: w.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			FChain:      w.observer.ObserveFChain(),
+		}
+		return committypes.Observation{
+			MerkleRootObs: merkleRootObs,
 		}, nextState
-	case WaitingForReportTransmission:
-		return Observation{
-			OffRampNextSeqNums: w.observer.ObserveOffRampNextSeqNums(ctx),
-			FChain:             w.observer.ObserveFChain(),
+	case committypes.WaitingForReportTransmission:
+		return committypes.Observation{
+			MerkleRootObs: committypes.MerkleRootObservation{
+				OffRampNextSeqNums: w.observer.ObserveOffRampNextSeqNums(ctx),
+				FChain:             w.observer.ObserveFChain(),
+			},
 		}, nextState
 	default:
 		w.lggr.Errorw("Unexpected state", "state", nextState)
-		return Observation{}, nextState
+		return committypes.Observation{}, nextState
 	}
 }
 

@@ -3,6 +3,7 @@ package commit
 import (
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -15,12 +16,12 @@ func (p *Plugin) ValidateObservation(
 	q types.Query,
 	ao types.AttributedObservation,
 ) error {
-	decodedQ, err := DecodeCommitPluginQuery(q)
+	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
 	if err != nil {
 		return fmt.Errorf("decode query: %w", err)
 	}
 
-	obs, err := DecodeCommitPluginObservation(ao.Observation)
+	obs, err := committypes.DecodeCommitPluginObservation(ao.Observation)
 	if err != nil {
 		return fmt.Errorf("failed to decode commit plugin observation: %w", err)
 	}

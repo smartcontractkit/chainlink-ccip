@@ -43,7 +43,7 @@ func Test_Observation(t *testing.T) {
 	testCases := []struct {
 		name         string
 		getProcessor func(t *testing.T) *processor
-		expObs       Observation
+		expObs       TokenPriceObservation
 		expErr       error
 	}{
 		{
@@ -83,7 +83,7 @@ func Test_Observation(t *testing.T) {
 					bigF:             f,
 				}
 			},
-			expObs: Observation{
+			expObs: TokenPriceObservation{
 				FeedTokenPrices:       feedTokenPrices,
 				FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
 				FChain:                fChains,
@@ -109,7 +109,7 @@ func Test_Observation(t *testing.T) {
 					bigF:             f,
 				}
 			},
-			expObs: Observation{},
+			expObs: TokenPriceObservation{},
 		},
 	}
 
@@ -118,11 +118,11 @@ func Test_Observation(t *testing.T) {
 			ctx := context.Background()
 			p := tc.getProcessor(t)
 
-			actualObs, err := p.Observation(ctx, Outcome{}, Query{})
+			actualObs, err := p.Observation(ctx, TokenPriceOutcome{}, TokenPriceQuery{})
 			if tc.expErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, tc.expErr.Error(), err.Error())
-				assert.Equal(t, Observation{}, actualObs)
+				assert.Equal(t, TokenPriceObservation{}, actualObs)
 			} else {
 				require.NoError(t, err)
 				// No need to check timestamp

@@ -5,35 +5,37 @@ import (
 	"errors"
 	"fmt"
 
+	ct "github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
-func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+func (w *Processor) Query(ctx context.Context, prevOutcome ct.Outcome) (ct.Query, error) {
 	if !w.cfg.RMNEnabled {
-		return Query{}, nil
+		return ct.Query{}, nil
 	}
+	prevMerkleOutcome := prevOutcome.MerkleRootOutcome
 
-	nextState := prevOutcome.NextState()
-	if nextState != BuildingReport {
-		return Query{}, nil
+	nextState := prevMerkleOutcome.NextState()
+	if nextState != ct.BuildingReport {
+		return ct.Query{}, nil
 	}
 
 	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
 	if err != nil {
-		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
+		return ct.Query{}, fmt.Errorf("get offRamp contract address: %w", err)
 	}
 	dstChainInfo := &rmnpb.LaneDest{
 		DestChainSelector: uint64(w.cfg.DestChain),
 		OfframpAddress:    offRampAddress,
 	}
 
-	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
-	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
+	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevMerkleOutcome.RangesSelectedForReport))
+	for _, sourceChainRange := range prevMerkleOutcome.RangesSelectedForReport {
 		onRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
-			return Query{}, fmt.Errorf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
+			return ct.Query{}, fmt.Errorf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 		}
 
 		reqUpdates = append(reqUpdates, &rmnpb.FixedDestLaneUpdateRequest{
@@ -56,10 +58,10 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		if errors.Is(err, rmn.ErrTimeout) {
 			w.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
 				len(reqUpdates), dstChainInfo)
-			return Query{RetryRMNSignatures: true}, nil
+			return ct.Query{MerkleRootQuery: ct.MerkleRootQuery{RetryRMNSignatures: true}}, nil
 		}
-		return Query{}, fmt.Errorf("compute RMN signatures: %w", err)
+		return ct.Query{}, fmt.Errorf("compute RMN signatures: %w", err)
 	}
 
-	return Query{RetryRMNSignatures: false, RMNSignatures: sigs}, nil
+	return ct.Query{MerkleRootQuery: ct.MerkleRootQuery{RetryRMNSignatures: false, RMNSignatures: sigs}}, nil
 }

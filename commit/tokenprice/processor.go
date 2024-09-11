@@ -50,22 +50,22 @@ func NewProcessor(
 	}
 }
 
-func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
-	return Query{}, nil
+func (p *processor) Query(ctx context.Context, prevOutcome TokenPriceOutcome) (TokenPriceQuery, error) {
+	return TokenPriceQuery{}, nil
 }
 
 func (p *processor) Observation(
 	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
-) (Observation, error) {
+	prevOutcome TokenPriceOutcome,
+	query TokenPriceQuery,
+) (TokenPriceObservation, error) {
 
 	fChain := p.ObserveFChain()
 	if len(fChain) == 0 {
-		return Observation{}, nil
+		return TokenPriceObservation{}, nil
 	}
 
-	return Observation{
+	return TokenPriceObservation{
 		FeedTokenPrices:       p.ObserveFeedTokenPrices(ctx),
 		FeeQuoterTokenUpdates: p.ObserveFeeQuoterTokenUpdates(ctx),
 		FChain:                fChain,
@@ -74,32 +74,32 @@ func (p *processor) Observation(
 }
 
 func (p *processor) ValidateObservation(
-	prevOutcome Outcome,
-	query Query,
-	ao shared.AttributedObservation[Observation],
+	prevOutcome TokenPriceOutcome,
+	query TokenPriceQuery,
+	ao shared.AttributedObservation[TokenPriceObservation],
 ) error {
 	//TODO: Validate token prices
 	return nil
 }
 
 func (p *processor) Outcome(
-	_ Outcome,
-	_ Query,
-	aos []shared.AttributedObservation[Observation],
-) (Outcome, error) {
+	_ TokenPriceOutcome,
+	_ TokenPriceQuery,
+	aos []shared.AttributedObservation[TokenPriceObservation],
+) (TokenPriceOutcome, error) {
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
-		return Outcome{}, nil
+		return TokenPriceOutcome{}, nil
 	}
 
 	consensusObservation, err := p.getConsensusObservation(aos)
 	if err != nil {
-		return Outcome{}, err
+		return TokenPriceOutcome{}, err
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(consensusObservation)
-	return Outcome{
+	return TokenPriceOutcome{
 		TokenPrices: tokenPriceOutcome,
 	}, nil
 }
@@ -119,4 +119,4 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	return nil
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &processor{}
+var _ shared.PluginProcessor[TokenPriceQuery, TokenPriceObservation, TokenPriceOutcome] = &processor{}
