@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	ct "github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -56,17 +57,17 @@ func TestProcessor_Query(t *testing.T) {
 
 	testCases := []struct {
 		name              string
-		prevOutcome       MerkleRootOutcome
+		prevOutcome       ct.MerkleRootOutcome
 		contractAddresses map[ccipocr3.ChainSelector]map[string][]byte
 		cfg               pluginconfig.CommitPluginConfig
 		rmnClient         func(t *testing.T) *rmnmocks.MockClient
-		expQuery          MerkleRootQuery
+		expQuery          ct.MerkleRootQuery
 		expErr            bool
 	}{
 		{
 			name: "happy path",
-			prevOutcome: MerkleRootOutcome{
-				OutcomeType: ReportIntervalsSelected,
+			prevOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
@@ -107,7 +108,7 @@ func TestProcessor_Query(t *testing.T) {
 					Return(expSigs1, nil)
 				return cl
 			},
-			expQuery: MerkleRootQuery{
+			expQuery: ct.MerkleRootQuery{
 				RetryRMNSignatures: false,
 				RMNSignatures:      expSigs1,
 			},
@@ -115,8 +116,8 @@ func TestProcessor_Query(t *testing.T) {
 		},
 		{
 			name: "rmn timeout",
-			prevOutcome: MerkleRootOutcome{
-				OutcomeType: ReportIntervalsSelected,
+			prevOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
@@ -135,7 +136,7 @@ func TestProcessor_Query(t *testing.T) {
 					Return(expSigs1, rmn.ErrTimeout) // <------------------------------------ timeout error
 				return cl
 			},
-			expQuery: MerkleRootQuery{
+			expQuery: ct.MerkleRootQuery{
 				RetryRMNSignatures: true,
 				RMNSignatures:      nil,
 			},
@@ -143,8 +144,8 @@ func TestProcessor_Query(t *testing.T) {
 		},
 		{
 			name: "rmn random error",
-			prevOutcome: MerkleRootOutcome{
-				OutcomeType: ReportIntervalsSelected,
+			prevOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
@@ -163,13 +164,13 @@ func TestProcessor_Query(t *testing.T) {
 					Return(expSigs1, fmt.Errorf("some error")) // <------------------------- some random error
 				return cl
 			},
-			expQuery: MerkleRootQuery{},
+			expQuery: ct.MerkleRootQuery{},
 			expErr:   true,
 		},
 		{
 			name: "not in building reports state",
-			prevOutcome: MerkleRootOutcome{
-				OutcomeType: ReportInFlight,
+			prevOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportInFlight,
 			},
 			cfg: pluginconfig.CommitPluginConfig{
 				RMNEnabled:           true,
@@ -177,13 +178,13 @@ func TestProcessor_Query(t *testing.T) {
 				DestChain:            dstChain,
 			},
 			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
-			expQuery:  MerkleRootQuery{},
+			expQuery:  ct.MerkleRootQuery{},
 			expErr:    false,
 		},
 		{
 			name: "rmn sig checks disabled",
-			prevOutcome: MerkleRootOutcome{
-				OutcomeType: ReportIntervalsSelected,
+			prevOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportIntervalsSelected,
 			},
 			cfg: pluginconfig.CommitPluginConfig{
 				RMNEnabled:           false, // <-------------- disabled
@@ -191,34 +192,34 @@ func TestProcessor_Query(t *testing.T) {
 				DestChain:            dstChain,
 			},
 			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
-			expQuery:  MerkleRootQuery{},
+			expQuery:  ct.MerkleRootQuery{},
 			expErr:    false,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
 			ccipReader := reader.NewMockCCIPReader(t)
-			for chainSel, contracts := range tc.contractAddresses {
+			for chainSel, contracts := range testCase.contractAddresses {
 				for name, addr := range contracts {
 					ccipReader.EXPECT().GetContractAddress(name, chainSel).Return(addr, nil)
 				}
 			}
 
 			w := Processor{
-				cfg:        tc.cfg,
+				cfg:        testCase.cfg,
 				ccipReader: ccipReader,
-				rmnClient:  tc.rmnClient(t),
+				rmnClient:  testCase.rmnClient(t),
 				lggr:       logger.Test(t),
 			}
 
-			q, err := w.Query(ctx, tc.prevOutcome)
-			if tc.expErr {
+			q, err := w.Query(ctx, ct.Outcome{MerkleRootOutcome: testCase.prevOutcome})
+			if testCase.expErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tc.expQuery, q)
+			require.Equal(t, testCase.expQuery, q.MerkleRootQuery)
 		})
 	}
 }

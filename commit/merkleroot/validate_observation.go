@@ -21,11 +21,11 @@ func (w *Processor) ValidateObservation(
 	q committypes.Query,
 	ao shared.AttributedObservation[committypes.Observation]) error {
 
-	if q.RetryRMNSignatures && !ao.Observation.IsEmpty() {
+	if q.MerkleRootQuery.RetryRMNSignatures && !ao.Observation.MerkleRootObs.IsEmpty() {
 		return fmt.Errorf("observation should be empty when retrying getting rmn signature")
 	}
 
-	obs := ao.Observation
+	obs := ao.Observation.MerkleRootObs
 	if err := validateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}

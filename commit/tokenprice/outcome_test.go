@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 
@@ -41,7 +42,7 @@ var fChains = map[cciptypes.ChainSelector]int{
 	destChainSel: 1,
 	feedChainSel: 2,
 }
-var obs = TokenPriceObservation{
+var obs = committypes.TokenPriceObservation{
 	FeedTokenPrices:       feedTokenPrices,
 	FeeQuoterTokenUpdates: feeQuoterUpdates,
 	FChain:                fChains,
@@ -71,7 +72,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
-	aos := []shared.AttributedObservation[TokenPriceObservation]{
+	aos := []shared.AttributedObservation[committypes.TokenPriceObservation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},
@@ -89,7 +90,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	assert.Len(t, consensusObs.FeedTokenPrices, 0)
 
 	// Same but with 5 oracles, will have consensus on both feedprice and feequoter
-	aos = []shared.AttributedObservation[TokenPriceObservation]{
+	aos = []shared.AttributedObservation[committypes.TokenPriceObservation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},
@@ -148,7 +149,7 @@ func TestOutcome(t *testing.T) {
 		bigF: 1,
 	}
 
-	outcome, err := p.Outcome(TokenPriceOutcome{}, TokenPriceQuery{}, []shared.AttributedObservation[TokenPriceObservation]{
+	outcome, err := p.Outcome(committypes.TokenPriceOutcome{}, committypes.Query{}, []shared.AttributedObservation[committypes.TokenPriceObservation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},

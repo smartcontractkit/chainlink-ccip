@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -14,7 +15,7 @@ import (
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *processor) getConsensusObservation(
-	aos []shared.AttributedObservation[TokenPriceObservation],
+	aos []shared.AttributedObservation[committypes.TokenPriceObservation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
@@ -132,7 +133,7 @@ func (p *processor) selectTokensForUpdate(
 }
 
 // aggregateObservations takes a list of observations and produces an AggregateObservation
-func aggregateObservations(aos []shared.AttributedObservation[TokenPriceObservation]) AggregateObservation {
+func aggregateObservations(aos []shared.AttributedObservation[committypes.TokenPriceObservation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
 		FeeQuoterTokenUpdates: make(map[types.Account][]shared.TimestampedBig),

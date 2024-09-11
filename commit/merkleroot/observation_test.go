@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"testing"
 
+	ct "github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -46,14 +48,14 @@ func Test_Observation(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		previousOutcome MerkleRootOutcome
+		previousOutcome ct.MerkleRootOutcome
 		getObserver     func(t *testing.T) *merkleroot.MockObserver
-		expObs          MerkleRootObservation
+		expObs          ct.MerkleRootObservation
 	}{
 		{
 			name: "SelectingRangesForReport observation",
-			previousOutcome: MerkleRootOutcome{
-				OutcomeType: ReportTransmitted,
+			previousOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportTransmitted,
 			},
 			getObserver: func(t *testing.T) *merkleroot.MockObserver {
 				observer := merkleroot.NewMockObserver(t)
@@ -61,7 +63,7 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
-			expObs: MerkleRootObservation{
+			expObs: ct.MerkleRootObservation{
 				OnRampMaxSeqNums:   offRampNextSeqNums,
 				OffRampNextSeqNums: offRampNextSeqNums,
 				FChain:             fChain,
@@ -69,8 +71,8 @@ func Test_Observation(t *testing.T) {
 		},
 		{
 			name: "BuildingReport observation",
-			previousOutcome: MerkleRootOutcome{
-				OutcomeType: ReportIntervalsSelected,
+			previousOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{
 						ChainSel:    1,
@@ -89,15 +91,15 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
-			expObs: MerkleRootObservation{
+			expObs: ct.MerkleRootObservation{
 				MerkleRoots: merkleRoots,
 				FChain:      fChain,
 			},
 		},
 		{
 			name: "WaitingForReportTransmission observation",
-			previousOutcome: MerkleRootOutcome{
-				OutcomeType: ReportInFlight,
+			previousOutcome: ct.MerkleRootOutcome{
+				OutcomeType: ct.ReportInFlight,
 			},
 			getObserver: func(t *testing.T) *merkleroot.MockObserver {
 				observer := merkleroot.NewMockObserver(t)
@@ -105,7 +107,7 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
-			expObs: MerkleRootObservation{
+			expObs: ct.MerkleRootObservation{
 				OffRampNextSeqNums: offRampNextSeqNums,
 				FChain:             fChain,
 			},
@@ -125,11 +127,11 @@ func Test_Observation(t *testing.T) {
 
 			actualObs, err := p.Observation(
 				ctx,
-				tc.previousOutcome,
-				MerkleRootQuery{},
+				ct.Outcome{MerkleRootOutcome: tc.previousOutcome},
+				ct.Query{},
 			)
 			require.NoError(t, err)
-			assert.Equal(t, tc.expObs, actualObs)
+			assert.Equal(t, tc.expObs, actualObs.MerkleRootObs)
 		})
 	}
 }

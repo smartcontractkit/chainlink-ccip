@@ -38,7 +38,7 @@ type Plugin struct {
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor CommitProcessor
-	tokenPriceProcessor CommitProcessor
+	tokenPriceProcessor shared.PluginProcessor[committypes.Query, committypes.TokenPriceObservation, committypes.TokenPriceOutcome]
 	//chainFeeProcessor   CommitProcessor
 }
 
@@ -117,7 +117,7 @@ func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (ty
 
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 
-	q.MerkleRootQuery, err = p.merkleRootProcessor.Query(ctx, prevOutcome.MerkleRootOutcome)
+	q, err = p.merkleRootProcessor.Query(ctx, prevOutcome)
 	if err != nil {
 		p.lggr.Errorw("get merkle roots query", "err", err)
 	}
@@ -141,7 +141,7 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
-	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
+	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome, decodedQ)
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
 	}
@@ -155,7 +155,7 @@ func (p *Plugin) Observation(
 	//}
 
 	obs := committypes.Observation{
-		MerkleRootObs: merkleRootObs,
+		MerkleRootObs: merkleRootObs.MerkleRootObs,
 		//TokenPriceObs: tokenPriceObs,
 		//ChainFeeObs: chainFeeObs,
 		FChain: fChain,
@@ -187,70 +187,55 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
-	var merkleObservations []MerkleRootObservation
-	var tokensObservations []TokenPricesObservation
-	var feeObservations []ChainFeeObservation
+	//var merkleObservations []MerkleRootObservation
+	//var tokensObservations []TokenPricesObservation
+	//var feeObservations []ChainFeeObservation
 
+	var attributedObs []shared.AttributedObservation[committypes.Observation]
 	for _, ao := range aos {
 		obs, err := committypes.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			p.lggr.Errorw("failed to decode observation", "err", err)
 			continue
 		}
-		merkleObservations = append(merkleObservations,
-			MerkleRootObservation{
-				OracleID:    ao.Observer,
-				Observation: obs.MerkleRootObs,
-			},
-		)
-
-		tokensObservations = append(tokensObservations,
-			TokenPricesObservation{
-				OracleID:    ao.Observer,
-				Observation: obs.TokenPriceObs,
-			},
-		)
-
-		feeObservations = append(feeObservations,
-			ChainFeeObservation{
-				OracleID:    ao.Observer,
-				Observation: obs.ChainFeeObs,
-			},
-		)
+		attributedObs = append(attributedObs, shared.AttributedObservation[committypes.Observation]{
+			OracleID:    ao.Observer,
+			Observation: obs,
+		})
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
-		prevOutcome.MerkleRootOutcome,
-		decodedQ.MerkleRootQuery,
-		merkleObservations,
+		prevOutcome,
+		decodedQ,
+		attributedObs,
 	)
-	if err != nil {
-		p.lggr.Errorw("failed to get merkle outcome", "err", err)
-	}
-
-	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
-		prevOutcome.TokenPriceOutcome,
-		decodedQ.TokenPriceQuery,
-		tokensObservations,
-	)
-
-	if err != nil {
-		p.lggr.Errorw("failed to get token prices outcome", "err", err)
-	}
-
-	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
-		prevOutcome.ChainFeeOutcome,
-		decodedQ.ChainFeeQuery,
-		feeObservations,
-	)
-	if err != nil {
-		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
-	}
+	//if err != nil {
+	//	p.lggr.Errorw("failed to get merkle outcome", "err", err)
+	//}
+	//
+	//tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
+	//	prevOutcome.TokenPriceOutcome,
+	//	decodedQ.TokenPriceQuery,
+	//	tokensObservations,
+	//)
+	//
+	//if err != nil {
+	//	p.lggr.Errorw("failed to get token prices outcome", "err", err)
+	//}
+	//
+	//chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
+	//	prevOutcome.ChainFeeOutcome,
+	//	decodedQ.ChainFeeQuery,
+	//	feeObservations,
+	//)
+	//if err != nil {
+	//	p.lggr.Errorw("failed to get gas prices outcome", "err", err)
+	//}
 
 	return committypes.Outcome{
-		MerkleRootOutcome: merkleRootOutcome,
-		TokenPriceOutcome: tokenPriceOutcome,
-		ChainFeeOutcome:   chainFeeOutcome,
+		MerkleRootOutcome: merkleRootOutcome.MerkleRootOutcome,
+		//TokenPriceOutcome: tokenPriceOutcome,
+		//ChainFeeOutcome:   chainFeeOutcome,
 	}.Encode()
 }
 

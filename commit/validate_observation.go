@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	ct "github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -31,33 +33,33 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	merkleObs := MerkleRootObservation{
+	merkleObs := shared.AttributedObservation[ct.Observation]{
 		OracleID:    ao.Observer,
-		Observation: obs.MerkleRootObs,
+		Observation: obs,
 	}
 
-	err = p.merkleRootProcessor.ValidateObservation(prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery, merkleObs)
+	err = p.merkleRootProcessor.ValidateObservation(prevOutcome, decodedQ, merkleObs)
 	if err != nil {
 		return fmt.Errorf("validate merkle roots observation: %w", err)
 	}
 
-	tokenObs := TokenPricesObservation{
+	tokenObs := shared.AttributedObservation[ct.TokenPriceObservation]{
 		OracleID:    ao.Observer,
 		Observation: obs.TokenPriceObs,
 	}
-	err = p.tokenPriceProcessor.ValidateObservation(prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery, tokenObs)
+	err = p.tokenPriceProcessor.ValidateObservation(prevOutcome.TokenPriceOutcome, decodedQ, tokenObs)
 	if err != nil {
 		return fmt.Errorf("validate token prices observation: %w", err)
 	}
 
-	gasObs := ChainFeeObservation{
-		OracleID:    ao.Observer,
-		Observation: obs.ChainFeeObs,
-	}
-	err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
-	if err != nil {
-		return fmt.Errorf("validate chain fee observation: %w", err)
-	}
+	//gasObs := ChainFeeObservation{
+	//	OracleID:    ao.Observer,
+	//	Observation: obs.ChainFeeObs,
+	//}
+	//err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
+	//if err != nil {
+	//	return fmt.Errorf("validate chain fee observation: %w", err)
+	//}
 
 	return nil
 }

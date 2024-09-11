@@ -22,7 +22,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 	}
 
 	// Until we start adding tokens and gas to the report, we don't need to report anything
-	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
+	if outcome.MerkleRootOutcome.OutcomeType != committypes.ReportGenerated {
 		return []ocr3types.ReportWithInfo[[]byte]{}, nil
 	}
 
@@ -30,7 +30,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
 		PriceUpdates: cciptypes.PriceUpdates{
 			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
-			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
+			//GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		// RMNSignatures: nil,
 	}

@@ -3,6 +3,7 @@ package merkleroot
 import (
 	"testing"
 
+	ct "github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -28,8 +29,8 @@ func Test_buildReport(t *testing.T) {
 		}
 
 		for i := 0; i < rounds; i++ {
-			report1 := buildReport(MerkleRootQuery{}, obs, MerkleRootOutcome{})
-			report2 := buildReport(MerkleRootQuery{}, obs, MerkleRootOutcome{})
+			report1 := buildReport(ct.MerkleRootQuery{}, obs, ct.MerkleRootOutcome{})
+			report2 := buildReport(ct.MerkleRootQuery{}, obs, ct.MerkleRootOutcome{})
 			require.Equal(t, report1, report2)
 		}
 	})

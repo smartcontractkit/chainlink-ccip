@@ -6,6 +6,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -50,22 +51,22 @@ func NewProcessor(
 	}
 }
 
-func (p *processor) Query(ctx context.Context, prevOutcome TokenPriceOutcome) (TokenPriceQuery, error) {
-	return TokenPriceQuery{}, nil
+func (p *processor) Query(ctx context.Context, prevOutcome committypes.TokenPriceOutcome) (committypes.Query, error) {
+	return committypes.Query{}, nil
 }
 
 func (p *processor) Observation(
 	ctx context.Context,
-	prevOutcome TokenPriceOutcome,
-	query TokenPriceQuery,
-) (TokenPriceObservation, error) {
+	prevOutcome committypes.TokenPriceOutcome,
+	query committypes.Query,
+) (committypes.TokenPriceObservation, error) {
 
 	fChain := p.ObserveFChain()
 	if len(fChain) == 0 {
-		return TokenPriceObservation{}, nil
+		return committypes.TokenPriceObservation{}, nil
 	}
 
-	return TokenPriceObservation{
+	return committypes.TokenPriceObservation{
 		FeedTokenPrices:       p.ObserveFeedTokenPrices(ctx),
 		FeeQuoterTokenUpdates: p.ObserveFeeQuoterTokenUpdates(ctx),
 		FChain:                fChain,
@@ -74,32 +75,32 @@ func (p *processor) Observation(
 }
 
 func (p *processor) ValidateObservation(
-	prevOutcome TokenPriceOutcome,
-	query TokenPriceQuery,
-	ao shared.AttributedObservation[TokenPriceObservation],
+	prevOutcome committypes.TokenPriceOutcome,
+	query committypes.Query,
+	ao shared.AttributedObservation[committypes.TokenPriceObservation],
 ) error {
 	//TODO: Validate token prices
 	return nil
 }
 
 func (p *processor) Outcome(
-	_ TokenPriceOutcome,
-	_ TokenPriceQuery,
-	aos []shared.AttributedObservation[TokenPriceObservation],
-) (TokenPriceOutcome, error) {
+	_ committypes.TokenPriceOutcome,
+	_ committypes.Query,
+	aos []shared.AttributedObservation[committypes.TokenPriceObservation],
+) (committypes.TokenPriceOutcome, error) {
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
-		return TokenPriceOutcome{}, nil
+		return committypes.TokenPriceOutcome{}, nil
 	}
 
 	consensusObservation, err := p.getConsensusObservation(aos)
 	if err != nil {
-		return TokenPriceOutcome{}, err
+		return committypes.TokenPriceOutcome{}, err
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(consensusObservation)
-	return TokenPriceOutcome{
+	return committypes.TokenPriceOutcome{
 		TokenPrices: tokenPriceOutcome,
 	}, nil
 }
@@ -119,4 +120,4 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	return nil
 }
 
-var _ shared.PluginProcessor[TokenPriceQuery, TokenPriceObservation, TokenPriceOutcome] = &processor{}
+var _ shared.PluginProcessor[committypes.Query, committypes.TokenPriceObservation, committypes.TokenPriceOutcome] = &processor{}

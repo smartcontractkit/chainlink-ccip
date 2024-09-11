@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -43,7 +44,7 @@ func Test_Observation(t *testing.T) {
 	testCases := []struct {
 		name         string
 		getProcessor func(t *testing.T) *processor
-		expObs       TokenPriceObservation
+		expObs       committypes.TokenPriceObservation
 		expErr       error
 	}{
 		{
@@ -83,7 +84,7 @@ func Test_Observation(t *testing.T) {
 					bigF:             f,
 				}
 			},
-			expObs: TokenPriceObservation{
+			expObs: committypes.TokenPriceObservation{
 				FeedTokenPrices:       feedTokenPrices,
 				FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
 				FChain:                fChains,
@@ -109,7 +110,7 @@ func Test_Observation(t *testing.T) {
 					bigF:             f,
 				}
 			},
-			expObs: TokenPriceObservation{},
+			expObs: committypes.TokenPriceObservation{},
 		},
 	}
 
@@ -118,11 +119,11 @@ func Test_Observation(t *testing.T) {
 			ctx := context.Background()
 			p := tc.getProcessor(t)
 
-			actualObs, err := p.Observation(ctx, TokenPriceOutcome{}, TokenPriceQuery{})
+			actualObs, err := p.Observation(ctx, committypes.TokenPriceOutcome{}, committypes.Query{})
 			if tc.expErr != nil {
 				require.Error(t, err)
 				assert.Equal(t, tc.expErr.Error(), err.Error())
-				assert.Equal(t, TokenPriceObservation{}, actualObs)
+				assert.Equal(t, committypes.TokenPriceObservation{}, actualObs)
 			} else {
 				require.NoError(t, err)
 				// No need to check timestamp
