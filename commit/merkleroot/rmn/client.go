@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	crand "crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
@@ -76,7 +79,8 @@ type RMNNodeInfo struct {
 	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
 	IsSigner                  bool
 	SignReportsPublicKey      *ecdsa.PublicKey
-	SignObservationsPublicKey *ecdsa.PublicKey
+	SignObservationsPublicKey *ed25519.PublicKey
+	SignObservationPrefix     string // e.g. "chainlink ccip 1.6 rmn observation"
 }
 
 // NewClient creates a new RMN Client to be used by the plugin.
@@ -379,9 +383,38 @@ func (c *client) validateSignedObservationResponse(
 		}
 	}
 
-	// signedObs.Signature
-	// ed25519 - sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
-	// verify with rmn node pub key, found at [c.rmnNodes where rmnNodeID]
+	if err := c.verifyObservationSignature(rmnNodeID, signedObs); err != nil {
+		return fmt.Errorf("failed to verify observation signature: %w", err)
+	}
+
+	return nil
+}
+
+// verifyObservationSignature verifies the signature of the observation.
+//
+//	e.g. ed25519.sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
+func (c *client) verifyObservationSignature(
+	rmnNodeID NodeID,
+	signedObs *rmnpb.SignedObservation,
+) error {
+	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
+	if !exists {
+		return fmt.Errorf("rmn node %d not found", rmnNodeID)
+	}
+
+	observationBytes, err := proto.Marshal(signedObs.GetObservation())
+	if err != nil {
+		return fmt.Errorf("failed to marshal observation: %w", err)
+	}
+
+	observationBytesSha256 := sha256.Sum256(observationBytes)
+	msg := append([]byte(rmnNode.SignObservationPrefix), observationBytesSha256[:]...)
+	msgSha256 := sha256.Sum256(msg)
+
+	isValid := ed25519.Verify(*rmnNode.SignObservationsPublicKey, msgSha256[:], signedObs.Signature)
+	if !isValid {
+		return fmt.Errorf("observation signature does not match node %d public key", rmnNodeID)
+	}
 
 	return nil
 }
@@ -608,6 +641,15 @@ func (c *client) ensureEnoughSignedObservations(rmnSignedObservations []rmnSigne
 	}
 
 	return nil
+}
+
+func (c *client) getRmnNodeByID(nodeID NodeID) (RMNNodeInfo, bool) {
+	for _, node := range c.rmnNodes {
+		if node.ID == nodeID {
+			return node, true
+		}
+	}
+	return RMNNodeInfo{}, false
 }
 
 type RawRmnClient interface {
