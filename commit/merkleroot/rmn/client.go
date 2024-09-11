@@ -9,11 +9,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"math/rand"
 	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -521,7 +523,7 @@ func (c *client) getRmnReportSignatures(
 	}
 
 	ecdsaSignatures, err := c.listenForRmnReportSignatures(
-		ctx, requestIDs, fixedDestLaneUpdates, reportSigReq, signersRequested)
+		ctx, requestIDs, fixedDestLaneUpdates, reportSigReq, signersRequested, destChain)
 	if err != nil {
 		return nil, fmt.Errorf("listen for rmn report signatures: %w", err)
 	}
@@ -538,6 +540,7 @@ func (c *client) listenForRmnReportSignatures(
 	fixedDestLaneUpdates []*rmnpb.FixedDestLaneUpdate,
 	reportSigReq *rmnpb.ReportSignatureRequest,
 	signersRequested mapset.Set[NodeID],
+	destChain *rmnpb.LaneDest,
 ) ([]*rmnpb.EcdsaSignature, error) {
 	tReportsInitialRequest := time.NewTimer(c.reportsInitialRequestTimerDuration)
 	reportSigs := make([]*rmnpb.ReportSignature, 0)
@@ -567,8 +570,24 @@ func (c *client) listenForRmnReportSignatures(
 				continue
 			}
 
+			ch, exists := chainsel.ChainBySelector(destChain.DestChainSelector)
+			if !exists {
+				c.lggr.Warnw("unknown chain selector", "chainSelector", destChain.DestChainSelector)
+				continue
+			}
+
+			configDigestBytes32 := [32]byte{}
+			copy(configDigestBytes32[:], c.rmnHomeConfigDigest)
+
 			err = VerifyRmnReportSignatures(
-				fixedDestLaneUpdates,
+				ReportData{
+					DestChainEvmID:              big.NewInt(int64(ch.EvmChainID)),
+					DestChainSelector:           destChain.DestChainSelector,
+					RmnRemoteContractAddress:    common.BytesToAddress(c.rmnRemoteAddress),
+					OfframpAddress:              common.BytesToAddress(destChain.OfframpAddress),
+					RmnHomeContractConfigDigest: configDigestBytes32,
+					LaneUpdates:                 NewLaneUpdatesFromPBType(fixedDestLaneUpdates),
+				},
 				[]*rmnpb.EcdsaSignature{reportSig.Signature},
 				[]RMNNodeInfo{rmnNode},
 			)

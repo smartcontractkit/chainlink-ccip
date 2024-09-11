@@ -39,6 +39,12 @@ type CommitPluginConfig struct {
 	// RMNSignaturesTimeout is the timeout for RMN signature verification.
 	// Typically set to `MaxQueryDuration - e`, where e some small duration.
 	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+
+	// RMNRemoteContractAddress is the remote contract address for RMN.
+	RMNRemoteContractAddress []byte `json:"rmnRemoteContractAddress"`
+
+	// RMNHomeContractConfigDigest is the digest of the RMN home contract config.
+	RMNHomeContractConfigDigest []byte `json:"rmnHomeContractConfigDigest"`
 }
 
 func (c CommitPluginConfig) Validate() error {

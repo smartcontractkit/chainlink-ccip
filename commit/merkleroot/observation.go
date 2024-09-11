@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -20,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -35,7 +37,28 @@ func (w *Processor) Observation(
 	q Query,
 ) (Observation, error) {
 	if q.RMNSignatures != nil {
-		err := rmn.VerifyRmnReportSignatures(q.RMNSignatures.LaneUpdates, q.RMNSignatures.Signatures, w.rmnNodeInfo)
+		ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))
+		if !exists {
+			return Observation{}, fmt.Errorf("failed to get chain by selector %d", w.cfg.DestChain)
+		}
+
+		offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
+		if err != nil {
+			return Observation{}, fmt.Errorf("failed to get offramp contract address: %w", err)
+		}
+
+		err = rmn.VerifyRmnReportSignatures(
+			rmn.ReportData{
+				DestChainEvmID:              ch.EvmChainID,
+				DestChainSelector:           ch.Selector,
+				RmnRemoteContractAddress:    w.cfg.RMNRemoteContractAddress,
+				OfframpAddress:              offRampAddress,
+				RmnHomeContractConfigDigest: w.cfg.RMNHomeContractConfigDigest,
+				LaneUpdates:                 q.RMNSignatures.LaneUpdates,
+			},
+			q.RMNSignatures.Signatures,
+			w.rmnNodeInfo,
+		)
 		if err != nil {
 			return Observation{}, fmt.Errorf("failed to verify RMN signatures provided by leader: %w", err)
 		}

@@ -4,15 +4,34 @@ import (
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
+
+func abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
+	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "%s": %s}]`, "inputs", abiStr)
+
+	ab, err := abi.JSON(strings.NewReader(inDef))
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := ab.Pack("method", values...)
+	if err != nil {
+		return nil, err
+	}
+
+	return res[4:], nil
+}
 
 // verifyObservationSignature verifies the signature of the observation.
 //
@@ -44,7 +63,7 @@ func verifyObservationSignature(
 //		recover the public key based on the laneUpdates
 //		make sure the public key is in the list of RMN nodes
 func VerifyRmnReportSignatures(
-	laneUpdates []*rmnpb.FixedDestLaneUpdate,
+	reportData ReportData,
 	reportSigs []*rmnpb.EcdsaSignature,
 	rmnNodes []RMNNodeInfo,
 ) error {
@@ -53,24 +72,57 @@ func VerifyRmnReportSignatures(
 	if reportSigs == nil {
 		return fmt.Errorf("no signatures provided")
 	}
-	if laneUpdates == nil {
+	if reportData.LaneUpdates == nil {
 		return fmt.Errorf("no lane updates provided")
 	}
 
-	// todo: should match rmn signed msg but that's abi encoded
-	// so we need to add a chain agnostic interface for computing this hash
-	msg, err := json.Marshal(laneUpdates)
+	// -----------------------------------------------------------------------------------
+
+	abiDefinition := `[
+		{"name": "", "type": "bytes32"},
+		{
+			"name": "",
+			"type": "tuple",
+			"components": [
+				{"name": "DestChainEvmID", "type": "uint256"},
+				{"name": "DestChainSelector", "type": "uint64"},
+				{"name": "RmnRemoteContractAddress", "type": "address"},
+				{"name": "OfframpAddress", "type": "address"},
+				{"name": "RmnHomeContractConfigDigest", "type": "bytes32"},
+				{
+					"name": "LaneUpdates",
+					"type": "tuple[]",
+					"components": [
+						{"name": "SourceChainSelector", "type": "uint64"},
+						{"name": "MinSeqNr", "type": "uint64"},
+						{"name": "MaxSeqNr", "type": "uint64"},
+						{"name": "MerkleRoot", "type": "bytes32"},
+						{"name": "OnRampAddress", "type": "bytes"}
+					]
+				}
+			]
+		}
+	]`
+
+	rmnVersionHash := crypto.Keccak256Hash([]byte("RMN_V1_6_ANY2EVM_REPORT"))
+	fmt.Println(">>>>>>>>>> rmnVersionHash", rmnVersionHash)
+
+	data, err := abiEncode(abiDefinition, rmnVersionHash, reportData)
 	if err != nil {
-		return fmt.Errorf("failed to marshal lane updates: %w", err)
+		log.Fatalf("Failed to ABI encode: %v", err)
 	}
-	h := sha256.Sum256(msg)
+	fmt.Println(">>>>>>>>>> abi encoded data", data)
+
+	signedHash := crypto.Keccak256Hash(data)
+	fmt.Println(">>>>>>>>>>>> signedHash", signedHash)
+	// -----------------------------------------------------------------------------------
 
 	for _, sig := range reportSigs {
 		recoveredPubKey, err := recoverPublicKeyFromSignature(
 			v,
 			new(big.Int).SetBytes(sig.R),
 			new(big.Int).SetBytes(sig.S),
-			h[:],
+			signedHash[:],
 		)
 		if err != nil {
 			return fmt.Errorf("failed to recover public key from signature: %w", err)
@@ -85,7 +137,7 @@ func VerifyRmnReportSignatures(
 			}
 		}
 		if !found {
-			return fmt.Errorf("public key not found in RMN nodes")
+			return fmt.Errorf("public key not found in RMN nodes, signature verification failed")
 		}
 	}
 
