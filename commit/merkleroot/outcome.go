@@ -193,6 +193,8 @@ func getConsensusObservation(
 	for chain := range aggObs.FChain {
 		fMin[chain] = F
 	}
+	// consensus on the fChain map uses the role DON F value
+	// because all nodes can observe the home chain.
 	fChains := shared.GetConsensusMap(lggr, "fChain", aggObs.FChain, fMin)
 
 	_, exists := fChains[destChain]

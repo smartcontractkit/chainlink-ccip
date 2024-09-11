@@ -167,7 +167,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		RemoteGasPriceBatchWriteFrequency commonconfig.Duration
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
 		TokenInfo                         map[types.Account]TokenInfo
-		TokenPriceChainSelector           uint64
+		TokenPriceChainSelector           cciptypes.ChainSelector
 		TokenDecimals                     map[types.Account]uint8
 	}
 	//nolint:gosec

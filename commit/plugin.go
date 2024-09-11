@@ -92,6 +92,7 @@ func NewPlugin(
 		chainSupport,
 		tokenPricesReader,
 		homeChain,
+		reportingCfg.F,
 	)
 
 	return &Plugin{
