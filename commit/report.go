@@ -25,11 +25,14 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		return []ocr3types.ReportWithInfo[[]byte]{}, nil
 	}
 
-	rep := cciptypes.NewCommitPluginReport(
-		outcome.MerkleRootOutcome.RootsToReport,
-		outcome.TokenPriceOutcome.TokenPrices,
-		outcome.ChainFeeOutcome.GasPrices,
-	)
+	rep := cciptypes.CommitPluginReport{
+		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
+		PriceUpdates: cciptypes.PriceUpdates{
+			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
+			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
+		},
+		// RMNSignatures: nil,
+	}
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
 	if err != nil {
