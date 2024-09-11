@@ -21,6 +21,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
+var (
+	chainA = cciptypes.ChainSelector(1)
+	chainB = cciptypes.ChainSelector(2)
+	chainC = cciptypes.ChainSelector(3)
+)
+
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockContractReader)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
@@ -43,7 +49,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	}).Return(nil)
 
 	offrampAddress := []byte{0x3}
-	ccipReader := NewCCIPChainReader(
+	ccipReader := newCCIPChainReaderInternal(
 		logger.Test(t),
 		map[cciptypes.ChainSelector]types.ContractReader{
 			chainA: sourceCRs[chainA],
@@ -74,7 +80,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	ecr := contractreader2.NewMockExtended(t)
 
-	ccipReader := CCIPChainReader{
+	ccipReader := ccipChainReader{
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainA: ecr,
 		},

@@ -7,7 +7,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -133,4 +133,4 @@ func (r InMemoryCCIPReader) Sync(ctx context.Context) (bool, error) {
 }
 
 // Interface compatibility check.
-var _ reader.CCIP = InMemoryCCIPReader{}
+var _ reader.CCIPReader = InMemoryCCIPReader{}
