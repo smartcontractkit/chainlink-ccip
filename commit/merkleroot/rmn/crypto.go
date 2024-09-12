@@ -1,14 +1,16 @@
 package rmn
 
 import (
-	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"google.golang.org/protobuf/proto"
 
@@ -18,7 +20,7 @@ import (
 )
 
 func abiEncode(abiStr string, values ...interface{}) ([]byte, error) {
-	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "%s": %s}]`, "inputs", abiStr)
+	inDef := fmt.Sprintf(`[{ "name" : "method", "type": "function", "inputs": %s}]`, abiStr)
 
 	ab, err := abi.JSON(strings.NewReader(inDef))
 	if err != nil {
@@ -78,50 +80,65 @@ func VerifyRmnReportSignatures(
 
 	// -----------------------------------------------------------------------------------
 
-	abiDefinition := `[
-		{"name": "", "type": "bytes32"},
-		{
-			"name": "",
-			"type": "tuple",
-			"components": [
-				{"name": "DestChainEvmID", "type": "uint256"},
-				{"name": "DestChainSelector", "type": "uint64"},
-				{"name": "RmnRemoteContractAddress", "type": "address"},
-				{"name": "OfframpAddress", "type": "address"},
-				{"name": "RmnHomeContractConfigDigest", "type": "bytes32"},
-				{
-					"name": "LaneUpdates",
-					"type": "tuple[]",
-					"components": [
-						{"name": "SourceChainSelector", "type": "uint64"},
-						{"name": "MinSeqNr", "type": "uint64"},
-						{"name": "MaxSeqNr", "type": "uint64"},
-						{"name": "MerkleRoot", "type": "bytes32"},
-						{"name": "OnRampAddress", "type": "bytes"}
-					]
-				}
-			]
+	internalMerkleRoots := make([]InternalMerkleRoot, len(reportData.LaneUpdates))
+	for i, lu := range reportData.LaneUpdates {
+		internalMerkleRoots[i] = InternalMerkleRoot{
+			SourceChainSelector: lu.SourceChainSelector,
+			OnRampAddress:       lu.OnRampAddress,
+			MinSeqNr:            lu.MinSeqNr,
+			MaxSeqNr:            lu.MaxSeqNr,
+			MerkleRoot:          lu.MerkleRoot,
 		}
-	]`
+	}
 
+	abiDefinition := `[{"name": "", "type": "bytes32"}]`
 	rmnVersionHash := crypto.Keccak256Hash([]byte("RMN_V1_6_ANY2EVM_REPORT"))
-	fmt.Println(">>>>>>>>>> rmnVersionHash", rmnVersionHash)
-
-	data, err := abiEncode(abiDefinition, rmnVersionHash, reportData)
+	rmnVersionHashAbi, err := abiEncode(abiDefinition, rmnVersionHash)
 	if err != nil {
 		log.Fatalf("Failed to ABI encode: %v", err)
 	}
-	fmt.Println(">>>>>>>>>> abi encoded data", data)
+
+	encodingUtilsABI, err := abi.JSON(strings.NewReader(EncodingUtilsABI))
+	if err != nil {
+		log.Fatalf("Failed to parse ABI: %v", err)
+	}
+
+	p := &RMNRemoteReport{
+		DestChainId:                 reportData.DestChainEvmID,
+		DestChainSelector:           reportData.DestChainSelector,
+		RmnRemoteContractAddress:    common.HexToAddress(reportData.RmnRemoteContractAddress),
+		OfframpAddress:              common.HexToAddress(reportData.OfframpAddress),
+		RmnHomeContractConfigDigest: reportData.RmnHomeContractConfigDigest,
+		DestLaneUpdates:             internalMerkleRoots,
+	}
+	data, err := encodingUtilsABI.Methods["_rmnReport"].Inputs.Pack(rmnVersionHash, p)
+	if err != nil {
+		log.Fatalf("Failed to ABI encode: %v", err)
+	}
+
+	packedDataJSON, err := json.MarshalIndent(p, " ", " ")
+	if err != nil {
+		log.Fatalf("Failed to marshal: %v", err)
+	}
+	fmt.Println(">>> abi encoded data:", string(packedDataJSON))
+
+	// override with correct abi encoded data
+	// data = common.FromHex("9651943783dbf81935a60e98f218a9d9b5b28823fb2228bbd91320d632facf53000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000038ac16c53d51914c00000000000000000000000000000000000000000000000049153604bdc88fa50000000000000000000000003d015cec4411357eff4ea5f009a581cc519f75d3000000000000000000000000c5cdb7711a478058023373b8ae9e7421925140f8785936570d1c7422ef30b7da5555ad2f175fa2dd97a2429a2e71d1e07c94e06000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000729d724980edda1000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000007d29db169b9649bc00000000000000000000000000000000000000000000000072581dd2208d09ba48e688aefc20a04fdec6b8ff19df358fd532455659dcf529797cda358e9e520500000000000000000000000000000000000000000000000000000000000000200000000000000000000000006662cb20464f4be557262693bea0409f068397ed")
+	fmt.Println(">>>", hex.EncodeToString(rmnVersionHashAbi), hex.EncodeToString(data))
+
+	// got
+	// 9651943783dbf81935a60e98f218a9d9b5b28823fb2228bbd91320d632facf53000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000038ac16c53d51914c00000000000000000000000000000000000000000000000049153604bdc88fa50000000000000000000000003d015cec4411357eff4ea5f009a581cc519f75d3000000000000000000000000c5cdb7711a478058023373b8ae9e7421925140f8785936570d1c7422ef30b7da5555ad2f175fa2dd97a2429a2e71d1e07c94e06000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000729d724980edda1000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000007d29db169b9649bc00000000000000000000000000000000000000000000000072581dd2208d09ba48e688aefc20a04fdec6b8ff19df358fd532455659dcf529797cda358e9e520500000000000000000000000000000000000000000000000000000000000000200000000000000000000000006662cb20464f4be557262693bea0409f068397ed
+	// exp
+	// 9651943783dbf81935a60e98f218a9d9b5b28823fb2228bbd91320d632facf53000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000038ac16c53d51914c00000000000000000000000000000000000000000000000049153604bdc88fa50000000000000000000000003d015cec4411357eff4ea5f009a581cc519f75d3000000000000000000000000c5cdb7711a478058023373b8ae9e7421925140f8785936570d1c7422ef30b7da5555ad2f175fa2dd97a2429a2e71d1e07c94e06000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000729d724980edda1000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000007d29db169b9649bc00000000000000000000000000000000000000000000000072581dd2208d09ba48e688aefc20a04fdec6b8ff19df358fd532455659dcf529797cda358e9e520500000000000000000000000000000000000000000000000000000000000000200000000000000000000000006662cb20464f4be557262693bea0409f068397ed
 
 	signedHash := crypto.Keccak256Hash(data)
-	fmt.Println(">>>>>>>>>>>> signedHash", signedHash)
 	// -----------------------------------------------------------------------------------
 
 	for _, sig := range reportSigs {
-		recoveredPubKey, err := recoverPublicKeyFromSignature(
+		recoveredAddress, err := recoverAddressFromSig(
 			v,
-			new(big.Int).SetBytes(sig.R),
-			new(big.Int).SetBytes(sig.S),
+			sig.R,
+			sig.S,
 			signedHash[:],
 		)
 		if err != nil {
@@ -131,7 +148,7 @@ func VerifyRmnReportSignatures(
 		// Check if the public key is in the list of the provided RMN nodes
 		found := false
 		for _, node := range rmnNodes {
-			if node.SignReportsPublicKey.Equal(recoveredPubKey) {
+			if node.SignReportsAddress == recoveredAddress {
 				found = true
 				break
 			}
@@ -144,23 +161,33 @@ func VerifyRmnReportSignatures(
 	return nil
 }
 
-// Recover public key from ECDSA signature using r, s, v, and the hash of the message
-func recoverPublicKeyFromSignature(v int, r, s *big.Int, hash []byte) (*ecdsa.PublicKey, error) {
-	recoveryID := v - 27
-	if recoveryID != 0 && recoveryID != 1 {
-		return nil, fmt.Errorf("invalid v value: %d", v)
+// Recover public address from ECDSA signature using r, s, v, and the hash of the message
+func recoverAddressFromSig(v int, r, s []byte, hash []byte) (common.Address, error) {
+	// Ensure r and s are 32 bytes each
+	if len(r) != 32 || len(s) != 32 {
+		return common.Address{}, errors.New("r and s must be 32 bytes")
 	}
 
-	// Combine r and s into a 65-byte signature for recovery
-	signature := make([]byte, 65)
-	copy(signature[0:32], r.Bytes())  // r (32 bytes)
-	copy(signature[32:64], s.Bytes()) // s (32 bytes)
-	signature[64] = byte(recoveryID)  // v (recovery id)
+	// Ensure v is either 27 or 28 (as used in Ethereum)
+	if v != 27 && v != 28 {
+		return common.Address{}, errors.New("v must be 27 or 28")
+	}
 
-	sigPublicKey, err := crypto.SigToPub(hash, signature)
+	// Construct the signature by concatenating r, s, and the recovery ID (v - 27 to convert to 0/1)
+	sig := append(r, s...)
+	sig = append(sig, byte(v-27))
+
+	// Recover the public key bytes from the signature and message hash
+	pubKeyBytes, err := crypto.Ecrecover(hash, sig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to recover public key from signature: %w", err)
+		return common.Address{}, fmt.Errorf("failed to recover public key: %v", err)
 	}
 
-	return sigPublicKey, nil
+	// Convert the recovered public key to an ECDSA public key
+	pubKey, err := crypto.UnmarshalPubkey(pubKeyBytes)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("failed to unmarshal public key: %v", err)
+	} // or SigToPub
+
+	return crypto.PubkeyToAddress(*pubKey), nil
 }

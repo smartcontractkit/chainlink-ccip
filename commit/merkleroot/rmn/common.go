@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/ethereum/go-ethereum/common"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -50,20 +50,20 @@ func (c *client) parseResponse(
 }
 
 type ReportData struct {
-	DestChainEvmID              *big.Int
-	DestChainSelector           uint64
-	RmnRemoteContractAddress    common.Address
-	OfframpAddress              common.Address
-	RmnHomeContractConfigDigest [32]byte
-	LaneUpdates                 []LaneUpdate
+	DestChainEvmID              *big.Int          `abi:"destChainId"`
+	DestChainSelector           uint64            `abi:"destChainSelector"`
+	RmnRemoteContractAddress    string            `abi:"rmnRemoteContractAddress"`
+	OfframpAddress              string            `abi:"offrampAddress"`
+	RmnHomeContractConfigDigest cciptypes.Bytes32 `abi:"rmnHomeContractConfigDigest"`
+	LaneUpdates                 []LaneUpdate      `abi:"destLaneUpdates"`
 }
 
 type LaneUpdate struct {
-	SourceChainSelector uint64
-	MinSeqNr            uint64
-	MaxSeqNr            uint64
-	MerkleRoot          [32]byte
-	OnRampAddress       []byte
+	SourceChainSelector uint64            `abi:"sourceChainSelector"`
+	OnRampAddress       []byte            `abi:"onRampAddress"`
+	MinSeqNr            uint64            `abi:"minSeqNr"`
+	MaxSeqNr            uint64            `abi:"maxSeqNr"`
+	MerkleRoot          cciptypes.Bytes32 `abi:"merkleRoot"`
 }
 
 // NewLaneUpdatesFromPBType creates a LaneUpdate from protobuf LaneUpdate type.

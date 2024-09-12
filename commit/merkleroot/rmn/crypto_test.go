@@ -1,10 +1,9 @@
 package rmn
 
 import (
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"encoding/hex"
+	"log"
 	"math/big"
 	"testing"
 
@@ -67,51 +66,64 @@ func Test_verifyObservationSignature(t *testing.T) {
 }
 
 func Test_VerifyRmnReportSignatures(t *testing.T) {
-	onchainPublicKey := "3d7b340c1cab93313ef6a5eff342e1689643514a44e7dcf786a4382e39698ac4f7ad1bec072c" +
-		"5458c29091682b7f1bd89be8a903aadd8353ff6dee20485b9b76"
-
-	// Parse onchain pub key
-	pubKeyBytes, err := hex.DecodeString(onchainPublicKey)
-	require.NoError(t, err)
-	require.Len(t, pubKeyBytes, 64)
-	x := new(big.Int).SetBytes(pubKeyBytes[:32])
-	y := new(big.Int).SetBytes(pubKeyBytes[32:])
-	onchainPK := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
+	onchainRmnRemoteAddr := "0x7821bcd6944457d17c631157efeb0c621baa76eb"
 
 	// Init rmn node
 	rmnNode := RMNNodeInfo{
 		ID:                    123,
-		SignReportsPublicKey:  onchainPK,
+		SignReportsAddress:    common.HexToAddress(onchainRmnRemoteAddr),
 		SignObservationPrefix: "chainlink ccip 1.6 rmn observation",
 	}
 
+	rmnHomeContractConfigDigestHex := "0x785936570d1c7422ef30b7da5555ad2f175fa2dd97a2429a2e71d1e07c94e060"
+	rmnHomeContractConfigDigest := common.FromHex(rmnHomeContractConfigDigestHex)
+	require.Len(t, rmnHomeContractConfigDigest, 32)
+	var rmnHomeContractConfigDigest32 [32]byte
+	copy(rmnHomeContractConfigDigest32[:], rmnHomeContractConfigDigest)
+
+	rootHex := "0x48e688aefc20a04fdec6b8ff19df358fd532455659dcf529797cda358e9e5205"
+	root := common.FromHex(rootHex)
+	require.Len(t, root, 32)
+	var root32 [32]byte
+	copy(root32[:], root)
+
+	onRampAddr := common.HexToAddress("0x6662cb20464f4be557262693bea0409f068397ed")
+	abiDefinition := `[{"name": "", "type": "address"}]`
+	onRampAddrAbi, err := abiEncode(abiDefinition, onRampAddr)
+	if err != nil {
+		log.Fatalf("Failed to ABI encode: %v", err)
+	}
+
+	destChainEvmID := uint64(4083663998511321420)
 	reportData := ReportData{
-		big.NewInt(1),
-		2,
-		common.BytesToAddress(empty20ByteArr[:]),
-		common.BytesToAddress(empty20ByteArr[:]),
-		empty32ByteArr,
-		NewLaneUpdatesFromPBType([]*rmnpb.FixedDestLaneUpdate{
+		DestChainEvmID:              big.NewInt(0).SetUint64(destChainEvmID),
+		DestChainSelector:           5266174733271469989,
+		RmnRemoteContractAddress:    "0x3d015cec4411357eff4ea5f009a581cc519f75d3",
+		OfframpAddress:              "0xc5cdb7711a478058023373b8ae9e7421925140f8",
+		RmnHomeContractConfigDigest: rmnHomeContractConfigDigest32,
+		LaneUpdates: NewLaneUpdatesFromPBType([]*rmnpb.FixedDestLaneUpdate{
 			{
 				LaneSource: &rmnpb.LaneSource{
-					SourceChainSelector: 2,
-					OnrampAddress:       empty20ByteArr[:],
+					SourceChainSelector: 8258882951688608272,
+					OnrampAddress:       onRampAddrAbi,
 				},
-				ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 0, MaxMsgNr: 0},
-				Root:           empty32ByteArr[:],
+				ClosedInterval: &rmnpb.ClosedInterval{
+					MinMsgNr: 9018980618932210108,
+					MaxMsgNr: 8239368306600774074,
+				},
+				Root: root32[:],
 			},
 		}),
 	}
 
-	expSig := rmnpb.EcdsaSignature{}
-	expSig.R, err = hex.DecodeString("a4489445efbe21ad923f4c0105eb7adcdd1fd008e4e3d44b15746857efe332e0")
-	require.NoError(t, err)
-	expSig.S, err = hex.DecodeString("f87fcdfa9926d083cec28c42a2c65263b9fd83b1862d1312bdcafccaa6172719")
-	require.NoError(t, err)
+	rmnNodeSig := rmnpb.EcdsaSignature{
+		R: common.FromHex("0x89546b4652d0377062a398e413344e4da6034ae877c437d0efe0e5246b70a9a1"),
+		S: common.FromHex("0x95eef2d24d856ccac3886db8f4aebea60684ed73942392692908fed79a679b4e"),
+	}
 
 	err = VerifyRmnReportSignatures(
 		reportData,
-		[]*rmnpb.EcdsaSignature{&expSig},
+		[]*rmnpb.EcdsaSignature{&rmnNodeSig},
 		[]RMNNodeInfo{rmnNode},
 	)
 	assert.NoError(t, err)

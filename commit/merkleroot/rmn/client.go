@@ -3,10 +3,10 @@ package rmn
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"crypto/ed25519"
 	crand "crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -78,7 +78,7 @@ type RMNNodeInfo struct {
 	ID                        NodeID
 	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
 	IsSigner                  bool
-	SignReportsPublicKey      *ecdsa.PublicKey   // evmOnChainPublicKey
+	SignReportsAddress        common.Address
 	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
 	SignObservationPrefix     string             // e.g. "chainlink ccip 1.6 rmn observation"
 }
@@ -583,8 +583,8 @@ func (c *client) listenForRmnReportSignatures(
 				ReportData{
 					DestChainEvmID:              big.NewInt(int64(ch.EvmChainID)),
 					DestChainSelector:           destChain.DestChainSelector,
-					RmnRemoteContractAddress:    common.BytesToAddress(c.rmnRemoteAddress),
-					OfframpAddress:              common.BytesToAddress(destChain.OfframpAddress),
+					RmnRemoteContractAddress:    c.rmnRemoteAddress.String(),
+					OfframpAddress:              hex.EncodeToString(destChain.OfframpAddress),
 					RmnHomeContractConfigDigest: configDigestBytes32,
 					LaneUpdates:                 NewLaneUpdatesFromPBType(fixedDestLaneUpdates),
 				},
