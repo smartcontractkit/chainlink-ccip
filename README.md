@@ -10,6 +10,7 @@ To learn more about CRIB please the general documentation in Confluence:
 ## Project Structure
 ```
 .
+├── cli (CLI for CRIB - currently under development)
 ├── components (devspace components used as imports)
 ├── deployments/ccip (CCIP CRIB)
 ├── deployments/core (CORE CRIB)
