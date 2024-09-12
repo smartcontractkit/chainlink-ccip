@@ -406,10 +406,7 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedNonceObservations", mergedNonceObservations)
 
-	observation := exectypes.NewObservation(
-		mergedCommitObservations,
-		mergedMessageObservations,
-		mergedNonceObservations)
+	observation := exectypes.NewObservation(mergedCommitObservations, mergedMessageObservations, nil, mergedNonceObservations)
 
 	return observation, nil
 }

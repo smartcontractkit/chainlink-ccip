@@ -188,7 +188,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil, nil).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -244,7 +244,7 @@ func (p *Plugin) Observation(
 		}
 
 		// TODO: Fire off messages for an attestation check service.
-		return exectypes.NewObservation(groupedCommits, messages, nil).Encode()
+		return exectypes.NewObservation(groupedCommits, messages, nil, nil).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -274,7 +274,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nonceObservations).Encode()
+		return exectypes.NewObservation(nil, nil, nil, nonceObservations).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -399,6 +399,11 @@ func (p *Plugin) Outcome(
 			for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
 				if msg, ok := observation.Messages[report.SourceChain][i]; ok {
 					report.Messages = append(report.Messages, msg)
+				}
+
+				if tokenData, ok := observation.TokenData[report.SourceChain][i]; ok {
+					// TODO how to handle missing attestation / token data at this stage?
+					report.TokenData = append(report.TokenData, tokenData.TokenData)
 				}
 			}
 			commitReports[i].Messages = report.Messages

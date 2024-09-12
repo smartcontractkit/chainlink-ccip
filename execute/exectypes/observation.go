@@ -18,6 +18,22 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
+type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]TokenData
+
+type TokenData struct {
+	TokenDataStatus TokenDataStatus
+	Error           error
+	TokenData       [][]byte
+}
+
+type TokenDataStatus uint8
+
+const (
+	TokenDataNotNeeded TokenDataStatus = iota + 1
+	TokenDataFetchError
+	TokenDataNotAvailable
+)
+
 // Observation is the observation of the ExecutePlugin.
 // TODO: revisit observation types. The maps used here are more space efficient and easier to work
 // with but require more transformations compared to the on-chain representations.
@@ -32,17 +48,21 @@ type Observation struct {
 	// execute report.
 	Messages MessageObservations `json:"messages"`
 
+	// TokenData are determined during the second phase of execute.
+	// It contains the token data for the messages identified in the same stage as Messages
+	TokenData TokenDataObservations `json:"tokenDataObservations"`
+
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
 }
 
 // NewObservation constructs a Observation object.
-func NewObservation(
-	commitReports CommitObservations, messages MessageObservations, nonces NonceObservations) Observation {
+func NewObservation(commitReports CommitObservations, messages MessageObservations, tokenData TokenDataObservations, nonces NonceObservations) Observation {
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,
+		TokenData:     tokenData,
 		Nonces:        nonces,
 	}
 }

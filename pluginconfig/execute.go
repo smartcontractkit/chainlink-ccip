@@ -52,6 +52,61 @@ type ExecuteOffchainConfig struct {
 
 	// BatchingStrategyID is the strategy to use for batching messages.
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
+
+	// RawTokenDataProcessors registers different strategies for processing token data.
+	RawTokenDataProcessors []json.RawMessage `json:"tokenDataProcessors"`
+
+	// TokenDataProcessors is the parsed version of RawTokenDataProcessors.
+	TokenDataProcessors []interface{}
+}
+
+type TokenDataProcessor struct {
+	Type    string `json:"type"`
+	Version string `json:"version"`
+}
+
+const UsdcProcessorType = "usdc-cctp"
+
+type UsdcCctpTokenDataProcessor struct {
+	TokenDataProcessor
+	Tokens                       []UsdcCctpToken        `json:"tokens"`
+	AttestationAPI               string                 `json:"attestationAPI"`
+	AttestationAPITimeout        *commonconfig.Duration `json:"attestationAPITimeout"`
+	AttestationAPIIntervalMillis *commonconfig.Duration `json:"attestationAPIIntervalMilliseconds"`
+}
+
+func (p UsdcCctpTokenDataProcessor) Validate() error {
+	if p.AttestationAPI == "" {
+		return errors.New("AttestationAPI not set")
+	}
+	if len(p.Tokens) == 0 {
+		return errors.New("Tokens not set")
+	}
+	for _, token := range p.Tokens {
+		if err := token.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type UsdcCctpToken struct {
+	SourceChainSelector          int    `json:"sourceChainSelector"`
+	SourceTokenAddress           string `json:"sourceTokenAddress"`
+	SourceMessageTransmitterAddr string `json:"sourceMessageTransmitterAddress"`
+}
+
+func (t UsdcCctpToken) Validate() error {
+	if t.SourceChainSelector == 0 {
+		return errors.New("SourceChainSelector not set")
+	}
+	if t.SourceTokenAddress == "" {
+		return errors.New("SourceTokenAddress not set")
+	}
+	if t.SourceMessageTransmitterAddr == "" {
+		return errors.New("SourceMessageTransmitterAddress not set")
+	}
+	return nil
 }
 
 func (e ExecuteOffchainConfig) Validate() error {
@@ -78,6 +133,16 @@ func (e ExecuteOffchainConfig) Validate() error {
 		return errors.New("MessageVisibilityInterval not set")
 	}
 
+	for _, processor := range e.TokenDataProcessors {
+		switch casted := processor.(type) {
+		case UsdcCctpTokenDataProcessor:
+			if err := casted.Validate(); err != nil {
+				return err
+			}
+		default:
+			return errors.New("unknown token data processor type")
+		}
+	}
 	return nil
 }
 
@@ -92,5 +157,29 @@ func DecodeExecuteOffchainConfig(encodedExecuteOffchainConfig []byte) (ExecuteOf
 	if err := json.Unmarshal(encodedExecuteOffchainConfig, &e); err != nil {
 		return e, err
 	}
+
+	if len(e.RawTokenDataProcessors) == 0 {
+		return e, nil
+	}
+
+	tokenDataProcessors := make([]interface{}, len(e.RawTokenDataProcessors))
+	for i, processor := range e.RawTokenDataProcessors {
+		var baseProcessor TokenDataProcessor
+		if err := json.Unmarshal(processor, &baseProcessor); err != nil {
+			return e, err
+		}
+		switch baseProcessor.Type {
+		case UsdcProcessorType:
+			var usdcProcessor UsdcCctpTokenDataProcessor
+			if err := json.Unmarshal(processor, &usdcProcessor); err != nil {
+				return e, err
+			}
+			tokenDataProcessors[i] = usdcProcessor
+		default:
+			return e, errors.New("unknown token data processor type")
+		}
+	}
+	e.TokenDataProcessors = tokenDataProcessors
+
 	return e, nil
 }
