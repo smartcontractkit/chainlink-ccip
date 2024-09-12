@@ -586,18 +586,8 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-// Sync is going to be replaced with newSync.
+// Sync binds ContractAddresses to the contract readers.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
-	addresses, err := r.DiscoverContracts(ctx, r.destChain)
-	if err != nil {
-		return fmt.Errorf("discover contracts: %w", err)
-	}
-
-	return r.newSync(ctx, addresses)
-}
-
-// newSync binds ContractAddresses to the contract readers.
-func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
 	var err error
 
 	// OffRamp
