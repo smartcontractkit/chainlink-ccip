@@ -1,0 +1,25 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments promtail
+
+deployments:
+  promtail:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: promtail
+        repo: https://grafana.github.io/helm-charts
+        version: 6.16.5
+      values:
+        config:
+          enabled: true
+
+profiles:
+  - name: default
+    patches:
+      - op: add
+        path: deployments.promtail.helm.valuesFiles
+        value: ["./values/default.yaml"]

@@ -6,6 +6,13 @@ vars:
     source: all
     default: "aws"
 
+dependencies:
+  promtail:
+    path: ${COMPONENTS_DIR}/promtail
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - default
+
 commands:
   purge-kind:
     command: |-
