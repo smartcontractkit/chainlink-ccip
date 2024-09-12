@@ -49,3 +49,8 @@ profiles:
       - op: replace
         path: deployments.configs.kubectl.manifests[0]
         value: ${COMPONENTS_DIR}/loki/configmaps/beholder.yaml
+  - name: kind
+    patches:
+      - op: replace
+        path: deployments.configs.kubectl.manifests[0]
+        value: ${COMPONENTS_DIR}/loki/configmaps/default.yaml

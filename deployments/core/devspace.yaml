@@ -4,8 +4,8 @@ name: chainlink
 
 imports:
   - path: ../../components/don/don.yaml
-  - path: ../../components/beholder/beholder.yaml
   - path: ../../components/kind/kind.yaml
+  - path: ../../components/beholder/beholder.yaml
 
 vars:
   SCRIPTS_DIR:
@@ -42,6 +42,9 @@ pipelines:
 
       if [[ ${PROVIDER:-} == "kind" ]]; then
         ensure_pull_secrets --all
+        run_dependency_pipelines loki
+        run_dependency_pipelines promtail
+        run_dependency_pipelines grafana
       fi
 
       if [[ -n "${tagOverride}" ]]; then
@@ -376,13 +379,15 @@ deployments:
                         name: mockserver
                         port:
                           number: 1080
+
+            # TODO: Move this Ingress to the component
             - host: ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
               http:
                 paths:
                   - path: /
                     backend:
                       service:
-                        name: app-grafana
+                        name: grafana
                         port:
                           number: 80
         networkPolicyDefault:

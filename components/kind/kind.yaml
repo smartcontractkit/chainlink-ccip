@@ -7,6 +7,16 @@ vars:
     default: "aws"
 
 dependencies:
+  grafana:
+    path: ${COMPONENTS_DIR}/grafana
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - kind
+  loki:
+    path: ${COMPONENTS_DIR}/loki
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - kind
   promtail:
     path: ${COMPONENTS_DIR}/promtail
     namespace: ${DEVSPACE_NAMESPACE}
