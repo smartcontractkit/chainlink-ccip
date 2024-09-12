@@ -38,7 +38,7 @@ pullSecrets:
 pipelines:
   beholder:
     run: |-
-      run_dependency_pipelines --all
+      run_dependency_pipelines prometheus grafana loki tempo redpanda
       if [[ ${PROVIDER:-} == "kind" ]]; then
         ensure_pull_secrets regcred-beholder
       fi
