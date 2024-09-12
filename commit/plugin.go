@@ -22,6 +22,8 @@ import (
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/chainlink-ccip/shared/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/shared/discovery/discoverytypes"
 )
 
 type MerkleRootObservation = shared.AttributedObservation[merkleroot.Observation]
@@ -44,6 +46,7 @@ type Plugin struct {
 	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	rmnConfig           rmn.Config
+	discoveryProcessor  *discovery.ContractDiscoveryProcessor
 }
 
 func NewPlugin(
@@ -101,6 +104,14 @@ func NewPlugin(
 		reportingCfg.F,
 	)
 
+	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
+		lggr,
+		&ccipReader,
+		homeChain,
+		cfg.DestChain,
+		reportingCfg.F,
+	)
+
 	return &Plugin{
 		nodeID:              nodeID,
 		oracleIDToP2pID:     oracleIDToP2pID,
@@ -117,6 +128,7 @@ func NewPlugin(
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainfee.NewProcessor(),
 		rmnConfig:           rmnConfig,
+		discoveryProcessor:  discoveryProcessor,
 	}
 }
 
@@ -172,11 +184,16 @@ func (p *Plugin) Observation(
 	if err != nil {
 		p.lggr.Errorw("failed to get gas prices", "err", err)
 	}
+	discoveryObs, err := p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+	if err != nil {
+		p.lggr.Errorw("failed to discover contracts", "err", err)
+	}
 
 	obs := Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		ChainFeeObs:   chainFeeObs,
+		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
 	return obs.Encode()
@@ -209,6 +226,7 @@ func (p *Plugin) Outcome(
 	var merkleObservations []MerkleRootObservation
 	var tokensObservations []TokenPricesObservation
 	var feeObservations []ChainFeeObservation
+	var discoveryObservations []shared.AttributedObservation[dt.Observation]
 
 	for _, ao := range aos {
 		obs, err := DecodeCommitPluginObservation(ao.Observation)
@@ -234,6 +252,13 @@ func (p *Plugin) Outcome(
 			ChainFeeObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.ChainFeeObs,
+			},
+		)
+
+		discoveryObservations = append(discoveryObservations,
+			shared.AttributedObservation[dt.Observation]{
+				OracleID:    ao.Observer,
+				Observation: obs.DiscoveryObs,
 			},
 		)
 	}
@@ -264,6 +289,15 @@ func (p *Plugin) Outcome(
 	)
 	if err != nil {
 		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
+	}
+
+	_, err = p.discoveryProcessor.Outcome(
+		dt.Outcome{},
+		dt.Query{},
+		discoveryObservations,
+	)
+	if err != nil {
+		p.lggr.Errorw("failed to get discovery outcome", "err", err)
 	}
 
 	return Outcome{

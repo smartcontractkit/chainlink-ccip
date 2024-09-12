@@ -25,6 +25,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/chainlink-ccip/shared/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/shared/discovery/discoverytypes"
 )
 
 // maxReportSizeBytes that should be returned as an execution report payload.
@@ -41,6 +44,7 @@ type Plugin struct {
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
+	discovery    *discovery.ContractDiscoveryProcessor
 
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver tokendata.TokenDataObserver
@@ -82,6 +86,13 @@ func NewPlugin(
 		tokenDataObserver: tokenDataObserver,
 		estimateProvider:  estimateProvider,
 		lggr:              lggr,
+		discovery: discovery.NewContractDiscoveryProcessor(
+			lggr,
+			&ccipReader,
+			homeChain,
+			cfg.DestChain,
+			reportingCfg.F,
+		),
 	}
 }
 
@@ -370,13 +381,33 @@ func (p *Plugin) Outcome(
 		}
 	}
 
+	decodedAos, err := decodeAttributedObservations(aos)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode observations: %w", err)
+	}
+
+	// discovery processor disabled by setting it to nil.
+	if p.discovery != nil {
+		discoveryAos := make([]shared.AttributedObservation[dt.Observation], len(decodedAos))
+		for i := range decodedAos {
+			discoveryAos[i] = shared.AttributedObservation[dt.Observation]{
+				OracleID:    decodedAos[i].OracleID,
+				Observation: decodedAos[i].Observation.Contracts,
+			}
+		}
+		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
+		if err != nil {
+			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
+		}
+	}
+
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
 	}
 
 	observation, err := getConsensusObservation(
-		p.lggr, aos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
+		p.lggr, decodedAos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}

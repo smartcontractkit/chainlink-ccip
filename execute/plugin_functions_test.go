@@ -6,16 +6,16 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
@@ -536,13 +536,13 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    []types.AttributedObservation
-		want    []decodedAttributedObservation
+		want    []shared.AttributedObservation[exectypes.Observation]
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			args:    nil,
-			want:    []decodedAttributedObservation{},
+			want:    []shared.AttributedObservation[exectypes.Observation]{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -557,9 +557,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					}),
 				},
 			},
-			want: []decodedAttributedObservation{
+			want: []shared.AttributedObservation[exectypes.Observation]{
 				{
-					Observer: commontypes.OracleID(1),
+					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
@@ -589,9 +589,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					}),
 				},
 			},
-			want: []decodedAttributedObservation{
+			want: []shared.AttributedObservation[exectypes.Observation]{
 				{
-					Observer: commontypes.OracleID(1),
+					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
@@ -599,7 +599,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					},
 				},
 				{
-					Observer: commontypes.OracleID(2),
+					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
@@ -788,13 +788,11 @@ func Test_getConsensusObservation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Convert observations to the expected decoded type.
-			var ao []types.AttributedObservation
+			var ao []shared.AttributedObservation[exectypes.Observation]
 			for i, observation := range tt.args.observation {
-				encodedObservation, err := observation.Encode()
-				require.NoError(t, err)
-				ao = append(ao, types.AttributedObservation{
-					Observation: encodedObservation,
-					Observer:    commontypes.OracleID(i),
+				ao = append(ao, shared.AttributedObservation[exectypes.Observation]{
+					Observation: observation,
+					OracleID:    commontypes.OracleID(i),
 				})
 			}
 
