@@ -12,18 +12,18 @@ datasources:
       - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://beholder-prometheus:9090
+        url: http://prometheus:9090
 
       - name: Loki
         type: loki
         access: proxy
-        url: http://beholder-loki:3100
+        url: http://loki:3100
 
       - name: Tempo
         type: tempo
         access: proxy
         orgId: 1
-        url: http://beholder-tempo:3200
+        url: http://tempo:3200
         basicAuth: false
         isDefault: true
         version: 1
