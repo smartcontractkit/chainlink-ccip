@@ -3,47 +3,17 @@ version: v2beta1
 pipelines:
   deploy:
     run: |-
-      create_deployments configs
       create_deployments grafana
 
 deployments:
-  configs:
-    kubectl:
-      manifests:
-        - ${COMPONENTS_DIR}/grafana/configmaps/default.yaml
-
   grafana:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       chart:
-        name: component-chart
-        repo: https://charts.devspace.sh
+        name: grafana
+        repo: https://grafana.github.io/helm-charts
+        version: 8.5.1
       values:
-        containers:
-          - image: grafana/grafana
-            volumeMounts:
-              - containerPath: /etc/grafana/provisioning
-                volume:
-                  name: config-volume
-            env:
-              - name: GF_AUTH_ANONYMOUS_ENABLED
-                value: "true"
-              - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-                value: "Admin"
-              - name: GF_AUTH_DISABLE_LOGIN_FORM
-                value: "true"
-              - name: GF_FEATURE_TOGGLES_ENABLE
-                value: "traceqlEditor traceQLStreaming metricsSummary"
-        volumes:
-          - name: config-volume
-            configMap:
-              name: grafana-config
-        service:
-          name: grafana
-          ports:
-            - port: 3000
-        podSecurityContext:
-          fsGroup: 999
         securityContext:
           runAsUser: 999
           runAsGroup: 999
@@ -52,16 +22,12 @@ deployments:
 profiles:
   - name: add-beholder-config
     patches:
-      - op: replace
-        path: deployments.configs.kubectl.manifests[0]
-        value: ${COMPONENTS_DIR}/grafana/configmaps/beholder.yaml
       - op: add
-        path: deployments.grafana.helm.values.volumes[0]
-        value:
-          items:
-            - key: datasources.yml
-              path: datasources/datasources.yml
-            - key: main.yml
-              path: dashboards/main.yml
-            - key: beholder-demo-dashboard.json
-              path: dashboards/beholder-demo-dashboard.json
+        path: deployments.grafana.helm.valuesFiles
+        value: ["./values/beholder.yaml"]
+
+  - name: kind
+    patches:
+      - op: add
+        path: deployments.grafana.helm.valuesFiles
+        value: ["./values/default.yaml"]

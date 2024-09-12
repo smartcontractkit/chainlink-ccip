@@ -4,3 +4,33 @@ metadata:
   name: loki-config
 data:
   loki.yml: |
+    auth_enabled: false
+
+    server:
+      http_listen_port: 3100
+
+    common:
+      ring:
+        instance_addr: 127.0.0.1
+        kvstore:
+          store: inmemory
+      replication_factor: 1
+      path_prefix: /tmp/loki
+
+    schema_config:
+      configs:
+        - from: 2020-05-15
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+    storage_config:
+      filesystem:
+        directory: /tmp/loki/chunks
+
+    limits_config:
+      ingestion_rate_mb: 5 # Limit ingestion rate to prevent overload
+      ingestion_burst_size_mb: 10 # Burst size allows temporary exceedance
