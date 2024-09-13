@@ -6,7 +6,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/ethereum/go-ethereum v1.13.8
 	github.com/smartcontractkit/chain-selectors v1.0.23
-	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240909141252-663388d38293
+	github.com/smartcontractkit/chainlink-common v0.2.2-0.20240913100429-aa383c8c4694
 	github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
@@ -34,6 +34,8 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -60,6 +62,9 @@ require (
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
+	go.opentelemetry.io/otel v1.28.0 // indirect
+	go.opentelemetry.io/otel/metric v1.28.0 // indirect
+	go.opentelemetry.io/otel/trace v1.28.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/net v0.28.0 // indirect

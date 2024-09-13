@@ -6,16 +6,13 @@ import (
 	"crypto/ed25519"
 	crand "crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/ethereum/go-ethereum/common"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -66,10 +63,12 @@ type client struct {
 	rmnNodes                                []RMNNodeInfo
 	rmnRemoteAddress                        cciptypes.Bytes
 	rmnHomeConfigDigest                     cciptypes.Bytes
+	rmnReportVersion                        string
 	minObservers                            int
 	minSigners                              int
 	observationsInitialRequestTimerDuration time.Duration
 	reportsInitialRequestTimerDuration      time.Duration
+	rmnCrypto                               cciptypes.RMNCrypto
 }
 
 // RMNNodeInfo contains the information about an RMN node.
@@ -78,7 +77,7 @@ type RMNNodeInfo struct {
 	ID                        NodeID
 	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
 	IsSigner                  bool
-	SignReportsAddress        common.Address
+	SignReportsAddress        cciptypes.Bytes
 	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
 	SignObservationPrefix     string             // e.g. "chainlink ccip 1.6 rmn observation"
 }
@@ -579,17 +578,31 @@ func (c *client) listenForRmnReportSignatures(
 			configDigestBytes32 := [32]byte{}
 			copy(configDigestBytes32[:], c.rmnHomeConfigDigest)
 
-			err = VerifyRmnReportSignatures(
-				ReportData{
-					DestChainEvmID:              big.NewInt(int64(ch.EvmChainID)),
-					DestChainSelector:           destChain.DestChainSelector,
-					RmnRemoteContractAddress:    c.rmnRemoteAddress.String(),
-					OfframpAddress:              hex.EncodeToString(destChain.OfframpAddress),
-					RmnHomeContractConfigDigest: configDigestBytes32,
-					LaneUpdates:                 NewLaneUpdatesFromPBType(fixedDestLaneUpdates),
-				},
-				[]*rmnpb.EcdsaSignature{reportSig.Signature},
-				[]RMNNodeInfo{rmnNode},
+			laneUpdates, err := rmnpb.NewLaneUpdatesFromPB(fixedDestLaneUpdates)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
+			}
+
+			rmnReport := cciptypes.RMNReport{
+				ReportVersion:               c.rmnReportVersion,
+				DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
+				DestChainSelector:           cciptypes.ChainSelector(destChain.DestChainSelector),
+				RmnRemoteContractAddress:    c.rmnRemoteAddress,
+				OfframpAddress:              destChain.OfframpAddress,
+				RmnHomeContractConfigDigest: configDigestBytes32,
+				LaneUpdates:                 laneUpdates,
+			}
+
+			sig, err := rmnpb.NewECDSASigFromPB(reportSig.Signature)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert signature from protobuf: %w", err)
+			}
+
+			err = c.rmnCrypto.VerifyReportSignatures(
+				ctx,
+				[]cciptypes.RMNECDSASignature{*sig},
+				rmnReport,
+				[]cciptypes.Bytes{rmnNode.SignReportsAddress},
 			)
 			if err != nil {
 				c.lggr.Warnw("failed to verify report signature", "err", err)

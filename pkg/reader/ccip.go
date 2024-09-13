@@ -183,9 +183,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			})
 		}
 
-		blockNum, err := strconv.ParseUint(item.Head.Identifier, 10, 64)
+		blockNum, err := strconv.ParseUint(item.Head.Height, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Identifier, err)
+			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
 		}
 
 		reports = append(reports, plugintypes.CommitPluginReportWithMeta{

@@ -122,7 +122,7 @@ type CommitOffchainConfig struct {
 	// the token prices are read from.
 	// This will typically be an arbitrum testnet/mainnet chain depending on
 	// the deployment.
-	TokenPriceChainSelector uint64 `json:"tokenPriceChainSelector"`
+	TokenPriceChainSelector cciptypes.ChainSelector `json:"tokenPriceChainSelector"`
 }
 
 func (c CommitOffchainConfig) Validate() error {

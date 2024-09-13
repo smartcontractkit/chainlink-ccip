@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -36,32 +36,8 @@ func (w *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
-	if q.RMNSignatures != nil {
-		ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))
-		if !exists {
-			return Observation{}, fmt.Errorf("failed to get chain by selector %d", w.cfg.DestChain)
-		}
-
-		offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
-		if err != nil {
-			return Observation{}, fmt.Errorf("failed to get offramp contract address: %w", err)
-		}
-
-		err = rmn.VerifyRmnReportSignatures(
-			rmn.ReportData{
-				DestChainEvmID:              ch.EvmChainID,
-				DestChainSelector:           ch.Selector,
-				RmnRemoteContractAddress:    w.cfg.RMNRemoteContractAddress,
-				OfframpAddress:              offRampAddress,
-				RmnHomeContractConfigDigest: w.cfg.RMNHomeContractConfigDigest,
-				LaneUpdates:                 q.RMNSignatures.LaneUpdates,
-			},
-			q.RMNSignatures.Signatures,
-			w.rmnNodeInfo,
-		)
-		if err != nil {
-			return Observation{}, fmt.Errorf("failed to verify RMN signatures provided by leader: %w", err)
-		}
+	if err := w.verifyQuery(ctx, q); err != nil {
+		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
 
 	tStart := time.Now()
@@ -69,6 +45,52 @@ func (w *Processor) Observation(
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
+}
+
+func (w *Processor) verifyQuery(ctx context.Context, q Query) error {
+	if q.RMNSignatures == nil {
+		return nil
+	}
+
+	ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))
+	if !exists {
+		return fmt.Errorf("failed to get chain by selector %d", w.cfg.DestChain)
+	}
+
+	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
+	if err != nil {
+		return fmt.Errorf("failed to get offramp contract address: %w", err)
+	}
+
+	sigs, err := rmnpb.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+	if err != nil {
+		return fmt.Errorf("failed to convert signatures from protobuf: %w", err)
+	}
+
+	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
+	for _, rmnNode := range w.rmnNodeInfo {
+		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
+	}
+
+	laneUpdates, err := rmnpb.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
+	if err != nil {
+		return fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
+	}
+
+	rmnReport := cciptypes.RMNReport{
+		ReportVersion:               w.rmnReportVersion,
+		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
+		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
+		RmnRemoteContractAddress:    w.cfg.RMNRemoteContractAddress,
+		OfframpAddress:              offRampAddress,
+		RmnHomeContractConfigDigest: cciptypes.Bytes32(w.cfg.RMNHomeContractConfigDigest),
+		LaneUpdates:                 laneUpdates,
+	}
+
+	if err := w.rmnCrypto.VerifyReportSignatures(ctx, sigs, rmnReport, signerAddresses); err != nil {
+		return fmt.Errorf("failed to verify RMN signatures: %w", err)
+	}
+	return nil
 }
 
 func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
