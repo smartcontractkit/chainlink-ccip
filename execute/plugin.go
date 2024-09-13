@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -243,8 +244,13 @@ func (p *Plugin) Observation(
 			groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
 		}
 
-		// TODO: Fire off messages for an attestation check service.
-		return exectypes.NewObservation(groupedCommits, messages, nil, nil).Encode()
+		// Dummy token data to satisfy the interface, to be replaces with real implementation
+		tkData, err1 := (&tokendata.NoopTokenProcessor{}).ProcessTokenData(ctx, messages)
+		if err1 != nil {
+			return types.Observation{}, fmt.Errorf("unable to process token data %w", err)
+		}
+
+		return exectypes.NewObservation(groupedCommits, messages, tkData, nil).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -402,11 +408,11 @@ func (p *Plugin) Outcome(
 				}
 
 				if tokenData, ok := observation.TokenData[report.SourceChain][i]; ok {
-					// TODO how to handle missing attestation / token data at this stage?
-					report.TokenData = append(report.TokenData, tokenData.TokenData)
+					report.MessageTokensData = append(report.MessageTokensData, tokenData)
 				}
 			}
 			commitReports[i].Messages = report.Messages
+			commitReports[i].MessageTokensData = report.MessageTokensData
 		}
 
 		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
@@ -414,17 +420,7 @@ func (p *Plugin) Outcome(
 		commitReports := previousOutcome.PendingCommitReports
 
 		// TODO: this function should be pure, a context should not be needed.
-		builder := report.NewBuilder(
-			context.Background(),
-			p.lggr,
-			p.msgHasher,
-			p.tokenDataReader,
-			p.reportCodec,
-			p.estimateProvider,
-			observation.Nonces,
-			p.cfg.DestChain,
-			uint64(maxReportSizeBytes),
-			p.cfg.OffchainConfig.BatchGasLimit)
+		builder := report.NewBuilder(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.estimateProvider, observation.Nonces, p.cfg.DestChain, uint64(maxReportSizeBytes), p.cfg.OffchainConfig.BatchGasLimit)
 		outcomeReports, commitReports, err := selectReport(
 			p.lggr,
 			commitReports,

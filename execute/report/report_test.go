@@ -239,6 +239,18 @@ func makeTestCommitReport(
 		messages = append(messages, msg)
 	}
 
+	messageTokenData := make([]exectypes.MessageTokensData, numMessages)
+	for i := 0; i < len(messages); i++ {
+		messageTokenData[i] = exectypes.MessageTokensData{
+			TokenData: []exectypes.TokenData{
+				{
+					Ready: true,
+					Data:  []byte(fmt.Sprintf("data %d", i)),
+				},
+			},
+		}
+	}
+
 	commitReport := exectypes.CommitData{
 		//MerkleRoot:          root,
 		SourceChain:         cciptypes.ChainSelector(srcChain),
@@ -247,6 +259,7 @@ func makeTestCommitReport(
 		BlockNum:            uint64(block),
 		Messages:            messages,
 		ExecutedMessages:    executed,
+		MessageTokensData:   messageTokenData,
 	}
 
 	// calculate merkle root
@@ -304,7 +317,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "token data length mismatch: got 2, expected 1",
 			args: args{
 				report: exectypes.CommitData{
-					TokenData:           make([][][]byte, 2),
+					MessageTokensData:   make([]exectypes.MessageTokensData, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
@@ -317,7 +330,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unexpected number of messages: expected 1, got 2",
 			args: args{
 				report: exectypes.CommitData{
-					TokenData:           make([][][]byte, 2),
+					MessageTokensData:   make([]exectypes.MessageTokensData, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
@@ -331,7 +344,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
 				report: exectypes.CommitData{
-					TokenData:           make([][][]byte, 2),
+					MessageTokensData:   make([]exectypes.MessageTokensData, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					Messages: []cciptypes.Message{
 						{
@@ -353,7 +366,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unexpected source chain: expected 1111, got 2222",
 			args: args{
 				report: exectypes.CommitData{
-					TokenData:           make([][][]byte, 1),
+					MessageTokensData:   make([]exectypes.MessageTokensData, 1),
 					SourceChain:         1111,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
@@ -373,7 +386,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unable to hash message (1234567, 100): bad hasher",
 			args: args{
 				report: exectypes.CommitData{
-					TokenData:           make([][][]byte, 1),
+					MessageTokensData:   make([]exectypes.MessageTokensData, 1),
 					SourceChain:         1234567,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
@@ -425,7 +438,6 @@ func Test_Builder_Build(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
 	codec := mocks.NewExecutePluginJSONReportCodec()
 	lggr := logger.Test(t)
-	tokenDataReader := tdr{mode: good}
 	sender, err := cciptypes.NewBytesFromString(randomAddress())
 	require.NoError(t, err)
 	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
@@ -735,17 +747,7 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			builder := NewBuilder(
-				ctx,
-				lggr,
-				hasher,
-				tokenDataReader,
-				codec,
-				evm.EstimateProvider{},
-				tt.args.nonces,
-				1,
-				tt.args.maxReportSize,
-				tt.args.maxGasLimit)
+			builder := NewBuilder(ctx, lggr, hasher, codec, evm.EstimateProvider{}, tt.args.nonces, 1, tt.args.maxReportSize, tt.args.maxGasLimit)
 
 			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
@@ -1034,30 +1036,33 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: false, Data: nil}}},
+					},
 				},
 			},
 			fields: fields{
 				tokenDataReader: tdr{mode: bad},
 			},
-			expectedStatus: TokenDataFetchError,
-			expectedLog:    "unable to read token data - unknown error",
-		},
-		{
-			name: "token data not ready",
-			args: args{
-				idx: 0,
-				execReport: exectypes.CommitData{
-					Messages: []cciptypes.Message{
-						makeMessage(1, 100, 0),
-					},
-				},
-			},
-			fields: fields{
-				tokenDataReader: tdr{mode: notReady},
-			},
 			expectedStatus: TokenDataNotReady,
 			expectedLog:    "unable to read token data - token data not ready",
 		},
+		//{
+		//	name: "token data not ready",
+		//	args: args{
+		//		idx: 0,
+		//		execReport: exectypes.CommitData{
+		//			Messages: []cciptypes.Message{
+		//				makeMessage(1, 100, 0),
+		//			},
+		//		},
+		//	},
+		//	fields: fields{
+		//		tokenDataReader: tdr{mode: notReady},
+		//	},
+		//	expectedStatus: TokenDataNotReady,
+		//	expectedLog:    "unable to read token data - token data not ready",
+		//},
 		{
 			name: "good token data is cached",
 			args: args{
@@ -1065,6 +1070,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				execReport: exectypes.CommitData{
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
+					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 					},
 				},
 			},
@@ -1076,8 +1084,8 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
-				TokenData: [][][]byte{
-					{{0x01, 0x02, 0x03}},
+				MessageTokensData: []exectypes.MessageTokensData{
+					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 				},
 			},
 		},
@@ -1089,6 +1097,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+					},
 				},
 			},
 			fields: fields{
@@ -1099,7 +1110,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
-				TokenData: [][][]byte{nil},
+				MessageTokensData: []exectypes.MessageTokensData{
+					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+				},
 			},
 		},
 		{
@@ -1110,6 +1123,10 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 						makeMessage(1, 101, 0),
+					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
 			},
@@ -1122,7 +1139,10 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					makeMessage(1, 100, 0),
 					makeMessage(1, 101, 0),
 				},
-				TokenData: [][][]byte{nil, nil},
+				MessageTokensData: []exectypes.MessageTokensData{
+					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+				},
 			},
 		},
 		{
@@ -1133,6 +1153,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					SourceChain: 1,
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 1),
+					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
 			},
@@ -1152,6 +1175,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					SourceChain: 1,
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 1),
+					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
 			},
@@ -1174,6 +1200,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 1),
 					},
+					MessageTokensData: []exectypes.MessageTokensData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+					},
 				},
 			},
 			fields: fields{
@@ -1188,17 +1217,8 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			t.Parallel()
 			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 
-			// Select token data reader mock.
-			var resolvedTokenDataReader exectypes.TokenDataReader
-			if tt.fields.tokenDataReader != nil {
-				resolvedTokenDataReader = tt.fields.tokenDataReader
-			} else {
-				resolvedTokenDataReader = tdr{mode: good}
-			}
-
 			b := &execReportBuilder{
 				lggr:             lggr,
-				tokenDataReader:  resolvedTokenDataReader,
 				estimateProvider: evm.EstimateProvider{},
 				accumulated:      tt.fields.accumulated,
 				sendersNonce:     tt.args.nonces,

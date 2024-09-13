@@ -305,6 +305,14 @@ func mergeCommitObservations(
 	return results, nil
 }
 
+func mergeTokenObservations(observations []decodedAttributedObservation, chain map[cciptypes.ChainSelector]int) (exectypes.TokenDataObservations, error) {
+	// Return first one
+	for _, ao := range observations {
+		return ao.Observation.TokenData, nil
+	}
+	return nil, nil
+}
+
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeNonceObservations(
@@ -396,6 +404,15 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
+	mergedTokenObservations, err := mergeTokenObservations(decodedObservations, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge token observations: %w", err)
+	}
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
+		"oracle", oracleID,
+		"mergedTokenObservations", mergedTokenObservations)
+
 	mergedNonceObservations :=
 		mergeNonceObservations(decodedObservations, fChain[destChainSelector])
 	if err != nil {
@@ -406,7 +423,7 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedNonceObservations", mergedNonceObservations)
 
-	observation := exectypes.NewObservation(mergedCommitObservations, mergedMessageObservations, nil, mergedNonceObservations)
+	observation := exectypes.NewObservation(mergedCommitObservations, mergedMessageObservations, mergedTokenObservations, mergedNonceObservations)
 
 	return observation, nil
 }

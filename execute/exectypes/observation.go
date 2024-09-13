@@ -18,21 +18,47 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
-type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]TokenData
+type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokensData
 
-type TokenData struct {
-	TokenDataStatus TokenDataStatus
-	Error           error
-	TokenData       [][]byte
+type MessageTokensData struct {
+	TokenData []TokenData
 }
 
-type TokenDataStatus uint8
+func (mtd MessageTokensData) IsReady() bool {
+	for _, td := range mtd.TokenData {
+		if !td.IsReady() {
+			return false
+		}
+	}
+	return true
+}
 
-const (
-	TokenDataNotNeeded TokenDataStatus = iota + 1
-	TokenDataFetchError
-	TokenDataNotAvailable
-)
+func (mtd MessageTokensData) Error() error {
+	for _, td := range mtd.TokenData {
+		if td.Error != nil {
+			return td.Error
+		}
+	}
+	return nil
+}
+
+func (mtd MessageTokensData) ToByteSlice() [][]byte {
+	out := make([][]byte, len(mtd.TokenData))
+	for i, td := range mtd.TokenData {
+		out[i] = td.Data
+	}
+	return out
+}
+
+type TokenData struct {
+	Ready bool   `json:"ready"`
+	Error error  `json:"error"`
+	Data  []byte `json:"data"`
+}
+
+func (td TokenData) IsReady() bool {
+	return td.Ready
+}
 
 // Observation is the observation of the ExecutePlugin.
 // TODO: revisit observation types. The maps used here are more space efficient and easier to work

@@ -237,7 +237,7 @@ func setupSimpleTest(
 	require.NoError(t, err, "failed to start home chain poller")
 
 	tokenDataReader := mock_types.NewMockTokenDataReader(t)
-	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
+	//tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
