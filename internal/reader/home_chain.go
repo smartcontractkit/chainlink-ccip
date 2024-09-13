@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"sync"
 	"time"
@@ -39,6 +40,36 @@ type HomeChain interface {
 	services.Service
 }
 
+//go:generate mockery --name RMNConfigFetcher --output ./mocks/ --case underscore
+type RMNConfigFetcher interface {
+	GetRMNNodesInfo() ([]RMNNodeInfo, error)
+	GetRMNHomeConfigDigest() (cciptypes.Bytes, error)
+	// TODO: We could return the value for a selector, depending on how it's used
+	GetMinObservers() (map[cciptypes.ChainSelector]int, error)
+	GetMinSigners() (map[cciptypes.ChainSelector]int, error)
+}
+
+// NodeID and RMNNodeInfo might be put in a common package to be imported by both the reader and rmn packages
+type NodeID uint32
+
+// RMNNodeInfo contains the information about an RMN node.
+type RMNNodeInfo struct {
+	// ID is the index of this node in the RMN config
+	ID                        NodeID
+	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
+	IsSigner                  bool
+	SignReportsAddress        []byte
+	SignObservationsPublicKey *ed25519.PublicKey
+	SignObservationPrefix     string // e.g. "chainlink ccip 1.6 rmn observation" - some string used to prefix the signed observation - not sure where it exists
+}
+
+type rmnState struct {
+	rmnNodes            []RMNNodeInfo
+	rmnHomeConfigDigest cciptypes.Bytes
+	minObservers        map[cciptypes.ChainSelector]int
+	minSigners          map[cciptypes.ChainSelector]int
+}
+
 type state struct {
 	// gets updated by the polling loop
 	chainConfigs map[cciptypes.ChainSelector]ChainConfig
@@ -58,11 +89,13 @@ type homeChainPoller struct {
 	lggr            logger.Logger
 	mutex           *sync.RWMutex
 	state           state
+	rmnState        rmnState
 	failedPolls     uint
 	// TODO: currently unused but will be passed into GetLatestValue
 	// once the chainlink-common breaking change comes in
 	// (https://github.com/smartcontractkit/chainlink-common/pull/603).
 	ccipConfigBoundContract types.BoundContract
+	rmnHomeBoundContract    types.BoundContract
 	// How frequently the poller fetches the chain configs
 	pollingDuration time.Duration
 }
@@ -79,11 +112,13 @@ func NewHomeChainConfigPoller(
 		stopCh:                  make(chan struct{}),
 		homeChainReader:         homeChainReader,
 		state:                   state{},
+		rmnState:                rmnState{},
 		mutex:                   &sync.RWMutex{},
 		failedPolls:             0,
 		lggr:                    lggr,
 		pollingDuration:         pollingInterval,
 		ccipConfigBoundContract: ccipConfigBoundContract,
+		rmnHomeBoundContract:    types.BoundContract{}, // TODO: set the RMNHome contract
 	}
 }
 
@@ -116,13 +151,30 @@ func (r *homeChainPoller) poll() {
 			r.mutex.Unlock()
 			return
 		case <-ticker.C:
+			// TODO: fetch concurrently using a waitgroup
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
 			}
+			if err := r.fetchAndSetRMNConfig(ctx); err != nil {
+				r.mutex.Lock()
+				r.failedPolls++
+				r.mutex.Unlock()
+			}
+
+			// TODO: how to handle RMNRemote fetching
+			// - multiple contracts
+			// - not all the nodes will be able to fetch the RMNRemote config
+			// - need to be shared via OCR?
 		}
 	}
+}
+
+// nolint:unusedparams
+func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
+	// TODO: implement
+	return nil
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
@@ -238,6 +290,30 @@ func (r *homeChainPoller) GetOCRConfigs(
 	}
 
 	return ocrConfigs, nil
+}
+
+func (r *homeChainPoller) GetRMNNodesInfo() ([]RMNNodeInfo, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.rmnState.rmnNodes, nil
+}
+
+func (r *homeChainPoller) GetRMNHomeConfigDigest() (cciptypes.Bytes, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.rmnState.rmnHomeConfigDigest, nil
+}
+
+func (r *homeChainPoller) GetMinObservers() (map[cciptypes.ChainSelector]int, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.rmnState.minObservers, nil
+}
+
+func (r *homeChainPoller) GetMinSigners() (map[cciptypes.ChainSelector]int, error) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.rmnState.minSigners, nil
 }
 
 func (r *homeChainPoller) Close() error {
