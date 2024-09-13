@@ -112,11 +112,11 @@ type CommitOffchainConfig struct {
 	// Note that the token address is that on the remote chain.
 	TokenInfo map[types.Account]TokenInfo `json:"tokenInfo"`
 
-	// TokenPriceChainSelector is the chain selector for the chain on which
+	// PriceFeedChainSelector is the chain selector for the chain on which
 	// the token prices are read from.
 	// This will typically be an arbitrum testnet/mainnet chain depending on
 	// the deployment.
-	TokenPriceChainSelector cciptypes.ChainSelector `json:"tokenPriceChainSelector"`
+	PriceFeedChainSelector cciptypes.ChainSelector `json:"tokenPriceChainSelector"`
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -129,9 +129,9 @@ func (c CommitOffchainConfig) Validate() error {
 	// If price sources are provided the batch write frequency and token price chain selector
 	// config fields MUST be provided.
 	if len(c.TokenInfo) > 0 &&
-		(c.TokenPriceBatchWriteFrequency.Duration() == 0 || c.TokenPriceChainSelector == 0) {
+		(c.TokenPriceBatchWriteFrequency.Duration() == 0 || c.PriceFeedChainSelector == 0) {
 		return fmt.Errorf("tokenPriceBatchWriteFrequency (%s) or tokenPriceChainSelector (%d) not set",
-			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
+			c.TokenPriceBatchWriteFrequency, c.PriceFeedChainSelector)
 	}
 
 	for token, tokenInfo := range c.TokenInfo {

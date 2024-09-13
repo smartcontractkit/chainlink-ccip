@@ -34,7 +34,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 		return []cciptypes.TokenPrice{}
 	}
 
-	if !supportedChains.Contains(p.cfg.OffchainConfig.TokenPriceChainSelector) {
+	if !supportedChains.Contains(p.cfg.OffchainConfig.PriceFeedChainSelector) {
 		p.lggr.Debugw("oracle does not support token price observation", "oracleID", p.oracleID)
 		return []cciptypes.TokenPrice{}
 
