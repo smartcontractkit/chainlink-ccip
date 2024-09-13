@@ -578,7 +578,7 @@ func (c *client) listenForRmnReportSignatures(
 			configDigestBytes32 := [32]byte{}
 			copy(configDigestBytes32[:], c.rmnHomeConfigDigest)
 
-			laneUpdates, err := rmnpb.NewLaneUpdatesFromPB(fixedDestLaneUpdates)
+			laneUpdates, err := NewLaneUpdatesFromPB(fixedDestLaneUpdates)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
 			}
@@ -593,7 +593,7 @@ func (c *client) listenForRmnReportSignatures(
 				LaneUpdates:                 laneUpdates,
 			}
 
-			sig, err := rmnpb.NewECDSASigFromPB(reportSig.Signature)
+			sig, err := NewECDSASigFromPB(reportSig.Signature)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert signature from protobuf: %w", err)
 			}

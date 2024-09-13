@@ -1,13 +1,15 @@
-package rmnpb
+package rmn
 
 import (
 	"fmt"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
 // NewLaneUpdatesFromPB converts a slice of pb FixedDestLaneUpdate to a slice of RMNLaneUpdate
-func NewLaneUpdatesFromPB(pbLaneUpdates []*FixedDestLaneUpdate) ([]cciptypes.RMNLaneUpdate, error) {
+func NewLaneUpdatesFromPB(pbLaneUpdates []*rmnpb.FixedDestLaneUpdate) ([]cciptypes.RMNLaneUpdate, error) {
 	laneUpdates := make([]cciptypes.RMNLaneUpdate, 0, len(pbLaneUpdates))
 
 	for _, lu := range pbLaneUpdates {
@@ -30,7 +32,7 @@ func NewLaneUpdatesFromPB(pbLaneUpdates []*FixedDestLaneUpdate) ([]cciptypes.RMN
 }
 
 // NewECDSASigsFromPB converts a slice of pb EcdsaSignature to a slice of RMNECDSASignature
-func NewECDSASigsFromPB(pbSigs []*EcdsaSignature) ([]cciptypes.RMNECDSASignature, error) {
+func NewECDSASigsFromPB(pbSigs []*rmnpb.EcdsaSignature) ([]cciptypes.RMNECDSASignature, error) {
 	sigs := make([]cciptypes.RMNECDSASignature, 0, len(pbSigs))
 	for _, pbSig := range pbSigs {
 		s, err := NewECDSASigFromPB(pbSig)
@@ -44,7 +46,7 @@ func NewECDSASigsFromPB(pbSigs []*EcdsaSignature) ([]cciptypes.RMNECDSASignature
 }
 
 // NewECDSASigFromPB converts a pb EcdsaSignature to a RMNECDSASignature
-func NewECDSASigFromPB(sig *EcdsaSignature) (*cciptypes.RMNECDSASignature, error) {
+func NewECDSASigFromPB(sig *rmnpb.EcdsaSignature) (*cciptypes.RMNECDSASignature, error) {
 	if len(sig.R) != 32 || len(sig.S) != 32 {
 		return nil, fmt.Errorf("invalid signature, R and S must be 32 bytes: %v", sig)
 	}

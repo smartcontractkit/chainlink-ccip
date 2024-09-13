@@ -18,7 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -62,7 +62,7 @@ func (w *Processor) verifyQuery(ctx context.Context, q Query) error {
 		return fmt.Errorf("failed to get offramp contract address: %w", err)
 	}
 
-	sigs, err := rmnpb.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+	sigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 	if err != nil {
 		return fmt.Errorf("failed to convert signatures from protobuf: %w", err)
 	}
@@ -72,7 +72,7 @@ func (w *Processor) verifyQuery(ctx context.Context, q Query) error {
 		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
 	}
 
-	laneUpdates, err := rmnpb.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
+	laneUpdates, err := rmn.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
 	if err != nil {
 		return fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
 	}
