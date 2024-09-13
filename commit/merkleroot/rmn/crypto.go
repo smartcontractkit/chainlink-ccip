@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
-// verifyObservationSignature verifies the signature of the observation.
+// verifyObservationSignature verifies the signature of the RMN observation.
 //
 //	e.g. ed25519.sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
 func verifyObservationSignature(

@@ -47,6 +47,9 @@ func (w *Processor) Observation(
 	return observation, nil
 }
 
+// verifyQuery verifies the query based to the following rules.
+// 1. If RMN is enabled, RMN signatures are required in the BuildingReport state but not expected in other states.
+// 2. If RMN signatures are provided, they are verified against the current RMN node config.
 func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Query) error {
 	if !w.cfg.RMNEnabled {
 		return nil
