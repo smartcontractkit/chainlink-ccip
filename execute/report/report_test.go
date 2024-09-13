@@ -179,6 +179,7 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 			MsgHash:             cciptypes.Bytes32{},
 			Nonce:               nonce,
 		},
+		FeeTokenAmount: cciptypes.NewBigIntFromInt64(1000),
 	}
 }
 
@@ -426,6 +427,7 @@ func Test_Builder_Build(t *testing.T) {
 	codec := mocks.NewExecutePluginJSONReportCodec()
 	lggr := logger.Test(t)
 	tokenDataReader := tdr{mode: good}
+	relativeBoostPerWaitHour := 1.0
 	sender, err := cciptypes.NewBytesFromString(randomAddress())
 	require.NoError(t, err)
 	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
@@ -745,7 +747,8 @@ func Test_Builder_Build(t *testing.T) {
 				tt.args.nonces,
 				1,
 				tt.args.maxReportSize,
-				tt.args.maxGasLimit)
+				tt.args.maxGasLimit,
+				relativeBoostPerWaitHour)
 
 			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
@@ -851,7 +854,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			},
 			expectedIsValid: true,
 			expectedMetadata: validationMetadata{
-				encodedSizeBytes: 1633,
+				encodedSizeBytes: 1641,
 				gas:              482_240,
 			},
 		},

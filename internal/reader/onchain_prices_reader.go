@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
@@ -25,7 +27,7 @@ type PriceReader interface {
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]cciptypes.TokenPrice, error)
 
 	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
 	GetFeeQuoterTokenUpdates(
@@ -106,9 +108,9 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 
 func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
-) ([]*big.Int, error) {
+) ([]cciptypes.TokenPrice, error) {
 	if !pr.enabled {
-		return []*big.Int{}, nil
+		return []cciptypes.TokenPrice{}, nil
 	}
 	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
@@ -146,7 +148,16 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		}
 	}
 
-	return prices, nil
+	if len(prices) != len(tokens) {
+		return nil, fmt.Errorf("failed to get all token prices, wanted %d, got %d", len(tokens), len(prices))
+	}
+
+	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokens))
+	for i, token := range tokens {
+		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, prices[i]))
+	}
+
+	return tokenPricesUSD, nil
 }
 
 func (pr *OnchainTokenPricesReader) getFeedDecimals(
@@ -214,3 +225,44 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 
 // Ensure OnchainTokenPricesReader implements PriceReader
 var _ PriceReader = (*OnchainTokenPricesReader)(nil)
+
+// StaticPriceReader is configured with a static price for each token, and a default price for tokens not in the map.
+type StaticPriceReader struct {
+	staticTokenPrices map[ocr2types.Account]*big.Int
+	defaultPrice      *big.Int
+}
+
+func NewStaticPriceReader(
+	staticTokenPrice map[ocr2types.Account]*big.Int,
+	defaultPrice *big.Int,
+) *StaticPriceReader {
+	return &StaticPriceReader{
+		staticTokenPrices: staticTokenPrice,
+		defaultPrice:      defaultPrice,
+	}
+}
+
+func (pr *StaticPriceReader) GetTokenFeedPricesUSD(
+	ctx context.Context, tokens []ocr2types.Account,
+) ([]cciptypes.TokenPrice, error) {
+	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokens))
+	for _, token := range tokens {
+		price, ok := pr.staticTokenPrices[token]
+		if !ok {
+			price = pr.defaultPrice
+		}
+		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, price))
+	}
+	return tokenPricesUSD, nil
+}
+
+// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
+func (pr *StaticPriceReader) GetFeeQuoterTokenUpdates(
+	ctx context.Context,
+	tokens []ocr2types.Account,
+) (map[ocr2types.Account]shared.TimestampedBig, error) {
+	return nil, nil
+}
+
+// Ensure NoOpStaticPriceReader implements PriceReader
+var _ PriceReader = (*StaticPriceReader)(nil)

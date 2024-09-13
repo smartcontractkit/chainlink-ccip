@@ -4,7 +4,8 @@ package reader
 
 import (
 	context "context"
-	big "math/big"
+
+	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -86,23 +87,23 @@ func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(c
 }
 
 // GetTokenFeedPricesUSD provides a mock function with given fields: ctx, tokens
-func (_m *MockPriceReader) GetTokenFeedPricesUSD(ctx context.Context, tokens []types.Account) ([]*big.Int, error) {
+func (_m *MockPriceReader) GetTokenFeedPricesUSD(ctx context.Context, tokens []types.Account) ([]ccipocr3.TokenPrice, error) {
 	ret := _m.Called(ctx, tokens)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetTokenFeedPricesUSD")
 	}
 
-	var r0 []*big.Int
+	var r0 []ccipocr3.TokenPrice
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) ([]*big.Int, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) ([]ccipocr3.TokenPrice, error)); ok {
 		return rf(ctx, tokens)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) []*big.Int); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) []ccipocr3.TokenPrice); ok {
 		r0 = rf(ctx, tokens)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*big.Int)
+			r0 = ret.Get(0).([]ccipocr3.TokenPrice)
 		}
 	}
 
@@ -134,12 +135,12 @@ func (_c *MockPriceReader_GetTokenFeedPricesUSD_Call) Run(run func(ctx context.C
 	return _c
 }
 
-func (_c *MockPriceReader_GetTokenFeedPricesUSD_Call) Return(_a0 []*big.Int, _a1 error) *MockPriceReader_GetTokenFeedPricesUSD_Call {
+func (_c *MockPriceReader_GetTokenFeedPricesUSD_Call) Return(_a0 []ccipocr3.TokenPrice, _a1 error) *MockPriceReader_GetTokenFeedPricesUSD_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockPriceReader_GetTokenFeedPricesUSD_Call) RunAndReturn(run func(context.Context, []types.Account) ([]*big.Int, error)) *MockPriceReader_GetTokenFeedPricesUSD_Call {
+func (_c *MockPriceReader_GetTokenFeedPricesUSD_Call) RunAndReturn(run func(context.Context, []types.Account) ([]ccipocr3.TokenPrice, error)) *MockPriceReader_GetTokenFeedPricesUSD_Call {
 	_c.Call.Return(run)
 	return _c
 }

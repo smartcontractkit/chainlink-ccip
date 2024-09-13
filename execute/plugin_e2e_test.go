@@ -17,6 +17,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
@@ -143,6 +147,7 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 				SourceChainSelector: src,
 				SequenceNumber:      seqNum,
 			},
+			FeeTokenAmount: cciptypes.NewBigIntFromInt64(100),
 		},
 		Destination: dest,
 		Executed:    executed,
@@ -239,11 +244,19 @@ func setupSimpleTest(
 	tokenDataReader := mock_types.NewMockTokenDataReader(t)
 	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
 
+	tokenPricesReader := reader_mock.NewMockPriceReader(t)
+	tokenPricesReader.On("GetTokenFeedPricesUSD", mock.Anything, mock.Anything).Return([]cciptypes.TokenPrice{}, nil)
+
+	messageExecutionCostEstimator := gas.NewStaticMessageExecutionCostEstimator(cciptypes.NewBigIntFromInt64(0))
+
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, tokenPricesReader,
+			messageExecutionCostEstimator, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, tokenPricesReader,
+			messageExecutionCostEstimator, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, tokenPricesReader,
+			messageExecutionCostEstimator, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -262,6 +275,8 @@ func newNode(
 	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
 	tokenDataReader exectypes.TokenDataReader,
+	onChainTokenPricesReader reader.PriceReader,
+	messageExecutionCostEstimator gas.MessageExecutionCostEstimator,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
@@ -283,7 +298,9 @@ func newNode(
 		homeChain,
 		tokenDataReader,
 		evm.EstimateProvider{},
-		lggr)
+		lggr,
+		onChainTokenPricesReader,
+		messageExecutionCostEstimator)
 
 	return nodeSetup{
 		node:        node1,

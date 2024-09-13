@@ -30,6 +30,7 @@ func NewBuilder(
 	destChainSelector cciptypes.ChainSelector,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
+	relativeBoostPerWaitHour float64,
 ) ExecReportBuilder {
 	return &execReportBuilder{
 		ctx:  ctx,
@@ -42,9 +43,10 @@ func NewBuilder(
 		sendersNonce:     nonces,
 		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
 
-		destChainSelector:  destChainSelector,
-		maxReportSizeBytes: maxReportSizeBytes,
-		maxGas:             maxGas,
+		destChainSelector:        destChainSelector,
+		maxReportSizeBytes:       maxReportSizeBytes,
+		maxGas:                   maxGas,
+		relativeBoostPerWaitHour: relativeBoostPerWaitHour,
 	}
 }
 
@@ -73,9 +75,10 @@ type execReportBuilder struct {
 	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
 
 	// Config
-	destChainSelector  cciptypes.ChainSelector
-	maxReportSizeBytes uint64
-	maxGas             uint64
+	destChainSelector        cciptypes.ChainSelector
+	maxReportSizeBytes       uint64
+	maxGas                   uint64
+	relativeBoostPerWaitHour float64
 
 	// State
 	accumulated validationMetadata

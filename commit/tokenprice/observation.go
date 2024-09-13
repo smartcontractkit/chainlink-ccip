@@ -44,20 +44,10 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	//sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
-	tokenPrices, err := p.tokenPriceReader.GetTokenFeedPricesUSD(ctx, tokensToQuery)
+	tokenPricesUSD, err := p.tokenPriceReader.GetTokenFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
 		p.lggr.Errorw("call to GetTokenFeedPricesUSD failed", "err", err)
 		return []cciptypes.TokenPrice{}
-	}
-
-	// If we couldn't fetch all prices log and return only the ones we could fetch
-	if len(tokenPrices) != len(tokensToQuery) {
-		p.lggr.Errorw("token prices length mismatch", "got", tokenPrices, "want", tokensToQuery)
-	}
-
-	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokenPrices))
-	for i, token := range tokensToQuery {
-		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
 	}
 
 	return tokenPricesUSD

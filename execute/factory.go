@@ -4,22 +4,26 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"google.golang.org/grpc"
+
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -109,6 +113,12 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.OfframpAddress,
 	)
 
+	// TODO: Replace this with a price reader that reads from a configured price feed
+	defaultTokenPrice := big.NewInt(1)
+	onChainTokenPricesReader := reader.NewStaticPriceReader(map[ocr2types.Account]*big.Int{}, defaultTokenPrice)
+
+	messageExecutionCostEstimator := gas.NewStaticMessageExecutionCostEstimator(cciptypes.NewBigIntFromInt64(0))
+
 	return NewPlugin(
 			config,
 			pluginconfig.ExecutePluginConfig{
@@ -123,6 +133,8 @@ func (p PluginFactory) NewReportingPlugin(
 			p.tokenDataReader,
 			p.estimateProvider,
 			p.lggr,
+			onChainTokenPricesReader,
+			messageExecutionCostEstimator,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

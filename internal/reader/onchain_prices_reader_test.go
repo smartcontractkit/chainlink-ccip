@@ -53,7 +53,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		inputTokens   []ocr2types.Account
 		tokenInfo     map[ocr2types.Account]pluginconfig.TokenInfo
 		mockPrices    map[ocr2types.Account]*big.Int
-		want          []*big.Int
+		want          []cciptypes.TokenPrice
 		errorAccounts []ocr2types.Account
 		wantErr       bool
 	}{
@@ -64,7 +64,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []ocr2types.Account{ArbAddr},
 			mockPrices:  map[ocr2types.Account]*big.Int{ArbAddr: ArbPrice},
-			want:        []*big.Int{ArbPrice},
+			want:        []cciptypes.TokenPrice{{TokenID: ArbAddr, Price: cciptypes.NewBigInt(ArbPrice)}},
 		},
 		{
 			name: "On-chain multiple prices",
@@ -74,7 +74,10 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []ocr2types.Account{ArbAddr, EthAddr},
 			mockPrices:  map[ocr2types.Account]*big.Int{ArbAddr: ArbPrice, EthAddr: EthPrice},
-			want:        []*big.Int{ArbPrice, EthPrice},
+			want: []cciptypes.TokenPrice{
+				{TokenID: ArbAddr, Price: cciptypes.NewBigInt(ArbPrice)},
+				{TokenID: EthAddr, Price: cciptypes.NewBigInt(EthPrice)},
+			},
 		},
 		{
 			name: "Missing price should error",

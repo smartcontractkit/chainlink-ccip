@@ -57,7 +57,7 @@ func Test_Observation(t *testing.T) {
 
 				tokenPriceReader := readermock.NewMockPriceReader(t)
 				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, []types.Account{tokenA, tokenB}).
-					Return([]*big.Int{bi100, bi200}, nil)
+					Return(feedTokenPrices, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
 					map[types.Account]shared.TimestampedBig{

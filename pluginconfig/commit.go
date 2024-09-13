@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type CommitPluginConfig struct {

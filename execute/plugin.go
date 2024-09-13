@@ -9,12 +9,13 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -41,10 +42,12 @@ type Plugin struct {
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 
-	oracleIDToP2pID  map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader  exectypes.TokenDataReader
-	estimateProvider gas.EstimateProvider
-	lggr             logger.Logger
+	oracleIDToP2pID               map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataReader               exectypes.TokenDataReader
+	estimateProvider              gas.EstimateProvider
+	lggr                          logger.Logger
+	onChainTokenPricesReader      reader.PriceReader
+	messageExecutionCostEstimator gas.MessageExecutionCostEstimator
 }
 
 func NewPlugin(
@@ -58,6 +61,8 @@ func NewPlugin(
 	tokenDataReader exectypes.TokenDataReader,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
+	onChainTokenPricesReader reader.PriceReader,
+	messageExecutionCostEstimator gas.MessageExecutionCostEstimator,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
@@ -70,17 +75,19 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		reportingCfg:     reportingCfg,
-		cfg:              cfg,
-		oracleIDToP2pID:  oracleIDToP2pID,
-		ccipReader:       ccipReader,
-		readerSyncer:     readerSyncer,
-		reportCodec:      reportCodec,
-		msgHasher:        msgHasher,
-		homeChain:        homeChain,
-		tokenDataReader:  tokenDataReader,
-		estimateProvider: estimateProvider,
-		lggr:             lggr,
+		reportingCfg:                  reportingCfg,
+		cfg:                           cfg,
+		oracleIDToP2pID:               oracleIDToP2pID,
+		ccipReader:                    ccipReader,
+		readerSyncer:                  readerSyncer,
+		reportCodec:                   reportCodec,
+		msgHasher:                     msgHasher,
+		homeChain:                     homeChain,
+		tokenDataReader:               tokenDataReader,
+		estimateProvider:              estimateProvider,
+		lggr:                          lggr,
+		onChainTokenPricesReader:      onChainTokenPricesReader,
+		messageExecutionCostEstimator: messageExecutionCostEstimator,
 	}
 }
 
@@ -188,7 +195,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil, nil).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -196,6 +203,7 @@ func (p *Plugin) Observation(
 	case exectypes.GetMessages:
 		// Phase 2: Gather messages from the source chains and build the execution report.
 		messages := make(exectypes.MessageObservations)
+
 		if len(previousOutcome.PendingCommitReports) == 0 {
 			p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 			// No reports to execute.
@@ -233,6 +241,14 @@ func (p *Plugin) Observation(
 			}
 		}
 
+		// We need to observe the token prices for fee tokens so that we can calculate the fees in USD for each
+		// message and compare them to the execution cost for each message in Outcome. If the paid fees are less than
+		// the execution cost, we will not execute the message.
+		feeTokenPriceObservation, err := observeFeeTokenPrices(ctx, p.onChainTokenPricesReader, messages)
+		if err != nil {
+			return types.Observation{}, fmt.Errorf("unable to get token prices: %w", err)
+		}
+
 		// Regroup the commit reports back into the observation format.
 		// TODO: use same format for Observation and Outcome.
 		groupedCommits := make(exectypes.CommitObservations)
@@ -244,7 +260,7 @@ func (p *Plugin) Observation(
 		}
 
 		// TODO: Fire off messages for an attestation check service.
-		return exectypes.NewObservation(groupedCommits, messages, nil).Encode()
+		return exectypes.NewObservation(groupedCommits, messages, nil, feeTokenPriceObservation).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -274,7 +290,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nonceObservations).Encode()
+		return exectypes.NewObservation(nil, nil, nonceObservations, nil).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -419,7 +435,9 @@ func (p *Plugin) Outcome(
 			observation.Nonces,
 			p.cfg.DestChain,
 			uint64(maxReportSizeBytes),
-			p.cfg.OffchainConfig.BatchGasLimit)
+			p.cfg.OffchainConfig.BatchGasLimit,
+			p.cfg.OffchainConfig.RelativeBoostPerWaitHour)
+
 		outcomeReports, commitReports, err := selectReport(
 			p.lggr,
 			commitReports,

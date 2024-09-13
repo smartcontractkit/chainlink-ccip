@@ -1,6 +1,7 @@
 package execute
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -13,9 +14,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared/filter"
+
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
@@ -355,6 +361,36 @@ func mergeNonceObservations(
 	return results
 }
 
+// TODO: doc
+func mergeFeeTokenPriceObservations(
+	lggr logger.Logger,
+	aos []decodedAttributedObservation,
+	fTokenChain int,
+) exectypes.FeeTokenPriceObservations {
+	feeTokenPrices := make(map[types.Account][]cciptypes.TokenPrice)
+	for _, ao := range aos {
+		for token, price := range ao.Observation.FeeTokenPrices {
+			feeTokenPrices[token] = append(feeTokenPrices[token], price)
+		}
+	}
+
+	if len(feeTokenPrices) == 0 {
+		return nil
+	}
+
+	feeTokenPricesConsensus := shared.GetConsensusMapAggregator(
+		lggr,
+		"FeeTokenPrices",
+		feeTokenPrices,
+		shared.TwoFPlus1(fTokenChain),
+		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
+			return shared.Median(vals, shared.TokenPriceComparator)
+		},
+	)
+
+	return feeTokenPricesConsensus
+}
+
 // getConsensusObservation merges all attributed observations into a single observation based on which values have
 // consensus among the observers.
 func getConsensusObservation(
@@ -396,6 +432,14 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
+	// TODO: Implement
+	fTokenChain := 1
+	mergedFeeTokenPriceObservations := mergeFeeTokenPriceObservations(lggr, decodedObservations, fTokenChain)
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged token price observations", oracleID),
+		"oracle", oracleID,
+		"mergedFeeTokenPriceObservations", mergedFeeTokenPriceObservations)
+
 	mergedNonceObservations :=
 		mergeNonceObservations(decodedObservations, fChain[destChainSelector])
 	if err != nil {
@@ -409,7 +453,39 @@ func getConsensusObservation(
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations,
-		mergedNonceObservations)
+		mergedNonceObservations,
+		mergedFeeTokenPriceObservations,
+	)
 
 	return observation, nil
+}
+
+// getUniqueFeeTokens extracts the set of unique fee tokens from the given message observations.
+func getUniqueFeeTokens(msgObs exectypes.MessageObservations) []ocr2types.Account {
+	uniqueFeeTokens := mapset.NewSet[ocr2types.Account]()
+	for _, seqNumMap := range msgObs {
+		for _, message := range seqNumMap {
+			uniqueFeeTokens.Add(ocr2types.Account(message.FeeToken))
+		}
+	}
+
+	return uniqueFeeTokens.ToSlice()
+}
+
+// TODO: doc
+func observeFeeTokenPrices(
+	ctx context.Context,
+	onChainTokenPricesReader reader.PriceReader,
+	msgObs exectypes.MessageObservations,
+) (exectypes.FeeTokenPriceObservations, error) {
+	uniqueFeeTokens := getUniqueFeeTokens(msgObs)
+	tokenPricesUSD, err := onChainTokenPricesReader.GetTokenFeedPricesUSD(ctx, uniqueFeeTokens)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token feed prices: %w", err)
+	}
+	result := make(exectypes.FeeTokenPriceObservations)
+	for _, tokenPrice := range tokenPricesUSD {
+		result[tokenPrice.TokenID] = tokenPrice
+	}
+	return result, nil
 }
