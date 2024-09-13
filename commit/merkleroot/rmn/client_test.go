@@ -58,7 +58,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 				{ID: 4, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
 			},
 			rmnRemoteAddress:                        []byte{1, 2, 3},
-			rmnHomeConfigDigest:                     []byte{0xc, 0x0, 0xf},
+			rmnHomeConfigDigest:                     [32]byte{0xc, 0x0, 0xf},
 			minObservers:                            2,
 			minSigners:                              2,
 			observationsInitialRequestTimerDuration: time.Minute,
@@ -211,7 +211,7 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 	rmnClient *mockRawRmnClient,
 	requestIDs map[NodeID]uint64,
 	requestedChains map[NodeID]mapset.Set[uint64],
-	rmnHomeConfigDigest []byte,
+	rmnHomeConfigDigest [32]byte,
 	destChain *rmnpb.LaneDest,
 ) {
 	allLaneUpdates := ts.updateRequests
@@ -238,7 +238,7 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 			Response: &rmnpb.Response_SignedObservation{
 				SignedObservation: &rmnpb.SignedObservation{
 					Observation: &rmnpb.Observation{
-						RmnHomeContractConfigDigest: rmnHomeConfigDigest,
+						RmnHomeContractConfigDigest: rmnHomeConfigDigest[:],
 						LaneDest:                    destChain,
 						FixedDestLaneUpdates:        laneUpdates,
 						Timestamp:                   uint64(time.Now().UnixMilli()),

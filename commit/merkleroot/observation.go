@@ -36,7 +36,7 @@ func (w *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
-	if err := w.verifyQuery(ctx, q); err != nil {
+	if err := w.verifyQuery(ctx, prevOutcome, q); err != nil {
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
 
@@ -47,9 +47,17 @@ func (w *Processor) Observation(
 	return observation, nil
 }
 
-func (w *Processor) verifyQuery(ctx context.Context, q Query) error {
-	if q.RMNSignatures == nil {
+func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Query) error {
+	if !w.cfg.RMNEnabled {
 		return nil
+	}
+
+	nextState := prevOutcome.NextState()
+	if nextState == BuildingReport && q.RMNSignatures == nil {
+		return fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+	}
+	if nextState != BuildingReport && q.RMNSignatures != nil {
+		return fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
 
 	ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))

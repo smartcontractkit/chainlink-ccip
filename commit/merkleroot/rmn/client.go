@@ -62,7 +62,7 @@ type client struct {
 	rawRmnClient                            RawRmnClient
 	rmnNodes                                []RMNNodeInfo
 	rmnRemoteAddress                        cciptypes.Bytes
-	rmnHomeConfigDigest                     cciptypes.Bytes
+	rmnHomeConfigDigest                     cciptypes.Bytes32
 	rmnReportVersion                        string
 	minObservers                            int
 	minSigners                              int
@@ -88,7 +88,7 @@ func NewClient(
 	rawRmnClient RawRmnClient,
 	rmnNodes []RMNNodeInfo,
 	rmnRemoteAddress cciptypes.Bytes,
-	rmnHomeConfigDigest cciptypes.Bytes,
+	rmnHomeConfigDigest cciptypes.Bytes32,
 	minObservers int,
 	minSigners int,
 	observationsInitialRequestTimerDuration time.Duration,
@@ -338,7 +338,7 @@ func (c *client) validateSignedObservationResponse(
 	lurs map[uint64]updateRequestWithMeta,
 	signedObs *rmnpb.SignedObservation,
 	destChain *rmnpb.LaneDest,
-	rmnHomeConfigDigest cciptypes.Bytes,
+	rmnHomeConfigDigest cciptypes.Bytes32,
 ) error {
 	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
 	if !exists {
@@ -352,7 +352,7 @@ func (c *client) validateSignedObservationResponse(
 		return fmt.Errorf("unexpected lane dest offramp %v", signedObs.Observation.LaneDest)
 	}
 
-	if !bytes.Equal(signedObs.Observation.RmnHomeContractConfigDigest, rmnHomeConfigDigest) {
+	if !bytes.Equal(signedObs.Observation.RmnHomeContractConfigDigest, rmnHomeConfigDigest[:]) {
 		return fmt.Errorf("unexpected rmn home contract config digest %x",
 			signedObs.Observation.RmnHomeContractConfigDigest)
 	}
@@ -441,7 +441,7 @@ func (c *client) getRmnReportSignatures(
 		Context: &rmnpb.ReportContext{
 			EvmDestChainId:              chainInfo.EvmChainID,
 			RmnRemoteContractAddress:    c.rmnRemoteAddress,
-			RmnHomeContractConfigDigest: c.rmnHomeConfigDigest,
+			RmnHomeContractConfigDigest: c.rmnHomeConfigDigest[:],
 			LaneDest:                    destChain,
 		},
 		AttributedSignedObservations: sigObservations,
@@ -575,9 +575,6 @@ func (c *client) listenForRmnReportSignatures(
 				continue
 			}
 
-			configDigestBytes32 := [32]byte{}
-			copy(configDigestBytes32[:], c.rmnHomeConfigDigest)
-
 			laneUpdates, err := NewLaneUpdatesFromPB(fixedDestLaneUpdates)
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
@@ -589,7 +586,7 @@ func (c *client) listenForRmnReportSignatures(
 				DestChainSelector:           cciptypes.ChainSelector(destChain.DestChainSelector),
 				RmnRemoteContractAddress:    c.rmnRemoteAddress,
 				OfframpAddress:              destChain.OfframpAddress,
-				RmnHomeContractConfigDigest: configDigestBytes32,
+				RmnHomeContractConfigDigest: c.rmnHomeConfigDigest,
 				LaneUpdates:                 laneUpdates,
 			}
 

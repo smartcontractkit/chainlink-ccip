@@ -2,10 +2,8 @@ package rmn
 
 import (
 	"fmt"
-	"math/big"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -47,39 +45,4 @@ func (c *client) parseResponse(
 	}
 
 	return responseTyp, nil
-}
-
-type ReportData struct {
-	DestChainEvmID              *big.Int          `abi:"destChainId"`
-	DestChainSelector           uint64            `abi:"destChainSelector"`
-	RmnRemoteContractAddress    string            `abi:"rmnRemoteContractAddress"`
-	OfframpAddress              string            `abi:"offrampAddress"`
-	RmnHomeContractConfigDigest cciptypes.Bytes32 `abi:"rmnHomeContractConfigDigest"`
-	LaneUpdates                 []LaneUpdate      `abi:"destLaneUpdates"`
-}
-
-type LaneUpdate struct {
-	SourceChainSelector uint64            `abi:"sourceChainSelector"`
-	OnRampAddress       []byte            `abi:"onRampAddress"`
-	MinSeqNr            uint64            `abi:"minSeqNr"`
-	MaxSeqNr            uint64            `abi:"maxSeqNr"`
-	MerkleRoot          cciptypes.Bytes32 `abi:"merkleRoot"`
-}
-
-// NewLaneUpdatesFromPBType creates a LaneUpdate from protobuf LaneUpdate type.
-func NewLaneUpdatesFromPBType(pb []*rmnpb.FixedDestLaneUpdate) []LaneUpdate {
-	laneUpdates := make([]LaneUpdate, len(pb))
-	for i, pbLaneUpdate := range pb {
-		root32 := [32]byte{}
-		copy(root32[:], pbLaneUpdate.Root)
-
-		laneUpdates[i] = LaneUpdate{
-			SourceChainSelector: pbLaneUpdate.LaneSource.SourceChainSelector,
-			MinSeqNr:            pbLaneUpdate.ClosedInterval.MinMsgNr,
-			MaxSeqNr:            pbLaneUpdate.ClosedInterval.MaxMsgNr,
-			MerkleRoot:          root32,
-			OnRampAddress:       pbLaneUpdate.LaneSource.OnrampAddress,
-		}
-	}
-	return laneUpdates
 }
