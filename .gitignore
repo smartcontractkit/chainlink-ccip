@@ -22,3 +22,6 @@ repos
 
 # Local helm chart downloads
 /deployments/*/*.tgz
+
+# CLI related
+cli/dist/
