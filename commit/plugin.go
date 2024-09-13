@@ -85,7 +85,9 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		[]rmn.RMNNodeInfo{},
+		rmn.Client(nil),          // todo
+		cciptypes.RMNCrypto(nil), // todo
+		rmn.Config{},             // todo
 	)
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,

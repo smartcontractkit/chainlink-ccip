@@ -20,17 +20,16 @@ import (
 // It's setup to use RMN to query which messages to include in the merkle root and ensures
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
-	oracleID         commontypes.OracleID
-	cfg              pluginconfig.CommitPluginConfig
-	lggr             logger.Logger
-	observer         Observer
-	ccipReader       readerpkg.CCIPReader
-	reportingCfg     ocr3types.ReportingPluginConfig
-	chainSupport     plugincommon.ChainSupport
-	rmnClient        rmn.Client
-	rmnNodeInfo      []rmn.RMNNodeInfo
-	rmnCrypto        cciptypes.RMNCrypto
-	rmnReportVersion string // e.g. "RMN_V1_6_ANY2EVM_REPORT"
+	oracleID     commontypes.OracleID
+	cfg          pluginconfig.CommitPluginConfig
+	lggr         logger.Logger
+	observer     Observer
+	ccipReader   readerpkg.CCIPReader
+	reportingCfg ocr3types.ReportingPluginConfig
+	chainSupport plugincommon.ChainSupport
+	rmnClient    rmn.Client
+	rmnCrypto    cciptypes.RMNCrypto
+	rmnConfig    rmn.Config
 }
 
 // NewProcessor creates a new Processor
@@ -43,7 +42,9 @@ func NewProcessor(
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	chainSupport plugincommon.ChainSupport,
-	rmnNodeInfo []rmn.RMNNodeInfo,
+	rmnClient rmn.Client,
+	rmnCrypto cciptypes.RMNCrypto,
+	rmnConfig rmn.Config,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,
@@ -57,11 +58,13 @@ func NewProcessor(
 		oracleID:     oracleID,
 		cfg:          cfg,
 		lggr:         lggr,
-		ccipReader:   ccipReader,
 		observer:     observer,
+		ccipReader:   ccipReader,
 		reportingCfg: reportingCfg,
 		chainSupport: chainSupport,
-		rmnNodeInfo:  rmnNodeInfo,
+		rmnClient:    rmnClient,
+		rmnCrypto:    rmnCrypto,
+		rmnConfig:    rmnConfig,
 	}
 }
 

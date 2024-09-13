@@ -51,16 +51,21 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		cl := &client{
 			lggr:         lggr,
 			rawRmnClient: rawRmnClient,
-			rmnNodes: []RMNNodeInfo{
-				{ID: 1, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-				{ID: 2, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-				{ID: 3, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-				{ID: 4, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
+			rmnCfg: Config{
+				Home: RMNHomeConfig{
+					RmnNodes: []RMNNodeInfo{
+						{ID: 1, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
+						{ID: 2, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
+						{ID: 3, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
+						{ID: 4, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
+					},
+				},
+				Remote: RMNRemoteConfig{
+					ContractAddress: []byte{1, 2, 3},
+					MinObservers:    2,
+					MinSigners:      2,
+				},
 			},
-			rmnRemoteAddress:                        []byte{1, 2, 3},
-			rmnHomeConfigDigest:                     [32]byte{0xc, 0x0, 0xf},
-			minObservers:                            2,
-			minSigners:                              2,
 			observationsInitialRequestTimerDuration: time.Minute,
 			reportsInitialRequestTimerDuration:      time.Minute,
 		}
@@ -107,13 +112,14 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 		ts := newTestSetup(t)
 		go func() {
-			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(ts.rawRmnClient, ts.rmnClient.minObservers)
+			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
+				ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			ts.nodesRespondToTheObservationRequests(
-				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
+				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, ts.rmnClient.minSigners, ts.rmnClient.minObservers)
+				t, ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinSigners, ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -125,7 +131,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnClient.minSigners)
+		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
 	})
 
 	t.Run("happy path with retries", func(t *testing.T) {
@@ -137,24 +143,25 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnClient.reportsInitialRequestTimerDuration = time.Nanosecond
 
 		go func() {
-			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(ts.rawRmnClient, ts.rmnClient.minObservers)
+			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
+				ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			// requests should be sent to at least two nodes
-			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.minObservers)
-			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnClient.minObservers)
+			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.rmnCfg.Remote.MinObservers)
+			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			ts.nodesRespondToTheObservationRequests(
-				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
+				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
 			time.Sleep(time.Millisecond)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, len(ts.rmnClient.rmnNodes), ts.rmnClient.minObservers)
+				t, ts.rawRmnClient, len(ts.rmnClient.rmnCfg.Home.RmnNodes), ts.rmnClient.rmnCfg.Remote.MinObservers)
 			time.Sleep(time.Millisecond)
 
 			t.Logf("requestIDs: %v", requestIDs)
 
 			// requests should be sent to all nodes, since we hit the timer timeout
-			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnNodes))
+			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnCfg.Home.RmnNodes))
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -166,7 +173,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnClient.minSigners)
+		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
 	})
 }
 
