@@ -99,7 +99,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 
 	var onChainTokenPricesReader reader.PriceReader
 	// The node supports the chain that the token prices are on.
-	tokenPricesCr, ok := p.contractReaders[cciptypes.ChainSelector(offchainConfig.TokenPriceChainSelector)]
+	tokenPricesCr, ok := p.contractReaders[offchainConfig.TokenPriceChainSelector]
 	if ok {
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
 			tokenPricesCr,

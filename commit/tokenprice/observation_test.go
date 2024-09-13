@@ -25,17 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	bi100              = big.NewInt(100)
-	bi200              = big.NewInt(200)
-	tokenA             = types.Account("0xAAAAAAAAAAAAAAAa75C1216873Ec4F88C11E57E3")
-	tokenB             = types.Account("0xBBBBBBBBBBBBBBBb75C1216873Ec4F88C11E57E3")
-	tokenPriceChainSel = cciptypes.ChainSelector(1)
-	destChainSel       = cciptypes.ChainSelector(2)
-)
-
 func Test_Observation(t *testing.T) {
-	fDestChain := 3
+	fChains := map[cciptypes.ChainSelector]int{
+		feedChainSel: f,
+		destChainSel: f,
+	}
 	timestamp := time.Now().UTC()
 	feedTokenPrices := []cciptypes.TokenPrice{
 		cciptypes.NewTokenPrice(tokenA, bi100),
@@ -57,7 +51,7 @@ func Test_Observation(t *testing.T) {
 			getProcessor: func(t *testing.T) *processor {
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportedChains(mock.Anything).Return(
-					mapset.NewSet[cciptypes.ChainSelector](tokenPriceChainSel, destChainSel), nil,
+					mapset.NewSet[cciptypes.ChainSelector](feedChainSel, destChainSel), nil,
 				)
 				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 
@@ -75,7 +69,7 @@ func Test_Observation(t *testing.T) {
 
 				homeChain := readermock.NewMockHomeChain(t)
 				homeChain.EXPECT().GetFChain().Return(
-					map[cciptypes.ChainSelector]int{destChainSel: fDestChain},
+					map[cciptypes.ChainSelector]int{destChainSel: f, feedChainSel: f},
 					nil,
 				)
 
@@ -86,15 +80,15 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
+					bigF:             f,
 				}
 			},
 			expObs: Observation{
 				FeedTokenPrices:       feedTokenPrices,
 				FeeQuoterTokenUpdates: feeQuoterTokenUpdates,
-				FDestChain:            fDestChain,
+				FChain:                fChains,
 				Timestamp:             time.Now().UTC(),
 			},
-			expErr: nil,
 		},
 		{
 			name: "Failed to get FDestChain",
@@ -112,10 +106,10 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
+					bigF:             f,
 				}
 			},
 			expObs: Observation{},
-			expErr: errors.New("failed to get FChain"),
 		},
 	}
 
@@ -139,14 +133,6 @@ func Test_Observation(t *testing.T) {
 	}
 }
 
-func TestManyTimes(t *testing.T) {
-	for i := 0; i < 100; i++ {
-		t.Run("", func(t *testing.T) {
-			Test_Observation(t)
-		})
-	}
-}
-
 var defaultCfg = pluginconfig.CommitPluginConfig{
 	DestChain: destChainSel,
 	OffchainConfig: pluginconfig.CommitOffchainConfig{
@@ -161,6 +147,6 @@ var defaultCfg = pluginconfig.CommitPluginConfig{
 				AggregatorAddress: "0x2222222222222222222222Ff18C45Df59775Fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)}},
 		},
-		TokenPriceChainSelector: uint64(tokenPriceChainSel),
+		TokenPriceChainSelector: feedChainSel,
 	},
 }
