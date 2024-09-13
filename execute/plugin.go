@@ -42,10 +42,10 @@ type Plugin struct {
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 
-	oracleIDToP2pID  map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader  exectypes.TokenDataReader
-	estimateProvider gas.EstimateProvider
-	lggr             logger.Logger
+	oracleIDToP2pID    map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataProcessor tokendata.TokenDataProcessor
+	estimateProvider   gas.EstimateProvider
+	lggr               logger.Logger
 }
 
 func NewPlugin(
@@ -56,7 +56,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataReader exectypes.TokenDataReader,
+	tokenDataProcessor tokendata.TokenDataProcessor,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
@@ -71,17 +71,17 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		reportingCfg:     reportingCfg,
-		cfg:              cfg,
-		oracleIDToP2pID:  oracleIDToP2pID,
-		ccipReader:       ccipReader,
-		readerSyncer:     readerSyncer,
-		reportCodec:      reportCodec,
-		msgHasher:        msgHasher,
-		homeChain:        homeChain,
-		tokenDataReader:  tokenDataReader,
-		estimateProvider: estimateProvider,
-		lggr:             lggr,
+		reportingCfg:       reportingCfg,
+		cfg:                cfg,
+		oracleIDToP2pID:    oracleIDToP2pID,
+		ccipReader:         ccipReader,
+		readerSyncer:       readerSyncer,
+		reportCodec:        reportCodec,
+		msgHasher:          msgHasher,
+		homeChain:          homeChain,
+		tokenDataProcessor: tokenDataProcessor,
+		estimateProvider:   estimateProvider,
+		lggr:               lggr,
 	}
 }
 
@@ -244,8 +244,7 @@ func (p *Plugin) Observation(
 			groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
 		}
 
-		// Dummy token data to satisfy the interface, to be replaces with real implementation
-		tkData, err1 := (&tokendata.NoopTokenProcessor{}).ProcessTokenData(ctx, messages)
+		tkData, err1 := p.tokenDataProcessor.ProcessTokenData(ctx, messages)
 		if err1 != nil {
 			return types.Observation{}, fmt.Errorf("unable to process token data %w", err)
 		}
@@ -420,7 +419,17 @@ func (p *Plugin) Outcome(
 		commitReports := previousOutcome.PendingCommitReports
 
 		// TODO: this function should be pure, a context should not be needed.
-		builder := report.NewBuilder(context.Background(), p.lggr, p.msgHasher, p.reportCodec, p.estimateProvider, observation.Nonces, p.cfg.DestChain, uint64(maxReportSizeBytes), p.cfg.OffchainConfig.BatchGasLimit)
+		builder := report.NewBuilder(
+			context.Background(),
+			p.lggr,
+			p.msgHasher,
+			p.reportCodec,
+			p.estimateProvider,
+			observation.Nonces,
+			p.cfg.DestChain,
+			uint64(maxReportSizeBytes),
+			p.cfg.OffchainConfig.BatchGasLimit,
+		)
 		outcomeReports, commitReports, err := selectReport(
 			p.lggr,
 			commitReports,

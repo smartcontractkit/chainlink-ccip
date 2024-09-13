@@ -12,17 +12,23 @@ type UsdcTokenDataProcessor struct {
 	configs []pluginconfig.UsdcCctpTokenDataProcessor
 }
 
-func (u *UsdcTokenDataProcessor) ProcessTokenData(ctx context.Context, messages exectypes.MessageObservations) (exectypes.TokenDataObservations, error) {
+func (u *UsdcTokenDataProcessor) ProcessTokenData(
+	ctx context.Context,
+	messages exectypes.MessageObservations,
+) (exectypes.TokenDataObservations, error) {
+	// Ask LogPoller for USDC messages and matching events
 	usdcMessages, err := u.pickOnlyUSDCMessages(messages)
 	if err != nil {
 		return nil, err
 	}
 
+	// Fetch attestations for USDC messages
 	attestations, err := u.fetchAttestations(ctx, usdcMessages)
 	if err != nil {
 		return nil, err
 	}
 
+	// Add attestations to the token observations
 	return u.extractTokenData(attestations)
 }
 

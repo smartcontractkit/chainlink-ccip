@@ -35,6 +35,7 @@ func buildSingleChainReportHelper(
 		}
 		for i := 0; i < len(report.Messages); i++ {
 			if !report.MessageTokensData[i].IsReady() {
+				// Skip messages that don't have token data ready. Add logging here or detailed status message
 				continue
 			}
 
@@ -150,15 +151,8 @@ const (
 	*/
 )
 
-func padSlice[T any](slice []T, padLen int, defaultValue T) []T {
-	for len(slice) < padLen {
-		slice = append(slice, defaultValue)
-	}
-	return slice
-}
-
 func (b *execReportBuilder) checkMessage(
-	ctx context.Context, idx int, execReport exectypes.CommitData,
+	_ context.Context, idx int, execReport exectypes.CommitData,
 	// TODO: get rid of the nolint when the error is used
 ) (exectypes.CommitData, messageStatus, error) { // nolint this will use the error eventually
 	result := execReport
@@ -181,14 +175,10 @@ func (b *execReportBuilder) checkMessage(
 		return execReport, AlreadyExecuted, nil
 	}
 
-	// 2. Check if token data is ready.
-	//if b.tokenDataReader == nil {
-	//	return execReport, Unknown, fmt.Errorf("token data reader must be initialized")
-	//}
-
+	// 2. Check if all tokens are properly initialized with token data
 	if idx >= len(execReport.MessageTokensData) {
-		b.lggr.Errorw("token data index out of range", "index", idx, "numMessages", len(execReport.Messages))
-		return execReport, Unknown, fmt.Errorf("message index out of range")
+		b.lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(execReport.MessageTokensData))
+		return execReport, Unknown, fmt.Errorf("token data index out of range")
 	}
 
 	messageTokenData := execReport.MessageTokensData[idx]
@@ -202,35 +192,7 @@ func (b *execReportBuilder) checkMessage(
 			"messageState", TokenDataNotReady)
 		return execReport, TokenDataNotReady, nil
 	}
-
-	//tokenData, err := b.tokenDataReader.ReadTokenData(ctx, execReport.SourceChain, msg.Header.SequenceNumber)
-	//if err != nil {
-	//	if errors.Is(err, ErrNotReady) {
-	//		b.lggr.Infow(
-	//			"unable to read token data - token data not ready",
-	//			"messageID", msg.Header.MessageID,
-	//			"sourceChain", execReport.SourceChain,
-	//			"seqNum", msg.Header.SequenceNumber,
-	//			"error", err,
-	//			"messageState", TokenDataNotReady)
-	//		return execReport, TokenDataNotReady, nil
-	//	}
-	//	b.lggr.Errorw(
-	//		"unable to read token data - unknown error",
-	//		"messageID", msg.Header.MessageID,
-	//		"sourceChain", execReport.SourceChain,
-	//		"seqNum", msg.Header.SequenceNumber,
-	//		"error", err,
-	//		"messageState", TokenDataFetchError)
-	//	return execReport, TokenDataFetchError, nil
-	//}
-	//
-	//transformedTokenData := make([]exectypes.TokenData, len(tokenData))
-	//for i, td := range tokenData {
-	//	transformedTokenData[i] = exectypes.TokenData{Data: td}
-	//}
-	//result.TokenData = padSlice(execReport.TokenData, idx+1, nil)
-	//result.TokenData[idx] = transformedTokenData
+	result.MessageTokensData[idx] = messageTokenData
 	b.lggr.Infow(
 		"read token data",
 		"messageID", msg.Header.MessageID,

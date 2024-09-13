@@ -18,6 +18,16 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
+// TokenDataObservations contain token data for messages organized by source chain selector and sequence number.
+// There could be multiple tokens per a single message, so MessageTokensData is a slice of TokenData.
+// TokenDataObservations are populated during the Observation phase and depends on previously fetched
+// MessageObservations details and the `tokenDataProcessors` configured in the ExecuteOffchainConfig.
+// Content of the MessageTokensData is determined by the TokenDataProcessor implementations.
+//   - if Message doesn't have any tokens, TokenData slice will be empty.
+//   - if Message has tokens, but these tokens don't require any special treatment,
+//     TokenData slice will contain empty TokenData objects.
+//   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
+//     specific TokenDataProcessor will be used to populate the TokenData slice.
 type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokensData
 
 type MessageTokensData struct {
@@ -50,10 +60,20 @@ func (mtd MessageTokensData) ToByteSlice() [][]byte {
 	return out
 }
 
+// TokenData is the token data for a single token in a message.
+// It contains the token data and a flag indicating if the data is ready.
 type TokenData struct {
 	Ready bool   `json:"ready"`
-	Error error  `json:"error"`
 	Data  []byte `json:"data"`
+	Error error
+}
+
+func NewEmptyTokenData() TokenData {
+	return TokenData{
+		Ready: false,
+		Error: nil,
+		Data:  nil,
+	}
 }
 
 func (td TokenData) IsReady() bool {
@@ -84,7 +104,12 @@ type Observation struct {
 }
 
 // NewObservation constructs a Observation object.
-func NewObservation(commitReports CommitObservations, messages MessageObservations, tokenData TokenDataObservations, nonces NonceObservations) Observation {
+func NewObservation(
+	commitReports CommitObservations,
+	messages MessageObservations,
+	tokenData TokenDataObservations,
+	nonces NonceObservations,
+) Observation {
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,

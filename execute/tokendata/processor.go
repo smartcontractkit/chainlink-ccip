@@ -8,15 +8,24 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 )
 
-type TokenExecutionProcessor interface {
-	ProcessTokenData(ctx context.Context, observations exectypes.MessageObservations) (exectypes.TokenDataObservations, error)
+type TokenDataProcessor interface {
+	ProcessTokenData(
+		ctx context.Context,
+		observations exectypes.MessageObservations,
+	) (exectypes.TokenDataObservations, error)
 }
 
-type TokenExecutionComposite struct {
-	Processors []TokenExecutionProcessor
+// CompositeTokenDataProcessor is a TokenDataProcessor that combines multiple TokenDataProcessors.
+// Goal of that is to support multiple token processors supporting different tokens (e.g. CCTP, MyFancyToken etc)
+type CompositeTokenDataProcessor struct {
+	Processors []TokenDataProcessor
 }
 
-func (t *TokenExecutionComposite) ProcessTokenData(ctx context.Context, messages exectypes.MessageObservations) (exectypes.TokenDataObservations, error) {
+func (t *CompositeTokenDataProcessor) ProcessTokenData(
+	ctx context.Context,
+	messages exectypes.MessageObservations,
+) (exectypes.TokenDataObservations, error) {
+	// Dummy implementation, don't focus on that
 	var tokenObservation exectypes.TokenDataObservations
 	for _, processor := range t.Processors {
 		tokenData, err := processor.ProcessTokenData(ctx, messages)
@@ -28,13 +37,16 @@ func (t *TokenExecutionComposite) ProcessTokenData(ctx context.Context, messages
 	return tokenObservation, nil
 }
 
-func merge(observation exectypes.TokenDataObservations, data exectypes.TokenDataObservations) exectypes.TokenDataObservations {
+func merge(_ exectypes.TokenDataObservations, _ exectypes.TokenDataObservations) exectypes.TokenDataObservations {
 	return exectypes.TokenDataObservations{}
 }
 
 type NoopTokenProcessor struct{}
 
-func (n *NoopTokenProcessor) ProcessTokenData(_ context.Context, observations exectypes.MessageObservations) (exectypes.TokenDataObservations, error) {
+func (n *NoopTokenProcessor) ProcessTokenData(
+	_ context.Context,
+	observations exectypes.MessageObservations,
+) (exectypes.TokenDataObservations, error) {
 	tokenObservations := make(exectypes.TokenDataObservations)
 
 	for selector, obs := range observations {
@@ -42,11 +54,8 @@ func (n *NoopTokenProcessor) ProcessTokenData(_ context.Context, observations ex
 
 		for seq, message := range obs {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
-			for i, _ := range message.TokenAmounts {
-				tokenData[i] = exectypes.TokenData{
-					Ready: true,
-					Data:  []byte{},
-				}
+			for i := range message.TokenAmounts {
+				tokenData[i] = exectypes.NewEmptyTokenData()
 			}
 			tokenObservations[selector][seq] = exectypes.MessageTokensData{TokenData: tokenData}
 		}

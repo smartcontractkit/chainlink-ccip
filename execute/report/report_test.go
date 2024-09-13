@@ -747,7 +747,17 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			builder := NewBuilder(ctx, lggr, hasher, codec, evm.EstimateProvider{}, tt.args.nonces, 1, tt.args.maxReportSize, tt.args.maxGasLimit)
+			builder := NewBuilder(
+				ctx,
+				lggr,
+				hasher,
+				codec,
+				evm.EstimateProvider{},
+				tt.args.nonces,
+				1,
+				tt.args.maxReportSize,
+				tt.args.maxGasLimit,
+			)
 
 			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
@@ -959,40 +969,9 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 	}
 }
 
-type tdr struct {
-	mode tokenDataMode
-}
-
-type tokenDataMode int
-
-const (
-	noop tokenDataMode = iota + 1
-	good
-	bad
-	notReady
-)
-
-func (t tdr) ReadTokenData(
-	ctx context.Context, srcChain cciptypes.ChainSelector, num cciptypes.SeqNum) ([][]byte, error,
-) {
-	switch t.mode {
-	case noop:
-		return nil, nil
-	case good:
-		return [][]byte{{0x01, 0x02, 0x03}}, nil
-	case bad:
-		return nil, fmt.Errorf("bad token data reader")
-	case notReady:
-		return nil, ErrNotReady
-	default:
-		panic("mode should be one of the valid ones.")
-	}
-}
-
 func Test_execReportBuilder_checkMessage(t *testing.T) {
 	type fields struct {
-		tokenDataReader exectypes.TokenDataReader
-		accumulated     validationMetadata
+		accumulated validationMetadata
 	}
 	type args struct {
 		idx        int
@@ -1029,7 +1008,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			expectedLog:    "message already executed",
 		},
 		{
-			name: "bad token data",
+			name: "token data not ready",
 			args: args{
 				idx: 0,
 				execReport: exectypes.CommitData{
@@ -1041,28 +1020,9 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					},
 				},
 			},
-			fields: fields{
-				tokenDataReader: tdr{mode: bad},
-			},
 			expectedStatus: TokenDataNotReady,
 			expectedLog:    "unable to read token data - token data not ready",
 		},
-		//{
-		//	name: "token data not ready",
-		//	args: args{
-		//		idx: 0,
-		//		execReport: exectypes.CommitData{
-		//			Messages: []cciptypes.Message{
-		//				makeMessage(1, 100, 0),
-		//			},
-		//		},
-		//	},
-		//	fields: fields{
-		//		tokenDataReader: tdr{mode: notReady},
-		//	},
-		//	expectedStatus: TokenDataNotReady,
-		//	expectedLog:    "unable to read token data - token data not ready",
-		//},
 		{
 			name: "good token data is cached",
 			args: args{
@@ -1075,9 +1035,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 					},
 				},
-			},
-			fields: fields{
-				tokenDataReader: tdr{mode: good},
 			},
 			expectedStatus: ReadyToExecute,
 			expectedData: exectypes.CommitData{
@@ -1101,9 +1058,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
-			},
-			fields: fields{
-				tokenDataReader: tdr{mode: noop},
 			},
 			expectedStatus: ReadyToExecute,
 			expectedData: exectypes.CommitData{
@@ -1129,9 +1083,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
-			},
-			fields: fields{
-				tokenDataReader: tdr{mode: noop},
 			},
 			expectedStatus: ReadyToExecute,
 			expectedData: exectypes.CommitData{
@@ -1159,9 +1110,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					},
 				},
 			},
-			fields: fields{
-				tokenDataReader: tdr{mode: noop},
-			},
 			expectedStatus: MissingNoncesForChain,
 		},
 		{
@@ -1180,9 +1128,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
-			},
-			fields: fields{
-				tokenDataReader: tdr{mode: noop},
 			},
 			expectedStatus: MissingNonce,
 		},
@@ -1204,9 +1149,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
-			},
-			fields: fields{
-				tokenDataReader: tdr{mode: noop},
 			},
 			expectedStatus: InvalidNonce,
 		},
