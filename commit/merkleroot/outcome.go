@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
@@ -52,7 +53,7 @@ func (w *Processor) getOutcome(
 			// The current observations should all be empty.
 			return previousOutcome, BuildingReport
 		}
-		return buildReport(q, consensusObservation, previousOutcome), nextState
+		return buildReport(q, w.lggr, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
 		return checkForReportTransmission(
 			w.lggr, w.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
@@ -112,7 +113,8 @@ func reportRangesOutcome(
 // Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
 // to transmit on-chain
 func buildReport(
-	_ Query,
+	q Query,
+	lggr logger.Logger,
 	consensusObservation ConsensusObservation,
 	prevOutcome Outcome,
 ) Outcome {
@@ -125,12 +127,31 @@ func buildReport(
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
-	// TODO: use q.RMNSignatures in the generated outcome and eventually report. - Blocked by onchain work.
+	sigs := make([]cciptypes.RMNECDSASignature, 0)
+	if q.RMNSignatures == nil {
+		lggr.Error("RMNSignatures are nil")
+	} else {
+		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+		if err != nil {
+			lggr.Errorw("Failed to parse RMN signatures", "error", err)
+		} else {
+			sigs = parsedSigs
+		}
+	}
+	sort.Slice(sigs, func(i, j int) bool {
+		riStr := sigs[i].R.String()
+		rjStr := sigs[j].R.String()
+		if riStr != rjStr {
+			return riStr < rjStr
+		}
+		return sigs[i].S.String() < sigs[j].S.String()
+	})
 
 	outcome := Outcome{
-		OutcomeType:        outcomeType,
-		RootsToReport:      roots,
-		OffRampNextSeqNums: prevOutcome.OffRampNextSeqNums,
+		OutcomeType:         outcomeType,
+		RootsToReport:       roots,
+		OffRampNextSeqNums:  prevOutcome.OffRampNextSeqNums,
+		RMNReportSignatures: sigs,
 	}
 
 	return outcome

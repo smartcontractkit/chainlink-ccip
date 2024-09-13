@@ -112,6 +112,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
+			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
 		},
 	}
 
@@ -145,7 +146,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 							MerkleRoot:   merkleRoot1,
 						},
 					},
-					PriceUpdates: ccipocr3.PriceUpdates{},
+					PriceUpdates:  ccipocr3.PriceUpdates{},
+					RMNSignatures: []ccipocr3.RMNECDSASignature{},
 				},
 			},
 		},

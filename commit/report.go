@@ -31,7 +31,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
-		// RMNSignatures: nil,
+		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
 	}
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)

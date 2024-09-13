@@ -53,9 +53,14 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	nextState := prevOutcome.NextState()
-	if nextState == BuildingReport && q.RMNSignatures == nil {
+
+	// If we are in the BuildingReport state, and we are not retrying RMN signatures in the next round, we expect RMN
+	// signatures to be provided by the leader.
+	if nextState == BuildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
 		return fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
 	}
+
+	// If we are not in the BuildingReport state, we do not expect RMN signatures to be provided.
 	if nextState != BuildingReport && q.RMNSignatures != nil {
 		return fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
