@@ -2,8 +2,10 @@ package rmn
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -48,17 +50,30 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		resChan := make(chan RawRmnResponse, 200)
 		rawRmnClient := newMockRawRmnClient(resChan)
 
+		const numNodes = 4
+		rmnNodes := make([]RMNNodeInfo, numNodes)
+		for i := 0; i < numNodes; i++ {
+			publicKey, _, err := ed25519.GenerateKey(strings.NewReader(strings.Repeat("deterministic", 1000)))
+			require.NoError(t, err)
+
+			rmnNodes[i] = RMNNodeInfo{
+				ID:                        NodeID(i + 1),
+				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
+				IsSigner:                  true,
+				SignReportsAddress:        cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
+				SignObservationsPublicKey: &publicKey,
+				SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
+			}
+		}
+
 		cl := &client{
 			lggr:         lggr,
 			rawRmnClient: rawRmnClient,
 			rmnCfg: Config{
 				Home: RMNHomeConfig{
-					RmnNodes: []RMNNodeInfo{
-						{ID: 1, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-						{ID: 2, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-						{ID: 3, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-						{ID: 4, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-					},
+					RmnNodes:         rmnNodes,
+					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
+					RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
 				},
 				Remote: RMNRemoteConfig{
 					ContractAddress: []byte{1, 2, 3},
@@ -68,6 +83,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			},
 			observationsInitialRequestTimerDuration: time.Minute,
 			reportsInitialRequestTimerDuration:      time.Minute,
+			ed25519Verifier:                         signatureVerifierAlwaysTrue{},
+			rmnCrypto:                               signatureVerifierAlwaysTrue{},
 		}
 
 		updateRequests := []*rmnpb.FixedDestLaneUpdateRequest{
@@ -108,8 +125,6 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	})
 
 	t.Run("happy path no retries", func(t *testing.T) {
-		t.Skipf("skip until signature verification is implemented in the test")
-
 		ts := newTestSetup(t)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
@@ -135,8 +150,6 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	})
 
 	t.Run("happy path with retries", func(t *testing.T) {
-		t.Skipf("skip until signature verification is implemented in the test")
-
 		ts := newTestSetup(t)
 
 		ts.rmnClient.observationsInitialRequestTimerDuration = time.Nanosecond
@@ -310,14 +323,14 @@ func (ts *testSetup) nodesRespondToTheSignatureRequests(
 ) {
 	// now the plugin is waiting for rmn node responses for all this requests
 	for nodeID, reqID := range requestIDs {
+		r := [32]byte{byte(nodeID), 1, 2, 3}
+		s := [32]byte{byte(nodeID), 4, 5, 6}
+
 		resp := &rmnpb.Response{
 			RequestId: reqID,
 			Response: &rmnpb.Response_ReportSignature{
 				ReportSignature: &rmnpb.ReportSignature{
-					Signature: &rmnpb.EcdsaSignature{
-						R: []byte{byte(nodeID), 1, 2, 3},
-						S: []byte{byte(nodeID), 4, 5, 6},
-					},
+					Signature: &rmnpb.EcdsaSignature{R: r[:], S: s[:]},
 				},
 			},
 		}
@@ -384,4 +397,16 @@ func (m *mockRawRmnClient) Send(rmnNodeID NodeID, request []byte) error {
 
 func (m *mockRawRmnClient) Recv() <-chan RawRmnResponse {
 	return m.resChan
+}
+
+// signatureVerifierAlwaysTrue is a signature verifier that always returns true.
+type signatureVerifierAlwaysTrue struct{}
+
+func (a signatureVerifierAlwaysTrue) Verify(_ ed25519.PublicKey, _, _ []byte) bool {
+	return true
+}
+
+func (a signatureVerifierAlwaysTrue) VerifyReportSignatures(
+	_ context.Context, _ []cciptypes.RMNECDSASignature, _ cciptypes.RMNReport, _ []cciptypes.Bytes) error {
+	return nil
 }

@@ -56,10 +56,11 @@ type NodeID uint32
 
 // client is the base RMN Client implementation.
 type client struct {
-	lggr         logger.Logger
-	rmnCrypto    cciptypes.RMNCrypto
-	rawRmnClient RawRmnClient
-	rmnCfg       Config
+	lggr            logger.Logger
+	rmnCrypto       cciptypes.RMNCrypto
+	rawRmnClient    RawRmnClient
+	rmnCfg          Config
+	ed25519Verifier ED25519Verifier
 
 	observationsInitialRequestTimerDuration time.Duration
 	reportsInitialRequestTimerDuration      time.Duration
@@ -75,10 +76,11 @@ func NewClient(
 	reportsInitialRequestTimerDuration time.Duration,
 ) Client {
 	return &client{
-		lggr:         lggr,
-		rmnCrypto:    rmnCrypto,
-		rawRmnClient: rawRmnClient,
-		rmnCfg:       rmnConfig,
+		lggr:            lggr,
+		rmnCrypto:       rmnCrypto,
+		rawRmnClient:    rawRmnClient,
+		rmnCfg:          rmnConfig,
+		ed25519Verifier: NewED25519Verifier(),
 
 		observationsInitialRequestTimerDuration: observationsInitialRequestTimerDuration,
 		reportsInitialRequestTimerDuration:      reportsInitialRequestTimerDuration,
@@ -366,7 +368,7 @@ func (c *client) validateSignedObservationResponse(
 		}
 	}
 
-	if err := verifyObservationSignature(rmnNode, signedObs); err != nil {
+	if err := verifyObservationSignature(rmnNode, signedObs, c.ed25519Verifier); err != nil {
 		return fmt.Errorf("failed to verify observation signature: %w", err)
 	}
 	return nil

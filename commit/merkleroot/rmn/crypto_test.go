@@ -53,12 +53,12 @@ func Test_verifyObservationSignature(t *testing.T) {
 		SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
 	}
 
-	err = verifyObservationSignature(rmnNode, signedObs)
+	err = verifyObservationSignature(rmnNode, signedObs, NewED25519Verifier())
 	assert.NoError(t, err)
 
 	// After we update one byte in the signature, the signature verification should fail
 	signedObs.Signature[0] = signedObs.Signature[0] + 1
-	err = verifyObservationSignature(rmnNode, signedObs)
+	err = verifyObservationSignature(rmnNode, signedObs, NewED25519Verifier())
 	assert.Error(t, err)
 }
 
@@ -123,11 +123,11 @@ func Test_verifyObservationSignature2(t *testing.T) {
 		SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
 	}
 
-	err = verifyObservationSignature(rmnNode, signedObs)
+	err = verifyObservationSignature(rmnNode, signedObs, NewED25519Verifier())
 	assert.NoError(t, err)
 
 	// After we update one byte in the signature, the signature verification should fail
 	signedObs.Signature[0] = signedObs.Signature[0] + 1
-	err = verifyObservationSignature(rmnNode, signedObs)
+	err = verifyObservationSignature(rmnNode, signedObs, NewED25519Verifier())
 	assert.Error(t, err)
 }
