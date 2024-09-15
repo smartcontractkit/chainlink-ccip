@@ -12,7 +12,7 @@ vars:
 
 dependencies:
   atlas:
-    path: ${COMPONENTS_DIR}/atlas/atlas.yaml
+    path: ${IMPORTS_DIR}/atlas/atlas.yaml
     pipeline: atlas
     namespace: ${DEVSPACE_NAMESPACE}
 

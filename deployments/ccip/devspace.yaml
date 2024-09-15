@@ -2,18 +2,21 @@ version: v2beta1
 name: chainlink
 
 imports:
-  - path: ../../components/don/don.yaml
-  - path: ../../components/atlas/atlas.yaml
-  - path: ../../components/kind/kind.yaml
-  - path: ../../components/ccip/ui/devspace.yaml
+  - path: ${IMPORTS_DIR}/don/don.yaml
+  - path: ${IMPORTS_DIR}/atlas/atlas.yaml
+  - path: ${IMPORTS_DIR}/kind/kind.yaml
+  - path: ${IMPORTS_DIR}/ccip/ui/devspace.yaml
 
 vars:
   SCRIPTS_DIR:
     source: env
     default: "../../scripts"
-  COMPONENTS_DIR:
+  DEPENDENCIES_DIR:
     source: env
-    default: "../../components"
+    default: "../../dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "../../imports"
   CHAINLINK_REPO_DIR:
     source: env
     default: "${CHAINLINK_CODE_DIR}/ccip"

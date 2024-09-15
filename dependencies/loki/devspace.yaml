@@ -4,15 +4,15 @@ pipelines:
   deploy:
     run: |-
       create_deployments configs
-      create_deployments tempo
+      create_deployments loki
 
 deployments:
   configs:
     kubectl:
       manifests:
-        - ${COMPONENTS_DIR}/tempo/configmaps/default.yaml
+        - ${DEPENDENCIES_DIR}/loki/configmaps/default.yaml
 
-  tempo:
+  loki:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       chart:
@@ -20,34 +20,37 @@ deployments:
         repo: https://charts.devspace.sh
       values:
         containers:
-          - image: grafana/tempo:2.5.0
+          - image: grafana/loki:3.1.0
             args:
-              - "-config.file=/etc/tempo/config/tempo.yml"
-
+              - "--config.file=/etc/loki/config/loki.yml"
             volumeMounts:
-              - containerPath: /etc/tempo/config
+              - containerPath: /etc/loki/config
                 volume:
                   name: config-volume
         volumes:
           - name: config-volume
             configMap:
-              name: tempo-config
+              name: loki-config
 
         service:
-          name: tempo
+          name: loki
           ports:
-            - port: 4317
-            - port: 3200
+            - port: 3100
         podSecurityContext:
-          fsGroup: 10001
+          fsGroup: 999
         securityContext:
-          runAsUser: 10001
-          runAsGroup: 10001
-          fsGroup: 10001
+          runAsUser: 999
+          runAsGroup: 999
+          fsGroup: 999
 
 profiles:
   - name: add-beholder-config
     patches:
       - op: replace
         path: deployments.configs.kubectl.manifests[0]
-        value: ${COMPONENTS_DIR}/tempo/configmaps/beholder.yaml
+        value: ${DEPENDENCIES_DIR}/loki/configmaps/beholder.yaml
+  - name: kind
+    patches:
+      - op: replace
+        path: deployments.configs.kubectl.manifests[0]
+        value: ${DEPENDENCIES_DIR}/loki/configmaps/default.yaml

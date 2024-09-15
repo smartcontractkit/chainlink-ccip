@@ -39,13 +39,13 @@ The Beholder DevSpace configuration utilizes dependencies to manage the applicat
 ```yaml
 dependencies:
   prometheus:
-    path: ${COMPONENTS_DIR}/prometheus
+    path: ${DEPENDENCIES_DIR}/prometheus
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
       - add-beholder-config
   grafana:
-    path: ${COMPONENTS_DIR}/grafana
+    path: ${DEPENDENCIES_DIR}/grafana
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
