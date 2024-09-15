@@ -62,7 +62,7 @@ if [[ ${DEVSPACE_PROFILE} == "keystone" ]]; then
 		"KEYSTONE_ETH_HTTP_URL"
 		"KEYSTONE_ACCOUNT_KEY"
 	)
-	check_vars "keystone" "${required_vars_keystone[@]}"
+	check_vars "${required_vars_keystone[@]}"
 	missing_vars_total=$((missing_vars_total + $?))
 fi
 
