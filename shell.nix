@@ -54,7 +54,6 @@ mkShell' {
     libudev-zero
     libusb1
   ];
-  LD_LIBRARY_PATH = "${stdenv.cc.cc.lib}/lib64:$LD_LIBRARY_PATH";
   GOROOT = "${go}/share/go";
 
   PGDATA = "db";
