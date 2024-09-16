@@ -28,6 +28,8 @@ type Processor struct {
 	reportingCfg ocr3types.ReportingPluginConfig
 	chainSupport plugincommon.ChainSupport
 	rmnClient    rmn.Client
+	rmnCrypto    cciptypes.RMNCrypto
+	rmnConfig    rmn.Config
 }
 
 // NewProcessor creates a new Processor
@@ -40,6 +42,9 @@ func NewProcessor(
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	chainSupport plugincommon.ChainSupport,
+	rmnClient rmn.Client,
+	rmnCrypto cciptypes.RMNCrypto,
+	rmnConfig rmn.Config,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,
@@ -53,10 +58,13 @@ func NewProcessor(
 		oracleID:     oracleID,
 		cfg:          cfg,
 		lggr:         lggr,
-		ccipReader:   ccipReader,
 		observer:     observer,
+		ccipReader:   ccipReader,
 		reportingCfg: reportingCfg,
 		chainSupport: chainSupport,
+		rmnClient:    rmnClient,
+		rmnCrypto:    rmnCrypto,
+		rmnConfig:    rmnConfig,
 	}
 }
 

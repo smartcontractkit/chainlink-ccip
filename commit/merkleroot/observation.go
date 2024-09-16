@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -17,8 +18,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -33,11 +36,77 @@ func (w *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
+	if err := w.verifyQuery(ctx, prevOutcome, q); err != nil {
+		return Observation{}, fmt.Errorf("verify query: %w", err)
+	}
+
 	tStart := time.Now()
 	observation, nextState := w.getObservation(ctx, q, prevOutcome)
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
+}
+
+// verifyQuery verifies the query based to the following rules.
+// 1. If RMN is enabled, RMN signatures are required in the BuildingReport state but not expected in other states.
+// 2. If RMN signatures are provided, they are verified against the current RMN node config.
+func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Query) error {
+	if !w.cfg.RMNEnabled {
+		return nil
+	}
+
+	nextState := prevOutcome.NextState()
+
+	// If we are in the BuildingReport state, and we are not retrying RMN signatures in the next round, we expect RMN
+	// signatures to be provided by the leader.
+	if nextState == BuildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
+		return fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+	}
+
+	// If we are not in the BuildingReport state, we do not expect RMN signatures to be provided.
+	if nextState != BuildingReport && q.RMNSignatures != nil {
+		return fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
+	}
+
+	ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))
+	if !exists {
+		return fmt.Errorf("failed to get chain by selector %d", w.cfg.DestChain)
+	}
+
+	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
+	if err != nil {
+		return fmt.Errorf("failed to get offramp contract address: %w", err)
+	}
+
+	sigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
+	if err != nil {
+		return fmt.Errorf("failed to convert signatures from protobuf: %w", err)
+	}
+
+	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
+	for _, rmnNode := range w.rmnConfig.Home.RmnNodes {
+		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
+	}
+
+	laneUpdates, err := rmn.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
+	if err != nil {
+		return fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
+	}
+
+	rmnReport := cciptypes.RMNReport{
+		ReportVersion:               w.rmnConfig.Home.RmnReportVersion,
+		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
+		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
+		RmnRemoteContractAddress:    w.rmnConfig.Remote.ContractAddress,
+		OfframpAddress:              offRampAddress,
+		RmnHomeContractConfigDigest: w.rmnConfig.Home.ConfigDigest,
+		LaneUpdates:                 laneUpdates,
+	}
+
+	if err := w.rmnCrypto.VerifyReportSignatures(ctx, sigs, rmnReport, signerAddresses); err != nil {
+		return fmt.Errorf("failed to verify RMN signatures: %w", err)
+	}
+	return nil
 }
 
 func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
