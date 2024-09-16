@@ -34,11 +34,6 @@ func buildSingleChainReportHelper(
 			readyMessages = make(map[int]struct{})
 		}
 		for i := 0; i < len(report.Messages); i++ {
-			if !report.MessageTokenData[i].IsReady() {
-				// Skip messages that don't have token data ready. Add logging here or detailed status message
-				continue
-			}
-
 			readyMessages[i] = struct{}{}
 		}
 	}
