@@ -50,14 +50,14 @@ func (n *NoopTokenProcessor) ProcessTokenData(
 	tokenObservations := make(exectypes.TokenDataObservations)
 
 	for selector, obs := range observations {
-		tokenObservations[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokensData)
+		tokenObservations[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 
 		for seq, message := range obs {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i := range message.TokenAmounts {
 				tokenData[i] = exectypes.NewEmptyTokenData()
 			}
-			tokenObservations[selector][seq] = exectypes.MessageTokensData{TokenData: tokenData}
+			tokenObservations[selector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}
 	}
 	return tokenObservations, nil

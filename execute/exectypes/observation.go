@@ -19,22 +19,22 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
 // TokenDataObservations contain token data for messages organized by source chain selector and sequence number.
-// There could be multiple tokens per a single message, so MessageTokensData is a slice of TokenData.
+// There could be multiple tokens per a single message, so MessageTokenData is a slice of TokenData.
 // TokenDataObservations are populated during the Observation phase and depends on previously fetched
 // MessageObservations details and the `tokenDataProcessors` configured in the ExecuteOffchainConfig.
-// Content of the MessageTokensData is determined by the TokenDataProcessor implementations.
+// Content of the MessageTokenData is determined by the TokenDataProcessor implementations.
 //   - if Message doesn't have any tokens, TokenData slice will be empty.
 //   - if Message has tokens, but these tokens don't require any special treatment,
 //     TokenData slice will contain empty TokenData objects.
 //   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
 //     specific TokenDataProcessor will be used to populate the TokenData slice.
-type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokensData
+type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
 
-type MessageTokensData struct {
+type MessageTokenData struct {
 	TokenData []TokenData
 }
 
-func (mtd MessageTokensData) IsReady() bool {
+func (mtd MessageTokenData) IsReady() bool {
 	for _, td := range mtd.TokenData {
 		if !td.IsReady() {
 			return false
@@ -43,7 +43,7 @@ func (mtd MessageTokensData) IsReady() bool {
 	return true
 }
 
-func (mtd MessageTokensData) Error() error {
+func (mtd MessageTokenData) Error() error {
 	for _, td := range mtd.TokenData {
 		if td.Error != nil {
 			return td.Error
@@ -52,7 +52,7 @@ func (mtd MessageTokensData) Error() error {
 	return nil
 }
 
-func (mtd MessageTokensData) ToByteSlice() [][]byte {
+func (mtd MessageTokenData) ToByteSlice() [][]byte {
 	out := make([][]byte, len(mtd.TokenData))
 	for i, td := range mtd.TokenData {
 		out[i] = td.Data

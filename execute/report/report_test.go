@@ -239,9 +239,9 @@ func makeTestCommitReport(
 		messages = append(messages, msg)
 	}
 
-	messageTokenData := make([]exectypes.MessageTokensData, numMessages)
+	messageTokenData := make([]exectypes.MessageTokenData, numMessages)
 	for i := 0; i < len(messages); i++ {
-		messageTokenData[i] = exectypes.MessageTokensData{
+		messageTokenData[i] = exectypes.MessageTokenData{
 			TokenData: []exectypes.TokenData{
 				{
 					Ready: true,
@@ -317,7 +317,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "token data length mismatch: got 2, expected 1",
 			args: args{
 				report: exectypes.CommitData{
-					MessageTokensData:   make([]exectypes.MessageTokensData, 2),
+					MessageTokensData:   make([]exectypes.MessageTokenData, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
@@ -330,7 +330,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unexpected number of messages: expected 1, got 2",
 			args: args{
 				report: exectypes.CommitData{
-					MessageTokensData:   make([]exectypes.MessageTokensData, 2),
+					MessageTokensData:   make([]exectypes.MessageTokenData, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
 						{Header: cciptypes.RampMessageHeader{}},
@@ -344,7 +344,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "sequence number 102 outside of report range [100 -> 101]",
 			args: args{
 				report: exectypes.CommitData{
-					MessageTokensData:   make([]exectypes.MessageTokensData, 2),
+					MessageTokensData:   make([]exectypes.MessageTokenData, 2),
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(101)),
 					Messages: []cciptypes.Message{
 						{
@@ -366,7 +366,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unexpected source chain: expected 1111, got 2222",
 			args: args{
 				report: exectypes.CommitData{
-					MessageTokensData:   make([]exectypes.MessageTokensData, 1),
+					MessageTokensData:   make([]exectypes.MessageTokenData, 1),
 					SourceChain:         1111,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
@@ -386,7 +386,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 			wantErr: "unable to hash message (1234567, 100): bad hasher",
 			args: args{
 				report: exectypes.CommitData{
-					MessageTokensData:   make([]exectypes.MessageTokensData, 1),
+					MessageTokensData:   make([]exectypes.MessageTokenData, 1),
 					SourceChain:         1234567,
 					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
 					Messages: []cciptypes.Message{
@@ -1015,7 +1015,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: false, Data: nil}}},
 					},
 				},
@@ -1031,7 +1031,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 					},
 				},
@@ -1041,7 +1041,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
-				MessageTokensData: []exectypes.MessageTokensData{
+				MessageTokensData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 				},
 			},
@@ -1054,7 +1054,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
@@ -1064,7 +1064,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				Messages: []cciptypes.Message{
 					makeMessage(1, 100, 0),
 				},
-				MessageTokensData: []exectypes.MessageTokensData{
+				MessageTokensData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 				},
 			},
@@ -1078,7 +1078,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						makeMessage(1, 100, 0),
 						makeMessage(1, 101, 0),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
@@ -1090,7 +1090,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					makeMessage(1, 100, 0),
 					makeMessage(1, 101, 0),
 				},
-				MessageTokensData: []exectypes.MessageTokensData{
+				MessageTokensData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 				},
@@ -1105,7 +1105,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 1),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
@@ -1124,7 +1124,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 1),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},
@@ -1145,7 +1145,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 1),
 					},
-					MessageTokensData: []exectypes.MessageTokensData{
+					MessageTokensData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
 				},

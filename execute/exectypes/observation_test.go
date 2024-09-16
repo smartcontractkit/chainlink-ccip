@@ -10,19 +10,19 @@ import (
 func Test_MessageTokensData(t *testing.T) {
 	tests := []struct {
 		name         string
-		msgTokenData MessageTokensData
+		msgTokenData MessageTokenData
 		ready        bool
 		error        error
 	}{
 		{
 			name:         "empty MessageTokenData is always ready - message doesnt carry tokens",
-			msgTokenData: MessageTokensData{},
+			msgTokenData: MessageTokenData{},
 			ready:        true,
 			error:        nil,
 		},
 		{
 			name: "MessageTokenData is ready - all tokens are ready",
-			msgTokenData: MessageTokensData{
+			msgTokenData: MessageTokenData{
 				TokenData: []TokenData{
 					{
 						Ready: true,
@@ -39,7 +39,7 @@ func Test_MessageTokensData(t *testing.T) {
 		},
 		{
 			name: "MessageTokenData is not ready - one token is not ready",
-			msgTokenData: MessageTokensData{
+			msgTokenData: MessageTokenData{
 				TokenData: []TokenData{
 					{
 						Ready: true,
@@ -57,7 +57,7 @@ func Test_MessageTokensData(t *testing.T) {
 		},
 		{
 			name: "MessageTokenData is not ready - all tokens are not ready, first error is returned",
-			msgTokenData: MessageTokensData{
+			msgTokenData: MessageTokenData{
 				TokenData: []TokenData{
 					{
 						Ready: false,
@@ -87,17 +87,17 @@ func Test_MessageTokensData(t *testing.T) {
 func Test_MessageTokensData_ToByteSlice(t *testing.T) {
 	tests := []struct {
 		name         string
-		msgTokenData MessageTokensData
+		msgTokenData MessageTokenData
 		expected     [][]byte
 	}{
 		{
 			name:         "empty MessageTokenData is always ready - message doesnt carry tokens",
-			msgTokenData: MessageTokensData{},
+			msgTokenData: MessageTokenData{},
 			expected:     [][]byte{},
 		},
 		{
 			name: "MessageTokenData is ready - all tokens are ready",
-			msgTokenData: MessageTokensData{
+			msgTokenData: MessageTokenData{
 				TokenData: []TokenData{
 					{
 						Ready: true,
