@@ -31,7 +31,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
-		// RMNSignatures: nil,
+		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
 	}
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
@@ -53,6 +53,14 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	isEmpty := decodedReport.IsEmpty()
 	if isEmpty {
 		p.lggr.Infow("skipping empty report")
+		return false, nil
+	}
+
+	if p.cfg.RMNEnabled &&
+		len(decodedReport.MerkleRoots) > 0 &&
+		len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
+		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
+			len(decodedReport.RMNSignatures), p.rmnConfig.Remote.MinSigners)
 		return false, nil
 	}
 
