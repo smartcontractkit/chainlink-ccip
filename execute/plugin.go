@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -41,10 +42,10 @@ type Plugin struct {
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 
-	oracleIDToP2pID  map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataReader  exectypes.TokenDataReader
-	estimateProvider gas.EstimateProvider
-	lggr             logger.Logger
+	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataObserver tokendata.TokenDataObserver
+	estimateProvider  gas.EstimateProvider
+	lggr              logger.Logger
 }
 
 func NewPlugin(
@@ -55,7 +56,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataReader exectypes.TokenDataReader,
+	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
@@ -70,17 +71,17 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		reportingCfg:     reportingCfg,
-		cfg:              cfg,
-		oracleIDToP2pID:  oracleIDToP2pID,
-		ccipReader:       ccipReader,
-		readerSyncer:     readerSyncer,
-		reportCodec:      reportCodec,
-		msgHasher:        msgHasher,
-		homeChain:        homeChain,
-		tokenDataReader:  tokenDataReader,
-		estimateProvider: estimateProvider,
-		lggr:             lggr,
+		reportingCfg:      reportingCfg,
+		cfg:               cfg,
+		oracleIDToP2pID:   oracleIDToP2pID,
+		ccipReader:        ccipReader,
+		readerSyncer:      readerSyncer,
+		reportCodec:       reportCodec,
+		msgHasher:         msgHasher,
+		homeChain:         homeChain,
+		tokenDataObserver: tokenDataObserver,
+		estimateProvider:  estimateProvider,
+		lggr:              lggr,
 	}
 }
 
@@ -188,7 +189,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil, nil).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -243,8 +244,12 @@ func (p *Plugin) Observation(
 			groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
 		}
 
-		// TODO: Fire off messages for an attestation check service.
-		return exectypes.NewObservation(groupedCommits, messages, nil).Encode()
+		tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
+		if err1 != nil {
+			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
+		}
+
+		return exectypes.NewObservation(groupedCommits, messages, tkData, nil).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -274,7 +279,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nonceObservations).Encode()
+		return exectypes.NewObservation(nil, nil, nil, nonceObservations).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -396,12 +401,17 @@ func (p *Plugin) Outcome(
 		// add messages to their commitReports.
 		for i, report := range commitReports {
 			report.Messages = nil
-			for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
-				if msg, ok := observation.Messages[report.SourceChain][i]; ok {
+			for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
+				if msg, ok := observation.Messages[report.SourceChain][j]; ok {
 					report.Messages = append(report.Messages, msg)
+				}
+
+				if tokenData, ok := observation.TokenData[report.SourceChain][j]; ok {
+					report.MessageTokenData = append(report.MessageTokenData, tokenData)
 				}
 			}
 			commitReports[i].Messages = report.Messages
+			commitReports[i].MessageTokenData = report.MessageTokenData
 		}
 
 		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
@@ -413,13 +423,13 @@ func (p *Plugin) Outcome(
 			context.Background(),
 			p.lggr,
 			p.msgHasher,
-			p.tokenDataReader,
 			p.reportCodec,
 			p.estimateProvider,
 			observation.Nonces,
 			p.cfg.DestChain,
 			uint64(maxReportSizeBytes),
-			p.cfg.OffchainConfig.BatchGasLimit)
+			p.cfg.OffchainConfig.BatchGasLimit,
+		)
 		outcomeReports, commitReports, err := selectReport(
 			p.lggr,
 			commitReports,

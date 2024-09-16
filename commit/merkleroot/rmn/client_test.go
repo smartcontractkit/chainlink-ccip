@@ -2,8 +2,11 @@ package rmn
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -48,21 +51,42 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		resChan := make(chan RawRmnResponse, 200)
 		rawRmnClient := newMockRawRmnClient(resChan)
 
+		const numNodes = 4
+		rmnNodes := make([]RMNNodeInfo, numNodes)
+		for i := 0; i < numNodes; i++ {
+			// deterministically create a public key by seeding with a 32char string.
+			publicKey, _, err := ed25519.GenerateKey(
+				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
+			require.NoError(t, err)
+			rmnNodes[i] = RMNNodeInfo{
+				ID:                        NodeID(i + 1),
+				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
+				IsSigner:                  true,
+				SignReportsAddress:        cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
+				SignObservationsPublicKey: &publicKey,
+				SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
+			}
+		}
+
 		cl := &client{
 			lggr:         lggr,
 			rawRmnClient: rawRmnClient,
-			rmnNodes: []RMNNodeInfo{
-				{ID: 1, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-				{ID: 2, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-				{ID: 3, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
-				{ID: 4, SupportedSourceChains: mapset.NewSet(chainS1, chainS2), IsSigner: true},
+			rmnCfg: Config{
+				Home: RMNHomeConfig{
+					RmnNodes:         rmnNodes,
+					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
+					RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
+				},
+				Remote: RMNRemoteConfig{
+					ContractAddress: []byte{1, 2, 3},
+					MinObservers:    2,
+					MinSigners:      2,
+				},
 			},
-			rmnRemoteAddress:                        []byte{1, 2, 3},
-			rmnHomeConfigDigest:                     []byte{0xc, 0x0, 0xf},
-			minObservers:                            2,
-			minSigners:                              2,
 			observationsInitialRequestTimerDuration: time.Minute,
 			reportsInitialRequestTimerDuration:      time.Minute,
+			ed25519Verifier:                         signatureVerifierAlwaysTrue{},
+			rmnCrypto:                               signatureVerifierAlwaysTrue{},
 		}
 
 		updateRequests := []*rmnpb.FixedDestLaneUpdateRequest{
@@ -105,13 +129,14 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	t.Run("happy path no retries", func(t *testing.T) {
 		ts := newTestSetup(t)
 		go func() {
-			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(ts.rawRmnClient, ts.rmnClient.minObservers)
+			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
+				ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			ts.nodesRespondToTheObservationRequests(
-				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
+				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, ts.rmnClient.minSigners, ts.rmnClient.minObservers)
+				t, ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinSigners, ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -123,7 +148,12 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnClient.minSigners)
+		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
+		// Make sure signature are in ascending signer address order
+		for i := 1; i < len(sigs.Signatures); i++ {
+			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
+			assert.True(t, sigs.Signatures[i].S[0] > sigs.Signatures[i-1].S[0])
+		}
 	})
 
 	t.Run("happy path with retries", func(t *testing.T) {
@@ -133,24 +163,25 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnClient.reportsInitialRequestTimerDuration = time.Nanosecond
 
 		go func() {
-			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(ts.rawRmnClient, ts.rmnClient.minObservers)
+			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
+				ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			// requests should be sent to at least two nodes
-			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.minObservers)
-			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnClient.minObservers)
+			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.rmnCfg.Remote.MinObservers)
+			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnClient.rmnCfg.Remote.MinObservers)
 
 			ts.nodesRespondToTheObservationRequests(
-				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnHomeConfigDigest, destChain)
+				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
 			time.Sleep(time.Millisecond)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, len(ts.rmnClient.rmnNodes), ts.rmnClient.minObservers)
+				t, ts.rawRmnClient, len(ts.rmnClient.rmnCfg.Home.RmnNodes), ts.rmnClient.rmnCfg.Remote.MinObservers)
 			time.Sleep(time.Millisecond)
 
 			t.Logf("requestIDs: %v", requestIDs)
 
 			// requests should be sent to all nodes, since we hit the timer timeout
-			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnNodes))
+			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnCfg.Home.RmnNodes))
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -162,7 +193,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnClient.minSigners)
+		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
 	})
 }
 
@@ -207,7 +238,7 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 	rmnClient *mockRawRmnClient,
 	requestIDs map[NodeID]uint64,
 	requestedChains map[NodeID]mapset.Set[uint64],
-	rmnHomeConfigDigest []byte,
+	rmnHomeConfigDigest [32]byte,
 	destChain *rmnpb.LaneDest,
 ) {
 	allLaneUpdates := ts.updateRequests
@@ -234,7 +265,7 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 			Response: &rmnpb.Response_SignedObservation{
 				SignedObservation: &rmnpb.SignedObservation{
 					Observation: &rmnpb.Observation{
-						RmnHomeContractConfigDigest: rmnHomeConfigDigest,
+						RmnHomeContractConfigDigest: rmnHomeConfigDigest[:],
 						LaneDest:                    destChain,
 						FixedDestLaneUpdates:        laneUpdates,
 						Timestamp:                   uint64(time.Now().UnixMilli()),
@@ -299,14 +330,14 @@ func (ts *testSetup) nodesRespondToTheSignatureRequests(
 ) {
 	// now the plugin is waiting for rmn node responses for all this requests
 	for nodeID, reqID := range requestIDs {
+		r := [32]byte{byte(nodeID), 1, 2, 3}
+		s := [32]byte{byte(nodeID), 4, 5, 6}
+
 		resp := &rmnpb.Response{
 			RequestId: reqID,
 			Response: &rmnpb.Response_ReportSignature{
 				ReportSignature: &rmnpb.ReportSignature{
-					Signature: &rmnpb.EcdsaSignature{
-						R: []byte{byte(nodeID), 1, 2, 3},
-						S: []byte{byte(nodeID), 4, 5, 6},
-					},
+					Signature: &rmnpb.EcdsaSignature{R: r[:], S: s[:]},
 				},
 			},
 		}
@@ -373,4 +404,16 @@ func (m *mockRawRmnClient) Send(rmnNodeID NodeID, request []byte) error {
 
 func (m *mockRawRmnClient) Recv() <-chan RawRmnResponse {
 	return m.resChan
+}
+
+// signatureVerifierAlwaysTrue is a signature verifier that always returns true.
+type signatureVerifierAlwaysTrue struct{}
+
+func (a signatureVerifierAlwaysTrue) Verify(_ ed25519.PublicKey, _, _ []byte) bool {
+	return true
+}
+
+func (a signatureVerifierAlwaysTrue) VerifyReportSignatures(
+	_ context.Context, _ []cciptypes.RMNECDSASignature, _ cciptypes.RMNReport, _ []cciptypes.Bytes) error {
+	return nil
 }

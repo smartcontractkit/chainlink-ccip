@@ -18,6 +18,70 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
+// TokenDataObservations contain token data for messages organized by source chain selector and sequence number.
+// There could be multiple tokens per a single message, so MessageTokenData is a slice of TokenData.
+// TokenDataObservations are populated during the Observation phase and depend on previously fetched
+// MessageObservations details and the `tokenDataObservers` configured in the ExecuteOffchainConfig.
+// Content of the MessageTokenData is determined by the tokendata.TokenDataObserver implementations.
+//   - if Message doesn't have any tokens, TokenData slice will be empty.
+//   - if Message has tokens, but these tokens don't require any special treatment,
+//     TokenData slice will contain empty TokenData objects.
+//   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
+//     specific tokendata.TokenDataObserver will be used to populate the TokenData slice.
+type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
+
+type MessageTokenData struct {
+	TokenData []TokenData
+}
+
+func (mtd MessageTokenData) IsReady() bool {
+	for _, td := range mtd.TokenData {
+		if !td.IsReady() {
+			return false
+		}
+	}
+	return true
+}
+
+func (mtd MessageTokenData) Error() error {
+	for _, td := range mtd.TokenData {
+		if td.Error != nil {
+			return td.Error
+		}
+	}
+	return nil
+}
+
+func (mtd MessageTokenData) ToByteSlice() [][]byte {
+	out := make([][]byte, len(mtd.TokenData))
+	for i, td := range mtd.TokenData {
+		out[i] = td.Data
+	}
+	return out
+}
+
+// TokenData is the token data for a single token in a message.
+// It contains the token data and a flag indicating if the data is ready.
+type TokenData struct {
+	Ready bool   `json:"ready"`
+	Data  []byte `json:"data"`
+	// Error is used only for internal processing, we don't want nodes to gossip about the
+	// errors they see during processing
+	Error error `json:"-"`
+}
+
+func NewEmptyTokenData() TokenData {
+	return TokenData{
+		Ready: false,
+		Error: nil,
+		Data:  nil,
+	}
+}
+
+func (td TokenData) IsReady() bool {
+	return td.Ready
+}
+
 // Observation is the observation of the ExecutePlugin.
 // TODO: revisit observation types. The maps used here are more space efficient and easier to work
 // with but require more transformations compared to the on-chain representations.
@@ -32,17 +96,26 @@ type Observation struct {
 	// execute report.
 	Messages MessageObservations `json:"messages"`
 
+	// TokenData are determined during the second phase of execute.
+	// It contains the token data for the messages identified in the same stage as Messages
+	TokenData TokenDataObservations `json:"tokenDataObservations"`
+
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
 }
 
-// NewObservation constructs a Observation object.
+// NewObservation constructs an Observation object.
 func NewObservation(
-	commitReports CommitObservations, messages MessageObservations, nonces NonceObservations) Observation {
+	commitReports CommitObservations,
+	messages MessageObservations,
+	tokenData TokenDataObservations,
+	nonces NonceObservations,
+) Observation {
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,
+		TokenData:     tokenData,
 		Nonces:        nonces,
 	}
 }
