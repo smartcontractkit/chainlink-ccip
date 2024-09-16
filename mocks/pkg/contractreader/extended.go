@@ -569,6 +569,38 @@ func (_c *MockExtended_Unbind_Call) RunAndReturn(run func(context.Context, []typ
 	return _c
 }
 
+// mustEmbedUnimplementedContractReaderServer provides a mock function with given fields:
+func (_m *MockExtended) mustEmbedUnimplementedContractReaderServer() {
+	_m.Called()
+}
+
+// MockExtended_mustEmbedUnimplementedContractReaderServer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'mustEmbedUnimplementedContractReaderServer'
+type MockExtended_mustEmbedUnimplementedContractReaderServer_Call struct {
+	*mock.Call
+}
+
+// mustEmbedUnimplementedContractReaderServer is a helper method to define mock.On call
+func (_e *MockExtended_Expecter) mustEmbedUnimplementedContractReaderServer() *MockExtended_mustEmbedUnimplementedContractReaderServer_Call {
+	return &MockExtended_mustEmbedUnimplementedContractReaderServer_Call{Call: _e.mock.On("mustEmbedUnimplementedContractReaderServer")}
+}
+
+func (_c *MockExtended_mustEmbedUnimplementedContractReaderServer_Call) Run(run func()) *MockExtended_mustEmbedUnimplementedContractReaderServer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockExtended_mustEmbedUnimplementedContractReaderServer_Call) Return() *MockExtended_mustEmbedUnimplementedContractReaderServer_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockExtended_mustEmbedUnimplementedContractReaderServer_Call) RunAndReturn(run func()) *MockExtended_mustEmbedUnimplementedContractReaderServer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockExtended creates a new instance of MockExtended. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockExtended(t interface {
