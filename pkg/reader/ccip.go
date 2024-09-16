@@ -57,15 +57,17 @@ func newCCIPChainReaderInternal(
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 	}
 
-	contracts := ContractAddresses{
-		consts.ContractNameOffRamp: {
-			destChain: offrampAddress,
-		},
-	}
+	/*
+		contracts := ContractAddresses{
+			consts.ContractNameOffRamp: {
+				destChain: offrampAddress,
+			},
+		}
 
-	if err := reader.Sync(context.Background(), contracts); err != nil {
-		lggr.Infow("failed to sync contracts", "err", err)
-	}
+		if err := reader.Sync(context.Background(), contracts); err != nil {
+			lggr.Infow("failed to sync contracts", "err", err)
+		}
+	*/
 
 	return reader
 }
@@ -587,8 +589,35 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-// Sync binds ContractAddresses to the contract readers.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+
+	// Make sure offramp is bound first.
+	offramp, err := typeconv.AddressStringToBytes(r.offrampAddress, uint64(r.destChain))
+	if err != nil {
+		return err
+	}
+
+	offrampOnly := ContractAddresses{
+		consts.ContractNameOffRamp: {
+			r.destChain: offramp,
+		},
+	}
+
+	if err := r.newSync(context.Background(), offrampOnly); err != nil {
+		r.lggr.Infow("failed to sync contracts", "err", err)
+	}
+
+	// Discover/bind everything else.
+	addresses, err := r.DiscoverContracts(ctx, r.destChain)
+	if err != nil {
+		return fmt.Errorf("discover contracts: %w", err)
+	}
+
+	return r.newSync(ctx, addresses)
+}
+
+// Sync binds ContractAddresses to the contract readers.
+func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
 	var err error
 
 	// OffRamp

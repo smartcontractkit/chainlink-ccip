@@ -291,14 +291,16 @@ func (p *Plugin) Outcome(
 		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
 	}
 
-	_, err = p.discoveryProcessor.Outcome(
-		dt.Outcome{},
-		dt.Query{},
-		discoveryObservations,
-	)
-	if err != nil {
-		p.lggr.Errorw("failed to get discovery outcome", "err", err)
-	}
+	/*
+		_, err = p.discoveryProcessor.Outcome(
+			dt.Outcome{},
+			dt.Query{},
+			discoveryObservations,
+		)
+		if err != nil {
+			p.lggr.Errorw("failed to get discovery outcome", "err", err)
+		}
+	*/
 
 	return Outcome{
 		MerkleRootOutcome: merkleRootOutcome,
