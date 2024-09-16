@@ -109,11 +109,12 @@ const (
 )
 
 type Outcome struct {
-	OutcomeType                     OutcomeType                 `json:"outcomeType"`
-	RangesSelectedForReport         []plugintypes.ChainRange    `json:"rangesSelectedForReport"`
-	RootsToReport                   []cciptypes.MerkleRootChain `json:"rootsToReport"`
-	OffRampNextSeqNums              []plugintypes.SeqNumChain   `json:"offRampNextSeqNums"`
-	ReportTransmissionCheckAttempts uint                        `json:"reportTransmissionCheckAttempts"`
+	OutcomeType                     OutcomeType                   `json:"outcomeType"`
+	RangesSelectedForReport         []plugintypes.ChainRange      `json:"rangesSelectedForReport"`
+	RootsToReport                   []cciptypes.MerkleRootChain   `json:"rootsToReport"`
+	OffRampNextSeqNums              []plugintypes.SeqNumChain     `json:"offRampNextSeqNums"`
+	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
+	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
 }
 
 // Sort all fields of the given Outcome
