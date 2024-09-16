@@ -184,17 +184,20 @@ func (p *Plugin) Observation(
 	if err != nil {
 		p.lggr.Errorw("failed to get gas prices", "err", err)
 	}
-	discoveryObs, err := p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
-	if err != nil {
-		p.lggr.Errorw("failed to discover contracts", "err", err)
-	}
+	/*
+		discoveryObs, err := p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+		if err != nil {
+			p.lggr.Errorw("failed to discover contracts", "err", err)
+		}
+
+	*/
 
 	obs := Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		ChainFeeObs:   chainFeeObs,
-		DiscoveryObs:  discoveryObs,
-		FChain:        fChain,
+		//DiscoveryObs:  discoveryObs,
+		FChain: fChain,
 	}
 	return obs.Encode()
 }
