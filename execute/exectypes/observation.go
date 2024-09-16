@@ -20,14 +20,14 @@ type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 
 // TokenDataObservations contain token data for messages organized by source chain selector and sequence number.
 // There could be multiple tokens per a single message, so MessageTokenData is a slice of TokenData.
-// TokenDataObservations are populated during the Observation phase and depends on previously fetched
-// MessageObservations details and the `tokenDataProcessors` configured in the ExecuteOffchainConfig.
-// Content of the MessageTokenData is determined by the TokenDataProcessor implementations.
+// TokenDataObservations are populated during the Observation phase and depend on previously fetched
+// MessageObservations details and the `tokenDataObservers` configured in the ExecuteOffchainConfig.
+// Content of the MessageTokenData is determined by the tokendata.TokenDataObserver implementations.
 //   - if Message doesn't have any tokens, TokenData slice will be empty.
 //   - if Message has tokens, but these tokens don't require any special treatment,
 //     TokenData slice will contain empty TokenData objects.
 //   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
-//     specific TokenDataProcessor will be used to populate the TokenData slice.
+//     specific tokendata.TokenDataObserver will be used to populate the TokenData slice.
 type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
 
 type MessageTokenData struct {
@@ -65,7 +65,9 @@ func (mtd MessageTokenData) ToByteSlice() [][]byte {
 type TokenData struct {
 	Ready bool   `json:"ready"`
 	Data  []byte `json:"data"`
-	Error error
+	// Error is used only for internal processing, we don't want nodes to gossip about the
+	// errors they see during processing
+	Error error `json:"-"`
 }
 
 func NewEmptyTokenData() TokenData {

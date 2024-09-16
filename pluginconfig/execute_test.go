@@ -122,7 +122,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 		RootSnoozeTime            commonconfig.Duration
 		MessageVisibilityInterval commonconfig.Duration
 		BatchingStrategyID        uint32
-		TokenDataProcessor        []TokenDataProcessor
+		TokenDataObserver         []TokenDataObserverConfig
 	}
 	tests := []struct {
 		name   string
@@ -171,7 +171,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
-				TokenDataProcessors:       tt.fields.TokenDataProcessor,
+				TokenDataObserver:         tt.fields.TokenDataObserver,
 			}
 			encoded, err := EncodeExecuteOffchainConfig(e)
 			require.NoError(t, err)
@@ -184,7 +184,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 	}
 }
 
-func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
+func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 	baseJSON := `{
 					  %s
 					  "batchGasLimit": 1,
@@ -198,18 +198,18 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 	tests := []struct {
 		name    string
 		json    string
-		want    []TokenDataProcessor
+		want    []TokenDataObserverConfig
 		wantErr bool
 		errMsg  string
 	}{
 		{
-			name: "valid config without token data processors",
+			name: "valid config without token data observers",
 			json: ``,
 			want: nil,
 		},
 		{
-			name: "invalid config with unknown token data processor type",
-			json: `"tokenDataProcessors": [
+			name: "invalid config with unknown token data observer type",
+			json: `"tokenDataObservers": [
 							{
 							  "type": "usdc-but-different",
 							  "version": "1.0",
@@ -217,11 +217,11 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 							}
 				  	],`,
 			wantErr: true,
-			errMsg:  "unknown token data processor type",
+			errMsg:  "unknown token data observer type",
 		},
 		{
 			name: "usdc type is set but struct is not initialized properly",
-			json: `"tokenDataProcessors": [
+			json: `"tokenDataObservers": [
 							{
 							  "type": "usdc-cctp",
 							  "version": "1.0",
@@ -229,11 +229,11 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 							}
 				  	],`,
 			wantErr: true,
-			errMsg:  "UsdcCctpTokenDataProcessor is empty",
+			errMsg:  "USDCCCTPObserverConfig is empty",
 		},
 		{
-			name: "valid config with UsdcCctpTokenDataProcessor",
-			json: `"tokenDataProcessors": [
+			name: "valid config with USDCCCTPObserverConfig",
+			json: `"tokenDataObservers": [
 							{
 							  "type": "usdc-cctp",
 							  "version": "1.0",
@@ -248,12 +248,12 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 							  "attestationAPIInterval": "500ms"
 							}
 				  	],`,
-			want: []TokenDataProcessor{
+			want: []TokenDataObserverConfig{
 				{
 					Type:    "usdc-cctp",
 					Version: "1.0",
-					UsdcCctpTokenDataProcessor: &UsdcCctpTokenDataProcessor{
-						Tokens: map[int]UsdcCctpToken{
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						Tokens: map[int]USDCCCTPTokenConfig{
 							1: {
 								SourceTokenAddress:           "0xabc",
 								SourceMessageTransmitterAddr: "0xefg",
@@ -267,8 +267,8 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 			},
 		},
 		{
-			name: "valid config with multiple tokens per UsdcCctpTokenDataProcessor",
-			json: `"tokenDataProcessors": [
+			name: "valid config with multiple tokens per USDCCCTPObserverConfig",
+			json: `"tokenDataObservers": [
 							{
 							  "type": "usdc-cctp",
 							  "version": "1.0",
@@ -287,12 +287,12 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 							  "attestationAPIInterval": "500ms"
 							}
 				  	],`,
-			want: []TokenDataProcessor{
+			want: []TokenDataObserverConfig{
 				{
 					Type:    "usdc-cctp",
 					Version: "1.0",
-					UsdcCctpTokenDataProcessor: &UsdcCctpTokenDataProcessor{
-						Tokens: map[int]UsdcCctpToken{
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
+						Tokens: map[int]USDCCCTPTokenConfig{
 							1: {
 								SourceTokenAddress:           "0xabc",
 								SourceMessageTransmitterAddr: "0xefg",
@@ -321,14 +321,14 @@ func Test_TokenDataProcessor_Unmarshall(t *testing.T) {
 				require.ErrorContains(t, err, tt.errMsg)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.want, e.TokenDataProcessors)
+				require.Equal(t, tt.want, e.TokenDataObserver)
 			}
 		})
 	}
 }
 
-func Test_TokenDataProcessor_Validation(t *testing.T) {
-	withBaseConfig := func(processors ...TokenDataProcessor) ExecuteOffchainConfig {
+func Test_TokenDataObserver_Validation(t *testing.T) {
+	withBaseConfig := func(configs ...TokenDataObserverConfig) ExecuteOffchainConfig {
 		return ExecuteOffchainConfig{
 			BatchGasLimit:             1,
 			RelativeBoostPerWaitHour:  1,
@@ -336,13 +336,13 @@ func Test_TokenDataProcessor_Validation(t *testing.T) {
 			RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 			BatchingStrategyID:        0,
-			TokenDataProcessors:       processors,
+			TokenDataObserver:         configs,
 		}
 	}
 
-	withUSDCConfig := func() *UsdcCctpTokenDataProcessor {
-		return &UsdcCctpTokenDataProcessor{
-			Tokens: map[int]UsdcCctpToken{
+	withUSDCConfig := func() *USDCCCTPObserverConfig {
+		return &USDCCCTPObserverConfig{
+			Tokens: map[int]USDCCCTPTokenConfig{
 				1: {
 					SourceTokenAddress:           "0xabc",
 					SourceMessageTransmitterAddr: "0xefg",
@@ -361,26 +361,26 @@ func Test_TokenDataProcessor_Validation(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name:   "valid config without token data processors",
+			name:   "valid config without token data observers",
 			config: withBaseConfig(),
 		},
 		{
-			name: "invalid config with unknown token data processor type",
+			name: "invalid config with unknown token data observer type",
 			config: withBaseConfig(
-				TokenDataProcessor{
-					Type:    "my-fancy-token-processor",
+				TokenDataObserverConfig{
+					Type:    "my-fancy-token",
 					Version: "1.0",
 				}),
 			wantErr: true,
-			errMsg:  "unknown token data processor type",
+			errMsg:  "unknown token data observer type",
 		},
 		{
 			name: "usdc type is set but struct is empty",
 			config: withBaseConfig(
-				TokenDataProcessor{
-					Type:                       "usdc-cctp",
-					Version:                    "1.0",
-					UsdcCctpTokenDataProcessor: &UsdcCctpTokenDataProcessor{},
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{},
 				}),
 			wantErr: true,
 			errMsg:  "AttestationAPI not set",
@@ -388,10 +388,10 @@ func Test_TokenDataProcessor_Validation(t *testing.T) {
 		{
 			name: "usdc type is set but tokens are missing",
 			config: withBaseConfig(
-				TokenDataProcessor{
+				TokenDataObserverConfig{
 					Type:    "usdc-cctp",
 					Version: "1.0",
-					UsdcCctpTokenDataProcessor: &UsdcCctpTokenDataProcessor{
+					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
 						AttestationAPI:         "http://localhost:8080",
 						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
 						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
@@ -401,43 +401,43 @@ func Test_TokenDataProcessor_Validation(t *testing.T) {
 			errMsg:  "Tokens not set",
 		},
 		{
-			name: "the same processor can't bet set twice",
+			name: "the same observer can't bet set twice",
 			config: withBaseConfig(
-				TokenDataProcessor{
-					Type:                       "usdc-cctp",
-					Version:                    "1.0",
-					UsdcCctpTokenDataProcessor: withUSDCConfig(),
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
 				},
-				TokenDataProcessor{
-					Type:                       "usdc-cctp",
-					Version:                    "1.0",
-					UsdcCctpTokenDataProcessor: withUSDCConfig(),
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
 				}),
 			wantErr: true,
-			errMsg:  "duplicate token data processor type",
+			errMsg:  "duplicate token data observer type",
 		},
 		{
-			name: "valid config with multiple the same processors types but different versions",
+			name: "valid config with multiple the same observers types but different versions",
 			config: withBaseConfig(
-				TokenDataProcessor{
-					Type:                       "usdc-cctp",
-					Version:                    "1.0",
-					UsdcCctpTokenDataProcessor: withUSDCConfig(),
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
 				},
-				TokenDataProcessor{
-					Type:                       "usdc-cctp",
-					Version:                    "2.0",
-					UsdcCctpTokenDataProcessor: withUSDCConfig(),
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "2.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
 				},
 			),
 		},
 		{
-			name: "valid config with single usdc processor",
+			name: "valid config with single usdc observer",
 			config: withBaseConfig(
-				TokenDataProcessor{
-					Type:                       "usdc-cctp",
-					Version:                    "1.0",
-					UsdcCctpTokenDataProcessor: withUSDCConfig(),
+				TokenDataObserverConfig{
+					Type:                   "usdc-cctp",
+					Version:                "1.0",
+					USDCCCTPObserverConfig: withUSDCConfig(),
 				}),
 		},
 	}

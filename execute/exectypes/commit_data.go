@@ -26,5 +26,5 @@ type CommitData struct {
 	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
 
 	// TokenData for each message.
-	MessageTokensData []MessageTokenData `json:"messageTokenData"`
+	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }

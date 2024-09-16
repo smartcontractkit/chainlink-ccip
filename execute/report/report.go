@@ -34,7 +34,7 @@ func buildSingleChainReportHelper(
 			readyMessages = make(map[int]struct{})
 		}
 		for i := 0; i < len(report.Messages); i++ {
-			if !report.MessageTokensData[i].IsReady() {
+			if !report.MessageTokenData[i].IsReady() {
 				// Skip messages that don't have token data ready. Add logging here or detailed status message
 				continue
 			}
@@ -50,9 +50,9 @@ func buildSingleChainReportHelper(
 	}
 
 	numMsg := len(report.Messages)
-	if len(report.MessageTokensData) != numMsg {
+	if len(report.MessageTokenData) != numMsg {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.MessageTokensData), numMsg)
+			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.MessageTokenData), numMsg)
 	}
 
 	lggr.Infow(
@@ -87,7 +87,7 @@ func buildSingleChainReportHelper(
 	var msgInRoot []cciptypes.Message
 	for i, msg := range report.Messages {
 		if _, ok := readyMessages[i]; ok {
-			offchainTokenData = append(offchainTokenData, report.MessageTokensData[i].ToByteSlice())
+			offchainTokenData = append(offchainTokenData, report.MessageTokenData[i].ToByteSlice())
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
 		}
@@ -176,12 +176,12 @@ func (b *execReportBuilder) checkMessage(
 	}
 
 	// 2. Check if all tokens are properly initialized with token data
-	if idx >= len(execReport.MessageTokensData) {
-		b.lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(execReport.MessageTokensData))
+	if idx >= len(execReport.MessageTokenData) {
+		b.lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(execReport.MessageTokenData))
 		return execReport, Unknown, fmt.Errorf("token data index out of range")
 	}
 
-	messageTokenData := execReport.MessageTokensData[idx]
+	messageTokenData := execReport.MessageTokenData[idx]
 	if !messageTokenData.IsReady() {
 		b.lggr.Infow(
 			"unable to read token data - token data not ready",
@@ -192,7 +192,7 @@ func (b *execReportBuilder) checkMessage(
 			"messageState", TokenDataNotReady)
 		return execReport, TokenDataNotReady, nil
 	}
-	result.MessageTokensData[idx] = messageTokenData
+	result.MessageTokenData[idx] = messageTokenData
 	b.lggr.Infow(
 		"read token data",
 		"messageID", msg.Header.MessageID,

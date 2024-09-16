@@ -8,11 +8,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-type UsdcTokenDataProcessor struct {
-	configs []pluginconfig.UsdcCctpTokenDataProcessor
+type USDCCCTPTokenDataObserver struct {
+	configs []pluginconfig.USDCCCTPObserverConfig
 }
 
-func (u *UsdcTokenDataProcessor) ProcessTokenData(
+func (u *USDCCCTPTokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
@@ -32,15 +32,15 @@ func (u *UsdcTokenDataProcessor) ProcessTokenData(
 	return u.extractTokenData(attestations)
 }
 
-func (u *UsdcTokenDataProcessor) pickOnlyUSDCMessages(_ exectypes.MessageObservations) (interface{}, error) {
+func (u *USDCCCTPTokenDataObserver) pickOnlyUSDCMessages(_ exectypes.MessageObservations) (interface{}, error) {
 	fmt.Println(u.configs)
 	panic("implement me")
 }
 
-func (u *UsdcTokenDataProcessor) fetchAttestations(_ context.Context, _ interface{}) (interface{}, error) {
+func (u *USDCCCTPTokenDataObserver) fetchAttestations(_ context.Context, _ interface{}) (interface{}, error) {
 	panic("implement me")
 }
 
-func (u *UsdcTokenDataProcessor) extractTokenData(_ interface{}) (exectypes.TokenDataObservations, error) {
+func (u *USDCCCTPTokenDataObserver) extractTokenData(_ interface{}) (exectypes.TokenDataObservations, error) {
 	panic("implement me")
 }

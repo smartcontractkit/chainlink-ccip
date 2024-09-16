@@ -42,10 +42,10 @@ type Plugin struct {
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 
-	oracleIDToP2pID    map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataProcessor tokendata.TokenDataProcessor
-	estimateProvider   gas.EstimateProvider
-	lggr               logger.Logger
+	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataObserver tokendata.TokenDataObserver
+	estimateProvider  gas.EstimateProvider
+	lggr              logger.Logger
 }
 
 func NewPlugin(
@@ -56,7 +56,7 @@ func NewPlugin(
 	reportCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
-	tokenDataProcessor tokendata.TokenDataProcessor,
+	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
@@ -71,17 +71,17 @@ func NewPlugin(
 	}
 
 	return &Plugin{
-		reportingCfg:       reportingCfg,
-		cfg:                cfg,
-		oracleIDToP2pID:    oracleIDToP2pID,
-		ccipReader:         ccipReader,
-		readerSyncer:       readerSyncer,
-		reportCodec:        reportCodec,
-		msgHasher:          msgHasher,
-		homeChain:          homeChain,
-		tokenDataProcessor: tokenDataProcessor,
-		estimateProvider:   estimateProvider,
-		lggr:               lggr,
+		reportingCfg:      reportingCfg,
+		cfg:               cfg,
+		oracleIDToP2pID:   oracleIDToP2pID,
+		ccipReader:        ccipReader,
+		readerSyncer:      readerSyncer,
+		reportCodec:       reportCodec,
+		msgHasher:         msgHasher,
+		homeChain:         homeChain,
+		tokenDataObserver: tokenDataObserver,
+		estimateProvider:  estimateProvider,
+		lggr:              lggr,
 	}
 }
 
@@ -244,7 +244,7 @@ func (p *Plugin) Observation(
 			groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
 		}
 
-		tkData, err1 := p.tokenDataProcessor.ProcessTokenData(ctx, messages)
+		tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
 		if err1 != nil {
 			return types.Observation{}, fmt.Errorf("unable to process token data %w", err)
 		}
@@ -407,11 +407,11 @@ func (p *Plugin) Outcome(
 				}
 
 				if tokenData, ok := observation.TokenData[report.SourceChain][i]; ok {
-					report.MessageTokensData = append(report.MessageTokensData, tokenData)
+					report.MessageTokenData = append(report.MessageTokenData, tokenData)
 				}
 			}
 			commitReports[i].Messages = report.Messages
-			commitReports[i].MessageTokensData = report.MessageTokensData
+			commitReports[i].MessageTokenData = report.MessageTokenData
 		}
 
 		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})

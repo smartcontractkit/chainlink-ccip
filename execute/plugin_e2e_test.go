@@ -237,13 +237,13 @@ func setupSimpleTest(
 	err = homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 
-	tokenDataProcessor := &tokendata.NoopTokenProcessor{}
+	tokenDataObserver := &tokendata.NoopTokenDataObserver{}
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataProcessor, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataProcessor, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataProcessor, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -261,7 +261,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
-	tokenDataProcessor tokendata.TokenDataProcessor,
+	tokenDataObserver tokendata.TokenDataObserver,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
@@ -281,7 +281,7 @@ func newNode(
 		reportCodec,
 		msgHasher,
 		homeChain,
-		tokenDataProcessor,
+		tokenDataObserver,
 		evm.EstimateProvider{},
 		lggr)
 
