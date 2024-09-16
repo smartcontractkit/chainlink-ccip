@@ -53,26 +53,61 @@ type ExecuteOffchainConfig struct {
 	// BatchingStrategyID is the strategy to use for batching messages.
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
 
-	// RawTokenDataProcessors registers different strategies for processing token data.
-	RawTokenDataProcessors []json.RawMessage `json:"tokenDataProcessors"`
-
-	// TokenDataProcessors is the parsed version of RawTokenDataProcessors.
-	TokenDataProcessors []interface{}
+	// TokenDataProcessors registers different strategies for processing token data.
+	TokenDataProcessors []TokenDataProcessor `json:"tokenDataProcessors"`
 }
 
+// TokenDataProcessor is the base struct for token data processors. Every token data processor
+// has to define its type and version. The type is used to determine which processor's implementation to use.
+// Whenever you want to add a new processor type, you need to add a new struct and embed that in the TokenDataProcessor.
+// similarly to how UsdcCctpTokenDataProcessor is embedded in the TokenDataProcessor.
+// There are two additional checks for the TokenDataProcessor to enforce that it's
+// semantically and syntactically correct:
+// * WellFormed: checks that the processor is syntactically correct - matching struct is set based on a type
+// * Validate: checks that the processor is semantically correct - fields are set correctly
 type TokenDataProcessor struct {
 	Type    string `json:"type"`
 	Version string `json:"version"`
+
+	*UsdcCctpTokenDataProcessor
 }
 
 const UsdcProcessorType = "usdc-cctp"
 
 type UsdcCctpTokenDataProcessor struct {
-	TokenDataProcessor
-	Tokens                       []UsdcCctpToken        `json:"tokens"`
-	AttestationAPI               string                 `json:"attestationAPI"`
-	AttestationAPITimeout        *commonconfig.Duration `json:"attestationAPITimeout"`
-	AttestationAPIIntervalMillis *commonconfig.Duration `json:"attestationAPIIntervalMilliseconds"`
+	Tokens                 map[int]UsdcCctpToken  `json:"tokens"`
+	AttestationAPI         string                 `json:"attestationAPI"`
+	AttestationAPITimeout  *commonconfig.Duration `json:"attestationAPITimeout"`
+	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
+}
+
+type UsdcCctpToken struct {
+	SourceTokenAddress           string `json:"sourceTokenAddress"`
+	SourceMessageTransmitterAddr string `json:"sourceMessageTransmitterAddress"`
+}
+
+func (t TokenDataProcessor) WellFormed() error {
+	switch t.Type {
+	case UsdcProcessorType:
+		if t.UsdcCctpTokenDataProcessor == nil {
+			return errors.New("UsdcCctpTokenDataProcessor is empty")
+		}
+	default:
+		return errors.New("unknown token data processor type")
+	}
+	return nil
+}
+
+func (t TokenDataProcessor) Validate() error {
+	switch t.Type {
+	case UsdcProcessorType:
+		if err := t.UsdcCctpTokenDataProcessor.Validate(); err != nil {
+			return err
+		}
+	default:
+		return errors.New("unknown token data processor type")
+	}
+	return nil
 }
 
 func (p UsdcCctpTokenDataProcessor) Validate() error {
@@ -90,16 +125,7 @@ func (p UsdcCctpTokenDataProcessor) Validate() error {
 	return nil
 }
 
-type UsdcCctpToken struct {
-	SourceChainSelector          int    `json:"sourceChainSelector"`
-	SourceTokenAddress           string `json:"sourceTokenAddress"`
-	SourceMessageTransmitterAddr string `json:"sourceMessageTransmitterAddress"`
-}
-
 func (t UsdcCctpToken) Validate() error {
-	if t.SourceChainSelector == 0 {
-		return errors.New("SourceChainSelector not set")
-	}
 	if t.SourceTokenAddress == "" {
 		return errors.New("SourceTokenAddress not set")
 	}
@@ -133,15 +159,17 @@ func (e ExecuteOffchainConfig) Validate() error {
 		return errors.New("MessageVisibilityInterval not set")
 	}
 
+	set := make(map[string]struct{})
 	for _, processor := range e.TokenDataProcessors {
-		switch casted := processor.(type) {
-		case UsdcCctpTokenDataProcessor:
-			if err := casted.Validate(); err != nil {
-				return err
-			}
-		default:
-			return errors.New("unknown token data processor type")
+		if err := processor.Validate(); err != nil {
+			return err
 		}
+
+		processorKey := processor.Type + processor.Version
+		if _, exists := set[processorKey]; exists {
+			return errors.New("duplicate token data processor type and version")
+		}
+		set[processorKey] = struct{}{}
 	}
 	return nil
 }
@@ -158,28 +186,11 @@ func DecodeExecuteOffchainConfig(encodedExecuteOffchainConfig []byte) (ExecuteOf
 		return e, err
 	}
 
-	if len(e.RawTokenDataProcessors) == 0 {
-		return e, nil
-	}
-
-	tokenDataProcessors := make([]interface{}, len(e.RawTokenDataProcessors))
-	for i, processor := range e.RawTokenDataProcessors {
-		var baseProcessor TokenDataProcessor
-		if err := json.Unmarshal(processor, &baseProcessor); err != nil {
+	for _, processor := range e.TokenDataProcessors {
+		if err := processor.WellFormed(); err != nil {
 			return e, err
 		}
-		switch baseProcessor.Type {
-		case UsdcProcessorType:
-			var usdcProcessor UsdcCctpTokenDataProcessor
-			if err := json.Unmarshal(processor, &usdcProcessor); err != nil {
-				return e, err
-			}
-			tokenDataProcessors[i] = usdcProcessor
-		default:
-			return e, errors.New("unknown token data processor type")
-		}
 	}
-	e.TokenDataProcessors = tokenDataProcessors
 
 	return e, nil
 }
