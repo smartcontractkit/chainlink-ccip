@@ -11,6 +11,7 @@ const (
 	ContractNameCCIPConfig           = "CCIPConfig"
 	ContractNamePriceAggregator      = "AggregatorV3Interface"
 	ContractNameNonceManager         = "NonceManager"
+	ContractNameRMNHome              = "RMNHome"
 )
 
 // Method Names
@@ -48,6 +49,9 @@ const (
 	// NonceManager methods
 	MethodNameGetInboundNonce  = "GetInboundNonce"
 	MethodNameGetOutboundNonce = "GetOutboundNonce"
+
+	// RMNHome methods
+	MethodNameGetVersionedConfigsWithDigests = "GetVersionedConfigsWithDigests"
 
 	/*
 		// On EVM:

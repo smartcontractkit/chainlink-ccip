@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -13,25 +14,35 @@ type Config struct {
 	Remote RMNRemoteConfig
 }
 
+// RMNHomeConfig contains the configuration fetched from the RMNHome contract.
 type RMNHomeConfig struct {
-	RmnNodes         []RMNNodeInfo
-	ConfigDigest     cciptypes.Bytes32
-	RmnReportVersion string // e.g. "RMN_V1_6_ANY2EVM_REPORT"
+	Nodes          []RMNHomeNodeInfo
+	MinSigners     map[cciptypes.ChainSelector]uint64
+	ConfigDigest   cciptypes.Bytes32
+	OffchainConfig cciptypes.Bytes // Raw offchain configuration bytes
 }
 
-type RMNRemoteConfig struct {
-	ContractAddress cciptypes.Bytes
-	MinObservers    int
-	MinSigners      int
-}
-
-// RMNNodeInfo contains the information about an RMN node.
-type RMNNodeInfo struct {
-	// ID is the index of this node in the RMN config
-	ID                        NodeID
+// RMNHomeNodeInfo contains information about a node from the RMNHome contract.
+type RMNHomeNodeInfo struct {
+	ID                        NodeID // ID is the index of this node in the RMN config
+	PeerID                    cciptypes.Bytes32
 	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
-	IsSigner                  bool
-	SignReportsAddress        cciptypes.Bytes
-	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
-	SignObservationPrefix     string             // e.g. "chainlink ccip 1.6 rmn observation"
+	SignObservationsPublicKey *ed25519.PublicKey // offchainPublicKey
+}
+
+// RMNRemoteConfig contains the configuration fetched from the RMNRemote contract.
+type RMNRemoteConfig struct {
+	ContractAddress  cciptypes.Bytes
+	ConfigDigest     cciptypes.Bytes32
+	Signers          []RMNRemoteSignerInfo
+	MinSigners       uint64
+	ConfigVersion    uint32
+	RmnReportVersion string // e.g., "RMN_V1_6_ANY2EVM_REPORT"
+}
+
+// RMNRemoteSignerInfo contains information about a signer from the RMNRemote contract.
+type RMNRemoteSignerInfo struct {
+	SignReportsAddress    cciptypes.Bytes // for signing reports
+	NodeIndex             uint64          // maps to nodes in RMNHome
+	SignObservationPrefix string          // for signing observations
 }

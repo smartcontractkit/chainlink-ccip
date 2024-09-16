@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 )
 
 const (
@@ -27,6 +30,7 @@ const (
 
 //go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 type HomeChain interface {
+	// CCIPConfig specific methods
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
 	// GetSupportedChainsForPeer Gets all chain selectors that the peerID can read/write from/to
@@ -37,37 +41,18 @@ type HomeChain interface {
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
 	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
 	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
+
+	// RMNHome specific methods
+	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
+	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmn.RMNHomeNodeInfo, error)
+	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
+	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error)
+	// GetMinObservers gets the minimum number of observers required for each chain in the given configDigest
+	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error)
+	// GetOffChainConfig gets the offchain config for the given configDigest
+	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
+
 	services.Service
-}
-
-//go:generate mockery --name RMNConfigFetcher --output ./mocks/ --case underscore
-type RMNConfigFetcher interface {
-	GetRMNNodesInfo() ([]RMNNodeInfo, error)
-	GetRMNHomeConfigDigest() (cciptypes.Bytes, error)
-	// TODO: We could return the value for a selector, depending on how it's used
-	GetMinObservers() (map[cciptypes.ChainSelector]int, error)
-	GetMinSigners() (map[cciptypes.ChainSelector]int, error)
-}
-
-// NodeID and RMNNodeInfo might be put in a common package to be imported by both the reader and rmn packages
-type NodeID uint32
-
-// RMNNodeInfo contains the information about an RMN node.
-type RMNNodeInfo struct {
-	// ID is the index of this node in the RMN config
-	ID                        NodeID
-	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
-	IsSigner                  bool
-	SignReportsAddress        []byte
-	SignObservationsPublicKey *ed25519.PublicKey
-	SignObservationPrefix     string // e.g. "chainlink ccip 1.6 rmn observation" - some string used to prefix the signed observation - not sure where it exists
-}
-
-type rmnState struct {
-	rmnNodes            []RMNNodeInfo
-	rmnHomeConfigDigest cciptypes.Bytes
-	minObservers        map[cciptypes.ChainSelector]int
-	minSigners          map[cciptypes.ChainSelector]int
 }
 
 type state struct {
@@ -89,7 +74,7 @@ type homeChainPoller struct {
 	lggr            logger.Logger
 	mutex           *sync.RWMutex
 	state           state
-	rmnState        rmnState
+	rmnHomeConfig   map[cciptypes.Bytes32]rmn.RMNHomeConfig
 	failedPolls     uint
 	// TODO: currently unused but will be passed into GetLatestValue
 	// once the chainlink-common breaking change comes in
@@ -107,18 +92,19 @@ func NewHomeChainConfigPoller(
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
+	rmnHomeBoundContract types.BoundContract,
 ) HomeChain {
 	return &homeChainPoller{
 		stopCh:                  make(chan struct{}),
 		homeChainReader:         homeChainReader,
 		state:                   state{},
-		rmnState:                rmnState{},
+		rmnHomeConfig:           make(map[cciptypes.Bytes32]rmn.RMNHomeConfig),
 		mutex:                   &sync.RWMutex{},
 		failedPolls:             0,
 		lggr:                    lggr,
 		pollingDuration:         pollingInterval,
 		ccipConfigBoundContract: ccipConfigBoundContract,
-		rmnHomeBoundContract:    types.BoundContract{}, // TODO: set the RMNHome contract
+		rmnHomeBoundContract:    rmnHomeBoundContract,
 	}
 }
 
@@ -162,19 +148,8 @@ func (r *homeChainPoller) poll() {
 				r.failedPolls++
 				r.mutex.Unlock()
 			}
-
-			// TODO: how to handle RMNRemote fetching
-			// - multiple contracts
-			// - not all the nodes will be able to fetch the RMNRemote config
-			// - need to be shared via OCR?
 		}
 	}
-}
-
-// nolint:unusedparams
-func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
-	// TODO: implement
-	return nil
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
@@ -225,6 +200,45 @@ func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]Chai
 	s.nodeSupportedChains = createNodesSupportedChains(chainConfigs)
 	s.knownSourceChains = createKnownChains(chainConfigs)
 	s.fChain = createFChain(chainConfigs)
+}
+
+func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
+	var versionedConfigWithDigests []VersionedConfigWithDigest
+	err := r.homeChainReader.GetLatestValue(
+		ctx,
+		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetVersionedConfigsWithDigests),
+		primitives.Unconfirmed,
+		map[string]interface{}{
+			"offset": 0,
+			"limit":  2, // TODO: fetch CONFIG_RING_BUFFER_SIZE
+		},
+		&versionedConfigWithDigests,
+	)
+	if err != nil {
+		return fmt.Errorf("error fetching RMNHomeConfig: %w", err)
+	}
+
+	// TODO: fetch CONFIG_RING_BUFFER_SIZE and compare with len(versionedConfigWithDigests)
+	if len(versionedConfigWithDigests) > 2 {
+		r.lggr.Errorw("more than 2 RMNHomeConfigs found", "numConfigs", len(versionedConfigWithDigests), "requestedLimit", 2)
+		return fmt.Errorf("more than 2 RMNHomeConfigs found")
+	}
+
+	r.setRMNHomeState(convertOnChainConfigToRMNHomeChainConfig(r.lggr, versionedConfigWithDigests))
+
+	if len(versionedConfigWithDigests) == 0 {
+		// That's a legitimate case if there are no chain configs on chain yet
+		r.lggr.Warnw("no on chain configs found")
+		return nil
+	}
+
+	return nil
+}
+
+func (r *homeChainPoller) setRMNHomeState(rmnHomeConfig map[cciptypes.Bytes32]rmn.RMNHomeConfig) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+	r.rmnHomeConfig = rmnHomeConfig
 }
 
 func (r *homeChainPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
@@ -292,28 +306,29 @@ func (r *homeChainPoller) GetOCRConfigs(
 	return ocrConfigs, nil
 }
 
-func (r *homeChainPoller) GetRMNNodesInfo() ([]RMNNodeInfo, error) {
+func (r *homeChainPoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmn.RMNHomeNodeInfo, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.rmnState.rmnNodes, nil
+	return r.rmnHomeConfig[configDigest].Nodes, nil
 }
 
-func (r *homeChainPoller) GetRMNHomeConfigDigest() (cciptypes.Bytes, error) {
+func (r *homeChainPoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.rmnState.rmnHomeConfigDigest, nil
+	_, ok := r.rmnHomeConfig[configDigest]
+	return ok, nil
 }
 
-func (r *homeChainPoller) GetMinObservers() (map[cciptypes.ChainSelector]int, error) {
+func (r *homeChainPoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.rmnState.minObservers, nil
+	return r.rmnHomeConfig[configDigest].MinSigners, nil
 }
 
-func (r *homeChainPoller) GetMinSigners() (map[cciptypes.ChainSelector]int, error) {
+func (r *homeChainPoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.rmnState.minSigners, nil
+	return r.rmnHomeConfig[configDigest].OffchainConfig, nil
 }
 
 func (r *homeChainPoller) Close() error {
@@ -398,6 +413,67 @@ func convertOnChainConfigToHomeChainConfig(
 	return chainConfigs
 }
 
+func convertOnChainConfigToRMNHomeChainConfig(
+	lggr logger.Logger,
+	versionedConfigWithDigests []VersionedConfigWithDigest,
+) map[cciptypes.Bytes32]rmn.RMNHomeConfig {
+	if len(versionedConfigWithDigests) == 0 {
+		lggr.Warnw("no on chain RMNHomeConfigs found")
+		return map[cciptypes.Bytes32]rmn.RMNHomeConfig{}
+	}
+
+	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmn.RMNHomeConfig)
+	for _, versionedConfigWithDigest := range versionedConfigWithDigests {
+		config := versionedConfigWithDigest.VersionedConfig.Config
+		nodes := make([]rmn.RMNHomeNodeInfo, len(config.Nodes))
+		for i, node := range config.Nodes {
+			pubKey := ed25519.PublicKey(node.OffchainPublicKey[:])
+
+			nodes[i] = rmn.RMNHomeNodeInfo{
+				ID:                        rmn.NodeID(i),
+				PeerID:                    node.PeerID,
+				SignObservationsPublicKey: &pubKey,
+				SupportedSourceChains:     mapset.NewSet[cciptypes.ChainSelector](),
+			}
+		}
+
+		minSigners := make(map[cciptypes.ChainSelector]uint64)
+
+		for _, chain := range config.SourceChains {
+			minSigners[chain.ChainSelector] = chain.MinObservers
+			for j := 0; j < 256; j++ {
+				if isNodeObserver(chain, j) {
+					nodes[j].SupportedSourceChains.Add(chain.ChainSelector)
+				}
+			}
+		}
+
+		rmnHomeConfigs[versionedConfigWithDigest.ConfigDigest] = rmn.RMNHomeConfig{
+			Nodes:          nodes,
+			MinSigners:     minSigners,
+			ConfigDigest:   versionedConfigWithDigest.ConfigDigest,
+			OffchainConfig: config.OffchainConfig,
+		}
+	}
+	return rmnHomeConfigs
+}
+
+// IsNodeObserver checks if a node is an observer for the given source chain
+func isNodeObserver(sourceChain SourceChain, nodeIndex int) bool {
+	if nodeIndex >= 256 {
+		return false // uint256 can only represent up to 256 nodes
+	}
+
+	// Create a big.Int with 1 shifted left by nodeIndex
+	mask := new(big.Int).Lsh(big.NewInt(1), uint(nodeIndex))
+
+	// Perform the bitwise AND operation
+	result := new(big.Int).And(sourceChain.ObserverNodesBitmap.Int, mask)
+
+	// Check if the result equals the mask
+	return result.Cmp(mask) == 0
+}
+
 // HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make
 // se/deserializing easier
 type HomeChainConfigMapper struct {
@@ -444,6 +520,38 @@ type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
 	ConfigCount  uint64     `json:"configCount"`
 	ConfigDigest [32]byte   `json:"configDigest"`
+}
+
+// VersionedConfigWithDigest mirrors RMNHome.sol's VersionedConfigWithDigest struct
+type VersionedConfigWithDigest struct {
+	ConfigDigest    cciptypes.Bytes32 `json:"configDigest"`
+	VersionedConfig VersionedConfig   `json:"versionedConfig"`
+}
+
+// VersionedConfig mirrors RMNHome.sol's VersionedConfig struct
+type VersionedConfig struct {
+	Version uint32 `json:"version"`
+	Config  Config `json:"config"`
+}
+
+// Config mirrors RMNHome.sol's Config struct
+type Config struct {
+	Nodes          []Node          `json:"nodes"`
+	SourceChains   []SourceChain   `json:"sourceChains"`
+	OffchainConfig cciptypes.Bytes `json:"offchainConfig"`
+}
+
+// Node mirrors RMNHome.sol's Node struct
+type Node struct {
+	PeerID            cciptypes.Bytes32 `json:"peerId"`
+	OffchainPublicKey cciptypes.Bytes32 `json:"offchainPublicKey"`
+}
+
+// SourceChain mirrors RMNHome.sol's SourceChain struct
+type SourceChain struct {
+	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
+	MinObservers        uint64                  `json:"minObservers"`
+	ObserverNodesBitmap cciptypes.BigInt        `json:"observerNodesBitmap"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)

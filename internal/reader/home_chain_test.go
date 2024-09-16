@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -26,15 +27,23 @@ import (
 )
 
 var (
-	chainA       = cciptypes.ChainSelector(1)
-	chainB       = cciptypes.ChainSelector(2)
-	chainC       = cciptypes.ChainSelector(3)
-	oracleAId    = commontypes.OracleID(1)
-	p2pOracleAId = libocrtypes.PeerID{byte(oracleAId)}
-	oracleBId    = commontypes.OracleID(2)
-	p2pOracleBId = libocrtypes.PeerID{byte(oracleBId)}
-	oracleCId    = commontypes.OracleID(3)
-	p2pOracleCId = libocrtypes.PeerID{byte(oracleCId)}
+	chainA                  = cciptypes.ChainSelector(1)
+	chainB                  = cciptypes.ChainSelector(2)
+	chainC                  = cciptypes.ChainSelector(3)
+	oracleAId               = commontypes.OracleID(1)
+	p2pOracleAId            = libocrtypes.PeerID{byte(oracleAId)}
+	oracleBId               = commontypes.OracleID(2)
+	p2pOracleBId            = libocrtypes.PeerID{byte(oracleBId)}
+	oracleCId               = commontypes.OracleID(3)
+	p2pOracleCId            = libocrtypes.PeerID{byte(oracleCId)}
+	ccipConfigBoundContract = types.BoundContract{
+		Address: "0xCCIPConfigFakeAddress",
+		Name:    consts.ContractNameCCIPConfig,
+	}
+	rmnHomeBoundContract = types.BoundContract{
+		Address: "0xRMNHomeFakeAddress",
+		Name:    consts.ContractNameRMNHome,
+	}
 )
 
 func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
@@ -55,10 +64,8 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
-		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
-			Name:    consts.ContractNameCCIPConfig,
-		},
+		ccipConfigBoundContract,
+		rmnHomeBoundContract,
 	)
 	require.NoError(t, configPoller.Start(context.Background()))
 	// Initially it's healthy
@@ -76,7 +83,7 @@ func Test_PollingWorking(t *testing.T) {
 	chainConfig := chainconfig.ChainConfig{}
 	encodedChainConfig, err := chainconfig.EncodeChainConfig(chainConfig)
 	require.NoError(t, err)
-	onChainConfigs := []ChainConfigInfo{
+	ccipOnChainConfigs := []ChainConfigInfo{
 		{
 			ChainSelector: chainA,
 			ChainConfig: HomeChainConfigMapper{
@@ -129,18 +136,33 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
+	rmnHomeOnChainConfigs := createTestRMNHomeConfigs()
+
 	homeChainReader := chainreadermocks.NewMockContractReader(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		mock.Anything,
+		ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
 			arg := args.Get(4).(*[]ChainConfigInfo)
-			*arg = onChainConfigs
+			*arg = ccipOnChainConfigs
+		}).Return(nil)
+
+	homeChainReader.On(
+		"GetLatestValue",
+		mock.Anything,
+		rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetVersionedConfigsWithDigests),
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Run(
+		func(args mock.Arguments) {
+			arg := args.Get(4).(*[]VersionedConfigWithDigest)
+			*arg = rmnHomeOnChainConfigs
 		}).Return(nil)
 
 	defer homeChainReader.AssertExpectations(t)
@@ -154,10 +176,8 @@ func Test_PollingWorking(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
-		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
-			Name:    consts.ContractNameCCIPConfig,
-		},
+		ccipConfigBoundContract,
+		rmnHomeBoundContract,
 	)
 
 	require.NoError(t, configPoller.Start(context.Background()))
@@ -172,12 +192,30 @@ func Test_PollingWorking(t *testing.T) {
 			callCount++
 		}
 	}
-	// called at least 2 times, one for start and one for the first tick
-	require.GreaterOrEqual(t, callCount, 2)
-
+	// called at least 4 times, one for start and one for the first tick for each contract
+	require.GreaterOrEqual(t, callCount, 4)
 	configs, err := configPoller.GetAllChainConfigs()
 	require.NoError(t, err)
 	require.Equal(t, homeChainConfig, configs)
+
+	for _, configs := range rmnHomeOnChainConfigs {
+		rmnNodes, err := configPoller.GetRMNNodesInfo(configs.ConfigDigest)
+		require.NoError(t, err)
+		require.NotNil(t, rmnNodes)
+		fmt.Println("GetRMNNodesInfo", rmnNodes)
+
+		isValid, err := configPoller.isRMNHomeConfigDigestValid(configs.ConfigDigest)
+		require.NoError(t, err)
+		require.True(t, isValid)
+
+		offchainConfig, err := configPoller.GetOffChainConfig(configs.ConfigDigest)
+		require.NoError(t, err)
+		require.NotNil(t, offchainConfig)
+
+		minObs, err := configPoller.GetMinObservers(configs.ConfigDigest)
+		require.NoError(t, err)
+		require.NotNil(t, minObs)
+	}
 }
 
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
@@ -212,10 +250,8 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		10*time.Millisecond,
-		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
-			Name:    consts.ContractNameCCIPConfig,
-		},
+		ccipConfigBoundContract,
+		rmnHomeBoundContract,
 	)
 
 	configs, err := configPoller.GetOCRConfigs(context.Background(), donID, pluginType)
@@ -225,4 +261,62 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	require.Equal(t, cciptypes.ChainSelector(1), configs[0].Config.ChainSelector)
 	require.Equal(t, uint8(1), configs[0].Config.F)
 	require.Equal(t, []byte("offramp"), configs[0].Config.OfframpAddress)
+}
+
+func createTestRMNHomeConfigs() []VersionedConfigWithDigest {
+	return []VersionedConfigWithDigest{
+		{
+			ConfigDigest: cciptypes.Bytes32{1, 2, 3, 4, 5},
+			VersionedConfig: VersionedConfig{
+				Version: 1,
+				Config: Config{
+					Nodes: []Node{
+						{
+							PeerID:            cciptypes.Bytes32{10, 11, 12, 13, 14},
+							OffchainPublicKey: cciptypes.Bytes32{20, 21, 22, 23, 24},
+						},
+						{
+							PeerID:            cciptypes.Bytes32{15, 16, 17, 18, 19},
+							OffchainPublicKey: cciptypes.Bytes32{25, 26, 27, 28, 29},
+						},
+					},
+					SourceChains: []SourceChain{
+						{
+							ChainSelector:       cciptypes.ChainSelector(1),
+							MinObservers:        1,
+							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(2)), // 10 in binary = 1 is observer and 0 is not
+						},
+						{
+							ChainSelector:       cciptypes.ChainSelector(2),
+							MinObservers:        2,
+							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(3)), // 11 in binary = 0 and 1 are observers
+						},
+					},
+					OffchainConfig: cciptypes.Bytes{30, 31, 32, 33, 34},
+				},
+			},
+		},
+		{
+			ConfigDigest: cciptypes.Bytes32{6, 7, 8, 9, 10},
+			VersionedConfig: VersionedConfig{
+				Version: 2,
+				Config: Config{
+					Nodes: []Node{
+						{
+							PeerID:            cciptypes.Bytes32{40, 41, 42, 43, 44},
+							OffchainPublicKey: cciptypes.Bytes32{50, 51, 52, 53, 54},
+						},
+					},
+					SourceChains: []SourceChain{
+						{
+							ChainSelector:       cciptypes.ChainSelector(1),
+							MinObservers:        1,
+							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)), // 1 in binary = 0 is an observer
+						},
+					},
+					OffchainConfig: cciptypes.Bytes{60, 61, 62, 63, 64},
+				},
+			},
+		},
+	}
 }
