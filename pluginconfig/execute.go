@@ -130,7 +130,7 @@ type TokenDataObserverConfig struct {
 	//    "yetAnotherAPITimeout": "500ms"
 	//  }
 	//]
-	// Having version in that JSONisn't expensive, but it could reduce the risk of breaking the observers in the future.
+	// Having version in that JSON isn't expensive, but it could reduce the risk of breaking the observers in the future.
 	Version string `json:"version"`
 
 	*USDCCCTPObserverConfig
