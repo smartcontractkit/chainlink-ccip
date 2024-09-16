@@ -621,9 +621,15 @@ func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddress
 	var err error
 
 	// OffRamp
-	contracts[consts.ContractNameOffRamp] = map[cciptypes.ChainSelector][]byte{
-		r.destChain: []byte(r.offrampAddress),
-	}
+	/*
+		offrampBytes, err := typeconv.AddressStringToBytes(r.offrampAddress, uint64(r.destChain))
+		if err != nil {
+			return err
+		}
+		contracts[consts.ContractNameOffRamp] = map[cciptypes.ChainSelector][]byte{
+			r.destChain: offrampBytes,
+		}
+	*/
 	err = r.bindReaderContract(
 		ctx,
 		r.destChain,
