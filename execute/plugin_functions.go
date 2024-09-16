@@ -305,6 +305,7 @@ func mergeCommitObservations(
 	return results, nil
 }
 
+// TODO: implement mergeTokenObservations
 func mergeTokenObservations(
 	observations []decodedAttributedObservation,
 	_ map[cciptypes.ChainSelector]int,
