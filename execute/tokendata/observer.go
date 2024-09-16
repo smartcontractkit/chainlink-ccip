@@ -25,7 +25,6 @@ func (t *CompositeTokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
-	// Dummy implementation, don't focus on that
 	var tokenObservation exectypes.TokenDataObservations
 	for _, ob := range t.Observers {
 		tokenData, err := ob.Observe(ctx, messages)

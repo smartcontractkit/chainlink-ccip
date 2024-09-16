@@ -246,7 +246,7 @@ func (p *Plugin) Observation(
 
 		tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
 		if err1 != nil {
-			return types.Observation{}, fmt.Errorf("unable to process token data %w", err)
+			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 		}
 
 		return exectypes.NewObservation(groupedCommits, messages, tkData, nil).Encode()
@@ -401,12 +401,12 @@ func (p *Plugin) Outcome(
 		// add messages to their commitReports.
 		for i, report := range commitReports {
 			report.Messages = nil
-			for i := report.SequenceNumberRange.Start(); i <= report.SequenceNumberRange.End(); i++ {
-				if msg, ok := observation.Messages[report.SourceChain][i]; ok {
+			for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
+				if msg, ok := observation.Messages[report.SourceChain][j]; ok {
 					report.Messages = append(report.Messages, msg)
 				}
 
-				if tokenData, ok := observation.TokenData[report.SourceChain][i]; ok {
+				if tokenData, ok := observation.TokenData[report.SourceChain][j]; ok {
 					report.MessageTokenData = append(report.MessageTokenData, tokenData)
 				}
 			}

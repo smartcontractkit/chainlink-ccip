@@ -105,7 +105,7 @@ type Observation struct {
 	Nonces NonceObservations `json:"nonces"`
 }
 
-// NewObservation constructs a Observation object.
+// NewObservation constructs an Observation object.
 func NewObservation(
 	commitReports CommitObservations,
 	messages MessageObservations,

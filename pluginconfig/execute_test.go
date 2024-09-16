@@ -260,8 +260,8 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 							},
 						},
 						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				},
 			},
@@ -303,8 +303,8 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 							},
 						},
 						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				},
 			},
@@ -349,8 +349,8 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 				},
 			},
 			AttestationAPI:         "http://localhost:8080",
-			AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-			AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+			AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
+			AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
 		}
 	}
 
@@ -393,8 +393,8 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
 						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				}),
 			wantErr: true,

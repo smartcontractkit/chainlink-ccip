@@ -168,8 +168,8 @@ const USDCCCTPHandlerType = "usdc-cctp"
 type USDCCCTPObserverConfig struct {
 	Tokens                 map[int]USDCCCTPTokenConfig `json:"tokens"`
 	AttestationAPI         string                      `json:"attestationAPI"`
-	AttestationAPITimeout  *commonconfig.Duration      `json:"attestationAPITimeout"`
-	AttestationAPIInterval *commonconfig.Duration      `json:"attestationAPIInterval"`
+	AttestationAPITimeout  commonconfig.Duration       `json:"attestationAPITimeout"`
+	AttestationAPIInterval commonconfig.Duration       `json:"attestationAPIInterval"`
 }
 
 func (p USDCCCTPObserverConfig) Validate() error {
