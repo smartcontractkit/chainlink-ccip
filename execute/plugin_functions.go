@@ -305,7 +305,7 @@ func mergeCommitObservations(
 
 // TODO: implement mergeTokenObservations
 func mergeTokenObservations(
-	observations []decodedAttributedObservation,
+	observations []shared.AttributedObservation[exectypes.Observation],
 	_ map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
 	// Return first one, dummy implementation to make tests passing
@@ -402,7 +402,7 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations := mergeTokenObservations(decodedObservations, fChain)
+	mergedTokenObservations := mergeTokenObservations(aos, fChain)
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
 		"oracle", oracleID,
