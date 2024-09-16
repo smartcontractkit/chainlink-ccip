@@ -138,14 +138,6 @@ func buildReport(
 			sigs = parsedSigs
 		}
 	}
-	sort.Slice(sigs, func(i, j int) bool {
-		riStr := sigs[i].R.String()
-		rjStr := sigs[j].R.String()
-		if riStr != rjStr {
-			return riStr < rjStr
-		}
-		return sigs[i].S.String() < sigs[j].S.String()
-	})
 
 	outcome := Outcome{
 		OutcomeType:         outcomeType,

@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -53,9 +54,10 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		const numNodes = 4
 		rmnNodes := make([]RMNNodeInfo, numNodes)
 		for i := 0; i < numNodes; i++ {
-			publicKey, _, err := ed25519.GenerateKey(strings.NewReader(strings.Repeat("deterministic", 1000)))
+			// deterministically create a public key by seeding with a 32char string.
+			publicKey, _, err := ed25519.GenerateKey(
+				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
 			require.NoError(t, err)
-
 			rmnNodes[i] = RMNNodeInfo{
 				ID:                        NodeID(i + 1),
 				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
@@ -147,6 +149,11 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
 		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
+		// Make sure signature are in ascending signer address order
+		for i := 1; i < len(sigs.Signatures); i++ {
+			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
+			assert.True(t, sigs.Signatures[i].S[0] > sigs.Signatures[i-1].S[0])
+		}
 	})
 
 	t.Run("happy path with retries", func(t *testing.T) {

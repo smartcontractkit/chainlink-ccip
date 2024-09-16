@@ -514,6 +514,12 @@ func (c *client) getRmnReportSignatures(
 	}, nil
 }
 
+// reportSigWithNodeID is a helper struct to store the report signature and the node ID that provided it.
+type reportSigWithNodeID struct {
+	reportSig     *rmnpb.ReportSignature
+	signerAddress cciptypes.Bytes
+}
+
 func (c *client) listenForRmnReportSignatures(
 	ctx context.Context,
 	requestIDs mapset.Set[uint64],
@@ -523,7 +529,7 @@ func (c *client) listenForRmnReportSignatures(
 	destChain *rmnpb.LaneDest,
 ) ([]*rmnpb.EcdsaSignature, error) {
 	tReportsInitialRequest := time.NewTimer(c.reportsInitialRequestTimerDuration)
-	reportSigs := make([]*rmnpb.ReportSignature, 0)
+	reportSigs := make([]reportSigWithNodeID, 0)
 	finishedRequests := mapset.NewSet[uint64]()
 	respChan := c.rawRmnClient.Recv()
 	requestIDs = requestIDs.Clone()
@@ -588,12 +594,21 @@ func (c *client) listenForRmnReportSignatures(
 			}
 
 			c.lggr.Infow("received report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
-			reportSigs = append(reportSigs, reportSig)
+			reportSigs = append(reportSigs, reportSigWithNodeID{
+				reportSig:     reportSig,
+				signerAddress: rmnNode.SignReportsAddress,
+			})
 
 			if len(reportSigs) >= c.rmnCfg.Remote.MinSigners {
+				// Sort report sigs by signer address
+				// Similar to RMNRemote.verify (signatures must be sorted in ascending order by signer address).
+				sort.Slice(reportSigs, func(i, j int) bool {
+					return reportSigs[i].signerAddress.String() < reportSigs[j].signerAddress.String()
+				})
+
 				ecdsaSigs := make([]*rmnpb.EcdsaSignature, 0)
 				for _, rs := range reportSigs {
-					ecdsaSigs = append(ecdsaSigs, rs.Signature)
+					ecdsaSigs = append(ecdsaSigs, rs.reportSig.Signature)
 				}
 				return ecdsaSigs, nil
 			}
