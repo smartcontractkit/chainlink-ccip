@@ -23,7 +23,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 	"github.com/smartcontractkit/chainlink-ccip/shared/discovery"
-	dt "github.com/smartcontractkit/chainlink-ccip/shared/discovery/discoverytypes"
 )
 
 type MerkleRootObservation = shared.AttributedObservation[merkleroot.Observation]
@@ -229,7 +228,7 @@ func (p *Plugin) Outcome(
 	var merkleObservations []MerkleRootObservation
 	var tokensObservations []TokenPricesObservation
 	var feeObservations []ChainFeeObservation
-	var discoveryObservations []shared.AttributedObservation[dt.Observation]
+	//var discoveryObservations []shared.AttributedObservation[dt.Observation]
 
 	for _, ao := range aos {
 		obs, err := DecodeCommitPluginObservation(ao.Observation)
@@ -258,12 +257,14 @@ func (p *Plugin) Outcome(
 			},
 		)
 
-		discoveryObservations = append(discoveryObservations,
-			shared.AttributedObservation[dt.Observation]{
-				OracleID:    ao.Observer,
-				Observation: obs.DiscoveryObs,
-			},
-		)
+		/*
+			discoveryObservations = append(discoveryObservations,
+				shared.AttributedObservation[dt.Observation]{
+					OracleID:    ao.Observer,
+					Observation: obs.DiscoveryObs,
+				},
+			)
+		*/
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
