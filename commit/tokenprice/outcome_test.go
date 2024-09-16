@@ -56,7 +56,7 @@ var offChainCfg = pluginconfig.CommitOffchainConfig{
 		tokenC: {DeviationPPB: cbi(3)},
 		tokenD: {DeviationPPB: cbi(4)},
 	},
-	TokenPriceChainSelector: feedChainSel,
+	PriceFeedChainSelector: feedChainSel,
 }
 
 func TestGetConsensusObservation(t *testing.T) {

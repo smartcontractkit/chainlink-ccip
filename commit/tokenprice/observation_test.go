@@ -147,6 +147,6 @@ var defaultCfg = pluginconfig.CommitPluginConfig{
 				AggregatorAddress: "0x2222222222222222222222Ff18C45Df59775Fbb2",
 				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)}},
 		},
-		TokenPriceChainSelector: feedChainSel,
+		PriceFeedChainSelector: feedChainSel,
 	},
 }
