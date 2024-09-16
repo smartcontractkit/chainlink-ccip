@@ -43,6 +43,7 @@ type Plugin struct {
 	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
+	rmnConfig           rmn.Config
 }
 
 func NewPlugin(
@@ -57,6 +58,7 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 	reportingCfg ocr3types.ReportingPluginConfig,
+	rmnConfig rmn.Config,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
@@ -87,7 +89,7 @@ func NewPlugin(
 		chainSupport,
 		rmn.Client(nil),          // todo
 		cciptypes.RMNCrypto(nil), // todo
-		rmn.Config{},             // todo
+		rmnConfig,
 	)
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,
@@ -114,6 +116,7 @@ func NewPlugin(
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainfee.NewProcessor(),
+		rmnConfig:           rmnConfig,
 	}
 }
 
