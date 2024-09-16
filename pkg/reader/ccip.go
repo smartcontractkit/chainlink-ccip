@@ -569,6 +569,7 @@ func (r *ccipChainReader) bindReaderContract(
 	}
 
 	address := addresses[contractName][chainSel]
+	encAddress := typeconv.AddressBytesToString(address, uint64(chainSel))
 
 	// Bind the contract address to the reader.
 	// If the same address exists -> no-op
@@ -576,7 +577,7 @@ func (r *ccipChainReader) bindReaderContract(
 	// If the contract not bound -> binds to the new address
 	if err := r.contractReaders[chainSel].Bind(ctx, []types.BoundContract{
 		{
-			Address: typeconv.AddressBytesToString(address, uint64(chainSel)),
+			Address: encAddress,
 			Name:    contractName,
 		},
 	}); err != nil {
