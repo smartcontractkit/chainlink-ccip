@@ -24,6 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -112,6 +113,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
+			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
 		},
 	}
 
@@ -145,7 +147,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 							MerkleRoot:   merkleRoot1,
 						},
 					},
-					PriceUpdates: ccipocr3.PriceUpdates{},
+					PriceUpdates:  ccipocr3.PriceUpdates{},
+					RMNSignatures: []ccipocr3.RMNECDSASignature{},
 				},
 			},
 		},
@@ -340,6 +343,7 @@ func setupNode(
 		lggr,
 		homeChainReader,
 		reportingCfg,
+		rmn.Config{},
 	)
 
 	return nodeSetup{
