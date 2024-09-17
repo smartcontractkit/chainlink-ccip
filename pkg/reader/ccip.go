@@ -512,7 +512,7 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
-	// TODO: Loookup fee quoter?
+	// TODO: Lookup fee quoter?
 
 	// Build response object.
 	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))
