@@ -562,7 +562,7 @@ func (r *ccipChainReader) bindReaderContract(
 }
 
 // Sync goes through the input contracts and binds them to the contract reader.
-func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+func (r *ccipChainReader) Sync(ctx context.Context, _ ContractAddresses) error {
 	// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
 	contracts, err := r.DiscoverContracts(ctx, r.destChain)
 	if err != nil {
