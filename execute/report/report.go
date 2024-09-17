@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -46,9 +45,9 @@ func buildSingleChainReportHelper(
 	}
 
 	numMsg := len(report.Messages)
-	if len(report.TokenData) != numMsg {
+	if len(report.MessageTokenData) != numMsg {
 		return cciptypes.ExecutePluginReportSingleChain{},
-			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.TokenData), numMsg)
+			fmt.Errorf("token data length mismatch: got %d, expected %d", len(report.MessageTokenData), numMsg)
 	}
 
 	lggr.Infow(
@@ -83,7 +82,7 @@ func buildSingleChainReportHelper(
 	var msgInRoot []cciptypes.Message
 	for i, msg := range report.Messages {
 		if _, ok := readyMessages[i]; ok {
-			offchainTokenData = append(offchainTokenData, report.TokenData[i])
+			offchainTokenData = append(offchainTokenData, report.MessageTokenData[i].ToByteSlice())
 			toExecute = append(toExecute, i)
 			msgInRoot = append(msgInRoot, msg)
 		}
@@ -147,15 +146,8 @@ const (
 	*/
 )
 
-func padSlice[T any](slice []T, padLen int, defaultValue T) []T {
-	for len(slice) < padLen {
-		slice = append(slice, defaultValue)
-	}
-	return slice
-}
-
 func (b *execReportBuilder) checkMessage(
-	ctx context.Context, idx int, execReport exectypes.CommitData,
+	_ context.Context, idx int, execReport exectypes.CommitData,
 	// TODO: get rid of the nolint when the error is used
 ) (exectypes.CommitData, messageStatus, error) { // nolint this will use the error eventually
 	result := execReport
@@ -178,40 +170,30 @@ func (b *execReportBuilder) checkMessage(
 		return execReport, AlreadyExecuted, nil
 	}
 
-	// 2. Check if token data is ready.
-	if b.tokenDataReader == nil {
-		return execReport, Unknown, fmt.Errorf("token data reader must be initialized")
+	// 2. Check if all tokens are properly initialized with token data
+	if idx >= len(execReport.MessageTokenData) {
+		b.lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(execReport.MessageTokenData))
+		return execReport, Unknown, fmt.Errorf("token data index out of range")
 	}
-	tokenData, err := b.tokenDataReader.ReadTokenData(ctx, execReport.SourceChain, msg.Header.SequenceNumber)
-	if err != nil {
-		if errors.Is(err, ErrNotReady) {
-			b.lggr.Infow(
-				"unable to read token data - token data not ready",
-				"messageID", msg.Header.MessageID,
-				"sourceChain", execReport.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"error", err,
-				"messageState", TokenDataNotReady)
-			return execReport, TokenDataNotReady, nil
-		}
-		b.lggr.Errorw(
-			"unable to read token data - unknown error",
+
+	messageTokenData := execReport.MessageTokenData[idx]
+	if !messageTokenData.IsReady() {
+		b.lggr.Infow(
+			"unable to read token data - token data not ready",
 			"messageID", msg.Header.MessageID,
 			"sourceChain", execReport.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
-			"error", err,
-			"messageState", TokenDataFetchError)
-		return execReport, TokenDataFetchError, nil
+			"error", messageTokenData,
+			"messageState", TokenDataNotReady)
+		return execReport, TokenDataNotReady, nil
 	}
-
-	result.TokenData = padSlice(execReport.TokenData, idx+1, nil)
-	result.TokenData[idx] = tokenData
+	result.MessageTokenData[idx] = messageTokenData
 	b.lggr.Infow(
 		"read token data",
 		"messageID", msg.Header.MessageID,
 		"sourceChain", execReport.SourceChain,
 		"seqNum", msg.Header.SequenceNumber,
-		"data", tokenData)
+		"data", messageTokenData.ToByteSlice())
 
 	// 3. Check if the message has a valid nonce.
 	if msg.Header.Nonce != 0 {

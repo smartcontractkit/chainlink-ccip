@@ -77,7 +77,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 
 	boundContract := commontypes.BoundContract{
 		Address: string(pr.FeeQuoterAddress),
-		Name:    consts.ContractNamePriceRegistry,
+		Name:    consts.ContractNameFeeQuoter,
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found

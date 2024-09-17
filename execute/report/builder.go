@@ -23,7 +23,6 @@ func NewBuilder(
 	ctx context.Context,
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
-	tokenDataReader exectypes.TokenDataReader,
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider gas.EstimateProvider,
 	nonces map[cciptypes.ChainSelector]map[string]uint64,
@@ -35,7 +34,6 @@ func NewBuilder(
 		ctx:  ctx,
 		lggr: logger,
 
-		tokenDataReader:  tokenDataReader,
 		encoder:          encoder,
 		hasher:           hasher,
 		estimateProvider: estimateProvider,
@@ -66,7 +64,6 @@ type execReportBuilder struct {
 	lggr logger.Logger
 
 	// Providers
-	tokenDataReader  exectypes.TokenDataReader
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
 	estimateProvider gas.EstimateProvider

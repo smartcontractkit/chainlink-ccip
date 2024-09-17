@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -100,8 +101,19 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 
 	var onChainTokenPricesReader reader.PriceReader
 	// The node supports the chain that the token prices are on.
-	tokenPricesCr, ok := p.contractReaders[offchainConfig.TokenPriceChainSelector]
+	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
 	if ok {
+		// Bind all token aggregate contracts
+		var bcs []types.BoundContract
+		for _, info := range offchainConfig.TokenInfo {
+			bcs = append(bcs, types.BoundContract{
+				Address: info.AggregatorAddress,
+				Name:    consts.ContractNamePriceAggregator,
+			})
+		}
+		if err1 := tokenPricesCr.Bind(context.Background(), bcs); err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
+		}
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
 			tokenPricesCr,
 			offchainConfig.TokenInfo,

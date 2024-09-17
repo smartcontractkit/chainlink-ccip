@@ -25,8 +25,6 @@ type CommitData struct {
 	// ExecutedMessages are the messages in this report that have already been executed.
 	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
 
-	// The following values are cached for validation algorithms, serialization is not required for consensus.
-
 	// TokenData for each message.
-	TokenData [][][]byte `json:"-"`
+	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }

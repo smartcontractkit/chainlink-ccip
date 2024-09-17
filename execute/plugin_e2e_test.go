@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
@@ -240,14 +241,13 @@ func setupSimpleTest(
 	err = homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 
-	tokenDataReader := mock_types.NewMockTokenDataReader(t)
-	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
+	tokenDataObserver := &tokendata.NoopTokenDataObserver{}
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -265,7 +265,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
-	tokenDataReader exectypes.TokenDataReader,
+	tokenDataObserver tokendata.TokenDataObserver,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
@@ -285,7 +285,7 @@ func newNode(
 		reportCodec,
 		msgHasher,
 		homeChain,
-		tokenDataReader,
+		tokenDataObserver,
 		evm.EstimateProvider{},
 		lggr)
 

@@ -240,7 +240,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency: tt.fields.RemoteGasPriceBatchWriteFrequency,
 				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
 				TokenInfo:                         tt.fields.TokenInfo,
-				TokenPriceChainSelector:           tt.fields.TokenPriceChainSelector,
+				PriceFeedChainSelector:            tt.fields.TokenPriceChainSelector,
 			}
 			err := c.Validate()
 			if tt.wantErr {
