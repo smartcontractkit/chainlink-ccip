@@ -18,7 +18,7 @@ repos
 
 # Ignore DevSpace cache and log folder
 .devspace/
-/components/atlas/init/output/*
+/imports/atlas/init/output/*
 
 # Local helm chart downloads
 /deployments/*/*.tgz
