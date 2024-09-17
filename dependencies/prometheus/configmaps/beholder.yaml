@@ -16,4 +16,4 @@ data:
       - job_name: otel-collector-gateway
         static_configs:
           - targets:
-              - crib-beholder-infra-otel-collector-gateway:8889
+              - beholder-otel-collector-gateway:8889
