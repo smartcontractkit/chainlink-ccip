@@ -14,8 +14,9 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	merkleroot "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -43,7 +44,7 @@ type Plugin struct {
 	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
-	rmnConfig           rmn.Config
+	rmnConfig           rmntypes.Config
 }
 
 func NewPlugin(
@@ -58,7 +59,7 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	rmnConfig rmn.Config,
+	rmnConfig rmntypes.Config,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,

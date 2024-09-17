@@ -1,4 +1,4 @@
-package rmn
+package types
 
 import (
 	"crypto/ed25519"
@@ -7,6 +7,8 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+type NodeID uint32
 
 // Config contains the RMN configuration required by the plugin and the RMN client in a single struct.
 type Config struct {

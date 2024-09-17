@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 var (
@@ -53,20 +54,20 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		rawRmnClient := newMockRawRmnClient(resChan)
 
 		const numNodes = 4
-		rmnNodes := make([]RMNHomeNodeInfo, numNodes)
-		rmnSignerNodes := make([]RMNRemoteSignerInfo, numNodes)
+		rmnNodes := make([]types.RMNHomeNodeInfo, numNodes)
+		rmnSignerNodes := make([]types.RMNRemoteSignerInfo, numNodes)
 		for i := 0; i < numNodes; i++ {
 			// deterministically create a public key by seeding with a 32char string.
 			publicKey, _, err := ed25519.GenerateKey(
 				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
 			require.NoError(t, err)
-			rmnNodes[i] = RMNHomeNodeInfo{
-				ID:                        NodeID(i),
+			rmnNodes[i] = types.RMNHomeNodeInfo{
+				ID:                        types.NodeID(i),
 				PeerID:                    cciptypes.Bytes32{uint8(i + 1), 0, 0, 0},
 				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
 				SignObservationsPublicKey: &publicKey,
 			}
-			rmnSignerNodes[i] = RMNRemoteSignerInfo{
+			rmnSignerNodes[i] = types.RMNRemoteSignerInfo{
 				SignReportsAddress:    cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
 				NodeIndex:             uint64(i),
 				SignObservationPrefix: "chainlink ccip 1.6 rmn observation",
@@ -76,8 +77,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		cl := &client{
 			lggr:         lggr,
 			rawRmnClient: rawRmnClient,
-			rmnCfg: Config{
-				Home: RMNHomeConfig{
+			rmnCfg: types.Config{
+				Home: types.RMNHomeConfig{
 					Nodes:        rmnNodes,
 					ConfigDigest: cciptypes.Bytes32{0x1, 0x2, 0x3},
 					MinObservers: map[cciptypes.ChainSelector]uint64{
@@ -86,7 +87,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 					},
 					OffchainConfig: cciptypes.Bytes{0x1, 0x2, 0x3},
 				},
-				Remote: RMNRemoteConfig{
+				Remote: types.RMNRemoteConfig{
 					ContractAddress:  []byte{1, 2, 3},
 					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
 					Signers:          rmnSignerNodes,
@@ -217,9 +218,9 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockRawRmnClient,
 	minObserversS1 int,
 	minObserversS2 int,
-) (map[NodeID]uint64, map[NodeID]mapset.Set[uint64]) {
-	requestIDs := make(map[NodeID]uint64)
-	requestedChains := make(map[NodeID]mapset.Set[uint64])
+) (map[types.NodeID]uint64, map[types.NodeID]mapset.Set[uint64]) {
+	requestIDs := make(map[types.NodeID]uint64)
+	requestedChains := make(map[types.NodeID]mapset.Set[uint64])
 
 	for {
 		time.Sleep(time.Millisecond)
@@ -253,8 +254,8 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 
 func (ts *testSetup) nodesRespondToTheObservationRequests(
 	rmnClient *mockRawRmnClient,
-	requestIDs map[NodeID]uint64,
-	requestedChains map[NodeID]mapset.Set[uint64],
+	requestIDs map[types.NodeID]uint64,
+	requestedChains map[types.NodeID]mapset.Set[uint64],
 	rmnHomeConfigDigest [32]byte,
 	destChain *rmnpb.LaneDest,
 ) {
@@ -307,8 +308,8 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 	rmnClient *mockRawRmnClient,
 	expectedResponses int,
 	minObservers int,
-) map[NodeID]uint64 {
-	requestIDs := make(map[NodeID]uint64)
+) map[types.NodeID]uint64 {
+	requestIDs := make(map[types.NodeID]uint64)
 	// plugin now has received the observation responses and should send
 	// the report requests to the nodes, wait for them to be received by the nodes
 	// should a total of minSigners requests each one containing the observation requests
@@ -343,7 +344,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 
 func (ts *testSetup) nodesRespondToTheSignatureRequests(
 	rmnClient *mockRawRmnClient,
-	requestIDs map[NodeID]uint64,
+	requestIDs map[types.NodeID]uint64,
 ) {
 	// now the plugin is waiting for rmn node responses for all this requests
 	for nodeID, reqID := range requestIDs {
@@ -370,7 +371,7 @@ func (ts *testSetup) nodesRespondToTheSignatureRequests(
 
 type mockRawRmnClient struct {
 	resChan          chan RawRmnResponse
-	receivedRequests map[NodeID][]*rmnpb.Request
+	receivedRequests map[types.NodeID][]*rmnpb.Request
 	mu               *sync.RWMutex
 }
 
@@ -381,8 +382,8 @@ func newMockRawRmnClient(resChan chan RawRmnResponse) *mockRawRmnClient {
 	}
 }
 
-func (m *mockRawRmnClient) getReceivedRequests() map[NodeID][]*rmnpb.Request {
-	cp := make(map[NodeID][]*rmnpb.Request)
+func (m *mockRawRmnClient) getReceivedRequests() map[types.NodeID][]*rmnpb.Request {
+	cp := make(map[types.NodeID][]*rmnpb.Request)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for k, v := range m.receivedRequests {
@@ -394,15 +395,15 @@ func (m *mockRawRmnClient) getReceivedRequests() map[NodeID][]*rmnpb.Request {
 func (m *mockRawRmnClient) resetReceivedRequests() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.receivedRequests = make(map[NodeID][]*rmnpb.Request)
+	m.receivedRequests = make(map[types.NodeID][]*rmnpb.Request)
 }
 
-func (m *mockRawRmnClient) Send(rmnNodeID NodeID, request []byte) error {
+func (m *mockRawRmnClient) Send(rmnNodeID types.NodeID, request []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.receivedRequests == nil {
-		m.receivedRequests = map[NodeID][]*rmnpb.Request{}
+		m.receivedRequests = map[types.NodeID][]*rmnpb.Request{}
 	}
 
 	if _, ok := m.receivedRequests[rmnNodeID]; !ok {

@@ -21,15 +21,26 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 const (
 	defaultConfigPageSize = uint64(100)
 )
 
-type HomeChain interface {
-	// CCIPConfig specific methods
+type RMNHome interface {
+	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
+	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error)
+	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
+	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error)
+	// GetMinObservers gets the minimum number of observers required for each chain in the given configDigest
+	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error)
+	// GetOffChainConfig gets the offchain config for the given configDigest
+	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
+}
+
+type CCIPHome interface {
+	// GetChainConfig gets the ChainConfig for the given chainSelector
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
 	// GetSupportedChainsForPeer Gets all chain selectors that the peerID can read/write from/to
@@ -40,17 +51,11 @@ type HomeChain interface {
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
 	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
 	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
+}
 
-	// RMNHome specific methods
-	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
-	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmn.RMNHomeNodeInfo, error)
-	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
-	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error)
-	// GetMinObservers gets the minimum number of observers required for each chain in the given configDigest
-	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error)
-	// GetOffChainConfig gets the offchain config for the given configDigest
-	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
-
+type HomeChain interface {
+	CCIPHome
+	RMNHome
 	services.Service
 }
 
@@ -73,7 +78,7 @@ type homeChainPoller struct {
 	lggr            logger.Logger
 	mutex           *sync.RWMutex
 	state           state
-	rmnHomeConfig   map[cciptypes.Bytes32]rmn.RMNHomeConfig
+	rmnHomeConfig   map[cciptypes.Bytes32]rmntypes.RMNHomeConfig
 	failedPolls     uint
 	// TODO: currently unused but will be passed into GetLatestValue
 	// once the chainlink-common breaking change comes in
@@ -97,7 +102,7 @@ func NewHomeChainConfigPoller(
 		stopCh:                  make(chan struct{}),
 		homeChainReader:         homeChainReader,
 		state:                   state{},
-		rmnHomeConfig:           make(map[cciptypes.Bytes32]rmn.RMNHomeConfig),
+		rmnHomeConfig:           make(map[cciptypes.Bytes32]rmntypes.RMNHomeConfig),
 		mutex:                   &sync.RWMutex{},
 		failedPolls:             0,
 		lggr:                    lggr,
@@ -234,7 +239,7 @@ func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
 	return nil
 }
 
-func (r *homeChainPoller) setRMNHomeState(rmnHomeConfig map[cciptypes.Bytes32]rmn.RMNHomeConfig) {
+func (r *homeChainPoller) setRMNHomeState(rmnHomeConfig map[cciptypes.Bytes32]rmntypes.RMNHomeConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	r.rmnHomeConfig = rmnHomeConfig
@@ -305,7 +310,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	return ocrConfigs, nil
 }
 
-func (r *homeChainPoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmn.RMNHomeNodeInfo, error) {
+func (r *homeChainPoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.rmnHomeConfig[configDigest].Nodes, nil
@@ -415,21 +420,21 @@ func convertOnChainConfigToHomeChainConfig(
 func convertOnChainConfigToRMNHomeChainConfig(
 	lggr logger.Logger,
 	versionedConfigWithDigests []VersionedConfigWithDigest,
-) map[cciptypes.Bytes32]rmn.RMNHomeConfig {
+) map[cciptypes.Bytes32]rmntypes.RMNHomeConfig {
 	if len(versionedConfigWithDigests) == 0 {
 		lggr.Warnw("no on chain RMNHomeConfigs found")
-		return map[cciptypes.Bytes32]rmn.RMNHomeConfig{}
+		return map[cciptypes.Bytes32]rmntypes.RMNHomeConfig{}
 	}
 
-	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmn.RMNHomeConfig)
+	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmntypes.RMNHomeConfig)
 	for _, versionedConfigWithDigest := range versionedConfigWithDigests {
 		config := versionedConfigWithDigest.VersionedConfig.Config
-		nodes := make([]rmn.RMNHomeNodeInfo, len(config.Nodes))
+		nodes := make([]rmntypes.RMNHomeNodeInfo, len(config.Nodes))
 		for i, node := range config.Nodes {
 			pubKey := ed25519.PublicKey(node.OffchainPublicKey[:])
 
-			nodes[i] = rmn.RMNHomeNodeInfo{
-				ID:                        rmn.NodeID(i),
+			nodes[i] = rmntypes.RMNHomeNodeInfo{
+				ID:                        rmntypes.NodeID(i),
 				PeerID:                    node.PeerID,
 				SignObservationsPublicKey: &pubKey,
 				SupportedSourceChains:     mapset.NewSet[cciptypes.ChainSelector](),
@@ -452,7 +457,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 			}
 		}
 
-		rmnHomeConfigs[versionedConfigWithDigest.ConfigDigest] = rmn.RMNHomeConfig{
+		rmnHomeConfigs[versionedConfigWithDigest.ConfigDigest] = rmntypes.RMNHomeConfig{
 			Nodes:          nodes,
 			MinObservers:   minObservers,
 			ConfigDigest:   versionedConfigWithDigest.ConfigDigest,

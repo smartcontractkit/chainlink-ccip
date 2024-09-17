@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 // ED25519Verifier is an interface for verifying ED25519 signatures.
@@ -29,8 +30,8 @@ func (ED25519VerifierImpl) Verify(publicKey ed25519.PublicKey, message, sig []by
 //
 //	e.g. ed25519.sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
 func verifyObservationSignature(
-	rmnNode RMNHomeNodeInfo,
-	signer RMNRemoteSignerInfo,
+	rmnNode types.RMNHomeNodeInfo,
+	signer types.RMNRemoteSignerInfo,
 	signedObs *rmnpb.SignedObservation,
 	verifier ED25519Verifier,
 ) error {

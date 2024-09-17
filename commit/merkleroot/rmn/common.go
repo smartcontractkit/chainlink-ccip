@@ -7,9 +7,10 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
-func (c *client) marshalAndSend(req *rmnpb.Request, nodeID NodeID) error {
+func (c *client) marshalAndSend(req *rmnpb.Request, nodeID types.NodeID) error {
 	reqBytes, err := proto.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("proto marshal RMN request: %w", err)

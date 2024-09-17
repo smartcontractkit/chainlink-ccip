@@ -18,6 +18,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 // TODO: testing - more unit tests and some code cleanup.
@@ -53,14 +54,12 @@ type ReportSignatures struct {
 	LaneUpdates []*rmnpb.FixedDestLaneUpdate
 }
 
-type NodeID uint32
-
 // client is the base RMN Client implementation.
 type client struct {
 	lggr            logger.Logger
 	rmnCrypto       cciptypes.RMNCrypto
 	rawRmnClient    RawRmnClient
-	rmnCfg          Config
+	rmnCfg          types.Config
 	ed25519Verifier ED25519Verifier
 
 	observationsInitialRequestTimerDuration time.Duration
@@ -72,7 +71,7 @@ func NewClient(
 	lggr logger.Logger,
 	rmnCrypto cciptypes.RMNCrypto,
 	rawRmnClient RawRmnClient,
-	rmnConfig Config,
+	rmnConfig types.Config,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Client {
@@ -103,7 +102,7 @@ func (c *client) ComputeReportSignatures(
 
 		updatesPerChain[updateReq.LaneSource.SourceChainSelector] = updateRequestWithMeta{
 			data:     updateReq,
-			rmnNodes: mapset.NewSet[NodeID](),
+			rmnNodes: mapset.NewSet[types.NodeID](),
 		}
 		for _, node := range c.rmnCfg.Home.Nodes {
 			if node.SupportedSourceChains.Contains(cciptypes.ChainSelector(updateReq.LaneSource.SourceChainSelector)) {
@@ -145,14 +144,14 @@ func (c *client) getRmnSignedObservations(
 	destChain *rmnpb.LaneDest,
 	updateRequestsPerChain map[uint64]updateRequestWithMeta,
 ) ([]rmnSignedObservationWithMeta, error) {
-	requestedNodes := make(map[uint64]mapset.Set[NodeID])                   // sourceChain -> requested rmnNodeIDs
-	requestsPerNode := make(map[NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
+	requestedNodes := make(map[uint64]mapset.Set[types.NodeID])                   // sourceChain -> requested rmnNodeIDs
+	requestsPerNode := make(map[types.NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
 	c.lggr.Infof("update requests per chain: %v", updateRequestsPerChain)
 
 	// For each lane update request send an observation request to at most 'minObservers' number of rmn nodes.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
-		requestedNodes[sourceChain] = mapset.NewSet[NodeID]()
+		requestedNodes[sourceChain] = mapset.NewSet[types.NodeID]()
 
 		// At this point we assume at least minObservers RMN nodes are available for each source chain.
 		for nodeID := range updateRequest.rmnNodes.Iter() {
@@ -187,7 +186,7 @@ func (c *client) getRmnSignedObservations(
 
 func (c *client) sendObservationRequests(
 	destChain *rmnpb.LaneDest,
-	requestsPerNode map[NodeID][]*rmnpb.FixedDestLaneUpdateRequest,
+	requestsPerNode map[types.NodeID][]*rmnpb.FixedDestLaneUpdateRequest,
 ) (requestIDs mapset.Set[uint64]) {
 	requestIDs = mapset.NewSet[uint64]()
 
@@ -217,7 +216,7 @@ func (c *client) listenForRmnObservationResponses(
 	destChain *rmnpb.LaneDest,
 	requestIDs mapset.Set[uint64],
 	lursPerChain map[uint64]updateRequestWithMeta,
-	requestedNodes map[uint64]mapset.Set[NodeID],
+	requestedNodes map[uint64]mapset.Set[types.NodeID],
 ) ([]rmnSignedObservationWithMeta, error) {
 	c.lggr.Infow("Waiting for observation requests", "requestIDs", requestIDs.String())
 
@@ -297,7 +296,7 @@ func (c *client) listenForRmnObservationResponses(
 		case <-initialObservationRequestTimer.C:
 			c.lggr.Warn("initial observation request timer expired, sending additional requests")
 			// Timer expired, send the observation requests to the rest of the RMN nodes.
-			requestsPerNode := make(map[NodeID][]*rmnpb.FixedDestLaneUpdateRequest)
+			requestsPerNode := make(map[types.NodeID][]*rmnpb.FixedDestLaneUpdateRequest)
 			for sourceChain, updateReq := range lursPerChain {
 				for _, nodeID := range randomShuffle(updateReq.rmnNodes.ToSlice()) {
 					if requestedNodes[sourceChain].Contains(nodeID) {
@@ -319,7 +318,7 @@ func (c *client) listenForRmnObservationResponses(
 }
 
 func (c *client) validateSignedObservationResponse(
-	rmnNodeID NodeID,
+	rmnNodeID types.NodeID,
 	lurs map[uint64]updateRequestWithMeta,
 	signedObs *rmnpb.SignedObservation,
 	destChain *rmnpb.LaneDest,
@@ -437,7 +436,7 @@ func (c *client) getRmnReportSignatures(
 	}
 
 	requestIDs := mapset.NewSet[uint64]()
-	signersRequested := mapset.NewSet[NodeID]()
+	signersRequested := mapset.NewSet[types.NodeID]()
 
 	// Send the report signature request to at least minSigners
 	for _, signers := range c.rmnCfg.Remote.Signers {
@@ -531,7 +530,7 @@ func (c *client) listenForRmnReportSignatures(
 	requestIDs mapset.Set[uint64],
 	fixedDestLaneUpdates []*rmnpb.FixedDestLaneUpdate,
 	reportSigReq *rmnpb.ReportSignatureRequest,
-	signersRequested mapset.Set[NodeID],
+	signersRequested mapset.Set[types.NodeID],
 	destChain *rmnpb.LaneDest,
 ) ([]*rmnpb.EcdsaSignature, error) {
 	tReportsInitialRequest := time.NewTimer(c.reportsInitialRequestTimerDuration)
@@ -663,26 +662,26 @@ func (c *client) ensureEnoughSignedObservations(rmnSignedObservations []rmnSigne
 	return nil
 }
 
-func (c *client) getRmnNodeByID(nodeID NodeID) (RMNHomeNodeInfo, bool) {
+func (c *client) getRmnNodeByID(nodeID types.NodeID) (types.RMNHomeNodeInfo, bool) {
 	for _, node := range c.rmnCfg.Home.Nodes {
 		if node.ID == nodeID {
 			return node, true
 		}
 	}
-	return RMNHomeNodeInfo{}, false
+	return types.RMNHomeNodeInfo{}, false
 }
 
-func (c *client) getRmnSignerByID(nodeID NodeID) (RMNRemoteSignerInfo, bool) {
+func (c *client) getRmnSignerByID(nodeID types.NodeID) (types.RMNRemoteSignerInfo, bool) {
 	for _, signer := range c.rmnCfg.Remote.Signers {
 		if signer.NodeIndex == uint64(nodeID) {
 			return signer, true
 		}
 	}
-	return RMNRemoteSignerInfo{}, false
+	return types.RMNRemoteSignerInfo{}, false
 }
 
 type RawRmnClient interface {
-	Send(rmnNodeID NodeID, request []byte) error
+	Send(rmnNodeID types.NodeID, request []byte) error
 	// Recv returns a channel which can be used to listen on for
 	// responses by all RMN nodes. This is expected to be monitored
 	// by the plugin in order to get RMN responses.
@@ -690,18 +689,18 @@ type RawRmnClient interface {
 }
 
 type RawRmnResponse struct {
-	RMNNodeID NodeID
+	RMNNodeID types.NodeID
 	Body      []byte // pb
 }
 
 type updateRequestWithMeta struct {
 	data     *rmnpb.FixedDestLaneUpdateRequest
-	rmnNodes mapset.Set[NodeID]
+	rmnNodes mapset.Set[types.NodeID]
 }
 
 type rmnSignedObservationWithMeta struct {
 	SignedObservation *rmnpb.SignedObservation
-	RMNNodeID         NodeID
+	RMNNodeID         types.NodeID
 }
 
 func randomShuffle[T any](s []T) []T {
