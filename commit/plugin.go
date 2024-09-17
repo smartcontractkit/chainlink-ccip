@@ -252,9 +252,8 @@ func (p *Plugin) Outcome(
 		decodedQ.TokenPriceQuery,
 		tokensObservations,
 	)
-
 	if err != nil {
-		p.lggr.Errorw("failed to get token prices outcome", "err", err)
+		p.lggr.Warnw("failed to get token prices outcome", "err", err)
 	}
 
 	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
@@ -263,7 +262,7 @@ func (p *Plugin) Outcome(
 		feeObservations,
 	)
 	if err != nil {
-		p.lggr.Errorw("failed to get gas prices outcome", "err", err)
+		p.lggr.Warnw("failed to get gas prices outcome", "err", err)
 	}
 
 	return Outcome{
