@@ -115,7 +115,7 @@ func Test_verifyObservationSignature(t *testing.T) {
 			assert.NoError(t, err)
 
 			signerNode2 := signerNode
-			signerNode.SignObservationPrefix = "chainlink ccip 1.6 rmn observation2----------"
+			signerNode2.SignObservationPrefix = "chainlink ccip 1.6 rmn observation2----------"
 			err = verifyObservationSignature(rmnNode, signerNode2, tc.signedObs, NewED25519Verifier())
 			assert.Error(t, err)
 
