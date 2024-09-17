@@ -322,7 +322,7 @@ func (r *homeChainPoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes3
 func (r *homeChainPoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.rmnHomeConfig[configDigest].MinSigners, nil
+	return r.rmnHomeConfig[configDigest].MinObservers, nil
 }
 
 func (r *homeChainPoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
@@ -437,10 +437,10 @@ func convertOnChainConfigToRMNHomeChainConfig(
 			}
 		}
 
-		minSigners := make(map[cciptypes.ChainSelector]uint64)
+		minObservers := make(map[cciptypes.ChainSelector]uint64)
 
 		for _, chain := range config.SourceChains {
-			minSigners[chain.ChainSelector] = chain.MinObservers
+			minObservers[chain.ChainSelector] = chain.MinObservers
 			for j := 0; j < 256; j++ {
 				if isNodeObserver(chain, j) {
 					nodes[j].SupportedSourceChains.Add(chain.ChainSelector)
@@ -450,7 +450,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 		rmnHomeConfigs[versionedConfigWithDigest.ConfigDigest] = rmn.RMNHomeConfig{
 			Nodes:          nodes,
-			MinSigners:     minSigners,
+			MinObservers:   minObservers,
 			ConfigDigest:   versionedConfigWithDigest.ConfigDigest,
 			OffchainConfig: config.OffchainConfig,
 		}

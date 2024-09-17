@@ -17,7 +17,7 @@ type Config struct {
 // RMNHomeConfig contains the configuration fetched from the RMNHome contract.
 type RMNHomeConfig struct {
 	Nodes          []RMNHomeNodeInfo
-	MinSigners     map[cciptypes.ChainSelector]uint64
+	MinObservers   map[cciptypes.ChainSelector]uint64
 	ConfigDigest   cciptypes.Bytes32
 	OffchainConfig cciptypes.Bytes // Raw offchain configuration bytes
 }
