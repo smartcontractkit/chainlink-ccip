@@ -204,7 +204,7 @@ func Test_PollingWorking(t *testing.T) {
 		require.NotNil(t, rmnNodes)
 		fmt.Println("GetRMNNodesInfo", rmnNodes)
 
-		isValid, err := configPoller.isRMNHomeConfigDigestValid(configs.ConfigDigest)
+		isValid, err := configPoller.IsRMNHomeConfigDigestSet(configs.ConfigDigest)
 		require.NoError(t, err)
 		require.True(t, isValid)
 

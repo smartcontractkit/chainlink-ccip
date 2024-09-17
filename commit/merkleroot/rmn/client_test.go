@@ -13,12 +13,13 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
@@ -52,19 +53,22 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		rawRmnClient := newMockRawRmnClient(resChan)
 
 		const numNodes = 4
-		rmnNodes := make([]RMNNodeInfo, numNodes)
+		rmnNodes := make([]RMNHomeNodeInfo, numNodes)
+		rmnSignerNodes := make([]RMNRemoteSignerInfo, numNodes)
 		for i := 0; i < numNodes; i++ {
 			// deterministically create a public key by seeding with a 32char string.
 			publicKey, _, err := ed25519.GenerateKey(
 				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
 			require.NoError(t, err)
-			rmnNodes[i] = RMNNodeInfo{
+			rmnNodes[i] = RMNHomeNodeInfo{
 				ID:                        NodeID(i + 1),
 				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
-				IsSigner:                  true,
-				SignReportsAddress:        cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
 				SignObservationsPublicKey: &publicKey,
-				SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
+			}
+			rmnSignerNodes[i] = RMNRemoteSignerInfo{
+				SignReportsAddress:    cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
+				NodeIndex:             uint64(i),
+				SignObservationPrefix: "chainlink ccip 1.6 rmn observation",
 			}
 		}
 
@@ -73,14 +77,20 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			rawRmnClient: rawRmnClient,
 			rmnCfg: Config{
 				Home: RMNHomeConfig{
-					RmnNodes:         rmnNodes,
-					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
-					RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
+					Nodes:        rmnNodes,
+					ConfigDigest: cciptypes.Bytes32{0x1, 0x2, 0x3},
+					MinObservers: map[cciptypes.ChainSelector]uint64{
+						chainS1: 2,
+						chainS2: 2,
+						chainD1: 2,
+					},
 				},
 				Remote: RMNRemoteConfig{
-					ContractAddress: []byte{1, 2, 3},
-					MinObservers:    2,
-					MinSigners:      2,
+					ContractAddress:  []byte{1, 2, 3},
+					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
+					MinSigners:       2,
+					Signers:          rmnSignerNodes,
+					RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
 				},
 			},
 			observationsInitialRequestTimerDuration: time.Minute,
@@ -130,13 +140,13 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts := newTestSetup(t)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinObservers)
+				ts.rawRmnClient, int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
 
 			ts.nodesRespondToTheObservationRequests(
 				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinSigners, ts.rmnClient.rmnCfg.Remote.MinObservers)
+				t, ts.rawRmnClient, int(ts.rmnClient.rmnCfg.Remote.MinSigners), int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -148,7 +158,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
+		assert.Len(t, sigs.Signatures, int(ts.rmnClient.rmnCfg.Remote.MinSigners))
 		// Make sure signature are in ascending signer address order
 		for i := 1; i < len(sigs.Signatures); i++ {
 			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
@@ -164,24 +174,24 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.rawRmnClient, ts.rmnClient.rmnCfg.Remote.MinObservers)
+				ts.rawRmnClient, int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
 
 			// requests should be sent to at least two nodes
-			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnClient.rmnCfg.Remote.MinObservers)
-			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnClient.rmnCfg.Remote.MinObservers)
+			assert.GreaterOrEqual(t, len(requestIDs), int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
+			assert.GreaterOrEqual(t, len(requestedChains), int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
 
 			ts.nodesRespondToTheObservationRequests(
 				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
 			time.Sleep(time.Millisecond)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.rawRmnClient, len(ts.rmnClient.rmnCfg.Home.RmnNodes), ts.rmnClient.rmnCfg.Remote.MinObservers)
+				t, ts.rawRmnClient, len(ts.rmnClient.rmnCfg.Home.Nodes), int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
 			time.Sleep(time.Millisecond)
 
 			t.Logf("requestIDs: %v", requestIDs)
 
 			// requests should be sent to all nodes, since we hit the timer timeout
-			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnCfg.Home.RmnNodes))
+			assert.Equal(t, len(requestIDs), len(ts.rmnClient.rmnCfg.Home.Nodes))
 
 			ts.nodesRespondToTheSignatureRequests(ts.rawRmnClient, requestIDs)
 		}()
@@ -193,7 +203,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnClient.rmnCfg.Remote.MinSigners)
+		assert.Len(t, sigs.Signatures, int(ts.rmnClient.rmnCfg.Remote.MinSigners))
 	})
 }
 

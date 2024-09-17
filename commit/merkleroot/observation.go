@@ -84,7 +84,7 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
-	for _, rmnNode := range w.rmnConfig.Home.RmnNodes {
+	for _, rmnNode := range w.rmnConfig.Remote.Signers {
 		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
 	}
 
@@ -94,7 +94,7 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               w.rmnConfig.Home.RmnReportVersion,
+		ReportVersion:               w.rmnConfig.Remote.RmnReportVersion,
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
 		RmnRemoteContractAddress:    w.rmnConfig.Remote.ContractAddress,

@@ -103,22 +103,25 @@ func Test_verifyObservationSignature(t *testing.T) {
 				tc.signedObs.Observation.FixedDestLaneUpdates[0].Root, _ = hex.DecodeString(tc.rootStr)
 			}
 
-			rmnNode := RMNNodeInfo{
+			rmnNode := RMNHomeNodeInfo{
 				SignObservationsPublicKey: &offchainPK,
-				SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
 			}
 
-			err = verifyObservationSignature(rmnNode, tc.signedObs, NewED25519Verifier())
+			signerNode := RMNRemoteSignerInfo{
+				SignObservationPrefix: "chainlink ccip 1.6 rmn observation",
+			}
+
+			err = verifyObservationSignature(rmnNode, signerNode, tc.signedObs, NewED25519Verifier())
 			assert.NoError(t, err)
 
-			rmnNode2 := rmnNode
-			rmnNode2.SignObservationPrefix = "chainlink ccip 1.6 rmn observation2----------"
-			err = verifyObservationSignature(rmnNode2, tc.signedObs, NewED25519Verifier())
+			signerNode2 := signerNode
+			signerNode.SignObservationPrefix = "chainlink ccip 1.6 rmn observation2----------"
+			err = verifyObservationSignature(rmnNode, signerNode2, tc.signedObs, NewED25519Verifier())
 			assert.Error(t, err)
 
 			// After we update one byte in the signature, the signature verification should fail
 			tc.signedObs.Signature[0] = tc.signedObs.Signature[0] + 1
-			err = verifyObservationSignature(rmnNode, tc.signedObs, NewED25519Verifier())
+			err = verifyObservationSignature(rmnNode, signerNode, tc.signedObs, NewED25519Verifier())
 			assert.Error(t, err)
 		})
 	}

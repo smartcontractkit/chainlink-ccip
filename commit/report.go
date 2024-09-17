@@ -58,7 +58,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	if p.cfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
-		len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
+		len(decodedReport.RMNSignatures) < int(p.rmnConfig.Remote.MinSigners) {
 		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
 			len(decodedReport.RMNSignatures), p.rmnConfig.Remote.MinSigners)
 		return false, nil

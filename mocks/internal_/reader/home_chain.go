@@ -13,6 +13,8 @@ import (
 
 	reader "github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
+	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+
 	types "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
@@ -301,6 +303,64 @@ func (_c *MockHomeChain_GetKnownCCIPChains_Call) RunAndReturn(run func() (mapset
 	return _c
 }
 
+// GetMinObservers provides a mock function with given fields: configDigest
+func (_m *MockHomeChain) GetMinObservers(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]uint64, error) {
+	ret := _m.Called(configDigest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMinObservers")
+	}
+
+	var r0 map[ccipocr3.ChainSelector]uint64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]uint64, error)); ok {
+		return rf(configDigest)
+	}
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) map[ccipocr3.ChainSelector]uint64); ok {
+		r0 = rf(configDigest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]uint64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes32) error); ok {
+		r1 = rf(configDigest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockHomeChain_GetMinObservers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMinObservers'
+type MockHomeChain_GetMinObservers_Call struct {
+	*mock.Call
+}
+
+// GetMinObservers is a helper method to define mock.On call
+//   - configDigest ccipocr3.Bytes32
+func (_e *MockHomeChain_Expecter) GetMinObservers(configDigest interface{}) *MockHomeChain_GetMinObservers_Call {
+	return &MockHomeChain_GetMinObservers_Call{Call: _e.mock.On("GetMinObservers", configDigest)}
+}
+
+func (_c *MockHomeChain_GetMinObservers_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockHomeChain_GetMinObservers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(ccipocr3.Bytes32))
+	})
+	return _c
+}
+
+func (_c *MockHomeChain_GetMinObservers_Call) Return(_a0 map[ccipocr3.ChainSelector]uint64, _a1 error) *MockHomeChain_GetMinObservers_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockHomeChain_GetMinObservers_Call) RunAndReturn(run func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]uint64, error)) *MockHomeChain_GetMinObservers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetOCRConfigs provides a mock function with given fields: ctx, donID, pluginType
 func (_m *MockHomeChain) GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]reader.OCR3ConfigWithMeta, error) {
 	ret := _m.Called(ctx, donID, pluginType)
@@ -357,6 +417,122 @@ func (_c *MockHomeChain_GetOCRConfigs_Call) Return(_a0 []reader.OCR3ConfigWithMe
 }
 
 func (_c *MockHomeChain_GetOCRConfigs_Call) RunAndReturn(run func(context.Context, uint32, uint8) ([]reader.OCR3ConfigWithMeta, error)) *MockHomeChain_GetOCRConfigs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOffChainConfig provides a mock function with given fields: configDigest
+func (_m *MockHomeChain) GetOffChainConfig(configDigest ccipocr3.Bytes32) (ccipocr3.Bytes, error) {
+	ret := _m.Called(configDigest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOffChainConfig")
+	}
+
+	var r0 ccipocr3.Bytes
+	var r1 error
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) (ccipocr3.Bytes, error)); ok {
+		return rf(configDigest)
+	}
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) ccipocr3.Bytes); ok {
+		r0 = rf(configDigest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ccipocr3.Bytes)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes32) error); ok {
+		r1 = rf(configDigest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockHomeChain_GetOffChainConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOffChainConfig'
+type MockHomeChain_GetOffChainConfig_Call struct {
+	*mock.Call
+}
+
+// GetOffChainConfig is a helper method to define mock.On call
+//   - configDigest ccipocr3.Bytes32
+func (_e *MockHomeChain_Expecter) GetOffChainConfig(configDigest interface{}) *MockHomeChain_GetOffChainConfig_Call {
+	return &MockHomeChain_GetOffChainConfig_Call{Call: _e.mock.On("GetOffChainConfig", configDigest)}
+}
+
+func (_c *MockHomeChain_GetOffChainConfig_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockHomeChain_GetOffChainConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(ccipocr3.Bytes32))
+	})
+	return _c
+}
+
+func (_c *MockHomeChain_GetOffChainConfig_Call) Return(_a0 ccipocr3.Bytes, _a1 error) *MockHomeChain_GetOffChainConfig_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockHomeChain_GetOffChainConfig_Call) RunAndReturn(run func(ccipocr3.Bytes32) (ccipocr3.Bytes, error)) *MockHomeChain_GetOffChainConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRMNNodesInfo provides a mock function with given fields: configDigest
+func (_m *MockHomeChain) GetRMNNodesInfo(configDigest ccipocr3.Bytes32) ([]rmn.RMNHomeNodeInfo, error) {
+	ret := _m.Called(configDigest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRMNNodesInfo")
+	}
+
+	var r0 []rmn.RMNHomeNodeInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) ([]rmn.RMNHomeNodeInfo, error)); ok {
+		return rf(configDigest)
+	}
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) []rmn.RMNHomeNodeInfo); ok {
+		r0 = rf(configDigest)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]rmn.RMNHomeNodeInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes32) error); ok {
+		r1 = rf(configDigest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockHomeChain_GetRMNNodesInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRMNNodesInfo'
+type MockHomeChain_GetRMNNodesInfo_Call struct {
+	*mock.Call
+}
+
+// GetRMNNodesInfo is a helper method to define mock.On call
+//   - configDigest ccipocr3.Bytes32
+func (_e *MockHomeChain_Expecter) GetRMNNodesInfo(configDigest interface{}) *MockHomeChain_GetRMNNodesInfo_Call {
+	return &MockHomeChain_GetRMNNodesInfo_Call{Call: _e.mock.On("GetRMNNodesInfo", configDigest)}
+}
+
+func (_c *MockHomeChain_GetRMNNodesInfo_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockHomeChain_GetRMNNodesInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(ccipocr3.Bytes32))
+	})
+	return _c
+}
+
+func (_c *MockHomeChain_GetRMNNodesInfo_Call) Return(_a0 []rmn.RMNHomeNodeInfo, _a1 error) *MockHomeChain_GetRMNNodesInfo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockHomeChain_GetRMNNodesInfo_Call) RunAndReturn(run func(ccipocr3.Bytes32) ([]rmn.RMNHomeNodeInfo, error)) *MockHomeChain_GetRMNNodesInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -462,6 +638,62 @@ func (_c *MockHomeChain_HealthReport_Call) Return(_a0 map[string]error) *MockHom
 }
 
 func (_c *MockHomeChain_HealthReport_Call) RunAndReturn(run func() map[string]error) *MockHomeChain_HealthReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsRMNHomeConfigDigestSet provides a mock function with given fields: configDigest
+func (_m *MockHomeChain) IsRMNHomeConfigDigestSet(configDigest ccipocr3.Bytes32) (bool, error) {
+	ret := _m.Called(configDigest)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsRMNHomeConfigDigestSet")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) (bool, error)); ok {
+		return rf(configDigest)
+	}
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) bool); ok {
+		r0 = rf(configDigest)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes32) error); ok {
+		r1 = rf(configDigest)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockHomeChain_IsRMNHomeConfigDigestSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsRMNHomeConfigDigestSet'
+type MockHomeChain_IsRMNHomeConfigDigestSet_Call struct {
+	*mock.Call
+}
+
+// IsRMNHomeConfigDigestSet is a helper method to define mock.On call
+//   - configDigest ccipocr3.Bytes32
+func (_e *MockHomeChain_Expecter) IsRMNHomeConfigDigestSet(configDigest interface{}) *MockHomeChain_IsRMNHomeConfigDigestSet_Call {
+	return &MockHomeChain_IsRMNHomeConfigDigestSet_Call{Call: _e.mock.On("IsRMNHomeConfigDigestSet", configDigest)}
+}
+
+func (_c *MockHomeChain_IsRMNHomeConfigDigestSet_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockHomeChain_IsRMNHomeConfigDigestSet_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(ccipocr3.Bytes32))
+	})
+	return _c
+}
+
+func (_c *MockHomeChain_IsRMNHomeConfigDigestSet_Call) Return(_a0 bool, _a1 error) *MockHomeChain_IsRMNHomeConfigDigestSet_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockHomeChain_IsRMNHomeConfigDigestSet_Call) RunAndReturn(run func(ccipocr3.Bytes32) (bool, error)) *MockHomeChain_IsRMNHomeConfigDigestSet_Call {
 	_c.Call.Return(run)
 	return _c
 }

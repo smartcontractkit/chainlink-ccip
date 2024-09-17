@@ -131,6 +131,10 @@ func setupHomeChainPoller(
 			Address: "0xCCIPConfigFakeAddress",
 			Name:    consts.ContractNameCCIPConfig,
 		},
+		types.BoundContract{
+			Address: "0xRMNHomeFakeAddress",
+			Name:    consts.ContractNameRMNHome,
+		},
 	)
 
 	return homeChain
