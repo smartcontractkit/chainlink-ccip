@@ -24,7 +24,7 @@ func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
 
 func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.TokenPrice {
 	if p.tokenPriceReader == nil {
-		p.lggr.Errorw("no token price reader available")
+		p.lggr.Debugw("no token price reader available")
 		return []cciptypes.TokenPrice{}
 	}
 
@@ -65,7 +65,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 
 func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]shared.TimestampedBig {
 	if p.tokenPriceReader == nil {
-		p.lggr.Errorw("no token price reader available")
+		p.lggr.Debugw("no token price reader available")
 		return map[types.Account]shared.TimestampedBig{}
 	}
 

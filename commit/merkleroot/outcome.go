@@ -129,7 +129,7 @@ func buildReport(
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
 	if q.RMNSignatures == nil {
-		lggr.Error("RMNSignatures are nil")
+		lggr.Warn("RMNSignatures are nil")
 	} else {
 		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
