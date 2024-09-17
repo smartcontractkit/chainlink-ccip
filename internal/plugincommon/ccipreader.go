@@ -114,22 +114,16 @@ func backgroundReaderSync(
 
 func syncReader(
 	ctx context.Context,
-	lggr logger.Logger,
+	_ logger.Logger,
 	reader reader.CCIPReader,
 	syncTimeout time.Duration,
 ) error {
 	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
 	defer cf()
 
-	updated, err := reader.Sync(timeoutCtx)
+	err := reader.Sync(timeoutCtx, nil)
 	if err != nil {
-		return err
-	}
-
-	if !updated {
-		lggr.Debug("no updates found after trying to sync")
-	} else {
-		lggr.Info("ccip reader sync success")
+		return fmt.Errorf("syncReader: %w", err)
 	}
 
 	return nil
