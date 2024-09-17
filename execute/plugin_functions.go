@@ -308,7 +308,7 @@ func mergeTokenObservations(
 	observations []shared.AttributedObservation[exectypes.Observation],
 	_ map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
-	// Finds the observation with the most token data.
+	// Finds the observation with 'the most token data'.
 	// This is a dummy algorithm, proper consensus should be implemented.
 
 	maxCnt := -1
@@ -324,6 +324,9 @@ func mergeTokenObservations(
 		}
 	}
 
+	if maxCnt == -1 {
+		return nil
+	}
 	return maxV
 }
 
