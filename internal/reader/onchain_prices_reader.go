@@ -36,7 +36,7 @@ type PriceReader interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader   commontypes.ContractReader
+	ContractReader   ContractReaderFacade
 	TokenInfo        map[types.Account]pluginconfig.TokenInfo
 	FeeQuoterAddress types.Account
 	// If not enabled just return empty prices
@@ -45,7 +45,7 @@ type OnchainTokenPricesReader struct {
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontypes.ContractReader,
+	contractReader ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{

@@ -16,7 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -29,13 +30,13 @@ var (
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockContractReader)
+	sourceCRs := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = chainreadermocks.NewMockContractReader(t)
+		sourceCRs[chain] = reader.NewMockContractReaderFacade(t)
 		sourceCRs[chain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	}
 
-	destCR := chainreadermocks.NewMockContractReader(t)
+	destCR := reader.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
@@ -58,7 +59,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		logger.Test(t),
-		map[cciptypes.ChainSelector]types.ContractReader{
+		map[cciptypes.ChainSelector]reader2.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
