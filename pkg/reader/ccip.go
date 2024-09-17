@@ -557,22 +557,12 @@ func (r *ccipChainReader) bindReaderContract(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
-	contracts ContractAddresses,
+	address []byte,
 ) error {
 	if err := r.validateReaderExistence(chainSel); err != nil {
 		return fmt.Errorf("validate reader existence: %w", err)
 	}
 
-	// No contracts provided for the requested contract is a no-op.
-	if _, ok := contracts[contractName]; !ok {
-		return nil
-	}
-
-	if _, ok := contracts[contractName][chainSel]; !ok {
-		return fmt.Errorf("missing address for chain %d", chainSel)
-	}
-
-	address := contracts[contractName][chainSel]
 	encAddress := typeconv.AddressBytesToString(address, uint64(chainSel))
 
 	// Bind the contract address to the reader.
@@ -591,11 +581,28 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-// newSync binds ContractAddresses to the contract readers.
+// newSync goes through the input contracts and binds them to the contract reader.
 //
 //nolint:unused // it will be used soon.
 func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
-	var err error
+	var errs []error
+	for contractName, chainSelToAddress := range contracts {
+		for chainSel, address := range chainSelToAddress {
+			// try to bind
+			err := r.bindReaderContract(ctx, chainSel, contractName, address)
+			if err != nil {
+				if errors.Is(err, ErrContractReaderNotFound) {
+					// don't support this chain
+					continue
+				}
+				// some other error, gather
+				// TODO: maybe return early?
+				errs = append(errs, err)
+			}
+			// error is nil, nothing to do
+		}
+	}
+	return errors.Join(errs...)
 
 	// OffRamp
 	/*
@@ -607,37 +614,39 @@ func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddress
 			r.destChain: offrampBytes,
 		}
 	*/
-	err = r.bindReaderContract(
-		ctx,
-		r.destChain,
-		consts.ContractNameOffRamp,
-		contracts,
-	)
-	if err != nil {
-		return fmt.Errorf("sync error (offramp): %w", err)
-	}
+	/*
+		err = r.bindReaderContract(
+			ctx,
+			r.destChain,
+			consts.ContractNameOffRamp,
+			contracts,
+		)
+		if err != nil {
+			return fmt.Errorf("sync error (offramp): %w", err)
+		}
 
-	// OnRamps
-	err = r.bindReaderContracts(
-		ctx,
-		maps.Keys(r.contractReaders),
-		consts.ContractNameOnRamp,
-		contracts,
-	)
-	if err != nil {
-		return fmt.Errorf("sync error (onramp): %w", err)
-	}
+		// OnRamps
+		err = r.bindReaderContracts(
+			ctx,
+			maps.Keys(r.contractReaders),
+			consts.ContractNameOnRamp,
+			contracts,
+		)
+		if err != nil {
+			return fmt.Errorf("sync error (onramp): %w", err)
+		}
 
-	// Nonce manager
-	err = r.bindReaderContract(
-		ctx,
-		r.destChain,
-		consts.ContractNameNonceManager,
-		contracts,
-	)
-	if err != nil {
-		return fmt.Errorf("sync error (nonce manager): %w", err)
-	}
+		// Nonce manager
+		err = r.bindReaderContract(
+			ctx,
+			r.destChain,
+			consts.ContractNameNonceManager,
+			contracts,
+		)
+		if err != nil {
+			return fmt.Errorf("sync error (nonce manager): %w", err)
+		}
+	*/
 
 	return nil
 }
