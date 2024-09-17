@@ -62,7 +62,7 @@ func newCCIPChainReaderInternal(
 			destChain: offrampAddress,
 		},
 	}
-	if err := reader.newSync(context.Background(), contracts); err != nil {
+	if err := reader.Sync(context.Background(), contracts); err != nil {
 		lggr.Infow("failed to sync contracts", "err", err)
 	}
 
@@ -533,8 +533,6 @@ func (r *ccipChainReader) DiscoverContracts(
 //
 // No error is returned if contractName is not found in the contracts. This allows calling the function before all
 // contracts are discovered.
-//
-//nolint:unused // it will be used soon.
 func (r *ccipChainReader) bindReaderContract(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
@@ -563,10 +561,14 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-// newSync goes through the input contracts and binds them to the contract reader.
-//
-//nolint:unused // it will be used soon.
-func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
+// Sync goes through the input contracts and binds them to the contract reader.
+func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
+	contracts, err := r.DiscoverContracts(ctx, r.destChain)
+	if err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
