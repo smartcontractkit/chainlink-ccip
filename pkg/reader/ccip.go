@@ -20,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -37,7 +38,7 @@ type ccipChainReader struct {
 
 func newCCIPChainReaderInternal(
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]reader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,

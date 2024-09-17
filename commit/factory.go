@@ -120,9 +120,15 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		)
 	}
 
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]reader.ContractReaderFacade)
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
 	ccipReader := readerpkg.NewCCIPChainReader(
 		p.lggr,
-		p.contractReaders,
+		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,

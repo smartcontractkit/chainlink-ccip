@@ -19,6 +19,7 @@ packages:
             HomeChain:
             CCIP:
             PriceReader:
+            ContractReaderFacade:
     github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
         interfaces:
             ChainSupport:

@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // Extended version of a ContractReader.
 type Extended interface {
-	types.ContractReader
+	reader.ContractReaderFacade
 	GetBindings(contractName string) []ExtendedBoundContract
 }
 
@@ -24,14 +25,14 @@ type ExtendedBoundContract struct {
 
 // extendedContractReader is an extended version of the contract reader.
 type extendedContractReader struct {
-	types.ContractReader
+	reader.ContractReaderFacade
 	contractBindingsByName map[string][]ExtendedBoundContract
 	mu                     *sync.RWMutex
 }
 
-func NewExtendedContractReader(baseContractReader types.ContractReader) Extended {
+func NewExtendedContractReader(baseContractReader reader.ContractReaderFacade) Extended {
 	return &extendedContractReader{
-		ContractReader:         baseContractReader,
+		ContractReaderFacade:   baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
 		mu:                     &sync.RWMutex{},
 	}
@@ -43,7 +44,7 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 		return nil
 	}
 
-	err := e.ContractReader.Bind(ctx, validBindings)
+	err := e.ContractReaderFacade.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("bind: %w", err)
 	}
