@@ -61,7 +61,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
 			require.NoError(t, err)
 			rmnNodes[i] = RMNHomeNodeInfo{
-				ID:                        NodeID(i + 1),
+				ID:                        NodeID(i),
+				PeerID:                    cciptypes.Bytes32{uint8(i + 1), 0, 0, 0},
 				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
 				SignObservationsPublicKey: &publicKey,
 			}
@@ -82,14 +83,15 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 					MinObservers: map[cciptypes.ChainSelector]uint64{
 						chainS1: 2,
 						chainS2: 2,
-						chainD1: 2,
 					},
+					OffchainConfig: cciptypes.Bytes{0x1, 0x2, 0x3},
 				},
 				Remote: RMNRemoteConfig{
 					ContractAddress:  []byte{1, 2, 3},
 					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
-					MinSigners:       2,
 					Signers:          rmnSignerNodes,
+					MinSigners:       2,
+					ConfigVersion:    1,
 					RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
 				},
 			},
@@ -140,7 +142,9 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts := newTestSetup(t)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.rawRmnClient, int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
+				ts.rawRmnClient,
+				int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]),
+				int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS2]))
 
 			ts.nodesRespondToTheObservationRequests(
 				ts.rawRmnClient, requestIDs, requestedChains, ts.rmnClient.rmnCfg.Home.ConfigDigest, destChain)
@@ -174,7 +178,9 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.rawRmnClient, int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
+				ts.rawRmnClient,
+				int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]),
+				int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS2]))
 
 			// requests should be sent to at least two nodes
 			assert.GreaterOrEqual(t, len(requestIDs), int(ts.rmnClient.rmnCfg.Home.MinObservers[chainS1]))
@@ -209,7 +215,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockRawRmnClient,
-	minObservers int,
+	minObserversS1 int,
+	minObserversS2 int,
 ) (map[NodeID]uint64, map[NodeID]mapset.Set[uint64]) {
 	requestIDs := make(map[NodeID]uint64)
 	requestedChains := make(map[NodeID]mapset.Set[uint64])
@@ -225,7 +232,7 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 				}
 			}
 		}
-		if requestsPerChain[uint64(chainS1)] >= minObservers && requestsPerChain[uint64(chainS2)] >= minObservers {
+		if requestsPerChain[uint64(chainS1)] >= minObserversS1 && requestsPerChain[uint64(chainS2)] >= minObserversS2 {
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
