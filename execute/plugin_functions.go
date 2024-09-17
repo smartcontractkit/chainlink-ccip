@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 	"github.com/smartcontractkit/chainlink-ccip/shared/filter"
 )
 
@@ -203,28 +204,25 @@ func filterOutExecutedMessages(
 	return filtered, nil
 }
 
-type decodedAttributedObservation struct {
-	Observation exectypes.Observation
-	Observer    commontypes.OracleID
-}
-
-func decodeAttributedObservations(aos []types.AttributedObservation) ([]decodedAttributedObservation, error) {
-	decoded := make([]decodedAttributedObservation, len(aos))
+func decodeAttributedObservations(
+	aos []types.AttributedObservation,
+) ([]shared.AttributedObservation[exectypes.Observation], error) {
+	decoded := make([]shared.AttributedObservation[exectypes.Observation], len(aos))
 	for i, ao := range aos {
 		observation, err := exectypes.DecodeObservation(ao.Observation)
 		if err != nil {
 			return nil, err
 		}
-		decoded[i] = decodedAttributedObservation{
+		decoded[i] = shared.AttributedObservation[exectypes.Observation]{
 			Observation: observation,
-			Observer:    ao.Observer,
+			OracleID:    ao.Observer,
 		}
 	}
 	return decoded, nil
 }
 
 func mergeMessageObservations(
-	aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int,
+	aos []shared.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.MessageObservations, error) {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]filter.MinObservation[cciptypes.Message])
@@ -268,7 +266,7 @@ func mergeMessageObservations(
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
-	aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int,
+	aos []shared.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.CommitObservations, error) {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]filter.MinObservation[exectypes.CommitData])
@@ -307,7 +305,7 @@ func mergeCommitObservations(
 
 // TODO: implement mergeTokenObservations
 func mergeTokenObservations(
-	observations []decodedAttributedObservation,
+	observations []shared.AttributedObservation[exectypes.Observation],
 	_ map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
 	// Return first one, dummy implementation to make tests passing
@@ -320,7 +318,7 @@ func mergeTokenObservations(
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeNonceObservations(
-	daos []decodedAttributedObservation,
+	daos []shared.AttributedObservation[exectypes.Observation],
 	fChainDest int,
 ) exectypes.NonceObservations {
 	// Nonces store context in a map key, so a different container type is needed for the observation filter.
