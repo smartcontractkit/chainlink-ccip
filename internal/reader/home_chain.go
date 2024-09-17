@@ -28,7 +28,6 @@ const (
 	defaultConfigPageSize = uint64(100)
 )
 
-//go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 type HomeChain interface {
 	// CCIPConfig specific methods
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
@@ -442,7 +441,12 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		for _, chain := range config.SourceChains {
 			minObservers[chain.ChainSelector] = chain.MinObservers
 			for j := 0; j < 256; j++ {
-				if isNodeObserver(chain, j) {
+				isObserver, err := IsNodeObserver(chain, j, len(nodes))
+				if err != nil {
+					lggr.Warnw("failed to check if node is observer", "err", err)
+					continue
+				}
+				if isObserver {
 					nodes[j].SupportedSourceChains.Add(chain.ChainSelector)
 				}
 			}
@@ -459,9 +463,20 @@ func convertOnChainConfigToRMNHomeChainConfig(
 }
 
 // IsNodeObserver checks if a node is an observer for the given source chain
-func isNodeObserver(sourceChain SourceChain, nodeIndex int) bool {
-	if nodeIndex >= 256 {
-		return false // uint256 can only represent up to 256 nodes
+func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (bool, error) {
+	if totalNodes > 256 || totalNodes <= 0 {
+		return false, fmt.Errorf("invalid total nodes: %d", totalNodes)
+	}
+
+	if nodeIndex < 0 || nodeIndex >= totalNodes {
+		return false, fmt.Errorf("invalid node index: %d", nodeIndex)
+	}
+
+	// Validate the bitmap
+	maxValidBitmap := new(big.Int).Lsh(big.NewInt(1), uint(totalNodes))
+	maxValidBitmap.Sub(maxValidBitmap, big.NewInt(1))
+	if sourceChain.ObserverNodesBitmap.Int.Cmp(maxValidBitmap) > 0 {
+		return false, fmt.Errorf("invalid observer nodes bitmap")
 	}
 
 	// Create a big.Int with 1 shifted left by nodeIndex
@@ -471,7 +486,7 @@ func isNodeObserver(sourceChain SourceChain, nodeIndex int) bool {
 	result := new(big.Int).And(sourceChain.ObserverNodesBitmap.Int, mask)
 
 	// Check if the result equals the mask
-	return result.Cmp(mask) == 0
+	return result.Cmp(mask) == 0, nil
 }
 
 // HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make

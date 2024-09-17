@@ -263,6 +263,129 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	require.Equal(t, []byte("offramp"), configs[0].Config.OfframpAddress)
 }
 
+func TestIsNodeObserver(t *testing.T) {
+	tests := []struct {
+		name           string
+		sourceChain    SourceChain
+		nodeIndex      int
+		totalNodes     int
+		expectedResult bool
+		expectedError  string
+	}{
+		{
+			name: "Node is observer",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
+			},
+			nodeIndex:      1,
+			totalNodes:     3,
+			expectedResult: true,
+			expectedError:  "",
+		},
+		{
+			name: "Node is not observer",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(5)), // 101 in binary
+			},
+			nodeIndex:      1,
+			totalNodes:     3,
+			expectedResult: false,
+			expectedError:  "",
+		},
+		{
+			name: "Node index out of range (high)",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
+			},
+			nodeIndex:      3,
+			totalNodes:     3,
+			expectedResult: false,
+			expectedError:  "invalid node index: 3",
+		},
+		{
+			name: "Negative node index",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
+			},
+			nodeIndex:      -1,
+			totalNodes:     3,
+			expectedResult: false,
+			expectedError:  "invalid node index: -1",
+		},
+		{
+			name: "Invalid bitmap (out of bounds)",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(8)), // 1000 in binary
+			},
+			nodeIndex:      0,
+			totalNodes:     3,
+			expectedResult: false,
+			expectedError:  "invalid observer nodes bitmap",
+		},
+		{
+			name: "Zero total nodes",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
+			},
+			nodeIndex:      0,
+			totalNodes:     0,
+			expectedResult: false,
+			expectedError:  "invalid total nodes: 0",
+		},
+		{
+			name: "Total nodes exceeds 256",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        3,
+				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
+			},
+			nodeIndex:      0,
+			totalNodes:     257,
+			expectedResult: false,
+			expectedError:  "invalid total nodes: 257",
+		},
+		{
+			name: "Last valid node is observer",
+			sourceChain: SourceChain{
+				ChainSelector:       cciptypes.ChainSelector(1),
+				MinObservers:        1,
+				ObserverNodesBitmap: cciptypes.NewBigInt(new(big.Int).SetBit(big.NewInt(0), 255, 1)), // Only the 256th bit is set
+			},
+			nodeIndex:      255,
+			totalNodes:     256,
+			expectedResult: true,
+			expectedError:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := IsNodeObserver(tt.sourceChain, tt.nodeIndex, tt.totalNodes)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				require.Equal(t, tt.expectedError, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tt.expectedResult, result)
+		})
+	}
+}
+
 func createTestRMNHomeConfigs() []VersionedConfigWithDigest {
 	return []VersionedConfigWithDigest{
 		{
