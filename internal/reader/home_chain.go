@@ -26,6 +26,7 @@ import (
 
 const (
 	defaultConfigPageSize = uint64(100)
+	rmnMaxSizeCommittee   = 256 // bitmap is 256 bits making the max committee size 256
 )
 
 type RMNHome interface {
@@ -207,7 +208,7 @@ func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]Chai
 }
 
 func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
-	var versionedConfigWithDigests []VersionedConfigWithDigest
+	var versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
 		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetVersionedConfigsWithDigests),
@@ -231,7 +232,7 @@ func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
 	r.setRMNHomeState(convertOnChainConfigToRMNHomeChainConfig(r.lggr, versionedConfigWithDigests))
 
 	if len(versionedConfigWithDigests) == 0 {
-		// That's a legitimate case if there are no chain configs on chain yet
+		// That's a legitimate case if there are no rmn configs on chain yet
 		r.lggr.Warnw("no on chain configs found")
 		return nil
 	}
@@ -419,7 +420,7 @@ func convertOnChainConfigToHomeChainConfig(
 
 func convertOnChainConfigToRMNHomeChainConfig(
 	lggr logger.Logger,
-	versionedConfigWithDigests []VersionedConfigWithDigest,
+	versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest,
 ) map[cciptypes.Bytes32]rmntypes.RMNHomeConfig {
 	if len(versionedConfigWithDigests) == 0 {
 		lggr.Warnw("no on chain RMNHomeConfigs found")
@@ -445,7 +446,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 		for _, chain := range config.SourceChains {
 			minObservers[chain.ChainSelector] = chain.MinObservers
-			for j := 0; j < 256; j++ {
+			for j := 0; j < rmnMaxSizeCommittee; j++ {
 				isObserver, err := IsNodeObserver(chain, j, len(nodes))
 				if err != nil {
 					lggr.Warnw("failed to check if node is observer", "err", err)
@@ -468,8 +469,8 @@ func convertOnChainConfigToRMNHomeChainConfig(
 }
 
 // IsNodeObserver checks if a node is an observer for the given source chain
-func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (bool, error) {
-	if totalNodes > 256 || totalNodes <= 0 {
+func IsNodeObserver(sourceChain rmntypes.SourceChain, nodeIndex int, totalNodes int) (bool, error) {
+	if totalNodes > rmnMaxSizeCommittee || totalNodes <= 0 {
 		return false, fmt.Errorf("invalid total nodes: %d", totalNodes)
 	}
 
@@ -540,38 +541,6 @@ type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
 	ConfigCount  uint64     `json:"configCount"`
 	ConfigDigest [32]byte   `json:"configDigest"`
-}
-
-// VersionedConfigWithDigest mirrors RMNHome.sol's VersionedConfigWithDigest struct
-type VersionedConfigWithDigest struct {
-	ConfigDigest    cciptypes.Bytes32 `json:"configDigest"`
-	VersionedConfig VersionedConfig   `json:"versionedConfig"`
-}
-
-// VersionedConfig mirrors RMNHome.sol's VersionedConfig struct
-type VersionedConfig struct {
-	Version uint32 `json:"version"`
-	Config  Config `json:"config"`
-}
-
-// Config mirrors RMNHome.sol's Config struct
-type Config struct {
-	Nodes          []Node          `json:"nodes"`
-	SourceChains   []SourceChain   `json:"sourceChains"`
-	OffchainConfig cciptypes.Bytes `json:"offchainConfig"`
-}
-
-// Node mirrors RMNHome.sol's Node struct
-type Node struct {
-	PeerID            cciptypes.Bytes32 `json:"peerId"`
-	OffchainPublicKey cciptypes.Bytes32 `json:"offchainPublicKey"`
-}
-
-// SourceChain mirrors RMNHome.sol's SourceChain struct
-type SourceChain struct {
-	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
-	MinObservers        uint64                  `json:"minObservers"`
-	ObserverNodesBitmap cciptypes.BigInt        `json:"observerNodesBitmap"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)

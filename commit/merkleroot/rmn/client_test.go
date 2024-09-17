@@ -77,7 +77,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		cl := &client{
 			lggr:         lggr,
 			rawRmnClient: rawRmnClient,
-			rmnCfg: types.Config{
+			rmnCfg: types.RMNConfig{
 				Home: types.RMNHomeConfig{
 					Nodes:        rmnNodes,
 					ConfigDigest: cciptypes.Bytes32{0x1, 0x2, 0x3},

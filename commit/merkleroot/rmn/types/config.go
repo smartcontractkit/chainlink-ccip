@@ -10,8 +10,8 @@ import (
 
 type NodeID uint32
 
-// Config contains the RMN configuration required by the plugin and the RMN client in a single struct.
-type Config struct {
+// RMNConfig contains the RMN configuration required by the plugin and the RMN client in a single struct.
+type RMNConfig struct {
 	Home   RMNHomeConfig
 	Remote RMNRemoteConfig
 }

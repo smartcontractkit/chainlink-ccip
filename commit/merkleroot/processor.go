@@ -30,7 +30,7 @@ type Processor struct {
 	chainSupport plugincommon.ChainSupport
 	rmnClient    rmn.Client
 	rmnCrypto    cciptypes.RMNCrypto
-	rmnConfig    rmntypes.Config
+	rmnConfig    rmntypes.RMNConfig
 }
 
 // NewProcessor creates a new Processor
@@ -45,7 +45,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	rmnClient rmn.Client,
 	rmnCrypto cciptypes.RMNCrypto,
-	rmnConfig rmntypes.Config,
+	rmnConfig rmntypes.RMNConfig,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,

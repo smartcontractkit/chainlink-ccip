@@ -59,7 +59,7 @@ type client struct {
 	lggr            logger.Logger
 	rmnCrypto       cciptypes.RMNCrypto
 	rawRmnClient    RawRmnClient
-	rmnCfg          types.Config
+	rmnCfg          types.RMNConfig
 	ed25519Verifier ED25519Verifier
 
 	observationsInitialRequestTimerDuration time.Duration
@@ -71,7 +71,7 @@ func NewClient(
 	lggr logger.Logger,
 	rmnCrypto cciptypes.RMNCrypto,
 	rawRmnClient RawRmnClient,
-	rmnConfig types.Config,
+	rmnConfig types.RMNConfig,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Client {

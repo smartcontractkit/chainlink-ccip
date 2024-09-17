@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 )
 
@@ -161,7 +162,7 @@ func Test_PollingWorking(t *testing.T) {
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]VersionedConfigWithDigest)
+			arg := args.Get(4).(*[]rmntypes.VersionedConfigWithDigest)
 			*arg = rmnHomeOnChainConfigs
 		}).Return(nil)
 
@@ -192,7 +193,7 @@ func Test_PollingWorking(t *testing.T) {
 			callCount++
 		}
 	}
-	// called at least 4 times, one for start and one for the first tick for each contract
+	// called at least 4 times, one for start and one for the first tick for each contract (ccip *2 and rmn *2)
 	require.GreaterOrEqual(t, callCount, 4)
 	configs, err := configPoller.GetAllChainConfigs()
 	require.NoError(t, err)
@@ -202,7 +203,6 @@ func Test_PollingWorking(t *testing.T) {
 		rmnNodes, err := configPoller.GetRMNNodesInfo(configs.ConfigDigest)
 		require.NoError(t, err)
 		require.NotNil(t, rmnNodes)
-		fmt.Println("GetRMNNodesInfo", rmnNodes)
 
 		isValid, err := configPoller.IsRMNHomeConfigDigestSet(configs.ConfigDigest)
 		require.NoError(t, err)
@@ -266,7 +266,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 func TestIsNodeObserver(t *testing.T) {
 	tests := []struct {
 		name           string
-		sourceChain    SourceChain
+		sourceChain    rmntypes.SourceChain
 		nodeIndex      int
 		totalNodes     int
 		expectedResult bool
@@ -274,7 +274,7 @@ func TestIsNodeObserver(t *testing.T) {
 	}{
 		{
 			name: "Node is observer",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
@@ -286,7 +286,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Node is not observer",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(5)), // 101 in binary
@@ -298,7 +298,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Node index out of range (high)",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
@@ -310,7 +310,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Negative node index",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
@@ -322,7 +322,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Invalid bitmap (out of bounds)",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(8)), // 1000 in binary
@@ -334,7 +334,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Zero total nodes",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
@@ -346,7 +346,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Total nodes exceeds 256",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
@@ -358,7 +358,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Last valid node is observer",
-			sourceChain: SourceChain{
+			sourceChain: rmntypes.SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        1,
 				ObserverNodesBitmap: cciptypes.NewBigInt(new(big.Int).SetBit(big.NewInt(0), 255, 1)), // Only the 256th bit is set
@@ -386,14 +386,14 @@ func TestIsNodeObserver(t *testing.T) {
 	}
 }
 
-func createTestRMNHomeConfigs() []VersionedConfigWithDigest {
-	return []VersionedConfigWithDigest{
+func createTestRMNHomeConfigs() []rmntypes.VersionedConfigWithDigest {
+	return []rmntypes.VersionedConfigWithDigest{
 		{
 			ConfigDigest: cciptypes.Bytes32{1, 2, 3, 4, 5},
-			VersionedConfig: VersionedConfig{
+			VersionedConfig: rmntypes.VersionedConfig{
 				Version: 1,
-				Config: Config{
-					Nodes: []Node{
+				Config: rmntypes.Config{
+					Nodes: []rmntypes.Node{
 						{
 							PeerID:            cciptypes.Bytes32{10, 11, 12, 13, 14},
 							OffchainPublicKey: cciptypes.Bytes32{20, 21, 22, 23, 24},
@@ -403,7 +403,7 @@ func createTestRMNHomeConfigs() []VersionedConfigWithDigest {
 							OffchainPublicKey: cciptypes.Bytes32{25, 26, 27, 28, 29},
 						},
 					},
-					SourceChains: []SourceChain{
+					SourceChains: []rmntypes.SourceChain{
 						{
 							ChainSelector:       cciptypes.ChainSelector(1),
 							MinObservers:        1,
@@ -421,16 +421,16 @@ func createTestRMNHomeConfigs() []VersionedConfigWithDigest {
 		},
 		{
 			ConfigDigest: cciptypes.Bytes32{6, 7, 8, 9, 10},
-			VersionedConfig: VersionedConfig{
+			VersionedConfig: rmntypes.VersionedConfig{
 				Version: 2,
-				Config: Config{
-					Nodes: []Node{
+				Config: rmntypes.Config{
+					Nodes: []rmntypes.Node{
 						{
 							PeerID:            cciptypes.Bytes32{40, 41, 42, 43, 44},
 							OffchainPublicKey: cciptypes.Bytes32{50, 51, 52, 53, 54},
 						},
 					},
-					SourceChains: []SourceChain{
+					SourceChains: []rmntypes.SourceChain{
 						{
 							ChainSelector:       cciptypes.ChainSelector(1),
 							MinObservers:        1,

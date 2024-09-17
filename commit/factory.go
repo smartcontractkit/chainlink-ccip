@@ -145,7 +145,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.lggr,
 			p.homeChainReader,
 			config,
-			rmntypes.Config{}, // todo
+			rmntypes.RMNConfig{}, // todo
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

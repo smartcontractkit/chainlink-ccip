@@ -343,7 +343,7 @@ func setupNode(
 		lggr,
 		homeChainReader,
 		reportingCfg,
-		rmntypes.Config{},
+		rmntypes.RMNConfig{},
 	)
 
 	return nodeSetup{
