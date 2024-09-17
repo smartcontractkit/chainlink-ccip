@@ -57,16 +57,14 @@ func newCCIPChainReaderInternal(
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 	}
 
-	/*
-		contracts := ContractAddresses{
-			consts.ContractNameOffRamp: {
-				destChain: offrampAddress,
-			},
-		}
-		if err := reader.Sync(context.Background(), contracts); err != nil {
-			lggr.Infow("failed to sync contracts", "err", err)
-		}
-	*/
+	contracts := ContractAddresses{
+		consts.ContractNameOffRamp: {
+			destChain: offrampAddress,
+		},
+	}
+	if err := reader.newSync(context.Background(), contracts); err != nil {
+		lggr.Infow("failed to sync contracts", "err", err)
+	}
 
 	return reader
 }
