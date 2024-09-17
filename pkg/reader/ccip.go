@@ -530,22 +530,6 @@ func (r *ccipChainReader) DiscoverContracts(
 	return resp, nil
 }
 
-// bindReaderContracts calls bindReaderContract for a list of chain selectors.
-//
-//nolint:unused // it will be used soon.
-func (r *ccipChainReader) bindReaderContracts(
-	ctx context.Context,
-	chainSels []cciptypes.ChainSelector,
-	contractName string,
-	addresses ContractAddresses,
-) error {
-	var errs []error
-	for _, chainSel := range chainSels {
-		errs = append(errs, r.bindReaderContract(ctx, chainSel, contractName, addresses))
-	}
-	return errors.Join(errs...)
-}
-
 // bindReaderContract is a generic helper for binding contracts to readers, the addresses input is the same object
 // returned by DiscoverContracts.
 //
@@ -647,8 +631,6 @@ func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddress
 			return fmt.Errorf("sync error (nonce manager): %w", err)
 		}
 	*/
-
-	return nil
 }
 
 func (r *ccipChainReader) Close(ctx context.Context) error {
