@@ -18,6 +18,10 @@ var (
 	ErrContractWriterNotFound = errors.New("contract writer not found")
 )
 
+// ContractAddresses is a map of contract names across all chain selectors and their address.
+// Currently only one contract per chain per name is supported.
+type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
+
 func NewCCIPChainReader(
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
@@ -102,9 +106,13 @@ type CCIPReader interface {
 	// GasPrices reads the provided chains gas prices.
 	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)
 
+	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
+	// contract and source chain selector.
+	DiscoverContracts(ctx context.Context, destChain cciptypes.ChainSelector) (ContractAddresses, error)
+
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
-	Sync(ctx context.Context) (bool, error)
+	Sync(ctx context.Context, contracts ContractAddresses) error
 
 	// Close closes any open resources.
 	Close(ctx context.Context) error
