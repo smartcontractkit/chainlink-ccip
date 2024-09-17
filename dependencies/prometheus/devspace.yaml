@@ -10,7 +10,7 @@ deployments:
   configs:
     kubectl:
       manifests:
-        - ${COMPONENTS_DIR}/prometheus/configmaps/default.yaml
+        - ${DEPENDENCIES_DIR}/prometheus/configmaps/default.yaml
 
   prometheus:
     namespace: ${DEVSPACE_NAMESPACE}
@@ -49,4 +49,4 @@ profiles:
     patches:
       - op: replace
         path: deployments.configs.kubectl.manifests[0]
-        value: ${COMPONENTS_DIR}/prometheus/configmaps/beholder.yaml
+        value: ${DEPENDENCIES_DIR}/prometheus/configmaps/beholder.yaml

@@ -8,18 +8,21 @@ vars:
 
 dependencies:
   grafana:
-    path: ${COMPONENTS_DIR}/grafana
+    path: ${DEPENDENCIES_DIR}/grafana
     namespace: ${DEVSPACE_NAMESPACE}
+    overwriteVars: true
     profiles:
       - kind
   loki:
-    path: ${COMPONENTS_DIR}/loki
+    path: ${DEPENDENCIES_DIR}/loki
     namespace: ${DEVSPACE_NAMESPACE}
+    overwriteVars: true
     profiles:
       - kind
   promtail:
-    path: ${COMPONENTS_DIR}/promtail
+    path: ${DEPENDENCIES_DIR}/promtail
     namespace: ${DEVSPACE_NAMESPACE}
+    overwriteVars: true
     profiles:
       - default
 

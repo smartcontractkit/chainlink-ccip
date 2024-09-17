@@ -2,31 +2,31 @@ version: v2beta1
 
 dependencies:
   prometheus:
-    path: ${COMPONENTS_DIR}/prometheus
+    path: ${DEPENDENCIES_DIR}/prometheus
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
       - add-beholder-config
   grafana:
-    path: ${COMPONENTS_DIR}/grafana
+    path: ${DEPENDENCIES_DIR}/grafana
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
       - add-beholder-config
   loki:
-    path: ${COMPONENTS_DIR}/loki
+    path: ${DEPENDENCIES_DIR}/loki
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
       - add-beholder-config
   tempo:
-    path: ${COMPONENTS_DIR}/tempo
+    path: ${DEPENDENCIES_DIR}/tempo
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
     profiles:
       - add-beholder-config
   redpanda:
-    path: ${COMPONENTS_DIR}/redpanda
+    path: ${DEPENDENCIES_DIR}/redpanda
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
 
