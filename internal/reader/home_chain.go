@@ -72,22 +72,18 @@ type state struct {
 }
 
 type homeChainPoller struct {
-	wg              sync.WaitGroup
-	stopCh          services.StopChan
-	sync            services.StateMachine
-	homeChainReader types.ContractReader
-	lggr            logger.Logger
-	mutex           *sync.RWMutex
-	state           state
-	rmnHomeConfig   map[cciptypes.Bytes32]rmntypes.RMNHomeConfig
-	failedPolls     uint
-	// TODO: currently unused but will be passed into GetLatestValue
-	// once the chainlink-common breaking change comes in
-	// (https://github.com/smartcontractkit/chainlink-common/pull/603).
+	wg                      sync.WaitGroup
+	stopCh                  services.StopChan
+	sync                    services.StateMachine
+	homeChainReader         types.ContractReader
+	lggr                    logger.Logger
+	mutex                   *sync.RWMutex
+	state                   state
+	rmnHomeConfig           map[cciptypes.Bytes32]rmntypes.RMNHomeConfig
+	failedPolls             uint
 	ccipConfigBoundContract types.BoundContract
 	rmnHomeBoundContract    types.BoundContract
-	// How frequently the poller fetches the chain configs
-	pollingDuration time.Duration
+	pollingDuration         time.Duration // How frequently the poller fetches the chain configs
 }
 
 const MaxFailedPolls = 10
