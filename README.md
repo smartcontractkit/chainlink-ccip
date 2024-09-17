@@ -11,7 +11,8 @@ To learn more about CRIB please the general documentation in Confluence:
 ```
 .
 ├── cli (CLI for CRIB - currently under development)
-├── components (devspace components used as imports)
+├── dependencies (devspace components used as dependencies)
+├── imports (devspace components used as imports)
 ├── deployments/ccip (CCIP CRIB)
 ├── deployments/core (CORE CRIB)
 ├── dashboards-lib (Library for generating Grafana dashboards)
