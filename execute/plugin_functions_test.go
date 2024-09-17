@@ -16,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
@@ -536,13 +537,13 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    []types.AttributedObservation
-		want    []decodedAttributedObservation
+		want    []shared.AttributedObservation[exectypes.Observation]
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			args:    nil,
-			want:    []decodedAttributedObservation{},
+			want:    []shared.AttributedObservation[exectypes.Observation]{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -557,9 +558,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					}),
 				},
 			},
-			want: []decodedAttributedObservation{
+			want: []shared.AttributedObservation[exectypes.Observation]{
 				{
-					Observer: commontypes.OracleID(1),
+					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
@@ -589,9 +590,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					}),
 				},
 			},
-			want: []decodedAttributedObservation{
+			want: []shared.AttributedObservation[exectypes.Observation]{
 				{
-					Observer: commontypes.OracleID(1),
+					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
@@ -599,7 +600,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					},
 				},
 				{
-					Observer: commontypes.OracleID(2),
+					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
