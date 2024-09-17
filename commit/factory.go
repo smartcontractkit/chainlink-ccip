@@ -70,16 +70,21 @@ func NewPluginFactory(
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
-	contractReaders map[cciptypes.ChainSelector]contractreader.Reader,
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
+	readers := make(map[cciptypes.ChainSelector]contractreader.Reader)
+	for chain, cr := range contractReaders {
+		readers[chain] = cr
+	}
+
 	return &PluginFactory{
 		lggr:            lggr,
 		ocrConfig:       ocrConfig,
 		commitCodec:     commitCodec,
 		msgHasher:       msgHasher,
 		homeChainReader: homeChainReader,
-		contractReaders: contractReaders,
+		contractReaders: readers,
 		chainWriters:    chainWriters,
 	}
 }
