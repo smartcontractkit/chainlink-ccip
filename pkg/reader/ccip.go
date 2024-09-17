@@ -586,54 +586,9 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 				// TODO: maybe return early?
 				errs = append(errs, err)
 			}
-			// error is nil, nothing to do
 		}
 	}
 	return errors.Join(errs...)
-
-	// OffRamp
-	/*
-		offrampBytes, err := typeconv.AddressStringToBytes(r.offrampAddress, uint64(r.destChain))
-		if err != nil {
-			return err
-		}
-		contracts[consts.ContractNameOffRamp] = map[cciptypes.ChainSelector][]byte{
-			r.destChain: offrampBytes,
-		}
-	*/
-	/*
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameOffRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (offramp): %w", err)
-		}
-
-		// OnRamps
-		err = r.bindReaderContracts(
-			ctx,
-			maps.Keys(r.contractReaders),
-			consts.ContractNameOnRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (onramp): %w", err)
-		}
-
-		// Nonce manager
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameNonceManager,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (nonce manager): %w", err)
-		}
-	*/
 }
 
 func (r *ccipChainReader) Close(ctx context.Context) error {
