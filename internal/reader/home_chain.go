@@ -442,7 +442,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 		for _, chain := range config.SourceChains {
 			minObservers[chain.ChainSelector] = chain.MinObservers
-			for j := 0; j < rmnMaxSizeCommittee; j++ {
+			for j := 0; j < len(nodes); j++ {
 				isObserver, err := IsNodeObserver(chain, j, len(nodes))
 				if err != nil {
 					lggr.Warnw("failed to check if node is observer", "err", err)
