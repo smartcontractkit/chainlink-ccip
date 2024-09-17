@@ -561,24 +561,16 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-func (r *ccipChainReader) Sync(ctx context.Context, _ ContractAddresses) error {
-	contracts, err := r.DiscoverContracts(ctx, r.destChain)
-	if err != nil {
-		return fmt.Errorf("sync: %w", err)
-	}
-
-	return r.newSync(ctx, contracts)
-}
-
 // Sync goes through the input contracts and binds them to the contract reader.
-func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
-	// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
-	/*
-		contracts, err := r.DiscoverContracts(ctx, r.destChain)
+func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	if len(contracts) == 0 {
+		// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
+		var err error
+		contracts, err = r.DiscoverContracts(ctx, r.destChain)
 		if err != nil {
 			return fmt.Errorf("sync: %w", err)
 		}
-	*/
+	}
 
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
