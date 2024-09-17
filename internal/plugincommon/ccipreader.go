@@ -104,9 +104,10 @@ func backgroundReaderSync(
 				lggr.Debug("backgroundReaderSync context done")
 				return
 			case <-ticker:
-				if err := syncReader(ctx, lggr, reader, syncTimeout); err != nil {
+				if err := syncReader(ctx, reader, syncTimeout); err != nil {
 					lggr.Errorw("runBackgroundReaderSync failed", "err", err)
 				}
+				lggr.Infow("runBackgroundReaderSync success")
 			}
 		}
 	}()
@@ -114,7 +115,6 @@ func backgroundReaderSync(
 
 func syncReader(
 	ctx context.Context,
-	_ logger.Logger,
 	reader reader.CCIPReader,
 	syncTimeout time.Duration,
 ) error {
