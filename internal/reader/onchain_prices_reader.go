@@ -6,12 +6,14 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -36,7 +38,7 @@ type PriceReader interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader   commontypes.ContractReader
+	ContractReader   contractreader.Reader
 	TokenInfo        map[types.Account]pluginconfig.TokenInfo
 	FeeQuoterAddress types.Account
 	// If not enabled just return empty prices
@@ -45,7 +47,7 @@ type OnchainTokenPricesReader struct {
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontypes.ContractReader,
+	contractReader contractreader.Reader,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{

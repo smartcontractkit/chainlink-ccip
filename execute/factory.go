@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -56,7 +57,7 @@ type PluginFactory struct {
 	homeChainReader   reader.HomeChain
 	estimateProvider  gas.EstimateProvider
 	tokenDataObserver tokendata.TokenDataObserver
-	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	contractReaders   map[cciptypes.ChainSelector]contractreader.Reader
 	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
 }
 
@@ -68,7 +69,7 @@ func NewPluginFactory(
 	homeChainReader reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Reader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{

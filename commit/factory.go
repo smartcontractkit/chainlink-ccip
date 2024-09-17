@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -59,7 +60,7 @@ type PluginFactory struct {
 	commitCodec     cciptypes.CommitPluginCodec
 	msgHasher       cciptypes.MessageHasher
 	homeChainReader reader.HomeChain
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+	contractReaders map[cciptypes.ChainSelector]contractreader.Reader
 	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
 }
 
@@ -69,7 +70,7 @@ func NewPluginFactory(
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Reader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{

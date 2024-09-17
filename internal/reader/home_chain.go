@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 const (
@@ -54,7 +55,7 @@ type homeChainPoller struct {
 	wg              sync.WaitGroup
 	stopCh          services.StopChan
 	sync            services.StateMachine
-	homeChainReader types.ContractReader
+	homeChainReader contractreader.Reader
 	lggr            logger.Logger
 	mutex           *sync.RWMutex
 	state           state
@@ -70,7 +71,7 @@ type homeChainPoller struct {
 const MaxFailedPolls = 10
 
 func NewHomeChainConfigPoller(
-	homeChainReader types.ContractReader,
+	homeChainReader contractreader.Reader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,

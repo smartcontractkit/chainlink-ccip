@@ -37,7 +37,7 @@ type ccipChainReader struct {
 
 func newCCIPChainReaderInternal(
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Reader,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,

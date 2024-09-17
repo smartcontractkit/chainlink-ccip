@@ -58,7 +58,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		logger.Test(t),
-		map[cciptypes.ChainSelector]types.ContractReader{
+		map[cciptypes.ChainSelector]contractreader.Reader{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
