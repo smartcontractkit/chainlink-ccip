@@ -78,6 +78,14 @@ func NewEmptyTokenData() TokenData {
 	}
 }
 
+func NewNoopTokenData() TokenData {
+	return TokenData{
+		Ready: true,
+		Error: nil,
+		Data:  []byte{},
+	}
+}
+
 func (td TokenData) IsReady() bool {
 	return td.Ready
 }
