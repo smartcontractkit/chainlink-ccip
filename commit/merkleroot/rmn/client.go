@@ -75,6 +75,8 @@ func NewClient(
 	rmnCrypto cciptypes.RMNCrypto,
 	rawRmnClient RawRmnClient,
 	rmnConfig types.RMNConfig,
+	rmnHomeReader reader.RMNHome,
+	rmnRemoteReader reader.RMNRemote,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Client {
@@ -83,6 +85,8 @@ func NewClient(
 		rmnCrypto:       rmnCrypto,
 		rawRmnClient:    rawRmnClient,
 		rmnCfg:          rmnConfig,
+		rmnHomeReader:   rmnHomeReader,
+		rmnRemoteReader: rmnRemoteReader,
 		ed25519Verifier: NewED25519Verifier(),
 
 		observationsInitialRequestTimerDuration: observationsInitialRequestTimerDuration,
