@@ -130,7 +130,7 @@ func (u *USDCCCTPTokenDataObserver) fetchAttestations(
 }
 
 func (u *USDCCCTPTokenDataObserver) extractTokenData(_ interface{}) (exectypes.TokenDataObservations, error) {
-	panic("implement me")
+	return exectypes.TokenDataObservations{}, nil
 }
 
 func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {

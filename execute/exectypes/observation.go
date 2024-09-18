@@ -34,6 +34,10 @@ type MessageTokenData struct {
 	TokenData []TokenData
 }
 
+func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
+	return MessageTokenData{TokenData: tokenData}
+}
+
 func (mtd MessageTokenData) IsReady() bool {
 	for _, td := range mtd.TokenData {
 		if !td.IsReady() {
@@ -83,6 +87,14 @@ func NewNoopTokenData() TokenData {
 		Ready: true,
 		Error: nil,
 		Data:  []byte{},
+	}
+}
+
+func NewTokenData(data []byte) TokenData {
+	return TokenData{
+		Ready: true,
+		Error: nil,
+		Data:  data,
 	}
 }
 

@@ -26,7 +26,7 @@ type TokenDataObserver interface {
 // CompositeTokenDataObserver is a TokenDataObserver that combines multiple TokenDataObserver behind the same interface.
 // Goal of that is to support multiple token observers supporting different tokens (e.g. CCTP, MyFancyToken etc)
 type CompositeTokenDataObserver struct {
-	Observers []TokenDataObserver
+	observers []TokenDataObserver
 }
 
 // nolint early-return
@@ -39,7 +39,7 @@ func NewCompositeTokenDataObserver(config []pluginconfig.TokenDataObserverConfig
 			return nil, errors.New("unsupported token data observer")
 		}
 	}
-	return &CompositeTokenDataObserver{Observers: observers}, nil
+	return &CompositeTokenDataObserver{observers: observers}, nil
 }
 
 // Observe start with stubbing exectypes.TokenDataObservations with empty data based on the supported tokens.
@@ -50,7 +50,7 @@ func (t *CompositeTokenDataObserver) Observe(
 ) (exectypes.TokenDataObservations, error) {
 	tokenDataObservations := t.initTokenDataObservations(msgObservations)
 
-	for _, ob := range t.Observers {
+	for _, ob := range t.observers {
 		tokenData, err := ob.Observe(ctx, msgObservations)
 		if err != nil {
 			return nil, err
@@ -64,7 +64,7 @@ func (t *CompositeTokenDataObserver) IsTokenSupported(
 	chainSelector cciptypes.ChainSelector,
 	token cciptypes.RampTokenAmount,
 ) bool {
-	for _, ob := range t.Observers {
+	for _, ob := range t.observers {
 		if ob.IsTokenSupported(chainSelector, token) {
 			return true
 		}
