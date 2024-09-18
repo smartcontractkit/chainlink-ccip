@@ -24,8 +24,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gen"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -35,7 +35,7 @@ import (
 func Test_getPendingExecutedReports(t *testing.T) {
 	tests := []struct {
 		name    string
-		reports []plugintypes.CommitPluginReportWithMeta
+		reports []plugintypes2.CommitPluginReportWithMeta
 		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
 		want    exectypes.CommitObservations
 		wantErr assert.ErrorAssertionFunc
@@ -49,7 +49,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		},
 		{
 			name: "single non-executed report",
-			reports: []plugintypes.CommitPluginReportWithMeta{
+			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -80,7 +80,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		},
 		{
 			name: "single half-executed report",
-			reports: []plugintypes.CommitPluginReportWithMeta{
+			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -115,7 +115,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		},
 		{
 			name: "last timestamp",
-			reports: []plugintypes.CommitPluginReportWithMeta{
+			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),

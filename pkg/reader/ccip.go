@@ -20,9 +20,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
@@ -78,7 +78,7 @@ func (r *ccipChainReader) WithExtendedContractReader(
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit)
 
-	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
+	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
@@ -201,7 +201,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
 		}
 
-		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
+		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				MerkleRoots:  merkleRoots,
 				PriceUpdates: priceUpdates,

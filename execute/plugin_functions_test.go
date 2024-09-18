@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
@@ -266,7 +266,7 @@ func Test_computeRanges(t *testing.T) {
 
 func Test_groupByChainSelector(t *testing.T) {
 	type args struct {
-		reports []plugintypes.CommitPluginReportWithMeta
+		reports []plugintypes2.CommitPluginReportWithMeta
 	}
 	tests := []struct {
 		name string
@@ -275,12 +275,12 @@ func Test_groupByChainSelector(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			args: args{reports: []plugintypes.CommitPluginReportWithMeta{}},
+			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{}},
 			want: exectypes.CommitObservations{},
 		},
 		{
 			name: "reports",
-			args: args{reports: []plugintypes.CommitPluginReportWithMeta{{
+			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{{
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},

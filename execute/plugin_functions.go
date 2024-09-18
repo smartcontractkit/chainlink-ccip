@@ -15,7 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
@@ -111,7 +111,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 }
 
 func groupByChainSelector(
-	reports []plugintypes.CommitPluginReportWithMeta) exectypes.CommitObservations {
+	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for _, report := range reports {
 		for _, singleReport := range report.Report.MerkleRoots {
@@ -429,9 +429,6 @@ func getConsensusObservation(
 
 	mergedNonceObservations :=
 		mergeNonceObservations(decodedObservations, fChain[destChainSelector])
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge nonce observations: %w", err)
-	}
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged nonce observations", oracleID),
 		"oracle", oracleID,
