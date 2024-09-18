@@ -72,14 +72,14 @@ func (mtd MessageTokenData) ToByteSlice() [][]byte {
 type TokenData struct {
 	Ready bool   `json:"ready"`
 	Data  []byte `json:"data"`
-	// Error is used only for internal processing, we don't want nodes to gossip about the
-	// errors they see during processing
+	// Error and Supported are used only for internal processing, we don't want nodes to gossip about the
+	// internals they see during processing
 	Error     error `json:"-"`
 	Supported bool  `json:"-"`
 }
 
 // NotSupportedTokenData returns a TokenData object with Supported set to false.
-// It should be returned by the Observer when particular token is not supported.
+// It should be returned by the Observer for tokens that are not supported.
 func NotSupportedTokenData() TokenData {
 	return TokenData{
 		Ready:     false,

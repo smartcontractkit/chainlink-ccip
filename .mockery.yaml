@@ -8,9 +8,6 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/gen:
         interfaces:
             ExecutePluginCodec:
-    github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc:
-        interfaces:
-            AttestationClient:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot:
         interfaces:
             Observer:
@@ -22,7 +19,6 @@ packages:
             HomeChain:
             CCIP:
             PriceReader:
-            USDCMessageReader:
     github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
         interfaces:
             ChainSupport:

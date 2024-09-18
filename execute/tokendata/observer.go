@@ -13,11 +13,15 @@ import (
 
 type TokenDataObserver interface {
 	// Observe takes the message observations and returns token data observations for matching tokens.
-	// If TokenDataObserver doesn't support the token it should return NoopTokenData.
+	// If TokenDataObserver doesn't support the token it must return exectypes.NotSupportedTokenData.
+	// This way higher layer will know how to orchestrate Observers and which observations are relevant.
+	//
 	// TokenDataObserver must return data for every token that is present in the exectypes.MessageObservations.
+	// Meaning that exectypes.TokenDataObservations must reflect the structure of exectypes.MessageObservations
+	// (the same number of objects and tokens).
 	// * if token is supported and requires offchain processing, TokenDataObserver must initialize the token according
-	// 	 to its logic. If processing is successful, it must set use exectypes.NewSuccessTokenData or
-	//	 exectypes.NewErrorTokenData, depending on the outcome
+	// 	 to its logic. Depending on the result it must initialize with either exectypes.NewSuccessTokenData or
+	//	 exectypes.NewErrorTokenData
 	// * if token is not supported, TokenDataObserver must set the token data to exectypes.NotSupportedTokenData
 	Observe(
 		ctx context.Context,
