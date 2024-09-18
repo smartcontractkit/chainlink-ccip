@@ -202,7 +202,7 @@ func (p *USDCCCTPObserverConfig) setDefaults() {
 		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
 	}
 
-	// Default to 1 second if AttestationAPIInterval is not set
+	// Default to 100 millis if AttestationAPIInterval is not set
 	if p.AttestationAPIInterval == nil {
 		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
 	}
