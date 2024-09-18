@@ -11,7 +11,7 @@ datasources:
           timeout: 60
           maxLines: 100
         basicAuth: false # Ensure basic auth is disabled
-        isDefault: true # Optional: make Loki the default datasource
+        isDefault: true
 
   main.yml:
     apiVersion: 1

@@ -31,9 +31,3 @@ profiles:
       - op: add
         path: deployments.grafana.helm.valuesFiles
         value: ["./values/default.yaml"]
-
-  - name: kind-bix-ship
-    patches:
-      - op: add
-        path: deployments.grafana.helm.valuesFiles
-        value: ["./values/kind-bix-ship.yaml"]
