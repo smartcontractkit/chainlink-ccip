@@ -72,6 +72,55 @@ func (_c *MockObserver_ObserveFChain_Call) RunAndReturn(run func() map[ccipocr3.
 	return _c
 }
 
+// ObserveLatestOnRampSeqNums provides a mock function with given fields: ctx, destChain
+func (_m *MockObserver) ObserveLatestOnRampSeqNums(ctx context.Context, destChain ccipocr3.ChainSelector) []plugintypes.SeqNumChain {
+	ret := _m.Called(ctx, destChain)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ObserveLatestOnRampSeqNums")
+	}
+
+	var r0 []plugintypes.SeqNumChain
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) []plugintypes.SeqNumChain); ok {
+		r0 = rf(ctx, destChain)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]plugintypes.SeqNumChain)
+		}
+	}
+
+	return r0
+}
+
+// MockObserver_ObserveLatestOnRampSeqNums_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ObserveLatestOnRampSeqNums'
+type MockObserver_ObserveLatestOnRampSeqNums_Call struct {
+	*mock.Call
+}
+
+// ObserveLatestOnRampSeqNums is a helper method to define mock.On call
+//   - ctx context.Context
+//   - destChain ccipocr3.ChainSelector
+func (_e *MockObserver_Expecter) ObserveLatestOnRampSeqNums(ctx interface{}, destChain interface{}) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+	return &MockObserver_ObserveLatestOnRampSeqNums_Call{Call: _e.mock.On("ObserveLatestOnRampSeqNums", ctx, destChain)}
+}
+
+func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) Run(run func(ctx context.Context, destChain ccipocr3.ChainSelector)) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) Return(_a0 []plugintypes.SeqNumChain) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) []plugintypes.SeqNumChain) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ObserveMerkleRoots provides a mock function with given fields: ctx, ranges
 func (_m *MockObserver) ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []ccipocr3.MerkleRootChain {
 	ret := _m.Called(ctx, ranges)

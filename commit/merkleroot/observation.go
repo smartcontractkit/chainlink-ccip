@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -114,12 +115,10 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
+		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.cfg.DestChain)
+
 		return Observation{
-			// TODO: observe OnRamp max seq nums. The use of offRampNextSeqNums here effectively disables batching,
-			// e.g. the ranges selected for each chain will be [x, x] (e.g. [46, 46]), which means reports will only
-			// contain one message per chain. Querying the OnRamp contract requires changes to reader.CCIPReader,
-			// which will need to be done in a future change.
-			OnRampMaxSeqNums:   offRampNextSeqNums,
+			OnRampMaxSeqNums:   onRampLatestSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
 			FChain:             w.observer.ObserveFChain(),
 		}, nextState
@@ -145,8 +144,11 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 }
 
 type Observer interface {
-	// ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
+	// ObserveOffRampNextSeqNums observes the next OffRamp sequence numbers for each source chain
 	ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain
+
+	// ObserveLatestOnRampSeqNums observes the latest OnRamp sequence numbers for each configured source chain.
+	ObserveLatestOnRampSeqNums(ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain
 
 	// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
@@ -200,6 +202,45 @@ func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	}
 
 	return result
+}
+
+// ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
+func (o ObserverImpl) ObserveLatestOnRampSeqNums(
+	ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain {
+	sourceChains, err := o.chainSupport.KnownSourceChainsSlice()
+	if err != nil {
+		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil
+	}
+
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, len(sourceChains))
+	eg := &errgroup.Group{}
+
+	for i, sourceChain := range sourceChains {
+		i, sourceChain := i, sourceChain
+		eg.Go(func() error {
+			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
+			if err != nil {
+				return fmt.Errorf("failed to get expected next sequence number for source chain %d: %w", sourceChain, err)
+			}
+			if nextOnRampSeqNum == 0 {
+				return fmt.Errorf("expected next sequence number for source chain %d is 0", sourceChain)
+			}
+
+			latestOnRampSeqNums[i] = plugintypes.SeqNumChain{
+				ChainSel: sourceChain,
+				SeqNum:   nextOnRampSeqNum - 1, // Latest is the next one minus one.
+			}
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		o.lggr.Warnw("call to GetExpectedNextSequenceNumber failed", "err", err)
+		return nil
+	}
+
+	return latestOnRampSeqNums
 }
 
 // ObserveMerkleRoots computes the merkle roots for the given sequence number ranges

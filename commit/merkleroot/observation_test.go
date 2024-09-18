@@ -35,10 +35,10 @@ func Test_Observation(t *testing.T) {
 		},
 	}
 	offRampNextSeqNums := []plugintypes.SeqNumChain{
-		{
-			ChainSel: 456,
-			SeqNum:   9987,
-		},
+		{ChainSel: 456, SeqNum: 9987},
+	}
+	onRampLatestSeqNums := []plugintypes.SeqNumChain{
+		{ChainSel: 456, SeqNum: 9990},
 	}
 	fChain := map[cciptypes.ChainSelector]int{
 		872: 3,
@@ -58,11 +58,12 @@ func Test_Observation(t *testing.T) {
 			getObserver: func(t *testing.T) *merkleroot.MockObserver {
 				observer := merkleroot.NewMockObserver(t)
 				observer.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Once().Return(offRampNextSeqNums)
+				observer.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything, mock.Anything).Return(onRampLatestSeqNums)
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
 				return observer
 			},
 			expObs: Observation{
-				OnRampMaxSeqNums:   offRampNextSeqNums,
+				OnRampMaxSeqNums:   onRampLatestSeqNums,
 				OffRampNextSeqNums: offRampNextSeqNums,
 				FChain:             fChain,
 			},

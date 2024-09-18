@@ -9,9 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 type CommitPluginConfig struct {
@@ -39,6 +40,11 @@ type CommitPluginConfig struct {
 	// RMNSignaturesTimeout is the timeout for RMN signature verification.
 	// Typically set to `MaxQueryDuration - e`, where e some small duration.
 	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+
+	// BatchLimits is the maximum number of messages to include in a single report for a target chain.
+	// If for example in the next round we have 1000 pending messages and a batch limit of 256, only 256 seq nums
+	// will be in the report. If a value is not set we fallback to merkleroot.DefaultSeqNumsBatchLimit.
+	BatchLimits map[cciptypes.ChainSelector]uint64 `json:"batchLimits"`
 }
 
 func (c CommitPluginConfig) Validate() error {

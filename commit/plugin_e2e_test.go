@@ -331,6 +331,11 @@ func setupNode(
 	}
 	ccipReader.EXPECT().NextSeqNum(ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
+	for _, ch := range sourceChains {
+		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
+			ctx, ch, destChain).Return(offRampNextSeqNum[ch]+1, nil).Maybe()
+	}
+
 	p := NewPlugin(
 		ctx,
 		nodeID,
