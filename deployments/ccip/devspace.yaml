@@ -20,6 +20,9 @@ vars:
   CHAINLINK_REPO_DIR:
     source: env
     default: "${CHAINLINK_CODE_DIR}/ccip"
+  CHAINLINK_CLUSTER_HELM_CHART_URI:
+    source: env
+    default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
   # Env Vars Required for ccip-scripts based contracts and jobs deployment
   # Image URI required for deploying CCIP Contracts and Jobs
   DEVSPACE_CCIP_SCRIPTS_IMAGE:
@@ -75,10 +78,11 @@ pipelines:
 
         args=""
         for i in {1..5}; do
-          args+="--set=helm.values.crib-chainlink-cluster.chainlink.nodes.node$i.image=$image "
+          args+="--set=helm.values.chainlink.nodes.node$i.image=$image "
         done
 
         create_deployments app $args
+        create_deployments ccip-scripts
       elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
         echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
@@ -86,6 +90,7 @@ pipelines:
       else
         build_images --all
         create_deployments app
+        create_deployments ccip-scripts
       fi
 
       if [ "${CCIP_UI_ENABLED}" = "false" ]; then
@@ -147,7 +152,7 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       releaseName: "app"
       chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip
+        name: ${CHAINLINK_CLUSTER_HELM_CHART_URI}
         version: "1.x"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
@@ -156,311 +161,320 @@ deployments:
         podSecurityContext:
           fsGroup: 999
 
-        crib-chainlink-cluster:
-          chainlink:
-            global:
-              overridesToml: |-
-                [Feature]
-                LogPoller = true
-                CCIP = true
+        chainlink:
+          global:
+            overridesToml: |-
+              [Feature]
+              LogPoller = true
+              CCIP = true
 
-                [Log]
-                Level = 'debug'
-                JSONConsole = true
+              [Log]
+              Level = 'debug'
+              JSONConsole = true
 
-                [Log.File]
-                MaxSize = '0b'
+              [Log.File]
+              MaxSize = '0b'
 
-                [WebServer]
-                AllowOrigins = '*'
-                HTTPPort = 6688
-                SecureCookies = false
-                HTTPWriteTimeout = '1m'
+              [WebServer]
+              AllowOrigins = '*'
+              HTTPPort = 6688
+              SecureCookies = false
+              HTTPWriteTimeout = '1m'
 
-                [WebServer.RateLimit]
-                Authenticated = 2000
-                Unauthenticated = 1000
+              [WebServer.RateLimit]
+              Authenticated = 2000
+              Unauthenticated = 1000
 
-                [WebServer.TLS]
-                HTTPSPort = 0
+              [WebServer.TLS]
+              HTTPSPort = 0
 
-                [Database]
-                MaxIdleConns = 50
-                MaxOpenConns = 50
-                MigrateOnStartup = true
+              [Database]
+              MaxIdleConns = 50
+              MaxOpenConns = 50
+              MigrateOnStartup = true
 
-                [OCR2]
-                Enabled = true
-                DefaultTransactionQueueDepth = 0
+              [OCR2]
+              Enabled = true
+              DefaultTransactionQueueDepth = 0
 
-                [OCR]
-                Enabled = false
-                DefaultTransactionQueueDepth = 0
+              [OCR]
+              Enabled = false
+              DefaultTransactionQueueDepth = 0
 
-                [P2P]
-                [P2P.V2]
-                Enabled = true
-                ListenAddresses = ['0.0.0.0:6690']
-                AnnounceAddresses = ['0.0.0.0:6690']
-                DeltaDial = '500ms'
-                DeltaReconcile = '5s'
-            securityContext:
-              capabilities:
-                drop:
-                  - ALL
-              readOnlyRootFilesystem: false
-              runAsNonRoot: true
-              runAsUser: 14933
-              runAsGroup: 999
-            web_port: 6688
-            p2p_port: 6690
-            # extraEnvVars:
-            # "CL_MEDIAN_CMD": "chainlink-feeds"
-            nodes:
-              node1:
-                image: ${runtime.images.app}
-                # override default config per node
-                # for example, use OCRv2 P2P setup, the whole config
-                #      toml: |
-                #        RootDir = './clroot'
-                #        [Log]
-                #        JSONConsole = true
-                #        Level = 'debug'
-                #        [WebServer]
-                #        AllowOrigins = '*'
-                #        SecureCookies = false
-                #        SessionTimeout = '999h0m0s'
-                #        [OCR2]
-                #        Enabled = true
-                #        [P2P]
-                #        [P2P.V2]
-                #        Enabled = false
-                #        AnnounceAddresses = []
-                #        DefaultBootstrappers = []
-                #        DeltaDial = '15s'
-                #        DeltaReconcile = '1m0s'
-                #        ListenAddresses = []
-                #        [[EVM]]
-                #        ChainID = '1337'
-                #        MinContractPayment = '0'
-                #        [[EVM.Nodes]]
-                #        Name = 'node-0'
-                #        WSURL = 'ws://geth:8546'
-                #        HTTPURL = 'http://geth:8544'
-                #        [WebServer.TLS]
-                #        HTTPSPort = 0
-                # or use overridesToml to override some part of configuration
-                # overridesToml: |
-                # Enable Tracing
-                #   [Tracing]
-                #   Enabled = true
-                #   SamplingRatio = 1.0
-                #   CollectorTarget = 'app-opentelemetry-collector:4317'
-                #   TLSCertPath = ''
-                #   Mode = 'unencrypted'
-              node2:
-                image: ${runtime.images.app}
-              node3:
-                image: ${runtime.images.app}
-              node4:
-                image: ${runtime.images.app}
-              node5:
-                image: ${runtime.images.app}
+              [P2P]
+              [P2P.V2]
+              Enabled = true
+              ListenAddresses = ['0.0.0.0:6690']
+              AnnounceAddresses = ['0.0.0.0:6690']
+              DeltaDial = '500ms'
+              DeltaReconcile = '5s'
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 14933
+            runAsGroup: 999
+          web_port: 6688
+          p2p_port: 6690
+          # extraEnvVars:
+          # "CL_MEDIAN_CMD": "chainlink-feeds"
+          nodes:
+            node1:
+              image: ${runtime.images.app}
+              # override default config per node
+              # for example, use OCRv2 P2P setup, the whole config
+              #      toml: |
+              #        RootDir = './clroot'
+              #        [Log]
+              #        JSONConsole = true
+              #        Level = 'debug'
+              #        [WebServer]
+              #        AllowOrigins = '*'
+              #        SecureCookies = false
+              #        SessionTimeout = '999h0m0s'
+              #        [OCR2]
+              #        Enabled = true
+              #        [P2P]
+              #        [P2P.V2]
+              #        Enabled = false
+              #        AnnounceAddresses = []
+              #        DefaultBootstrappers = []
+              #        DeltaDial = '15s'
+              #        DeltaReconcile = '1m0s'
+              #        ListenAddresses = []
+              #        [[EVM]]
+              #        ChainID = '1337'
+              #        MinContractPayment = '0'
+              #        [[EVM.Nodes]]
+              #        Name = 'node-0'
+              #        WSURL = 'ws://geth:8546'
+              #        HTTPURL = 'http://geth:8544'
+              #        [WebServer.TLS]
+              #        HTTPSPort = 0
+              # or use overridesToml to override some part of configuration
+              # overridesToml: |
+              # Enable Tracing
+              #   [Tracing]
+              #   Enabled = true
+              #   SamplingRatio = 1.0
+              #   CollectorTarget = 'app-opentelemetry-collector:4317'
+              #   TLSCertPath = ''
+              #   Mode = 'unencrypted'
+            node2:
+              image: ${runtime.images.app}
+            node3:
+              image: ${runtime.images.app}
+            node4:
+              image: ${runtime.images.app}
+            node5:
+              image: ${runtime.images.app}
 
-          db:
-            securityContext:
-              capabilities:
-                drop:
-                  - ALL
-              readOnlyRootFilesystem: false
-              runAsNonRoot: true
-              runAsUser: 999
-              runAsGroup: 999
-          # default cluster shipped with latest Geth ( dev mode by default )
-          geth:
-            statefulSet:
-              # Set to true to use StatefulSet instead of Deployment.
-              enabled: true
-            networkPolicy:
-              # Allow additional services to access geth
-              extraIngressSelectors:
-                - podSelector:
-                    matchLabels:
-                      app: atlas
-                - podSelector:
-                    matchLabels:
-                      app: ccip-scripts-deployer
-            securityContext:
-              capabilities:
-                drop:
-                  - ALL
-              readOnlyRootFilesystem: false
-              runAsNonRoot: true
-              runAsUser: 999
-              runAsGroup: 999
-            version: v1.12.0
-            wsRpcPort: 8546
-            httpRpcPort: 8544
-            chains:
-              - networkId: 1337
-                customEVMConfigToml: |
-                  [EVM.GasEstimator]
-                  PriceMax = '200 gwei'
-                  LimitDefault = 6000000
-                  FeeCapDefault = '200 gwei'
-              - networkId: 2337
-                customEVMConfigToml: |
-                  [EVM.GasEstimator]
-                  PriceMax = '200 gwei'
-                  LimitDefault = 6000000
-                  FeeCapDefault = '200 gwei'
-            blocktime: 1
-          # mockserver is https://www.mock-server.com/where/kubernetes.html
-          # used to stub External Adapters
-          mockserver:
-            #  image: "mockserver/mockserver"
-            #  version: "mockserver-5.15.0"
-            securityContext:
-              capabilities:
-                drop:
-                  - ALL
-              readOnlyRootFilesystem: false
-              runAsNonRoot: true
-              runAsUser: 999
-              runAsGroup: 999
+        db:
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+        # default cluster shipped with latest Geth ( dev mode by default )
+        geth:
+          statefulSet:
+            # Set to true to use StatefulSet instead of Deployment.
             enabled: true
-            releasenameOverride: mockserver
-            app:
-              runAsUser: 999
-              readOnlyRootFilesystem: false
-            port: 1080
-          # monitoring.coreos.com/v1 PodMonitor for each node
-          prometheusMonitor: true
-
-          # These ingresses create AWS ALB resources and Route 53 Records.
-          ingress:
-            enabled: true
-            baseDomain: ${DEVSPACE_INGRESS_BASE_DOMAIN}
-            annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
-            annotation_group_name: ${DEVSPACE_NAMESPACE}
-            hosts:
-              - host: ${DEVSPACE_NAMESPACE}-node1.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: app-node1
-                          port:
-                            number: 6688
-              - host: ${DEVSPACE_NAMESPACE}-node2.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: app-node2
-                          port:
-                            number: 6688
-              - host: ${DEVSPACE_NAMESPACE}-node3.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: app-node3
-                          port:
-                            number: 6688
-              - host: ${DEVSPACE_NAMESPACE}-node4.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: app-node4
-                          port:
-                            number: 6688
-              - host: ${DEVSPACE_NAMESPACE}-node5.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: app-node5
-                          port:
-                            number: 6688
-              - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: geth-1337
-                          port:
-                            number: 8544
-              - host: ${DEVSPACE_NAMESPACE}-geth-1337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: geth-1337
-                          port:
-                            number: 8546
-              - host: ${DEVSPACE_NAMESPACE}-geth-2337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: geth-2337
-                          port:
-                            number: 8544
-              - host: ${DEVSPACE_NAMESPACE}-geth-2337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: geth-2337
-                          port:
-                            number: 8546
-              - host: ${DEVSPACE_NAMESPACE}-mockserver.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: mockserver
-                          port:
-                            number: 1080
-              # TODO: Move this Ingress to the component
-              - host: ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
-                http:
-                  paths:
-                    - path: /
-                      backend:
-                        service:
-                          name: grafana
-                          port:
-                            number: 80
-          networkPolicyDefault:
-            ingress:
-              allowCustomCidrs: true
-              # Should be a comma separated list of CIDR blocks. To include
-              # AWS ALB private CIDRs and optionally other custom CIDRs.
-              # Example format: 10.0.0.0/16,192.168.0.1/24
-              customCidrs: ${DEVSPACE_INGRESS_CIDRS}
-          # deployment placement, standard helm stuff
-          podAnnotations:
-          nodeSelector:
-          tolerations:
-          affinity:
-        ccipScriptsDeployment:
+          networkPolicy:
+            # Allow additional services to access geth
+            extraIngressSelectors:
+              - podSelector:
+                  matchLabels:
+                    app: atlas
+              - podSelector:
+                  matchLabels:
+                    app: ccip-scripts-deployer
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+          version: v1.12.0
+          wsRpcPort: 8546
+          httpRpcPort: 8544
+          chains:
+            - networkId: 1337
+              customEVMConfigToml: |
+                [EVM.GasEstimator]
+                PriceMax = '200 gwei'
+                LimitDefault = 6000000
+                FeeCapDefault = '200 gwei'
+            - networkId: 2337
+              customEVMConfigToml: |
+                [EVM.GasEstimator]
+                PriceMax = '200 gwei'
+                LimitDefault = 6000000
+                FeeCapDefault = '200 gwei'
+          blocktime: 1
+        # mockserver is https://www.mock-server.com/where/kubernetes.html
+        # used to stub External Adapters
+        mockserver:
+          #  image: "mockserver/mockserver"
+          #  version: "mockserver-5.15.0"
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
           enabled: true
-          image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
-          oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
-          outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
+          releasenameOverride: mockserver
+          app:
+            runAsUser: 999
+            readOnlyRootFilesystem: false
+          port: 1080
+        # monitoring.coreos.com/v1 PodMonitor for each node
+        prometheusMonitor: true
+
+        # These ingresses create AWS ALB resources and Route 53 Records.
+        ingress:
+          enabled: true
+          baseDomain: ${DEVSPACE_INGRESS_BASE_DOMAIN}
+          annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
+          annotation_group_name: ${DEVSPACE_NAMESPACE}
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-node1.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: app-node1
+                        port:
+                          number: 6688
+            - host: ${DEVSPACE_NAMESPACE}-node2.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: app-node2
+                        port:
+                          number: 6688
+            - host: ${DEVSPACE_NAMESPACE}-node3.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: app-node3
+                        port:
+                          number: 6688
+            - host: ${DEVSPACE_NAMESPACE}-node4.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: app-node4
+                        port:
+                          number: 6688
+            - host: ${DEVSPACE_NAMESPACE}-node5.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: app-node5
+                        port:
+                          number: 6688
+            - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-1337
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-geth-1337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-1337
+                        port:
+                          number: 8546
+            - host: ${DEVSPACE_NAMESPACE}-geth-2337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-2337
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-geth-2337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-2337
+                        port:
+                          number: 8546
+            - host: ${DEVSPACE_NAMESPACE}-mockserver.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: mockserver
+                        port:
+                          number: 1080
+            # TODO: Move this Ingress to the component
+            - host: ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: grafana
+                        port:
+                          number: 80
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+        # deployment placement, standard helm stuff
+        podAnnotations:
+        nodeSelector:
+        tolerations:
+        affinity:
+
+  ccip-scripts:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/ccip-scripts
+        version: "0.1.0-preview-1618-5f4509d"
+      values:
+        enabled: true
+        image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
+        oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
+        outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
+        chainlink:
+          releaseName: app
 
 profiles:
   - name: kind
@@ -471,32 +485,22 @@ profiles:
           PROVIDER: "kind"
     patches:
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
+        path: deployments.app.helm.values.geth.statefulSet
       - op: add
         path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev-kind.yaml"]
-
-  - name: local-dev
-    patches:
-      # Remove the global overridesToml field.
-      # This will be configured via a values file.
-      - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
+        value: ["./values-profiles/values-dev-kind-crib-chainlink-cluster.yaml"]
       - op: add
-        path: deployments.app.helm.valuesFiles
-        value: ["./values-profiles/values-dev.yaml"]
-      - op: replace
-        path: deployments.app.helm.values.ccipScriptsDeployment.enabled
-        value: false
+        path: deployments.ccip-scripts.helm.valuesFiles
+        value: ["./values-profiles/values-dev-kind-ccip-scripts.yaml"]
 
   - name: eks-bix-ship
     patches:
       # Remove the global overridesToml field.
       # This will be configured via a values file.
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
+        path: deployments.app.helm.values.chainlink.global.overridesToml
       - op: remove
-        path: deployments.app.helm.values.ccipScriptsDeployment.chains
+        path: deployments.ccip-scripts.helm.values.chains
       - op: add
         path: deployments.app.helm.valuesFiles
         value:
@@ -505,7 +509,7 @@ profiles:
             "./values-profiles/values-bix-ship-new-chain.yaml",
           ]
       - op: replace
-        path: deployments.app.helm.values.crib-chainlink-cluster.geth.enabled
+        path: deployments.app.helm.values.geth.enabled
         value: false
 
   # Resolve local chart versions for development
@@ -516,7 +520,13 @@ profiles:
           helm:
             chart:
               name: crib-ccip
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-chainlink-cluster
+              version: null
+        ccip-scripts:
+          helm:
+            chart:
+              name: crib-ccip
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/ccip-scripts
               version: null
 
   - name: kind-bix-ship
@@ -524,20 +534,20 @@ profiles:
     # This profile will be automatically activated
     patches:
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.chainlink.global.overridesToml
+        path: deployments.app.helm.values.chainlink.global.overridesToml
       - op: add
         path: deployments.app.helm.valuesFiles
         value:
           [
-            "./values-profiles/values-dev-kind.yaml",
+            "./values-profiles/values-dev-kind-crib-chainlink-cluster.yaml",
             "./values-profiles/values-kind-bix-ship.yaml",
             "./values-profiles/values-bix-ship-new-chain.yaml",
           ]
       - op: remove
-        path: deployments.app.helm.values.crib-chainlink-cluster.geth.statefulSet
+        path: deployments.app.helm.values.geth.statefulSet
       - op: replace
-        path: deployments.app.helm.values.crib-chainlink-cluster.geth.enabled
+        path: deployments.app.helm.values.geth.enabled
         value: false
       - op: replace
-        path: deployments.app.helm.values.ccipScriptsDeployment.enabled
+        path: deployments.ccip-scripts.helm.values.enabled
         value: false
