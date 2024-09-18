@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
-	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )

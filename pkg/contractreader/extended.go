@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 // Extended version of a ContractReader.
