@@ -497,6 +497,13 @@ func (p *Plugin) Outcome(
 	}
 
 	if outcome.IsEmpty() {
+		p.lggr.Warnw(
+			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
+			"oracle", p.reportingCfg.OracleID,
+			"execPluginState", state)
+		if p.initialized {
+			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
+		}
 		return nil, nil
 	}
 
