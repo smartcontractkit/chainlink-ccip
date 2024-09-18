@@ -5,11 +5,11 @@ import (
 	"errors"
 	"time"
 
+	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -25,7 +25,7 @@ type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
 
 func NewCCIPChainReader(
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]reader.ContractReaderFacade,
+	contractReaders map[cciptypes.ChainSelector]contractreader2.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,

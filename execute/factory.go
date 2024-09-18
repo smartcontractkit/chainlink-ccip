@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -102,7 +103,7 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	// map types to the facade.
-	readers := make(map[cciptypes.ChainSelector]reader.ContractReaderFacade)
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
 		readers[chain] = cr
 	}

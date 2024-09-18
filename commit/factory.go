@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -121,7 +122,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	}
 
 	// map types to the facade.
-	readers := make(map[cciptypes.ChainSelector]reader.ContractReaderFacade)
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
 		readers[chain] = cr
 	}

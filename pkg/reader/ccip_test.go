@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	reader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
