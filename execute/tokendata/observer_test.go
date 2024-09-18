@@ -3,6 +3,7 @@ package tokendata
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"testing"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -13,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-func TestTokenDataObserver_Observe(t *testing.T) {
+func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 	ethereumUSDCPool := randBytes().String()
 	avalancheUSDCPool := randBytes().String()
 	config := pluginconfig.TokenDataObserverConfig{
@@ -92,9 +93,20 @@ func TestTokenDataObserver_Observe(t *testing.T) {
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
-					10: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewTokenData([]byte{10_2})),
-					11: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewTokenData([]byte{11_2}), exectypes.NewNoopTokenData()),
-					12: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewNoopTokenData(), exectypes.NewTokenData([]byte{12_3})),
+					10: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewTokenData([]byte{10_2}),
+					),
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewTokenData([]byte{11_2}),
+						exectypes.NewNoopTokenData(),
+					),
+					12: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewTokenData([]byte{12_3}),
+					),
 					13: exectypes.NewMessageTokenData(),
 				},
 			},
@@ -140,6 +152,147 @@ func TestTokenDataObserver_Observe(t *testing.T) {
 	}
 }
 
+type fakeObserver struct {
+	prefix          string
+	supportedTokens map[cciptypes.ChainSelector]string
+}
+
+func (f fakeObserver) Observe(
+	_ context.Context,
+	observations exectypes.MessageObservations,
+) (exectypes.TokenDataObservations, error) {
+	tokenObservations := make(exectypes.TokenDataObservations)
+	for chainSelector, messages := range observations {
+		if _, exists := tokenObservations[chainSelector]; !exists {
+			tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		}
+
+		for seq, msg := range messages {
+			tokenData := make([]exectypes.TokenData, len(msg.TokenAmounts))
+			for i, token := range msg.TokenAmounts {
+				if f.IsTokenSupported(chainSelector, token) {
+					payload := fmt.Sprintf("%s_%d_%d", f.prefix, seq, i)
+					tokenData[i] = exectypes.NewTokenData([]byte(payload))
+				}
+			}
+			tokenObservations[chainSelector][seq] = exectypes.NewMessageTokenData(tokenData...)
+		}
+	}
+	return tokenObservations, nil
+}
+
+func (f fakeObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
+	tokenAddr, ok := f.supportedTokens[sourceChain]
+	return ok && tokenAddr == msgToken.SourcePoolAddress.String()
+}
+
+func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
+	linkEthereumTokenSourcePool := randBytes().String()
+	linkAvalancheTokenSourcePool := randBytes().String()
+	usdcEthereumTokenSourcePool := randBytes().String()
+
+	composite := CompositeTokenDataObserver{observers: []TokenDataObserver{
+		fakeObserver{
+			prefix: "LINK",
+			supportedTokens: map[cciptypes.ChainSelector]string{
+				1: linkEthereumTokenSourcePool,
+				2: linkAvalancheTokenSourcePool,
+			}},
+		fakeObserver{
+			prefix: "USDC",
+			supportedTokens: map[cciptypes.ChainSelector]string{
+				1: usdcEthereumTokenSourcePool,
+			}},
+	}}
+
+	tests := []struct {
+		name                string
+		messageObservations exectypes.MessageObservations
+		expectedTokenData   exectypes.TokenDataObservations
+	}{
+		{
+			name:                "no messages",
+			messageObservations: exectypes.MessageObservations{},
+			expectedTokenData:   exectypes.TokenDataObservations{},
+		},
+		{
+			name: "only not-supported tokens",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: messageWithTokens(t, randBytes().String()),
+					11: messageWithTokens(t, randBytes().String()),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
+					11: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
+				},
+			},
+		},
+		{
+			name: "mixed usdc and link tokens",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: messageWithTokens(t, linkEthereumTokenSourcePool, usdcEthereumTokenSourcePool),
+					11: messageWithTokens(t, linkEthereumTokenSourcePool, linkEthereumTokenSourcePool),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_10_0")),
+						exectypes.NewTokenData([]byte("USDC_10_1")),
+					),
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_11_1")),
+						exectypes.NewTokenData([]byte("LINK_11_2")),
+					),
+				},
+			},
+		},
+		{
+			name: "mixed tokens",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: messageWithTokens(t, linkEthereumTokenSourcePool, randBytes().String()),
+					11: messageWithTokens(t, linkEthereumTokenSourcePool, linkEthereumTokenSourcePool),
+				},
+				2: {
+					12: messageWithTokens(t, linkAvalancheTokenSourcePool, randBytes().String()),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_10_0")),
+						exectypes.NewNoopTokenData(),
+					),
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_11_1")),
+						exectypes.NewTokenData([]byte("LINK_11_2")),
+					),
+				},
+				2: {
+					12: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_12_0")),
+						exectypes.NewNoopTokenData(),
+					),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tkData, err := composite.Observe(context.Background(), test.messageObservations)
+			require.NoError(t, err)
+
+			require.Equal(t, test.expectedTokenData, tkData)
+		})
+	}
+}
+
 func messageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message {
 	onRampTokens := make([]cciptypes.RampTokenAmount, len(tokenPoolAddr))
 	for i, addr := range tokenPoolAddr {
@@ -150,7 +303,9 @@ func messageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message 
 			Amount:            cciptypes.NewBigIntFromInt64(int64(i + 1)),
 		}
 	}
-	return cciptypes.Message{}
+	return cciptypes.Message{
+		TokenAmounts: onRampTokens,
+	}
 }
 
 func randBytes() cciptypes.Bytes {
