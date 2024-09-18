@@ -466,8 +466,8 @@ deployments:
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
       chart:
-        name: ${CHAINLINK_HELM_REGISTRY_URI}/ccip-scripts
-        version: "0.1.0-preview-1618-5f4509d"
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip-scripts
+        version: "0.1.0"
       values:
         enabled: true
         image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
