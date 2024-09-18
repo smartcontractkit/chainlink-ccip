@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 // DefaultSeqNumsBatchLimit is the default number of max new messages to scan, we use this value when
@@ -72,4 +71,4 @@ func NewProcessor(
 	}
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}

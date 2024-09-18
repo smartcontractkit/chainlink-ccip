@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
-
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -20,11 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
@@ -57,16 +55,14 @@ func newCCIPChainReaderInternal(
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 	}
 
-	/*
-		contracts := ContractAddresses{
-			consts.ContractNameOffRamp: {
-				destChain: offrampAddress,
-			},
-		}
-		if err := reader.Sync(context.Background(), contracts); err != nil {
-			lggr.Infow("failed to sync contracts", "err", err)
-		}
-	*/
+	contracts := ContractAddresses{
+		consts.ContractNameOffRamp: {
+			destChain: offrampAddress,
+		},
+	}
+	if err := reader.Sync(context.Background(), contracts); err != nil {
+		lggr.Infow("failed to sync contracts", "err", err)
+	}
 
 	return reader
 }
@@ -80,7 +76,7 @@ func (r *ccipChainReader) WithExtendedContractReader(
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}
@@ -151,7 +147,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit)
 
-	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
+	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
@@ -186,7 +182,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: types2.Account(typconv.HexEncode(tokenPriceUpdate.SourceToken)),
+				TokenID: types2.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
@@ -203,7 +199,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
 		}
 
-		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
+		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				MerkleRoots:  merkleRoots,
 				PriceUpdates: priceUpdates,
@@ -514,7 +510,7 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
-	// TODO: Loookup fee quoter?
+	// TODO: Lookup fee quoter?
 
 	// Build response object.
 	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))
@@ -535,8 +531,6 @@ func (r *ccipChainReader) DiscoverContracts(
 //
 // No error is returned if contractName is not found in the contracts. This allows calling the function before all
 // contracts are discovered.
-//
-//nolint:unused // it will be used soon.
 func (r *ccipChainReader) bindReaderContract(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
@@ -565,10 +559,17 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-// newSync goes through the input contracts and binds them to the contract reader.
-//
-//nolint:unused // it will be used soon.
-func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
+// Sync goes through the input contracts and binds them to the contract reader.
+func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	if len(contracts) == 0 {
+		// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
+		var err error
+		contracts, err = r.DiscoverContracts(ctx, r.destChain)
+		if err != nil {
+			return fmt.Errorf("sync: %w", err)
+		}
+	}
+
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
@@ -583,54 +584,9 @@ func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddress
 				// TODO: maybe return early?
 				errs = append(errs, err)
 			}
-			// error is nil, nothing to do
 		}
 	}
 	return errors.Join(errs...)
-
-	// OffRamp
-	/*
-		offrampBytes, err := typeconv.AddressStringToBytes(r.offrampAddress, uint64(r.destChain))
-		if err != nil {
-			return err
-		}
-		contracts[consts.ContractNameOffRamp] = map[cciptypes.ChainSelector][]byte{
-			r.destChain: offrampBytes,
-		}
-	*/
-	/*
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameOffRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (offramp): %w", err)
-		}
-
-		// OnRamps
-		err = r.bindReaderContracts(
-			ctx,
-			maps.Keys(r.contractReaders),
-			consts.ContractNameOnRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (onramp): %w", err)
-		}
-
-		// Nonce manager
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameNonceManager,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (nonce manager): %w", err)
-		}
-	*/
 }
 
 func (r *ccipChainReader) Close(ctx context.Context) error {

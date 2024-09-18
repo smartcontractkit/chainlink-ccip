@@ -6,8 +6,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 type Query struct {
@@ -45,7 +45,7 @@ type MerkleAggregatedObservation struct {
 }
 
 // aggregateObservations takes a list of observations and produces an MerkleAggregatedObservation
-func aggregateObservations(aos []shared.AttributedObservation[Observation]) MerkleAggregatedObservation {
+func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) MerkleAggregatedObservation {
 	aggObs := MerkleAggregatedObservation{
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),

@@ -1,4 +1,4 @@
-package shared
+package plugincommon
 
 import (
 	"sort"
@@ -6,8 +6,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/shared/filter"
 )
 
 // GetConsensusMap takes a mapping from chains to a list of items,
@@ -24,7 +22,7 @@ func GetConsensusMap[T any](
 
 	for chain, items := range itemsByChain {
 		if min, exists := minObs[chain]; exists {
-			minObservations := filter.NewMinObservation[T](min, nil)
+			minObservations := NewMinObservation[T](min, nil)
 			for _, item := range items {
 				minObservations.Add(item)
 			}

@@ -32,7 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func TestPlugin(t *testing.T) {
@@ -177,7 +177,7 @@ func setupSimpleTest(
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
 		Dest: dstSelector,
-		Reports: []plugintypes.CommitPluginReportWithMeta{
+		Reports: []plugintypes2.CommitPluginReportWithMeta{
 			{
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
