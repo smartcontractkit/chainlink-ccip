@@ -9,10 +9,9 @@ import (
 	"sync"
 	"time"
 
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
-
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -20,11 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
@@ -78,7 +76,7 @@ func (r *ccipChainReader) WithExtendedContractReader(
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
 		return nil, err
 	}
@@ -149,7 +147,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit)
 
-	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
+	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
@@ -184,7 +182,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: types2.Account(typconv.HexEncode(tokenPriceUpdate.SourceToken)),
+				TokenID: types2.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
@@ -201,7 +199,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
 		}
 
-		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
+		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				MerkleRoots:  merkleRoots,
 				PriceUpdates: priceUpdates,
