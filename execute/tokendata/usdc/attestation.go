@@ -19,6 +19,16 @@ type AttestationStatus struct {
 	Data  [32]byte
 }
 
+// AttestationClient is an interface for fetching attestation data from the Circle API.
+// It returns a data grouped by chainSelector, sequenceNumber and tokenIndex
+//
+// Example: if we have two USDC tokens transferred (slot 0 and slot 2) within a single message with sequence number 12
+// on Ethereum chain with, it's going to look like this:
+// Ethereum ->
+//
+//	12 ->
+//	  0 -> AttestationStatus{Error: nil, Data: [32]byte{attestation_data}}
+//	  2 -> AttestationStatus{Error: ErrNotRead, Data: nil}
 type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
