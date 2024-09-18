@@ -76,14 +76,14 @@ func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 	if !supportsDestChain {
-		p.lggr.Debugw("oracle does not support price registry observation", "oracleID", p.oracleID)
+		p.lggr.Debugw("oracle does not support fee quoter observation", "oracleID", p.oracleID)
 		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 
 	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
-	p.lggr.Infow("observing price registry token updates")
+	p.lggr.Infow("observing fee quoter token updates")
 	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery)
 	if err != nil {
 		p.lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)

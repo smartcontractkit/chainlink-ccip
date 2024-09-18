@@ -39,6 +39,8 @@ type OnchainTokenPricesReader struct {
 	ContractReader   commontypes.ContractReader
 	TokenInfo        map[types.Account]pluginconfig.TokenInfo
 	FeeQuoterAddress types.Account
+	// FeeQuoterEnabled Flag until we discover feeQuoter address and bind it correctly
+	feeQuoterEnabled bool
 }
 
 func NewOnchainTokenPricesReader(
@@ -67,6 +69,9 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
 ) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
+	if !pr.feeQuoterEnabled {
+		return make(map[ocr2types.Account]plugintypes.TimestampedBig), nil
+	}
 	var updates []plugintypes.TimestampedBig
 
 	boundContract := commontypes.BoundContract{
