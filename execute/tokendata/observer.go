@@ -16,8 +16,8 @@ type TokenDataObserver interface {
 	// If TokenDataObserver doesn't support the token it should return NoopTokenData.
 	// TokenDataObserver must return data for every token that is present in the exectypes.MessageObservations.
 	// * if token is supported and requires offchain processing, TokenDataObserver must initialize the token according
-	// 	 to its logic. If processing is successful, it must set the TokenData to IsReady=true, otherwise it must set
-	//   it to false and set the error if necessary
+	// 	 to its logic. If processing is successful, it must set use exectypes.NewSuccessTokenData or
+	//	 exectypes.NewErrorTokenData, depending on the outcome
 	// * if token is not supported, TokenDataObserver must set the token data to exectypes.NotSupportedTokenData
 	Observe(
 		ctx context.Context,
@@ -107,7 +107,7 @@ func (t *CompositeTokenDataObserver) initTokenDataObservations(
 				}
 				// Token is supported by one of the registered observers, mark it as not ready
 				// It would be processed by the registered processor in the next step
-				tokenData[i] = exectypes.NewNotReadyTokenData()
+				tokenData[i] = exectypes.TokenData{Ready: false}
 			}
 			tokenObservation[chainSelector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}
@@ -154,7 +154,7 @@ func (n *NoopTokenDataObserver) Observe(
 		for seq, message := range obs {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i := range message.TokenAmounts {
-				tokenData[i] = exectypes.NewNotReadyTokenData()
+				tokenData[i] = exectypes.NewNoopTokenData()
 			}
 			tokenObservations[selector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}

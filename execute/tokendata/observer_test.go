@@ -104,12 +104,12 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte("LINK_10_0")),
-						exectypes.NewTokenData([]byte("USDC_10_1")),
+						exectypes.NewSuccessTokenData([]byte("LINK_10_0")),
+						exectypes.NewSuccessTokenData([]byte("USDC_10_1")),
 					),
 					11: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte("LINK_11_0")),
-						exectypes.NewTokenData([]byte("LINK_11_1")),
+						exectypes.NewSuccessTokenData([]byte("LINK_11_0")),
+						exectypes.NewSuccessTokenData([]byte("LINK_11_1")),
 					),
 				},
 			},
@@ -128,17 +128,17 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte("LINK_10_0")),
+						exectypes.NewSuccessTokenData([]byte("LINK_10_0")),
 						exectypes.NewNoopTokenData(),
 					),
 					11: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte("LINK_11_0")),
-						exectypes.NewTokenData([]byte("LINK_11_1")),
+						exectypes.NewSuccessTokenData([]byte("LINK_11_0")),
+						exectypes.NewSuccessTokenData([]byte("LINK_11_1")),
 					),
 				},
 				2: {
 					12: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte("LINK_12_0")),
+						exectypes.NewSuccessTokenData([]byte("LINK_12_0")),
 						exectypes.NewNoopTokenData(),
 					),
 				},
@@ -195,7 +195,7 @@ func (f fakeObserver) Observe(
 			for i, token := range msg.TokenAmounts {
 				if f.IsTokenSupported(chainSelector, token) {
 					payload := fmt.Sprintf("%s_%d_%d", f.prefix, seq, i)
-					tokenData[i] = exectypes.NewTokenData([]byte(payload))
+					tokenData[i] = exectypes.NewSuccessTokenData([]byte(payload))
 				} else {
 					tokenData[i] = exectypes.NotSupportedTokenData()
 				}

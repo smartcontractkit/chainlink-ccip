@@ -161,12 +161,12 @@ func (u *USDCCCTPTokenDataObserver) extractTokenData(
 func attestationToTokenData(tokenIndex int, statuses map[int]AttestationStatus) exectypes.TokenData {
 	status, ok := statuses[tokenIndex]
 	if !ok {
-		return exectypes.NewNotReadyTokenData()
+		return exectypes.NewErrorTokenData(ErrDataMissing)
 	}
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
-	return exectypes.NewTokenData(status.Data[:])
+	return exectypes.NewSuccessTokenData(status.Data[:])
 }
 
 func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {

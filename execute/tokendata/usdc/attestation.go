@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	ErrNotReady  = errors.New("token data not ready")
-	ErrRateLimit = errors.New("token data API is being rate limited")
-	ErrTimeout   = errors.New("token data API timed out")
+	ErrDataMissing = errors.New("token data missing")
+	ErrNotReady    = errors.New("token data not ready")
+	ErrRateLimit   = errors.New("token data API is being rate limited")
+	ErrTimeout     = errors.New("token data API timed out")
 )
 
 type AttestationStatus struct {

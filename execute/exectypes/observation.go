@@ -78,6 +78,8 @@ type TokenData struct {
 	Supported bool  `json:"-"`
 }
 
+// NotSupportedTokenData returns a TokenData object with Supported set to false.
+// It should be returned by the Observer when particular token is not supported.
 func NotSupportedTokenData() TokenData {
 	return TokenData{
 		Ready:     false,
@@ -87,14 +89,8 @@ func NotSupportedTokenData() TokenData {
 	}
 }
 
-func NewNotReadyTokenData() TokenData {
-	return TokenData{
-		Ready: false,
-		Error: nil,
-		Data:  nil,
-	}
-}
-
+// NewNoopTokenData returns a TokenData object with Ready set to true and empty data.
+// It's used for marking tokens that don't require offchain processing.
 func NewNoopTokenData() TokenData {
 	return TokenData{
 		Ready:     true,
@@ -104,7 +100,8 @@ func NewNoopTokenData() TokenData {
 	}
 }
 
-func NewTokenData(data []byte) TokenData {
+// NewSuccessTokenData returns a TokenData object with Ready set to true and the provided data.
+func NewSuccessTokenData(data []byte) TokenData {
 	return TokenData{
 		Ready:     true,
 		Error:     nil,
@@ -113,6 +110,7 @@ func NewTokenData(data []byte) TokenData {
 	}
 }
 
+// NewErrorTokenData returns a TokenData object with Ready set to false and the provided error.
 func NewErrorTokenData(err error) TokenData {
 	return TokenData{
 		Ready:     false,

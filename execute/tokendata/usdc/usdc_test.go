@@ -93,10 +93,10 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
-					10: exectypes.NewMessageTokenData(trimmedTokenData([32]byte{10_1})),
+					10: exectypes.NewMessageTokenData(newReadyTokenData([32]byte{10_1})),
 				},
 				2: {
-					12: exectypes.NewMessageTokenData(trimmedTokenData([32]byte{12_1})),
+					12: exectypes.NewMessageTokenData(newReadyTokenData([32]byte{12_1})),
 				},
 			},
 		},
@@ -134,17 +134,17 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				1: {
 					10: exectypes.NewMessageTokenData(
 						exectypes.NotSupportedTokenData(),
-						trimmedTokenData([32]byte{10_1}),
+						newReadyTokenData([32]byte{10_1}),
 					),
 					11: exectypes.NewMessageTokenData(
 						exectypes.NotSupportedTokenData(),
-						trimmedTokenData([32]byte{11_1}),
+						newReadyTokenData([32]byte{11_1}),
 						exectypes.NotSupportedTokenData(),
 					),
 					12: exectypes.NewMessageTokenData(
 						exectypes.NotSupportedTokenData(),
 						exectypes.NotSupportedTokenData(),
-						trimmedTokenData([32]byte{12_2}),
+						newReadyTokenData([32]byte{12_2}),
 					),
 					13: exectypes.NewMessageTokenData(),
 				},
@@ -185,15 +185,15 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						trimmedTokenData([32]byte{10_0}),
-						trimmedTokenData([32]byte{10_1}),
-						trimmedTokenData([32]byte{10_2}),
+						newReadyTokenData([32]byte{10_0}),
+						newReadyTokenData([32]byte{10_1}),
+						newReadyTokenData([32]byte{10_2}),
 					),
 				},
 				2: {
 					12: exectypes.NewMessageTokenData(
-						trimmedTokenData([32]byte{12_0}),
-						trimmedTokenData([32]byte{12_1}),
+						newReadyTokenData([32]byte{12_0}),
+						newReadyTokenData([32]byte{12_1}),
 					),
 				},
 			},
@@ -222,7 +222,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						trimmedTokenData([32]byte{10_0}),
+						newReadyTokenData([32]byte{10_0}),
 						exectypes.TokenData{
 							Ready:     false,
 							Data:      nil,
@@ -252,7 +252,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 	}
 }
 
-func trimmedTokenData(data [32]byte) exectypes.TokenData {
+func newReadyTokenData(data [32]byte) exectypes.TokenData {
 	return exectypes.TokenData{
 		Ready:     true,
 		Error:     nil,
