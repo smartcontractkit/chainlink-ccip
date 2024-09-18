@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
@@ -31,20 +32,26 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockContractReader)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
 		sourceCRs[chain] = chainreadermocks.NewMockContractReader(t)
+		sourceCRs[chain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	}
 
 	destCR := chainreadermocks.NewMockContractReader(t)
-
-	destCR.On(
-		"GetLatestValue",
+	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-	).Run(func(args mock.Arguments) {
-		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := args.Get(4).(*sourceChainConfig)
+	).Run(func(
+		ctx context.Context,
+		readIdentifier string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params interface{},
+		returnVal interface{},
+	) {
+		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
+		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 
@@ -58,9 +65,6 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		}, nil, chainC, offrampAddress,
 	)
 
-	sourceCRs[chainA].On("Bind", mock.Anything, mock.Anything).Return(nil)
-	sourceCRs[chainB].On("Bind", mock.Anything, mock.Anything).Return(nil)
-	destCR.On("Bind", mock.Anything, mock.Anything).Return(nil)
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
 		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
 	require.NoError(t, ccipReader.contractReaders[chainB].Bind(

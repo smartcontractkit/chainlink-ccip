@@ -55,16 +55,14 @@ func newCCIPChainReaderInternal(
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 	}
 
-	/*
-		contracts := ContractAddresses{
-			consts.ContractNameOffRamp: {
-				destChain: offrampAddress,
-			},
-		}
-		if err := reader.Sync(context.Background(), contracts); err != nil {
-			lggr.Infow("failed to sync contracts", "err", err)
-		}
-	*/
+	contracts := ContractAddresses{
+		consts.ContractNameOffRamp: {
+			destChain: offrampAddress,
+		},
+	}
+	if err := reader.Sync(context.Background(), contracts); err != nil {
+		lggr.Infow("failed to sync contracts", "err", err)
+	}
 
 	return reader
 }
@@ -512,7 +510,7 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
-	// TODO: Loookup fee quoter?
+	// TODO: Lookup fee quoter?
 
 	// Build response object.
 	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))
@@ -533,8 +531,6 @@ func (r *ccipChainReader) DiscoverContracts(
 //
 // No error is returned if contractName is not found in the contracts. This allows calling the function before all
 // contracts are discovered.
-//
-//nolint:unused // it will be used soon.
 func (r *ccipChainReader) bindReaderContract(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
@@ -563,10 +559,17 @@ func (r *ccipChainReader) bindReaderContract(
 	return nil
 }
 
-// newSync goes through the input contracts and binds them to the contract reader.
-//
-//nolint:unused // it will be used soon.
-func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
+// Sync goes through the input contracts and binds them to the contract reader.
+func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+	if len(contracts) == 0 {
+		// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
+		var err error
+		contracts, err = r.DiscoverContracts(ctx, r.destChain)
+		if err != nil {
+			return fmt.Errorf("sync: %w", err)
+		}
+	}
+
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
@@ -581,54 +584,9 @@ func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddress
 				// TODO: maybe return early?
 				errs = append(errs, err)
 			}
-			// error is nil, nothing to do
 		}
 	}
 	return errors.Join(errs...)
-
-	// OffRamp
-	/*
-		offrampBytes, err := typeconv.AddressStringToBytes(r.offrampAddress, uint64(r.destChain))
-		if err != nil {
-			return err
-		}
-		contracts[consts.ContractNameOffRamp] = map[cciptypes.ChainSelector][]byte{
-			r.destChain: offrampBytes,
-		}
-	*/
-	/*
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameOffRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (offramp): %w", err)
-		}
-
-		// OnRamps
-		err = r.bindReaderContracts(
-			ctx,
-			maps.Keys(r.contractReaders),
-			consts.ContractNameOnRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (onramp): %w", err)
-		}
-
-		// Nonce manager
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameNonceManager,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (nonce manager): %w", err)
-		}
-	*/
 }
 
 func (r *ccipChainReader) Close(ctx context.Context) error {
