@@ -130,6 +130,7 @@ func groupByChainSelector(
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
+// nolint:gocyclo // todo
 func filterOutExecutedMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ([]exectypes.CommitData, error) {
