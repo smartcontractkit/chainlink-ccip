@@ -7,8 +7,6 @@ import (
 
 	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	exectypes "github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-
 	mock "github.com/stretchr/testify/mock"
 
 	usdc "github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
@@ -28,27 +26,27 @@ func (_m *MockAttestationClient) EXPECT() *MockAttestationClient_Expecter {
 }
 
 // Attestations provides a mock function with given fields: ctx, msgs
-func (_m *MockAttestationClient) Attestations(ctx context.Context, msgs map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData) (map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData, error) {
+func (_m *MockAttestationClient) Attestations(ctx context.Context, msgs map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte) (map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus, error) {
 	ret := _m.Called(ctx, msgs)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Attestations")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData
+	var r0 map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData) (map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte) (map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus, error)); ok {
 		return rf(ctx, msgs)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData) map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte) map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus); ok {
 		r0 = rf(ctx, msgs)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte) error); ok {
 		r1 = rf(ctx, msgs)
 	} else {
 		r1 = ret.Error(1)
@@ -64,24 +62,24 @@ type MockAttestationClient_Attestations_Call struct {
 
 // Attestations is a helper method to define mock.On call
 //   - ctx context.Context
-//   - msgs map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData
+//   - msgs map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte
 func (_e *MockAttestationClient_Expecter) Attestations(ctx interface{}, msgs interface{}) *MockAttestationClient_Attestations_Call {
 	return &MockAttestationClient_Attestations_Call{Call: _e.mock.On("Attestations", ctx, msgs)}
 }
 
-func (_c *MockAttestationClient_Attestations_Call) Run(run func(ctx context.Context, msgs map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData)) *MockAttestationClient_Attestations_Call {
+func (_c *MockAttestationClient_Attestations_Call) Run(run func(ctx context.Context, msgs map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte)) *MockAttestationClient_Attestations_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData))
+		run(args[0].(context.Context), args[1].(map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte))
 	})
 	return _c
 }
 
-func (_c *MockAttestationClient_Attestations_Call) Return(_a0 map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData, _a1 error) *MockAttestationClient_Attestations_Call {
+func (_c *MockAttestationClient_Attestations_Call) Return(_a0 map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus, _a1 error) *MockAttestationClient_Attestations_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockAttestationClient_Attestations_Call) RunAndReturn(run func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum][]usdc.UsdcTokenData) (map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]exectypes.TokenData, error)) *MockAttestationClient_Attestations_Call {
+func (_c *MockAttestationClient_Attestations_Call) RunAndReturn(run func(context.Context, map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int][]byte) (map[ccipocr3.ChainSelector]map[ccipocr3.SeqNum]map[int]usdc.AttestationStatus, error)) *MockAttestationClient_Attestations_Call {
 	_c.Call.Return(run)
 	return _c
 }

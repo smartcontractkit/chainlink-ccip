@@ -35,6 +35,9 @@ type MessageTokenData struct {
 }
 
 func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
+	if len(tokenData) == 0 {
+		return MessageTokenData{TokenData: []TokenData{}}
+	}
 	return MessageTokenData{TokenData: tokenData}
 }
 
@@ -106,6 +109,15 @@ func NewTokenData(data []byte) TokenData {
 		Ready:     true,
 		Error:     nil,
 		Data:      data,
+		Supported: true,
+	}
+}
+
+func NewErrorTokenData(err error) TokenData {
+	return TokenData{
+		Ready:     false,
+		Error:     err,
+		Data:      nil,
 		Supported: true,
 	}
 }

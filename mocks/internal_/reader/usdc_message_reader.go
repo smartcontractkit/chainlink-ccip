@@ -24,23 +24,23 @@ func (_m *MockUSDCMessageReader) EXPECT() *MockUSDCMessageReader_Expecter {
 }
 
 // MessageHashes provides a mock function with given fields: ctx, source, seqNums
-func (_m *MockUSDCMessageReader) MessageHashes(ctx context.Context, source ccipocr3.ChainSelector, seqNums []ccipocr3.SeqNum) (map[ccipocr3.SeqNum][][32]byte, error) {
+func (_m *MockUSDCMessageReader) MessageHashes(ctx context.Context, source ccipocr3.ChainSelector, seqNums []ccipocr3.SeqNum) (map[ccipocr3.SeqNum]map[int][]byte, error) {
 	ret := _m.Called(ctx, source, seqNums)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MessageHashes")
 	}
 
-	var r0 map[ccipocr3.SeqNum][][32]byte
+	var r0 map[ccipocr3.SeqNum]map[int][]byte
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNum) (map[ccipocr3.SeqNum][][32]byte, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNum) (map[ccipocr3.SeqNum]map[int][]byte, error)); ok {
 		return rf(ctx, source, seqNums)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNum) map[ccipocr3.SeqNum][][32]byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNum) map[ccipocr3.SeqNum]map[int][]byte); ok {
 		r0 = rf(ctx, source, seqNums)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.SeqNum][][32]byte)
+			r0 = ret.Get(0).(map[ccipocr3.SeqNum]map[int][]byte)
 		}
 	}
 
@@ -73,12 +73,12 @@ func (_c *MockUSDCMessageReader_MessageHashes_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockUSDCMessageReader_MessageHashes_Call) Return(_a0 map[ccipocr3.SeqNum][][32]byte, _a1 error) *MockUSDCMessageReader_MessageHashes_Call {
+func (_c *MockUSDCMessageReader_MessageHashes_Call) Return(_a0 map[ccipocr3.SeqNum]map[int][]byte, _a1 error) *MockUSDCMessageReader_MessageHashes_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockUSDCMessageReader_MessageHashes_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNum) (map[ccipocr3.SeqNum][][32]byte, error)) *MockUSDCMessageReader_MessageHashes_Call {
+func (_c *MockUSDCMessageReader_MessageHashes_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, []ccipocr3.SeqNum) (map[ccipocr3.SeqNum]map[int][]byte, error)) *MockUSDCMessageReader_MessageHashes_Call {
 	_c.Call.Return(run)
 	return _c
 }

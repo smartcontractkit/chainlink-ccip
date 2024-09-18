@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	usdcMocks "github.com/smartcontractkit/chainlink-ccip/mocks/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -39,11 +38,13 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 		name                string
 		messageObservations exectypes.MessageObservations
 		expectedTokenData   exectypes.TokenDataObservations
+		attestationClient   usdc.AttestationClient
 	}{
 		{
 			name:                "no messages",
 			messageObservations: exectypes.MessageObservations{},
 			expectedTokenData:   exectypes.TokenDataObservations{},
+			attestationClient:   usdc.FakeAttestationClient{},
 		},
 		{
 			name: "no USDC messages",
@@ -55,10 +56,11 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
-					10: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
+					10: exectypes.NewMessageTokenData(exectypes.NotSupportedTokenData()),
 					11: exectypes.NewMessageTokenData(),
 				},
 			},
+			attestationClient: usdc.FakeAttestationClient{},
 		},
 		{
 			name: "single USDC message per chain",
@@ -78,6 +80,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					12: exectypes.NewMessageTokenData(exectypes.NewTokenData([]byte{12_1})),
 				},
 			},
+			attestationClient: usdc.FakeAttestationClient{},
 		},
 		{
 			name: "USDC messages mixed with regular  within a single msg chain",
@@ -108,6 +111,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					13: exectypes.NewMessageTokenData(),
 				},
 			},
+			attestationClient: usdc.FakeAttestationClient{},
 		},
 		{
 			name: "multiple USDC transfer in a single message",
@@ -134,6 +138,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					),
 				},
 			},
+			attestationClient: usdc.FakeAttestationClient{},
 		},
 	}
 
@@ -142,7 +147,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			observer := usdc.NewUSDCCCTP(
 				config,
 				reader.NewMockUSDCMessageReader(t),
-				usdcMocks.NewMockAttestationClient(t),
+				test.attestationClient,
 			)
 
 			tkData, err := observer.Observe(context.Background(), test.messageObservations)

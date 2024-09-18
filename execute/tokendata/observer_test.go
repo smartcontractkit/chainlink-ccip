@@ -43,6 +43,21 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 			expectedTokenData:   exectypes.TokenDataObservations{},
 		},
 		{
+			name: "messages without tokens are ignored",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t),
+					11: internal.MessageWithTokens(t),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(),
+					11: exectypes.NewMessageTokenData(),
+				},
+			},
+		},
+		{
 			name: "only not-supported tokens",
 			messageObservations: exectypes.MessageObservations{
 				1: {

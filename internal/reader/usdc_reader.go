@@ -16,7 +16,7 @@ type USDCMessageReader interface {
 	MessageHashes(ctx context.Context,
 		source cciptypes.ChainSelector,
 		seqNums []cciptypes.SeqNum,
-	) (map[cciptypes.SeqNum][][32]byte, error)
+	) (map[cciptypes.SeqNum]map[int][]byte, error)
 }
 
 type NoopUSDCMessageReader struct{}
