@@ -146,12 +146,12 @@ dashboards:
                     "uid": "loki"
                   },
                   "editorMode": "code",
-                  "expr": "{pod=~\"app-node[2-5]-[a-z0-9]+-[a-z0-9]+\"} |= `\"$msg_id\"`",
+                  "expr": "{pod=~\"app-node[2-5]-[a-z0-9]+-[a-z0-9]+\"} |= `\"$search_text\"`",
                   "queryType": "range",
                   "refId": "A"
                 }
               ],
-              "title": "Logs for msg_id",
+              "title": "Logs for search_text",
               "type": "logs"
             },
             {
@@ -282,7 +282,7 @@ dashboards:
                   "value": "info"
                 },
                 "hide": 0,
-                "name": "msg_id",
+                "name": "search_text",
                 "options": [
                   {
                     "selected": true,
