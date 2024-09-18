@@ -11,9 +11,72 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
+func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
+	obs, err := tokendata.NewConfigBasedCompositeObservers([]pluginconfig.TokenDataObserverConfig{})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name                string
+		messageObservations exectypes.MessageObservations
+		expectedTokenData   exectypes.TokenDataObservations
+	}{
+		{
+			name:                "no messages",
+			messageObservations: exectypes.MessageObservations{},
+			expectedTokenData:   exectypes.TokenDataObservations{},
+		},
+		{
+			name: "messages without tokens have empty token data",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t),
+					11: internal.MessageWithTokens(t),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(),
+					11: exectypes.NewMessageTokenData(),
+				},
+			},
+		},
+		{
+			name: "messages with random tokens have empty states for all tokens",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t, internal.RandBytes().String()),
+					11: internal.MessageWithTokens(t, internal.RandBytes().String()),
+				},
+				2: {
+					20: internal.MessageWithTokens(t, internal.RandBytes().String(), internal.RandBytes().String()),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
+					11: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
+				},
+				2: {
+					20: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewNoopTokenData()),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tkData, err1 := obs.Observe(context.Background(), test.messageObservations)
+			require.NoError(t, err1)
+
+			require.Equal(t, test.expectedTokenData, tkData)
+		})
+	}
+}
+
+func Test_CompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 	linkEthereumTokenSourcePool := internal.RandBytes().String()
 	linkAvalancheTokenSourcePool := internal.RandBytes().String()
 	usdcEthereumTokenSourcePool := internal.RandBytes().String()
