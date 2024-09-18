@@ -86,7 +86,7 @@ func (s *SequentialAttestationClient) callAttestationAPI(
 }
 
 type FakeAttestationClient struct {
-	attestations map[string]AttestationStatus
+	Data map[string]AttestationStatus
 }
 
 func (f FakeAttestationClient) Attestations(
@@ -102,7 +102,7 @@ func (f FakeAttestationClient) Attestations(
 			outcome[chainSelector][seqNum] = make(map[int]AttestationStatus)
 
 			for index := range messages {
-				outcome[chainSelector][seqNum][index] = f.attestations[string(messages[index])]
+				outcome[chainSelector][seqNum][index] = f.Data[string(messages[index])]
 			}
 		}
 	}

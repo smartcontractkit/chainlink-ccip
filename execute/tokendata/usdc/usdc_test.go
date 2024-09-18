@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -37,13 +37,15 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 	tests := []struct {
 		name                string
 		messageObservations exectypes.MessageObservations
-		expectedTokenData   exectypes.TokenDataObservations
+		usdcReader          reader.USDCMessageReader
 		attestationClient   usdc.AttestationClient
+		expectedTokenData   exectypes.TokenDataObservations
 	}{
 		{
 			name:                "no messages",
 			messageObservations: exectypes.MessageObservations{},
 			expectedTokenData:   exectypes.TokenDataObservations{},
+			usdcReader:          reader.FakeUSDCMessageReader{},
 			attestationClient:   usdc.FakeAttestationClient{},
 		},
 		{
@@ -60,6 +62,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					11: exectypes.NewMessageTokenData(),
 				},
 			},
+			usdcReader:        reader.FakeUSDCMessageReader{},
 			attestationClient: usdc.FakeAttestationClient{},
 		},
 		{
@@ -72,15 +75,30 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					12: internal.MessageWithTokens(t, avalancheUSDCPool),
 				},
 			},
-			expectedTokenData: exectypes.TokenDataObservations{
-				1: {
-					10: exectypes.NewMessageTokenData(exectypes.NewTokenData([]byte{10_1})),
-				},
-				2: {
-					12: exectypes.NewMessageTokenData(exectypes.NewTokenData([]byte{12_1})),
+			usdcReader: reader.FakeUSDCMessageReader{
+				Messages: map[cciptypes.SeqNum]map[int][]byte{
+					10: {
+						0: []byte("message10"),
+					},
+					12: {
+						0: []byte("message12"),
+					},
 				},
 			},
-			attestationClient: usdc.FakeAttestationClient{},
+			attestationClient: usdc.FakeAttestationClient{
+				Data: map[string]usdc.AttestationStatus{
+					"message10": {Data: [32]byte{10_1}},
+					"message12": {Data: [32]byte{12_1}},
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(trimmedTokenData([32]byte{10_1})),
+				},
+				2: {
+					12: exectypes.NewMessageTokenData(trimmedTokenData([32]byte{12_1})),
+				},
+			},
 		},
 		{
 			name: "USDC messages mixed with regular  within a single msg chain",
@@ -92,26 +110,45 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					13: internal.MessageWithTokens(t),
 				},
 			},
+			usdcReader: reader.FakeUSDCMessageReader{
+				Messages: map[cciptypes.SeqNum]map[int][]byte{
+					10: {
+						1: []byte("message10_1"),
+					},
+					11: {
+						1: []byte("message11_1"),
+					},
+					12: {
+						2: []byte("message12_2"),
+					},
+				},
+			},
+			attestationClient: usdc.FakeAttestationClient{
+				Data: map[string]usdc.AttestationStatus{
+					"message10_1": {Data: [32]byte{10_1}},
+					"message11_1": {Data: [32]byte{11_1}},
+					"message12_2": {Data: [32]byte{12_2}},
+				},
+			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-						exectypes.NewTokenData([]byte{10_2}),
+						exectypes.NotSupportedTokenData(),
+						trimmedTokenData([32]byte{10_1}),
 					),
 					11: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-						exectypes.NewTokenData([]byte{11_2}),
-						exectypes.NewNoopTokenData(),
+						exectypes.NotSupportedTokenData(),
+						trimmedTokenData([32]byte{11_1}),
+						exectypes.NotSupportedTokenData(),
 					),
 					12: exectypes.NewMessageTokenData(
-						exectypes.NewNoopTokenData(),
-						exectypes.NewNoopTokenData(),
-						exectypes.NewTokenData([]byte{12_3}),
+						exectypes.NotSupportedTokenData(),
+						exectypes.NotSupportedTokenData(),
+						trimmedTokenData([32]byte{12_2}),
 					),
 					13: exectypes.NewMessageTokenData(),
 				},
 			},
-			attestationClient: usdc.FakeAttestationClient{},
 		},
 		{
 			name: "multiple USDC transfer in a single message",
@@ -123,22 +160,43 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					12: internal.MessageWithTokens(t, avalancheUSDCPool, avalancheUSDCPool),
 				},
 			},
+			usdcReader: reader.FakeUSDCMessageReader{
+				Messages: map[cciptypes.SeqNum]map[int][]byte{
+					10: {
+						0: []byte("message10_0"),
+						1: []byte("message10_1"),
+						2: []byte("message10_2"),
+					},
+					12: {
+						0: []byte("message12_0"),
+						1: []byte("message12_1"),
+					},
+				},
+			},
+			attestationClient: usdc.FakeAttestationClient{
+				Data: map[string]usdc.AttestationStatus{
+					"message10_0": {Data: [32]byte{10_0}},
+					"message10_1": {Data: [32]byte{10_1}},
+					"message10_2": {Data: [32]byte{10_2}},
+					"message12_0": {Data: [32]byte{12_0}},
+					"message12_1": {Data: [32]byte{12_1}},
+				},
+			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte{10_1}),
-						exectypes.NewTokenData([]byte{10_2}),
-						exectypes.NewTokenData([]byte{10_3}),
+						trimmedTokenData([32]byte{10_0}),
+						trimmedTokenData([32]byte{10_1}),
+						trimmedTokenData([32]byte{10_2}),
 					),
 				},
 				2: {
 					12: exectypes.NewMessageTokenData(
-						exectypes.NewTokenData([]byte{12_1}),
-						exectypes.NewTokenData([]byte{12_2}),
+						trimmedTokenData([32]byte{12_0}),
+						trimmedTokenData([32]byte{12_1}),
 					),
 				},
 			},
-			attestationClient: usdc.FakeAttestationClient{},
 		},
 	}
 
@@ -146,7 +204,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			observer := usdc.NewUSDCCCTP(
 				config,
-				reader.NewMockUSDCMessageReader(t),
+				test.usdcReader,
 				test.attestationClient,
 			)
 
@@ -155,5 +213,14 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 
 			require.Equal(t, test.expectedTokenData, tkData)
 		})
+	}
+}
+
+func trimmedTokenData(data [32]byte) exectypes.TokenData {
+	return exectypes.TokenData{
+		Ready:     true,
+		Error:     nil,
+		Data:      data[:],
+		Supported: true,
 	}
 }

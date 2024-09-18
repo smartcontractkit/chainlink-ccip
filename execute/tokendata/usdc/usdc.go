@@ -109,6 +109,9 @@ func (u *USDCCCTPTokenDataObserver) fetchUSDCMessageHashes(
 	output := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte)
 
 	for chainSelector, messages := range usdcMessages {
+		if len(messages) == 0 {
+			continue
+		}
 		// TODO Sequential reading USDC messages from the source chain
 		usdcHashes, err := u.usdcMessageReader.MessageHashes(ctx, chainSelector, maps.Keys(messages))
 		if err != nil {

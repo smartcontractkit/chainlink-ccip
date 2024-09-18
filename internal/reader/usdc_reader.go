@@ -6,12 +6,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-type USDCMessageHash struct {
-	Source      cciptypes.ChainSelector
-	SeqNr       cciptypes.SeqNum
-	MessageHash []byte
-}
-
 type USDCMessageReader interface {
 	MessageHashes(ctx context.Context,
 		source cciptypes.ChainSelector,
@@ -19,16 +13,20 @@ type USDCMessageReader interface {
 	) (map[cciptypes.SeqNum]map[int][]byte, error)
 }
 
-type NoopUSDCMessageReader struct{}
+type FakeUSDCMessageReader struct {
+	Messages map[cciptypes.SeqNum]map[int][]byte
+}
 
-func (n *NoopUSDCMessageReader) MessageHashes(
-	ctx context.Context,
-	source cciptypes.ChainSelector,
+func (f FakeUSDCMessageReader) MessageHashes(
+	_ context.Context,
+	_ cciptypes.ChainSelector,
 	seqNums []cciptypes.SeqNum,
-) (map[cciptypes.SeqNum][][32]byte, error) {
-	result := map[cciptypes.SeqNum][][32]byte{}
+) (map[cciptypes.SeqNum]map[int][]byte, error) {
+	outcome := make(map[cciptypes.SeqNum]map[int][]byte)
 	for _, seqNum := range seqNums {
-		result[seqNum] = [][32]byte{}
+		if messages, ok := f.Messages[seqNum]; ok {
+			outcome[seqNum] = messages
+		}
 	}
-	return result, nil
+	return outcome, nil
 }
