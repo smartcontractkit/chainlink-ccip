@@ -1,0 +1,5 @@
+extraEnvs:
+  - name: AWS_IAM_ENABLED
+    value: "false"
+imagePullSecrets:
+  - name: regcred-ccip
