@@ -11,9 +11,6 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot:
         interfaces:
             Observer:
-    github.com/smartcontractkit/chainlink-ccip/shared:
-        interfaces:
-            PluginProcessor:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
@@ -22,6 +19,7 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
         interfaces:
             ChainSupport:
+            PluginProcessor:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
             Client:

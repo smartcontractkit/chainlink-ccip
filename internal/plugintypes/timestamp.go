@@ -1,4 +1,4 @@
-package shared
+package plugintypes
 
 import (
 	"math/big"

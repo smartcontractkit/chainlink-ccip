@@ -1,4 +1,4 @@
-package shared
+package mathslib
 
 import (
 	"math/big"
