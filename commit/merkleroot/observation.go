@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -207,11 +208,21 @@ func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
 func (o ObserverImpl) ObserveLatestOnRampSeqNums(
 	ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain {
-	sourceChains, err := o.chainSupport.KnownSourceChainsSlice()
+
+	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
 	}
+
+	supportedChains, err := o.chainSupport.SupportedChains(o.nodeID)
+	if err != nil {
+		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil
+	}
+
+	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
+	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, len(sourceChains))
 	eg := &errgroup.Group{}
