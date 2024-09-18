@@ -1,0 +1,321 @@
+env:
+  GF_AUTH_ANONYMOUS_ENABLED: "true"
+  GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+  GF_AUTH_DISABLE_LOGIN_FORM: "true"
+  GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor tempoSearch tempoServiceGraph"
+
+datasources:
+  datasources.yml:
+    apiVersion: 1
+
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki:3100
+
+      - name: Tempo
+        type: tempo
+        access: proxy
+        orgId: 1
+        url: http://tempo:3200
+        basicAuth: false
+        isDefault: true
+        version: 1
+        editable: false
+        apiVersion: 1
+        uid: tempo
+        jsonData:
+          httpMethod: GET
+          serviceMap:
+            datasourceUid: prometheus
+
+  main.yml:
+    apiVersion: 1
+
+    providers:
+      - name: "Dashboard provider"
+        orgId: 1
+        type: file
+        disableDeletion: false
+        updateIntervalSeconds: 10
+        allowUiUpdates: false
+        options:
+          path: /etc/grafana/provisioning/dashboards
+          foldersFromFilesStructure: true
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: "default"
+        orgId: 1
+        folder: ""
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboards:
+  default:
+    beholder-demo-dashboard:
+      json: |
+        {
+          "annotations": {
+            "list": [
+              {
+                "builtIn": 1,
+                "datasource": {
+                  "type": "grafana",
+                  "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+              }
+            ]
+        },
+          "editable": true,
+          "fiscalYearStartMonth": 0,
+          "graphTooltip": 0,
+          "id": 1,
+          "links": [],
+          "panels": [
+            {
+              "datasource": {
+                "default": true,
+                "type": "loki",
+                "uid": "P8E80F9AEF21F6940"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "id": 2,
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "loki",
+                    "uid": "P8E80F9AEF21F6940"
+                  },
+                  "editorMode": "builder",
+                  "expr": "{pod=~\"app-node[2-5]-[a-z0-9]+-[a-z0-9]+\"} |= `\"level\":\"error\"`",
+                  "maxLines": 1000,
+                  "queryType": "range",
+                  "refId": "A"
+                }
+              ],
+              "title": "All \"error\" msgs for DON nodes",
+              "type": "logs"
+            },
+            {
+              "datasource": {
+                "default": true,
+                "type": "loki",
+                "uid": "P8E80F9AEF21F6940"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "id": 4,
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "loki",
+                    "uid": "P8E80F9AEF21F6940"
+                  },
+                  "editorMode": "code",
+                  "expr": "{pod=~\"app-node[2-5]-[a-z0-9]+-[a-z0-9]+\"} |= `\"$msg_id\"`",
+                  "queryType": "range",
+                  "refId": "A"
+                }
+              ],
+              "title": "Logs for msg_id",
+              "type": "logs"
+            },
+            {
+              "datasource": {
+                "default": true,
+                "type": "loki",
+                "uid": "P8E80F9AEF21F6940"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+              },
+              "id": 1,
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "loki",
+                    "uid": "P8E80F9AEF21F6940"
+                  },
+                  "editorMode": "builder",
+                  "expr": "{pod=~\"app-node[2-5]-[a-z0-9]+-[a-z0-9]+\"} |= `\"level\":\"info\"`",
+                  "maxLines": 1000,
+                  "queryType": "range",
+                  "refId": "A"
+                }
+              ],
+              "title": "All \"info\" msgs for DON nodes",
+              "type": "logs"
+            },
+            {
+              "datasource": {
+                "default": true,
+                "type": "loki",
+                "uid": "P8E80F9AEF21F6940"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+              },
+              "id": 3,
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "loki",
+                    "uid": "P8E80F9AEF21F6940"
+                  },
+                  "editorMode": "builder",
+                  "expr": "{pod=~\"app-node[2-5]-[a-z0-9]+-[a-z0-9]+\"} |= `\"level\":\"debug\"`",
+                  "queryType": "range",
+                  "refId": "A"
+                }
+              ],
+              "title": "All \"debug\" msgs for DON nodes",
+              "type": "logs"
+            },
+            {
+              "datasource": {
+                "default": true,
+                "type": "loki",
+                "uid": "P8E80F9AEF21F6940"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+              },
+              "id": 5,
+              "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": false,
+                "sortOrder": "Descending",
+                "wrapLogMessage": false
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "loki",
+                    "uid": "P8E80F9AEF21F6940"
+                  },
+                  "editorMode": "builder",
+                  "expr": "{pod=~\"app-node1-bootstrap-[a-z0-9]+-[a-z0-9]+\"} |= `\"level\":\"info\"` or `\"level\":\"error\"`",
+                  "maxLines": 1000,
+                  "queryType": "range",
+                  "refId": "A"
+                }
+              ],
+              "title": "Bootstrap logs (info and error)",
+              "type": "logs"
+            }
+          ],
+          "schemaVersion": 39,
+          "tags": [],
+          "templating": {
+            "list": [
+              {
+                "current": {
+                  "selected": false,
+                  "text": "info",
+                  "value": "info"
+                },
+                "hide": 0,
+                "name": "msg_id",
+                "options": [
+                  {
+                    "selected": true,
+                    "text": "info",
+                    "value": "info"
+                  }
+                ],
+                "query": "info",
+                "skipUrlSync": false,
+                "type": "textbox"
+              }
+            ]
+          },
+          "time": {
+            "from": "now-6h",
+            "to": "now"
+          },
+          "timepicker": {},
+          "timezone": "browser",
+          "title": "One Click",
+          "uid": "cdy8ojg0ukwlce",
+          "version": 6,
+          "weekStart": ""
+        }
