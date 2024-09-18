@@ -104,9 +104,10 @@ func backgroundReaderSync(
 				lggr.Debug("backgroundReaderSync context done")
 				return
 			case <-ticker:
-				if err := syncReader(ctx, lggr, reader, syncTimeout); err != nil {
+				if err := syncReader(ctx, reader, syncTimeout); err != nil {
 					lggr.Errorw("runBackgroundReaderSync failed", "err", err)
 				}
+				lggr.Infow("runBackgroundReaderSync success")
 			}
 		}
 	}()
@@ -114,22 +115,15 @@ func backgroundReaderSync(
 
 func syncReader(
 	ctx context.Context,
-	lggr logger.Logger,
 	reader reader.CCIPReader,
 	syncTimeout time.Duration,
 ) error {
 	timeoutCtx, cf := context.WithTimeout(ctx, syncTimeout)
 	defer cf()
 
-	updated, err := reader.Sync(timeoutCtx)
+	err := reader.Sync(timeoutCtx, nil)
 	if err != nil {
-		return err
-	}
-
-	if !updated {
-		lggr.Debug("no updates found after trying to sync")
-	} else {
-		lggr.Info("ccip reader sync success")
+		return fmt.Errorf("syncReader: %w", err)
 	}
 
 	return nil

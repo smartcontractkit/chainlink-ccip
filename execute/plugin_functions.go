@@ -308,11 +308,26 @@ func mergeTokenObservations(
 	observations []shared.AttributedObservation[exectypes.Observation],
 	_ map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
-	// Return first one, dummy implementation to make tests passing
+	// Finds the observation with 'the most token data'.
+	// This is a dummy algorithm, proper consensus should be implemented.
+
+	maxCnt := -1
+	maxV := exectypes.TokenDataObservations{}
 	for _, ao := range observations {
-		return ao.Observation.TokenData
+		cnt := 0
+		for _, tokenData := range ao.Observation.TokenData {
+			cnt += len(tokenData)
+		}
+		if cnt > maxCnt {
+			maxCnt = cnt
+			maxV = ao.Observation.TokenData
+		}
 	}
-	return nil
+
+	if maxCnt == -1 {
+		return nil
+	}
+	return maxV
 }
 
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.

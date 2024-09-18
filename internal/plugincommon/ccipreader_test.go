@@ -46,7 +46,7 @@ func TestBackgroundReaderSyncer(t *testing.T) {
 
 	t.Run("syncing", func(t *testing.T) {
 		ctx := context.Background()
-		mockReader.On("Sync", mock.Anything).Return(false, nil)
+		mockReader.On("Sync", mock.Anything, mock.Anything).Return(nil)
 		readerSyncer := NewBackgroundReaderSyncer(lggr, mockReader, time.Second, time.Millisecond)
 		err := readerSyncer.Start(ctx)
 		assert.NoError(t, err, "start success")
@@ -71,15 +71,15 @@ func Test_backgroundReaderSync(t *testing.T) {
 	backgroundReaderSync(ctx, wg, lggr, reader, syncTimeout, ticker)
 
 	// send a tick to trigger the first sync that errors
-	reader.On("Sync", mock.Anything).Return(false, fmt.Errorf("some err")).Once()
+	reader.On("Sync", mock.Anything, mock.Anything).Return(fmt.Errorf("some err")).Once()
 	ticker <- time.Now()
 
 	// send a tick to trigger the second sync that succeeds without changes
-	reader.On("Sync", mock.Anything).Return(false, nil).Once()
+	reader.On("Sync", mock.Anything, mock.Anything).Return(nil).Once()
 	ticker <- time.Now()
 
 	// make sync hang to see the context timeout
-	reader.On("Sync", mock.Anything).Run(func(args mock.Arguments) {
+	reader.On("Sync", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		ctx := args.Get(0).(context.Context)
 		for { // simulate endless work until context times out
 			select {
@@ -90,11 +90,11 @@ func Test_backgroundReaderSync(t *testing.T) {
 				time.Sleep(time.Millisecond) // sleep to not block the CPU
 			}
 		}
-	}).Return(false, nil).Once()
+	}).Return(nil).Once()
 	ticker <- time.Now()
 
 	// send a tick to trigger the fourth sync that succeeds with changes
-	reader.On("Sync", mock.Anything).Return(true, nil).Once()
+	reader.On("Sync", mock.Anything, mock.Anything).Return(nil).Once()
 	ticker <- time.Now()
 
 	cf()      // trigger bg sync to stop
