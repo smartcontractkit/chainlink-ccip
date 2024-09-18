@@ -173,6 +173,8 @@ func (f fakeObserver) Observe(
 				if f.IsTokenSupported(chainSelector, token) {
 					payload := fmt.Sprintf("%s_%d_%d", f.prefix, seq, i)
 					tokenData[i] = exectypes.NewTokenData([]byte(payload))
+				} else {
+					tokenData[i] = exectypes.NotSupportedTokenData()
 				}
 			}
 			tokenObservations[chainSelector][seq] = exectypes.NewMessageTokenData(tokenData...)
@@ -231,6 +233,27 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 			},
 		},
 		{
+			name: "only mixed not-supported tokens",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: messageWithTokens(t, randBytes().String(), randBytes().String()),
+					11: messageWithTokens(t, randBytes().String()),
+				},
+				2: {
+					12: messageWithTokens(t, randBytes().String(), randBytes().String()),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewNoopTokenData()),
+					11: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
+				},
+				2: {
+					12: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewNoopTokenData()),
+				},
+			},
+		},
+		{
 			name: "mixed usdc and link tokens",
 			messageObservations: exectypes.MessageObservations{
 				1: {
@@ -245,8 +268,8 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 						exectypes.NewTokenData([]byte("USDC_10_1")),
 					),
 					11: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_11_0")),
 						exectypes.NewTokenData([]byte("LINK_11_1")),
-						exectypes.NewTokenData([]byte("LINK_11_2")),
 					),
 				},
 			},
@@ -269,8 +292,8 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 						exectypes.NewNoopTokenData(),
 					),
 					11: exectypes.NewMessageTokenData(
+						exectypes.NewTokenData([]byte("LINK_11_0")),
 						exectypes.NewTokenData([]byte("LINK_11_1")),
-						exectypes.NewTokenData([]byte("LINK_11_2")),
 					),
 				},
 				2: {
@@ -278,6 +301,25 @@ func TestNewCompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 						exectypes.NewTokenData([]byte("LINK_12_0")),
 						exectypes.NewNoopTokenData(),
 					),
+				},
+			},
+		},
+		{
+			name: "not supported tokens for chain selector are ignored",
+			messageObservations: exectypes.MessageObservations{
+				3: {
+					10: messageWithTokens(t, linkAvalancheTokenSourcePool, randBytes().String()),
+				},
+				5: {
+					12: messageWithTokens(t, usdcEthereumTokenSourcePool),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				3: {
+					10: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData(), exectypes.NewNoopTokenData()),
+				},
+				5: {
+					12: exectypes.NewMessageTokenData(exectypes.NewNoopTokenData()),
 				},
 			},
 		},

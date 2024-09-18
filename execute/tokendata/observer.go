@@ -14,6 +14,11 @@ import (
 type TokenDataObserver interface {
 	// Observe takes the message observations and returns token data observations for matching tokens.
 	// If TokenDataObserver doesn't support the token it should return NoopTokenData.
+	// TokenDataObserver must return data for every token that is present in the exectypes.MessageObservations.
+	// * if token is supported and requires offchain processing, TokenDataObserver must initialize the token according
+	// 	 to its logic. If processing is successful, it must set the TokenData to IsReady=true, otherwise it must set
+	//   it to false and set the error if necessary
+	// * if token is not supported, TokenDataObserver must set the token data to exectypes.NotSupportedTokenData
 	Observe(
 		ctx context.Context,
 		observations exectypes.MessageObservations,
@@ -55,7 +60,10 @@ func (t *CompositeTokenDataObserver) Observe(
 		if err != nil {
 			return nil, err
 		}
-		tokenDataObservations = merge(tokenDataObservations, tokenData)
+		tokenDataObservations, err = merge(tokenDataObservations, tokenData)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return tokenDataObservations, nil
 }
@@ -93,7 +101,9 @@ func (t *CompositeTokenDataObserver) initTokenDataObservations(
 					tokenData[i] = exectypes.NewNoopTokenData()
 					continue
 				}
-				tokenData[i] = exectypes.NewEmptyTokenData()
+				// Token is supported by one of the registered observers, mark it as not ready
+				// It would be processed by the registered processor in the next step
+				tokenData[i] = exectypes.NewNotReadyTokenData()
 			}
 			tokenObservation[chainSelector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}
@@ -101,8 +111,29 @@ func (t *CompositeTokenDataObserver) initTokenDataObservations(
 	return tokenObservation
 }
 
-func merge(base exectypes.TokenDataObservations, _ exectypes.TokenDataObservations) exectypes.TokenDataObservations {
-	return base
+func merge(
+	base exectypes.TokenDataObservations,
+	from exectypes.TokenDataObservations,
+) (exectypes.TokenDataObservations, error) {
+	for chainSelector, chainObservations := range from {
+		for seq, messageTokenData := range chainObservations {
+			if len(messageTokenData.TokenData) != len(base[chainSelector][seq].TokenData) {
+				return nil, errors.New("token data length mismatch")
+			}
+
+			// Merge only TokenData created by the observer
+			for i, newTokenData := range messageTokenData.TokenData {
+				if base[chainSelector][seq].TokenData[i].IsReady() {
+					// Already processed by another observer, skip or raise a warning
+					continue
+				}
+				if newTokenData.Supported {
+					base[chainSelector][seq].TokenData[i] = newTokenData
+				}
+			}
+		}
+	}
+	return base, nil
 }
 
 type NoopTokenDataObserver struct{}
@@ -119,7 +150,7 @@ func (n *NoopTokenDataObserver) Observe(
 		for seq, message := range obs {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i := range message.TokenAmounts {
-				tokenData[i] = exectypes.NewEmptyTokenData()
+				tokenData[i] = exectypes.NewNotReadyTokenData()
 			}
 			tokenObservations[selector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}

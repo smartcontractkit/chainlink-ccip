@@ -71,10 +71,20 @@ type TokenData struct {
 	Data  []byte `json:"data"`
 	// Error is used only for internal processing, we don't want nodes to gossip about the
 	// errors they see during processing
-	Error error `json:"-"`
+	Error     error `json:"-"`
+	Supported bool  `json:"-"`
 }
 
-func NewEmptyTokenData() TokenData {
+func NotSupportedTokenData() TokenData {
+	return TokenData{
+		Ready:     false,
+		Error:     nil,
+		Data:      nil,
+		Supported: false,
+	}
+}
+
+func NewNotReadyTokenData() TokenData {
 	return TokenData{
 		Ready: false,
 		Error: nil,
@@ -84,17 +94,19 @@ func NewEmptyTokenData() TokenData {
 
 func NewNoopTokenData() TokenData {
 	return TokenData{
-		Ready: true,
-		Error: nil,
-		Data:  []byte{},
+		Ready:     true,
+		Error:     nil,
+		Data:      []byte{},
+		Supported: true,
 	}
 }
 
 func NewTokenData(data []byte) TokenData {
 	return TokenData{
-		Ready: true,
-		Error: nil,
-		Data:  data,
+		Ready:     true,
+		Error:     nil,
+		Data:      data,
+		Supported: true,
 	}
 }
 
