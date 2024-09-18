@@ -97,15 +97,14 @@ func (t *CompositeTokenDataObserver) initTokenDataObservations(
 ) exectypes.TokenDataObservations {
 	tokenObservation := make(exectypes.TokenDataObservations)
 	for chainSelector, observation := range observations {
-		// Initialize the nested map if not already present
-		if _, exists := tokenObservation[chainSelector]; !exists {
-			tokenObservation[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-		}
+		tokenObservation[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 
 		for seq, message := range observation {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i, token := range message.TokenAmounts {
 				if !t.IsTokenSupported(chainSelector, token) {
+					// It means that none of the registers support that,
+					// we assume token doesn't require additional processing and skip it
 					tokenData[i] = exectypes.NewNoopTokenData()
 					continue
 				}

@@ -186,9 +186,7 @@ func (f fakeObserver) Observe(
 ) (exectypes.TokenDataObservations, error) {
 	tokenObservations := make(exectypes.TokenDataObservations)
 	for chainSelector, messages := range observations {
-		if _, exists := tokenObservations[chainSelector]; !exists {
-			tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-		}
+		tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 
 		for seq, msg := range messages {
 			tokenData := make([]exectypes.TokenData, len(msg.TokenAmounts))

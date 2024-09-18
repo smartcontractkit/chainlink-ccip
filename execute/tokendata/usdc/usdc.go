@@ -23,10 +23,7 @@ func NewUSDCCCTPTokenDataObserver(configs pluginconfig.USDCCCTPObserverConfig) *
 	return NewUSDCCCTP(
 		configs,
 		nil,
-		NewSequentialAttestationClient(
-			configs.AttestationAPI,
-			configs.AttestationAPITimeout.Duration(),
-		),
+		nil,
 	)
 }
 
