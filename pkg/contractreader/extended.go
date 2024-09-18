@@ -14,9 +14,22 @@ import (
 )
 
 type Reader interface {
-	GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error
+	GetLatestValue(
+		ctx context.Context,
+		readIdentifier string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params, returnVal any,
+	) error
+
 	Bind(ctx context.Context, bindings []types.BoundContract) error
-	QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error)
+
+	QueryKey(
+		ctx context.Context,
+		contract types.BoundContract,
+		filter query.KeyFilter,
+		limitAndSort query.LimitAndSort,
+		sequenceDataType any,
+	) ([]types.Sequence, error)
 }
 
 // Extended version of a ContractReader.
