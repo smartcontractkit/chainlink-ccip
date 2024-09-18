@@ -198,6 +198,42 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "not ready messages are populated to the result set",
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t, ethereumUSDCPool, ethereumUSDCPool, internal.RandBytes().String()),
+				},
+			},
+			usdcReader: reader.FakeUSDCMessageReader{
+				Messages: map[cciptypes.SeqNum]map[int][]byte{
+					10: {
+						0: []byte("message10_0"),
+						1: []byte("message10_1"),
+					},
+				},
+			},
+			attestationClient: usdc.FakeAttestationClient{
+				Data: map[string]usdc.AttestationStatus{
+					"message10_0": {Data: [32]byte{10_0}},
+					"message10_1": {Error: usdc.ErrNotReady},
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(
+						trimmedTokenData([32]byte{10_0}),
+						exectypes.TokenData{
+							Ready:     false,
+							Data:      nil,
+							Error:     usdc.ErrNotReady,
+							Supported: true,
+						},
+						exectypes.NotSupportedTokenData(),
+					),
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
