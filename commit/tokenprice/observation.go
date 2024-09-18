@@ -53,6 +53,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	// If we couldn't fetch all prices log and return only the ones we could fetch
 	if len(tokenPrices) != len(tokensToQuery) {
 		p.lggr.Errorw("token prices length mismatch", "got", tokenPrices, "want", tokensToQuery)
+		return []cciptypes.TokenPrice{}
 	}
 
 	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokenPrices))

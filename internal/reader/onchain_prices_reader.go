@@ -39,9 +39,6 @@ type OnchainTokenPricesReader struct {
 	ContractReader   commontypes.ContractReader
 	TokenInfo        map[types.Account]pluginconfig.TokenInfo
 	FeeQuoterAddress types.Account
-	// If not enabled just return empty prices
-	// TODO: Remove completely once integration tests are updated
-	enabled bool
 }
 
 func NewOnchainTokenPricesReader(
@@ -71,9 +68,6 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	tokens []ocr2types.Account,
 ) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
 	var updates []plugintypes.TimestampedBig
-	if !pr.enabled {
-		return map[types.Account]plugintypes.TimestampedBig{}, nil
-	}
 
 	boundContract := commontypes.BoundContract{
 		Address: string(pr.FeeQuoterAddress),
@@ -107,9 +101,6 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
-	if !pr.enabled {
-		return []*big.Int{}, nil
-	}
 	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
