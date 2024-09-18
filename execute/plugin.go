@@ -49,6 +49,9 @@ type Plugin struct {
 	tokenDataObserver tokendata.TokenDataObserver
 	estimateProvider  gas.EstimateProvider
 	lggr              logger.Logger
+
+	// state
+	initialized bool
 }
 
 func NewPlugin(
@@ -187,6 +190,10 @@ func (p *Plugin) Observation(
 		discoveryObs, err = p.discovery.Observation(ctx, dt.Outcome{}, dt.Query{})
 		if err != nil {
 			p.lggr.Errorw("failed to discover contracts", "err", err)
+		}
+
+		if !p.initialized {
+			return exectypes.Observation{Contracts: discoveryObs}.Encode()
 		}
 	}
 
@@ -409,6 +416,7 @@ func (p *Plugin) Outcome(
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
 		}
+		p.initialized = true
 	}
 
 	fChain, err := p.homeChain.GetFChain()
