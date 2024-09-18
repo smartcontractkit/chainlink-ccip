@@ -64,7 +64,7 @@ dashboardProviders:
 
 dashboards:
   default:
-    beholder-demo-dashboard:
+    one-click-dashboard:
       json: |
         {
           "annotations": {
