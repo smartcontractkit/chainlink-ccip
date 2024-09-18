@@ -6,12 +6,12 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -31,7 +31,7 @@ type PriceReader interface {
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
 		tokens []ocr2types.Account,
-	) (map[ocr2types.Account]shared.TimestampedBig, error)
+	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
 }
 
 type OnchainTokenPricesReader struct {
@@ -69,10 +69,10 @@ type LatestRoundData struct {
 func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
-) (map[ocr2types.Account]shared.TimestampedBig, error) {
-	var updates []shared.TimestampedBig
+) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
+	var updates []plugintypes.TimestampedBig
 	if !pr.enabled {
-		return map[types.Account]shared.TimestampedBig{}, nil
+		return map[types.Account]plugintypes.TimestampedBig{}, nil
 	}
 
 	boundContract := commontypes.BoundContract{
@@ -92,7 +92,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 		return nil, fmt.Errorf("failed to get token prices: %w", err)
 	}
 
-	updateMap := make(map[ocr2types.Account]shared.TimestampedBig)
+	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == time.Unix(0, 0) {
@@ -116,7 +116,7 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		idx := idx
 		token := token
 		eg.Go(func() error {
-			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
+			// TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
 			// are merged we'll need to use the bound contract
 			boundContract := commontypes.BoundContract{
 				Address: pr.TokenInfo[token].AggregatorAddress,

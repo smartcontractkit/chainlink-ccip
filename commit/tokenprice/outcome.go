@@ -5,16 +5,18 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *processor) getConsensusObservation(
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
@@ -25,7 +27,7 @@ func (p *processor) getConsensusObservation(
 
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
-	fChains := shared.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
+	fChains := plugincommon.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
 
 	fDestChain, exists := fChains[p.cfg.DestChain]
 	if !exists {
@@ -39,27 +41,27 @@ func (p *processor) getConsensusObservation(
 			fmt.Errorf("no consensus value for f for FeedChain: %d", p.cfg.OffchainConfig.PriceFeedChainSelector)
 	}
 
-	feedPricesConsensus := shared.GetConsensusMapAggregator(
+	feedPricesConsensus := plugincommon.GetConsensusMapAggregator(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		shared.TwoFPlus1(fFeedChain),
+		mathslib.TwoFPlus1(fFeedChain),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
-			return shared.Median(vals, shared.TokenPriceComparator)
+			return plugincommon.Median(vals, plugincommon.TokenPriceComparator)
 		},
 	)
 
-	feeQuoterUpdatesConsensus := shared.GetConsensusMapAggregator(
+	feeQuoterUpdatesConsensus := plugincommon.GetConsensusMapAggregator(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		shared.TwoFPlus1(fDestChain),
+		mathslib.TwoFPlus1(fDestChain),
 		feeQuoterAggregator,
 	)
 
 	consensusObs := ConsensusObservation{
 		FChain:                fChains,
-		Timestamp:             shared.Median(aggObs.Timestamps, shared.TimestampComparator),
+		Timestamp:             plugincommon.Median(aggObs.Timestamps, plugincommon.TimestampComparator),
 		FeedTokenPrices:       feedPricesConsensus,
 		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus,
 	}
@@ -68,16 +70,16 @@ func (p *processor) getConsensusObservation(
 }
 
 // feeQuoterAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
-var feeQuoterAggregator = func(updates []shared.TimestampedBig) shared.TimestampedBig {
+var feeQuoterAggregator = func(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
 	timestamps := make([]time.Time, len(updates))
 	prices := make([]cciptypes.BigInt, len(updates))
 	for i := range updates {
 		timestamps[i] = updates[i].Timestamp
 		prices[i] = updates[i].Value
 	}
-	medianPrice := shared.Median(prices, shared.BigIntComparator)
-	medianTimestamp := shared.Median(timestamps, shared.TimestampComparator)
-	return shared.TimestampedBig{
+	medianPrice := plugincommon.Median(prices, plugincommon.BigIntComparator)
+	medianTimestamp := plugincommon.Median(timestamps, plugincommon.TimestampComparator)
+	return plugintypes.TimestampedBig{
 		Value:     medianPrice,
 		Timestamp: medianTimestamp,
 	}
@@ -115,7 +117,7 @@ func (p *processor) selectTokensForUpdate(
 		nextUpdateTime := lastUpdate.Timestamp.Add(cfg.TokenPriceBatchWriteFrequency.Duration())
 		shouldUpdate :=
 			obs.Timestamp.After(nextUpdateTime) ||
-				shared.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
+				mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
 		if shouldUpdate {
 			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
 				TokenID: token,
@@ -132,10 +134,10 @@ func (p *processor) selectTokensForUpdate(
 }
 
 // aggregateObservations takes a list of observations and produces an AggregateObservation
-func aggregateObservations(aos []shared.AttributedObservation[Observation]) AggregateObservation {
+func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
-		FeeQuoterTokenUpdates: make(map[types.Account][]shared.TimestampedBig),
+		FeeQuoterTokenUpdates: make(map[types.Account][]plugintypes.TimestampedBig),
 		FChain:                make(map[cciptypes.ChainSelector][]int),
 		Timestamps:            []time.Time{},
 	}

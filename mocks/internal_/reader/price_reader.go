@@ -8,7 +8,7 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	shared "github.com/smartcontractkit/chainlink-ccip/shared"
+	plugintypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
@@ -27,23 +27,23 @@ func (_m *MockPriceReader) EXPECT() *MockPriceReader_Expecter {
 }
 
 // GetFeeQuoterTokenUpdates provides a mock function with given fields: ctx, tokens
-func (_m *MockPriceReader) GetFeeQuoterTokenUpdates(ctx context.Context, tokens []types.Account) (map[types.Account]shared.TimestampedBig, error) {
+func (_m *MockPriceReader) GetFeeQuoterTokenUpdates(ctx context.Context, tokens []types.Account) (map[types.Account]plugintypes.TimestampedBig, error) {
 	ret := _m.Called(ctx, tokens)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetFeeQuoterTokenUpdates")
 	}
 
-	var r0 map[types.Account]shared.TimestampedBig
+	var r0 map[types.Account]plugintypes.TimestampedBig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) (map[types.Account]shared.TimestampedBig, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) (map[types.Account]plugintypes.TimestampedBig, error)); ok {
 		return rf(ctx, tokens)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) map[types.Account]shared.TimestampedBig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []types.Account) map[types.Account]plugintypes.TimestampedBig); ok {
 		r0 = rf(ctx, tokens)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[types.Account]shared.TimestampedBig)
+			r0 = ret.Get(0).(map[types.Account]plugintypes.TimestampedBig)
 		}
 	}
 
@@ -75,12 +75,12 @@ func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) Return(_a0 map[types.Account]shared.TimestampedBig, _a1 error) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
+func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) Return(_a0 map[types.Account]plugintypes.TimestampedBig, _a1 error) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(context.Context, []types.Account) (map[types.Account]shared.TimestampedBig, error)) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
+func (_c *MockPriceReader_GetFeeQuoterTokenUpdates_Call) RunAndReturn(run func(context.Context, []types.Account) (map[types.Account]plugintypes.TimestampedBig, error)) *MockPriceReader_GetFeeQuoterTokenUpdates_Call {
 	_c.Call.Return(run)
 	return _c
 }

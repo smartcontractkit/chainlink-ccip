@@ -28,14 +28,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
+	"github.com/stretchr/testify/mock"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
-	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -211,7 +210,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
 					Return(
-						map[ocr2types.Account]shared.TimestampedBig{}, nil,
+						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
 			}

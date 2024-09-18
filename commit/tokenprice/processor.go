@@ -7,13 +7,12 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -76,16 +75,16 @@ func (p *processor) Observation(
 func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,
-	ao shared.AttributedObservation[Observation],
+	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	//TODO: Validate token prices
+	// TODO: Validate token prices
 	return nil
 }
 
 func (p *processor) Outcome(
 	_ Outcome,
 	_ Query,
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
@@ -119,4 +118,4 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	return nil
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}

@@ -14,9 +14,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-	"github.com/smartcontractkit/chainlink-ccip/shared/filter"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
@@ -206,14 +205,14 @@ func filterOutExecutedMessages(
 
 func decodeAttributedObservations(
 	aos []types.AttributedObservation,
-) ([]shared.AttributedObservation[exectypes.Observation], error) {
-	decoded := make([]shared.AttributedObservation[exectypes.Observation], len(aos))
+) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
+	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], len(aos))
 	for i, ao := range aos {
 		observation, err := exectypes.DecodeObservation(ao.Observation)
 		if err != nil {
 			return nil, err
 		}
-		decoded[i] = shared.AttributedObservation[exectypes.Observation]{
+		decoded[i] = plugincommon.AttributedObservation[exectypes.Observation]{
 			Observation: observation,
 			OracleID:    ao.Observer,
 		}
@@ -222,12 +221,12 @@ func decodeAttributedObservations(
 }
 
 func mergeMessageObservations(
-	aos []shared.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
+	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.MessageObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]filter.MinObservation[cciptypes.Message])
+	validators := make(map[cciptypes.ChainSelector]plugincommon.MinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = filter.NewMinObservation[cciptypes.Message](f+1, nil)
+		validators[selector] = plugincommon.NewMinObservation[cciptypes.Message](f+1, nil)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -266,13 +265,13 @@ func mergeMessageObservations(
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
-	aos []shared.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
+	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.CommitObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]filter.MinObservation[exectypes.CommitData])
+	validators := make(map[cciptypes.ChainSelector]plugincommon.MinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
 		validators[selector] =
-			filter.NewMinObservation[exectypes.CommitData](f+1, nil)
+			plugincommon.NewMinObservation[exectypes.CommitData](f+1, nil)
 	}
 
 	// Add reports to the validator for each chain selector.
@@ -305,7 +304,7 @@ func mergeCommitObservations(
 
 // TODO: implement mergeTokenObservations
 func mergeTokenObservations(
-	observations []shared.AttributedObservation[exectypes.Observation],
+	observations []plugincommon.AttributedObservation[exectypes.Observation],
 	_ map[cciptypes.ChainSelector]int,
 ) exectypes.TokenDataObservations {
 	// Finds the observation with 'the most token data'.
@@ -333,7 +332,7 @@ func mergeTokenObservations(
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeNonceObservations(
-	daos []shared.AttributedObservation[exectypes.Observation],
+	daos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChainDest int,
 ) exectypes.NonceObservations {
 	// Nonces store context in a map key, so a different container type is needed for the observation filter.
@@ -344,7 +343,7 @@ func mergeNonceObservations(
 	}
 
 	// Create one validator because nonces are only observed from the destination chain.
-	validator := filter.NewMinObservation[NonceTriplet](fChainDest, nil)
+	validator := plugincommon.NewMinObservation[NonceTriplet](fChainDest, nil)
 
 	// Add reports to the validator for each chain selector.
 	for _, ao := range daos {
