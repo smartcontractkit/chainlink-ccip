@@ -2,36 +2,36 @@ chainlink:
   global:
     toml: |-
       RootDir = './clroot'
-      
+
       [Log]
       JSONConsole = true
       Level = 'debug'
-      
+
       [WebServer]
       AllowOrigins = '*'
       SessionTimeout = '999h0m0s'
       HTTPPort = 6688
       SecureCookies = false
       HTTPWriteTimeout = '1m'
-      
+
       [WebServer.RateLimit]
       Authenticated = 2000
       Unauthenticated = 1000
-      
+
       [Feature]
       FeedsManager = true
       LogPoller = true
       UICSAKeys = true
-      
+
       [OCR]
       Enabled = true
       DefaultTransactionQueueDepth = 0
-      
+
       [OCR2]
       Enabled = true
       DefaultTransactionQueueDepth = 150
       SimulateTransactions = false
-      
+
       [P2P]
       [P2P.V2]
       Enabled = true
@@ -39,7 +39,7 @@ chainlink:
       AnnounceAddresses = ['0.0.0.0:6690']
       DeltaDial = '500ms'
       DeltaReconcile = '5s'
-      
+
       [[EVM]]
       # Celo Testnet
       ChainID = "44787"
