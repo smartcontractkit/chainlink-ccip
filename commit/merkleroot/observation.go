@@ -84,7 +84,7 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
-	for _, rmnNode := range w.rmnConfig.Remote.Signers {
+	for _, rmnNode := range w.rmnRemoteReader.GetSignersInfo() {
 		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
 	}
 
@@ -93,13 +93,14 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
 	}
 
+	// TODO: this is a temporary while the RMNRemoteReader interface is being refactored
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               w.rmnConfig.Remote.RmnReportVersion,
+		ReportVersion:               w.rmnRemoteReader.GetRmnReportVersion(),
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
-		RmnRemoteContractAddress:    w.rmnConfig.Remote.ContractAddress,
+		RmnRemoteContractAddress:    cciptypes.Bytes(w.rmnRemoteReader.GetRmnRemoteContractAddress()),
 		OfframpAddress:              offRampAddress,
-		RmnHomeContractConfigDigest: w.rmnConfig.Home.ConfigDigest,
+		RmnHomeContractConfigDigest: w.rmnRemoteReader.GetRmnHomeConfigDigest(),
 		LaneUpdates:                 laneUpdates,
 	}
 

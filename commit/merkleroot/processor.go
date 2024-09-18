@@ -8,7 +8,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -21,16 +20,17 @@ import (
 // It's setup to use RMN to query which messages to include in the merkle root and ensures
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
-	oracleID     commontypes.OracleID
-	cfg          pluginconfig.CommitPluginConfig
-	lggr         logger.Logger
-	observer     Observer
-	ccipReader   readerpkg.CCIPReader
-	reportingCfg ocr3types.ReportingPluginConfig
-	chainSupport plugincommon.ChainSupport
-	rmnClient    rmn.Client
-	rmnCrypto    cciptypes.RMNCrypto
-	rmnConfig    rmntypes.RMNConfig
+	oracleID        commontypes.OracleID
+	cfg             pluginconfig.CommitPluginConfig
+	lggr            logger.Logger
+	observer        Observer
+	ccipReader      readerpkg.CCIPReader
+	reportingCfg    ocr3types.ReportingPluginConfig
+	chainSupport    plugincommon.ChainSupport
+	rmnClient       rmn.Client
+	rmnCrypto       cciptypes.RMNCrypto
+	rmnHomeReader   reader.RMNHome
+	rmnRemoteReader reader.RMNRemote
 }
 
 // NewProcessor creates a new Processor
@@ -45,7 +45,8 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	rmnClient rmn.Client,
 	rmnCrypto cciptypes.RMNCrypto,
-	rmnConfig rmntypes.RMNConfig,
+	rmnHomeReader reader.RMNHome,
+	rmnRemoteReader reader.RMNRemote,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,
@@ -56,16 +57,17 @@ func NewProcessor(
 		msgHasher,
 	}
 	return &Processor{
-		oracleID:     oracleID,
-		cfg:          cfg,
-		lggr:         lggr,
-		observer:     observer,
-		ccipReader:   ccipReader,
-		reportingCfg: reportingCfg,
-		chainSupport: chainSupport,
-		rmnClient:    rmnClient,
-		rmnCrypto:    rmnCrypto,
-		rmnConfig:    rmnConfig,
+		oracleID:        oracleID,
+		cfg:             cfg,
+		lggr:            lggr,
+		observer:        observer,
+		ccipReader:      ccipReader,
+		reportingCfg:    reportingCfg,
+		chainSupport:    chainSupport,
+		rmnClient:       rmnClient,
+		rmnCrypto:       rmnCrypto,
+		rmnHomeReader:   rmnHomeReader,
+		rmnRemoteReader: rmnRemoteReader,
 	}
 }
 

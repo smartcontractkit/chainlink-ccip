@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 )
 
 // TODO: testing - more unit tests and some code cleanup.
@@ -59,7 +60,9 @@ type client struct {
 	lggr            logger.Logger
 	rmnCrypto       cciptypes.RMNCrypto
 	rawRmnClient    RawRmnClient
-	rmnCfg          types.RMNConfig
+	rmnCfg          types.RMNConfig // TODO: to remove when the RMN readers are implemented
+	rmnHomeReader   reader.RMNHome
+	rmnRemoteReader reader.RMNRemote
 	ed25519Verifier ED25519Verifier
 
 	observationsInitialRequestTimerDuration time.Duration

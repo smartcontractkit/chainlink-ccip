@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -21,8 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 const maxReportTransmissionCheckAttempts = 5
@@ -55,13 +54,14 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr            logger.Logger
-	ocrConfig       reader.OCR3ConfigWithMeta
-	commitCodec     cciptypes.CommitPluginCodec
-	msgHasher       cciptypes.MessageHasher
-	homeChainReader reader.HomeChain
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
+	lggr              logger.Logger
+	ocrConfig         reader.OCR3ConfigWithMeta
+	commitCodec       cciptypes.CommitPluginCodec
+	msgHasher         cciptypes.MessageHasher
+	homeChainReader   reader.HomeChain
+	homeChainSelector cciptypes.ChainSelector
+	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
@@ -70,17 +70,19 @@ func NewPluginFactory(
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
+	homeChainSelector cciptypes.ChainSelector,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:            lggr,
-		ocrConfig:       ocrConfig,
-		commitCodec:     commitCodec,
-		msgHasher:       msgHasher,
-		homeChainReader: homeChainReader,
-		contractReaders: contractReaders,
-		chainWriters:    chainWriters,
+		lggr:              lggr,
+		ocrConfig:         ocrConfig,
+		commitCodec:       commitCodec,
+		msgHasher:         msgHasher,
+		homeChainReader:   homeChainReader,
+		homeChainSelector: homeChainSelector,
+		contractReaders:   contractReaders,
+		chainWriters:      chainWriters,
 	}
 }
 
@@ -99,6 +101,29 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
+
+	// Bind the RMNHome contract
+	rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
+	rmnCr, ok := p.contractReaders[p.homeChainSelector]
+	if !ok {
+		return nil,
+			ocr3types.ReportingPluginInfo{},
+			fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
+	}
+	rmnHomeBoundContract := types.BoundContract{
+		Address: string(rmnHomeAddress),
+		Name:    consts.ContractNameRMNHome,
+	}
+
+	if err1 := rmnCr.Bind(context.Background(), []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMN contract: %w", err1)
+	}
+	rmnHomeReader := reader.NewRMNHomePoller(
+		rmnCr,
+		rmnHomeBoundContract,
+		p.lggr,
+		100*time.Millisecond,
+	)
 
 	var onChainTokenPricesReader reader.PriceReader
 	// The node supports the chain that the token prices are on.
@@ -144,8 +169,9 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.msgHasher,
 			p.lggr,
 			p.homeChainReader,
+			rmnHomeReader,
+			reader.NewRMNRemotePoller(), // Todo: instantiate properly
 			config,
-			rmntypes.RMNConfig{}, // todo
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

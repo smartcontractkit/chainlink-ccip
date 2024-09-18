@@ -2,9 +2,7 @@ package reader
 
 import (
 	"context"
-	"crypto/ed25519"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -26,21 +24,10 @@ import (
 
 const (
 	defaultConfigPageSize = uint64(100)
-	rmnMaxSizeCommittee   = 256 // bitmap is 256 bits making the max committee size 256
+	MaxFailedPolls        = 10
 )
 
-type RMNHome interface {
-	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
-	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error)
-	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
-	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error)
-	// GetMinObservers gets the minimum number of observers required for each chain in the given configDigest
-	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error)
-	// GetOffChainConfig gets the offchain config for the given configDigest
-	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
-}
-
-type CCIPHome interface {
+type HomeChain interface {
 	// GetChainConfig gets the ChainConfig for the given chainSelector
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)
@@ -52,11 +39,6 @@ type CCIPHome interface {
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
 	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
 	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
-}
-
-type HomeChain interface {
-	CCIPHome
-	RMNHome
 	services.Service
 }
 
@@ -82,18 +64,14 @@ type homeChainPoller struct {
 	rmnHomeConfig           map[cciptypes.Bytes32]rmntypes.RMNHomeConfig
 	failedPolls             uint
 	ccipConfigBoundContract types.BoundContract
-	rmnHomeBoundContract    types.BoundContract
 	pollingDuration         time.Duration // How frequently the poller fetches the chain configs
 }
-
-const MaxFailedPolls = 10
 
 func NewHomeChainConfigPoller(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
-	rmnHomeBoundContract types.BoundContract,
 ) HomeChain {
 	return &homeChainPoller{
 		stopCh:                  make(chan struct{}),
@@ -105,7 +83,6 @@ func NewHomeChainConfigPoller(
 		lggr:                    lggr,
 		pollingDuration:         pollingInterval,
 		ccipConfigBoundContract: ccipConfigBoundContract,
-		rmnHomeBoundContract:    rmnHomeBoundContract,
 	}
 }
 
@@ -138,13 +115,7 @@ func (r *homeChainPoller) poll() {
 			r.mutex.Unlock()
 			return
 		case <-ticker.C:
-			// TODO: fetch concurrently using a waitgroup
 			if err := r.fetchAndSetConfigs(ctx); err != nil {
-				r.mutex.Lock()
-				r.failedPolls++
-				r.mutex.Unlock()
-			}
-			if err := r.fetchAndSetRMNConfig(ctx); err != nil {
 				r.mutex.Lock()
 				r.failedPolls++
 				r.mutex.Unlock()
@@ -201,45 +172,6 @@ func (r *homeChainPoller) setState(chainConfigs map[cciptypes.ChainSelector]Chai
 	s.nodeSupportedChains = createNodesSupportedChains(chainConfigs)
 	s.knownSourceChains = createKnownChains(chainConfigs)
 	s.fChain = createFChain(chainConfigs)
-}
-
-func (r *homeChainPoller) fetchAndSetRMNConfig(ctx context.Context) error {
-	var versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest
-	err := r.homeChainReader.GetLatestValue(
-		ctx,
-		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetVersionedConfigsWithDigests),
-		primitives.Unconfirmed,
-		map[string]interface{}{
-			"offset": 0,
-			"limit":  2, // TODO: fetch CONFIG_RING_BUFFER_SIZE
-		},
-		&versionedConfigWithDigests,
-	)
-	if err != nil {
-		return fmt.Errorf("error fetching RMNHomeConfig: %w", err)
-	}
-
-	// TODO: fetch CONFIG_RING_BUFFER_SIZE and compare with len(versionedConfigWithDigests)
-	if len(versionedConfigWithDigests) > 2 {
-		r.lggr.Errorw("more than 2 RMNHomeConfigs found", "numConfigs", len(versionedConfigWithDigests), "requestedLimit", 2)
-		return fmt.Errorf("more than 2 RMNHomeConfigs found")
-	}
-
-	r.setRMNHomeState(convertOnChainConfigToRMNHomeChainConfig(r.lggr, versionedConfigWithDigests))
-
-	if len(versionedConfigWithDigests) == 0 {
-		// That's a legitimate case if there are no rmn configs on chain yet
-		r.lggr.Warnw("no on chain configs found")
-		return nil
-	}
-
-	return nil
-}
-
-func (r *homeChainPoller) setRMNHomeState(rmnHomeConfig map[cciptypes.Bytes32]rmntypes.RMNHomeConfig) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.rmnHomeConfig = rmnHomeConfig
 }
 
 func (r *homeChainPoller) GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error) {
@@ -305,31 +237,6 @@ func (r *homeChainPoller) GetOCRConfigs(
 	}
 
 	return ocrConfigs, nil
-}
-
-func (r *homeChainPoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	return r.rmnHomeConfig[configDigest].Nodes, nil
-}
-
-func (r *homeChainPoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	_, ok := r.rmnHomeConfig[configDigest]
-	return ok, nil
-}
-
-func (r *homeChainPoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	return r.rmnHomeConfig[configDigest].MinObservers, nil
-}
-
-func (r *homeChainPoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
-	r.mutex.RLock()
-	defer r.mutex.RUnlock()
-	return r.rmnHomeConfig[configDigest].OffchainConfig, nil
 }
 
 func (r *homeChainPoller) Close() error {
@@ -414,83 +321,6 @@ func convertOnChainConfigToHomeChainConfig(
 	return chainConfigs
 }
 
-func convertOnChainConfigToRMNHomeChainConfig(
-	lggr logger.Logger,
-	versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest,
-) map[cciptypes.Bytes32]rmntypes.RMNHomeConfig {
-	if len(versionedConfigWithDigests) == 0 {
-		lggr.Warnw("no on chain RMNHomeConfigs found")
-		return map[cciptypes.Bytes32]rmntypes.RMNHomeConfig{}
-	}
-
-	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmntypes.RMNHomeConfig)
-	for _, versionedConfigWithDigest := range versionedConfigWithDigests {
-		config := versionedConfigWithDigest.VersionedConfig.Config
-		nodes := make([]rmntypes.RMNHomeNodeInfo, len(config.Nodes))
-		for i, node := range config.Nodes {
-			pubKey := ed25519.PublicKey(node.OffchainPublicKey[:])
-
-			nodes[i] = rmntypes.RMNHomeNodeInfo{
-				ID:                        rmntypes.NodeID(i),
-				PeerID:                    node.PeerID,
-				SignObservationsPublicKey: &pubKey,
-				SupportedSourceChains:     mapset.NewSet[cciptypes.ChainSelector](),
-			}
-		}
-
-		minObservers := make(map[cciptypes.ChainSelector]uint64)
-
-		for _, chain := range config.SourceChains {
-			minObservers[chain.ChainSelector] = chain.MinObservers
-			for j := 0; j < len(nodes); j++ {
-				isObserver, err := IsNodeObserver(chain, j, len(nodes))
-				if err != nil {
-					lggr.Warnw("failed to check if node is observer", "err", err)
-					continue
-				}
-				if isObserver {
-					nodes[j].SupportedSourceChains.Add(chain.ChainSelector)
-				}
-			}
-		}
-
-		rmnHomeConfigs[versionedConfigWithDigest.ConfigDigest] = rmntypes.RMNHomeConfig{
-			Nodes:          nodes,
-			MinObservers:   minObservers,
-			ConfigDigest:   versionedConfigWithDigest.ConfigDigest,
-			OffchainConfig: config.OffchainConfig,
-		}
-	}
-	return rmnHomeConfigs
-}
-
-// IsNodeObserver checks if a node is an observer for the given source chain
-func IsNodeObserver(sourceChain rmntypes.SourceChain, nodeIndex int, totalNodes int) (bool, error) {
-	if totalNodes > rmnMaxSizeCommittee || totalNodes <= 0 {
-		return false, fmt.Errorf("invalid total nodes: %d", totalNodes)
-	}
-
-	if nodeIndex < 0 || nodeIndex >= totalNodes {
-		return false, fmt.Errorf("invalid node index: %d", nodeIndex)
-	}
-
-	// Validate the bitmap
-	maxValidBitmap := new(big.Int).Lsh(big.NewInt(1), uint(totalNodes))
-	maxValidBitmap.Sub(maxValidBitmap, big.NewInt(1))
-	if sourceChain.ObserverNodesBitmap.Int.Cmp(maxValidBitmap) > 0 {
-		return false, fmt.Errorf("invalid observer nodes bitmap")
-	}
-
-	// Create a big.Int with 1 shifted left by nodeIndex
-	mask := new(big.Int).Lsh(big.NewInt(1), uint(nodeIndex))
-
-	// Perform the bitwise AND operation
-	result := new(big.Int).And(sourceChain.ObserverNodesBitmap.Int, mask)
-
-	// Check if the result equals the mask
-	return result.Cmp(mask) == 0, nil
-}
-
 // HomeChainConfigMapper This is a 1-1 mapping between the config that we get from the contract to make
 // se/deserializing easier
 type HomeChainConfigMapper struct {
@@ -526,6 +356,7 @@ type OCR3Config struct {
 	F                     uint8                   `json:"F"`
 	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
 	OfframpAddress        []byte                  `json:"offrampAddress"`
+	RmnHomeAddress        []byte                  `json:"rmnHomeAddress"`
 	P2PIds                [][32]byte              `json:"p2pIds"`
 	Signers               [][]byte                `json:"signers"`
 	Transmitters          [][]byte                `json:"transmitters"`

@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	merkleroot "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -39,12 +38,13 @@ type Plugin struct {
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
+	rmnHomeReader       reader.RMNHome
+	rmnRemoteReader     reader.RMNRemote
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
-	rmnConfig           rmntypes.RMNConfig
 }
 
 func NewPlugin(
@@ -58,8 +58,9 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
+	rmnHomeReader reader.RMNHome,
+	rmnRemoteReader reader.RMNRemote,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	rmnConfig rmntypes.RMNConfig,
 ) *Plugin {
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
@@ -90,7 +91,8 @@ func NewPlugin(
 		chainSupport,
 		rmn.Client(nil),          // todo
 		cciptypes.RMNCrypto(nil), // todo
-		rmnConfig,
+		rmnHomeReader,
+		rmnRemoteReader,
 	)
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,
@@ -110,6 +112,8 @@ func NewPlugin(
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,
+		rmnHomeReader:       rmnHomeReader,
+		rmnRemoteReader:     rmnRemoteReader,
 		readerSyncer:        readerSyncer,
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
@@ -117,7 +121,6 @@ func NewPlugin(
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainfee.NewProcessor(),
-		rmnConfig:           rmnConfig,
 	}
 }
 

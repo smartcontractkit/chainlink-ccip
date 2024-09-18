@@ -24,7 +24,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -260,6 +259,8 @@ func setupNode(
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)
+	rmnHomeReader := reader_mock.NewMockRMNHome(t)     // TODO: add expectations
+	rmnRemoteReader := reader_mock.NewMockRMNRemote(t) // TODO: add expectations
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
@@ -342,8 +343,9 @@ func setupNode(
 		msgHasher,
 		lggr,
 		homeChainReader,
+		rmnHomeReader,
+		rmnRemoteReader,
 		reportingCfg,
-		rmntypes.RMNConfig{},
 	)
 
 	return nodeSetup{
