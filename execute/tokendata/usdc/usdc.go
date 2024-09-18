@@ -20,6 +20,21 @@ type USDCCCTPTokenDataObserver struct {
 }
 
 func NewUSDCCCTPTokenDataObserver(configs pluginconfig.USDCCCTPObserverConfig) *USDCCCTPTokenDataObserver {
+	return NewUSDCCCTP(
+		configs,
+		nil,
+		NewSequentialAttestationClient(
+			configs.AttestationAPI,
+			configs.AttestationAPITimeout.Duration(),
+		),
+	)
+}
+
+func NewUSDCCCTP(
+	configs pluginconfig.USDCCCTPObserverConfig,
+	usdcMessageReader reader.USDCMessageReader,
+	attestationClient AttestationClient,
+) *USDCCCTPTokenDataObserver {
 	supportedTokens := make(map[string]struct{})
 	for chainSelector, tokenConfig := range configs.Tokens {
 		key := sourceTokenIdentifier(chainSelector, tokenConfig.SourcePoolAddress)
@@ -27,12 +42,10 @@ func NewUSDCCCTPTokenDataObserver(configs pluginconfig.USDCCCTPObserverConfig) *
 	}
 
 	return &USDCCCTPTokenDataObserver{
-		configs:         configs,
-		supportedTokens: supportedTokens,
-		attestationClient: NewSequentialAttestationClient(
-			configs.AttestationAPI,
-			configs.AttestationAPITimeout.Duration(),
-		),
+		configs:           configs,
+		supportedTokens:   supportedTokens,
+		usdcMessageReader: usdcMessageReader,
+		attestationClient: attestationClient,
 	}
 }
 
@@ -67,23 +80,23 @@ func (u *USDCCCTPTokenDataObserver) IsTokenSupported(
 	return ok
 }
 
-type usdcTokenData struct {
+type UsdcTokenData struct {
 	Index       int
 	MessageHash [32]byte
 }
 
 func (u *USDCCCTPTokenDataObserver) pickOnlyUSDCMessages(
 	messageObservations exectypes.MessageObservations,
-) map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData {
-	usdcMessages := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData)
+) map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData {
+	usdcMessages := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData)
 
 	for chainSelector, messages := range messageObservations {
 		for seqNum, message := range messages {
-			var usdcTokens []usdcTokenData
+			var usdcTokens []UsdcTokenData
 			for i, tokenAmount := range message.TokenAmounts {
 				tokenIdentifier := sourceTokenIdentifier(chainSelector, tokenAmount.SourcePoolAddress.String())
 				if _, ok := u.supportedTokens[tokenIdentifier]; ok {
-					usdcTokens = append(usdcTokens, usdcTokenData{Index: i})
+					usdcTokens = append(usdcTokens, UsdcTokenData{Index: i})
 				}
 			}
 			if len(usdcTokens) > 0 {
@@ -96,8 +109,8 @@ func (u *USDCCCTPTokenDataObserver) pickOnlyUSDCMessages(
 
 func (u *USDCCCTPTokenDataObserver) fetchUSDCMessageHashes(
 	ctx context.Context,
-	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData,
-) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData, error) {
+	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData,
+) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData, error) {
 	for chainSelector, messages := range usdcMessages {
 		// TODO Sequential reading USDC messages from the source chain
 		usdcHashes, err := u.usdcMessageReader.MessageHashes(ctx, chainSelector, maps.Keys(messages))
@@ -120,7 +133,7 @@ func (u *USDCCCTPTokenDataObserver) fetchUSDCMessageHashes(
 
 func (u *USDCCCTPTokenDataObserver) fetchAttestations(
 	ctx context.Context,
-	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData,
+	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData,
 ) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.TokenData, error) {
 	attestations, err := u.attestationClient.Attestations(ctx, usdcMessages)
 	if err != nil {

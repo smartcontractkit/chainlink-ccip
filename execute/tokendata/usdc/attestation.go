@@ -23,7 +23,7 @@ var (
 type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
-		msgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData,
+		msgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData,
 	) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.TokenData, error)
 }
 
@@ -83,7 +83,7 @@ func NewSequentialAttestationClient(
 
 func (s *SequentialAttestationClient) Attestations(
 	ctx context.Context,
-	msgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]usdcTokenData,
+	msgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]UsdcTokenData,
 ) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.TokenData, error) {
 	for _, chainMessages := range msgs {
 		for _, messages := range chainMessages {

@@ -35,7 +35,7 @@ type CompositeTokenDataObserver struct {
 }
 
 // nolint early-return
-func NewCompositeTokenDataObserver(config []pluginconfig.TokenDataObserverConfig) (*CompositeTokenDataObserver, error) {
+func NewConfigBasedCompositeObservers(config []pluginconfig.TokenDataObserverConfig) (*CompositeTokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
 		if c.USDCCCTPObserverConfig != nil {
@@ -44,7 +44,11 @@ func NewCompositeTokenDataObserver(config []pluginconfig.TokenDataObserverConfig
 			return nil, errors.New("unsupported token data observer")
 		}
 	}
-	return &CompositeTokenDataObserver{observers: observers}, nil
+	return NewCompositeObservers(observers...), nil
+}
+
+func NewCompositeObservers(observers ...TokenDataObserver) *CompositeTokenDataObserver {
+	return &CompositeTokenDataObserver{observers: observers}
 }
 
 // Observe start with stubbing exectypes.TokenDataObservations with empty data based on the supported tokens.
