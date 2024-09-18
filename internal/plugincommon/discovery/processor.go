@@ -23,7 +23,7 @@ type ContractDiscoveryProcessor struct {
 	reader    *reader.CCIPReader
 	homechain reader.HomeChain
 	dest      cciptypes.ChainSelector
-	bigF      int
+	fRoleDON  int
 }
 
 func NewContractDiscoveryProcessor(
@@ -31,14 +31,14 @@ func NewContractDiscoveryProcessor(
 	reader *reader.CCIPReader,
 	homechain reader.HomeChain,
 	dest cciptypes.ChainSelector,
-	bigF int,
+	fRoleDON int,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
 		lggr:      lggr,
 		reader:    reader,
 		homechain: homechain,
 		dest:      dest,
-		bigF:      bigF,
+		fRoleDON:  fRoleDON,
 	}
 }
 
@@ -96,7 +96,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	fMin := make(map[cciptypes.ChainSelector]int)
 	for chain := range fChainObs {
-		fMin[chain] = cdp.bigF
+		fMin[chain] = cdp.fRoleDON
 	}
 
 	fChain := plugincommon.GetConsensusMap(cdp.lggr, "fChain", fChainObs, fMin)
