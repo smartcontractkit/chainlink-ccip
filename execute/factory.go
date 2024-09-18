@@ -69,9 +69,14 @@ func NewPluginFactory(
 	homeChainReader reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
-	contractReaders map[cciptypes.ChainSelector]contractreader.Reader,
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
+	readers := make(map[cciptypes.ChainSelector]contractreader.Reader)
+	for chain, cr := range contractReaders {
+		readers[chain] = cr
+	}
+
 	return &PluginFactory{
 		lggr:              lggr,
 		ocrConfig:         ocrConfig,
@@ -79,7 +84,7 @@ func NewPluginFactory(
 		msgHasher:         msgHasher,
 		homeChainReader:   homeChainReader,
 		estimateProvider:  estimateProvider,
-		contractReaders:   contractReaders,
+		contractReaders:   readers,
 		chainWriters:      chainWriters,
 		tokenDataObserver: tokenDataObserver,
 	}
