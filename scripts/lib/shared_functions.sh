@@ -30,8 +30,16 @@ function is_custom_image() {
 # Checks if the required repository dir exists and if it is a git repository.
 function check_repo_exists() {
 	local repo_dir="${1:-}"
-	if [[ ! -d "${repo_dir}/.git" ]]; then
-		return 1
+
+	# Check if it's a Git directory
+	if [[ -d "${repo_dir}/.git" ]]; then
+		return 0
 	fi
-	return 0
+	# If it's not a Git directory, check if it's a Git file (e.g. in case of worktrees / submodules )
+	if [[ -f "${repo_dir}/.git" ]]; then
+		return 0
+	fi
+
+	# If neither a Git directory nor a Git file, return failure
+	return 1
 }
