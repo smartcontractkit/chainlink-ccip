@@ -46,7 +46,7 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(q, consensusObservation), nextState
+		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize), nextState
 	case BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
@@ -64,10 +64,11 @@ func (w *Processor) getOutcome(
 }
 
 // reportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
-// TODO: ensure each range is below a limit
 func reportRangesOutcome(
 	_ Query,
+	lggr logger.Logger,
 	consensusObservation ConsensusObservation,
+	maxMerkleTreeSize uint64,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
@@ -82,11 +83,19 @@ func reportRangesOutcome(
 		}
 
 		if offRampNextSeqNum <= onRampMaxSeqNum {
+			rng := cciptypes.NewSeqNumRange(offRampNextSeqNum, onRampMaxSeqNum)
+
 			chainRange := plugintypes.ChainRange{
 				ChainSel:    chainSel,
-				SeqNumRange: [2]cciptypes.SeqNum{offRampNextSeqNum, onRampMaxSeqNum},
+				SeqNumRange: rng.Limit(maxMerkleTreeSize),
 			}
 			rangesToReport = append(rangesToReport, chainRange)
+
+			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
+				lggr.Infof("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+			} else {
+				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
+			}
 		}
 
 		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
