@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 )
 
 // CommitObservations contain the commit plugin report data organized by the source chain selector.
@@ -32,6 +34,13 @@ type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]Mess
 
 type MessageTokenData struct {
 	TokenData []TokenData
+}
+
+func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
+	if len(tokenData) == 0 {
+		return MessageTokenData{TokenData: []TokenData{}}
+	}
+	return MessageTokenData{TokenData: tokenData}
 }
 
 func (mtd MessageTokenData) IsReady() bool {
@@ -65,16 +74,51 @@ func (mtd MessageTokenData) ToByteSlice() [][]byte {
 type TokenData struct {
 	Ready bool   `json:"ready"`
 	Data  []byte `json:"data"`
-	// Error is used only for internal processing, we don't want nodes to gossip about the
-	// errors they see during processing
-	Error error `json:"-"`
+	// Error and Supported are used only for internal processing, we don't want nodes to gossip about the
+	// internals they see during processing
+	Error     error `json:"-"`
+	Supported bool  `json:"-"`
 }
 
-func NewEmptyTokenData() TokenData {
+// NotSupportedTokenData returns a TokenData object with Supported set to false.
+// It should be returned by the Observer for tokens that are not supported.
+func NotSupportedTokenData() TokenData {
 	return TokenData{
-		Ready: false,
-		Error: nil,
-		Data:  nil,
+		Ready:     false,
+		Error:     nil,
+		Data:      nil,
+		Supported: false,
+	}
+}
+
+// NewNoopTokenData returns a TokenData object with Ready set to true and empty data.
+// It's used for marking tokens that don't require offchain processing.
+func NewNoopTokenData() TokenData {
+	return TokenData{
+		Ready:     true,
+		Error:     nil,
+		Data:      []byte{},
+		Supported: true,
+	}
+}
+
+// NewSuccessTokenData returns a TokenData object with Ready set to true and the provided data.
+func NewSuccessTokenData(data []byte) TokenData {
+	return TokenData{
+		Ready:     true,
+		Error:     nil,
+		Data:      data,
+		Supported: true,
+	}
+}
+
+// NewErrorTokenData returns a TokenData object with Ready set to false and the provided error.
+func NewErrorTokenData(err error) TokenData {
+	return TokenData{
+		Ready:     false,
+		Error:     err,
+		Data:      nil,
+		Supported: true,
 	}
 }
 
@@ -103,6 +147,9 @@ type Observation struct {
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
+
+	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
+	Contracts dt.Observation `json:"contracts"`
 }
 
 // NewObservation constructs an Observation object.
@@ -111,12 +158,14 @@ func NewObservation(
 	messages MessageObservations,
 	tokenData TokenDataObservations,
 	nonces NonceObservations,
+	contracts dt.Observation,
 ) Observation {
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,
 		TokenData:     tokenData,
 		Nonces:        nonces,
+		Contracts:     contracts,
 	}
 }
 

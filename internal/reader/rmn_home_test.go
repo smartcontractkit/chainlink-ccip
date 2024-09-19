@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 )
 
@@ -56,33 +55,77 @@ func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 
 func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
 	homeChainReader := readermock.NewMockContractReaderFacade(t)
+
+	var (
+		tickTime       = 1 * time.Millisecond
+		totalSleepTime = 50 * time.Millisecond // give more time for multiple ticks
+	)
+
+	// Set up the mock to return an error for the first 10 calls
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything).Return(fmt.Errorf("error"))
+		mock.Anything,
+	).Return(fmt.Errorf("error")).Times(50)
 
-	var (
-		tickTime       = 1 * time.Millisecond
-		totalSleepTime = 50 * time.Millisecond // give enough time for 10 ticks
-	)
+	// Set up the mock for a successful call after 10 errors
+	primaryConfig, secondaryConfig := createTestRMNHomeConfigs(false, false)
+	rmnHomeOnChainConfigs := []VersionedConfigWithDigest{primaryConfig, secondaryConfig}
+
+	homeChainReader.On(
+		"GetLatestValue",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Run(func(args mock.Arguments) {
+		arg := args.Get(4).(*[]VersionedConfigWithDigest)
+		*arg = rmnHomeOnChainConfigs
+	}).Return(nil).Times(50)
+
+	homeChainReader.On(
+		"GetLatestValue",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(fmt.Errorf("error"))
+
 	configPoller := NewRMNHomePoller(
 		homeChainReader,
 		rmnHomeBoundContract,
 		logger.Test(t),
 		tickTime,
 	)
+
 	require.NoError(t, configPoller.Start(context.Background()))
 	// Initially it's healthy
 	healthy := configPoller.HealthReport()
 	require.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
-	// After one second it will try polling 10 times and fail
+
+	// give some time for polling to happen
 	time.Sleep(totalSleepTime)
 	errors := configPoller.HealthReport()
 	require.Equal(t, 1, len(errors))
 	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+
+	// give some time for successful polling to happen
+	time.Sleep(totalSleepTime * 1)
+	errors = configPoller.HealthReport()
+	require.Equal(t, 1, len(errors))
+	require.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy) // should not produce an error
+
+	// give some time for polling to fail again
+	time.Sleep(totalSleepTime * 1)
+	errors = configPoller.HealthReport()
+	require.Equal(t, 1, len(errors))
+	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+
 	require.NoError(t, configPoller.Close())
 }
 
@@ -122,7 +165,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			primaryConfig, secondaryConfig := createTestRMNHomeConfigs(tt.primaryEmpty, tt.secondaryEmpty)
-			rmnHomeOnChainConfigs := []rmntypes.VersionedConfigWithDigest{primaryConfig, secondaryConfig}
+			rmnHomeOnChainConfigs := []VersionedConfigWithDigest{primaryConfig, secondaryConfig}
 
 			homeChainReader := readermock.NewMockContractReaderFacade(t)
 			homeChainReader.On(
@@ -134,7 +177,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 				mock.Anything,
 			).Run(
 				func(args mock.Arguments) {
-					arg := args.Get(4).(*[]rmntypes.VersionedConfigWithDigest)
+					arg := args.Get(4).(*[]VersionedConfigWithDigest)
 					*arg = rmnHomeOnChainConfigs
 				}).Return(nil)
 
@@ -214,7 +257,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 func TestIsNodeObserver(t *testing.T) {
 	tests := []struct {
 		name           string
-		sourceChain    rmntypes.SourceChain
+		sourceChain    SourceChain
 		nodeIndex      int
 		totalNodes     int
 		expectedResult bool
@@ -222,7 +265,7 @@ func TestIsNodeObserver(t *testing.T) {
 	}{
 		{
 			name: "Node is observer",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
@@ -234,7 +277,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Node is not observer",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(5)), // 101 in binary
@@ -246,7 +289,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Node index out of range (high)",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
@@ -258,7 +301,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Negative node index",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
@@ -270,7 +313,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Invalid bitmap (out of bounds)",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(8)), // 1000 in binary
@@ -282,7 +325,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Zero total nodes",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
@@ -294,7 +337,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Total nodes exceeds 256",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
 				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
@@ -306,7 +349,7 @@ func TestIsNodeObserver(t *testing.T) {
 		},
 		{
 			name: "Last valid node is observer",
-			sourceChain: rmntypes.SourceChain{
+			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        1,
 				ObserverNodesBitmap: cciptypes.NewBigInt(new(big.Int).SetBit(big.NewInt(0), 255, 1)), // Only the 256th bit is set
@@ -336,23 +379,23 @@ func TestIsNodeObserver(t *testing.T) {
 
 func createTestRMNHomeConfigs(
 	primaryEmpty bool,
-	secondaryEmpty bool) (primary, secondary rmntypes.VersionedConfigWithDigest) {
-	createConfig := func(id byte, isEmpty bool) rmntypes.VersionedConfigWithDigest {
+	secondaryEmpty bool) (primary, secondary VersionedConfigWithDigest) {
+	createConfig := func(id byte, isEmpty bool) VersionedConfigWithDigest {
 		if isEmpty {
-			return rmntypes.VersionedConfigWithDigest{}
+			return VersionedConfigWithDigest{}
 		}
-		return rmntypes.VersionedConfigWithDigest{
+		return VersionedConfigWithDigest{
 			ConfigDigest: cciptypes.Bytes32{id},
-			VersionedConfig: rmntypes.VersionedConfig{
+			VersionedConfig: VersionedConfig{
 				Version: uint32(id),
-				Config: rmntypes.Config{
-					Nodes: []rmntypes.Node{
+				Config: Config{
+					Nodes: []Node{
 						{
 							PeerID:            cciptypes.Bytes32{10 * id},
 							OffchainPublicKey: cciptypes.Bytes32{20 * id},
 						},
 					},
-					SourceChains: []rmntypes.SourceChain{
+					SourceChains: []SourceChain{
 						{
 							ChainSelector:       cciptypes.ChainSelector(uint64(id)),
 							MinObservers:        uint64(id),

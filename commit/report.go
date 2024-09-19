@@ -24,6 +24,11 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
 		return []ocr3types.ReportWithInfo[[]byte]{}, nil
 	}
+	p.lggr.Infow("generating report",
+		"roots", outcome.MerkleRootOutcome.RootsToReport,
+		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
+		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
+	)
 
 	rep := cciptypes.CommitPluginReport{
 		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
