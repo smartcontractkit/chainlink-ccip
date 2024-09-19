@@ -122,14 +122,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	ev := CommitReportAcceptedEvent{}
 
-	extendedBindings := r.contractReaders[dest].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-	iter, err := r.contractReaders[dest].QueryKey(
+	iter, err := r.contractReaders[dest].ExtendedQueryKey(
 		ctx,
-		contractBinding,
+		consts.ContractNameOffRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
@@ -232,14 +227,9 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 
 	dataTyp := ExecutionStateChangedEvent{}
 
-	extendedBindings := r.contractReaders[dest].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-	iter, err := r.contractReaders[dest].QueryKey(
+	iter, err := r.contractReaders[dest].ExtendedQueryKey(
 		ctx,
-		contractBinding,
+		consts.ContractNameOffRamp,
 		query.KeyFilter{
 			Key: consts.EventNameExecutionStateChanged,
 			Expressions: []query.Expression{
@@ -295,14 +285,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		Message           cciptypes.Message
 	}
 
-	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the OnRamp contract, got %d", len(bindings))
-	}
-
-	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
+	seq, err := r.contractReaders[sourceChainSelector].ExtendedQueryKey(
 		ctx,
-		bindings[0].Binding,
+		consts.ContractNameOnRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
@@ -365,16 +350,11 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 		return 0, err
 	}
 
-	extendedBindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(extendedBindings) != 1 {
-		return 0, fmt.Errorf("expected one binding for the OnRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-
 	var expectedNextSequenceNumber uint64
-	err := r.contractReaders[sourceChainSelector].GetLatestValue(
+	err := r.contractReaders[sourceChainSelector].ExtendedGetLatestValue(
 		ctx,
-		contractBinding.ReadIdentifier(consts.MethodNameGetExpectedNextSequenceNumber),
+		consts.ContractNameOnRamp,
+		consts.MethodNameGetExpectedNextSequenceNumber,
 		primitives.Unconfirmed,
 		map[string]any{
 			"destChainSelector": destChainSelector,
@@ -432,16 +412,11 @@ func (r *ccipChainReader) Nonces(
 				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 			}
 
-			extendedBindings := r.contractReaders[destChainSelector].GetBindings(consts.ContractNameNonceManager)
-			if len(extendedBindings) != 1 {
-				return fmt.Errorf("expected one binding for the NonceManager contract, got %d", len(extendedBindings))
-			}
-			contractBinding := extendedBindings[0].Binding
-
 			var resp uint64
-			err = r.contractReaders[destChainSelector].GetLatestValue(
+			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 				ctx,
-				contractBinding.ReadIdentifier(consts.MethodNameGetInboundNonce),
+				consts.ContractNameNonceManager,
+				consts.MethodNameGetInboundNonce,
 				primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": sourceChainSelector,
@@ -628,14 +603,10 @@ func (r *ccipChainReader) getSourceChainsConfig(
 		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
-			extendedBindings := r.contractReaders[r.destChain].GetBindings(consts.ContractNameOffRamp)
-			if len(extendedBindings) != 1 {
-				return fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-			}
-			contractBinding := extendedBindings[0].Binding
-			err := r.contractReaders[r.destChain].GetLatestValue(
+			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 				ctx,
-				contractBinding.ReadIdentifier(consts.MethodNameGetSourceChainConfig),
+				consts.ContractNameOffRamp,
+				consts.MethodNameGetSourceChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": chainSel,
@@ -697,17 +668,11 @@ func (r *ccipChainReader) getOfframpStaticConfig(
 		return offrampStaticChainConfig{}, err
 	}
 
-	extendedBindings := r.contractReaders[chain].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return offrampStaticChainConfig{},
-			fmt.Errorf("expected one binding for Offramp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-
 	resp := offrampStaticChainConfig{}
-	err := r.contractReaders[chain].GetLatestValue(
+	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
-		contractBinding.ReadIdentifier(consts.MethodNameOfframpGetStaticConfig),
+		consts.ContractNameOffRamp,
+		consts.MethodNameOfframpGetStaticConfig,
 		primitives.Unconfirmed,
 		map[string]any{},
 		&resp,
