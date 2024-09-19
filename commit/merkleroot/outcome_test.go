@@ -8,7 +8,7 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 func Test_buildReport(t *testing.T) {
