@@ -51,7 +51,7 @@ type Plugin struct {
 	lggr              logger.Logger
 
 	// state
-	initialized bool
+	contractsInitialized bool
 }
 
 func NewPlugin(
@@ -192,7 +192,7 @@ func (p *Plugin) Observation(
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
 
-		if !p.initialized {
+		if !p.contractsInitialized {
 			return exectypes.Observation{Contracts: discoveryObs}.Encode()
 		}
 	}
@@ -416,7 +416,7 @@ func (p *Plugin) Outcome(
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
 		}
-		p.initialized = true
+		p.contractsInitialized = true
 	}
 
 	fChain, err := p.homeChain.GetFChain()
@@ -501,7 +501,7 @@ func (p *Plugin) Outcome(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
 			"oracle", p.reportingCfg.OracleID,
 			"execPluginState", state)
-		if p.initialized {
+		if p.contractsInitialized {
 			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
 		}
 		return nil, nil
