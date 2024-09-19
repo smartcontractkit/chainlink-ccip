@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/require"
 
@@ -15,7 +16,7 @@ import (
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
-	obs, err := tokendata.NewConfigBasedCompositeObservers([]pluginconfig.TokenDataObserverConfig{})
+	obs, err := tokendata.NewConfigBasedCompositeObservers(logger.Test(t), []pluginconfig.TokenDataObserverConfig{})
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -82,17 +83,18 @@ func Test_CompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 	usdcEthereumTokenSourcePool := internal.RandBytes().String()
 
 	composite := tokendata.NewCompositeObservers(
-		fakeObserver{
-			prefix: "LINK",
-			supportedTokens: map[cciptypes.ChainSelector]string{
+		logger.Test(t),
+		fake(
+			"LINK",
+			map[cciptypes.ChainSelector]string{
 				1: linkEthereumTokenSourcePool,
 				2: linkAvalancheTokenSourcePool,
-			}},
-		fakeObserver{
-			prefix: "USDC",
-			supportedTokens: map[cciptypes.ChainSelector]string{
+			}),
+		fake(
+			"USDC",
+			map[cciptypes.ChainSelector]string{
 				1: usdcEthereumTokenSourcePool,
-			}},
+			}),
 	)
 
 	tests := []struct {
@@ -238,7 +240,191 @@ func Test_CompositeTokenDataObserver_ObserveDifferentTokens(t *testing.T) {
 	}
 }
 
+func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
+	linkEthereumTokenSourcePool := internal.RandBytes().String()
+	linkAvalancheTokenSourcePool := internal.RandBytes().String()
+	usdcEthereumTokenSourcePool := internal.RandBytes().String()
+
+	tests := []struct {
+		name                string
+		observers           []tokendata.TokenDataObserver
+		messageObservations exectypes.MessageObservations
+		expectedTokenData   exectypes.TokenDataObservations
+	}{
+		{
+			name: "single observer returns an error but no tokens in messages",
+			observers: []tokendata.TokenDataObserver{
+				faulty(
+					"stLINK",
+					map[cciptypes.ChainSelector]string{
+						1: linkEthereumTokenSourcePool,
+					}),
+			},
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t),
+					11: internal.MessageWithTokens(t),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(),
+					11: exectypes.NewMessageTokenData(),
+				},
+			},
+		},
+		{
+			name: "faulty observer doesn't affect other tokens",
+			observers: []tokendata.TokenDataObserver{
+				faulty(
+					"LINK",
+					map[cciptypes.ChainSelector]string{
+						1: linkEthereumTokenSourcePool,
+					}),
+			},
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t, linkEthereumTokenSourcePool, internal.RandBytes().String()),
+					11: internal.MessageWithTokens(t, internal.RandBytes().String(), internal.RandBytes().String()),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(
+						exectypes.TokenData{
+							Ready:     false,
+							Data:      nil,
+							Error:     nil,
+							Supported: true,
+						},
+						exectypes.NewNoopTokenData(),
+					),
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewNoopTokenData(),
+					),
+				},
+			},
+		},
+		{
+			name: "single observer returns an error for tokens for different chains",
+			observers: []tokendata.TokenDataObserver{
+				faulty(
+					"LINK",
+					map[cciptypes.ChainSelector]string{
+						1: linkEthereumTokenSourcePool,
+					}),
+				fake(
+					"LINK",
+					map[cciptypes.ChainSelector]string{
+						2: linkAvalancheTokenSourcePool,
+					}),
+			},
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t, linkEthereumTokenSourcePool),
+				},
+				2: {
+					20: internal.MessageWithTokens(t, linkAvalancheTokenSourcePool),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					// TokenObserver failed to process that
+					10: exectypes.NewMessageTokenData(exectypes.TokenData{
+						Ready:     false,
+						Data:      nil,
+						Error:     nil,
+						Supported: true,
+					}),
+				},
+				2: {
+					20: exectypes.NewMessageTokenData(exectypes.NewSuccessTokenData([]byte("LINK_20_0"))),
+				},
+			},
+		},
+		{
+			name: "multiple observers return an error for tokens for different chains",
+			observers: []tokendata.TokenDataObserver{
+				faulty(
+					"LINK",
+					map[cciptypes.ChainSelector]string{
+						1: linkEthereumTokenSourcePool,
+					}),
+				fake(
+					"USDC",
+					map[cciptypes.ChainSelector]string{
+						1: usdcEthereumTokenSourcePool,
+					}),
+			},
+			messageObservations: exectypes.MessageObservations{
+				1: {
+					10: internal.MessageWithTokens(t, linkEthereumTokenSourcePool),
+					11: internal.MessageWithTokens(t, usdcEthereumTokenSourcePool),
+					12: internal.MessageWithTokens(t, internal.RandBytes().String(), linkEthereumTokenSourcePool),
+					13: internal.MessageWithTokens(t, internal.RandBytes().String(), usdcEthereumTokenSourcePool),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					10: exectypes.NewMessageTokenData(exectypes.TokenData{
+						Ready:     false,
+						Data:      nil,
+						Error:     nil,
+						Supported: true,
+					}),
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("USDC_11_0")),
+					),
+					12: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.TokenData{
+							Ready:     false,
+							Data:      nil,
+							Error:     nil,
+							Supported: true,
+						},
+					),
+					13: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte("USDC_13_1")),
+					),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			composite := tokendata.NewCompositeObservers(logger.Test(t), test.observers...)
+
+			tkData, err := composite.Observe(context.Background(), test.messageObservations)
+			require.NoError(t, err)
+
+			require.Equal(t, test.expectedTokenData, tkData)
+		})
+
+	}
+}
+
+func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) tokendata.TokenDataObserver {
+	return fakeObserver{
+		prefix:          prefix,
+		faulty:          true,
+		supportedTokens: supportedTokens,
+	}
+}
+
+func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) tokendata.TokenDataObserver {
+	return fakeObserver{
+		prefix:          prefix,
+		faulty:          false,
+		supportedTokens: supportedTokens,
+	}
+}
+
 type fakeObserver struct {
+	faulty          bool
 	prefix          string
 	supportedTokens map[cciptypes.ChainSelector]string
 }
@@ -247,6 +433,10 @@ func (f fakeObserver) Observe(
 	_ context.Context,
 	observations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	if f.faulty {
+		return nil, fmt.Errorf("error")
+	}
+
 	tokenObservations := make(exectypes.TokenDataObservations)
 	for chainSelector, messages := range observations {
 		tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)

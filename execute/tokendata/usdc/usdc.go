@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/exp/maps"
 
@@ -13,6 +14,7 @@ import (
 )
 
 type tokenDataObserver struct {
+	lggr              logger.Logger
 	config            pluginconfig.USDCCCTPObserverConfig
 	supportedTokens   map[string]struct{}
 	usdcMessageReader reader.USDCMessageReader
@@ -21,6 +23,7 @@ type tokenDataObserver struct {
 
 // nolint unexported-return
 func NewTokenDataObserver(
+	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
 	usdcMessageReader reader.USDCMessageReader,
 	attestationClient AttestationClient,
@@ -32,6 +35,7 @@ func NewTokenDataObserver(
 	}
 
 	return &tokenDataObserver{
+		lggr:              lggr,
 		config:            config,
 		supportedTokens:   supportedTokens,
 		usdcMessageReader: usdcMessageReader,

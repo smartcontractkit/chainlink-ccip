@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -35,6 +36,7 @@ type TokenDataObserver interface {
 // compositeTokenDataObserver is a TokenDataObserver that combines multiple TokenDataObserver behind the same interface.
 // Goal of that is to support multiple token observers supporting different tokens (e.g. CCTP, MyFancyToken etc)
 type compositeTokenDataObserver struct {
+	lggr      logger.Logger
 	observers []TokenDataObserver
 }
 
@@ -43,41 +45,42 @@ type compositeTokenDataObserver struct {
 // Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
 // This constructor that should be used by the plugin.
 // nolint unexported-return
-func NewConfigBasedCompositeObservers(config []pluginconfig.TokenDataObserverConfig) (*compositeTokenDataObserver, error) {
+func NewConfigBasedCompositeObservers(lggr logger.Logger, config []pluginconfig.TokenDataObserverConfig) (*compositeTokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
 		// TODO consider if we can get rid of this switch stmt by moving the logic to the config
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observers[i] = usdc.NewTokenDataObserver(*c.USDCCCTPObserverConfig, nil, nil)
+			observers[i] = usdc.NewTokenDataObserver(lggr, *c.USDCCCTPObserverConfig, nil, nil)
 		default:
 			return nil, errors.New("unsupported token data observer")
 		}
 	}
-	return NewCompositeObservers(observers...), nil
+	return NewCompositeObservers(lggr, observers...), nil
 }
 
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.
 // Created mostly for tests purposes, it allows the user to specify custom observers and skip the part
 // in which we match the configuration to the proper TokenDataObserver.
 // nolint unexported-return
-func NewCompositeObservers(observers ...TokenDataObserver) *compositeTokenDataObserver {
-	return &compositeTokenDataObserver{observers: observers}
+func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) *compositeTokenDataObserver {
+	return &compositeTokenDataObserver{lggr: lggr, observers: observers}
 }
 
 // Observe start with stubbing exectypes.TokenDataObservations with empty data based on the supported tokens.
 // Then it iterates over all observers and merges token data returned from them into the final result.
-func (t *compositeTokenDataObserver) Observe(
+func (c *compositeTokenDataObserver) Observe(
 	ctx context.Context,
 	msgObservations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
-	tokenDataObservations := t.initTokenDataObservations(msgObservations)
+	tokenDataObservations := c.initTokenDataObservations(msgObservations)
 
-	for _, ob := range t.observers {
+	for _, ob := range c.observers {
 		tokenData, err := ob.Observe(ctx, msgObservations)
 		if err != nil {
-			return nil, err
+			c.lggr.Error("Error while observing token data", "error", err)
+			continue
 		}
 		tokenDataObservations, err = merge(tokenDataObservations, tokenData)
 		if err != nil {
@@ -87,11 +90,11 @@ func (t *compositeTokenDataObserver) Observe(
 	return tokenDataObservations, nil
 }
 
-func (t *compositeTokenDataObserver) IsTokenSupported(
+func (c *compositeTokenDataObserver) IsTokenSupported(
 	chainSelector cciptypes.ChainSelector,
 	token cciptypes.RampTokenAmount,
 ) bool {
-	for _, ob := range t.observers {
+	for _, ob := range c.observers {
 		if ob.IsTokenSupported(chainSelector, token) {
 			return true
 		}
@@ -103,7 +106,7 @@ func (t *compositeTokenDataObserver) IsTokenSupported(
 // whether the token is supported or not. If token is supported and requires additional processing we set its state to
 // isReady=false. If token is noop (doesn't require offchain processing) we initialize it with empty
 // data and set IsReady=true.
-func (t *compositeTokenDataObserver) initTokenDataObservations(
+func (c *compositeTokenDataObserver) initTokenDataObservations(
 	observations exectypes.MessageObservations,
 ) exectypes.TokenDataObservations {
 	tokenObservation := make(exectypes.TokenDataObservations)
@@ -113,7 +116,7 @@ func (t *compositeTokenDataObserver) initTokenDataObservations(
 		for seq, message := range observation {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i, token := range message.TokenAmounts {
-				if !t.IsTokenSupported(chainSelector, token) {
+				if !c.IsTokenSupported(chainSelector, token) {
 					// It means that none of the registers support that,
 					// we assume token doesn't require additional processing and skip it
 					tokenData[i] = exectypes.NewNoopTokenData()
@@ -121,7 +124,7 @@ func (t *compositeTokenDataObserver) initTokenDataObservations(
 				}
 				// Token is supported by one of the registered observers, mark it as not ready
 				// It would be processed by the registered processor in the next step
-				tokenData[i] = exectypes.TokenData{Ready: false}
+				tokenData[i] = exectypes.TokenData{Ready: false, Supported: true}
 			}
 			tokenObservation[chainSelector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}

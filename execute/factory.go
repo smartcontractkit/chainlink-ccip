@@ -96,7 +96,7 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 
-	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(offchainConfig.TokenDataObservers)
+	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(p.lggr, offchainConfig.TokenDataObservers)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
