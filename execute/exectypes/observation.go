@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 )
 
 // CommitObservations contain the commit plugin report data organized by the source chain selector.
@@ -145,6 +147,9 @@ type Observation struct {
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
+
+	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
+	Contracts dt.Observation `json:"contracts"`
 }
 
 // NewObservation constructs an Observation object.
@@ -153,12 +158,14 @@ func NewObservation(
 	messages MessageObservations,
 	tokenData TokenDataObservations,
 	nonces NonceObservations,
+	contracts dt.Observation,
 ) Observation {
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,
 		TokenData:     tokenData,
 		Nonces:        nonces,
+		Contracts:     contracts,
 	}
 }
 

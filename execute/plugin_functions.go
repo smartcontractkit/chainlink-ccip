@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -384,26 +385,22 @@ func mergeNonceObservations(
 // consensus among the observers.
 func getConsensusObservation(
 	lggr logger.Logger,
-	aos []types.AttributedObservation,
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	oracleID commontypes.OracleID,
 	destChainSelector cciptypes.ChainSelector,
 	F int,
 	fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.Observation, error) {
-	decodedObservations, err := decodeAttributedObservations(aos)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to decode observations: %w", err)
-	}
-	if len(decodedObservations) < F {
+	if len(aos) < F {
 		return exectypes.Observation{}, fmt.Errorf("below F threshold")
 	}
 
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", oracleID),
 		"oracle", oracleID,
-		"decodedObservations", decodedObservations)
+		"aos", aos)
 
-	mergedCommitObservations, err := mergeCommitObservations(decodedObservations, fChain)
+	mergedCommitObservations, err := mergeCommitObservations(aos, fChain)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
@@ -412,7 +409,7 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedCommitObservations", mergedCommitObservations)
 
-	mergedMessageObservations, err := mergeMessageObservations(decodedObservations, fChain)
+	mergedMessageObservations, err := mergeMessageObservations(aos, fChain)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
@@ -421,14 +418,14 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations := mergeTokenObservations(decodedObservations, fChain)
+	mergedTokenObservations := mergeTokenObservations(aos, fChain)
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
 		"oracle", oracleID,
 		"mergedTokenObservations", mergedTokenObservations)
 
 	mergedNonceObservations :=
-		mergeNonceObservations(decodedObservations, fChain[destChainSelector])
+		mergeNonceObservations(aos, fChain[destChainSelector])
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged nonce observations", oracleID),
 		"oracle", oracleID,
@@ -439,6 +436,7 @@ func getConsensusObservation(
 		mergedMessageObservations,
 		mergedTokenObservations,
 		mergedNonceObservations,
+		dt.Observation{},
 	)
 
 	return observation, nil
