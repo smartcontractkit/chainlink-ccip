@@ -47,7 +47,7 @@ type rmnHomeState struct {
 }
 
 // RmnHomePoller polls the RMNHome contract for the latest RMNHomeConfigs
-// It is running in the backdoung with a polling interval of pollingDuration
+// It is running in the background with a polling interval of pollingDuration
 type RmnHomePoller struct {
 	wg                   sync.WaitGroup
 	stopCh               services.StopChan
@@ -131,18 +131,21 @@ func (r *RmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 	}
 
 	if len(versionedConfigWithDigests) != expectedRMNHomeConfigs {
-		r.lggr.Warnw("expected 2 RMNHomeConfigs, got", "count", len(versionedConfigWithDigests))
-		return fmt.Errorf("expected 2 RMNHomeConfigs, got %d", len(versionedConfigWithDigests))
+		r.lggr.Warnw(
+			"unexpected number of RMNHomeConfigs",
+			"numConfigs", len(versionedConfigWithDigests),
+			"expected", expectedRMNHomeConfigs)
+		return fmt.Errorf("unexpected number of RMNHomeConfigs")
 	}
 
 	primaryConfigDigest := versionedConfigWithDigests[0].ConfigDigest
 	if primaryConfigDigest.IsEmpty() {
-		r.lggr.Warnw("primary config digest is empty")
+		r.lggr.Debugw("primary config digest is empty")
 	}
 
 	secondaryConfigDigest := versionedConfigWithDigests[1].ConfigDigest
 	if secondaryConfigDigest.IsEmpty() {
-		r.lggr.Warnw("secondary config digest is empty")
+		r.lggr.Debugw("secondary config digest is empty")
 	}
 
 	r.setRMNHomeState(
@@ -171,9 +174,8 @@ func (r *RmnHomePoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmnty
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
 	if !ok {
-		if !ok {
-			return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
-		}
+		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
+
 	}
 	return r.rmnHomeState.rmnHomeConfig[configDigest].Nodes, nil
 }
@@ -190,9 +192,7 @@ func (r *RmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cci
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
 	if !ok {
-		if !ok {
-			return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
-		}
+		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
 	}
 	return r.rmnHomeState.rmnHomeConfig[configDigest].SourceChainMinObservers, nil
 }
@@ -200,13 +200,11 @@ func (r *RmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cci
 func (r *RmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
+	cfg, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
 	if !ok {
-		if !ok {
-			return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
-		}
+		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
 	}
-	return r.rmnHomeState.rmnHomeConfig[configDigest].OffchainConfig, nil
+	return cfg.OffchainConfig, nil
 }
 
 func (r *RmnHomePoller) Close() error {

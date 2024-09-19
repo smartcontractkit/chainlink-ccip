@@ -27,7 +27,6 @@ var (
 	}
 )
 
-// test the ready method
 func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	configPoller := NewRMNHomePoller(
