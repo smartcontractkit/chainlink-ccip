@@ -292,7 +292,7 @@ func (_c *MockRMNHome_HealthReport_Call) RunAndReturn(run func() map[string]erro
 }
 
 // IsRMNHomeConfigDigestSet provides a mock function with given fields: configDigest
-func (_m *MockRMNHome) IsRMNHomeConfigDigestSet(configDigest ccipocr3.Bytes32) (bool, error) {
+func (_m *MockRMNHome) IsRMNHomeConfigDigestSet(configDigest ccipocr3.Bytes32) bool {
 	ret := _m.Called(configDigest)
 
 	if len(ret) == 0 {
@@ -300,23 +300,13 @@ func (_m *MockRMNHome) IsRMNHomeConfigDigestSet(configDigest ccipocr3.Bytes32) (
 	}
 
 	var r0 bool
-	var r1 error
-	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) (bool, error)); ok {
-		return rf(configDigest)
-	}
 	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) bool); ok {
 		r0 = rf(configDigest)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
-	if rf, ok := ret.Get(1).(func(ccipocr3.Bytes32) error); ok {
-		r1 = rf(configDigest)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // MockRMNHome_IsRMNHomeConfigDigestSet_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsRMNHomeConfigDigestSet'
@@ -337,12 +327,12 @@ func (_c *MockRMNHome_IsRMNHomeConfigDigestSet_Call) Run(run func(configDigest c
 	return _c
 }
 
-func (_c *MockRMNHome_IsRMNHomeConfigDigestSet_Call) Return(_a0 bool, _a1 error) *MockRMNHome_IsRMNHomeConfigDigestSet_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockRMNHome_IsRMNHomeConfigDigestSet_Call) Return(_a0 bool) *MockRMNHome_IsRMNHomeConfigDigestSet_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRMNHome_IsRMNHomeConfigDigestSet_Call) RunAndReturn(run func(ccipocr3.Bytes32) (bool, error)) *MockRMNHome_IsRMNHomeConfigDigestSet_Call {
+func (_c *MockRMNHome_IsRMNHomeConfigDigestSet_Call) RunAndReturn(run func(ccipocr3.Bytes32) bool) *MockRMNHome_IsRMNHomeConfigDigestSet_Call {
 	_c.Call.Return(run)
 	return _c
 }
