@@ -38,19 +38,29 @@ type compositeTokenDataObserver struct {
 	observers []TokenDataObserver
 }
 
-// nolint early-return unexported-return
+// NewConfigBasedCompositeObservers creates a compositeTokenDataObserver based on the provided configuration.
+// Slice of []pluginconfig.TokenDataObserverConfig must be deduped and validated by the plugin.
+// Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
+// This constructor that should be used by the plugin.
+// nolint unexported-return
 func NewConfigBasedCompositeObservers(config []pluginconfig.TokenDataObserverConfig) (*compositeTokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
-		if c.USDCCCTPObserverConfig != nil {
+		// TODO consider if we can get rid of this switch stmt by moving the logic to the config
+		// e.g. observers[i] := config.CreateTokenDataObserver()
+		switch {
+		case c.USDCCCTPObserverConfig != nil:
 			observers[i] = usdc.NewTokenDataObserver(*c.USDCCCTPObserverConfig, nil, nil)
-		} else {
+		default:
 			return nil, errors.New("unsupported token data observer")
 		}
 	}
 	return NewCompositeObservers(observers...), nil
 }
 
+// NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.
+// Created mostly for tests purposes, it allows the user to specify custom observers and skip the part
+// in which we match the configuration to the proper TokenDataObserver.
 // nolint unexported-return
 func NewCompositeObservers(observers ...TokenDataObserver) *compositeTokenDataObserver {
 	return &compositeTokenDataObserver{observers: observers}
