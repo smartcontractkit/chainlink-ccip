@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -171,7 +172,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
-				TokenDataObserver:         tt.fields.TokenDataObserver,
+				TokenDataObservers:        tt.fields.TokenDataObserver,
 			}
 			encoded, err := EncodeExecuteOffchainConfig(e)
 			require.NoError(t, err)
@@ -253,15 +254,15 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 					Type:    "usdc-cctp",
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
-						Tokens: map[int]USDCCCTPTokenConfig{
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
-								SourceTokenAddress:           "0xabc",
+								SourcePoolAddress:            "0xabc",
 								SourceMessageTransmitterAddr: "0xefg",
 							},
 						},
 						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				},
 			},
@@ -292,19 +293,19 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 					Type:    "usdc-cctp",
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
-						Tokens: map[int]USDCCCTPTokenConfig{
+						Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 							1: {
-								SourceTokenAddress:           "0xabc",
+								SourcePoolAddress:            "0xabc",
 								SourceMessageTransmitterAddr: "0xefg",
 							},
 							20: {
-								SourceTokenAddress:           "0x123",
+								SourcePoolAddress:            "0x123",
 								SourceMessageTransmitterAddr: "0x456",
 							},
 						},
 						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				},
 			},
@@ -321,7 +322,7 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 				require.ErrorContains(t, err, tt.errMsg)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tt.want, e.TokenDataObserver)
+				require.Equal(t, tt.want, e.TokenDataObservers)
 			}
 		})
 	}
@@ -336,21 +337,21 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			RootSnoozeTime:            *commonconfig.MustNewDuration(1),
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(1),
 			BatchingStrategyID:        0,
-			TokenDataObserver:         configs,
+			TokenDataObservers:        configs,
 		}
 	}
 
 	withUSDCConfig := func() *USDCCCTPObserverConfig {
 		return &USDCCCTPObserverConfig{
-			Tokens: map[int]USDCCCTPTokenConfig{
+			Tokens: map[cciptypes.ChainSelector]USDCCCTPTokenConfig{
 				1: {
-					SourceTokenAddress:           "0xabc",
+					SourcePoolAddress:            "0xabc",
 					SourceMessageTransmitterAddr: "0xefg",
 				},
 			},
 			AttestationAPI:         "http://localhost:8080",
-			AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
-			AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
+			AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+			AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 		}
 	}
 
@@ -393,8 +394,8 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Version: "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{
 						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  *commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: *commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				}),
 			wantErr: true,

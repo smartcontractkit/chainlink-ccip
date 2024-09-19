@@ -53,8 +53,8 @@ type ExecuteOffchainConfig struct {
 	// BatchingStrategyID is the strategy to use for batching messages.
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
 
-	// TokenDataObserver registers different strategies for processing token data.
-	TokenDataObserver []TokenDataObserverConfig `json:"tokenDataObservers"`
+	// TokenDataObservers registers different strategies for processing token data.
+	TokenDataObservers []TokenDataObserverConfig `json:"tokenDataObservers"`
 }
 
 func (e ExecuteOffchainConfig) Validate() error {
@@ -82,7 +82,7 @@ func (e ExecuteOffchainConfig) Validate() error {
 	}
 
 	set := make(map[string]struct{})
-	for _, ob := range e.TokenDataObserver {
+	for _, ob := range e.TokenDataObservers {
 		if err := ob.Validate(); err != nil {
 			return err
 		}
@@ -166,18 +166,26 @@ func (t TokenDataObserverConfig) Validate() error {
 const USDCCCTPHandlerType = "usdc-cctp"
 
 type USDCCCTPObserverConfig struct {
-	Tokens                 map[int]USDCCCTPTokenConfig `json:"tokens"`
-	AttestationAPI         string                      `json:"attestationAPI"`
-	AttestationAPITimeout  commonconfig.Duration       `json:"attestationAPITimeout"`
-	AttestationAPIInterval commonconfig.Duration       `json:"attestationAPIInterval"`
+	Tokens                 map[cciptypes.ChainSelector]USDCCCTPTokenConfig `json:"tokens"`
+	AttestationAPI         string                                          `json:"attestationAPI"`
+	AttestationAPITimeout  *commonconfig.Duration                          `json:"attestationAPITimeout"`
+	AttestationAPIInterval *commonconfig.Duration                          `json:"attestationAPIInterval"`
 }
 
-func (p USDCCCTPObserverConfig) Validate() error {
+func (p *USDCCCTPObserverConfig) Validate() error {
+	p.setDefaults()
+
 	if p.AttestationAPI == "" {
 		return errors.New("AttestationAPI not set")
 	}
 	if len(p.Tokens) == 0 {
 		return errors.New("Tokens not set")
+	}
+	if p.AttestationAPIInterval == nil || p.AttestationAPIInterval.Duration() == 0 {
+		return errors.New("AttestationAPIInterval not set")
+	}
+	if p.AttestationAPITimeout == nil || p.AttestationAPITimeout.Duration() == 0 {
+		return errors.New("AttestationAPITimeout not set")
 	}
 	for _, token := range p.Tokens {
 		if err := token.Validate(); err != nil {
@@ -187,18 +195,30 @@ func (p USDCCCTPObserverConfig) Validate() error {
 	return nil
 }
 
+func (p *USDCCCTPObserverConfig) setDefaults() {
+	// Default to 1 second if AttestationAPITimeout is not set
+	if p.AttestationAPITimeout == nil {
+		p.AttestationAPITimeout = commonconfig.MustNewDuration(5 * time.Second)
+	}
+
+	// Default to 100 millis if AttestationAPIInterval is not set
+	if p.AttestationAPIInterval == nil {
+		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
+	}
+}
+
 // nolint:lll // CCTP link
 type USDCCCTPTokenConfig struct {
-	// SourceTokenAddress is the address of the USDC ECR-20 token on the source chain
-	SourceTokenAddress string `json:"sourceTokenAddress"`
+	// SourcePoolAddress is the address of the USDC token pool on the source chain that support USDC token transfers
+	SourcePoolAddress string `json:"sourceTokenAddress"`
 	// SourceMessageTransmitterAddr is the address of the CCTP MessageTransmitter address on the source chain
 	// https://github.com/circlefin/evm-cctp-contracts/blob/adb2a382b09ea574f4d18d8af5b6706e8ed9b8f2/src/MessageTransmitter.sol
 	SourceMessageTransmitterAddr string `json:"sourceMessageTransmitterAddress"`
 }
 
 func (t USDCCCTPTokenConfig) Validate() error {
-	if t.SourceTokenAddress == "" {
-		return errors.New("SourceTokenAddress not set")
+	if t.SourcePoolAddress == "" {
+		return errors.New("SourcePoolAddress not set")
 	}
 	if t.SourceMessageTransmitterAddr == "" {
 		return errors.New("SourceMessageTransmitterAddress not set")
@@ -218,7 +238,7 @@ func DecodeExecuteOffchainConfig(encodedExecuteOffchainConfig []byte) (ExecuteOf
 		return e, err
 	}
 
-	for _, ob := range e.TokenDataObserver {
+	for _, ob := range e.TokenDataObservers {
 		if err := ob.WellFormed(); err != nil {
 			return e, err
 		}
