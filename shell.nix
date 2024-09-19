@@ -1,8 +1,7 @@
 { pkgs }:
 with pkgs;
 let
-  go = go_1_21;
-  postgresql = postgresql_14;
+  go = go_1_22;
   nodejs = nodejs-18_x;
   nodePackages = pkgs.nodePackages.override { inherit nodejs; };
 
@@ -15,18 +14,10 @@ mkShell' {
   nativeBuildInputs = [
     go
     goreleaser
-    postgresql
-
-    python3
-    python3Packages.pip
 
     curl
     nodejs
     nodePackages.pnpm
-    # TODO: compiler / gcc for secp compilation
-    go-ethereum # geth
-    # parity # openethereum
-    go-mockery
 
     # tooling
     gotools
@@ -44,9 +35,6 @@ mkShell' {
     kubectl
     kubernetes-helm
 
-    # cross-compiling, used in CRIB
-    zig
-
     # gofuzz
   ] ++ lib.optionals stdenv.isLinux [
     # some dependencies needed for node-gyp on pnpm install
@@ -55,9 +43,6 @@ mkShell' {
     libusb1
   ];
   GOROOT = "${go}/share/go";
-
-  PGDATA = "db";
-  CL_DATABASE_URL = "postgresql://chainlink:chainlink@localhost:5432/chainlink_test?sslmode=disable";
 
   shellHook = ''
     # Some useful custom aliases
