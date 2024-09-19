@@ -60,66 +60,125 @@ func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
 }
 
 func Test_RMNHomePollingWorking(t *testing.T) {
-	rmnHomeOnChainConfigs := createTestRMNHomeConfigs()
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
-	homeChainReader.On(
-		"GetLatestValue",
-		mock.Anything,
-		rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetVersionedConfigsWithDigests),
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Run(
-		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]rmntypes.VersionedConfigWithDigest)
-			*arg = rmnHomeOnChainConfigs
-		}).Return(nil)
-
-	defer homeChainReader.AssertExpectations(t)
-
-	var (
-		tickTime       = 2 * time.Millisecond
-		totalSleepTime = tickTime * 20
-	)
-
-	configPoller := NewRMNHomePoller(
-		homeChainReader,
-		rmnHomeBoundContract,
-		logger.Test(t),
-		tickTime,
-	)
-
-	require.NoError(t, configPoller.Start(context.Background()))
-	// sleep to allow polling to happen
-	time.Sleep(totalSleepTime)
-	require.NoError(t, configPoller.Close())
-
-	calls := homeChainReader.Calls
-	callCount := 0
-	for _, call := range calls {
-		if call.Method == "GetLatestValue" {
-			callCount++
-		}
+	tests := []struct {
+		name              string
+		primaryEmpty      bool
+		secondaryEmpty    bool
+		expectedCallCount int
+	}{
+		{
+			name:              "Both configs non-empty",
+			primaryEmpty:      false,
+			secondaryEmpty:    false,
+			expectedCallCount: 4,
+		},
+		{
+			name:              "Primary config empty",
+			primaryEmpty:      true,
+			secondaryEmpty:    false,
+			expectedCallCount: 4,
+		},
+		{
+			name:              "Secondary config empty",
+			primaryEmpty:      false,
+			secondaryEmpty:    true,
+			expectedCallCount: 4,
+		},
+		{
+			name:              "Both configs empty",
+			primaryEmpty:      true,
+			secondaryEmpty:    true,
+			expectedCallCount: 4,
+		},
 	}
-	// called at least 4 times, one for start and one for the first tick for each contract (ccip *2 and rmn *2)
-	require.GreaterOrEqual(t, callCount, 4)
 
-	for _, configs := range rmnHomeOnChainConfigs {
-		rmnNodes, err := configPoller.GetRMNNodesInfo(configs.ConfigDigest)
-		require.NoError(t, err)
-		require.NotNil(t, rmnNodes)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			primaryConfig, secondaryConfig := createTestRMNHomeConfigs(tt.primaryEmpty, tt.secondaryEmpty)
+			rmnHomeOnChainConfigs := []rmntypes.VersionedConfigWithDigest{primaryConfig, secondaryConfig}
 
-		isValid, err := configPoller.IsRMNHomeConfigDigestSet(configs.ConfigDigest)
-		require.NoError(t, err)
-		require.True(t, isValid)
+			homeChainReader := readermock.NewMockContractReaderFacade(t)
+			homeChainReader.On(
+				"GetLatestValue",
+				mock.Anything,
+				rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetAllConfigs),
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+			).Run(
+				func(args mock.Arguments) {
+					arg := args.Get(4).(*[]rmntypes.VersionedConfigWithDigest)
+					*arg = rmnHomeOnChainConfigs
+				}).Return(nil)
 
-		offchainConfig, err := configPoller.GetOffChainConfig(configs.ConfigDigest)
-		require.NoError(t, err)
-		require.NotNil(t, offchainConfig)
+			defer homeChainReader.AssertExpectations(t)
 
-		minObs, err := configPoller.GetMinObservers(configs.ConfigDigest)
-		require.NoError(t, err)
-		require.NotNil(t, minObs)
+			var (
+				tickTime       = 2 * time.Millisecond
+				totalSleepTime = tickTime * 20
+			)
+
+			configPoller := NewRMNHomePoller(
+				homeChainReader,
+				rmnHomeBoundContract,
+				logger.Test(t),
+				tickTime,
+			)
+
+			require.NoError(t, configPoller.Start(context.Background()))
+			// sleep to allow polling to happen
+			time.Sleep(totalSleepTime)
+			require.NoError(t, configPoller.Close())
+
+			calls := homeChainReader.Calls
+			callCount := 0
+			for _, call := range calls {
+				if call.Method == "GetLatestValue" {
+					callCount++
+				}
+			}
+			require.GreaterOrEqual(t, callCount, tt.expectedCallCount)
+
+			for i, config := range rmnHomeOnChainConfigs {
+				isEmpty := (i == 0 && tt.primaryEmpty) || (i == 1 && tt.secondaryEmpty)
+
+				rmnNodes, err := configPoller.GetRMNNodesInfo(config.ConfigDigest)
+				require.NoError(t, err)
+				if isEmpty {
+					require.Empty(t, rmnNodes)
+				} else {
+					require.NotEmpty(t, rmnNodes)
+				}
+
+				isValid, err := configPoller.IsRMNHomeConfigDigestSet(config.ConfigDigest)
+				require.NoError(t, err)
+				if isEmpty {
+					require.False(t, isValid)
+				} else {
+					require.True(t, isValid)
+				}
+
+				offchainConfig, err := configPoller.GetOffChainConfig(config.ConfigDigest)
+				require.NoError(t, err)
+				if isEmpty {
+					require.Empty(t, offchainConfig)
+				} else {
+					require.NotEmpty(t, offchainConfig)
+				}
+
+				minObsMap, err := configPoller.GetMinObservers(config.ConfigDigest)
+				require.NoError(t, err)
+				if isEmpty {
+					require.Empty(t, minObsMap)
+				} else {
+					require.Len(t, minObsMap, 1)
+					expectedChainSelector := cciptypes.ChainSelector(uint64(i + 1))
+					minObs, exists := minObsMap[expectedChainSelector]
+					require.True(t, exists)
+					require.Equal(t, uint64(i+1), minObs)
+				}
+			}
+		})
 	}
 }
 
@@ -246,60 +305,38 @@ func TestIsNodeObserver(t *testing.T) {
 	}
 }
 
-func createTestRMNHomeConfigs() []rmntypes.VersionedConfigWithDigest {
-	return []rmntypes.VersionedConfigWithDigest{
-		{
-			ConfigDigest: cciptypes.Bytes32{1, 2, 3, 4, 5},
+func createTestRMNHomeConfigs(
+	primaryEmpty bool,
+	secondaryEmpty bool) (primary, secondary rmntypes.VersionedConfigWithDigest) {
+	createConfig := func(id byte, isEmpty bool) rmntypes.VersionedConfigWithDigest {
+		if isEmpty {
+			return rmntypes.VersionedConfigWithDigest{}
+		}
+		return rmntypes.VersionedConfigWithDigest{
+			ConfigDigest: cciptypes.Bytes32{id},
 			VersionedConfig: rmntypes.VersionedConfig{
-				Version: 1,
+				Version: uint32(id),
 				Config: rmntypes.Config{
 					Nodes: []rmntypes.Node{
 						{
-							PeerID:            cciptypes.Bytes32{10, 11, 12, 13, 14},
-							OffchainPublicKey: cciptypes.Bytes32{20, 21, 22, 23, 24},
-						},
-						{
-							PeerID:            cciptypes.Bytes32{15, 16, 17, 18, 19},
-							OffchainPublicKey: cciptypes.Bytes32{25, 26, 27, 28, 29},
+							PeerID:            cciptypes.Bytes32{10 * id},
+							OffchainPublicKey: cciptypes.Bytes32{20 * id},
 						},
 					},
 					SourceChains: []rmntypes.SourceChain{
 						{
-							ChainSelector:       cciptypes.ChainSelector(1),
-							MinObservers:        1,
-							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(2)), // 10 in binary = 1 is observer and 0 is not
-						},
-						{
-							ChainSelector:       cciptypes.ChainSelector(2),
-							MinObservers:        2,
-							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(3)), // 11 in binary = 0 and 1 are observers
+							ChainSelector:       cciptypes.ChainSelector(uint64(id)),
+							MinObservers:        uint64(id),
+							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(int64(id))),
 						},
 					},
-					OffchainConfig: cciptypes.Bytes{30, 31, 32, 33, 34},
+					OffchainConfig: cciptypes.Bytes{30 * id},
 				},
 			},
-		},
-		{
-			ConfigDigest: cciptypes.Bytes32{6, 7, 8, 9, 10},
-			VersionedConfig: rmntypes.VersionedConfig{
-				Version: 2,
-				Config: rmntypes.Config{
-					Nodes: []rmntypes.Node{
-						{
-							PeerID:            cciptypes.Bytes32{40, 41, 42, 43, 44},
-							OffchainPublicKey: cciptypes.Bytes32{50, 51, 52, 53, 54},
-						},
-					},
-					SourceChains: []rmntypes.SourceChain{
-						{
-							ChainSelector:       cciptypes.ChainSelector(1),
-							MinObservers:        1,
-							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)), // 1 in binary = 0 is an observer
-						},
-					},
-					OffchainConfig: cciptypes.Bytes{60, 61, 62, 63, 64},
-				},
-			},
-		},
+		}
 	}
+
+	primary = createConfig(1, primaryEmpty)
+	secondary = createConfig(2, secondaryEmpty)
+	return primary, secondary
 }
