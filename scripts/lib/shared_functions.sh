@@ -39,7 +39,7 @@ function check_repo_exists() {
 	if [[ -f "${repo_dir}/.git" ]]; then
 		return 0
 	fi
-	
+
 	# If neither a Git directory nor a Git file, return failure
 	return 1
 }
