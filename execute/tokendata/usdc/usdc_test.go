@@ -238,7 +238,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			observer := usdc.NewUSDCCCTP(
+			observer := usdc.NewTokenDataObserver(
 				config,
 				test.usdcReader,
 				test.attestationClient,

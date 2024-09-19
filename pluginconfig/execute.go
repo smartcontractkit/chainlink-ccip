@@ -54,7 +54,6 @@ type ExecuteOffchainConfig struct {
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
 
 	// TokenDataObservers registers different strategies for processing token data.
-	// TokenDataObservers registers different strategies for processing token data.
 	TokenDataObservers []TokenDataObserverConfig `json:"tokenDataObservers"`
 }
 

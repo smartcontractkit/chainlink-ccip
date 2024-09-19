@@ -12,41 +12,34 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-type USDCCCTPTokenDataObserver struct {
-	configs           pluginconfig.USDCCCTPObserverConfig
+type tokenDataObserver struct {
+	config            pluginconfig.USDCCCTPObserverConfig
 	supportedTokens   map[string]struct{}
 	usdcMessageReader reader.USDCMessageReader
 	attestationClient AttestationClient
 }
 
-func NewUSDCCCTPTokenDataObserver(configs pluginconfig.USDCCCTPObserverConfig) *USDCCCTPTokenDataObserver {
-	return NewUSDCCCTP(
-		configs,
-		nil,
-		nil,
-	)
-}
-
-func NewUSDCCCTP(
-	configs pluginconfig.USDCCCTPObserverConfig,
+// nolint unexported-return
+func NewTokenDataObserver(
+	config pluginconfig.USDCCCTPObserverConfig,
 	usdcMessageReader reader.USDCMessageReader,
 	attestationClient AttestationClient,
-) *USDCCCTPTokenDataObserver {
+) *tokenDataObserver {
 	supportedTokens := make(map[string]struct{})
-	for chainSelector, tokenConfig := range configs.Tokens {
+	for chainSelector, tokenConfig := range config.Tokens {
 		key := sourceTokenIdentifier(chainSelector, tokenConfig.SourcePoolAddress)
 		supportedTokens[key] = struct{}{}
 	}
 
-	return &USDCCCTPTokenDataObserver{
-		configs:           configs,
+	return &tokenDataObserver{
+		config:            config,
 		supportedTokens:   supportedTokens,
 		usdcMessageReader: usdcMessageReader,
 		attestationClient: attestationClient,
 	}
 }
 
-func (u *USDCCCTPTokenDataObserver) Observe(
+func (u *tokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
@@ -69,7 +62,7 @@ func (u *USDCCCTPTokenDataObserver) Observe(
 	return u.extractTokenData(messages, attestations)
 }
 
-func (u *USDCCCTPTokenDataObserver) IsTokenSupported(
+func (u *tokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
@@ -77,7 +70,7 @@ func (u *USDCCCTPTokenDataObserver) IsTokenSupported(
 	return ok
 }
 
-func (u *USDCCCTPTokenDataObserver) pickOnlyUSDCMessages(
+func (u *tokenDataObserver) pickOnlyUSDCMessages(
 	messageObservations exectypes.MessageObservations,
 ) map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int {
 	usdcMessages := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int)
@@ -99,7 +92,7 @@ func (u *USDCCCTPTokenDataObserver) pickOnlyUSDCMessages(
 	return usdcMessages
 }
 
-func (u *USDCCCTPTokenDataObserver) fetchUSDCMessageHashes(
+func (u *tokenDataObserver) fetchUSDCMessageHashes(
 	ctx context.Context,
 	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int,
 ) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte, error) {
@@ -119,7 +112,7 @@ func (u *USDCCCTPTokenDataObserver) fetchUSDCMessageHashes(
 	return output, nil
 }
 
-func (u *USDCCCTPTokenDataObserver) fetchAttestations(
+func (u *tokenDataObserver) fetchAttestations(
 	ctx context.Context,
 	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte,
 ) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus, error) {
@@ -130,7 +123,7 @@ func (u *USDCCCTPTokenDataObserver) fetchAttestations(
 	return attestations, nil
 }
 
-func (u *USDCCCTPTokenDataObserver) extractTokenData(
+func (u *tokenDataObserver) extractTokenData(
 	messages exectypes.MessageObservations,
 	attestations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus,
 ) (exectypes.TokenDataObservations, error) {
