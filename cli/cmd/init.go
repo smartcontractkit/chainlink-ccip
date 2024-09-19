@@ -12,6 +12,9 @@ var initCmd = &cobra.Command{
 	Short: "Initialize a new CRIB installation",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("init called")
+
+		// TODO: call SetupAwsProfile when applicable
+		// e.g. utils.SetupAwsProfile("$HOME/.aws/config", viper.GetString("crib.awsProfileName"), viper.GetString("aws.accountId"), viper.GetString("aws.region"), viper.GetString("aws.ssoRoleName"), viper.GetString("aws.ssoStartUrl"))
 	},
 }
 
