@@ -27,6 +27,23 @@ var (
 	}
 )
 
+// test the ready method
+func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	configPoller := NewRMNHomePoller(
+		homeChainReader,
+		rmnHomeBoundContract,
+		logger.Test(t),
+		1*time.Millisecond,
+	)
+	// Initially it's not ready
+	require.Error(t, configPoller.Ready())
+
+	require.NoError(t, configPoller.Start(context.Background()))
+	// After starting it's ready
+	require.NoError(t, configPoller.Ready())
+}
+
 func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
 	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	homeChainReader.On(

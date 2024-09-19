@@ -12,18 +12,18 @@ type NodeID uint32
 
 // RMNHomeConfig contains the configuration fetched from the RMNHome contract.
 type RMNHomeConfig struct {
-	Nodes          []RMNHomeNodeInfo
-	MinObservers   map[cciptypes.ChainSelector]uint64
-	ConfigDigest   cciptypes.Bytes32
-	OffchainConfig cciptypes.Bytes // Raw offchain configuration bytes
+	Nodes                   []RMNHomeNodeInfo
+	SourceChainMinObservers map[cciptypes.ChainSelector]uint64
+	ConfigDigest            cciptypes.Bytes32
+	OffchainConfig          cciptypes.Bytes // The raw offchain config
 }
 
 // RMNHomeNodeInfo contains information about a node from the RMNHome contract.
 type RMNHomeNodeInfo struct {
-	ID                        NodeID // ID is the index of this node in the RMN config
-	PeerID                    cciptypes.Bytes32
-	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
-	SignObservationsPublicKey *ed25519.PublicKey // offchainPublicKey
+	ID                    NodeID                              // ID is the index of this node in the RMN config
+	PeerID                cciptypes.Bytes32                   // The peer ID of the node
+	SupportedSourceChains mapset.Set[cciptypes.ChainSelector] // Set of supported source chains by the node
+	OffchainPublicKey     *ed25519.PublicKey                  // The private key is used to verify observations
 }
 
 // RMNRemoteConfig contains the configuration fetched from the RMNRemote contract.
@@ -38,9 +38,9 @@ type RMNRemoteConfig struct {
 
 // RMNRemoteSignerInfo contains information about a signer from the RMNRemote contract.
 type RMNRemoteSignerInfo struct {
-	SignReportsAddress    cciptypes.Bytes // for signing reports
-	NodeIndex             uint64          // maps to nodes in RMNHome
-	SignObservationPrefix string          // for signing observations
+	SignerOnchainAddress  cciptypes.Bytes // The signer's onchain address, used to verify report signature
+	NodeIndex             uint64          // The index of the node in the RMN config
+	SignObservationPrefix string          // The prefix of the observation to sign
 }
 
 // VersionedConfigWithDigest mirrors RMNHome.sol's VersionedConfigWithDigest struct

@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	rmnMaxSizeCommittee = 256 // bitmap is 256 bits making the max committee size 256
+	expectedRMNHomeConfigs = 2   // RMNHome contract should have 2 configs, primary and secondary
+	rmnMaxSizeCommittee    = 256 // bitmap is 256 bits making the max committee size 256
 )
 
 type RMNHome interface {
@@ -45,14 +46,16 @@ type rmnHomeState struct {
 	rmnHomeConfig         map[cciptypes.Bytes32]rmntypes.RMNHomeConfig
 }
 
+// RmnHomePoller polls the RMNHome contract for the latest RMNHomeConfigs
+// It is running in the backdoung with a polling interval of pollingDuration
 type RmnHomePoller struct {
 	wg                   sync.WaitGroup
 	stopCh               services.StopChan
 	sync                 services.StateMachine
+	mutex                *sync.RWMutex
 	contractReader       contractreader.ContractReaderFacade
 	rmnHomeBoundContract types.BoundContract
 	lggr                 logger.Logger
-	mutex                *sync.RWMutex
 	rmnHomeState         rmnHomeState
 	failedPolls          uint
 	pollingDuration      time.Duration // How frequently the poller fetches the chain configs
@@ -127,36 +130,25 @@ func (r *RmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 		return fmt.Errorf("error fetching RMNHomeConfig: %w", err)
 	}
 
-	if len(versionedConfigWithDigests) != 2 {
+	if len(versionedConfigWithDigests) != expectedRMNHomeConfigs {
 		r.lggr.Warnw("expected 2 RMNHomeConfigs, got", "count", len(versionedConfigWithDigests))
 		return fmt.Errorf("expected 2 RMNHomeConfigs, got %d", len(versionedConfigWithDigests))
 	}
 
-	var primaryConfigDigest, secondaryConfigDigest cciptypes.Bytes32
-
-	// check if the versionesconfigwithdigests are set (can be empty)
-	if versionedConfigWithDigests[0].ConfigDigest == (cciptypes.Bytes32{}) {
+	primaryConfigDigest := versionedConfigWithDigests[0].ConfigDigest
+	if primaryConfigDigest.IsEmpty() {
 		r.lggr.Warnw("primary config digest is empty")
-	} else {
-		primaryConfigDigest = versionedConfigWithDigests[0].ConfigDigest
 	}
 
-	if versionedConfigWithDigests[1].ConfigDigest == (cciptypes.Bytes32{}) {
+	secondaryConfigDigest := versionedConfigWithDigests[1].ConfigDigest
+	if secondaryConfigDigest.IsEmpty() {
 		r.lggr.Warnw("secondary config digest is empty")
-	} else {
-		secondaryConfigDigest = versionedConfigWithDigests[1].ConfigDigest
 	}
 
 	r.setRMNHomeState(
 		primaryConfigDigest,
 		secondaryConfigDigest,
 		convertOnChainConfigToRMNHomeChainConfig(r.lggr, versionedConfigWithDigests))
-
-	if len(versionedConfigWithDigests) == 0 {
-		// That's a legitimate case if there are no rmn configs on chain yet
-		r.lggr.Warnw("no on chain configs found")
-		return nil
-	}
 
 	return nil
 }
@@ -177,6 +169,12 @@ func (r *RmnHomePoller) setRMNHomeState(
 func (r *RmnHomePoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
+	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
+	if !ok {
+		if !ok {
+			return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
+		}
+	}
 	return r.rmnHomeState.rmnHomeConfig[configDigest].Nodes, nil
 }
 
@@ -184,18 +182,35 @@ func (r *RmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32)
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
-	return ok, nil
+	if !ok {
+		if !ok {
+			return false, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
+		}
+	}
+	return true, nil
 }
 
 func (r *RmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	return r.rmnHomeState.rmnHomeConfig[configDigest].MinObservers, nil
+	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
+	if !ok {
+		if !ok {
+			return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
+		}
+	}
+	return r.rmnHomeState.rmnHomeConfig[configDigest].SourceChainMinObservers, nil
 }
 
 func (r *RmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
+	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
+	if !ok {
+		if !ok {
+			return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
+		}
+	}
 	return r.rmnHomeState.rmnHomeConfig[configDigest].OffchainConfig, nil
 }
 
@@ -226,6 +241,14 @@ func (r *RmnHomePoller) Name() string {
 	return "RmnHomePoller"
 }
 
+func validate(config rmntypes.VersionedConfigWithDigest) error {
+	// check if the versionesconfigwithdigests are set (can be empty)
+	if config.ConfigDigest.IsEmpty() {
+		return fmt.Errorf("configDigest is empty")
+	}
+	return nil
+}
+
 func convertOnChainConfigToRMNHomeChainConfig(
 	lggr logger.Logger,
 	versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest,
@@ -237,21 +260,23 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmntypes.RMNHomeConfig)
 	for _, versionedConfigWithDigest := range versionedConfigWithDigests {
-		// check if the versionesconfigwithdigests are set (can be empty)
-		if versionedConfigWithDigest.ConfigDigest == (cciptypes.Bytes32{}) {
-			lggr.Warnw("config digest is empty")
+		err := validate(versionedConfigWithDigest)
+
+		if err != nil {
+			lggr.Warnw("invalid on chain RMNHomeConfig", "err", err)
 			continue
 		}
+
 		config := versionedConfigWithDigest.VersionedConfig.Config
 		nodes := make([]rmntypes.RMNHomeNodeInfo, len(config.Nodes))
 		for i, node := range config.Nodes {
 			pubKey := ed25519.PublicKey(node.OffchainPublicKey[:])
 
 			nodes[i] = rmntypes.RMNHomeNodeInfo{
-				ID:                        rmntypes.NodeID(i),
-				PeerID:                    node.PeerID,
-				SignObservationsPublicKey: &pubKey,
-				SupportedSourceChains:     mapset.NewSet[cciptypes.ChainSelector](),
+				ID:                    rmntypes.NodeID(i),
+				PeerID:                node.PeerID,
+				OffchainPublicKey:     &pubKey,
+				SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](),
 			}
 		}
 
@@ -272,10 +297,10 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		}
 
 		rmnHomeConfigs[versionedConfigWithDigest.ConfigDigest] = rmntypes.RMNHomeConfig{
-			Nodes:          nodes,
-			MinObservers:   minObservers,
-			ConfigDigest:   versionedConfigWithDigest.ConfigDigest,
-			OffchainConfig: config.OffchainConfig,
+			Nodes:                   nodes,
+			SourceChainMinObservers: minObservers,
+			ConfigDigest:            versionedConfigWithDigest.ConfigDigest,
+			OffchainConfig:          config.OffchainConfig,
 		}
 	}
 	return rmnHomeConfigs
