@@ -5,7 +5,7 @@ go 1.22.5
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/smartcontractkit/chain-selectors v1.0.23
-	github.com/smartcontractkit/chainlink-common v0.2.3-0.20240918103207-e78a0de3f684
+	github.com/smartcontractkit/chainlink-common v0.2.3-0.20240919092417-53e784c2e420
 	github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
@@ -51,11 +51,4 @@ require (
 	golang.org/x/text v0.18.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240822170219-fc7c04adadcd // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-)
-
-// replicating the replace directive on cosmos SDK
-replace (
-	github.com/gogo/protobuf => github.com/regen-network/protobuf v1.3.3-alpha.regen.1
-	// until merged upstream: https://github.com/mitchellh/mapstructure/pull/343
-	github.com/mitchellh/mapstructure v1.5.0 => github.com/nolag/mapstructure v1.5.2-0.20240625151721-90ea83a3f479
 )

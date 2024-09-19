@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -120,9 +121,15 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		)
 	}
 
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
 	ccipReader := readerpkg.NewCCIPChainReader(
 		p.lggr,
-		p.contractReaders,
+		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,

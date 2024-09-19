@@ -6,17 +6,18 @@ import (
 	"math/big"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type PriceReader interface {
@@ -36,7 +37,7 @@ type PriceReader interface {
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader   commontypes.ContractReader
+	ContractReader   contractreader.ContractReaderFacade
 	TokenInfo        map[types.Account]pluginconfig.TokenInfo
 	FeeQuoterAddress types.Account
 	// FeeQuoterEnabled Flag until we discover feeQuoter address and bind it correctly
@@ -44,7 +45,7 @@ type OnchainTokenPricesReader struct {
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontypes.ContractReader,
+	contractReader contractreader.ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{

@@ -27,8 +27,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -53,18 +53,25 @@ func TestPlugin(t *testing.T) {
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
-	// Round 1.
-	// One pending commit report only.
-	// Two of the messages are executed which should be indicated in the Outcome.
+	// Contract Discovery round.
 	res, err := runner.RunRound(ctx)
 	require.NoError(t, err)
 	outcome, err := exectypes.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// Round 1 - Get Commit Reports
+	// One pending commit report only.
+	// Two of the messages are executed which should be indicated in the Outcome.
+	res, err = runner.RunRound(ctx)
+	require.NoError(t, err)
+	outcome, err = exectypes.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
-	// Round 2.
+	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
@@ -73,7 +80,7 @@ func TestPlugin(t *testing.T) {
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 
-	// Round 3.
+	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
@@ -98,7 +105,7 @@ func setupHomeChainPoller(
 	lggr logger.Logger,
 	chainConfigInfos []reader.ChainConfigInfo,
 ) reader.HomeChain {
-	homeChainReader := chainreadermocks.NewMockContractReader(t)
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",

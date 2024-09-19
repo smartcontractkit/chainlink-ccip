@@ -22,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -41,11 +43,15 @@ type Plugin struct {
 	reportCodec  cciptypes.ExecutePluginCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
+	discovery    *discovery.ContractDiscoveryProcessor
 
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver tokendata.TokenDataObserver
 	estimateProvider  gas.EstimateProvider
 	lggr              logger.Logger
+
+	// state
+	contractsInitialized bool
 }
 
 func NewPlugin(
@@ -82,6 +88,13 @@ func NewPlugin(
 		tokenDataObserver: tokenDataObserver,
 		estimateProvider:  estimateProvider,
 		lggr:              lggr,
+		discovery: discovery.NewContractDiscoveryProcessor(
+			lggr,
+			&ccipReader,
+			homeChain,
+			cfg.DestChain,
+			reportingCfg.F,
+		),
 	}
 }
 
@@ -171,6 +184,19 @@ func (p *Plugin) Observation(
 		p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 	}
 
+	var discoveryObs dt.Observation
+	// discovery processor disabled by setting it to nil.
+	if p.discovery != nil {
+		discoveryObs, err = p.discovery.Observation(ctx, dt.Outcome{}, dt.Query{})
+		if err != nil {
+			p.lggr.Errorw("failed to discover contracts", "err", err)
+		}
+
+		if !p.contractsInitialized {
+			return exectypes.Observation{Contracts: discoveryObs}.Encode()
+		}
+	}
+
 	state := previousOutcome.State.Next()
 	p.lggr.Debugw("Execute plugin performing observation", "state", state)
 	switch state {
@@ -190,7 +216,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil, nil).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil, nil, discoveryObs).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -250,7 +276,7 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 		}
 
-		return exectypes.NewObservation(groupedCommits, messages, tkData, nil).Encode()
+		return exectypes.NewObservation(groupedCommits, messages, tkData, nil, discoveryObs).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -280,7 +306,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nil, nonceObservations).Encode()
+		return exectypes.NewObservation(nil, nil, nil, nonceObservations, discoveryObs).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -372,13 +398,34 @@ func (p *Plugin) Outcome(
 		}
 	}
 
+	decodedAos, err := decodeAttributedObservations(aos)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode observations: %w", err)
+	}
+
+	// discovery processor disabled by setting it to nil.
+	if p.discovery != nil {
+		discoveryAos := make([]plugincommon.AttributedObservation[dt.Observation], len(decodedAos))
+		for i := range decodedAos {
+			discoveryAos[i] = plugincommon.AttributedObservation[dt.Observation]{
+				OracleID:    decodedAos[i].OracleID,
+				Observation: decodedAos[i].Observation.Contracts,
+			}
+		}
+		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
+		if err != nil {
+			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
+		}
+		p.contractsInitialized = true
+	}
+
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
 	}
 
 	observation, err := getConsensusObservation(
-		p.lggr, aos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
+		p.lggr, decodedAos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -450,6 +497,13 @@ func (p *Plugin) Outcome(
 	}
 
 	if outcome.IsEmpty() {
+		p.lggr.Warnw(
+			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
+			"oracle", p.reportingCfg.OracleID,
+			"execPluginState", state)
+		if p.contractsInitialized {
+			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
+		}
 		return nil, nil
 	}
 

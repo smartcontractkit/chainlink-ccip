@@ -13,6 +13,9 @@ const (
 	// Unknown is the zero value, this allows a "Next" state transition for uninitialized values (i.e. the first round).
 	Unknown PluginState = ""
 
+	// Initialized is used to indicate that there was nothing to do except initialize contract addresses.
+	Initialized PluginState = "Initialized"
+
 	// GetCommitReports is the first step, it is used to select commit reports from the destination chain.
 	GetCommitReports PluginState = "GetCommitReports"
 
@@ -33,6 +36,8 @@ func (p PluginState) Next() PluginState {
 		return Filter
 
 	case Unknown:
+		fallthrough
+	case Initialized:
 		fallthrough
 	case Filter:
 		return GetCommitReports
