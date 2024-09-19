@@ -16,7 +16,8 @@ import (
 
 // Extended version of a ContractReader.
 type Extended interface {
-	contractreader.ContractReaderFacade
+	Bind(ctx context.Context, bindings []types.BoundContract) error
+
 	GetBindings(contractName string) []ExtendedBoundContract
 
 	// ExtendedQueryKey performs automatic binding from contractName to the first bound contract.
@@ -73,6 +74,7 @@ func (e *extendedContractReader) ExtendedQueryKey(
 			"ExtendedQueryKey: expected one binding for %s contract, got %d", contractName, len(extendedBindings))
 	}
 	contractBinding := extendedBindings[0].Binding
+
 	return e.QueryKey(
 		ctx,
 		contractBinding,
