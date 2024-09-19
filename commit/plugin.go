@@ -37,6 +37,7 @@ type Plugin struct {
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
+	rmnHomeReader       reader.RMNHome
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
@@ -56,6 +57,7 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
+	rmnHomeReader reader.RMNHome,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	rmnConfig rmn.Config,
 ) *Plugin {
@@ -94,6 +96,7 @@ func NewPlugin(
 		rmn.Client(nil),          // todo
 		cciptypes.RMNCrypto(nil), // todo
 		rmnConfig,
+		rmnHomeReader,
 	)
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,
@@ -113,6 +116,7 @@ func NewPlugin(
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,
+		rmnHomeReader:       rmnHomeReader,
 		readerSyncer:        readerSyncer,
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
