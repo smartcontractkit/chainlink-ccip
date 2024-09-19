@@ -9,11 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+// EvmDefaultMaxMerkleTreeSize is the default number of max new messages to put in a merkle tree.
+// We use this default value when the config is not set for a specific chain.
+const EvmDefaultMaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 
 type CommitPluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
@@ -41,10 +46,10 @@ type CommitPluginConfig struct {
 	// Typically set to `MaxQueryDuration - e`, where e some small duration.
 	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
 
-	// BatchLimits is the maximum number of messages to include in a single report for a target chain.
-	// If for example in the next round we have 1000 pending messages and a batch limit of 256, only 256 seq nums
-	// will be in the report. If a value is not set we fallback to merkleroot.DefaultSeqNumsBatchLimit.
-	BatchLimits map[cciptypes.ChainSelector]uint64 `json:"batchLimits"`
+	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
+	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
+	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
+	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
 }
 
 func (c CommitPluginConfig) Validate() error {

@@ -44,10 +44,10 @@ func Test_reportRangesOutcome(t *testing.T) {
 	lggr := logger.Test(t)
 
 	testCases := []struct {
-		name                      string
-		consensusObservation      ConsensusObservation
-		rangeLimitsPerSourceChain map[cciptypes.ChainSelector]uint64
-		expectedOutcome           Outcome
+		name                 string
+		consensusObservation ConsensusObservation
+		merkleTreeSizeLimit  uint64
+		expectedOutcome      Outcome
 	}{
 		{
 			name: "base empty outcome",
@@ -67,7 +67,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 					1: 18, // off ramp next is 18, on ramp max is 20 so new msgs are: [18, 19, 20]
 				},
 			},
-			rangeLimitsPerSourceChain: map[cciptypes.ChainSelector]uint64{},
+			merkleTreeSizeLimit: 256, // default limit should be used
 			expectedOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
@@ -92,15 +92,13 @@ func Test_reportRangesOutcome(t *testing.T) {
 					3: 500, // off ramp next is 500, we have new messages up to 10000 (default limit applied)
 				},
 			},
-			rangeLimitsPerSourceChain: map[cciptypes.ChainSelector]uint64{
-				2: 5, // limit to 5 messages, [1000] should be excluded
-			},
+			merkleTreeSizeLimit: 5,
 			expectedOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
 					{ChainSel: 1, SeqNumRange: cciptypes.NewSeqNumRange(18, 20)},
 					{ChainSel: 2, SeqNumRange: cciptypes.NewSeqNumRange(995, 999)},
-					{ChainSel: 3, SeqNumRange: cciptypes.NewSeqNumRange(500, 755)},
+					{ChainSel: 3, SeqNumRange: cciptypes.NewSeqNumRange(500, 504)},
 				},
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: 1, SeqNum: 18},
@@ -113,7 +111,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			outc := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.rangeLimitsPerSourceChain)
+			outc := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit)
 			require.Equal(t, tc.expectedOutcome, outc)
 		})
 	}

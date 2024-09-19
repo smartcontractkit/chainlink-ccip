@@ -15,10 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
-// DefaultSeqNumsBatchLimit is the default number of max new messages to scan, we use this value when
-// the config is not set for a specific chain.
-const DefaultSeqNumsBatchLimit = 256
-
 // Processor is the processor responsible for
 // reading next messages and building merkle roots for them,
 // It's setup to use RMN to query which messages to include in the merkle root and ensures

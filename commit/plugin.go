@@ -78,6 +78,11 @@ func NewPlugin(
 		cfg.DestChain,
 	)
 
+	if cfg.MaxMerkleTreeSize == 0 {
+		lggr.Warnw("MaxMerkleTreeSize not set, using default value", "default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
+		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
+	}
+
 	merkleRootProcessor := merkleroot.NewProcessor(
 		nodeID,
 		lggr,

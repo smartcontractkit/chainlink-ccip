@@ -10,8 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/cciptypeutil"
-
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/shared"
@@ -48,7 +46,7 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.BatchLimits), nextState
+		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize), nextState
 	case BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
@@ -70,7 +68,7 @@ func reportRangesOutcome(
 	_ Query,
 	lggr logger.Logger,
 	consensusObservation ConsensusObservation,
-	rangeLimitsPerSourceChain map[cciptypes.ChainSelector]uint64,
+	maxMerkleTreeSize uint64,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
@@ -85,20 +83,15 @@ func reportRangesOutcome(
 		}
 
 		if offRampNextSeqNum <= onRampMaxSeqNum {
-			rngLimit, ok := rangeLimitsPerSourceChain[chainSel]
-			if !ok {
-				rngLimit = DefaultSeqNumsBatchLimit
-			}
-
 			rng := cciptypes.NewSeqNumRange(offRampNextSeqNum, onRampMaxSeqNum)
 
 			chainRange := plugintypes.ChainRange{
 				ChainSel:    chainSel,
-				SeqNumRange: cciptypeutil.SeqNumRangeLimit(rng, rngLimit),
+				SeqNumRange: rng.Limit(maxMerkleTreeSize),
 			}
 			rangesToReport = append(rangesToReport, chainRange)
 
-			if wasTruncated := rng.End() != chainRange.SeqNumRange.End(); wasTruncated {
+			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
 				lggr.Infof("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
 			} else {
 				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
