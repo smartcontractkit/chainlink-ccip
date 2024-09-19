@@ -36,12 +36,23 @@ func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 		logger.Test(t),
 		1*time.Millisecond,
 	)
+	// Return any result as we are testing the ready method
+	homeChainReader.On(
+		"GetLatestValue",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything).Return(fmt.Errorf("error"))
+
 	// Initially it's not ready
 	require.Error(t, configPoller.Ready())
 
 	require.NoError(t, configPoller.Start(context.Background()))
 	// After starting it's ready
 	require.NoError(t, configPoller.Ready())
+
+	require.NoError(t, configPoller.Close())
 }
 
 func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
@@ -160,15 +171,15 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 				isEmpty := (i == 0 && tt.primaryEmpty) || (i == 1 && tt.secondaryEmpty)
 
 				rmnNodes, err := configPoller.GetRMNNodesInfo(config.ConfigDigest)
-				require.NoError(t, err)
 				if isEmpty {
+					require.Error(t, err)
 					require.Empty(t, rmnNodes)
 				} else {
+					require.NoError(t, err)
 					require.NotEmpty(t, rmnNodes)
 				}
 
-				isValid, err := configPoller.IsRMNHomeConfigDigestSet(config.ConfigDigest)
-				require.NoError(t, err)
+				isValid := configPoller.IsRMNHomeConfigDigestSet(config.ConfigDigest)
 				if isEmpty {
 					require.False(t, isValid)
 				} else {
@@ -176,18 +187,20 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 				}
 
 				offchainConfig, err := configPoller.GetOffChainConfig(config.ConfigDigest)
-				require.NoError(t, err)
 				if isEmpty {
+					require.Error(t, err)
 					require.Empty(t, offchainConfig)
 				} else {
+					require.NoError(t, err)
 					require.NotEmpty(t, offchainConfig)
 				}
 
 				minObsMap, err := configPoller.GetMinObservers(config.ConfigDigest)
-				require.NoError(t, err)
 				if isEmpty {
+					require.Error(t, err)
 					require.Empty(t, minObsMap)
 				} else {
+					require.NoError(t, err)
 					require.Len(t, minObsMap, 1)
 					expectedChainSelector := cciptypes.ChainSelector(uint64(i + 1))
 					minObs, exists := minObsMap[expectedChainSelector]

@@ -32,7 +32,7 @@ type RMNHome interface {
 	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
 	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error)
 	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
-	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error)
+	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool
 	// GetMinObservers gets the minimum number of observers required for each chain in the given configDigest
 	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
@@ -178,16 +178,11 @@ func (r *RmnHomePoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmnty
 	return r.rmnHomeState.rmnHomeConfig[configDigest].Nodes, nil
 }
 
-func (r *RmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) (bool, error) {
+func (r *RmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
-	if !ok {
-		if !ok {
-			return false, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
-		}
-	}
-	return true, nil
+	return ok
 }
 
 func (r *RmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
