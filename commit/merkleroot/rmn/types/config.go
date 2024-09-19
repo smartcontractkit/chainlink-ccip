@@ -10,12 +10,6 @@ import (
 
 type NodeID uint32
 
-// RMNConfig contains the RMN configuration required by the plugin and the RMN client in a single struct.
-type RMNConfig struct {
-	Home   RMNHomeConfig
-	Remote RMNRemoteConfig
-}
-
 // RMNHomeConfig contains the configuration fetched from the RMNHome contract.
 type RMNHomeConfig struct {
 	Nodes          []RMNHomeNodeInfo
