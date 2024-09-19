@@ -4,43 +4,165 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/exp/maps"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-type USDCCCTPTokenDataObserver struct {
-	configs []pluginconfig.USDCCCTPObserverConfig
+type tokenDataObserver struct {
+	lggr              logger.Logger
+	config            pluginconfig.USDCCCTPObserverConfig
+	supportedTokens   map[string]struct{}
+	usdcMessageReader reader.USDCMessageReader
+	attestationClient AttestationClient
 }
 
-func (u *USDCCCTPTokenDataObserver) Observe(
+// nolint unexported-return
+func NewTokenDataObserver(
+	lggr logger.Logger,
+	config pluginconfig.USDCCCTPObserverConfig,
+	usdcMessageReader reader.USDCMessageReader,
+	attestationClient AttestationClient,
+) *tokenDataObserver {
+	supportedTokens := make(map[string]struct{})
+	for chainSelector, tokenConfig := range config.Tokens {
+		key := sourceTokenIdentifier(chainSelector, tokenConfig.SourcePoolAddress)
+		supportedTokens[key] = struct{}{}
+	}
+
+	return &tokenDataObserver{
+		lggr:              lggr,
+		config:            config,
+		supportedTokens:   supportedTokens,
+		usdcMessageReader: usdcMessageReader,
+		attestationClient: attestationClient,
+	}
+}
+
+func (u *tokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
-	// Ask LogPoller for USDC messages and matching events
-	usdcMessages, err := u.pickOnlyUSDCMessages(messages)
+	// 1. Pick only messages that contain USDC tokens
+	usdcMessages := u.pickOnlyUSDCMessages(messages)
+
+	// 2. Fetch USDC messages hashes based on the `MessageSent (bytes message)` event
+	usdcMessageHashes, err := u.fetchUSDCMessageHashes(ctx, usdcMessages)
 	if err != nil {
 		return nil, err
 	}
 
-	// Fetch attestations for USDC messages
-	attestations, err := u.fetchAttestations(ctx, usdcMessages)
+	// 3. Fetch attestations for USDC messages
+	attestations, err := u.fetchAttestations(ctx, usdcMessageHashes)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add attestations to the token observations
-	return u.extractTokenData(attestations)
+	// 4. Add attestations to the token observations
+	return u.extractTokenData(messages, attestations)
 }
 
-func (u *USDCCCTPTokenDataObserver) pickOnlyUSDCMessages(_ exectypes.MessageObservations) (interface{}, error) {
-	fmt.Println(u.configs)
-	panic("implement me")
+func (u *tokenDataObserver) IsTokenSupported(
+	sourceChain cciptypes.ChainSelector,
+	msgToken cciptypes.RampTokenAmount,
+) bool {
+	_, ok := u.supportedTokens[sourceTokenIdentifier(sourceChain, msgToken.SourcePoolAddress.String())]
+	return ok
 }
 
-func (u *USDCCCTPTokenDataObserver) fetchAttestations(_ context.Context, _ interface{}) (interface{}, error) {
-	panic("implement me")
+func (u *tokenDataObserver) pickOnlyUSDCMessages(
+	messageObservations exectypes.MessageObservations,
+) map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int {
+	usdcMessages := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int)
+	for chainSelector, messages := range messageObservations {
+		usdcMessages[chainSelector] = make(map[cciptypes.SeqNum][]int)
+		for seqNum, message := range messages {
+			var usdcTokens []int
+			for i, tokenAmount := range message.TokenAmounts {
+				tokenIdentifier := sourceTokenIdentifier(chainSelector, tokenAmount.SourcePoolAddress.String())
+				if _, ok := u.supportedTokens[tokenIdentifier]; ok {
+					usdcTokens = append(usdcTokens, i)
+				}
+			}
+			if len(usdcTokens) > 0 {
+				usdcMessages[chainSelector][seqNum] = usdcTokens
+			}
+		}
+	}
+	return usdcMessages
 }
 
-func (u *USDCCCTPTokenDataObserver) extractTokenData(_ interface{}) (exectypes.TokenDataObservations, error) {
-	panic("implement me")
+func (u *tokenDataObserver) fetchUSDCMessageHashes(
+	ctx context.Context,
+	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int,
+) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte, error) {
+	output := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte)
+
+	for chainSelector, messages := range usdcMessages {
+		if len(messages) == 0 {
+			continue
+		}
+		// TODO Sequential reading USDC messages from the source chain
+		usdcHashes, err := u.usdcMessageReader.MessageHashes(ctx, chainSelector, maps.Keys(messages))
+		if err != nil {
+			return nil, err
+		}
+		output[chainSelector] = usdcHashes
+	}
+	return output, nil
+}
+
+func (u *tokenDataObserver) fetchAttestations(
+	ctx context.Context,
+	usdcMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte,
+) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus, error) {
+	attestations, err := u.attestationClient.Attestations(ctx, usdcMessages)
+	if err != nil {
+		return nil, err
+	}
+	return attestations, nil
+}
+
+func (u *tokenDataObserver) extractTokenData(
+	messages exectypes.MessageObservations,
+	attestations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus,
+) (exectypes.TokenDataObservations, error) {
+	tokenObservations := make(exectypes.TokenDataObservations)
+
+	for chainSelector, chainMessages := range messages {
+		tokenObservations[chainSelector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+
+		for seqNum, message := range chainMessages {
+			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
+			for i, tokenAmount := range message.TokenAmounts {
+				if !u.IsTokenSupported(chainSelector, tokenAmount) {
+					tokenData[i] = exectypes.NotSupportedTokenData()
+				} else {
+					tokenData[i] = attestationToTokenData(i, attestations[chainSelector][seqNum])
+				}
+			}
+
+			tokenObservations[chainSelector][seqNum] = exectypes.NewMessageTokenData(tokenData...)
+		}
+	}
+	return tokenObservations, nil
+}
+
+func attestationToTokenData(tokenIndex int, statuses map[int]AttestationStatus) exectypes.TokenData {
+	status, ok := statuses[tokenIndex]
+	if !ok {
+		return exectypes.NewErrorTokenData(ErrDataMissing)
+	}
+	if status.Error != nil {
+		return exectypes.NewErrorTokenData(status.Error)
+	}
+	return exectypes.NewSuccessTokenData(status.Data[:])
+}
+
+func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {
+	return fmt.Sprintf("%d-%s", chainSelector, sourcePoolAddress)
 }

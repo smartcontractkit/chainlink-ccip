@@ -97,6 +97,11 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 
+	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(p.lggr, offchainConfig.TokenDataObservers)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
+	}
+
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
@@ -127,7 +132,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.execCodec,
 			p.msgHasher,
 			p.homeChainReader,
-			p.tokenDataObserver,
+			tokenDataObserver,
 			p.estimateProvider,
 			p.lggr,
 		), ocr3types.ReportingPluginInfo{
