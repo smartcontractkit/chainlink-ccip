@@ -21,6 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 const (
@@ -46,9 +48,9 @@ type rmnHomeState struct {
 	rmnHomeConfig         map[cciptypes.Bytes32]rmntypes.RMNHomeConfig
 }
 
-// RmnHomePoller polls the RMNHome contract for the latest RMNHomeConfigs
+// rmnHomePoller polls the RMNHome contract for the latest RMNHomeConfigs
 // It is running in the background with a polling interval of pollingDuration
-type RmnHomePoller struct {
+type rmnHomePoller struct {
 	wg                   sync.WaitGroup
 	stopCh               services.StopChan
 	sync                 services.StateMachine
@@ -67,7 +69,7 @@ func NewRMNHomePoller(
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 ) RMNHome {
-	return &RmnHomePoller{
+	return &rmnHomePoller{
 		stopCh:               make(chan struct{}),
 		contractReader:       contractReader,
 		rmnHomeBoundContract: rmnHomeBoundContract,
@@ -79,16 +81,16 @@ func NewRMNHomePoller(
 	}
 }
 
-func (r *RmnHomePoller) Start(ctx context.Context) error {
-	r.lggr.Infow("Start Polling RMNHome")
+func (r *rmnHomePoller) Start(ctx context.Context) error {
 	return r.sync.StartOnce(r.Name(), func() error {
+		r.lggr.Infow("Start Polling RMNHome")
 		r.wg.Add(1)
 		go r.poll()
 		return nil
 	})
 }
 
-func (r *RmnHomePoller) poll() {
+func (r *rmnHomePoller) poll() {
 	defer r.wg.Done()
 	ctx, cancel := r.stopCh.NewCtx()
 	defer cancel()
@@ -108,17 +110,22 @@ func (r *RmnHomePoller) poll() {
 			r.mutex.Unlock()
 			return
 		case <-ticker.C:
+			fmt.Println("failedPolls", r.failedPolls)
 			if err := r.fetchAndSetRmnHomeConfigs(ctx); err != nil {
 				r.mutex.Lock()
 				r.failedPolls++
+				r.mutex.Unlock()
+			} else {
+				r.mutex.Lock()
+				r.failedPolls = 0
 				r.mutex.Unlock()
 			}
 		}
 	}
 }
 
-func (r *RmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
-	var versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest
+func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
+	var versionedConfigWithDigests []VersionedConfigWithDigest
 	err := r.contractReader.GetLatestValue(
 		ctx,
 		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetAllConfigs),
@@ -156,7 +163,7 @@ func (r *RmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 	return nil
 }
 
-func (r *RmnHomePoller) setRMNHomeState(
+func (r *rmnHomePoller) setRMNHomeState(
 	primaryConfigDigest cciptypes.Bytes32,
 	secondaryConfigDigest cciptypes.Bytes32,
 	rmnHomeConfig map[cciptypes.Bytes32]rmntypes.RMNHomeConfig) {
@@ -169,7 +176,7 @@ func (r *RmnHomePoller) setRMNHomeState(
 	s.rmnHomeConfig = rmnHomeConfig
 }
 
-func (r *RmnHomePoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error) {
+func (r *rmnHomePoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.RMNHomeNodeInfo, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
@@ -180,14 +187,14 @@ func (r *RmnHomePoller) GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmnty
 	return r.rmnHomeState.rmnHomeConfig[configDigest].Nodes, nil
 }
 
-func (r *RmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool {
+func (r *rmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
 	return ok
 }
 
-func (r *RmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
+func (r *rmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]uint64, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
@@ -197,7 +204,7 @@ func (r *RmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cci
 	return r.rmnHomeState.rmnHomeConfig[configDigest].SourceChainMinObservers, nil
 }
 
-func (r *RmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
+func (r *rmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	cfg, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
@@ -207,7 +214,7 @@ func (r *RmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (ccipt
 	return cfg.OffchainConfig, nil
 }
 
-func (r *RmnHomePoller) Close() error {
+func (r *rmnHomePoller) Close() error {
 	return r.sync.StopOnce(r.Name(), func() error {
 		defer r.wg.Wait()
 		close(r.stopCh)
@@ -215,26 +222,27 @@ func (r *RmnHomePoller) Close() error {
 	})
 }
 
-func (r *RmnHomePoller) Ready() error {
+func (r *rmnHomePoller) Ready() error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	return r.sync.Ready()
 }
 
-func (r *RmnHomePoller) HealthReport() map[string]error {
+func (r *rmnHomePoller) HealthReport() map[string]error {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	if r.failedPolls >= MaxFailedPolls {
-		r.sync.SvcErrBuffer.Append(fmt.Errorf("polling failed %d times in a row", MaxFailedPolls))
+		err := fmt.Errorf("polling failed %d times in a row (maximum allowed: %d)", r.failedPolls, MaxFailedPolls)
+		r.sync.SvcErrBuffer.Append(err)
 	}
 	return map[string]error{r.Name(): r.sync.Healthy()}
 }
 
-func (r *RmnHomePoller) Name() string {
-	return "RmnHomePoller"
+func (r *rmnHomePoller) Name() string {
+	return "rmnHomePoller"
 }
 
-func validate(config rmntypes.VersionedConfigWithDigest) error {
+func validate(config VersionedConfigWithDigest) error {
 	// check if the versionesconfigwithdigests are set (can be empty)
 	if config.ConfigDigest.IsEmpty() {
 		return fmt.Errorf("configDigest is empty")
@@ -244,7 +252,7 @@ func validate(config rmntypes.VersionedConfigWithDigest) error {
 
 func convertOnChainConfigToRMNHomeChainConfig(
 	lggr logger.Logger,
-	versionedConfigWithDigests []rmntypes.VersionedConfigWithDigest,
+	versionedConfigWithDigests []VersionedConfigWithDigest,
 ) map[cciptypes.Bytes32]rmntypes.RMNHomeConfig {
 	if len(versionedConfigWithDigests) == 0 {
 		lggr.Warnw("no on chain RMNHomeConfigs found")
@@ -267,7 +275,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 
 			nodes[i] = rmntypes.RMNHomeNodeInfo{
 				ID:                    rmntypes.NodeID(i),
-				PeerID:                node.PeerID,
+				PeerID:                ragep2ptypes.PeerID(node.PeerID),
 				OffchainPublicKey:     &pubKey,
 				SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](),
 			}
@@ -300,7 +308,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 }
 
 // IsNodeObserver checks if a node is an observer for the given source chain
-func IsNodeObserver(sourceChain rmntypes.SourceChain, nodeIndex int, totalNodes int) (bool, error) {
+func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (bool, error) {
 	if totalNodes > rmnMaxSizeCommittee || totalNodes <= 0 {
 		return false, fmt.Errorf("invalid total nodes: %d", totalNodes)
 	}
@@ -326,4 +334,38 @@ func IsNodeObserver(sourceChain rmntypes.SourceChain, nodeIndex int, totalNodes 
 	return result.Cmp(mask) == 0, nil
 }
 
-var _ RMNHome = (*RmnHomePoller)(nil)
+// VersionedConfigWithDigest mirrors RMNHome.sol's VersionedConfigWithDigest struct
+type VersionedConfigWithDigest struct {
+	// nolint:lll // don't split up the long url
+	// https://github.com/smartcontractkit/ccip/blob/e6e26ad31eef625faf68806a2b4f0549bc89b15c/contracts/src/v0.8/ccip/RMNRemote.sol#L34
+	ConfigDigest    cciptypes.Bytes32 `json:"configDigest"`
+	VersionedConfig VersionedConfig   `json:"versionedConfig"`
+}
+
+// VersionedConfig mirrors RMNHome.sol's VersionedConfig struct
+type VersionedConfig struct {
+	Version uint32 `json:"version"`
+	Config  Config `json:"config"`
+}
+
+// Config mirrors RMNHome.sol's Config struct
+type Config struct {
+	Nodes          []Node          `json:"nodes"`
+	SourceChains   []SourceChain   `json:"sourceChains"`
+	OffchainConfig cciptypes.Bytes `json:"offchainConfig"`
+}
+
+// Node mirrors RMNHome.sol's Node struct
+type Node struct {
+	PeerID            cciptypes.Bytes32 `json:"peerId"`
+	OffchainPublicKey cciptypes.Bytes32 `json:"offchainPublicKey"`
+}
+
+// SourceChain mirrors RMNHome.sol's SourceChain struct
+type SourceChain struct {
+	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
+	MinObservers        uint64                  `json:"minObservers"`
+	ObserverNodesBitmap cciptypes.BigInt        `json:"observerNodesBitmap"`
+}
+
+var _ RMNHome = (*rmnHomePoller)(nil)

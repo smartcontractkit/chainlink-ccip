@@ -78,7 +78,7 @@ const (
 
 	// RMNHome.sol methods
 	// Used by the rmn home reader.
-	MethodNameGetAllConfigs = "getAllConfigs"
+	MethodNameGetAllConfigs = "GetAllConfigs"
 )
 
 // Event Names
