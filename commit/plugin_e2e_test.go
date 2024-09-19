@@ -218,10 +218,16 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
+
+			// discover contracts on the first round
 			res, err := runner.RunRound(ctx)
 			assert.NoError(t, err)
-
 			decodedOutcome, err := DecodeOutcome(res.Outcome)
+			assert.NoError(t, err)
+
+			res, err = runner.RunRound(ctx)
+			assert.NoError(t, err)
+			decodedOutcome, err = DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expOutcome, decodedOutcome)
 
@@ -335,6 +341,9 @@ func setupNode(
 		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
 			ctx, ch, destChain).Return(offRampNextSeqNum[ch]+1, nil).Maybe()
 	}
+
+	ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+	ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 
 	p := NewPlugin(
 		ctx,
