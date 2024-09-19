@@ -59,7 +59,7 @@ func TestProcessor_Query(t *testing.T) {
 		prevOutcome       Outcome
 		contractAddresses map[ccipocr3.ChainSelector]map[string][]byte
 		cfg               pluginconfig.CommitPluginConfig
-		rmnClient         func(t *testing.T) *rmnmocks.MockClient
+		rmnClient         func(t *testing.T) *rmnmocks.MockController
 		expQuery          Query
 		expErr            bool
 	}{
@@ -78,8 +78,8 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: 5 * time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockClient {
-				cl := rmnmocks.NewMockClient(t)
+			rmnClient: func(t *testing.T) *rmnmocks.MockController {
+				cl := rmnmocks.NewMockController(t)
 				cl.EXPECT().
 					ComputeReportSignatures(
 						mock.Anything,
@@ -128,8 +128,8 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockClient {
-				cl := rmnmocks.NewMockClient(t)
+			rmnClient: func(t *testing.T) *rmnmocks.MockController {
+				cl := rmnmocks.NewMockController(t)
 				time.Sleep(time.Millisecond)
 				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, rmn.ErrTimeout) // <------------------------------------ timeout error
@@ -156,8 +156,8 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockClient {
-				cl := rmnmocks.NewMockClient(t)
+			rmnClient: func(t *testing.T) *rmnmocks.MockController {
+				cl := rmnmocks.NewMockController(t)
 				time.Sleep(time.Millisecond)
 				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, fmt.Errorf("some error")) // <------------------------- some random error
@@ -176,7 +176,7 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: 5 * time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
+			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
 			expQuery:  Query{},
 			expErr:    false,
 		},
@@ -190,7 +190,7 @@ func TestProcessor_Query(t *testing.T) {
 				RMNSignaturesTimeout: 5 * time.Second,
 				DestChain:            dstChain,
 			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockClient { return rmnmocks.NewMockClient(t) },
+			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
 			expQuery:  Query{},
 			expErr:    false,
 		},
