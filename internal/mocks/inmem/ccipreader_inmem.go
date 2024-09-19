@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type MessagesWithMetadata struct {
@@ -19,7 +19,7 @@ type MessagesWithMetadata struct {
 
 type InMemoryCCIPReader struct {
 	// Reports that may be returned.
-	Reports []plugintypes.CommitPluginReportWithMeta
+	Reports []plugintypes2.CommitPluginReportWithMeta
 
 	// Messages that may be returned.
 	Messages map[cciptypes.ChainSelector][]MessagesWithMetadata
@@ -41,8 +41,8 @@ func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
-	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+	results := slicelib.Filter(r.Reports, func(report plugintypes2.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
 	if len(results) > limit {

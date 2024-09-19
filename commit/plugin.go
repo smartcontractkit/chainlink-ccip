@@ -21,12 +21,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
-type MerkleRootObservation = shared.AttributedObservation[merkleroot.Observation]
-type TokenPricesObservation = shared.AttributedObservation[tokenprice.Observation]
-type ChainFeeObservation = shared.AttributedObservation[chainfee.Observation]
+type MerkleRootObservation = plugincommon.AttributedObservation[merkleroot.Observation]
+type TokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
+type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
 	nodeID              commontypes.OracleID
@@ -40,9 +39,9 @@ type Plugin struct {
 	homeChain           reader.HomeChain
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
-	merkleRootProcessor shared.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
-	tokenPriceProcessor shared.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
-	chainFeeProcessor   shared.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
+	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
+	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
+	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	rmnConfig           rmn.Config
 }
 

@@ -9,8 +9,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 var (
@@ -24,7 +25,7 @@ type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
 
 func NewCCIPChainReader(
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]contractreader2.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
@@ -61,7 +62,7 @@ type CCIPReader interface {
 		dest cciptypes.ChainSelector,
 		ts time.Time,
 		limit int,
-	) ([]plugintypes.CommitPluginReportWithMeta, error)
+	) ([]plugintypes2.CommitPluginReportWithMeta, error)
 
 	// ExecutedMessageRanges reads the destination chain and finds which messages are executed.
 	// A slice of sequence number ranges is returned to express which messages are executed.

@@ -9,12 +9,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
+	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 )
 
 func TestExtendedContractReader(t *testing.T) {
 	const contractName = "testContract"
-	cr := chainreadermocks.NewMockContractReader(t)
+	cr := chainreadermocks.NewMockContractReaderFacade(t)
 	extCr := NewExtendedContractReader(cr)
 
 	bindings := extCr.GetBindings(contractName)

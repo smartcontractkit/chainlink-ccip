@@ -6,9 +6,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -16,7 +14,10 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type PriceReader interface {
@@ -31,12 +32,12 @@ type PriceReader interface {
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
 		tokens []ocr2types.Account,
-	) (map[ocr2types.Account]shared.TimestampedBig, error)
+	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
 }
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
-	ContractReader   commontypes.ContractReader
+	ContractReader   contractreader.ContractReaderFacade
 	TokenInfo        map[types.Account]pluginconfig.TokenInfo
 	FeeQuoterAddress types.Account
 	// If not enabled just return empty prices
@@ -45,7 +46,7 @@ type OnchainTokenPricesReader struct {
 }
 
 func NewOnchainTokenPricesReader(
-	contractReader commontypes.ContractReader,
+	contractReader contractreader.ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
@@ -69,10 +70,10 @@ type LatestRoundData struct {
 func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
-) (map[ocr2types.Account]shared.TimestampedBig, error) {
-	var updates []shared.TimestampedBig
+) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
+	var updates []plugintypes.TimestampedBig
 	if !pr.enabled {
-		return map[types.Account]shared.TimestampedBig{}, nil
+		return map[types.Account]plugintypes.TimestampedBig{}, nil
 	}
 
 	boundContract := commontypes.BoundContract{
@@ -92,7 +93,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 		return nil, fmt.Errorf("failed to get token prices: %w", err)
 	}
 
-	updateMap := make(map[ocr2types.Account]shared.TimestampedBig)
+	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == time.Unix(0, 0) {
@@ -116,7 +117,7 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		idx := idx
 		token := token
 		eg.Go(func() error {
-			//TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
+			// TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
 			// are merged we'll need to use the bound contract
 			boundContract := commontypes.BoundContract{
 				Address: pr.TokenInfo[token].AggregatorAddress,

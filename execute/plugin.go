@@ -156,6 +156,7 @@ func getPendingExecutedReports(
 //
 // Phase 2: Gather messages from the source chains and build the execution
 // report.
+// nolint:gocyclo // todo
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
@@ -358,6 +359,7 @@ func selectReport(
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
+// nolint:gocyclo // todo
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {

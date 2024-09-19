@@ -13,9 +13,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
+	reader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -28,39 +30,42 @@ var (
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*chainreadermocks.MockContractReader)
+	sourceCRs := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = chainreadermocks.NewMockContractReader(t)
+		sourceCRs[chain] = reader.NewMockContractReaderFacade(t)
+		sourceCRs[chain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	}
 
-	destCR := chainreadermocks.NewMockContractReader(t)
-
-	destCR.On(
-		"GetLatestValue",
+	destCR := reader.NewMockContractReaderFacade(t)
+	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-	).Run(func(args mock.Arguments) {
-		sourceChain := args.Get(3).(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
-		v := args.Get(4).(*sourceChainConfig)
+	).Run(func(
+		ctx context.Context,
+		readIdentifier string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params interface{},
+		returnVal interface{},
+	) {
+		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
+		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
 	}).Return(nil)
 
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		logger.Test(t),
-		map[cciptypes.ChainSelector]types.ContractReader{
+		map[cciptypes.ChainSelector]reader2.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
 	)
 
-	sourceCRs[chainA].On("Bind", mock.Anything, mock.Anything).Return(nil)
-	sourceCRs[chainB].On("Bind", mock.Anything, mock.Anything).Return(nil)
-	destCR.On("Bind", mock.Anything, mock.Anything).Return(nil)
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
 		context.Background(), []types.BoundContract{{Name: "OnRamp", Address: "0x1"}}))
 	require.NoError(t, ccipReader.contractReaders[chainB].Bind(

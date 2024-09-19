@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 // Processor is the processor responsible for
@@ -68,4 +67,4 @@ func NewProcessor(
 	}
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}

@@ -7,7 +7,7 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
 
 type Processor struct {
@@ -32,7 +32,7 @@ func (w *Processor) Observation(
 func (w *Processor) Outcome(
 	prevOutcome Outcome,
 	query Query,
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	return Outcome{}, nil
 }
@@ -40,9 +40,9 @@ func (w *Processor) Outcome(
 func (w *Processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,
-	ao shared.AttributedObservation[Observation],
+	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	//TODO: Validate token prices
+	// TODO: Validate token prices
 	return nil
 }
 
@@ -62,4 +62,4 @@ func validateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
 	return nil
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}

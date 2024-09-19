@@ -208,6 +208,7 @@ func (c *client) sendObservationRequests(
 	return requestIDs
 }
 
+// nolint:gocyclo // todo
 func (c *client) listenForRmnObservationResponses(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
@@ -314,6 +315,7 @@ func (c *client) listenForRmnObservationResponses(
 	}
 }
 
+// nolint:gocyclo // todo
 func (c *client) validateSignedObservationResponse(
 	rmnNodeID NodeID,
 	lurs map[uint64]updateRequestWithMeta,
@@ -374,6 +376,7 @@ func (c *client) validateSignedObservationResponse(
 	return nil
 }
 
+// nolint:gocyclo // todo
 func (c *client) getRmnReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
@@ -520,6 +523,7 @@ type reportSigWithNodeID struct {
 	signerAddress cciptypes.Bytes
 }
 
+// nolint:gocyclo // todo
 func (c *client) listenForRmnReportSignatures(
 	ctx context.Context,
 	requestIDs mapset.Set[uint64],
