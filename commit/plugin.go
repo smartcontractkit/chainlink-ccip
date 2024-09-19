@@ -209,6 +209,7 @@ func (p *Plugin) Observation(
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		ChainFeeObs:   chainFeeObs,
+		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
 	return obs.Encode()
