@@ -14,6 +14,8 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
+            RMNHome:
+            RMNRemote:
             CCIP:
             PriceReader:
     github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader:
