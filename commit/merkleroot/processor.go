@@ -26,7 +26,7 @@ type Processor struct {
 	ccipReader   readerpkg.CCIPReader
 	reportingCfg ocr3types.ReportingPluginConfig
 	chainSupport plugincommon.ChainSupport
-	rmnClient    rmn.Client
+	rmnClient    rmn.Controller
 	rmnCrypto    cciptypes.RMNCrypto
 	rmnConfig    rmn.Config
 }
@@ -41,7 +41,7 @@ func NewProcessor(
 	msgHasher cciptypes.MessageHasher,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	chainSupport plugincommon.ChainSupport,
-	rmnClient rmn.Client,
+	rmnClient rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnConfig rmn.Config,
 ) *Processor {

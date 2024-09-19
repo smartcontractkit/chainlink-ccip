@@ -27,7 +27,7 @@ packages:
             PluginProcessor:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
-            Client:
+            Controller:
     github.com/smartcontractkit/chainlink-ccip/pkg/reader:
         interfaces:
             CCIPReader:
