@@ -59,6 +59,11 @@ func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	rmnConfig rmn.Config,
 ) *Plugin {
+	if cfg.MaxMerkleTreeSize == 0 {
+		lggr.Warnw("MaxMerkleTreeSize not set, using default value", "default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
+		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
+	}
+
 	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
 		lggr,
 		ccipReader,
@@ -76,11 +81,6 @@ func NewPlugin(
 		nodeID,
 		cfg.DestChain,
 	)
-
-	if cfg.MaxMerkleTreeSize == 0 {
-		lggr.Warnw("MaxMerkleTreeSize not set, using default value", "default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
-		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
-	}
 
 	merkleRootProcessor := merkleroot.NewProcessor(
 		nodeID,
