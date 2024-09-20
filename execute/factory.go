@@ -51,6 +51,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr              logger.Logger
+	donID             uint32
 	ocrConfig         reader.OCR3ConfigWithMeta
 	execCodec         cciptypes.ExecutePluginCodec
 	msgHasher         cciptypes.MessageHasher
@@ -63,6 +64,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID uint32,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
@@ -74,6 +76,7 @@ func NewPluginFactory(
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:              lggr,
+		donID:             donID,
 		ocrConfig:         ocrConfig,
 		execCodec:         execCodec,
 		msgHasher:         msgHasher,
@@ -122,6 +125,7 @@ func (p PluginFactory) NewReportingPlugin(
 	)
 
 	return NewPlugin(
+			p.donID,
 			config,
 			pluginconfig.ExecutePluginConfig{
 				DestChain:      p.ocrConfig.Config.ChainSelector,

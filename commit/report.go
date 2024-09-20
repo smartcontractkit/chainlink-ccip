@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -84,6 +85,13 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
+	// we only transmit reports if we are the "blue" instance.
+	// we can check this by reading the OCR conigs home chain.
+	if p.isGreenInstance(ctx) {
+		p.lggr.Infow("not the blue instance, skipping report transmission")
+		return false, nil
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
@@ -103,4 +111,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 	return true, nil
+}
+
+func (p *Plugin) isGreenInstance(ctx context.Context) bool {
+	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeCommit)
+	if err != nil {
+		p.lggr.Errorw("failed to get ocr configs from home chain", "err", err)
+		return false
+	}
+
+	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest
 }
