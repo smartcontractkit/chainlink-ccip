@@ -133,6 +133,7 @@ const (
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
 	MissingNonce                  messageStatus = "missing_nonce"
 	InvalidNonce                  messageStatus = "invalid_nonce"
+	TooCostly                     messageStatus = "tooCostly"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
@@ -196,6 +197,29 @@ func (b *execReportBuilder) checkMessage(
 		"data", messageTokenData.ToByteSlice())
 
 	// 3. Check if the message has a valid nonce.
+	status := b.checkMessageNonce(msg, execReport)
+	if status != "" {
+		return execReport, status, nil
+	}
+
+	// 4. Check if the message is too costly to execute.
+	if slices.Contains(execReport.CostlyMessages, msg.Header.MessageID) {
+		b.lggr.Infow(
+			"message too costly to execute",
+			"messageID", msg.Header.MessageID,
+			"sourceChain", execReport.SourceChain,
+			"seqNum", msg.Header.SequenceNumber,
+			"messageState", TooCostly)
+		return execReport, TooCostly, nil
+	}
+
+	return result, ReadyToExecute, nil
+}
+
+func (b *execReportBuilder) checkMessageNonce(
+	msg cciptypes.Message,
+	execReport exectypes.CommitData,
+) messageStatus {
 	if msg.Header.Nonce != 0 {
 		// Sequenced messages have non-zero nonces.
 
@@ -205,7 +229,7 @@ func (b *execReportBuilder) checkMessage(
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", MissingNoncesForChain)
-			return execReport, MissingNoncesForChain, nil
+			return MissingNoncesForChain
 		}
 
 		chainNonces := b.sendersNonce[execReport.SourceChain]
@@ -216,7 +240,7 @@ func (b *execReportBuilder) checkMessage(
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", MissingNonce)
-			return execReport, MissingNonce, nil
+			return MissingNonce
 		}
 
 		if b.expectedNonce == nil {
@@ -240,14 +264,12 @@ func (b *execReportBuilder) checkMessage(
 				"have", msg.Header.Nonce,
 				"want", b.expectedNonce[execReport.SourceChain][sender],
 				"messageState", InvalidNonce)
-			return execReport, InvalidNonce, nil
+			return InvalidNonce
 		}
 		b.expectedNonce[execReport.SourceChain][sender] = b.expectedNonce[execReport.SourceChain][sender] + 1
 	}
 
-	// TODO: Check for fee boost
-
-	return result, ReadyToExecute, nil
+	return ""
 }
 
 func (b *execReportBuilder) verifyReport(
