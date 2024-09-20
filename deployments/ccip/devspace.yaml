@@ -509,6 +509,9 @@ profiles:
             "./values-profiles/values-dev-eks-bix-ship.yaml",
             "./values-profiles/values-bix-ship-new-chain.yaml",
           ]
+      - op: add
+        path: deployments.ccip-scripts.helm.valuesFiles
+        value: ["./values-profiles/values-dev-eks-bix-ship-ccip-scripts.yaml"]
       - op: replace
         path: deployments.app.helm.values.geth.enabled
         value: false
