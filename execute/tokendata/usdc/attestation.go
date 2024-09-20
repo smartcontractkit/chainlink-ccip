@@ -5,6 +5,9 @@ import (
 	"errors"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 )
 
 var (
@@ -32,8 +35,8 @@ type AttestationStatus struct {
 type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
-		msgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte,
-	) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus, error)
+		msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error)
 }
 
 type FakeAttestationClient struct {
@@ -42,19 +45,15 @@ type FakeAttestationClient struct {
 
 func (f FakeAttestationClient) Attestations(
 	_ context.Context,
-	msgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int][]byte,
-) (map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus, error) {
-	outcome := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]map[int]AttestationStatus)
+	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
+	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
 
-	for chainSelector, chainMessages := range msgs {
-		outcome[chainSelector] = make(map[cciptypes.SeqNum]map[int]AttestationStatus)
+	for chainSelector, hashes := range msgs {
+		outcome[chainSelector] = make(map[exectypes.MessageTokenID]AttestationStatus)
 
-		for seqNum, messages := range chainMessages {
-			outcome[chainSelector][seqNum] = make(map[int]AttestationStatus)
-
-			for index := range messages {
-				outcome[chainSelector][seqNum][index] = f.Data[string(messages[index])]
-			}
+		for tokenID, messageHash := range hashes {
+			outcome[chainSelector][tokenID] = f.Data[string(messageHash)]
 		}
 	}
 	return outcome, nil

@@ -76,8 +76,8 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					12: internal.MessageWithTokens(t, avalancheUSDCPool),
 				},
 			},
-			usdcReader: reader.FakeUSDCMessageReader{
-				Messages: map[cciptypes.SeqNum]map[int][]byte{
+			usdcReader: reader.NewFakeUSDCMessageReader(
+				map[cciptypes.SeqNum]map[int][]byte{
 					10: {
 						0: []byte("message10"),
 					},
@@ -85,7 +85,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 						0: []byte("message12"),
 					},
 				},
-			},
+			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
 					"message10": {Data: [32]byte{10_1}},
@@ -111,8 +111,8 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					13: internal.MessageWithTokens(t),
 				},
 			},
-			usdcReader: reader.FakeUSDCMessageReader{
-				Messages: map[cciptypes.SeqNum]map[int][]byte{
+			usdcReader: reader.NewFakeUSDCMessageReader(
+				map[cciptypes.SeqNum]map[int][]byte{
 					10: {
 						1: []byte("message10_1"),
 					},
@@ -123,7 +123,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 						2: []byte("message12_2"),
 					},
 				},
-			},
+			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
 					"message10_1": {Data: [32]byte{10_1}},
@@ -161,8 +161,8 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					12: internal.MessageWithTokens(t, avalancheUSDCPool, avalancheUSDCPool),
 				},
 			},
-			usdcReader: reader.FakeUSDCMessageReader{
-				Messages: map[cciptypes.SeqNum]map[int][]byte{
+			usdcReader: reader.NewFakeUSDCMessageReader(
+				map[cciptypes.SeqNum]map[int][]byte{
 					10: {
 						0: []byte("message10_0"),
 						1: []byte("message10_1"),
@@ -173,7 +173,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 						1: []byte("message12_1"),
 					},
 				},
-			},
+			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
 					"message10_0": {Data: [32]byte{10_0}},
@@ -206,14 +206,14 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 					10: internal.MessageWithTokens(t, ethereumUSDCPool, ethereumUSDCPool, internal.RandBytes().String()),
 				},
 			},
-			usdcReader: reader.FakeUSDCMessageReader{
-				Messages: map[cciptypes.SeqNum]map[int][]byte{
+			usdcReader: reader.NewFakeUSDCMessageReader(
+				map[cciptypes.SeqNum]map[int][]byte{
 					10: {
 						0: []byte("message10_0"),
 						1: []byte("message10_1"),
 					},
 				},
-			},
+			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
 					"message10_0": {Data: [32]byte{10_0}},
