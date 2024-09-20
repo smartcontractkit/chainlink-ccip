@@ -59,6 +59,11 @@ pipelines:
         short: o
         type: string
         description: "If specified, the specified tag will be used instead of building a new image"
+      - name: decouple
+        short: e
+        type: bool
+        default: false
+        description: "If specified, the DON deployment will be decoupled from the ccip-scripts deployment"
     run: |-
       # Source the shared functions file.
       # shellcheck disable=SC1091
@@ -71,7 +76,10 @@ pipelines:
         run_dependency_pipelines grafana
       fi
 
+      # If the decouple flag is set, only deploy the DON component
+      decoupled=$(get_flag "decouple")
       tagOverride=$(get_flag "override-image-tag")
+
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image"
@@ -82,7 +90,10 @@ pipelines:
         done
 
         create_deployments app $args
-        create_deployments ccip-scripts
+
+        if [ "${decoupled}" = false ]; then
+          create_deployments ccip-scripts
+        fi
       elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
         echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
@@ -90,31 +101,37 @@ pipelines:
       else
         build_images --all
         create_deployments app
+      fi
+
+      if [ "${decoupled}" = false ]; then
         create_deployments ccip-scripts
-      fi
 
-      if [ "${CCIP_UI_ENABLED}" = "false" ]; then
-        echo "Deployment of CCIP UI component is disabled. In order to enable it set the CCIP_UI_ENABLED ENV value to true"
-      fi
+        if [ "${CCIP_UI_ENABLED}" = "false" ]; then
+          echo "Deployment of CCIP UI component is disabled. In order to enable it set the CCIP_UI_ENABLED ENV value to true"
+        fi
 
-      # Check if ATLAS_ENABLED is set and equals "true"
-      if [ "${ATLAS_ENABLED}" = "true" ]; then
-          # Execute the command
-          run_pipelines atlas
+        # Check if ATLAS_ENABLED is set and equals "true"
+        if [ "${ATLAS_ENABLED}" = "true" ]; then
+            # Execute the command
+            run_pipelines atlas
 
-          # Check if CCIP_UI_ENABLED is set and equals "true"
-          if [ "${CCIP_UI_ENABLED}" = "true" ]; then
-              # Execute the command
-              run_pipelines ccip-ui
-          fi
-      else
-          echo "Deployment of Atlas components is disabled. In order to enable it set the ATLAS_ENABLED ENV value to true"
-          if [ "${CCIP_UI_ENABLED}" = "true" ]; then
-              echo "Warning: Deployment of CCIP UI component requires ATLAS_ENABLED set to true. CCIP UI component won't be deployed."
-          fi
+            # Check if CCIP_UI_ENABLED is set and equals "true"
+            if [ "${CCIP_UI_ENABLED}" = "true" ]; then
+                # Execute the command
+                run_pipelines ccip-ui
+            fi
+        else
+            echo "Deployment of Atlas components is disabled. In order to enable it set the ATLAS_ENABLED ENV value to true"
+            if [ "${CCIP_UI_ENABLED}" = "true" ]; then
+                echo "Warning: Deployment of CCIP UI component requires ATLAS_ENABLED set to true. CCIP UI component won't be deployed."
+            fi
+        fi
       fi
 
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
+  ccip-scripts:
+    run: |-
+      create_deployments ccip-scripts
 
 commands:
   get_test_input:
