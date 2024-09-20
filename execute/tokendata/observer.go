@@ -44,8 +44,12 @@ type compositeTokenDataObserver struct {
 // Slice of []pluginconfig.TokenDataObserverConfig must be deduped and validated by the plugin.
 // Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
 // This constructor that should be used by the plugin.
-// nolint unexported-return
-func NewConfigBasedCompositeObservers(lggr logger.Logger, config []pluginconfig.TokenDataObserverConfig) (*compositeTokenDataObserver, error) {
+//
+//nolint:revive
+func NewConfigBasedCompositeObservers(
+	lggr logger.Logger,
+	config []pluginconfig.TokenDataObserverConfig,
+) (*compositeTokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
 		// TODO consider if we can get rid of this switch stmt by moving the logic to the config
@@ -63,7 +67,8 @@ func NewConfigBasedCompositeObservers(lggr logger.Logger, config []pluginconfig.
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.
 // Created mostly for tests purposes, it allows the user to specify custom observers and skip the part
 // in which we match the configuration to the proper TokenDataObserver.
-// nolint unexported-return
+//
+//nolint:revive
 func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) *compositeTokenDataObserver {
 	return &compositeTokenDataObserver{lggr: lggr, observers: observers}
 }
