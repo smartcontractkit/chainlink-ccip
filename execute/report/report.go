@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -133,6 +134,7 @@ const (
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
 	MissingNonce                  messageStatus = "missing_nonce"
 	InvalidNonce                  messageStatus = "invalid_nonce"
+	CostIsGreaterThanBoostedFee   messageStatus = "cost_is_greater_than_boosted_fee"
 	/*
 		SenderAlreadySkipped                 messageStatus = "sender_already_skipped"
 		MessageMaxGasCalcError               messageStatus = "message_max_gas_calc_error"
@@ -196,6 +198,23 @@ func (b *execReportBuilder) checkMessage(
 		"data", messageTokenData.ToByteSlice())
 
 	// 3. Check if the message has a valid nonce.
+	status := b.checkMessageNonce(msg, execReport)
+	if status != "" {
+		return execReport, status, nil
+	}
+
+	// If enabled, check if the message cost is greater than the boosted fee
+	if b.messageExecutionEconomicsEnabled && messageCostIsGreaterThanBoostedFee(msg, b.prices) {
+		return execReport, CostIsGreaterThanBoostedFee, nil
+	}
+
+	return result, ReadyToExecute, nil
+}
+
+func (b *execReportBuilder) checkMessageNonce(
+	msg cciptypes.Message,
+	execReport exectypes.CommitData,
+) messageStatus {
 	if msg.Header.Nonce != 0 {
 		// Sequenced messages have non-zero nonces.
 
@@ -205,7 +224,7 @@ func (b *execReportBuilder) checkMessage(
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", MissingNoncesForChain)
-			return execReport, MissingNoncesForChain, nil
+			return MissingNoncesForChain
 		}
 
 		chainNonces := b.sendersNonce[execReport.SourceChain]
@@ -216,7 +235,7 @@ func (b *execReportBuilder) checkMessage(
 				"sourceChain", execReport.SourceChain,
 				"seqNum", msg.Header.SequenceNumber,
 				"messageState", MissingNonce)
-			return execReport, MissingNonce, nil
+			return MissingNonce
 		}
 
 		if b.expectedNonce == nil {
@@ -240,14 +259,44 @@ func (b *execReportBuilder) checkMessage(
 				"have", msg.Header.Nonce,
 				"want", b.expectedNonce[execReport.SourceChain][sender],
 				"messageState", InvalidNonce)
-			return execReport, InvalidNonce, nil
+			return InvalidNonce
 		}
 		b.expectedNonce[execReport.SourceChain][sender] = b.expectedNonce[execReport.SourceChain][sender] + 1
 	}
 
-	// TODO: Check for fee boost
+	return ""
+}
 
-	return result, ReadyToExecute, nil
+// Return true if the message cost is greater than the boosted fee.
+// The message fee is the fee that the sender paid to have their message be executed. The message cost is the estimated
+// cost of executing this message. Before the message is sent though CCIP, its fee is confirmed to be enough to cover
+// the cost of its execution. However, after this message is sent, the cost of executing this message may change, e.g.
+// due to a gas spike on the destination chain. If we only executed messages that had a fee greater than the cost of
+// execution, we would fail to execute messages when execution costs unexpectedly rise, which would be poor user
+// experience. To avoid this, we boost the fee of messages by a time-based factor: the longer the message has been
+// unexecuted, the more we boost the fee. This attempts to find a balance between not executing messages that are too
+// expensive to execute (where CCIP would lose money), and not leaving messages unexecuted for too long (which would be
+// a poor user experience).
+func messageCostIsGreaterThanBoostedFee(msg cciptypes.Message, prices exectypes.PriceObservations) bool {
+	msgCostUSD := getMessageCostUSD(msg, prices)
+	msgFeeUSD := getMessageFeeUSD(msg, prices)
+	boostedFeeUSD := boostMessageFee(msgFeeUSD)
+	return msgCostUSD.Cmp(boostedFeeUSD) > 0
+}
+
+// TODO: implement
+func getMessageCostUSD(_ cciptypes.Message, _ exectypes.PriceObservations) *big.Int {
+	return big.NewInt(0)
+}
+
+// TODO: implement
+func getMessageFeeUSD(_ cciptypes.Message, _ exectypes.PriceObservations) *big.Int {
+	return big.NewInt(0)
+}
+
+// TODO: implement
+func boostMessageFee(msgCostUSD *big.Int) *big.Int {
+	return msgCostUSD
 }
 
 func (b *execReportBuilder) verifyReport(

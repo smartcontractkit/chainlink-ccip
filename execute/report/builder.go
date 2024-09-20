@@ -26,9 +26,11 @@ func NewBuilder(
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider gas.EstimateProvider,
 	nonces map[cciptypes.ChainSelector]map[string]uint64,
+	prices exectypes.PriceObservations,
 	destChainSelector cciptypes.ChainSelector,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
+	messageExecutionEconomicsEnabled bool,
 ) ExecReportBuilder {
 	return &execReportBuilder{
 		ctx:  ctx,
@@ -39,10 +41,12 @@ func NewBuilder(
 		estimateProvider: estimateProvider,
 		sendersNonce:     nonces,
 		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
+		prices:           prices,
 
-		destChainSelector:  destChainSelector,
-		maxReportSizeBytes: maxReportSizeBytes,
-		maxGas:             maxGas,
+		destChainSelector:                destChainSelector,
+		maxReportSizeBytes:               maxReportSizeBytes,
+		maxGas:                           maxGas,
+		messageExecutionEconomicsEnabled: messageExecutionEconomicsEnabled,
 	}
 }
 
@@ -68,11 +72,13 @@ type execReportBuilder struct {
 	hasher           cciptypes.MessageHasher
 	estimateProvider gas.EstimateProvider
 	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
+	prices           exectypes.PriceObservations
 
 	// Config
-	destChainSelector  cciptypes.ChainSelector
-	maxReportSizeBytes uint64
-	maxGas             uint64
+	destChainSelector                cciptypes.ChainSelector
+	maxReportSizeBytes               uint64
+	maxGas                           uint64
+	messageExecutionEconomicsEnabled bool
 
 	// State
 	accumulated validationMetadata

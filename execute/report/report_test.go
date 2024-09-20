@@ -754,9 +754,11 @@ func Test_Builder_Build(t *testing.T) {
 				codec,
 				evm.EstimateProvider{},
 				tt.args.nonces,
+				exectypes.PriceObservations{},
 				1,
 				tt.args.maxReportSize,
 				tt.args.maxGasLimit,
+				false,
 			)
 
 			var updatedMessages []exectypes.CommitData

@@ -7,9 +7,10 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -797,11 +798,148 @@ func Test_getConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain)
+			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain, false)
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "getConsensusObservation(...)")
+		})
+	}
+}
+
+func Test_mergePriceObservations(t *testing.T) {
+	tests := []struct {
+		name    string
+		aos     []plugincommon.AttributedObservation[exectypes.Observation]
+		fChain  int
+		want    exectypes.PriceObservations
+		wantErr bool
+	}{
+		{
+			name: "valid observations",
+			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{
+							JuelPriceUSD:            cciptypes.NewBigIntFromInt64(100),
+							GasPrice:                cciptypes.NewBigIntFromInt64(200),
+							DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(300),
+							MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+								"msgID1": cciptypes.NewBigIntFromInt64(400),
+							},
+						},
+					},
+					OracleID: commontypes.OracleID(1),
+				},
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{
+							JuelPriceUSD:            cciptypes.NewBigIntFromInt64(110),
+							GasPrice:                cciptypes.NewBigIntFromInt64(210),
+							DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(310),
+							MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+								"msgID1": cciptypes.NewBigIntFromInt64(410),
+							},
+						},
+					},
+					OracleID: commontypes.OracleID(2),
+				},
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{
+							JuelPriceUSD:            cciptypes.NewBigIntFromInt64(120),
+							GasPrice:                cciptypes.NewBigIntFromInt64(220),
+							DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(320),
+							MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+								"msgID1": cciptypes.NewBigIntFromInt64(420),
+							},
+						},
+					},
+					OracleID: commontypes.OracleID(3),
+				},
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{
+							JuelPriceUSD:            cciptypes.NewBigIntFromInt64(130),
+							GasPrice:                cciptypes.NewBigIntFromInt64(230),
+							DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(330),
+							MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+								"msgID1": cciptypes.NewBigIntFromInt64(430),
+							},
+						},
+					},
+					OracleID: commontypes.OracleID(4),
+				},
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{
+							JuelPriceUSD:            cciptypes.NewBigIntFromInt64(140),
+							GasPrice:                cciptypes.NewBigIntFromInt64(240),
+							DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(340),
+							MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+								"msgID1": cciptypes.NewBigIntFromInt64(440),
+							},
+						},
+					},
+					OracleID: commontypes.OracleID(5),
+				},
+			},
+			fChain: 2,
+			want: exectypes.PriceObservations{
+				JuelPriceUSD:            cciptypes.NewBigIntFromInt64(120),
+				GasPrice:                cciptypes.NewBigIntFromInt64(220),
+				DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(320),
+				MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+					"msgID1": cciptypes.NewBigIntFromInt64(420),
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "not enough observations",
+			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{
+							JuelPriceUSD:            cciptypes.NewBigIntFromInt64(100),
+							GasPrice:                cciptypes.NewBigIntFromInt64(200),
+							DestNativeTokenPriceUSD: cciptypes.NewBigIntFromInt64(300),
+							MessageExecutionGasCosts: map[string]cciptypes.BigInt{
+								"msgID1": cciptypes.NewBigIntFromInt64(400),
+							},
+						},
+					},
+					OracleID: commontypes.OracleID(1),
+				},
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{},
+					},
+					OracleID: commontypes.OracleID(2),
+				},
+				{
+					Observation: exectypes.Observation{
+						Prices: exectypes.PriceObservations{},
+					},
+					OracleID: commontypes.OracleID(3),
+				},
+			},
+			fChain:  1,
+			want:    exectypes.PriceObservations{},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+			got, err := mergePriceObservations(lggr, tt.aos, tt.fChain)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
 		})
 	}
 }

@@ -265,6 +265,69 @@ func mergeMessageObservations(
 	return results, nil
 }
 
+// isNonEmptyPriceObservations returns true if each of the price/cost observations in the given observation are
+// non-empty.
+func isNonEmptyPriceObservations(obs exectypes.PriceObservations) bool {
+	return !obs.JuelPriceUSD.IsEmpty() && !obs.GasPrice.IsEmpty() && !obs.DestNativeTokenPriceUSD.IsEmpty() &&
+		len(obs.MessageExecutionGasCosts) > 0
+}
+
+// mergePriceObservations takes a list of observations and extracts and merges the price observations.
+func mergePriceObservations(
+	lggr logger.Logger,
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChainDest int,
+) (exectypes.PriceObservations, error) {
+	// filter out observations that don't have prices
+	priceObservations := make([]exectypes.PriceObservations, 0)
+	for _, ao := range aos {
+		if isNonEmptyPriceObservations(ao.Observation.Prices) {
+			priceObservations = append(priceObservations, ao.Observation.Prices)
+		}
+	}
+
+	if len(priceObservations) < 2*fChainDest+1 {
+		return exectypes.PriceObservations{}, fmt.Errorf(
+			"not enough price observations, required 2 * fChainDest + 1: %d, got: %d",
+			2*fChainDest+1, len(priceObservations),
+		)
+	}
+
+	// Aggregate observations
+	JuelPricesUSD := make([]cciptypes.BigInt, 0)
+	GasPrices := make([]cciptypes.BigInt, 0)
+	DestNativeTokenPricesUSD := make([]cciptypes.BigInt, 0)
+	MessageExecutionGasCosts := make(map[string][]cciptypes.BigInt)
+
+	for _, prices := range priceObservations {
+		JuelPricesUSD = append(JuelPricesUSD, prices.JuelPriceUSD)
+		GasPrices = append(GasPrices, prices.GasPrice)
+		DestNativeTokenPricesUSD = append(DestNativeTokenPricesUSD, prices.DestNativeTokenPriceUSD)
+		for k, v := range prices.MessageExecutionGasCosts {
+			MessageExecutionGasCosts[k] = append(MessageExecutionGasCosts[k], v)
+		}
+	}
+
+	aggregatedMessageExecutionGasCosts := consensus.GetConsensusMapAggregator(
+		lggr,
+		"MessageExecutionGasCosts",
+		MessageExecutionGasCosts,
+		consensus.MakeConstantThreshold[string](consensus.TwoFPlus1(fChainDest)),
+		func(vals []cciptypes.BigInt) cciptypes.BigInt {
+			return consensus.Median(vals, consensus.BigIntComparator)
+		},
+	)
+
+	result := exectypes.PriceObservations{
+		JuelPriceUSD:             consensus.Median(JuelPricesUSD, consensus.BigIntComparator),
+		GasPrice:                 consensus.Median(GasPrices, consensus.BigIntComparator),
+		DestNativeTokenPriceUSD:  consensus.Median(DestNativeTokenPricesUSD, consensus.BigIntComparator),
+		MessageExecutionGasCosts: aggregatedMessageExecutionGasCosts,
+	}
+
+	return result, nil
+}
+
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
@@ -391,6 +454,7 @@ func getConsensusObservation(
 	destChainSelector cciptypes.ChainSelector,
 	F int,
 	fChain map[cciptypes.ChainSelector]int,
+	messageExecutionEconomicsEnabled bool,
 ) (exectypes.Observation, error) {
 	if len(aos) < F {
 		return exectypes.Observation{}, fmt.Errorf("below F threshold")
@@ -419,6 +483,18 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
+	mergedPriceObservations := exectypes.PriceObservations{}
+	if messageExecutionEconomicsEnabled {
+		mergedPriceObservations, err = mergePriceObservations(lggr, aos, fChain[destChainSelector])
+		if err != nil {
+			return exectypes.Observation{}, fmt.Errorf("unable to merge price observations: %w", err)
+		}
+		lggr.Debugw(
+			fmt.Sprintf("[oracle %d] exec outcome: merged price observations", oracleID),
+			"oracle", oracleID,
+			"mergedPriceObservations", mergedPriceObservations)
+	}
+
 	mergedTokenObservations := mergeTokenObservations(aos, fChain)
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
@@ -435,6 +511,7 @@ func getConsensusObservation(
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations,
+		mergedPriceObservations,
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},

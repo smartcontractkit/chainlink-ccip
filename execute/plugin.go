@@ -9,12 +9,13 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -51,6 +52,11 @@ type Plugin struct {
 	tokenDataObserver tokendata.TokenDataObserver
 	estimateProvider  gas.EstimateProvider
 	lggr              logger.Logger
+	priceObserver     exectypes.PriceObserver
+
+	// If true, the Exec plugin will observe prices and message execution costs, and also not execute messages that
+	// are too expensive to execute.
+	messageExecutionEconomicsEnabled bool
 
 	// state
 	contractsInitialized bool
@@ -69,6 +75,17 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
+
+	// TODO: use a price observer that uses FeeQuoter and CCIPReader
+	staticPriceObserver := exectypes.StaticPriceObserver{
+		PriceObservations: exectypes.PriceObservations{
+			JuelPriceUSD:             cciptypes.NewBigIntFromInt64(0),
+			GasPrice:                 cciptypes.NewBigIntFromInt64(0),
+			DestNativeTokenPriceUSD:  cciptypes.NewBigIntFromInt64(0),
+			MessageExecutionGasCosts: make(map[string]cciptypes.BigInt),
+		},
+	}
+
 	return &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
@@ -81,6 +98,7 @@ func NewPlugin(
 		tokenDataObserver: tokenDataObserver,
 		estimateProvider:  estimateProvider,
 		lggr:              lggr,
+		priceObserver:     &staticPriceObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			lggr,
 			&ccipReader,
@@ -88,6 +106,7 @@ func NewPlugin(
 			cfg.DestChain,
 			reportingCfg.F,
 		),
+		messageExecutionEconomicsEnabled: false,
 	}
 }
 
@@ -210,7 +229,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil, nil, discoveryObs).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, exectypes.PriceObservations{}, nil, nil, discoveryObs).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -270,11 +289,14 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 		}
 
-		return exectypes.NewObservation(groupedCommits, messages, tkData, nil, discoveryObs).Encode()
+		return exectypes.NewObservation(
+			groupedCommits, messages, exectypes.PriceObservations{}, tkData, nil, discoveryObs).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
 		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
+
+		messages := make([]cciptypes.Message, 0)
 
 		// Collect unique senders.
 		for _, commitReport := range previousOutcome.PendingCommitReports {
@@ -285,6 +307,15 @@ func (p *Plugin) Observation(
 			for _, msg := range commitReport.Messages {
 				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
 				nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
+				messages = append(messages, msg)
+			}
+		}
+
+		prices := exectypes.PriceObservations{}
+		if p.messageExecutionEconomicsEnabled {
+			prices, err = p.priceObserver.ObservePrices(messages)
+			if err != nil {
+				return types.Observation{}, fmt.Errorf("unable to observe prices: %w", err)
 			}
 		}
 
@@ -300,7 +331,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nil, nonceObservations, discoveryObs).Encode()
+		return exectypes.NewObservation(nil, nil, prices, nil, nonceObservations, discoveryObs).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -419,7 +450,8 @@ func (p *Plugin) Outcome(
 	}
 
 	observation, err := getConsensusObservation(
-		p.lggr, decodedAos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
+		p.lggr, decodedAos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain,
+		p.messageExecutionEconomicsEnabled)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -469,9 +501,11 @@ func (p *Plugin) Outcome(
 			p.reportCodec,
 			p.estimateProvider,
 			observation.Nonces,
+			observation.Prices,
 			p.cfg.DestChain,
 			uint64(maxReportSizeBytes),
 			p.cfg.OffchainConfig.BatchGasLimit,
+			p.messageExecutionEconomicsEnabled,
 		)
 		outcomeReports, commitReports, err := selectReport(
 			p.lggr,

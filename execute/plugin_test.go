@@ -230,7 +230,7 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 				},
 			},
 		},
-	}, nil, nil, dt.Observation{})
+	}, exectypes.PriceObservations{}, nil, nil, dt.Observation{})
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -262,7 +262,9 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 			{MerkleRoot: root},
 		},
 	}
-	observation := exectypes.NewObservation(commitReports, nil, nil, nil, dt.Observation{})
+	observation := exectypes.NewObservation(
+		commitReports, nil, exectypes.PriceObservations{}, nil, nil, dt.Observation{},
+	)
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -355,7 +357,9 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := exectypes.NewObservation(commitReports, nil, nil, nil, dt.Observation{}).Encode()
+	observation, err := exectypes.NewObservation(
+		commitReports, nil, exectypes.PriceObservations{}, nil, nil, dt.Observation{},
+	).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -388,7 +392,9 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := exectypes.NewObservation(nil, messages, nil, nil, dt.Observation{}).Encode()
+	observation, err := exectypes.NewObservation(
+		nil, messages, exectypes.PriceObservations{}, nil, nil, dt.Observation{},
+	).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{

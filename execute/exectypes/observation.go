@@ -15,6 +15,21 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 // and sequence number.
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
+// PriceObservations contains prices and costs that can be used to compute message fees and execution costs in USD
+type PriceObservations struct {
+	// The price of Juels (the smallest denomination of LINK) in USD. Each CCIP message has a fee denominated in Juels.
+	JuelPriceUSD cciptypes.BigInt `json:"juelPriceUSD"`
+
+	// The price of gas in the destination chain, denoted in the native token of the destination chain
+	GasPrice cciptypes.BigInt `json:"gasPrice"`
+
+	// The price of the native token of the destination chain in USD
+	DestNativeTokenPriceUSD cciptypes.BigInt `json:"destNativeTokenPriceUSD"`
+
+	// Maps message IDs to the estimated gas cost of executing these messages
+	MessageExecutionGasCosts map[string]cciptypes.BigInt `json:"messageExecutionCosts"`
+}
+
 // NonceObservations contain the latest nonce for senders in the previously observed messages.
 // Nonces are organized by source chain selector and the string encoded sender address. The address
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
@@ -54,6 +69,11 @@ type Observation struct {
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
 
+	// Prices are determined during the third phase of execute.
+	// It contains the prices and costs that can be used to compute message fees and execution costs in USD, which are
+	// used to determine if messages should be executed.
+	Prices PriceObservations `json:"prices"`
+
 	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
 	Contracts dt.Observation `json:"contracts"`
 }
@@ -62,6 +82,7 @@ type Observation struct {
 func NewObservation(
 	commitReports CommitObservations,
 	messages MessageObservations,
+	prices PriceObservations,
 	tokenData TokenDataObservations,
 	nonces NonceObservations,
 	contracts dt.Observation,
@@ -69,6 +90,7 @@ func NewObservation(
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,
+		Prices:        prices,
 		TokenData:     tokenData,
 		Nonces:        nonces,
 		Contracts:     contracts,
@@ -89,3 +111,18 @@ func DecodeObservation(b []byte) (Observation, error) {
 	err := json.Unmarshal(b, &obs)
 	return obs, err
 }
+
+// PriceObserver observes a set of prices and costs, used to determine if messages should be executed.
+type PriceObserver interface {
+	ObservePrices([]cciptypes.Message) (PriceObservations, error)
+}
+
+type StaticPriceObserver struct {
+	PriceObservations PriceObservations
+}
+
+func (spo *StaticPriceObserver) ObservePrices([]cciptypes.Message) (PriceObservations, error) {
+	return spo.PriceObservations, nil
+}
+
+var _ PriceObserver = &StaticPriceObserver{}
