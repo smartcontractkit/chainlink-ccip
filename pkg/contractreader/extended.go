@@ -2,6 +2,7 @@ package contractreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -14,8 +15,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 )
 
-const ErrTooManyBindings = "contract binding not found"
-const ErrNoBindings = "no bindings found"
+var (
+	ErrTooManyBindings = errors.New("contract binding not found")
+	ErrNoBindings      = errors.New("no bindings found")
+)
 
 // Extended version of a ContractReader.
 type Extended interface {
