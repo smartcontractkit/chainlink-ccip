@@ -516,7 +516,7 @@ profiles:
         path: deployments.app.helm.values.geth.enabled
         value: false
       - op: replace
-        path: deployments.app.helm.upgradeArgs
+        path: deployments.ccip-scripts.helm.upgradeArgs
         value: ["--timeout", "20m"]
 
   # Resolve local chart versions for development
