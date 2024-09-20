@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 )
 
 // buildSingleChainReportHelper converts the on-chain event data stored in cciptypes.ExecutePluginCommitData into the
@@ -209,7 +210,15 @@ func (b *execReportBuilder) checkMessage(
 		}
 
 		chainNonces := b.sendersNonce[execReport.SourceChain]
-		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(b.destChainSelector))
+		sender, err := address.MakeAndEncodeAddress(msg.Sender[:], b.destChainSelector)
+		if err != nil {
+			b.lggr.Errorw("Skipping message - unable to encode sender address",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", execReport.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", MissingNonce)
+			return execReport, MissingNonce, nil
+		}
 		if _, ok := chainNonces[sender]; !ok {
 			b.lggr.Errorw("Skipping message - missing nonce",
 				"messageID", msg.Header.MessageID,
@@ -221,11 +230,11 @@ func (b *execReportBuilder) checkMessage(
 
 		if b.expectedNonce == nil {
 			// initialize expected nonce if needed.
-			b.expectedNonce = make(map[cciptypes.ChainSelector]map[string]uint64)
+			b.expectedNonce = make(map[cciptypes.ChainSelector]map[common.EncodedAddress]uint64)
 		}
 		if _, ok := b.expectedNonce[execReport.SourceChain]; !ok {
 			// initialize expected nonce if needed.
-			b.expectedNonce[execReport.SourceChain] = make(map[string]uint64)
+			b.expectedNonce[execReport.SourceChain] = make(map[common.EncodedAddress]uint64)
 		}
 		if _, ok := b.expectedNonce[execReport.SourceChain][sender]; !ok {
 			b.expectedNonce[execReport.SourceChain][sender] = chainNonces[sender] + 1

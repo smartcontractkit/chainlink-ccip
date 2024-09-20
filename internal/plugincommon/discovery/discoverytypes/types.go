@@ -1,6 +1,9 @@
 package discoverytypes
 
-import "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+import (
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+)
 
 // Outcome isn't needed for this processor.
 type Outcome struct {
@@ -14,7 +17,7 @@ type Query []byte
 // Observation of contract addresses.
 type Observation struct {
 	FChain map[ccipocr3.ChainSelector]int
-	OnRamp map[ccipocr3.ChainSelector][]byte
+	OnRamp map[ccipocr3.ChainSelector]common.Address
 
 	// TODO: some sort of request flag to avoid including this every time.
 	// Request bool

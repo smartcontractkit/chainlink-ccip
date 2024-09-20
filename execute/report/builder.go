@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -25,7 +26,7 @@ func NewBuilder(
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider gas.EstimateProvider,
-	nonces map[cciptypes.ChainSelector]map[string]uint64,
+	nonces map[cciptypes.ChainSelector]map[common.EncodedAddress]uint64,
 	destChainSelector cciptypes.ChainSelector,
 	maxReportSizeBytes uint64,
 	maxGas uint64,
@@ -38,7 +39,7 @@ func NewBuilder(
 		hasher:           hasher,
 		estimateProvider: estimateProvider,
 		sendersNonce:     nonces,
-		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
+		expectedNonce:    make(map[cciptypes.ChainSelector]map[common.EncodedAddress]uint64),
 
 		destChainSelector:  destChainSelector,
 		maxReportSizeBytes: maxReportSizeBytes,
@@ -67,7 +68,7 @@ type execReportBuilder struct {
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
 	estimateProvider gas.EstimateProvider
-	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
+	sendersNonce     map[cciptypes.ChainSelector]map[common.EncodedAddress]uint64
 
 	// Config
 	destChainSelector  cciptypes.ChainSelector
@@ -77,7 +78,7 @@ type execReportBuilder struct {
 	// State
 	accumulated validationMetadata
 	// expectedNonce is used to track nonces for multiple messages from the same sender.
-	expectedNonce map[cciptypes.ChainSelector]map[string]uint64
+	expectedNonce map[cciptypes.ChainSelector]map[common.EncodedAddress]uint64
 
 	// Result
 	execReports []cciptypes.ExecutePluginReportSingleChain

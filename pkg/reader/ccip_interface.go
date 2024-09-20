@@ -95,7 +95,7 @@ type CCIPReader interface {
 	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
-	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
+	GetContractAddress(contractName string, chain cciptypes.ChainSelector) (common.Address, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
 	// it must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
@@ -103,7 +103,7 @@ type CCIPReader interface {
 		ctx context.Context,
 		source, dest cciptypes.ChainSelector,
 		addresses []string,
-	) (map[string]uint64, error)
+	) (map[common.EncodedAddress]uint64, error)
 
 	// GasPrices reads the provided chains gas prices.
 	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)

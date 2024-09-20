@@ -9,6 +9,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -20,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -286,17 +287,21 @@ func (p *Plugin) Observation(
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
-		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
+		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[common.EncodedAddress]struct{})
 
 		// Collect unique senders.
 		for _, commitReport := range previousOutcome.PendingCommitReports {
 			if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
-				nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
+				nonceRequestArgs[commitReport.SourceChain] = make(map[common.EncodedAddress]struct{})
 			}
 
 			for _, msg := range commitReport.Messages {
-				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
-				nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
+				sender, err := address.MakeAddress(msg.Sender[:], p.cfg.DestChain)
+				if err != nil {
+					return types.Observation{}, fmt.Errorf("unable to make address: %w", err)
+				}
+				encoded, err := sender.Encode()
+				nonceRequestArgs[commitReport.SourceChain][encoded] = struct{}{}
 			}
 		}
 

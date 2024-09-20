@@ -22,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -56,17 +55,12 @@ func newCCIPChainReaderInternal(
 		panic("Unable to make offramp address")
 	}
 
-	encodedOfframp, err := offramp.Encode()
-	if err != nil {
-		panic("Unable to encode offramp address")
-	}
-
 	reader := &ccipChainReader{
 		lggr:            lggr,
 		contractReaders: crs,
 		contractWriters: contractWriters,
 		destChain:       destChain,
-		offrampAddress:  encodedOfframp,
+		offrampAddress:  offramp.Encode(),
 	}
 
 	contracts := ContractAddresses{
@@ -190,8 +184,13 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		}
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
+			addr, err := address.MakeAddress(tokenPriceUpdate.SourceToken, dest)
+			if err != nil {
+				return nil, fmt.Errorf("failed to make address: %w", err)
+			}
+
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: types2.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
+				TokenID: types2.Account(addr.Encode().String()),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
@@ -336,7 +335,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			msg.Message.Header.SequenceNumber >= seqNumRange.Start() &&
 			msg.Message.Header.SequenceNumber <= seqNumRange.End()
 
-		msg.Message.Header.OnRamp = onRampAddress
+		msg.Message.Header.OnRamp = onRampAddress.Bytes()
 
 		if valid {
 			msgs = append(msgs, msg.Message)
@@ -407,21 +406,21 @@ func (r *ccipChainReader) Nonces(
 	ctx context.Context,
 	sourceChainSelector, destChainSelector cciptypes.ChainSelector,
 	addresses []string,
-) (map[string]uint64, error) {
+) (map[common.EncodedAddress]uint64, error) {
 	if err := r.validateReaderExistence(destChainSelector); err != nil {
 		return nil, err
 	}
 
-	res := make(map[string]uint64)
+	res := make(map[common.EncodedAddress]uint64)
 	mu := new(sync.Mutex)
 	eg := new(errgroup.Group)
 
-	for _, address := range addresses {
-		address := address
+	for _, addr := range addresses {
+		addr := addr
 		eg.Go(func() error {
-			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
+			sender, err := address.MakeAndDecodeEncodedAddress(addr, sourceChainSelector)
 			if err != nil {
-				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
+				return fmt.Errorf("failed to convert address %s to bytes: %w", addr, err)
 			}
 
 			var resp uint64
@@ -437,11 +436,11 @@ func (r *ccipChainReader) Nonces(
 				&resp,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to get nonce for address %s: %w", address, err)
+				return fmt.Errorf("failed to get nonce for address %s: %w", addr, err)
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			res[address] = resp
+			res[sender.Encode()] = resp
 			return nil
 		})
 	}
@@ -498,18 +497,22 @@ func (r *ccipChainReader) DiscoverContracts(
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
+	nonceManager, err := address.MakeAddress(staticConfig.NonceManager, destChain)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert nonce manager address: %w", err)
+	}
 
 	// TODO: Lookup fee quoter?
 
 	// Build response object.
-	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))
+	onramps := make(map[cciptypes.ChainSelector]common.Address, len(chains))
 	for chain, cfg := range sourceConfigs {
 		onramps[chain] = cfg.OnRamp
 	}
-	resp := map[string]map[cciptypes.ChainSelector][]byte{
+	resp := map[string]map[cciptypes.ChainSelector]common.Address{
 		consts.ContractNameOnRamp: onramps,
 		consts.ContractNameNonceManager: {
-			destChain: staticConfig.NonceManager,
+			destChain: nonceManager,
 		},
 	}
 	return resp, nil
@@ -524,13 +527,11 @@ func (r *ccipChainReader) bindReaderContract(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
-	address []byte,
+	address common.Address,
 ) error {
 	if err := r.validateReaderExistence(chainSel); err != nil {
 		return fmt.Errorf("validate reader existence: %w", err)
 	}
-
-	encAddress := typeconv.AddressBytesToString(address, uint64(chainSel))
 
 	// Bind the contract address to the reader.
 	// If the same address exists -> no-op
@@ -538,7 +539,7 @@ func (r *ccipChainReader) bindReaderContract(
 	// If the contract not bound -> binds to the new address
 	if err := r.contractReaders[chainSel].Bind(ctx, []types.BoundContract{
 		{
-			Address: encAddress,
+			Address: address.Encode().String(),
 			Name:    contractName,
 		},
 	}); err != nil {
@@ -582,13 +583,14 @@ func (r *ccipChainReader) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) (common.Address, error) {
 	bindings := r.contractReaders[chain].GetBindings(contractName)
 	if len(bindings) != 1 {
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
 	}
 
-	addressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(chain))
+	addressBytes, err := address.MakeAndDecodeEncodedAddress(bindings[0].Binding.Address, chain)
+
 	if err != nil {
 		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
 	}
@@ -647,7 +649,7 @@ func (r *ccipChainReader) getSourceChainsConfig(
 //nolint:lll // It's a URL.
 type sourceChainConfig struct {
 	IsEnabled bool
-	OnRamp    []byte
+	OnRamp    common.Address
 	MinSeqNr  uint64
 }
 

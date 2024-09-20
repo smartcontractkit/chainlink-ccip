@@ -11,30 +11,38 @@ import (
 
 func init() {
 	registry.RegisterConstructors(1,
-		func(data []byte) common.Address {
-			return Address(data)
+		func(data []byte) (common.Address, error) {
+			return Address(data), nil
 		},
-		func(data string) common.EncodedAddress {
-			return EncodedAddress(data)
+		func(data string) (common.EncodedAddress, error) {
+			return EncodedAddress(data), nil
 		},
 	)
 }
 
 type Address []byte
 
-func (sa Address) Encode() (common.EncodedAddress, error) {
+func (a Address) Encode() common.EncodedAddress {
 	// TODO: not EIP-55. Fix this?
-	return EncodedAddress("0x" + hex.EncodeToString(sa)), nil
+	return EncodedAddress("0x" + hex.EncodeToString(a))
+}
+
+func (a Address) Bytes() []byte {
+	return a
 }
 
 type EncodedAddress string
 
-func (esa EncodedAddress) Decode() (common.Address, error) {
+func (ea EncodedAddress) Decode() (common.Address, error) {
 	// lower case in case EIP-55 and trim 0x prefix if there
-	addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(string(esa), "0x")))
+	addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(string(ea), "0x")))
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode EVM address '%s': %w", esa, err)
+		return nil, fmt.Errorf("failed to decode EVM address '%s': %w", ea, err)
 	}
 
 	return Address(addrBytes), nil
+}
+
+func (ea EncodedAddress) String() string {
+	return string(ea)
 }

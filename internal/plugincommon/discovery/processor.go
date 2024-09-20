@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -102,7 +103,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	fChain := plugincommon.GetConsensusMap(cdp.lggr, "fChain", fChainObs, fMin)
 
 	// onramp address consensus
-	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
+	onrampAddrs := make(map[cciptypes.ChainSelector][]common.Address)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
 			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
@@ -110,7 +111,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	// call Sync to bind contracts.
-	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
+	contracts := make(reader.ContractAddresses)
 	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -28,7 +29,7 @@ type InMemoryCCIPReader struct {
 	Dest cciptypes.ChainSelector
 }
 
-func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) (common.Address, error) {
 	panic("not implemented")
 }
 
@@ -112,7 +113,7 @@ func (r InMemoryCCIPReader) Nonces(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
 	addresses []string,
-) (map[string]uint64, error) {
+) (map[common.EncodedAddress]uint64, error) {
 	return nil, nil
 }
 

@@ -7,8 +7,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-type AddressConstructor func(data []byte) common.Address
-type EncodedAddressConstructor func(data string) common.EncodedAddress
+type AddressConstructor func(data []byte) (common.Address, error)
+type EncodedAddressConstructor func(data string) (common.EncodedAddress, error)
 
 type constructors struct {
 	addressConstructor        AddressConstructor
@@ -38,7 +38,7 @@ func MakeAddress(data []byte, chainSel ccipocr3.ChainSelector) (common.Address, 
 		return nil, fmt.Errorf("no constructors registered for chain %d", chainSel)
 	}
 
-	return constructors.addressConstructor(data), nil
+	return constructors.addressConstructor(data)
 }
 
 func MakeEncodedAddress(data string, chainSel ccipocr3.ChainSelector) (common.EncodedAddress, error) {
@@ -47,5 +47,5 @@ func MakeEncodedAddress(data string, chainSel ccipocr3.ChainSelector) (common.En
 		return nil, fmt.Errorf("no constructors registered for chain %d", chainSel)
 	}
 
-	return constructors.encodedAddressConstructor(data), nil
+	return constructors.encodedAddressConstructor(data)
 }
