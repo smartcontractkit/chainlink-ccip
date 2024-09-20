@@ -87,7 +87,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// we only transmit reports if we are the "blue" instance.
 	// we can check this by reading the OCR conigs home chain.
-	if p.isGreenInstance(ctx) {
+	isGreen, err := p.isGreenInstance(ctx)
+	if err != nil {
+		return false, fmt.Errorf("isGreenInstance: %w", err)
+	}
+
+	if isGreen {
 		p.lggr.Infow("not the blue instance, skipping report transmission")
 		return false, nil
 	}
@@ -113,12 +118,11 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	return true, nil
 }
 
-func (p *Plugin) isGreenInstance(ctx context.Context) bool {
+func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
 	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeCommit)
 	if err != nil {
-		p.lggr.Errorw("failed to get ocr configs from home chain", "err", err)
-		return false
+		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest
+	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }
