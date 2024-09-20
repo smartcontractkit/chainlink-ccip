@@ -14,29 +14,29 @@ import (
 
 type tokenDataObserver struct {
 	lggr              logger.Logger
-	config            pluginconfig.USDCCCTPObserverConfig
+	destChainSelector cciptypes.ChainSelector
 	supportedTokens   map[string]struct{}
 	usdcMessageReader reader.USDCMessageReader
 	attestationClient AttestationClient
-	destChainSelector cciptypes.ChainSelector
 }
 
 //nolint:revive
 func NewTokenDataObserver(
 	lggr logger.Logger,
-	config pluginconfig.USDCCCTPObserverConfig,
+	destChainSelector cciptypes.ChainSelector,
+	tokens map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
 	usdcMessageReader reader.USDCMessageReader,
 	attestationClient AttestationClient,
 ) *tokenDataObserver {
 	supportedTokens := make(map[string]struct{})
-	for chainSelector, tokenConfig := range config.Tokens {
+	for chainSelector, tokenConfig := range tokens {
 		key := sourceTokenIdentifier(chainSelector, tokenConfig.SourcePoolAddress)
 		supportedTokens[key] = struct{}{}
 	}
 
 	return &tokenDataObserver{
 		lggr:              lggr,
-		config:            config,
+		destChainSelector: destChainSelector,
 		supportedTokens:   supportedTokens,
 		usdcMessageReader: usdcMessageReader,
 		attestationClient: attestationClient,

@@ -101,7 +101,13 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 
-	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(p.lggr, offchainConfig.TokenDataObservers)
+	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+		p.lggr,
+		p.ocrConfig.Config.ChainSelector,
+		offchainConfig.TokenDataObservers,
+		// FIXME contract readers should be `exteded` to support the new interface
+		nil, //p.contractReaders,
+	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}

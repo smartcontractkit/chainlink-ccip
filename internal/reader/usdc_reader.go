@@ -44,7 +44,6 @@ var CCTPDestDomains = map[uint64]uint32{
 }
 
 type usdcMessageReader struct {
-	config          pluginconfig.USDCCCTPObserverConfig
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	cctpDestDomain  map[uint64]uint32
 	eventIndex      int
@@ -71,10 +70,10 @@ func (m messageSentEvent) unpackID() (eventID, error) {
 }
 
 func NewUSDCMessageReader(
-	config pluginconfig.USDCCCTPObserverConfig,
+	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 ) (USDCMessageReader, error) {
-	for chainSelector, token := range config.Tokens {
+	for chainSelector, token := range tokensConfig {
 		err := bindMessageTransmitters(context.Background(), contractReaders, chainSelector, token.SourcePoolAddress)
 		if err != nil {
 			return nil, fmt.Errorf("unable to bind message transmitter for chain %d: %w", chainSelector, err)
@@ -82,7 +81,6 @@ func NewUSDCMessageReader(
 	}
 
 	return usdcMessageReader{
-		config:          config,
 		contractReaders: contractReaders,
 		cctpDestDomain:  CCTPDestDomains,
 		eventIndex:      MessageSentWordIndex,
@@ -150,7 +148,7 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 	messageTransmitterEvents := make(map[exectypes.MessageTokenID]eventID)
 
 	for id, token := range tokens {
-		sourceTokenPayload, err := parseUSDCExtraData(token)
+		sourceTokenPayload, err := parseTokenExtraData(token)
 		if err != nil {
 			return nil, err
 		}
@@ -226,8 +224,8 @@ type sourceTokenDataPayload struct {
 	SourceDomain uint32
 }
 
-// extractDetailsFromUSDCMessage extracts the nonce and source domain from the USDC message.
-// Please see the Solidity code for USDCTokenPool to understand more details
+// parseTokenExtraData extracts the nonce and source domain from the USDC message.
+// Please see the Solidity code in USDCTokenPool to understand more details
 //
 //	struct SourceTokenDataPayload {
 //		uint64 nonce;
@@ -237,7 +235,7 @@ type sourceTokenDataPayload struct {
 //	   destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
 //	   destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
 //	 });
-func parseUSDCExtraData(token cciptypes.RampTokenAmount) (*sourceTokenDataPayload, error) {
+func parseTokenExtraData(token cciptypes.RampTokenAmount) (*sourceTokenDataPayload, error) {
 	if len(token.ExtraData) < 12 {
 		return nil, fmt.Errorf("extraData is too short, expected at least 12 bytes")
 	}

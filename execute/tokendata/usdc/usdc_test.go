@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/require"
@@ -19,19 +18,14 @@ import (
 func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 	ethereumUSDCPool := internal.RandBytes().String()
 	avalancheUSDCPool := internal.RandBytes().String()
-	config := pluginconfig.USDCCCTPObserverConfig{
-		AttestationAPI:         "https://attestation.api",
-		AttestationAPITimeout:  commonconfig.MustNewDuration(1),
-		AttestationAPIInterval: commonconfig.MustNewDuration(1),
-		Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-			1: {
-				SourcePoolAddress:            ethereumUSDCPool,
-				SourceMessageTransmitterAddr: internal.RandBytes().String(),
-			},
-			2: {
-				SourcePoolAddress:            avalancheUSDCPool,
-				SourceMessageTransmitterAddr: internal.RandBytes().String(),
-			},
+	config := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+		1: {
+			SourcePoolAddress:            ethereumUSDCPool,
+			SourceMessageTransmitterAddr: internal.RandBytes().String(),
+		},
+		2: {
+			SourcePoolAddress:            avalancheUSDCPool,
+			SourceMessageTransmitterAddr: internal.RandBytes().String(),
 		},
 	}
 
@@ -239,7 +233,7 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			observer := usdc.NewTokenDataObserver(logger.Test(t), config, test.usdcReader, test.attestationClient)
+			observer := usdc.NewTokenDataObserver(logger.Test(t), 1, config, test.usdcReader, test.attestationClient)
 
 			tkData, err := observer.Observe(context.Background(), test.messageObservations)
 			require.NoError(t, err)
