@@ -21,7 +21,7 @@ type tokenDataObserver struct {
 	attestationClient AttestationClient
 }
 
-// nolint unexported-return
+//nolint:revive
 func NewTokenDataObserver(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
