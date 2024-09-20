@@ -99,7 +99,7 @@ pipelines:
 
       # If the decouple flag is set, only deploy the DON component
       decoupled=$(get_flag "decouple")
-      if [[ ! ${decoupled} ]]; then
+      if [ "${decoupled}" = false ]; then
         create_deployments ccip-scripts
 
         if [ "${CCIP_UI_ENABLED}" = "false" ]; then
