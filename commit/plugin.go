@@ -120,6 +120,15 @@ func NewPlugin(
 		reportingCfg.F,
 	)
 
+	chainFeeProcessr := chainfee.NewProcessor(
+		lggr,
+		homeChain,
+		chainSupport,
+		ccipReader,
+		cfg.OffchainConfig.TokenPriceBatchWriteFrequency,
+		reportingCfg.F,
+	)
+
 	return &Plugin{
 		nodeID:              nodeID,
 		oracleIDToP2pID:     oracleIDToP2pID,
@@ -134,7 +143,7 @@ func NewPlugin(
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
-		chainFeeProcessor:   chainfee.NewProcessor(),
+		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
 		rmnConfig:           rmnConfig,
 	}

@@ -104,8 +104,11 @@ type CCIPReader interface {
 		addresses []string,
 	) (map[string]uint64, error)
 
-	// GasPrices reads the provided chains gas prices.
-	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)
+	// GetAllChainsFeeComponents Reads all fee components for known chains (chains that have chain writer defined)
+	GetAllChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents
+
+	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
+	GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.TokenPrice, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

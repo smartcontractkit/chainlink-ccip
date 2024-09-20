@@ -440,29 +440,26 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
-	if err := r.validateWriterExistence(chains...); err != nil {
-		return nil, err
+func (r *ccipChainReader) GetAllChainsFeeComponents(
+	ctx context.Context,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
+	for chain, chainWriter := range r.contractWriters {
+		feeComponent, err := chainWriter.GetFeeComponents(ctx)
+		if err != nil {
+			r.lggr.Warnw("failed to get chain fee components for chain %d: %w", chain, err)
+			continue
+		}
+		feeComponents[chain] = *feeComponent
 	}
+	return feeComponents
+}
 
-	eg := new(errgroup.Group)
-	gasPrices := make([]cciptypes.BigInt, len(chains))
-	for i, chain := range chains {
-		i, chain := i, chain
-		eg.Go(func() error {
-			gasPrice, err := r.contractWriters[chain].GetFeeComponents(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get gas price: %w", err)
-			}
-			gasPrices[i] = cciptypes.NewBigInt(gasPrice.ExecutionFee)
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-	return gasPrices, nil
+func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]cciptypes.TokenPrice, error) {
+	return nil, nil
 }
 
 func (r *ccipChainReader) DiscoverContracts(

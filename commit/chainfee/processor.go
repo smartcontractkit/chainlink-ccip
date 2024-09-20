@@ -3,33 +3,62 @@ package chainfee
 import (
 	"context"
 	"fmt"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
 
-type Processor struct {
+type processor struct {
+	lggr                          logger.Logger
+	homeChain                     reader.HomeChain
+	chainSupport                  plugincommon.ChainSupport
+	ccipReader                    readerpkg.CCIPReader
+	TokenPriceBatchWriteFrequency commonconfig.Duration
+	bigF                          int
 }
 
-func NewProcessor() *Processor {
-	return &Processor{}
+func NewProcessor(
+	lggr logger.Logger,
+	homeChain reader.HomeChain,
+	chainSupport plugincommon.ChainSupport,
+	ccipReader readerpkg.CCIPReader,
+	TokenPriceBatchWriteFrequency commonconfig.Duration,
+	bigF int,
+) *processor {
+	return &processor{
+		lggr:                          lggr,
+		homeChain:                     homeChain,
+		chainSupport:                  chainSupport,
+		ccipReader:                    ccipReader,
+		TokenPriceBatchWriteFrequency: TokenPriceBatchWriteFrequency,
+		bigF:                          bigF,
+	}
 }
 
-func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
 }
 
-func (w *Processor) Observation(
+func (p *processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 ) (Observation, error) {
-	return Observation{}, nil
+	return Observation{
+		FChain:        p.ObserveFChain(),
+		FeeComponents: p.ObserveFeeComponents(ctx),
+		Timestamp:     time.Now().UTC(),
+	}, nil
 }
 
-func (w *Processor) Outcome(
+func (p *processor) Outcome(
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
@@ -37,7 +66,7 @@ func (w *Processor) Outcome(
 	return Outcome{}, nil
 }
 
-func (w *Processor) ValidateObservation(
+func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,
 	ao plugincommon.AttributedObservation[Observation],
@@ -62,4 +91,4 @@ func validateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
 	return nil
 }
 
-var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -206,6 +207,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
+
+				n.ccipReader.EXPECT().GetAllChainsFeeComponents(ctx).Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					assert.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
