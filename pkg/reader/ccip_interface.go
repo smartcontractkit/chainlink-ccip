@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -21,7 +22,7 @@ var (
 
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
-type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
+type ContractAddresses map[string]map[cciptypes.ChainSelector]common.Address
 
 func NewCCIPChainReader(
 	lggr logger.Logger,

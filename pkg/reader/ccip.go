@@ -12,6 +12,8 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -20,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -34,7 +36,7 @@ type ccipChainReader struct {
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
 	destChain       cciptypes.ChainSelector
-	offrampAddress  string
+	offrampAddress  common.EncodedAddress
 }
 
 func newCCIPChainReaderInternal(
@@ -49,17 +51,27 @@ func newCCIPChainReaderInternal(
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
 	}
 
+	offramp, err := address.MakeAddress(offrampAddress, destChain)
+	if err != nil {
+		panic("Unable to make offramp address")
+	}
+
+	encodedOfframp, err := offramp.Encode()
+	if err != nil {
+		panic("Unable to encode offramp address")
+	}
+
 	reader := &ccipChainReader{
 		lggr:            lggr,
 		contractReaders: crs,
 		contractWriters: contractWriters,
 		destChain:       destChain,
-		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
+		offrampAddress:  encodedOfframp,
 	}
 
 	contracts := ContractAddresses{
 		consts.ContractNameOffRamp: {
-			destChain: offrampAddress,
+			destChain: offramp,
 		},
 	}
 	if err := reader.Sync(context.Background(), contracts); err != nil {
