@@ -17,6 +17,10 @@ on:
       - "!**/*.md" # Exclude doc updates
       # Exclude .gitignore
       - "!.gitignore"
+    types:
+      - review_requested
+      - ready_for_review
+      - synchronize
   push:
     branches:
       - main # Trigger only on pushes to the main branch
@@ -48,7 +52,16 @@ jobs:
       contents: read
       actions: read
     steps:
+      - name: Prevent running on draft PRs
+        id: check-prereqs-for-running
+        run: |
+          should_run=true
+          if [ "${{ github.event_name }}" == "pull_request" ] && [ "${{ github.event.pull_request.draft }}" == "true" ]; then
+            should_run=false
+          fi
+          echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
       - name: Deploy and validate CRIB Environment for Core
+        if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
         uses: smartcontractkit/.github/actions/crib-deploy-environment@1fbf0b36c26d2159c513e28194d81e6fb54a4ab7 # crib-deploy-environment@1.3.0
         with:
@@ -66,7 +79,7 @@ jobs:
 
       - name: Destroy CRIB Environment
         id: destroy
-        if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true'
+        if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true' && steps.check-prereqs-for-running.outputs.should_run == 'true'
         uses: smartcontractkit/.github/actions/crib-purge-environment@da1c0099f3bab236660ccc10328a29e06950c69f # crib-purge-environment@0.2.0
         with:
           namespace: ${{ steps.deploy.outputs.devspace-namespace }}
