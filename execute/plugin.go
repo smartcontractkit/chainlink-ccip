@@ -193,6 +193,7 @@ func (p *Plugin) Observation(
 		}
 
 		if !p.contractsInitialized {
+			p.lggr.Infow("contracts not initialized, only making discovery observations")
 			return exectypes.Observation{Contracts: discoveryObs}.Encode()
 		}
 	}

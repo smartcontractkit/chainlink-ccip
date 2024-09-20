@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -42,7 +44,11 @@ type Plugin struct {
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
+	discoveryProcessor  *discovery.ContractDiscoveryProcessor
 	rmnConfig           rmn.Config
+
+	// state
+	contractsInitialized bool
 }
 
 func NewPlugin(
@@ -95,6 +101,7 @@ func NewPlugin(
 		cciptypes.RMNCrypto(nil), // todo
 		rmnConfig,
 	)
+
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,
 		lggr,
@@ -102,6 +109,14 @@ func NewPlugin(
 		chainSupport,
 		tokenPricesReader,
 		homeChain,
+		reportingCfg.F,
+	)
+
+	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
+		lggr,
+		&ccipReader,
+		homeChain,
+		cfg.DestChain,
 		reportingCfg.F,
 	)
 
@@ -120,6 +135,7 @@ func NewPlugin(
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainfee.NewProcessor(),
+		discoveryProcessor:  discoveryProcessor,
 		rmnConfig:           rmnConfig,
 	}
 }
@@ -164,6 +180,18 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
+	var discoveryObs dt.Observation
+	if p.discoveryProcessor != nil {
+		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+		if err != nil {
+			p.lggr.Errorw("failed to discover contracts", "err", err)
+		}
+		if !p.contractsInitialized {
+			p.lggr.Infow("contracts not initialized, only making discovery observations")
+			return Observation{DiscoveryObs: discoveryObs}.Encode()
+		}
+	}
+
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
@@ -181,6 +209,7 @@ func (p *Plugin) Observation(
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		ChainFeeObs:   chainFeeObs,
+		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
 	return obs.Encode()
@@ -213,6 +242,7 @@ func (p *Plugin) Outcome(
 	var merkleObservations []MerkleRootObservation
 	var tokensObservations []TokenPricesObservation
 	var feeObservations []ChainFeeObservation
+	var discoveryObservations []plugincommon.AttributedObservation[dt.Observation]
 
 	for _, ao := range aos {
 		obs, err := DecodeCommitPluginObservation(ao.Observation)
@@ -240,6 +270,20 @@ func (p *Plugin) Outcome(
 				Observation: obs.ChainFeeObs,
 			},
 		)
+
+		discoveryObservations = append(discoveryObservations,
+			plugincommon.AttributedObservation[dt.Observation]{
+				OracleID:    ao.Observer,
+				Observation: obs.DiscoveryObs,
+			})
+	}
+
+	if p.discoveryProcessor != nil {
+		_, err = p.discoveryProcessor.Outcome(dt.Outcome{}, dt.Query{}, discoveryObservations)
+		if err != nil {
+			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
+		}
+		p.contractsInitialized = true
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
