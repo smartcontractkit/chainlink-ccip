@@ -1,9 +1,7 @@
 package reader
 
 import (
-	"context"
 	"errors"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -11,7 +9,6 @@ import (
 
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 var (
@@ -30,7 +27,7 @@ func NewCCIPChainReader(
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) CCIPReader {
-	return newCCIPChainReaderInternal(
+	cr := newCCIPChainReaderInternal(
 		lggr,
 		contractReaders,
 		contractWriters,
@@ -51,13 +48,18 @@ func NewCCIPReaderWithExtendedContractReaders(
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}
-	return cr
+	return CCIPReader{ccipChainReader: cr}
 }
 
-type CCIPReader interface {
+type CCIPReader struct {
+	*ccipChainReader
+}
+
+/*
+//type CCIPReader interface {
 	// CommitReportsGTETimestamp reads the requested chain starting at a given timestamp
 	// and finds all ReportAccepted up to the provided limit.
-	CommitReportsGTETimestamp(
+	func (CommitReportsGTETimestamp(
 		ctx context.Context,
 		dest cciptypes.ChainSelector,
 		ts time.Time,
@@ -118,3 +120,4 @@ type CCIPReader interface {
 	// Close closes any open resources.
 	Close(ctx context.Context) error
 }
+*/

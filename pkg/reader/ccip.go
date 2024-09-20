@@ -62,7 +62,9 @@ func newCCIPChainReaderInternal(
 			destChain: offrampAddress,
 		},
 	}
-	if err := reader.Sync(context.Background(), contracts); err != nil {
+
+	cr := CCIPReader{reader}
+	if err := cr.Sync(context.Background(), contracts); err != nil {
 		lggr.Infow("failed to sync contracts", "err", err)
 	}
 
@@ -76,7 +78,7 @@ func (r *ccipChainReader) WithExtendedContractReader(
 	return r
 }
 
-func (r *ccipChainReader) CommitReportsGTETimestamp(
+func (r *CCIPReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
 ) ([]plugintypes2.CommitPluginReportWithMeta, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
@@ -212,7 +214,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	return reports[:limit], nil
 }
 
-func (r *ccipChainReader) ExecutedMessageRanges(
+func (r *CCIPReader) ExecutedMessageRanges(
 	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNumRange, error) {
 	if err := r.validateReaderExistence(dest); err != nil {
@@ -268,7 +270,7 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 	return executed, nil
 }
 
-func (r *ccipChainReader) MsgsBetweenSeqNums(
+func (r *CCIPReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
 	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
@@ -339,7 +341,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 }
 
 // GetExpectedNextSequenceNumber implements CCIP.
-func (r *ccipChainReader) GetExpectedNextSequenceNumber(
+func (r *CCIPReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
 	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
 	if destChainSelector != r.destChain {
@@ -368,7 +370,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
 }
 
-func (r *ccipChainReader) NextSeqNum(
+func (r *CCIPReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
 ) ([]cciptypes.SeqNum, error) {
 	cfgs, err := r.getSourceChainsConfig(ctx, chains)
@@ -391,7 +393,7 @@ func (r *ccipChainReader) NextSeqNum(
 	return res, err
 }
 
-func (r *ccipChainReader) Nonces(
+func (r *CCIPReader) Nonces(
 	ctx context.Context,
 	sourceChainSelector, destChainSelector cciptypes.ChainSelector,
 	addresses []string,
@@ -440,7 +442,7 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
+func (r *CCIPReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
 	if err := r.validateWriterExistence(chains...); err != nil {
 		return nil, err
 	}
@@ -465,7 +467,7 @@ func (r *ccipChainReader) GasPrices(ctx context.Context, chains []cciptypes.Chai
 	return gasPrices, nil
 }
 
-func (r *ccipChainReader) DiscoverContracts(
+func (r *CCIPReader) DiscoverContracts(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
@@ -508,7 +510,7 @@ func (r *ccipChainReader) DiscoverContracts(
 //
 // No error is returned if contractName is not found in the contracts. This allows calling the function before all
 // contracts are discovered.
-func (r *ccipChainReader) bindReaderContract(
+func (r *CCIPReader) bindReaderContract(
 	ctx context.Context,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
@@ -537,7 +539,7 @@ func (r *ccipChainReader) bindReaderContract(
 }
 
 // Sync goes through the input contracts and binds them to the contract reader.
-func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
+func (r *CCIPReader) Sync(ctx context.Context, contracts ContractAddresses) error {
 	if len(contracts) == 0 {
 		// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
 		var err error
@@ -566,11 +568,11 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	return errors.Join(errs...)
 }
 
-func (r *ccipChainReader) Close(ctx context.Context) error {
+func (r *CCIPReader) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+func (r *CCIPReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	bindings := r.contractReaders[chain].GetBindings(contractName)
 	if len(bindings) != 1 {
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
@@ -585,7 +587,7 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 }
 
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
-func (r *ccipChainReader) getSourceChainsConfig(
+func (r *CCIPReader) getSourceChainsConfig(
 	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
 	if err := r.validateReaderExistence(r.destChain); err != nil {
 		return nil, err
@@ -639,7 +641,7 @@ type sourceChainConfig struct {
 	MinSeqNr  uint64
 }
 
-func (r *ccipChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
+func (r *CCIPReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
 	for _, ch := range chains {
 		_, exists := r.contractReaders[ch]
 		if !exists {
@@ -649,7 +651,7 @@ func (r *ccipChainReader) validateReaderExistence(chains ...cciptypes.ChainSelec
 	return nil
 }
 
-func (r *ccipChainReader) validateWriterExistence(chains ...cciptypes.ChainSelector) error {
+func (r *CCIPReader) validateWriterExistence(chains ...cciptypes.ChainSelector) error {
 	for _, ch := range chains {
 		_, exists := r.contractWriters[ch]
 		if !exists {
@@ -660,7 +662,7 @@ func (r *ccipChainReader) validateWriterExistence(chains ...cciptypes.ChainSelec
 }
 
 // getSourceChainsConfig returns the destination offRamp contract's static chain configuration.
-func (r *ccipChainReader) getOfframpStaticConfig(
+func (r *CCIPReader) getOfframpStaticConfig(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 ) (offrampStaticChainConfig, error) {
@@ -695,4 +697,4 @@ type offrampStaticChainConfig struct {
 }
 
 // Interface compliance check
-var _ CCIPReader = (*ccipChainReader)(nil)
+//var _ CCIPReader = (*CCIPReader)(nil)
