@@ -27,6 +27,13 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
+// ccipReaderWrapper ensures that it is impossible to accidentally copy the underlying
+// ccipChainReader by embedding it in a struct. We are already pretty safe because ptr
+// receivers are used exclusively, this adds another layer of safety.
+type ccipReaderWrapper struct {
+	*ccipChainReader
+}
+
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
 // can be generated.
 type ccipChainReader struct {
@@ -43,18 +50,20 @@ func newCCIPChainReaderInternal(
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
-) *ccipChainReader {
+) ccipReaderWrapper {
 	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
 	for chainSelector, cr := range contractReaders {
 		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
 	}
 
-	reader := &ccipChainReader{
-		lggr:            lggr,
-		contractReaders: crs,
-		contractWriters: contractWriters,
-		destChain:       destChain,
-		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
+	reader := ccipReaderWrapper{
+		ccipChainReader: &ccipChainReader{
+			lggr:            lggr,
+			contractReaders: crs,
+			contractWriters: contractWriters,
+			destChain:       destChain,
+			offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
+		},
 	}
 
 	contracts := ContractAddresses{
