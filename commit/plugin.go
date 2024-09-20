@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -30,6 +31,7 @@ type TokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Obse
 type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
+	donID               plugintypes.DonID
 	nodeID              commontypes.OracleID
 	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
@@ -53,6 +55,7 @@ type Plugin struct {
 
 func NewPlugin(
 	_ context.Context,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg pluginconfig.CommitPluginConfig,
@@ -66,7 +69,8 @@ func NewPlugin(
 	rmnConfig rmn.Config,
 ) *Plugin {
 	if cfg.MaxMerkleTreeSize == 0 {
-		lggr.Warnw("MaxMerkleTreeSize not set, using default value", "default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
+		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
+			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
 		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
 	}
 
@@ -121,6 +125,7 @@ func NewPlugin(
 	)
 
 	return &Plugin{
+		donID:               donID,
 		nodeID:              nodeID,
 		oracleIDToP2pID:     oracleIDToP2pID,
 		lggr:                lggr,
