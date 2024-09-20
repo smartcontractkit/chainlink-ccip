@@ -50,6 +50,26 @@ type usdcMessageReader struct {
 	eventIndex      int
 }
 
+type eventID [32]byte
+
+type messageSentEvent struct {
+	payload []byte
+}
+
+func (m messageSentEvent) unpackID() (eventID, error) {
+	var result [32]byte
+
+	// Check if the data slice has at least 96 bytes
+	if len(m.payload) < 128 {
+		return result, fmt.Errorf("data slice too short, must be at least 128 bytes")
+	}
+
+	// Slice the third 32-byte segment (from index 96 to 128)
+	copy(result[:], m.payload[96:128])
+
+	return result, nil
+}
+
 func NewUSDCMessageReader(
 	config pluginconfig.USDCCCTPObserverConfig,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
@@ -69,36 +89,19 @@ func NewUSDCMessageReader(
 	}, nil
 }
 
-type MessageSentID [32]byte
-
-type MessageSentEvent struct {
-	payload []byte
-}
-
-func (m MessageSentEvent) UnpackID() (MessageSentID, error) {
-	var result [32]byte
-
-	// Check if the data slice has at least 96 bytes
-	if len(m.payload) < 128 {
-		return result, fmt.Errorf("data slice too short, must be at least 128 bytes")
-	}
-
-	// Slice the third 32-byte segment (from index 96 to 128)
-	copy(result[:], m.payload[96:128])
-
-	return result, nil
-}
-
 func (u usdcMessageReader) MessageHashes(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
 	tokens map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[exectypes.MessageTokenID]MessageHash, error) {
-	messageIDs, err := u.recreateMessageTransmitterEvents(dest, tokens)
+	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
+	eventIDs, err := u.recreateMessageTransmitterEvents(dest, tokens)
 	if err != nil {
 		return nil, err
 	}
 
+	// 2. Query the MessageTransmitter contract for the MessageSent events based on the 3rd words.
+	// We need entire MessageSent payload to use that with the Attestation API
 	iter, err := u.contractReaders[source].ExtendedQueryKey(
 		ctx,
 		MessageTransmitter,
@@ -107,27 +110,28 @@ func (u usdcMessageReader) MessageHashes(
 			Expressions: []query.Expression{},
 		},
 		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
-		&MessageSentEvent{},
+		&messageSentEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
 	}
 
-	messageSentEvents := make(map[MessageSentID]MessageHash)
+	messageSentEvents := make(map[eventID]MessageHash)
 	for _, item := range iter {
-		event, ok := item.Data.(*MessageSentEvent)
+		event, ok := item.Data.(*messageSentEvent)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
-		messageID, err1 := event.UnpackID()
+		e, err1 := event.unpackID()
 		if err1 != nil {
 			return nil, err1
 		}
-		messageSentEvents[messageID] = event.payload
+		messageSentEvents[e] = event.payload
 	}
 
+	// 3. This should be done by ChainReader - picking only events matching eventIDs
 	out := make(map[exectypes.MessageTokenID]MessageHash)
-	for tokenID, messageID := range messageIDs {
+	for tokenID, messageID := range eventIDs {
 		messageHash, ok := messageSentEvents[messageID]
 		if !ok {
 			// Token not available in the source chain
@@ -142,8 +146,8 @@ func (u usdcMessageReader) MessageHashes(
 func (u usdcMessageReader) recreateMessageTransmitterEvents(
 	destChainSelector cciptypes.ChainSelector,
 	tokens map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-) (map[exectypes.MessageTokenID]MessageSentID, error) {
-	messageTransmitterEvents := make(map[exectypes.MessageTokenID]MessageSentID)
+) (map[exectypes.MessageTokenID]eventID, error) {
+	messageTransmitterEvents := make(map[exectypes.MessageTokenID]eventID)
 
 	for id, token := range tokens {
 		sourceTokenPayload, err := parseUSDCExtraData(token)

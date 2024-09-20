@@ -127,9 +127,9 @@ func (td TokenData) IsReady() bool {
 	return td.Ready
 }
 
-// MessageTokenID is a unique identifier for a message token data. It's a composite key of the message sequence number
-// and the token index within the message. It's used to easier identify token data for messages without having to
-// deal with nested maps
+// MessageTokenID is a unique identifier for a message token data (per chain selector). It's a composite key of
+// the message sequence number and the token index within the message. It's used to easier identify token data for
+// messages without having to deal with nested maps.
 type MessageTokenID struct {
 	SeqNr cciptypes.SeqNum
 	Index int
