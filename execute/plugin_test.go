@@ -23,7 +23,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gen"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -172,8 +171,7 @@ func TestPlugin_Close(t *testing.T) {
 	mockReader.On("Close", mock.Anything).Return(nil)
 
 	lggr := logger.Test(t)
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(lggr, mockReader, 50*time.Millisecond, 100*time.Millisecond)
-	p := &Plugin{lggr: lggr, ccipReader: mockReader, readerSyncer: readerSyncer}
+	p := &Plugin{lggr: lggr, ccipReader: mockReader}
 	require.NoError(t, p.Close())
 }
 
