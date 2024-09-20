@@ -76,7 +76,10 @@ pipelines:
         run_dependency_pipelines grafana
       fi
 
+      # If the decouple flag is set, only deploy the DON component
+      decoupled=$(get_flag "decouple")
       tagOverride=$(get_flag "override-image-tag")
+
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image"
@@ -87,7 +90,10 @@ pipelines:
         done
 
         create_deployments app $args
-        create_deployments ccip-scripts
+
+        if [ "${decoupled}" = false ]; then
+          create_deployments ccip-scripts
+        fi
       elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
         echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
@@ -97,8 +103,6 @@ pipelines:
         create_deployments app
       fi
 
-      # If the decouple flag is set, only deploy the DON component
-      decoupled=$(get_flag "decouple")
       if [ "${decoupled}" = false ]; then
         create_deployments ccip-scripts
 
