@@ -130,11 +130,19 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
 		offRampNextSeqNumDefaultOverrideValues []ccipocr3.SeqNum
+
+		enableDiscovery bool
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
 			prevOutcome: Outcome{},
 			expOutcome:  outcomeIntervalsSelected,
+		},
+		{
+			name:            "discovery enabled, should discover contracts",
+			prevOutcome:     Outcome{},
+			expOutcome:      Outcome{},
+			enableDiscovery: true,
 		},
 		{
 			name:        "selected ranges for report in previous outcome",
@@ -215,6 +223,13 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
+
+				if !tc.enableDiscovery {
+					n.node.discoveryProcessor = nil
+				} else {
+					n.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+					n.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
+				}
 			}
 
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
