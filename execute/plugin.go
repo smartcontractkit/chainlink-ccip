@@ -90,7 +90,7 @@ func NewPlugin(
 		lggr:              lggr,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			lggr,
-			&ccipReader,
+			ccipReader,
 			homeChain,
 			cfg.DestChain,
 			reportingCfg.F,

@@ -20,7 +20,7 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
 	lggr      logger.Logger
-	reader    *reader.CCIPReader
+	reader    reader.CCIPReader
 	homechain reader.HomeChain
 	dest      cciptypes.ChainSelector
 	fRoleDON  int
@@ -28,7 +28,7 @@ type ContractDiscoveryProcessor struct {
 
 func NewContractDiscoveryProcessor(
 	lggr logger.Logger,
-	reader *reader.CCIPReader,
+	reader reader.CCIPReader,
 	homechain reader.HomeChain,
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
@@ -52,7 +52,7 @@ func (cdp *ContractDiscoveryProcessor) Query(_ context.Context, _ dt.Outcome) (d
 func (cdp *ContractDiscoveryProcessor) Observation(
 	ctx context.Context, _ dt.Outcome, _ dt.Query,
 ) (dt.Observation, error) {
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, cdp.dest)
+	contracts, err := cdp.reader.DiscoverContracts(ctx, cdp.dest)
 	if err != nil {
 		if errors.Is(err, reader.ErrContractReaderNotFound) {
 			// Not a dest reader, no observations will be made.
@@ -112,7 +112,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// call Sync to bind contracts.
 	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
 	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
-	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
+	if err := cdp.reader.Sync(context.Background(), contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}
 
