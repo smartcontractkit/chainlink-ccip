@@ -1,28 +1,39 @@
 package typconv
 
 import (
-	"encoding/hex"
-	"fmt"
-	"strings"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv/evm"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-// AddressBytesToString converts the given address bytes to a string
-// based upon the given chain selector's chain family.
-// TODO: only EVM supported for now, fix this.
-func AddressBytesToString(addr []byte, chainSelector uint64) string {
-	// TODO: not EIP-55. Fix this?
-	return "0x" + hex.EncodeToString(addr)
+// Address is the specific address family which can encode itself.
+type Address interface {
+	Encode() (EncodedAddress, error)
 }
 
-// AddressStringToBytes converts the given address string to bytes
-// based upon the given chain selector's chain family.
-// TODO: only EVM supported for now, fix this.
-func AddressStringToBytes(addr string, chainSelector uint64) ([]byte, error) {
-	// lower case in case EIP-55 and trim 0x prefix if there
-	addrBytes, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(addr, "0x")))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode EVM address '%s': %w", addr, err)
+// EncodedAddress is the specific encoded address family which can decode itself.
+type EncodedAddress interface {
+	Decode() (Address, error)
+}
+
+// UnknownAddress represents an address type which is not attached to a specific chain.
+type UnknownAddress []byte
+
+// UnknownEncodedAddress represents an encoded address type which is not attached to a specific chain.
+type UnknownEncodedAddress string
+
+// AddressProvider initializes an unknown address type, it knows how to map chainSel to the correct
+// address implementation. Once initialized the developer does not need to concern themself with
+// address semantics.
+type AddressProvider struct {
+}
+
+// MakeAddress initializes an unknown address type, it knows how to map chainSel to the correct
+func (ap AddressProvider) MakeAddress(data UnknownAddress, chainSel ccipocr3.ChainSelector) (Address, error) {
+	// TODO: Move to chain agnostic location.
+	switch chainSel {
+	default:
+		return evm.EVMAddress(data), nil
 	}
-
-	return addrBytes, nil
 }
+
+//MakeEncodedAddress(data UnknownEncodedAddress, chainSel ccipocr3.ChainSelector) (EncodedAddress, error)
