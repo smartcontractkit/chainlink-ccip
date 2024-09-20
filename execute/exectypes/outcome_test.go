@@ -19,6 +19,11 @@ func TestPluginState_Next(t *testing.T) {
 			want: GetCommitReports,
 		},
 		{
+			name: "Initialized",
+			p:    Initialized,
+			want: GetCommitReports,
+		},
+		{
 			name: "Phase 1 to 2",
 			p:    GetCommitReports,
 			want: GetMessages,

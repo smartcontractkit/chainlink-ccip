@@ -91,7 +91,7 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		rmn.Client(nil),          // todo
+		rmn.Controller(nil),      // todo
 		cciptypes.RMNCrypto(nil), // todo
 		rmnConfig,
 	)

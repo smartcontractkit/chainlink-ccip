@@ -6,7 +6,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -789,13 +788,11 @@ func Test_getConsensusObservation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Convert observations to the expected decoded type.
-			var ao []types.AttributedObservation
+			var ao []plugincommon.AttributedObservation[exectypes.Observation]
 			for i, observation := range tt.args.observation {
-				encodedObservation, err := observation.Encode()
-				require.NoError(t, err)
-				ao = append(ao, types.AttributedObservation{
-					Observation: encodedObservation,
-					Observer:    commontypes.OracleID(i),
+				ao = append(ao, plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: observation,
+					OracleID:    commontypes.OracleID(i),
 				})
 			}
 
