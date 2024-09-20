@@ -62,6 +62,7 @@ pipelines:
       - name: decouple
         short: e
         type: bool
+        default: false
         description: "If specified, the DON deployment will be decoupled from the ccip-scripts deployment"
     run: |-
       # Source the shared functions file.
