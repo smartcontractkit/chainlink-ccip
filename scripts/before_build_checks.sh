@@ -14,6 +14,7 @@ if is_custom_image "${DEVSPACE_IMAGE}"; then
 	exit 1
 fi
 
+if [[ -z ${CHAINLINK_CODE_DIR:-} ]]; then echo "Error: the CHAINLINK_CODE_DIR environment variable is not set."; fi
 if [[ -z ${CHAINLINK_REPO_DIR:-} ]]; then echo "Error: the CHAINLINK_REPO_DIR environment variable is not set."; fi
 if check_repo_exists "${CHAINLINK_REPO_DIR}"; then
 	echo "Info: Repository exists at ${CHAINLINK_REPO_DIR}."

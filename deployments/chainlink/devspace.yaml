@@ -1,0 +1,42 @@
+version: v2beta1
+name: chainlink
+
+vars:
+  SCRIPTS_DIR:
+    source: env
+    default: "../../scripts"
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "../../imports"
+  # "The provider being used to deploy CRIB"
+  PROVIDER:
+    source: all
+    default: "aws"
+  CHAINLINK_CODE_DIR:
+    source: env
+    default: "../../.."
+
+dependencies:
+  crib-chainlink-cluster:
+    path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - core
+
+pipelines:
+  deploy:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster
+
+  kind:
+    run: |-
+      if [[ ${PROVIDER:-} == "kind" ]]; then
+        ensure_pull_secrets --all
+        run_dependency_pipelines loki
+        run_dependency_pipelines promtail
+        run_dependency_pipelines grafana
+      fi
