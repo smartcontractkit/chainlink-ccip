@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -35,7 +36,7 @@ const maxReportSizeBytes = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
-	donID        uint32
+	donID        plugintypes.DonID
 	reportingCfg ocr3types.ReportingPluginConfig
 	cfg          pluginconfig.ExecutePluginConfig
 
@@ -57,7 +58,7 @@ type Plugin struct {
 }
 
 func NewPlugin(
-	donID uint32,
+	donID plugintypes.DonID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg pluginconfig.ExecutePluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,

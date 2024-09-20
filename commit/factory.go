@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -56,7 +57,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr            logger.Logger
-	donID           uint32
+	donID           plugintypes.DonID
 	ocrConfig       reader.OCR3ConfigWithMeta
 	commitCodec     cciptypes.CommitPluginCodec
 	msgHasher       cciptypes.MessageHasher
@@ -67,7 +68,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
-	donID uint32,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,

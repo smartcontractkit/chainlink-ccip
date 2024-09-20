@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -30,7 +31,7 @@ type TokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Obse
 type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
-	donID               uint32
+	donID               plugintypes.DonID
 	nodeID              commontypes.OracleID
 	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
@@ -54,7 +55,7 @@ type Plugin struct {
 
 func NewPlugin(
 	_ context.Context,
-	donID uint32,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg pluginconfig.CommitPluginConfig,

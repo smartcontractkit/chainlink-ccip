@@ -264,7 +264,7 @@ func setupNode(
 	ctx context.Context,
 	t *testing.T,
 	lggr logger.Logger,
-	donID uint32,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
