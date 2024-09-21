@@ -18,19 +18,20 @@ vars:
   CHAINLINK_CODE_DIR:
     source: env
     default: "../../.."
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
 
-dependencies:
-  crib-chainlink-cluster:
-    path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
-    overwriteVars: true
-    namespace: ${DEVSPACE_NAMESPACE}
-    profiles:
-      - core
 
 pipelines:
-  deploy:
+  core:
     run: |-
       run_dependency_pipelines crib-chainlink-cluster
+
+  ccip:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster
+      run_dependency_pipelines crib-ccip-scripts
 
   kind:
     run: |-
@@ -40,3 +41,68 @@ pipelines:
         run_dependency_pipelines promtail
         run_dependency_pipelines grafana
       fi
+
+  purge:
+    run: |-
+      kubectl delete ns ${DEVSPACE_NAMESPACE}
+
+profiles:
+  - name: core
+    patches:
+      - op: add
+        path: vars
+        value:
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/chainlink"
+    replace:
+      dependencies:
+        crib-chainlink-cluster:
+          path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
+          profiles:
+            - core
+  - name: ccip
+    patches:
+      - op: add
+        path: vars
+        value:
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/ccip"
+          # Env Vars Required for ccip-scripts based contracts and jobs deployment
+          # Image URI required for deploying CCIP Contracts and Jobs
+          DEVSPACE_CCIP_SCRIPTS_IMAGE:
+            source: env
+            default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
+          # AWS Role ARN required for uploading deploy job output to s3
+          DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
+            source: env
+            default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
+          # AWS S3 bucket name required for uploading deploy job output to s3
+          DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
+            source: env
+            default: "cl-stage-ccip-scripts-deploy-output"
+    replace:
+      dependencies:
+        crib-chainlink-cluster:
+          path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
+          profiles:
+            - ccip
+        crib-ccip-scripts:
+          path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
+          overwriteVars: true
+          namespace: ${DEVSPACE_NAMESPACE}
+
+commands:
+  ccip:
+    command: devspace run-pipeline ccip -p ccip
+    description: Run the CCIP pipeline.
+    appendArgs: true
+  core:
+    command: devspace run-pipeline core -p core
+    description: Run the Core pipeline.
+    appendArgs: true

@@ -43,9 +43,6 @@ vars:
   IMPORTS_DIR:
     source: env
     default: "../../imports"
-  CHAINLINK_REPO_DIR:
-    source: env
-    default: "${CHAINLINK_CODE_DIR}/chainlink"
   CHAINLINK_CLUSTER_HELM_CHART_URI:
     source: env
     default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
@@ -97,23 +94,6 @@ pipelines:
     run: |-
       kubectl delete ns ${DEVSPACE_NAMESPACE}
 
-images:
-  app:
-    image: ${DEVSPACE_IMAGE}
-    tags:
-      - ${devspace.namespace}-${devspace.timestamp}
-    custom:
-      skipImageArg: true
-      command: |-
-        image=${runtime.images.app}
-        (
-          cd ${CHAINLINK_REPO_DIR} && \
-          nix develop -c \
-            bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
-              release --snapshot --clean --config .goreleaser.devspace.yaml" && \
-          docker push $image
-        )
-
 pullSecrets:
   regcred-don:
     registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
@@ -151,8 +131,6 @@ commands:
     description: Display man pages
 
 hooks:
-  - command: ${SCRIPTS_DIR}/check_env_vars.sh
-    events: [ "before:deploy:app" ]
   - name: "pre-image-build-hook"
     command: ${SCRIPTS_DIR}/before_build_checks.sh
     events: ["before:build:app"]
@@ -440,7 +418,29 @@ deployments:
 
 profiles:
   - name: core
+    patches:
+      - op: add
+        path: hooks
+        value:
+          command: ${SCRIPTS_DIR}/check_env_vars.sh
+          events: [ "before:deploy:app" ]
     merge:
+      images:
+        app:
+          image: ${DEVSPACE_IMAGE}
+          tags:
+            - ${devspace.namespace}-${devspace.timestamp}
+          custom:
+            skipImageArg: true
+            command: |-
+              image=${runtime.images.app}
+              (
+                cd $CHAINLINK_CODE_DIR/chainlink && \
+                nix develop -c \
+                  bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
+                    release --snapshot --clean --config .goreleaser.devspace.yaml" && \
+                docker push $image
+              )
       deployments:
         app:
           helm:
@@ -483,7 +483,30 @@ profiles:
                     DeltaDial = '500ms'
                     DeltaReconcile = '5s'
   - name: ccip
+    patches:
+      - op: add
+        path: hooks
+        value:
+          command: ${SCRIPTS_DIR}/check_env_vars.sh
+          args: [ "ccip" ]
+          events: [ "before:deploy:app" ]
     merge:
+      images:
+        app:
+          image: ${DEVSPACE_IMAGE}
+          tags:
+            - ${devspace.namespace}-${devspace.timestamp}
+          custom:
+            skipImageArg: true
+            command: |-
+              image=${runtime.images.app}
+              (
+                cd $CHAINLINK_CODE_DIR/ccip && \
+                nix develop -c \
+                  bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
+                    release --snapshot --clean --config .goreleaser.devspace.yaml" && \
+                docker push $image
+              )
       deployments:
         app:
           helm:
