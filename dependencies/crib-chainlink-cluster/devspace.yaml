@@ -48,6 +48,10 @@ vars:
     default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
 
 pipelines:
+  kind:
+    run: |-
+      ensure_pull_secrets --all
+      run_pipelines deploy
   deploy:
     flags:
       - name: override-image-tag
@@ -60,13 +64,6 @@ pipelines:
       source "../../scripts/lib/shared_functions.sh"
       
       tagOverride=$(get_flag "override-image-tag")
-      
-      if [[ ${PROVIDER:-} == "kind" ]]; then
-        ensure_pull_secrets --all
-        run_dependency_pipelines loki
-        run_dependency_pipelines promtail
-        run_dependency_pipelines grafana
-      fi
       
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
@@ -584,3 +581,38 @@ profiles:
                       PriceMax = '200 gwei'
                       LimitDefault = 6000000
                       FeeCapDefault = '200 gwei'
+  - name: kind
+    merge:
+      deployments:
+        app:
+          helm:
+            values:
+              chainlink:
+                nodes:
+                  node1:
+                    resources:
+                      requests:
+                        cpu: 50m
+                        memory: 256Mi
+              db:
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 256Mi
+                statefulSet:
+                  enabled: false
+              geth:
+                enabled: true
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 256Mi
+                statefulSet:
+                  enabled: false
+              ingress:
+                ingressClassName: nginx
+              mockserver:
+                resources:
+                  requests:
+                    cpu: 50m
+                    memory: 256Mi

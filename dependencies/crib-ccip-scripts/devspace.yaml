@@ -21,6 +21,20 @@ commands:
     command: aws s3 cp s3://${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}/${DEVSPACE_NAMESPACE}-testInput.toml override.toml
     description: Download the testInput.toml file from the S3 bucket
 
+pullSecrets:
+  regcred-ccip:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-ccip
+
+pipelines:
+  kind:
+    run: |-
+      ensure_pull_secrets --all
+      run_pipelines deploy
+  deploy:
+    run: |-
+      create_deployments ccip-scripts
+
 deployments:
   ccip-scripts:
     updateImageTags: false
@@ -41,11 +55,13 @@ deployments:
 profiles:
   - name: kind
     description: The profile is supposed to be used with local deployment on a Kind cluster
-    # This profile will be automatically activated
-    activation:
-      - env:
-          PROVIDER: "kind"
-    patches:
-      - op: add
-        path: deployments.ccip-scripts.helm.valuesFiles
-        value: ["./values-profiles/values-dev-kind-ccip-scripts.yaml"]
+    merge:
+      deployments:
+        ccip-scripts:
+          helm:
+            values:
+              extraEnvs:
+                - name: AWS_IAM_ENABLED
+                  value: "false"
+              imagePullSecrets:
+                - name: regcred-ccip
