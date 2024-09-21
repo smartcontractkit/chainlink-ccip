@@ -3,11 +3,11 @@ package address
 
 import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/internal/registry"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/registry"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	// register evm with registry
-	_ "github.com/smartcontractkit/chainlink-ccip/internal/libs/address/internal/evm"
+	_ "github.com/smartcontractkit/chainlink-ccip/internal/libs/address/evm"
 )
 
 // MakeAddress initializes an unknown address type, it knows how to map chainSel to the correct
@@ -48,4 +48,57 @@ func MakeAndDecodeEncodedAddress(
 	}
 
 	return addr.Decode()
+}
+
+// MustMakeAddress initializes an unknown address type, it knows how to map chainSel to the correct
+func MustMakeAddress(
+	data []byte,
+	chainSel ccipocr3.ChainSelector,
+) common.Address {
+	addr, err := registry.MakeAddress(data, chainSel)
+	if err != nil {
+		panic(err)
+	}
+	return addr
+}
+
+// MustMakeAndEncodeAddress initializes an unknown address type and Encodes it.
+func MustMakeAndEncodeAddress(
+	data []byte,
+	chainSel ccipocr3.ChainSelector,
+) common.EncodedAddress {
+	addr, err := MakeAddress(data, chainSel)
+	if err != nil {
+		panic(err)
+	}
+
+	return addr.Encode()
+}
+
+func MustMakeEncodedAddress(
+	data string,
+	chainSel ccipocr3.ChainSelector,
+) common.EncodedAddress {
+	addr, err := registry.MakeEncodedAddress(data, chainSel)
+	if err != nil {
+		panic(err)
+	}
+	return addr
+}
+
+func MustMakeAndDecodeEncodedAddress(
+	data string,
+	chainSel ccipocr3.ChainSelector,
+) common.Address {
+	addr, err := MakeEncodedAddress(data, chainSel)
+	if err != nil {
+		panic(err)
+	}
+
+	decoded, err := addr.Decode()
+	if err != nil {
+		panic(err)
+	}
+
+	return decoded
 }

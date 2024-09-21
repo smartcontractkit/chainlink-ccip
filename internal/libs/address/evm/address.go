@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/common"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/internal/registry"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/address/registry"
 )
 
 func init() {
