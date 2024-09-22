@@ -487,6 +487,13 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
+	// RMNRemote is accessible via a method on the RMN contract.
+	// There is only one RMNRemote contract per de
+	rmnRemoteAddress, err := r.getRMNRemoteConfig(ctx, r.destChain)
+	if err != nil {
+		return nil, fmt.Errorf("unable to lookup RMNRemote: %w", err)
+	}
+
 	// TODO: Lookup fee quoter?
 
 	// Build response object.
@@ -498,6 +505,9 @@ func (r *ccipChainReader) DiscoverContracts(
 		consts.ContractNameOnRamp: onramps,
 		consts.ContractNameNonceManager: {
 			destChain: staticConfig.NonceManager,
+		},
+		consts.ContractNameRMNRemote: {
+			destChain: rmnRemoteAddress,
 		},
 	}
 	return resp, nil
@@ -679,6 +689,32 @@ func (r *ccipChainReader) getOfframpStaticConfig(
 	)
 	if err != nil {
 		return offrampStaticChainConfig{}, fmt.Errorf("failed to get source chain config: %w", err)
+	}
+	return resp, nil
+}
+
+// getRMNRemoteConfig returns the destination offRamp contract's RMNRemote configuration.
+func (r *ccipChainReader) getRMNRemoteConfig(
+	ctx context.Context,
+	chain cciptypes.ChainSelector,
+) ([]byte, error) {
+	if err := r.validateReaderExistence(chain); err != nil {
+		return nil, err
+	}
+
+	// RMNRemote is in the offramp static config.
+	// it is just one byte array per chain.
+	resp := []byte{}
+	err := r.contractReaders[chain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOfframpGetRMNRemoteConfig,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&resp,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get RMNRemote config: %w", err)
 	}
 	return resp, nil
 }

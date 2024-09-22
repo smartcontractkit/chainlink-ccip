@@ -67,9 +67,18 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		return dt.Observation{}, fmt.Errorf("unable to get fchain: %w", err)
 	}
 
+	// Check that we have only one chain for RMNRemote and that it is the dest chain.
+	if len(contracts[consts.ContractNameRMNRemote]) != 1 {
+		return dt.Observation{}, fmt.Errorf("expected one RMNRemote contract, got %d", len(contracts[consts.ContractNameRMNRemote]))
+	}
+	if _, ok := contracts[consts.ContractNameRMNRemote][cdp.dest]; !ok {
+		return dt.Observation{}, fmt.Errorf("expected RMNRemote contract on dest chain %v, got %v", cdp.dest, contracts[consts.ContractNameRMNRemote])
+	}
+
 	return dt.Observation{
-		FChain: fChain,
-		OnRamp: contracts[consts.ContractNameOnRamp],
+		FChain:    fChain,
+		OnRamp:    contracts[consts.ContractNameOnRamp],
+		RMNRemote: contracts[consts.ContractNameRMNRemote][cdp.dest],
 	}, nil
 }
 
@@ -109,9 +118,20 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		}
 	}
 
+	// RMNRemote address consensus
+	rmnRemoteAddrs := make(map[cciptypes.ChainSelector][][]byte)
+	for _, ao := range aos {
+		// RMNRemote is only observed on the dest chain.
+		rmnRemoteAddrs[cdp.dest] = append(rmnRemoteAddrs[cdp.dest], ao.Observation.RMNRemote)
+	}
+
 	// call Sync to bind contracts.
 	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
 	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
+	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
+		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
+	}
+	contracts[consts.ContractNameRMNRemote] = plugincommon.GetConsensusMap(cdp.lggr, "rmnremote", rmnRemoteAddrs, fChain)
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}
