@@ -54,7 +54,11 @@ pipelines:
     run: |-
       run_pipelines ccip
       run_dependency_pipelines atlas
-  
+
+  ccip-atlas-ui:
+    run: |-
+      run_pipelines ccip-atlas
+      run_dependency_pipelines ccip-ui
 
   purge:
     run: |-
@@ -188,7 +192,24 @@ profiles:
     parents:
       - profile: ccip
       - profile: atlas
-
+  - name: ccip-atlas-ui
+    parents:
+      - profile: ccip
+      - profile: atlas
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip
+          - ccip-ui-ingress
+      - op: add
+        path: dependencies
+        value:
+          ccip-ui:
+            path: ${DEPENDENCIES_DIR}/ccip-ui
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            pipeline: ccip-ui
 commands:
   ccip:
     command: devspace run-pipeline ccip -p ccip
@@ -209,4 +230,8 @@ commands:
   ccip-atlas:
     command: devspace run-pipeline ccip-atlas -p ccip-atlas
     description: Run the CCIP pipeline with Atlas.
+    appendArgs: true
+  ccip-atlas-ui:
+    command: devspace run-pipeline ccip-atlas-ui -p ccip-atlas-ui
+    description: Run the CCIP pipeline with Atlas and UI.
     appendArgs: true

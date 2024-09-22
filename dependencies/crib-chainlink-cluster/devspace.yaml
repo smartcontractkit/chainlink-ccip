@@ -616,3 +616,17 @@ profiles:
                   requests:
                     cpu: 50m
                     memory: 256Mi
+  - name: ccip-ui-ingress
+    patches:
+      - op: add
+        path: deployments.app.helm.values.ingress.hosts
+        value:
+          host: ${DEVSPACE_NAMESPACE}-ccip-ui.${DEVSPACE_INGRESS_BASE_DOMAIN}
+          http:
+            paths:
+              - path: /
+                backend:
+                  service:
+                    name: ccip-ui
+                    port:
+                      number: 3000
