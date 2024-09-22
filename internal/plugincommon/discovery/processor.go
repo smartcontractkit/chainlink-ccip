@@ -69,10 +69,12 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 
 	// Check that we have only one chain for RMNRemote and that it is the dest chain.
 	if len(contracts[consts.ContractNameRMNRemote]) != 1 {
-		return dt.Observation{}, fmt.Errorf("expected one RMNRemote contract, got %d", len(contracts[consts.ContractNameRMNRemote]))
+		return dt.Observation{},
+			fmt.Errorf("expected one RMNRemote contract, got %d", len(contracts[consts.ContractNameRMNRemote]))
 	}
 	if _, ok := contracts[consts.ContractNameRMNRemote][cdp.dest]; !ok {
-		return dt.Observation{}, fmt.Errorf("expected RMNRemote contract on dest chain %v, got %v", cdp.dest, contracts[consts.ContractNameRMNRemote])
+		return dt.Observation{},
+			fmt.Errorf("expected RMNRemote contract on dest chain %v, got %v", cdp.dest, contracts[consts.ContractNameRMNRemote])
 	}
 
 	return dt.Observation{
