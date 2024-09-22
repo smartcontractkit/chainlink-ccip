@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -44,46 +43,55 @@ var CCTPDestDomains = map[uint64]uint32{
 }
 
 type usdcMessageReader struct {
-	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader
 	cctpDestDomain  map[uint64]uint32
 	eventIndex      int
+	boundContracts  map[cciptypes.ChainSelector]types.BoundContract
 }
 
 type eventID [32]byte
 
-type messageSentEvent struct {
-	payload []byte
+type MessageSentEvent struct {
+	Arg0 []byte
 }
 
-func (m messageSentEvent) unpackID() (eventID, error) {
+func (m MessageSentEvent) unpackID() (eventID, error) {
 	var result [32]byte
 
 	// Check if the data slice has at least 96 bytes
-	if len(m.payload) < 128 {
+	if len(m.Arg0) < 32 {
 		return result, fmt.Errorf("data slice too short, must be at least 128 bytes")
 	}
 
 	// Slice the third 32-byte segment (from index 96 to 128)
-	copy(result[:], m.payload[96:128])
+	copy(result[:], m.Arg0[:32])
 
 	return result, nil
 }
 
 func NewUSDCMessageReader(
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
-	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
+	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 ) (USDCMessageReader, error) {
+	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
 	for chainSelector, token := range tokensConfig {
-		err := bindMessageTransmitters(context.Background(), contractReaders, chainSelector, token.SourcePoolAddress)
+		contract, err := bindMessageTransmitters(
+			context.Background(),
+			contractReaders,
+			chainSelector,
+			token.SourceMessageTransmitterAddr,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to bind message transmitter for chain %d: %w", chainSelector, err)
 		}
+		boundContracts[chainSelector] = contract
 	}
 
 	return usdcMessageReader{
 		contractReaders: contractReaders,
 		cctpDestDomain:  CCTPDestDomains,
 		eventIndex:      MessageSentWordIndex,
+		boundContracts:  boundContracts,
 	}, nil
 }
 
@@ -100,15 +108,20 @@ func (u usdcMessageReader) MessageHashes(
 
 	// 2. Query the MessageTransmitter contract for the MessageSent events based on the 3rd words.
 	// We need entire MessageSent payload to use that with the Attestation API
-	iter, err := u.contractReaders[source].ExtendedQueryKey(
+	cr, ok := u.boundContracts[source]
+	if !ok {
+		return nil, fmt.Errorf("no contract bound for chain %d", source)
+	}
+
+	iter, err := u.contractReaders[source].QueryKey(
 		ctx,
-		MessageTransmitter,
+		cr,
 		query.KeyFilter{
 			Key:         MessageTransmitterEvent,
 			Expressions: []query.Expression{},
 		},
 		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
-		&messageSentEvent{},
+		&MessageSentEvent{},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query onRamp: %w", err)
@@ -116,22 +129,22 @@ func (u usdcMessageReader) MessageHashes(
 
 	messageSentEvents := make(map[eventID]MessageHash)
 	for _, item := range iter {
-		event, ok := item.Data.(*messageSentEvent)
-		if !ok {
+		event, ok1 := item.Data.(*MessageSentEvent)
+		if !ok1 {
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 		e, err1 := event.unpackID()
 		if err1 != nil {
 			return nil, err1
 		}
-		messageSentEvents[e] = event.payload
+		messageSentEvents[e] = event.Arg0
 	}
 
 	// 3. This should be done by ChainReader - picking only events matching eventIDs
 	out := make(map[exectypes.MessageTokenID]MessageHash)
 	for tokenID, messageID := range eventIDs {
-		messageHash, ok := messageSentEvents[messageID]
-		if !ok {
+		messageHash, ok1 := messageSentEvents[messageID]
+		if !ok1 {
 			// Token not available in the source chain
 			continue
 		}
@@ -148,7 +161,7 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 	messageTransmitterEvents := make(map[exectypes.MessageTokenID]eventID)
 
 	for id, token := range tokens {
-		sourceTokenPayload, err := parseTokenExtraData(token)
+		sourceTokenPayload, err := NewSourceTokenDataPayloadFromBytes(token.ExtraData)
 		if err != nil {
 			return nil, err
 		}
@@ -198,33 +211,28 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 
 func bindMessageTransmitters(
 	ctx context.Context,
-	readers map[cciptypes.ChainSelector]contractreader.Extended,
+	readers map[cciptypes.ChainSelector]types.ContractReader,
 	chainSel cciptypes.ChainSelector,
 	address string,
-) error {
+) (types.BoundContract, error) {
+	var empty types.BoundContract
 	r, ok := readers[chainSel]
 	if !ok {
-		return fmt.Errorf("no contract reader found for chain %d", chainSel)
+		return empty, fmt.Errorf("no contract reader found for chain %d", chainSel)
 	}
 
-	if err := r.Bind(ctx, []types.BoundContract{
-		{
-			Address: address,
-			Name:    MessageTransmitter,
-		},
-	}); err != nil {
-		return fmt.Errorf("unable to bind %s for chain %d: %w", MessageTransmitter, chainSel, err)
+	contract := types.BoundContract{
+		Address: address,
+		Name:    MessageTransmitter,
+	}
+	if err := r.Bind(ctx, []types.BoundContract{contract}); err != nil {
+		return empty, fmt.Errorf("unable to bind %s for chain %d: %w", MessageTransmitter, chainSel, err)
 	}
 
-	return nil
+	return contract, nil
 }
 
-type sourceTokenDataPayload struct {
-	Nonce        uint64
-	SourceDomain uint32
-}
-
-// parseTokenExtraData extracts the nonce and source domain from the USDC message.
+// SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
 // Please see the Solidity code in USDCTokenPool to understand more details
 //
 //	struct SourceTokenDataPayload {
@@ -235,20 +243,42 @@ type sourceTokenDataPayload struct {
 //	   destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
 //	   destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
 //	 });
-func parseTokenExtraData(token cciptypes.RampTokenAmount) (*sourceTokenDataPayload, error) {
-	if len(token.ExtraData) < 12 {
+type SourceTokenDataPayload struct {
+	Nonce        uint64
+	SourceDomain uint32
+}
+
+func NewSourceTokenDataPayload(nonce uint64, sourceDomain uint32) *SourceTokenDataPayload {
+	return &SourceTokenDataPayload{
+		Nonce:        nonce,
+		SourceDomain: sourceDomain,
+	}
+}
+
+func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceTokenDataPayload, error) {
+	if len(extraData) < 12 {
 		return nil, fmt.Errorf("extraData is too short, expected at least 12 bytes")
 	}
 
 	// Extract the nonce (first 8 bytes)
-	nonce := binary.BigEndian.Uint64(token.ExtraData[:8])
+	nonce := binary.BigEndian.Uint64(extraData[:8])
 	// Extract the sourceDomain (next 4 bytes)
-	sourceDomain := binary.BigEndian.Uint32(token.ExtraData[8:12])
+	sourceDomain := binary.BigEndian.Uint32(extraData[8:12])
 
-	return &sourceTokenDataPayload{
+	return &SourceTokenDataPayload{
 		Nonce:        nonce,
 		SourceDomain: sourceDomain,
 	}, nil
+}
+
+func (s SourceTokenDataPayload) ToBytes() cciptypes.Bytes {
+	nonceBytes := [8]byte{}
+	binary.BigEndian.PutUint64(nonceBytes[:], s.Nonce)
+
+	sourceDomainBytes := [4]byte{}
+	binary.BigEndian.PutUint32(sourceDomainBytes[:], s.SourceDomain)
+
+	return append(nonceBytes[:], sourceDomainBytes[:]...)
 }
 
 type FakeUSDCMessageReader struct {

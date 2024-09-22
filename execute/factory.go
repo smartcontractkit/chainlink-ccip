@@ -105,8 +105,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.lggr,
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
-		// FIXME contract readers should be `exteded` to support the new interface
-		nil, //p.contractReaders,
+		p.contractReaders,
 	)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
