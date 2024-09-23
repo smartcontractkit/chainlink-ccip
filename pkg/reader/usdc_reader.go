@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -25,10 +26,7 @@ type USDCMessageReader interface {
 }
 
 const (
-	CCTPMessageVersion      = uint32(0)
-	MessageTransmitter      = "MessageTransmitter"
-	MessageTransmitterEvent = "MessageSent"
-	MessageSentWordIndex    = 3
+	CCTPMessageVersion = uint32(0)
 )
 
 // TODO, this should be fetched from USDC Token Pool and cached
@@ -45,7 +43,6 @@ var CCTPDestDomains = map[uint64]uint32{
 type usdcMessageReader struct {
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader
 	cctpDestDomain  map[uint64]uint32
-	eventIndex      int
 	boundContracts  map[cciptypes.ChainSelector]types.BoundContract
 }
 
@@ -58,12 +55,12 @@ type MessageSentEvent struct {
 func (m MessageSentEvent) unpackID() (eventID, error) {
 	var result [32]byte
 
-	// Check if the data slice has at least 96 bytes
+	// Check if the data slice has at least 32 bytes
 	if len(m.Arg0) < 32 {
 		return result, fmt.Errorf("data slice too short, must be at least 128 bytes")
 	}
 
-	// Slice the third 32-byte segment (from index 96 to 128)
+	// Slice the first 32-byte segment
 	copy(result[:], m.Arg0[:32])
 
 	return result, nil
@@ -90,7 +87,6 @@ func NewUSDCMessageReader(
 	return usdcMessageReader{
 		contractReaders: contractReaders,
 		cctpDestDomain:  CCTPDestDomains,
-		eventIndex:      MessageSentWordIndex,
 		boundContracts:  boundContracts,
 	}, nil
 }
@@ -117,7 +113,7 @@ func (u usdcMessageReader) MessageHashes(
 		ctx,
 		cr,
 		query.KeyFilter{
-			Key:         MessageTransmitterEvent,
+			Key:         consts.EventNameCCTPMessageSent,
 			Expressions: []query.Expression{},
 		},
 		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
@@ -223,10 +219,14 @@ func bindMessageTransmitters(
 
 	contract := types.BoundContract{
 		Address: address,
-		Name:    MessageTransmitter,
+		Name:    consts.ContractNameCCTPMessageTransmitter,
 	}
 	if err := r.Bind(ctx, []types.BoundContract{contract}); err != nil {
-		return empty, fmt.Errorf("unable to bind %s for chain %d: %w", MessageTransmitter, chainSel, err)
+		return empty,
+			fmt.Errorf(
+				"unable to bind %s for chain %d: %w",
+				consts.ContractNameCCTPMessageTransmitter, chainSel, err,
+			)
 	}
 
 	return contract, nil
