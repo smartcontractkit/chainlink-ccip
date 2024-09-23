@@ -21,7 +21,6 @@ type processor struct {
 	destChain                        cciptypes.ChainSelector
 	lggr                             logger.Logger
 	homeChain                        reader.HomeChain
-	chainSupport                     plugincommon.ChainSupport
 	ccipReader                       readerpkg.CCIPReader
 	ChainFeePriceBatchWriteFrequency commonconfig.Duration
 	bigF                             int
@@ -32,7 +31,6 @@ func NewProcessor(
 	lggr logger.Logger,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
-	chainSupport plugincommon.ChainSupport,
 	ccipReader readerpkg.CCIPReader,
 	chainFeePriceBatchWriteFrequency commonconfig.Duration,
 	bigF int,
@@ -41,7 +39,6 @@ func NewProcessor(
 		lggr:                             lggr,
 		destChain:                        destChain,
 		homeChain:                        homeChain,
-		chainSupport:                     chainSupport,
 		ccipReader:                       ccipReader,
 		ChainFeePriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
 		bigF:                             bigF,
@@ -83,17 +80,17 @@ func (p *processor) Outcome(
 	}
 	gasPrices := make([]cciptypes.GasPriceChain, 0, len(consensusObs.FeeComponents))
 	for chain, feeComp := range consensusObs.FeeComponents {
+		// GasPrice is a Bitwise operation here like:
+		// (dataAvFee * nativeTokenPrice) << 112 | executionFee * nativeTokenPrice
+		// nolint:lll
+		// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
+
 		dataAvailabilityPrice := cciptypes.NewBigIntFromInt64(1).
 			Mul(consensusObs.NativeTokenPrices[chain].Int,
 				feeComp.DataAvailabilityFee)
 		execPrice := cciptypes.NewBigIntFromInt64(1).
 			Mul(consensusObs.NativeTokenPrices[chain].Int,
 				feeComp.ExecutionFee)
-
-		// Bitwise operation here like:
-		// gasPrice << 112 | nativeTokenPrice * executionFee
-		// nolint:lll
-		// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
 		price := dataAvailabilityPrice.Lsh(dataAvailabilityPrice, 112)
 		combinedPrice := price.Or(price, execPrice)
 
