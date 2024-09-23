@@ -1,6 +1,7 @@
 package reader
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -191,18 +192,13 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 
 		senderBytes := [12]byte{}
 
-		messageTransmittedEvent := [32]byte(
-			append(
-				append(
-					append(
-						append(
-							msgVersionBytes[:],
-							sourceDomainBytes[:]...),
-						destDomainBytes[:]...),
-					nonceBytes[:]...),
-				senderBytes[:]...),
-		)
-		messageTransmitterEvents[id] = messageTransmittedEvent
+		var buf bytes.Buffer
+		buf.Write(msgVersionBytes[:])
+		buf.Write(sourceDomainBytes[:])
+		buf.Write(destDomainBytes[:])
+		buf.Write(nonceBytes[:])
+		buf.Write(senderBytes[:])
+		messageTransmitterEvents[id] = [32]byte(buf.Bytes()[:32])
 	}
 	return messageTransmitterEvents, nil
 }
