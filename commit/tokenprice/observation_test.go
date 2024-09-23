@@ -79,7 +79,7 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
-					bigF:             f,
+					fRoleDON:         f,
 				}
 			},
 			expObs: Observation{
@@ -105,7 +105,7 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
-					bigF:             f,
+					fRoleDON:         f,
 				}
 			},
 			expObs: Observation{},

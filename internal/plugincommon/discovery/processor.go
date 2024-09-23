@@ -2,7 +2,6 @@ package discovery
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -100,10 +99,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	for chain := range fChainObs {
 		fMin[chain] = cdp.fRoleDON
 	}
+	fChain := plugincommon.GetConsensusMap(
+		cdp.lggr,
+		"fChain",
+		fChainObs,
+		plugincommon.HonestMajorityThresholdMap(fMin),
+	)
 
-	fChain := plugincommon.GetConsensusMap(cdp.lggr, "fChain", fChainObs, fMin)
-
-	// onramp address consensus
+	// collect onramp addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
@@ -111,7 +114,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		}
 	}
 
-	// nonce manager address consensus
+	// collect nonce manager addresses
 	var nonceManagerAddrs [][]byte
 	for _, ao := range aos {
 		nonceManagerAddrs = append(
@@ -120,63 +123,23 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		)
 	}
 
-	nonceManagerConsensus, err := getConsensusNonceManager("nonceManager", nonceManagerAddrs, fChain[cdp.dest])
-	if err != nil {
-		return dt.Outcome{}, fmt.Errorf("unable to reach consensus on nonce manager: %w", err)
-	}
-
 	// call Sync to bind contracts.
-	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
-	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
-	contracts[consts.ContractNameNonceManager] = map[cciptypes.ChainSelector][]byte{
-		cdp.dest: nonceManagerConsensus,
-	}
+	contracts := make(reader.ContractAddresses)
+	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(
+		cdp.lggr,
+		"onramp",
+		onrampAddrs,
+		plugincommon.HonestMajorityThresholdMap(fChain),
+	)
+	contracts[consts.ContractNameNonceManager] = plugincommon.GetConsensusMap(
+		cdp.lggr,
+		"nonceManager",
+		map[cciptypes.ChainSelector][][]byte{cdp.dest: nonceManagerAddrs},
+		plugincommon.HonestMajorityThresholdMap(fChain),
+	)
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}
 
 	return dt.Outcome{}, nil
-}
-
-func getConsensusNonceManager(
-	objectName string,
-	nonceManagerAddrs [][]byte,
-	f int,
-) ([]byte, error) {
-	if len(nonceManagerAddrs) < 2*f+1 {
-		return nil, fmt.Errorf(
-			"could not reach consensus on %s, not enough observations (want %d got %d)",
-			objectName, 2*f+1, len(nonceManagerAddrs))
-	}
-	keyer := func(addr []byte) string { return hex.EncodeToString(addr) }
-	unkeyer := func(key string) ([]byte, error) { return hex.DecodeString(key) }
-	votes := make(map[string]int)
-	for _, addr := range nonceManagerAddrs {
-		votes[keyer(addr)]++
-	}
-
-	// Find the most common nonce manager address.
-	maxVotes := 0
-	var maxAddr string
-	for addr, vote := range votes {
-		if vote > maxVotes {
-			maxVotes = vote
-			maxAddr = addr
-		}
-	}
-
-	// Check if the most common nonce manager address was observed at least f+1 times.
-	if maxVotes < f+1 {
-		return nil, fmt.Errorf(
-			"could not reach consensus on %s, no single address was observed more than %d times",
-			objectName, f)
-	}
-
-	// Return the most common nonce manager address.
-	nonceManager, err := unkeyer(maxAddr)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode nonce manager address: %w", err)
-	}
-
-	return nonceManager, nil
 }
