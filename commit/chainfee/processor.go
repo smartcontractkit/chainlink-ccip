@@ -11,6 +11,7 @@ import (
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
@@ -51,10 +52,15 @@ func (p *processor) Observation(
 	prevOutcome Outcome,
 	query Query,
 ) (Observation, error) {
+
+	feeComponents := p.ccipReader.GetAllChainsFeeComponents(ctx)
+
+	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
 	return Observation{
-		FChain:        p.ObserveFChain(),
-		FeeComponents: p.ObserveFeeComponents(ctx),
-		Timestamp:     time.Now().UTC(),
+		FChain:           p.ObserveFChain(),
+		FeeComponents:    feeComponents,
+		NativeTokenPrice: nativeTokenPrices,
+		Timestamp:        time.Now().UTC(),
 	}, nil
 }
 

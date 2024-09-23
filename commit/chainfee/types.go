@@ -16,7 +16,8 @@ type Outcome struct {
 }
 
 type Observation struct {
-	FeeComponents map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
-	FChain        map[cciptypes.ChainSelector]int                      `json:"fChain"`
-	Timestamp     time.Time
+	FeeComponents    map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
+	NativeTokenPrice map[cciptypes.ChainSelector]cciptypes.BigInt         `json:"nativeTokenPrice"`
+	FChain           map[cciptypes.ChainSelector]int                      `json:"fChain"`
+	Timestamp        time.Time                                            `json:"timestamp"`
 }

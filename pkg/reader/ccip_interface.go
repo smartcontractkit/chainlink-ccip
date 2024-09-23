@@ -108,7 +108,7 @@ type CCIPReader interface {
 	GetAllChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents
 
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
-	GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]cciptypes.TokenPrice, error)
+	GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]cciptypes.BigInt
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

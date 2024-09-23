@@ -424,33 +424,23 @@ func (_c *MockCCIPReader_GetExpectedNextSequenceNumber_Call) RunAndReturn(run fu
 }
 
 // GetWrappedNativeTokenPriceUSD provides a mock function with given fields: ctx, selectors
-func (_m *MockCCIPReader) GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.TokenPrice, error) {
+func (_m *MockCCIPReader) GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.BigInt {
 	ret := _m.Called(ctx, selectors)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetWrappedNativeTokenPriceUSD")
 	}
 
-	var r0 map[ccipocr3.ChainSelector]ccipocr3.TokenPrice
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.TokenPrice, error)); ok {
-		return rf(ctx, selectors)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.TokenPrice); ok {
+	var r0 map[ccipocr3.ChainSelector]ccipocr3.BigInt
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.BigInt); ok {
 		r0 = rf(ctx, selectors)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]ccipocr3.TokenPrice)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]ccipocr3.BigInt)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, []ccipocr3.ChainSelector) error); ok {
-		r1 = rf(ctx, selectors)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetWrappedNativeTokenPriceUSD'
@@ -472,12 +462,12 @@ func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) Return(_a0 map[ccipocr3.ChainSelector]ccipocr3.TokenPrice, _a1 error) *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) Return(_a0 map[ccipocr3.ChainSelector]ccipocr3.BigInt) *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.TokenPrice, error)) *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call {
+func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.BigInt) *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -125,8 +125,8 @@ func (r InMemoryCCIPReader) GetAllChainsFeeComponents(
 func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]cciptypes.TokenPrice, error) {
-	return nil, nil
+) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	return nil
 }
 func (r InMemoryCCIPReader) DiscoverContracts(
 	ctx context.Context, destChain cciptypes.ChainSelector,
