@@ -88,6 +88,54 @@ profiles:
           namespace: ${DEVSPACE_NAMESPACE}
           profiles:
             - core
+  - name: core-dev-ocr2-external-network
+    parents:
+      - profile: core
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - local-dev
+  - name: core-dev-simulated-core-ocr1-stateless
+    parents:
+      - profile: core
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - local-dev-simulated-core-ocr1-stateless
+  - name: core-dev-simulated-core-ocr1
+    parents:
+      - profile: core
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - local-dev-simulated-core-ocr1
+  - name: keystone
+    parents:
+      - profile: core
+    patches:
+      - op: add
+        path: vars
+        value:
+          # For keystone provisioning
+          # The websocket of the blockchain node to connect each CL node to. Needs to be Sepolia endpoint.
+          KEYSTONE_ETH_WS_URL:
+            source: env
+          # The http endpoint of the blockchain node to connect each CL node to. Needs to be Sepolia endpoint.
+          KEYSTONE_ETH_HTTP_URL:
+            source: env
+          # A private key that contains sepolia ETH to use for contract deployment and funding transmitters.
+          KEYSTONE_ACCOUNT_KEY:
+            source: env
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - keystone
+      - op: add
+        path: dependencies.crib-chainlink-cluster.pipeline
+        value: keystone
   - name: ccip
     patches:
     - op: add
@@ -235,10 +283,6 @@ profiles:
         value: kind
 
 commands:
-  ccip:
-    command: devspace run-pipeline ccip -p ccip
-    description: Run the CCIP pipeline.
-    appendArgs: true
   core:
     command: devspace run-pipeline core -p core
     description: Run the Core pipeline.
@@ -246,6 +290,26 @@ commands:
   core-kind:
     command: devspace run-pipeline core-kind -p core-kind
     description: Run the Core pipeline for Kind.
+    appendArgs: true
+  core-dev-ocr2-external-network:
+    command: devspace run-pipeline core -p core-dev-ocr2-external-network
+    description: Run the Core pipeline with external network.
+    appendArgs: true
+  core-dev-simulated-core-ocr1-stateless:
+    command: devspace run-pipeline core -p core-dev-simulated-core-ocr1-stateless
+    description: Run the Core pipeline with external network.
+    appendArgs: true
+  core-dev-simulated-core-ocr1:
+    command: devspace run-pipeline core -p core-dev-simulated-core-ocr1
+    description: Run the Core pipeline with external network.
+    appendArgs: true
+  keystone:
+    command: devspace run-pipeline core -p keystone
+    description: Run the Core pipeline with Keystone.
+    appendArgs: true
+  ccip:
+    command: devspace run-pipeline ccip -p ccip
+    description: Run the CCIP pipeline.
     appendArgs: true
   ccip-kind:
     command: devspace run-pipeline ccip-kind -p ccip-kind

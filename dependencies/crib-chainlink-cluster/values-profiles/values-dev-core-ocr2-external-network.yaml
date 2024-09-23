@@ -1,4 +1,3 @@
-# Disable geth if using existing testnets.
 geth:
   enabled: false
 db:
@@ -77,8 +76,6 @@ chainlink:
       HTTPSPort = 0
 
       [Database]
-      MaxIdleConns = 50
-      MaxOpenConns = 50
       MigrateOnStartup = true
 
       [OCR2]
