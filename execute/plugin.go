@@ -24,7 +24,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -34,6 +36,7 @@ const maxReportSizeBytes = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
+	donID        plugintypes.DonID
 	reportingCfg ocr3types.ReportingPluginConfig
 	cfg          pluginconfig.ExecutePluginConfig
 
@@ -55,6 +58,7 @@ type Plugin struct {
 }
 
 func NewPlugin(
+	donID plugintypes.DonID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg pluginconfig.ExecutePluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -77,6 +81,7 @@ func NewPlugin(
 	}
 
 	return &Plugin{
+		donID:             donID,
 		reportingCfg:      reportingCfg,
 		cfg:               cfg,
 		oracleIDToP2pID:   oracleIDToP2pID,
@@ -578,6 +583,19 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
+	// we only transmit reports if we are the "blue" instance.
+	// we can check this by reading the OCR conigs home chain.
+	isGreen, err := p.isGreenInstance(ctx)
+	if err != nil {
+		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isGreenInstance: %w", err)
+	}
+
+	if isGreen {
+		p.lggr.Debugw("not the blue instance, skipping report transmission",
+			"myDigest", p.reportingCfg.ConfigDigest.Hex())
+		return false, nil
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
@@ -589,6 +607,15 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		"reports", decodedReport.ChainReports,
 	)
 	return true, nil
+}
+
+func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
+	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
+	if err != nil {
+		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
+	}
+
+	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }
 
 func (p *Plugin) Close() error {

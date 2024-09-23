@@ -95,3 +95,9 @@ const (
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "destChain"
 )
+
+// Mirrors of Internal.sol's OCRPluginType
+const (
+	PluginTypeCommit  uint8 = 0
+	PluginTypeExecute uint8 = 1
+)
