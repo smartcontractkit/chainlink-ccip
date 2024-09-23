@@ -20,13 +20,13 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = p.bigF
-	}
-
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
+	fMin := make(map[cciptypes.ChainSelector]int)
+	for chain := range aggObs.FChain {
+		// TODO: this doesn't seem right, should be passing in 2 * fRoleDON + 1?
+		fMin[chain] = p.fRoleDON
+	}
 	fChains := plugincommon.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
 
 	fDestChain, exists := fChains[p.cfg.DestChain]

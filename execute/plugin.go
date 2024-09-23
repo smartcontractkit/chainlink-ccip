@@ -41,12 +41,11 @@ type Plugin struct {
 	cfg          pluginconfig.ExecutePluginConfig
 
 	// providers
-	ccipReader   readerpkg.CCIPReader
-	readerSyncer *plugincommon.BackgroundReaderSyncer
-	reportCodec  cciptypes.ExecutePluginCodec
-	msgHasher    cciptypes.MessageHasher
-	homeChain    reader.HomeChain
-	discovery    *discovery.ContractDiscoveryProcessor
+	ccipReader  readerpkg.CCIPReader
+	reportCodec cciptypes.ExecutePluginCodec
+	msgHasher   cciptypes.MessageHasher
+	homeChain   reader.HomeChain
+	discovery   *discovery.ContractDiscoveryProcessor
 
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver tokendata.TokenDataObserver
@@ -70,23 +69,12 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		syncFrequency(cfg.SyncFrequency),
-	)
-	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Errorw("error starting background reader syncer", "err", err)
-	}
-
 	return &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
 		cfg:               cfg,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		ccipReader:        ccipReader,
-		readerSyncer:      readerSyncer,
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		homeChain:         homeChain,
@@ -623,10 +611,6 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
-	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Warnw("error closing reader syncer", "err", err)
-	}
-
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
@@ -654,20 +638,6 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
 	return chains.Contains(p.cfg.DestChain), nil
-}
-
-func syncFrequency(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 10 * time.Second
-	}
-	return configuredValue
-}
-
-func syncTimeout(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 3 * time.Second
-	}
-	return configuredValue
 }
 
 // Interface compatibility checks.

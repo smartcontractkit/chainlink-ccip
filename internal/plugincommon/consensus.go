@@ -81,14 +81,32 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 	return valsCopy[len(valsCopy)/2]
 }
 
-var TimestampComparator = func(a, b time.Time) bool {
+func TimestampComparator(a, b time.Time) bool {
 	return a.Before(b)
 }
 
-var BigIntComparator = func(a, b cciptypes.BigInt) bool {
+func BigIntComparator(a, b cciptypes.BigInt) bool {
 	return a.Cmp(b.Int) == -1
 }
 
-var TokenPriceComparator = func(a, b cciptypes.TokenPrice) bool {
+func TokenPriceComparator(a, b cciptypes.TokenPrice) bool {
 	return a.Price.Int.Cmp(b.Price.Int) == -1
+}
+
+// HonestMajorityThreshold takes a fault-tolerance f value
+// and returns the threshold value that is set to 2f+1.
+// Use this in cases where an honest majority is required.
+func HonestMajorityThreshold(f int) int {
+	return 2*f + 1
+}
+
+// HonestMajorityThresholdMap takes a map of chains to fault-tolerance
+// f values and returns a map of chains to threshold values that are set to 2f+1.
+// Use this in cases where an honest majority is required.
+func HonestMajorityThresholdMap(fMap map[cciptypes.ChainSelector]int) map[cciptypes.ChainSelector]int {
+	thresholdMap := make(map[cciptypes.ChainSelector]int)
+	for chain, f := range fMap {
+		thresholdMap[chain] = HonestMajorityThreshold(f)
+	}
+	return thresholdMap
 }
