@@ -122,6 +122,7 @@ func NewPlugin(
 
 	chainFeeProcessr := chainfee.NewProcessor(
 		lggr,
+		cfg.DestChain,
 		homeChain,
 		chainSupport,
 		ccipReader,

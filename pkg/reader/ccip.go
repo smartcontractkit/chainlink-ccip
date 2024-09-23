@@ -447,7 +447,7 @@ func (r *ccipChainReader) GetAllChainsFeeComponents(
 	for chain, chainWriter := range r.contractWriters {
 		feeComponent, err := chainWriter.GetFeeComponents(ctx)
 		if err != nil {
-			r.lggr.Warnw("failed to get chain fee components for chain %d: %w", chain, err)
+			r.lggr.Errorw("failed to get chain fee components for chain %d: %w", chain, err)
 			continue
 		}
 		feeComponents[chain] = *feeComponent
@@ -459,7 +459,16 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	return nil
+	//TODO:
+	// nolint:lll
+	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
+	// nolint:lll
+	// 2. Call FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
+	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, len(selectors))
+	for _, chain := range selectors {
+		prices[chain] = cciptypes.NewBigIntFromInt64(1)
+	}
+	return prices
 }
 
 func (r *ccipChainReader) DiscoverContracts(
@@ -484,7 +493,8 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
-	// TODO: Lookup fee quoter?
+	// TODO: Lookup FeeQuoter (from onRamp DynamicConfig)
+	// TODO: Lookup Router (from onRamp DestChainConfig)
 
 	// Build response object.
 	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))

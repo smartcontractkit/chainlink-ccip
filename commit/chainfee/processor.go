@@ -17,6 +17,7 @@ import (
 )
 
 type processor struct {
+	destChain                     cciptypes.ChainSelector
 	lggr                          logger.Logger
 	homeChain                     reader.HomeChain
 	chainSupport                  plugincommon.ChainSupport
@@ -25,8 +26,10 @@ type processor struct {
 	bigF                          int
 }
 
+// nolint: revive
 func NewProcessor(
 	lggr logger.Logger,
+	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
 	chainSupport plugincommon.ChainSupport,
 	ccipReader readerpkg.CCIPReader,
@@ -35,6 +38,7 @@ func NewProcessor(
 ) *processor {
 	return &processor{
 		lggr:                          lggr,
+		destChain:                     destChain,
 		homeChain:                     homeChain,
 		chainSupport:                  chainSupport,
 		ccipReader:                    ccipReader,
@@ -52,9 +56,7 @@ func (p *processor) Observation(
 	prevOutcome Outcome,
 	query Query,
 ) (Observation, error) {
-
 	feeComponents := p.ccipReader.GetAllChainsFeeComponents(ctx)
-
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
 	return Observation{
 		FChain:           p.ObserveFChain(),
@@ -69,6 +71,7 @@ func (p *processor) Outcome(
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
+
 	return Outcome{}, nil
 }
 

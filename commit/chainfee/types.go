@@ -21,3 +21,19 @@ type Observation struct {
 	FChain           map[cciptypes.ChainSelector]int                      `json:"fChain"`
 	Timestamp        time.Time                                            `json:"timestamp"`
 }
+
+// AggregateObservation is the aggregation of a list of observations
+type AggregateObservation struct {
+	FeeComponents     map[cciptypes.ChainSelector][]types.ChainFeeComponents `json:"feeComponents"`
+	NativeTokenPrices map[cciptypes.ChainSelector][]cciptypes.BigInt         `json:"nativeTokenPrice"`
+	FChain            map[cciptypes.ChainSelector][]int                      `json:"fChain"`
+	Timestamps        []time.Time                                            `json:"timestamps"`
+}
+
+// ConsensusObservation holds the consensus values for all observations in a round
+type ConsensusObservation struct {
+	FeeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
+	NativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt         `json:"nativeTokenPrice"`
+	FChain            map[cciptypes.ChainSelector]int                      `json:"fChain"`
+	Timestamp         time.Time                                            `json:"timestamp"`
+}
