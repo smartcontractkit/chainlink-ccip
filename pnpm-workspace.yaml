@@ -1,0 +1,6 @@
+# pnpm doesn't support package.json workspaces (https://docs.npmjs.com/cli/v10/using-npm/workspaces)
+# see: https://pnpm.io/workspaces
+packages:
+  - cli
+  - dashboard-lib
+  - deployments/*

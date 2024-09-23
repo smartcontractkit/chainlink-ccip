@@ -56,7 +56,7 @@ func InMemIniWithAwsProfiles(awsProfiles []AwsProfile) (*ini.File, error) {
 		}
 
 		for k, v := range awsProfile.entries {
-			section.NewKey(k, v)
+			_, _ = section.NewKey(k, v)
 		}
 	}
 
@@ -181,8 +181,8 @@ sso_role_name = outdated-role`), 0666)
 	want = ini.Empty()
 	section, err := want.NewSection("default")
 	require.NoError(t, err)
-	section.NewKey("region", "us-west-2")
-	section.NewKey("output", "text")
+	_, _ = section.NewKey("region", "us-west-2")
+	_, _ = section.NewKey("output", "text")
 
 	AssertEqualIniSections(t, want.Section("default"), got.Section("default"))
 }

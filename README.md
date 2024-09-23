@@ -77,7 +77,7 @@ Now follow the steps from [Scenario 1)](#pin-to-local-version-of-the-chart-in-yo
 
 ## Repository Management and Contribution Guidelines
 
-For detailed information on managing repository access, contributing to this repository, and a comprehensive list of related CRIB team repositories, please refer to our official [CRIB Team Repositories and Management Process](https://smartcontract-it.atlassian.net/wiki/spaces/CRIB/pages/837189704/CRIB+Team+Repositories+and+Management+Process) documentation on Confluence.
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Questions?
 For questions, please reach out to us on [#project-crib slack channel](https://chainlink.enterprise.slack.com/archives/C0637K4BBC2) 

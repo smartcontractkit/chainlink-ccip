@@ -1,0 +1,22 @@
+name: schedule-update-actions
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  update-actions:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Update custom actions
+        uses: smartcontractkit/.github/actions/update-actions@main
+        with:
+          aws-role-arn: ${{ secrets.AWS_OIDC_IAM_ROLE_ARN_GATI }}
+          aws-lambda-url: ${{ secrets.AWS_LAMBDA_URL_GATI }}
+          aws-role-arn-updater: ${{ secrets.AWS_OIDC_IAM_ROLE_ARN_GATI_UPDATER }}
+          aws-lambda-url-updater: ${{ secrets.AWS_LAMBDA_URL_GATI_UPDATER }}
+          aws-region: ${{ secrets.AWS_REGION }}
