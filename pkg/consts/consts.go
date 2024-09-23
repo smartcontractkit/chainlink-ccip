@@ -11,6 +11,8 @@ const (
 	ContractNameCCIPConfig           = "CCIPConfig"
 	ContractNamePriceAggregator      = "AggregatorV3Interface"
 	ContractNameNonceManager         = "NonceManager"
+	ContractNameRMNHome              = "RMNHome"
+	ContractNameRMNRemote            = "RMNRemote"
 )
 
 // Method Names
@@ -73,6 +75,10 @@ const (
 	// Used by the home chain reader.
 	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
 	MethodNameGetOCRConfig       = "GetOCRConfig"
+
+	// RMNHome.sol methods
+	// Used by the rmn home reader.
+	MethodNameGetAllConfigs = "GetAllConfigs"
 )
 
 // Event Names
@@ -87,4 +93,10 @@ const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "destChain"
+)
+
+// Mirrors of Internal.sol's OCRPluginType
+const (
+	PluginTypeCommit  uint8 = 0
+	PluginTypeExecute uint8 = 1
 )

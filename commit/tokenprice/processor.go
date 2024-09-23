@@ -64,11 +64,21 @@ func (p *processor) Observation(
 		return Observation{}, nil
 	}
 
+	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
+	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
+	ts := time.Now().UTC()
+	p.lggr.Infow(
+		"observed token prices",
+		"feed prices", feedTokenPrices,
+		"fee quoter updates", feeQuoterUpdates,
+		"timestamp", ts,
+	)
+
 	return Observation{
-		FeedTokenPrices:       p.ObserveFeedTokenPrices(ctx),
-		FeeQuoterTokenUpdates: p.ObserveFeeQuoterTokenUpdates(ctx),
+		FeedTokenPrices:       feedTokenPrices,
+		FeeQuoterTokenUpdates: feeQuoterUpdates,
 		FChain:                fChain,
-		Timestamp:             time.Now().UTC(),
+		Timestamp:             ts,
 	}, nil
 }
 
@@ -87,6 +97,7 @@ func (p *processor) Outcome(
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
+	p.lggr.Infow("processing token price outcome")
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
@@ -99,6 +110,10 @@ func (p *processor) Outcome(
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(consensusObservation)
+	p.lggr.Infow(
+		"outcome token prices",
+		"token prices", tokenPriceOutcome,
+	)
 	return Outcome{
 		TokenPrices: tokenPriceOutcome,
 	}, nil

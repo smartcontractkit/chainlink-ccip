@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -52,6 +53,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr              logger.Logger
+	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
 	execCodec         cciptypes.ExecutePluginCodec
 	msgHasher         cciptypes.MessageHasher
@@ -64,6 +66,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
@@ -75,6 +78,7 @@ func NewPluginFactory(
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:              lggr,
+		donID:             donID,
 		ocrConfig:         ocrConfig,
 		execCodec:         execCodec,
 		msgHasher:         msgHasher,
@@ -123,6 +127,7 @@ func (p PluginFactory) NewReportingPlugin(
 	)
 
 	plugin := NewPlugin(
+		p.donID,
 		config,
 		pluginconfig.ExecutePluginConfig{
 			DestChain:      p.ocrConfig.Config.ChainSelector,

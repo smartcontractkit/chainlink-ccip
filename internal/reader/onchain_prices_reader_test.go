@@ -93,9 +93,9 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	for _, tc := range testCases {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
 		tokenPricesReader := OnchainTokenPricesReader{
-			ContractReader: contractReader,
-			TokenInfo:      tc.tokenInfo,
-			enabled:        true,
+			ContractReader:   contractReader,
+			TokenInfo:        tc.tokenInfo,
+			feeQuoterEnabled: true,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
