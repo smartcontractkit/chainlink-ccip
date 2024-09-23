@@ -5,8 +5,9 @@ package contractreader
 import (
 	context "context"
 
-	contractreader "github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	mock "github.com/stretchr/testify/mock"
+
+	contractreader "github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 
 	primitives "github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 

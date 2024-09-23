@@ -50,9 +50,11 @@ func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 		4: {ts1, ts2, ts3},
 	}
 
-	timeFinal := GetConsensusMapAggregator(lggr, "time", timeValues, map[int]int{1: f, 2: f, 3: f, 4: f}, func(vals []time.Time) time.Time {
-		return Median(vals, TimestampComparator)
-	})
+	timeFinal := GetConsensusMapAggregator(lggr, "time",
+		timeValues, map[int]int{1: f, 2: f, 3: f, 4: f},
+		func(vals []time.Time) time.Time {
+			return Median(vals, TimestampComparator)
+		})
 
 	assert.Equal(t, map[int]time.Time{
 		1: ts1,
@@ -75,11 +77,13 @@ func Test_GetConsensusMapMedianInt(t *testing.T) {
 		5: {5, 4, 3, 2, 1},
 	}
 
-	intFinal := GetConsensusMapAggregator(lggr, "int", intValues, map[int]int{1: f, 2: f, 3: f, 4: f, 5: f}, func(vals []int) int {
-		return Median(vals, func(a, b int) bool {
-			return a < b
+	intFinal := GetConsensusMapAggregator(lggr, "int", intValues,
+		map[int]int{1: f, 2: f, 3: f, 4: f, 5: f},
+		func(vals []int) int {
+			return Median(vals, func(a, b int) bool {
+				return a < b
+			})
 		})
-	})
 
 	assert.Equal(t, map[int]int{
 		1: 5,

@@ -9,9 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -684,16 +685,6 @@ func (r *ccipChainReader) validateReaderExistence(chains ...cciptypes.ChainSelec
 		_, exists := r.contractReaders[ch]
 		if !exists {
 			return fmt.Errorf("chain %d: %w", ch, ErrContractReaderNotFound)
-		}
-	}
-	return nil
-}
-
-func (r *ccipChainReader) validateWriterExistence(chains ...cciptypes.ChainSelector) error {
-	for _, ch := range chains {
-		_, exists := r.contractWriters[ch]
-		if !exists {
-			return fmt.Errorf("chain %d: %w", ch, ErrContractWriterNotFound)
 		}
 	}
 	return nil
