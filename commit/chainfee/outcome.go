@@ -24,7 +24,7 @@ func (p *processor) getConsensusObservation(
 	// because all nodes can observe the home chain.
 	fChains := plugincommon.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
 
-	fDestChain, exists := fChains[p.destChain]
+	_, exists := fChains[p.destChain]
 	if !exists {
 		return ConsensusObservation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
@@ -34,7 +34,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeeComponents",
 		aggObs.FeeComponents,
-		mathslib.TwoFPlus1(fDestChain), // TODO: f for each component (change parameter to map)
+		mathslib.TwoFPlus1Map(fChains),
 		func(vals []types.ChainFeeComponents) types.ChainFeeComponents {
 			executionFees := make([]cciptypes.BigInt, len(vals))
 			dataAvailabilityFees := make([]cciptypes.BigInt, len(vals))
@@ -53,7 +53,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"NativeTokenPrices",
 		aggObs.NativeTokenPrices,
-		mathslib.TwoFPlus1(fDestChain),
+		mathslib.TwoFPlus1Map(fChains),
 		func(vals []cciptypes.BigInt) cciptypes.BigInt {
 			return plugincommon.Median(vals, plugincommon.BigIntComparator)
 		},

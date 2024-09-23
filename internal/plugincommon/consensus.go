@@ -51,14 +51,18 @@ func GetConsensusMapAggregator[K comparable, T any](
 	lggr logger.Logger,
 	objectName string,
 	items map[K][]T,
-	f int,
+	minObs map[K]int,
 	agg Aggregator[T],
 ) map[K]T {
 	consensus := make(map[K]T)
 
 	for key, values := range items {
-		if len(values) < f {
-			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
+		if _, exists := minObs[key]; !exists {
+			lggr.Warnf("no F value found for key %d", key)
+			continue
+		}
+		if len(values) < minObs[key] {
+			lggr.Warnf("not enough observations to reach consensus for %s on key %v", objectName, key)
 			continue
 		}
 		consensus[key] = agg(values)

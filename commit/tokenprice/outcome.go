@@ -6,6 +6,7 @@ import (
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -20,10 +21,11 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = p.bigF
-	}
+	//fMin := make(map[cciptypes.ChainSelector]int)
+	fMin := mathslib.RepeatedF(func() int { return p.bigF }, maps.Keys(aggObs.FChain))
+	//for chain := range aggObs.FChain {
+	//	fMin[chain] = p.bigF
+	//}
 
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
@@ -45,7 +47,10 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		mathslib.TwoFPlus1(fFeedChain),
+		mathslib.RepeatedF(
+			func() int { return mathslib.TwoFPlus1(fFeedChain) },
+			maps.Keys(aggObs.FeedTokenPrices),
+		),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
 			return plugincommon.Median(vals, plugincommon.TokenPriceComparator)
 		},
@@ -55,7 +60,10 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		mathslib.TwoFPlus1(fDestChain),
+		mathslib.RepeatedF(
+			func() int { return mathslib.TwoFPlus1(fDestChain) },
+			maps.Keys(aggObs.FeeQuoterTokenUpdates),
+		),
 		feeQuoterAggregator,
 	)
 
