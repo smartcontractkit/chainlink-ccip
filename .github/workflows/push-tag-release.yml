@@ -2,12 +2,10 @@ name: push-tag-release
 
 on:
   push:
-    # tags:
-    #   - '*/*'
-    branches:
-      - cli-cicd  # TODO: back to tags when stable
-    paths:
-      - .changeset/*
+    # tag format imposed by changesets on monorepos.
+    # see: https://github.com/changesets/changesets/blob/main/docs/command-line-options.md#tag
+    tags:
+      - '*@*'
 
 jobs:
   extract-package-from-tag:
@@ -15,20 +13,19 @@ jobs:
     outputs:
       package_name: ${{ steps.extract-package-from-tag.outputs.package_name }}
     steps:
-      # - uses: actions/checkout@v4
-      #   with:
-      #     fetch-depth: 0
-      #     fetch-tags: true
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Extract Package Name from Tag
         id: extract-package-from-tag
-        run: echo "package_name=cli" >> "$GITHUB_OUTPUT"
-        # run: |
-        #   TAG_REF="${GITHUB_REF#refs/tags/}"
-        #   PACKAGE_NAME=$(echo "$TAG_REF" | cut -d'/' -f1)
-        #   echo "Tag Reference: $TAG_REF"
-        #   echo "Package Name: $PACKAGE_NAME"
+        run: |
+          TAG_REF="${GITHUB_REF#refs/tags/}"
+          PACKAGE_NAME=$(echo "$TAG_REF" | cut -d'@' -f1)
+          echo "Tag Reference: $TAG_REF"
+          echo "Package Name: $PACKAGE_NAME"
 
-        #   echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
+          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
 
   ci-lint:
     needs: [extract-package-from-tag]
@@ -96,4 +93,9 @@ jobs:
           gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           # goreleaser inputs
-          goreleaser-args: ""
+          goreleaser-dist: goreleaser-pro
+          goreleaser-version: '~> v2'
+          goreleaser-key: ${{ secrets.GORELEASER_KEY }}
+          goreleaser-args: "-f ./${{ needs.extract-package-from-tag.outputs.package_name }}/.goreleaser.yaml"
+          go-version-file: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.mod
+          go-cache-dep-path: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.sum
