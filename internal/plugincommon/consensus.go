@@ -81,14 +81,14 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 	return valsCopy[len(valsCopy)/2]
 }
 
-var TimestampComparator = func(a, b time.Time) bool {
+func TimestampComparator(a, b time.Time) bool {
 	return a.Before(b)
 }
 
-var BigIntComparator = func(a, b cciptypes.BigInt) bool {
+func BigIntComparator(a, b cciptypes.BigInt) bool {
 	return a.Cmp(b.Int) == -1
 }
 
-var TokenPriceComparator = func(a, b cciptypes.TokenPrice) bool {
+func TokenPriceComparator(a, b cciptypes.TokenPrice) bool {
 	return a.Price.Int.Cmp(b.Price.Int) == -1
 }
