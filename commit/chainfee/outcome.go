@@ -6,8 +6,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/exp/maps"
 )
 
 func (p *processor) getConsensusObservation(
@@ -15,19 +17,36 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = p.bigF
-	}
-
+	fMin := mathslib.RepeatedF(func() int { return p.bigF }, maps.Keys(aggObs.FChain))
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	fChains := plugincommon.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
 
-	_, exists := fChains[p.destChain]
+	fDestChain, exists := fChains[p.destChain]
 	if !exists {
 		return ConsensusObservation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
+	}
+
+	timestamp := plugincommon.Median(aggObs.Timestamps, plugincommon.TimestampComparator)
+	chainFeeUpdatesConsensus := plugincommon.GetConsensusMapAggregator(
+		p.lggr,
+		"ChainFeePriceUpdates",
+		aggObs.ChainFeePriceUpdates,
+		mathslib.RepeatedF(
+			func() int { return mathslib.TwoFPlus1(fDestChain) },
+			maps.Keys(aggObs.ChainFeePriceUpdates),
+		),
+		plugincommon.TimestampedBigAggregator,
+	)
+
+	// Stop early if earliest updated timestamp is still fresh
+	earliestUpdateTime := plugincommon.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus), timestamp)
+	nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
+	if earliestUpdateTime.Before(nextUpdateTime) {
+		return ConsensusObservation{
+			ShouldUpdate: false,
+		}, nil
 	}
 
 	feeComponents := plugincommon.GetConsensusMapAggregator(
@@ -60,10 +79,12 @@ func (p *processor) getConsensusObservation(
 	)
 
 	consensusObs := ConsensusObservation{
-		FChain:            fChains,
-		Timestamp:         plugincommon.Median(aggObs.Timestamps, plugincommon.TimestampComparator),
-		FeeComponents:     feeComponents,
-		NativeTokenPrices: nativeTokenPrices,
+		FChain:               fChains,
+		FeeComponents:        feeComponents,
+		NativeTokenPrices:    nativeTokenPrices,
+		ChainFeePriceUpdates: chainFeeUpdatesConsensus,
+		Timestamp:            timestamp,
+		ShouldUpdate:         true,
 	}
 
 	return consensusObs, nil
@@ -71,10 +92,11 @@ func (p *processor) getConsensusObservation(
 
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
-		FeeComponents:     make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
-		NativeTokenPrices: make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
-		FChain:            make(map[cciptypes.ChainSelector][]int),
-		Timestamps:        []time.Time{},
+		FeeComponents:        make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
+		NativeTokenPrices:    make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
+		FChain:               make(map[cciptypes.ChainSelector][]int),
+		ChainFeePriceUpdates: make(map[cciptypes.ChainSelector][]plugintypes.TimestampedBig),
+		Timestamps:           []time.Time{},
 	}
 
 	for _, ao := range aos {
@@ -93,6 +115,10 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		// FChain
 		for chainSel, f := range obs.FChain {
 			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
+		}
+
+		for chainSel, feeUpdate := range obs.ChainFeePriceUpdates {
+			aggObs.ChainFeePriceUpdates[chainSel] = append(aggObs.ChainFeePriceUpdates[chainSel], feeUpdate)
 		}
 
 		// Timestamps

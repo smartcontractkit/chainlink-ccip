@@ -209,7 +209,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				}
 
 				n.ccipReader.EXPECT().
-					GetAllChainsFeeComponents(ctx).
+					GetAvailableChainsFeeComponents(ctx).
 					Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
 				n.ccipReader.EXPECT().
 					GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).

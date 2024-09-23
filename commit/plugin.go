@@ -126,7 +126,7 @@ func NewPlugin(
 		homeChain,
 		chainSupport,
 		ccipReader,
-		cfg.OffchainConfig.TokenPriceBatchWriteFrequency,
+		cfg.OffchainConfig.RemoteGasPriceBatchWriteFrequency,
 		reportingCfg.F,
 	)
 

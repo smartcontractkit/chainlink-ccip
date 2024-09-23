@@ -17,13 +17,13 @@ import (
 )
 
 type processor struct {
-	destChain                     cciptypes.ChainSelector
-	lggr                          logger.Logger
-	homeChain                     reader.HomeChain
-	chainSupport                  plugincommon.ChainSupport
-	ccipReader                    readerpkg.CCIPReader
-	TokenPriceBatchWriteFrequency commonconfig.Duration
-	bigF                          int
+	destChain                        cciptypes.ChainSelector
+	lggr                             logger.Logger
+	homeChain                        reader.HomeChain
+	chainSupport                     plugincommon.ChainSupport
+	ccipReader                       readerpkg.CCIPReader
+	ChainFeePriceBatchWriteFrequency commonconfig.Duration
+	bigF                             int
 }
 
 // nolint: revive
@@ -33,17 +33,17 @@ func NewProcessor(
 	homeChain reader.HomeChain,
 	chainSupport plugincommon.ChainSupport,
 	ccipReader readerpkg.CCIPReader,
-	TokenPriceBatchWriteFrequency commonconfig.Duration,
+	chainFeePriceBatchWriteFrequency commonconfig.Duration,
 	bigF int,
 ) *processor {
 	return &processor{
-		lggr:                          lggr,
-		destChain:                     destChain,
-		homeChain:                     homeChain,
-		chainSupport:                  chainSupport,
-		ccipReader:                    ccipReader,
-		TokenPriceBatchWriteFrequency: TokenPriceBatchWriteFrequency,
-		bigF:                          bigF,
+		lggr:                             lggr,
+		destChain:                        destChain,
+		homeChain:                        homeChain,
+		chainSupport:                     chainSupport,
+		ccipReader:                       ccipReader,
+		ChainFeePriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
+		bigF:                             bigF,
 	}
 }
 
@@ -56,7 +56,7 @@ func (p *processor) Observation(
 	prevOutcome Outcome,
 	query Query,
 ) (Observation, error) {
-	feeComponents := p.ccipReader.GetAllChainsFeeComponents(ctx)
+	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx)
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
 	return Observation{
 		FChain:           p.ObserveFChain(),
@@ -72,7 +72,40 @@ func (p *processor) Outcome(
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 
-	return Outcome{}, nil
+	consensusObs, err := p.getConsensusObservation(aos)
+	if err != nil {
+		return Outcome{}, err
+	}
+	// No need to update yet
+	if !consensusObs.ShouldUpdate || len(consensusObs.FeeComponents) == 0 {
+		return Outcome{}, nil
+	}
+	gasPrices := make([]cciptypes.GasPriceChain, 0, len(consensusObs.FeeComponents))
+	for chain, feeComp := range consensusObs.FeeComponents {
+		dataAvailabilityPrice := cciptypes.NewBigIntFromInt64(1).
+			Mul(consensusObs.NativeTokenPrices[chain].Int,
+				feeComp.DataAvailabilityFee)
+		execPrice := cciptypes.NewBigIntFromInt64(1).
+			Mul(consensusObs.NativeTokenPrices[chain].Int,
+				feeComp.ExecutionFee)
+
+		// Bitwise operation here like:
+		// gasPrice << 112 | nativeTokenPrice * executionFee
+		// nolint:lll
+		// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
+		price := dataAvailabilityPrice.Lsh(dataAvailabilityPrice, 112)
+		combinedPrice := price.Or(price, execPrice)
+
+		gasPrice := cciptypes.GasPriceChain{
+			ChainSel: chain,
+			GasPrice: cciptypes.NewBigInt(combinedPrice),
+		}
+		gasPrices = append(gasPrices, gasPrice)
+	}
+
+	return Outcome{
+		GasPrices: gasPrices,
+	}, nil
 }
 
 func (p *processor) ValidateObservation(

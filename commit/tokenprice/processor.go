@@ -98,7 +98,7 @@ func (p *processor) Outcome(
 	p.lggr.Infow("processing token price outcome")
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
-		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
+		p.lggr.Debugw("ChainFeePriceBatchWriteFrequency is set to zero, no prices will be reported")
 		return Outcome{}, nil
 	}
 

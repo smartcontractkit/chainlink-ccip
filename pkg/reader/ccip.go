@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
@@ -440,7 +441,7 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GetAllChainsFeeComponents(
+func (r *ccipChainReader) GetAvailableChainsFeeComponents(
 	ctx context.Context,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
@@ -469,6 +470,38 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		prices[chain] = cciptypes.NewBigIntFromInt64(1)
 	}
 	return prices
+}
+
+// GetChainFeePriceUpdate Read from FeeQuoter latest fee updates for the provided chains.
+// nolint:lll
+// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
+func (r *ccipChainReader) GetChainFeePriceUpdate(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
+	for _, chain := range selectors {
+		update := plugintypes.TimestampedBig{}
+		// Read from dest chain
+		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameGetFeePriceUpdate,
+			primitives.Unconfirmed,
+			map[string]any{
+				// That actually means that this selector is a source chain for the destChain
+				"destChainSelector": chain,
+			},
+			&update,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get chain fee price update", "chain", chain, "err", err)
+			continue
+		}
+		feeUpdates[chain] = update
+	}
+
+	return feeUpdates
 }
 
 func (r *ccipChainReader) DiscoverContracts(
