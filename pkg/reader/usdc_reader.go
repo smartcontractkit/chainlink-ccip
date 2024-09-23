@@ -14,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -42,7 +43,7 @@ var CCTPDestDomains = map[uint64]uint32{
 }
 
 type usdcMessageReader struct {
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
+	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
 	cctpDestDomain  map[uint64]uint32
 	boundContracts  map[cciptypes.ChainSelector]types.BoundContract
 }
@@ -70,7 +71,7 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 
 func NewUSDCMessageReader(
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (USDCMessageReader, error) {
 	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
 	for chainSelector, token := range tokensConfig {
@@ -205,7 +206,7 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 
 func bindMessageTransmitters(
 	ctx context.Context,
-	readers map[cciptypes.ChainSelector]types.ContractReader,
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	chainSel cciptypes.ChainSelector,
 	address string,
 ) (types.BoundContract, error) {

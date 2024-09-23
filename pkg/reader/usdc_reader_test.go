@@ -14,8 +14,9 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	reader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
+	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -85,7 +86,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			readers := make(map[cciptypes.ChainSelector]types.ContractReader)
+			readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 			for k, v := range tt.readers {
 				readers[k] = v
 			}
@@ -158,7 +159,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 		},
 	}
 
-	contactReaders := map[cciptypes.ChainSelector]types.ContractReader{
+	contactReaders := map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 		faultyChain: faultyReader,
 		emptyChain:  emptyReader,
 		validChain:  validReader,

@@ -3,7 +3,6 @@ package contractreader
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -13,7 +12,6 @@ import (
 //
 //nolint:lll // don't read this interface.
 type ContractReaderFacade interface {
-	services.Service
 	GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error
 	BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error)
 	Bind(ctx context.Context, bindings []types.BoundContract) error

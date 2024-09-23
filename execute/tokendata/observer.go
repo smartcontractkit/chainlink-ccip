@@ -5,11 +5,11 @@ import (
 	"errors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -52,7 +52,7 @@ func NewConfigBasedCompositeObservers(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
-	readers map[cciptypes.ChainSelector]types.ContractReader,
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (*compositeTokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
@@ -76,7 +76,7 @@ func createUSDCTokenObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
-	readers map[cciptypes.ChainSelector]types.ContractReader,
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (TokenDataObserver, error) {
 	usdcReader, err := reader.NewUSDCMessageReader(
 		tokensConfig,
