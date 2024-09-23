@@ -1,14 +1,101 @@
 package reader
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	reader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_USDCMessageReader_New(t *testing.T) {
+	tests := []struct {
+		name         string
+		tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig
+		readers      map[cciptypes.ChainSelector]*reader.MockContractReaderFacade
+		errorMessage string
+	}{
+		{
+			name:         "empty tokens and readers works",
+			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{},
+			readers:      map[cciptypes.ChainSelector]*reader.MockContractReaderFacade{},
+		},
+		{
+			name: "missing readers",
+			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+				cciptypes.ChainSelector(1): {
+					SourcePoolAddress:            "0xA",
+					SourceMessageTransmitterAddr: "0xB",
+				},
+			},
+			readers:      map[cciptypes.ChainSelector]*reader.MockContractReaderFacade{},
+			errorMessage: "no contract reader found for chain 1",
+		},
+		{
+			name: "binding errors",
+			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+				cciptypes.ChainSelector(1): {
+					SourcePoolAddress:            "0xA",
+					SourceMessageTransmitterAddr: "0xB",
+				},
+			},
+			readers: func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
+				readers := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
+				m := reader.NewMockContractReaderFacade(t)
+				m.EXPECT().Bind(mock.Anything, mock.Anything).Return(errors.New("error"))
+				readers[cciptypes.ChainSelector(1)] = m
+				return readers
+			}(),
+			errorMessage: "unable to bind MessageTransmitter for chain 1",
+		},
+		{
+			name: "happy path",
+			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+				cciptypes.ChainSelector(1): {
+					SourcePoolAddress:            "0xA",
+					SourceMessageTransmitterAddr: "0xB",
+				},
+			},
+			readers: func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
+				readers := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
+				m := reader.NewMockContractReaderFacade(t)
+				m.EXPECT().Bind(mock.Anything, []types.BoundContract{
+					{
+						Address: "0xB",
+						Name:    consts.ContractNameCCTPMessageTransmitter,
+					},
+				}).Return(nil)
 
+				readers[cciptypes.ChainSelector(1)] = m
+				return readers
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			readers := make(map[cciptypes.ChainSelector]types.ContractReader)
+			for k, v := range tt.readers {
+				readers[k] = v
+			}
+
+			r, err := NewUSDCMessageReader(tt.tokensConfig, readers)
+			if tt.errorMessage != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.errorMessage)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, r)
+			}
+		})
+	}
 }
 
 func Test_USDCMessageReader_MessageHashes(t *testing.T) {

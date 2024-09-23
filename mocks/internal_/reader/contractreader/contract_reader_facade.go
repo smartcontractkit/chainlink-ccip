@@ -133,6 +133,51 @@ func (_c *MockContractReaderFacade_Bind_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// Close provides a mock function with given fields:
+func (_m *MockContractReaderFacade) Close() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Close")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockContractReaderFacade_Close_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Close'
+type MockContractReaderFacade_Close_Call struct {
+	*mock.Call
+}
+
+// Close is a helper method to define mock.On call
+func (_e *MockContractReaderFacade_Expecter) Close() *MockContractReaderFacade_Close_Call {
+	return &MockContractReaderFacade_Close_Call{Call: _e.mock.On("Close")}
+}
+
+func (_c *MockContractReaderFacade_Close_Call) Run(run func()) *MockContractReaderFacade_Close_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Close_Call) Return(_a0 error) *MockContractReaderFacade_Close_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Close_Call) RunAndReturn(run func() error) *MockContractReaderFacade_Close_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLatestValue provides a mock function with given fields: ctx, readIdentifier, confidenceLevel, params, returnVal
 func (_m *MockContractReaderFacade) GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params interface{}, returnVal interface{}) error {
 	ret := _m.Called(ctx, readIdentifier, confidenceLevel, params, returnVal)
@@ -179,6 +224,98 @@ func (_c *MockContractReaderFacade_GetLatestValue_Call) Return(_a0 error) *MockC
 }
 
 func (_c *MockContractReaderFacade_GetLatestValue_Call) RunAndReturn(run func(context.Context, string, primitives.ConfidenceLevel, interface{}, interface{}) error) *MockContractReaderFacade_GetLatestValue_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// HealthReport provides a mock function with given fields:
+func (_m *MockContractReaderFacade) HealthReport() map[string]error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HealthReport")
+	}
+
+	var r0 map[string]error
+	if rf, ok := ret.Get(0).(func() map[string]error); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]error)
+		}
+	}
+
+	return r0
+}
+
+// MockContractReaderFacade_HealthReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HealthReport'
+type MockContractReaderFacade_HealthReport_Call struct {
+	*mock.Call
+}
+
+// HealthReport is a helper method to define mock.On call
+func (_e *MockContractReaderFacade_Expecter) HealthReport() *MockContractReaderFacade_HealthReport_Call {
+	return &MockContractReaderFacade_HealthReport_Call{Call: _e.mock.On("HealthReport")}
+}
+
+func (_c *MockContractReaderFacade_HealthReport_Call) Run(run func()) *MockContractReaderFacade_HealthReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContractReaderFacade_HealthReport_Call) Return(_a0 map[string]error) *MockContractReaderFacade_HealthReport_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContractReaderFacade_HealthReport_Call) RunAndReturn(run func() map[string]error) *MockContractReaderFacade_HealthReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Name provides a mock function with given fields:
+func (_m *MockContractReaderFacade) Name() string {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Name")
+	}
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// MockContractReaderFacade_Name_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Name'
+type MockContractReaderFacade_Name_Call struct {
+	*mock.Call
+}
+
+// Name is a helper method to define mock.On call
+func (_e *MockContractReaderFacade_Expecter) Name() *MockContractReaderFacade_Name_Call {
+	return &MockContractReaderFacade_Name_Call{Call: _e.mock.On("Name")}
+}
+
+func (_c *MockContractReaderFacade_Name_Call) Run(run func()) *MockContractReaderFacade_Name_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Name_Call) Return(_a0 string) *MockContractReaderFacade_Name_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Name_Call) RunAndReturn(run func() string) *MockContractReaderFacade_Name_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -241,6 +378,97 @@ func (_c *MockContractReaderFacade_QueryKey_Call) Return(_a0 []types.Sequence, _
 }
 
 func (_c *MockContractReaderFacade_QueryKey_Call) RunAndReturn(run func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)) *MockContractReaderFacade_QueryKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Ready provides a mock function with given fields:
+func (_m *MockContractReaderFacade) Ready() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Ready")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockContractReaderFacade_Ready_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Ready'
+type MockContractReaderFacade_Ready_Call struct {
+	*mock.Call
+}
+
+// Ready is a helper method to define mock.On call
+func (_e *MockContractReaderFacade_Expecter) Ready() *MockContractReaderFacade_Ready_Call {
+	return &MockContractReaderFacade_Ready_Call{Call: _e.mock.On("Ready")}
+}
+
+func (_c *MockContractReaderFacade_Ready_Call) Run(run func()) *MockContractReaderFacade_Ready_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Ready_Call) Return(_a0 error) *MockContractReaderFacade_Ready_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Ready_Call) RunAndReturn(run func() error) *MockContractReaderFacade_Ready_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *MockContractReaderFacade) Start(_a0 context.Context) error {
+	ret := _m.Called(_a0)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Start")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockContractReaderFacade_Start_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Start'
+type MockContractReaderFacade_Start_Call struct {
+	*mock.Call
+}
+
+// Start is a helper method to define mock.On call
+//   - _a0 context.Context
+func (_e *MockContractReaderFacade_Expecter) Start(_a0 interface{}) *MockContractReaderFacade_Start_Call {
+	return &MockContractReaderFacade_Start_Call{Call: _e.mock.On("Start", _a0)}
+}
+
+func (_c *MockContractReaderFacade_Start_Call) Run(run func(_a0 context.Context)) *MockContractReaderFacade_Start_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Start_Call) Return(_a0 error) *MockContractReaderFacade_Start_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContractReaderFacade_Start_Call) RunAndReturn(run func(context.Context) error) *MockContractReaderFacade_Start_Call {
 	_c.Call.Return(run)
 	return _c
 }

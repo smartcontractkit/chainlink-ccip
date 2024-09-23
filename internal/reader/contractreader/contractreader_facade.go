@@ -18,4 +18,9 @@ type ContractReaderFacade interface {
 	Unbind(ctx context.Context, bindings []types.BoundContract) error
 	QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error)
 	//mustEmbedUnimplementedContractReaderServer()
+	Name() string
+	Start(context.Context) error
+	Close() error
+	Ready() error
+	HealthReport() map[string]error
 }
