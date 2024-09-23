@@ -48,6 +48,7 @@ type usdcMessageReader struct {
 
 type eventID [32]byte
 
+// MessageSentEvent represents `MessageSent(bytes)` event emitted by the MessageTransmitter contract
 type MessageSentEvent struct {
 	Arg0 []byte
 }
@@ -136,7 +137,8 @@ func (u usdcMessageReader) MessageHashes(
 		messageSentEvents[e] = event.Arg0
 	}
 
-	// 3. This should be done by ChainReader - picking only events matching eventIDs
+	// 3. This should be done by ChainReader - picking only events matching eventIDs.
+	// Right now ChainReader doesn't support filtering by specific data words
 	out := make(map[exectypes.MessageTokenID]MessageHash)
 	for tokenID, messageID := range eventIDs {
 		messageHash, ok1 := messageSentEvents[messageID]
