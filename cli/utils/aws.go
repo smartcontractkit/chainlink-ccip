@@ -27,7 +27,5 @@ func SetupAwsProfile(configPath string, profileName string, accountId string, re
 	cfg.Section(awsProfileIniSectionName).Key("sso_region").SetValue(region)
 	cfg.Section(awsProfileIniSectionName).Key("sso_account_id").SetValue(accountId)
 	cfg.Section(awsProfileIniSectionName).Key("sso_role_name").SetValue(ssoRoleName)
-	cfg.SaveTo(configPath)
-
-	return nil
+	return cfg.SaveTo(configPath)
 }
