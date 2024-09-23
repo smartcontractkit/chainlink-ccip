@@ -1,7 +1,0 @@
-values-profiles/*
-!values-profiles/values-dev.yaml.example
-!values-profiles/values-dev-ccip.yaml.example
-!values-profiles/values-dev-kind-ccip-scripts.yaml
-!values-profiles/values-dev-kind-crib-chainlink-cluster.yaml
-!values-profiles/README.md
-override.toml
