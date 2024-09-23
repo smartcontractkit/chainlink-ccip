@@ -1,4 +1,4 @@
-package plugincommon
+package consensus_test
 
 import (
 	"fmt"
@@ -10,12 +10,13 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 )
 
 func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 	tests := []struct {
 		name    string
-		min     int
+		min     consensus.Threshold
 		reports []exectypes.CommitData
 		valid   []exectypes.CommitData
 	}{
@@ -95,7 +96,7 @@ func Test_CommitReportValidator_ExecutePluginCommitData(t *testing.T) {
 			idFunc := func(data exectypes.CommitData) [32]byte {
 				return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 			}
-			validator := NewMinObservation[exectypes.CommitData](tt.min, idFunc)
+			validator := consensus.NewMinObservation[exectypes.CommitData](tt.min, idFunc)
 			for _, report := range tt.reports {
 				validator.Add(report)
 			}
@@ -118,7 +119,7 @@ func Test_CommitReportValidator_Generics(t *testing.T) {
 	idFunc := func(data Generic) [32]byte {
 		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 	}
-	validator := NewMinObservation[Generic](2, idFunc)
+	validator := consensus.NewMinObservation[Generic](2, idFunc)
 
 	wantValue := Generic{number: 1}
 	otherValue := Generic{number: 2}

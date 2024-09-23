@@ -1,4 +1,4 @@
-package plugincommon
+package consensus
 
 import (
 	"fmt"
@@ -22,12 +22,7 @@ func Test_fChainConsensus(t *testing.T) {
 		cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least f times, no consensus
 	}
 
-	minObs := map[cciptypes.ChainSelector]int{
-		cciptypes.ChainSelector(1): f,
-		cciptypes.ChainSelector(2): f,
-		cciptypes.ChainSelector(3): f,
-		cciptypes.ChainSelector(4): f,
-	}
+	minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(f))
 	fChainFinal := GetConsensusMap(lggr, "fChain", fChainValues, minObs)
 
 	assert.Equal(t, map[cciptypes.ChainSelector]int{
@@ -51,7 +46,7 @@ func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 		4: {ts1, ts2, ts3},
 	}
 
-	timeFinal := GetConsensusMapAggregator(lggr, "time", timeValues, f, func(vals []time.Time) time.Time {
+	timeFinal := GetConsensusMapAggregator(lggr, "time", timeValues, Threshold(f), func(vals []time.Time) time.Time {
 		return Median(vals, TimestampComparator)
 	})
 
@@ -76,7 +71,7 @@ func Test_GetConsensusMapMedianInt(t *testing.T) {
 		5: {5, 4, 3, 2, 1},
 	}
 
-	intFinal := GetConsensusMapAggregator(lggr, "int", intValues, f, func(vals []int) int {
+	intFinal := GetConsensusMapAggregator(lggr, "int", intValues, Threshold(f), func(vals []int) int {
 		return Median(vals, func(a, b int) bool {
 			return a < b
 		})
@@ -202,4 +197,121 @@ func Test_HonestMajorityThresholdMap(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestMakeConstantThreshold(t *testing.T) {
+	{
+		f := 3
+		threshold := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(f))
+
+		for i := 0; i < 10; i++ {
+			thresh, ok := threshold.Get(cciptypes.ChainSelector(i))
+			assert.True(t, ok)
+			assert.Equal(t, Threshold(f), thresh)
+		}
+	}
+	{
+		f := 3.5
+		threshold := MakeConstantThreshold[float64](Threshold(f))
+
+		for i := 0; i < 10; i++ {
+			thresh, ok := threshold.Get(float64(i))
+			assert.True(t, ok)
+			assert.Equal(t, Threshold(f), thresh)
+		}
+	}
+}
+
+func TestMakeMultiThreshold(t *testing.T) {
+	fChain := map[cciptypes.ChainSelector]int{
+		cciptypes.ChainSelector(1): 1,
+		cciptypes.ChainSelector(2): 2,
+		cciptypes.ChainSelector(3): 3,
+	}
+
+	{
+		// Using TwoFPlus1
+		threshold := MakeMultiThreshold(fChain, TwoFPlus1)
+
+		thresh, ok := threshold.Get(cciptypes.ChainSelector(1))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(3), thresh)
+
+		thresh, ok = threshold.Get(cciptypes.ChainSelector(2))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(5), thresh)
+
+		thresh, ok = threshold.Get(cciptypes.ChainSelector(3))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(7), thresh)
+
+		_, ok = threshold.Get(cciptypes.ChainSelector(4))
+		assert.False(t, ok)
+	}
+	{
+		// Using FPlus1
+		threshold := MakeMultiThreshold(fChain, FPlus1)
+
+		thresh, ok := threshold.Get(cciptypes.ChainSelector(1))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(2), thresh)
+
+		thresh, ok = threshold.Get(cciptypes.ChainSelector(2))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(3), thresh)
+
+		thresh, ok = threshold.Get(cciptypes.ChainSelector(3))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(4), thresh)
+
+		_, ok = threshold.Get(cciptypes.ChainSelector(4))
+		assert.False(t, ok)
+	}
+	{
+		// Custom mapping which sets it to a constant.
+		threshold := MakeMultiThreshold(fChain, func(i int) Threshold {
+			return 1337
+		})
+
+		thresh, ok := threshold.Get(cciptypes.ChainSelector(1))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(1337), thresh)
+
+		thresh, ok = threshold.Get(cciptypes.ChainSelector(2))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(1337), thresh)
+
+		thresh, ok = threshold.Get(cciptypes.ChainSelector(3))
+		assert.True(t, ok)
+		assert.Equal(t, Threshold(1337), thresh)
+
+		_, ok = threshold.Get(cciptypes.ChainSelector(4))
+		assert.False(t, ok)
+	}
+}
+
+func TestMakeMultiThreshold_GenericKey(t *testing.T) {
+	fChain := map[float64]int{
+		1.23: 1,
+		2.34: 2,
+		8.91: 3,
+	}
+
+	// Not a chain selector for the key.
+	threshold := MakeMultiThreshold(fChain, FPlus1)
+
+	thresh, ok := threshold.Get(1.23)
+	assert.True(t, ok)
+	assert.Equal(t, Threshold(2), thresh)
+
+	thresh, ok = threshold.Get(2.34)
+	assert.True(t, ok)
+	assert.Equal(t, Threshold(3), thresh)
+
+	thresh, ok = threshold.Get(8.91)
+	assert.True(t, ok)
+	assert.Equal(t, Threshold(4), thresh)
+
+	_, ok = threshold.Get(4)
+	assert.False(t, ok)
 }
