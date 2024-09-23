@@ -173,6 +173,36 @@ profiles:
           path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
           overwriteVars: true
           namespace: ${DEVSPACE_NAMESPACE}
+  - name: ccip-local
+    parents:
+      - profile: ccip
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip
+          - local-charts
+      - op: add
+        path: dependencies.crib-ccip-scripts.profiles
+        value:
+          - local-charts
+  - name: ccip-eks-bix-ship
+    parents:
+      - profile: ccip
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip-eks-bix-ship
+  - name: ccip-kind-bix-ship
+    parents:
+      - profile: ccip
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip-kind-bix-ship
+          - kind
   - name: kind-dependencies
     patches:
     - op: add
@@ -314,6 +344,18 @@ commands:
   ccip-kind:
     command: devspace run-pipeline ccip-kind -p ccip-kind
     description: Run the Core pipeline for Kind.
+    appendArgs: true
+  ccip-local-charts:
+    command: devspace run-pipeline ccip -p ccip-local
+    description: Run the CCIP pipeline with local charts.
+    appendArgs: true
+  ccip-eks-bix-ship:
+    command: devspace run-pipeline ccip -p ccip-eks-bix-ship
+    description: Run the CCIP pipeline with EKS Bix Ship.
+    appendArgs: true
+  ccip-kind-bix-ship:
+    command: devspace run-pipeline ccip -p ccip-kind-bix-ship
+    description: Run the CCIP pipeline with Kind Bix Ship.
     appendArgs: true
   ccip-atlas:
     command: devspace run-pipeline ccip-atlas -p ccip-atlas

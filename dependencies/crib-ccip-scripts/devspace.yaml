@@ -65,3 +65,12 @@ profiles:
                   value: "false"
               imagePullSecrets:
                 - name: regcred-ccip
+  - name: local-charts
+    merge:
+      deployments:
+        ccip-scripts:
+          helm:
+            chart:
+              name: crib-ccip-scripts
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/ccip-scripts
+              version: null
