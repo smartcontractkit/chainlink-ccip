@@ -1,5 +1,10 @@
 version: v2beta1
 
+vars:
+  DEVSPACE_INGRESS_BASE_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
+
 pipelines:
   deploy:
     run: |-

@@ -1,0 +1,222 @@
+version: v2beta1
+
+dependencies:
+  prometheus:
+    path: ${DEPENDENCIES_DIR}/prometheus
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  grafana:
+    path: ${DEPENDENCIES_DIR}/grafana
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  loki:
+    path: ${DEPENDENCIES_DIR}/loki
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  tempo:
+    path: ${DEPENDENCIES_DIR}/tempo
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+    profiles:
+      - add-beholder-config
+  redpanda:
+    path: ${DEPENDENCIES_DIR}/redpanda
+    overwriteVars: true
+    namespace: ${DEVSPACE_NAMESPACE}
+
+pullSecrets:
+  regcred-beholder:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-beholder
+
+pipelines:
+  kind:
+    run: |-
+      run_dependency_pipelines prometheus grafana loki tempo redpanda
+      ensure_pull_secrets regcred-beholder
+      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
+  deploy:
+    run: |-
+      run_dependency_pipelines prometheus grafana loki tempo redpanda
+      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
+
+deployments:
+  beholder-test-client:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: beholder-test-client
+      displayOutput: true
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/beholder-test-client
+        version: "0.0.4"
+      values:
+        podSecurityContext:
+          fsGroup: 999
+
+        beholder-test-client:
+          args:
+            - -otel-exporter-grpc-enpoint
+            - beholder-otel-collector-agent:4317
+
+  beholder-otel-collector-agent:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: beholder-otel-collector-agent
+      displayOutput: true
+      chart:
+        name: opentelemetry-collector
+        repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+        version: "0.101.2"
+      values:
+        fullnameOverride: beholder-otel-collector-agent
+        mode: deployment
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 1001
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
+        image:
+          repository: otel/opentelemetry-collector
+          tag: 0.106.1
+        config:
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                http:
+                  endpoint: 0.0.0.0:4318
+          exporters:
+            debug:
+              verbosity: detailed
+            otlp:
+              endpoint: beholder-otel-collector-gateway:4317
+              tls:
+                insecure: true
+          service:
+            telemetry:
+              logs:
+                level: "debug"
+            pipelines:
+              traces:
+                receivers: [otlp]
+                exporters: [debug, otlp]
+              metrics:
+                receivers: [otlp]
+                exporters: [debug, otlp]
+              logs:
+                receivers: [otlp]
+                exporters: [debug, otlp]
+
+  beholder-otel-collector-gateway:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: beholder-otel-collector-gateway
+      displayOutput: true
+      chart:
+        name: opentelemetry-collector
+        repo: https://open-telemetry.github.io/opentelemetry-helm-charts
+        version: "0.101.2"
+      values:
+        fullnameOverride: beholder-otel-collector-gateway
+        mode: deployment
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsUser: 1001
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
+        image:
+          repository: otel/opentelemetry-collector
+          tag: 0.106.1
+        ports:
+          prometheus:
+            enabled: true
+            containerPort: 8889
+            servicePort: 8889
+            hostPort: 8889
+            protocol: TCP
+        config:
+          receivers:
+            otlp:
+              protocols:
+                grpc:
+                  endpoint: 0.0.0.0:4317
+                http:
+                  endpoint: 0.0.0.0:4318
+            prometheus:
+              config:
+                scrape_configs:
+                  - job_name: "otel-collector"
+                    scrape_interval: 5s
+                    static_configs:
+                      - targets: ["127.0.0.1:8888"]
+                  - job_name: "beholder-demo"
+                    scrape_interval: 5s
+                    static_configs:
+                      - targets: ["beholder-test-client:9091"]
+          exporters:
+            debug:
+              verbosity: detailed
+            kafka:
+              brokers:
+                - redpanda:9093
+              topic: beholder-test-client
+              encoding: otlp_json
+            prometheus:
+              endpoint: "0.0.0.0:8889"
+          service:
+            telemetry:
+              logs:
+                level: "debug"
+            pipelines:
+              traces:
+                receivers: [otlp]
+                exporters: [debug, kafka]
+              metrics:
+                receivers: [otlp, prometheus]
+                exporters: [debug, kafka, prometheus]
+              logs:
+                receivers: [otlp]
+                exporters: [debug, kafka]
+
+profiles:
+  - name: kind
+    merge:
+      deployments:
+        beholder-test-client:
+          helm:
+            values:
+              beholder-test-client:
+                affinity: [ ]
+                topologySpreadConstraints: [ ]
+                imagePullSecrets:
+                  - name: regcred-beholder
+#  - name: kind
+#    patches:
+#      - op: replace
+#        path: deployments.beholder-test-client.helm.values.beholder-test-client
+#        value:
+#          imagePullSecrets:
+#            - name: regcred-beholder
+  - name: local-charts
+    merge:
+      deployments:
+        beholder-test-client:
+          helm:
+            chart:
+              name: beholder-test-client
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/beholder-test-client
+              version: null
