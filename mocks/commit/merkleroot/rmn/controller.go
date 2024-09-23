@@ -5,9 +5,8 @@ package rmn
 import (
 	context "context"
 
-	mock "github.com/stretchr/testify/mock"
-
 	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	mock "github.com/stretchr/testify/mock"
 
 	rmnpb "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
