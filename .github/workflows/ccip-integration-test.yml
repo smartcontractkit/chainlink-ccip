@@ -65,10 +65,23 @@ jobs:
           ./ccip.test local db preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-      - name: Run ccip ocr3 integration test
+      - name: Run ccip ocr3 initial deploy integration test
         run: |
           cd $GITHUB_WORKSPACE/chainlink/integration-tests
           go test -v -run '^Test0002_InitialDeploy$' -timeout 5m ./deployment/ccip/changeset
+          EXITCODE=${PIPESTATUS[0]}
+          if [ $EXITCODE -ne 0 ]; then
+            echo "Integration test failed"
+          else
+            echo "Integration test passed!"
+          fi
+          exit $EXITCODE
+        env:
+          CL_DATABASE_URL: ${{ env.DB_URL }}
+      - name: Run ccip ocr3 add chain integration test
+        run: |
+          cd $GITHUB_WORKSPACE/chainlink/integration-tests
+          go test -v -run '^TestAddChainInbound$' -timeout 5m ./deployment/ccip/
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Integration test failed"
