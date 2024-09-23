@@ -57,7 +57,7 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 
 	// Check if the data slice has at least 32 bytes
 	if len(m.Arg0) < 32 {
-		return result, fmt.Errorf("data slice too short, must be at least 128 bytes")
+		return result, fmt.Errorf("data slice too short, must be at least 32 bytes")
 	}
 
 	// Slice the first 32-byte segment
