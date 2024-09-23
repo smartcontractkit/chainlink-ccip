@@ -7,4 +7,5 @@ use (
 	dashboard-lib
 	deployments/ccip
 	deployments/core
+	deployments/chainlink
 )

@@ -33,21 +33,20 @@ pipelines:
       run_dependency_pipelines crib-chainlink-cluster
       run_dependency_pipelines crib-ccip-scripts
 
-  kind:
+  kind-dependencies:
     run: |-
-      ensure_pull_secrets --all
       run_dependency_pipelines loki
       run_dependency_pipelines promtail
       run_dependency_pipelines grafana
 
   core-kind:
     run: |-
-      run_pipelines kind
+      run_pipelines kind-dependencies
       run_pipelines core
 
   ccip-kind:
     run: |-
-      run_pipelines kind
+      run_pipelines kind-dependencies
       run_pipelines ccip
 
   ccip-atlas:
@@ -126,7 +125,7 @@ profiles:
           path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
           overwriteVars: true
           namespace: ${DEVSPACE_NAMESPACE}
-  - name: kind
+  - name: kind-dependencies
     patches:
     - op: add
       path: dependencies
@@ -152,7 +151,7 @@ profiles:
   - name: core-kind
     parents:
       - profile: core
-      - profile: kind
+      - profile: kind-dependencies
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
@@ -165,7 +164,7 @@ profiles:
   - name: ccip-kind
     parents:
       - profile: ccip
-      - profile: kind
+      - profile: kind-dependencies
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
