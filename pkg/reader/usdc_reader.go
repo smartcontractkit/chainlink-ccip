@@ -120,7 +120,7 @@ func (u usdcMessageReader) MessageHashes(
 		&MessageSentEvent{},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query onRamp: %w", err)
+		return nil, fmt.Errorf("error querying contract reader for chain %d: %w", source, err)
 	}
 
 	messageSentEvents := make(map[eventID]MessageHash)

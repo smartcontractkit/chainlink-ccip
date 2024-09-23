@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"testing"
 
+	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	reader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -99,7 +103,134 @@ func Test_USDCMessageReader_New(t *testing.T) {
 }
 
 func Test_USDCMessageReader_MessageHashes(t *testing.T) {
+	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
+	emptyChainCCTP := CCTPDestDomains[uint64(emptyChain)]
+	emptyReader := reader.NewMockContractReaderFacade(t)
+	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	emptyReader.EXPECT().QueryKey(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return([]types.Sequence{}, nil).Maybe()
 
+	faultyChain := cciptypes.ChainSelector(sel.AVALANCHE_MAINNET.Selector)
+	faultyReader := reader.NewMockContractReaderFacade(t)
+	faultyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	faultyReader.EXPECT().QueryKey(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(nil, errors.New("error")).Maybe()
+
+	validSequence := []types.Sequence{
+		{
+			Data: &MessageSentEvent{Arg0: make([]byte, 128)},
+		},
+	}
+
+	validChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector)
+	validReader := reader.NewMockContractReaderFacade(t)
+	validReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	validReader.EXPECT().QueryKey(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(validSequence, nil).Maybe()
+
+	tokensConfigs := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+		faultyChain: {
+			SourcePoolAddress:            "0xA",
+			SourceMessageTransmitterAddr: "0xB",
+		},
+		emptyChain: {
+			SourcePoolAddress:            "0xC",
+			SourceMessageTransmitterAddr: "0xD",
+		},
+		validChain: {
+			SourcePoolAddress:            "0xE",
+			SourceMessageTransmitterAddr: "0xF",
+		},
+	}
+
+	contactReaders := map[cciptypes.ChainSelector]types.ContractReader{
+		faultyChain: faultyReader,
+		emptyChain:  emptyReader,
+		validChain:  validReader,
+	}
+
+	tokens := map[exectypes.MessageTokenID]cciptypes.RampTokenAmount{
+		exectypes.NewMessageTokenID(1, 1): {
+			ExtraData: NewSourceTokenDataPayload(11, emptyChainCCTP).ToBytes(),
+		},
+	}
+
+	usdcReader, err := NewUSDCMessageReader(tokensConfigs, contactReaders)
+	require.NoError(t, err)
+
+	tt := []struct {
+		name           string
+		sourceSelector cciptypes.ChainSelector
+		destSelector   cciptypes.ChainSelector
+		expectedMsgIDs []exectypes.MessageTokenID
+		errorMessage   string
+	}{
+		{
+			name:           "should return empty dataset when chain doesn't have events",
+			sourceSelector: emptyChain,
+			destSelector:   faultyChain,
+			expectedMsgIDs: []exectypes.MessageTokenID{},
+		},
+		{
+			name:           "should return error when chain reader errors",
+			sourceSelector: faultyChain,
+			destSelector:   emptyChain,
+			errorMessage:   "error querying contract reader for chain 6433500567565415381",
+		},
+		{
+			name:           "should return error when CCTP domain is not supported",
+			sourceSelector: emptyChain,
+			destSelector:   cciptypes.ChainSelector(2),
+			errorMessage:   "destination domain not found for chain ChainSelector(2)",
+		},
+		{
+			name:           "should return error when CCTP domain is not supported",
+			sourceSelector: cciptypes.ChainSelector(sel.POLYGON_MAINNET.Selector),
+			destSelector:   emptyChain,
+			errorMessage:   "no contract bound for chain 4051577828743386545",
+		},
+		{
+			name:           "valid chain return events but nothing is matched",
+			sourceSelector: validChain,
+			destSelector:   emptyChain,
+			expectedMsgIDs: []exectypes.MessageTokenID{},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			hashes, err1 := usdcReader.MessageHashes(
+				tests.Context(t),
+				tc.sourceSelector,
+				tc.destSelector,
+				tokens,
+			)
+
+			if tc.errorMessage != "" {
+				require.Error(t, err1)
+				require.ErrorContains(t, err1, tc.errorMessage)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, hashes)
+				require.Equal(t, tc.expectedMsgIDs, maps.Keys(hashes))
+			}
+		})
+	}
 }
 
 func Test_MessageSentEvent_unpackID(t *testing.T) {
@@ -112,7 +243,7 @@ func Test_MessageSentEvent_unpackID(t *testing.T) {
 	fullPayload = append(fullPayload, nonEmptyEvent[:]...)
 	fullPayload = append(fullPayload, nonEmptyEvent[:]...)
 
-	tests := []struct {
+	tt := []struct {
 		name    string
 		data    []byte
 		want    eventID
@@ -135,14 +266,14 @@ func Test_MessageSentEvent_unpackID(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			event := MessageSentEvent{Arg0: tt.data}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			event := MessageSentEvent{Arg0: tc.data}
 			got, err := event.unpackID()
 
-			if !tt.wantErr {
+			if !tc.wantErr {
 				require.NoError(t, err)
-				require.Equal(t, tt.want, got)
+				require.Equal(t, tc.want, got)
 			} else {
 				require.Error(t, err)
 			}
@@ -152,7 +283,7 @@ func Test_MessageSentEvent_unpackID(t *testing.T) {
 }
 
 func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
-	tests := []struct {
+	tt := []struct {
 		nonce        uint64
 		sourceDomain uint32
 	}{
@@ -170,9 +301,9 @@ func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("nonce=%d,sourceDomain=%d", test.nonce, test.sourceDomain), func(t *testing.T) {
-			payload1 := NewSourceTokenDataPayload(test.nonce, test.sourceDomain)
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("nonce=%d,sourceDomain=%d", tc.nonce, tc.sourceDomain), func(t *testing.T) {
+			payload1 := NewSourceTokenDataPayload(tc.nonce, tc.sourceDomain)
 			bytes := payload1.ToBytes()
 
 			payload2, err := NewSourceTokenDataPayloadFromBytes(bytes)
@@ -183,7 +314,7 @@ func Test_SourceTokenDataPayload_ToBytes(t *testing.T) {
 }
 
 func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
-	tests := []struct {
+	tt := []struct {
 		name    string
 		data    []byte
 		want    *SourceTokenDataPayload
@@ -206,13 +337,13 @@ func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := NewSourceTokenDataPayloadFromBytes(tt.data)
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := NewSourceTokenDataPayloadFromBytes(tc.data)
 
-			if !tt.wantErr {
+			if !tc.wantErr {
 				require.NoError(t, err)
-				require.Equal(t, tt.want, got)
+				require.Equal(t, tc.want, got)
 			} else {
 				require.Error(t, err)
 			}
