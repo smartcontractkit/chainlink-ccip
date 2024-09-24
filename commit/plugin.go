@@ -272,6 +272,7 @@ func (p *Plugin) Outcome(
 	}
 
 	if p.discoveryProcessor != nil {
+		p.lggr.Infow("processing discovery observations", "discoveryObservations", discoveryObservations)
 		_, err = p.discoveryProcessor.Outcome(dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
