@@ -16,7 +16,12 @@ import (
 )
 
 func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
-	obs, err := tokendata.NewConfigBasedCompositeObservers(logger.Test(t), []pluginconfig.TokenDataObserverConfig{})
+	obs, err := tokendata.NewConfigBasedCompositeObservers(
+		logger.Test(t),
+		100,
+		[]pluginconfig.TokenDataObserverConfig{},
+		nil,
+	)
 	require.NoError(t, err)
 
 	tests := []struct {
