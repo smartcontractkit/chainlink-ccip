@@ -20,3 +20,5 @@ type ChainRange struct {
 	ChainSel    cciptypes.ChainSelector `json:"chain"`
 	SeqNumRange cciptypes.SeqNumRange   `json:"seqNumRange"`
 }
+
+type DonID = uint32

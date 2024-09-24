@@ -1,6 +1,7 @@
 package plugincommon
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -123,6 +124,82 @@ func TestMedianBigInt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.want, Median(tt.vals, BigIntComparator), "Median(%v)", tt.vals)
+		})
+	}
+}
+
+func Test_HonestMajorityThreshold(t *testing.T) {
+	tests := []struct {
+		f    int
+		want int
+	}{
+		{f: 0, want: 1},
+		{f: 1, want: 3},
+		{f: 2, want: 5},
+		{f: 3, want: 7},
+		{f: 10, want: 21},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("f=%d", tt.f), func(t *testing.T) {
+			got := HonestMajorityThreshold(tt.f)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_HonestMajorityThresholdMap(t *testing.T) {
+	tests := []struct {
+		name string
+		fMap map[cciptypes.ChainSelector]int
+		want map[cciptypes.ChainSelector]int
+	}{
+		{
+			name: "base case",
+			fMap: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 0,
+				cciptypes.ChainSelector(2): 1,
+				cciptypes.ChainSelector(3): 2,
+			},
+			want: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 1,
+				cciptypes.ChainSelector(2): 3,
+				cciptypes.ChainSelector(3): 5,
+			},
+		},
+		{
+			name: "empty map",
+			fMap: map[cciptypes.ChainSelector]int{},
+			want: map[cciptypes.ChainSelector]int{},
+		},
+		{
+			name: "single entry",
+			fMap: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 10,
+			},
+			want: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 21,
+			},
+		},
+		{
+			name: "multiple entries",
+			fMap: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 3,
+				cciptypes.ChainSelector(2): 5,
+				cciptypes.ChainSelector(3): 7,
+			},
+			want: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 7,
+				cciptypes.ChainSelector(2): 11,
+				cciptypes.ChainSelector(3): 15,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := HonestMajorityThresholdMap(tt.fMap)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

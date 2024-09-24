@@ -205,18 +205,19 @@ func checkForReportTransmission(
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func getConsensusObservation(
 	lggr logger.Logger,
-	F int,
+	fRoleDON int,
 	destChain cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = F
-	}
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
+	fMin := make(map[cciptypes.ChainSelector]int)
+	for chain := range aggObs.FChain {
+		// TODO: this doesn't seem right, should be passing in 2*fRoleDON + 1?
+		fMin[chain] = fRoleDON
+	}
 	fChains := plugincommon.GetConsensusMap(lggr, "fChain", aggObs.FChain, fMin)
 
 	_, exists := fChains[destChain]
@@ -225,14 +226,16 @@ func getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
-	twoFPlus1 := make(map[cciptypes.ChainSelector]int)
-	for chain, f := range fChains {
-		twoFPlus1[chain] = 2*f + 1
+	twoFChainPlus1 := make(map[cciptypes.ChainSelector]int)
+	for chain, fChain := range fChains {
+		twoFChainPlus1[chain] = 2*fChain + 1
 	}
 
 	consensusObs := ConsensusObservation{
-		MerkleRoots:        plugincommon.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, fChains),
-		OnRampMaxSeqNums:   plugincommon.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
+		// TODO: don't think fChains is correct here, it should be twoFChainPlus1 since the param accepts a threshold.
+		MerkleRoots:      plugincommon.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, fChains),
+		OnRampMaxSeqNums: plugincommon.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
+		// TODO: don't think fChains is correct here, it should be twoFChainPlus1 since the param accepts a threshold.
 		OffRampNextSeqNums: plugincommon.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, fChains),
 		FChain:             fChains,
 	}

@@ -68,8 +68,9 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 	}
 
 	return dt.Observation{
-		FChain: fChain,
-		OnRamp: contracts[consts.ContractNameOnRamp],
+		FChain:           fChain,
+		OnRamp:           contracts[consts.ContractNameOnRamp],
+		DestNonceManager: contracts[consts.ContractNameNonceManager][cdp.dest],
 	}, nil
 }
 
@@ -98,10 +99,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	for chain := range fChainObs {
 		fMin[chain] = cdp.fRoleDON
 	}
+	fChain := plugincommon.GetConsensusMap(
+		cdp.lggr,
+		"fChain",
+		fChainObs,
+		plugincommon.HonestMajorityThresholdMap(fMin),
+	)
 
-	fChain := plugincommon.GetConsensusMap(cdp.lggr, "fChain", fChainObs, fMin)
-
-	// onramp address consensus
+	// collect onramp addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
@@ -109,9 +114,29 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		}
 	}
 
+	// collect nonce manager addresses
+	var nonceManagerAddrs [][]byte
+	for _, ao := range aos {
+		nonceManagerAddrs = append(
+			nonceManagerAddrs,
+			ao.Observation.DestNonceManager,
+		)
+	}
+
 	// call Sync to bind contracts.
-	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
-	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
+	contracts := make(reader.ContractAddresses)
+	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(
+		cdp.lggr,
+		"onramp",
+		onrampAddrs,
+		plugincommon.HonestMajorityThresholdMap(fChain),
+	)
+	contracts[consts.ContractNameNonceManager] = plugincommon.GetConsensusMap(
+		cdp.lggr,
+		"nonceManager",
+		map[cciptypes.ChainSelector][][]byte{cdp.dest: nonceManagerAddrs},
+		plugincommon.HonestMajorityThresholdMap(fChain),
+	)
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}
