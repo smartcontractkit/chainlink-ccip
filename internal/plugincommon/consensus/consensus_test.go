@@ -46,7 +46,8 @@ func Test_GetConsensusMapMedianTimestamp(t *testing.T) {
 		4: {ts1, ts2, ts3},
 	}
 
-	timeFinal := GetConsensusMapAggregator(lggr, "time", timeValues, Threshold(f), func(vals []time.Time) time.Time {
+	threshold := MakeConstantThreshold[int](Threshold(f))
+	timeFinal := GetConsensusMapAggregator(lggr, "time", timeValues, threshold, func(vals []time.Time) time.Time {
 		return Median(vals, TimestampComparator)
 	})
 
@@ -71,7 +72,8 @@ func Test_GetConsensusMapMedianInt(t *testing.T) {
 		5: {5, 4, 3, 2, 1},
 	}
 
-	intFinal := GetConsensusMapAggregator(lggr, "int", intValues, Threshold(f), func(vals []int) int {
+	threshold := MakeConstantThreshold[int](Threshold(f))
+	intFinal := GetConsensusMapAggregator(lggr, "int", intValues, threshold, func(vals []int) int {
 		return Median(vals, func(a, b int) bool {
 			return a < b
 		})

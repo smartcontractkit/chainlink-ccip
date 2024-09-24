@@ -42,7 +42,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		consensus.TwoFPlus1(fFeedChain),
+		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fFeedChain)),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
 			return consensus.Median(vals, consensus.TokenPriceComparator)
 		},
@@ -52,7 +52,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		consensus.TwoFPlus1(fDestChain),
+		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fDestChain)),
 		feeQuoterAggregator,
 	)
 
