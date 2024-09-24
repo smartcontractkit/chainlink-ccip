@@ -37,6 +37,7 @@ type peerClient struct {
 	respChan   chan PeerResponse
 }
 
+// DO NOT CHANGE THIS SIGNATURE
 func NewPeerClient(netEndpointFactory ocrnetworking.GenericNetworkEndpointFactory) PeerClient {
 	return &peerClient{
 		netEndpointFactory: netEndpointFactory,
