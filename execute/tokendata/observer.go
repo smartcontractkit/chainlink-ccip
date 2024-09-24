@@ -9,6 +9,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -48,7 +50,9 @@ type compositeTokenDataObserver struct {
 //nolint:revive
 func NewConfigBasedCompositeObservers(
 	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (*compositeTokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
@@ -56,12 +60,39 @@ func NewConfigBasedCompositeObservers(
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observers[i] = usdc.NewTokenDataObserver(lggr, *c.USDCCCTPObserverConfig, nil, nil)
+			observer, err1 := createUSDCTokenObserver(lggr, destChainSelector, c.USDCCCTPObserverConfig.Tokens, readers)
+			if err1 != nil {
+				return nil, err1
+			}
+			observers[i] = observer
 		default:
 			return nil, errors.New("unsupported token data observer")
 		}
 	}
 	return NewCompositeObservers(lggr, observers...), nil
+}
+
+func createUSDCTokenObserver(
+	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
+	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+) (TokenDataObserver, error) {
+	usdcReader, err := reader.NewUSDCMessageReader(
+		tokensConfig,
+		readers,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return usdc.NewTokenDataObserver(
+		lggr,
+		destChainSelector,
+		tokensConfig,
+		usdcReader,
+		nil,
+	), nil
 }
 
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.
