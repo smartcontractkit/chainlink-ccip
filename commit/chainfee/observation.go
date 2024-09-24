@@ -5,7 +5,7 @@ import cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr
 func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.lggr.Warnw("call to GetFChain failed", "err", err)
+		p.lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

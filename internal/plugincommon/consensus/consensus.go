@@ -111,8 +111,11 @@ var TimestampedBigAggregator = func(updates []plugintypes.TimestampedBig) plugin
 	}
 }
 
-func EarliestTimestamp(updates []plugintypes.TimestampedBig, current time.Time) time.Time {
-	earliest := current
+func EarliestTimestamp(updates []plugintypes.TimestampedBig) time.Time {
+	if len(updates) == 0 {
+		return time.Time{}
+	}
+	earliest := updates[0].Timestamp
 	for _, update := range updates {
 		if update.Timestamp.Before(earliest) {
 			earliest = update.Timestamp

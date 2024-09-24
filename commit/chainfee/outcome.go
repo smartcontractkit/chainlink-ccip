@@ -39,9 +39,9 @@ func (p *processor) getConsensusObservation(
 	)
 
 	// Stop early if earliest updated timestamp is still fresh
-	earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus), timestamp)
+	earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus))
 	nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
-	if earliestUpdateTime.Before(nextUpdateTime) {
+	if nextUpdateTime.Before(timestamp) {
 		return ConsensusObservation{
 			ShouldUpdate: false,
 		}, nil
