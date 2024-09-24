@@ -74,7 +74,7 @@ func bindReaderContract(
 	// If the address is changed -> updates the address, overwrites the existing one
 	// If the contract not bound -> binds to the new address
 	if err := readers[chainSel].Bind(ctx, []types.BoundContract{contract}); err != nil {
-		return empty, fmt.Errorf("unable to bind %s for chain %d: %w", contractName, chainSel, err)
+		return empty, fmt.Errorf("unable to bind %s address %s address bytes %s for chain %d: %w", contractName, encAddress, address, chainSel, err)
 	}
 
 	return contract, nil
