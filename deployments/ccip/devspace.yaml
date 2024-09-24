@@ -166,7 +166,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: ["--timeout", "10m"]
+      upgradeArgs: ["--timeout", "15m"]
       releaseName: "app"
       chart:
         name: ${CHAINLINK_CLUSTER_HELM_CHART_URI}
