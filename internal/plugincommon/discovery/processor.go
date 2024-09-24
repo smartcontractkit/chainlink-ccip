@@ -9,6 +9,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -68,8 +69,9 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 	}
 
 	return dt.Observation{
-		FChain: fChain,
-		OnRamp: contracts[consts.ContractNameOnRamp],
+		FChain:           fChain,
+		OnRamp:           contracts[consts.ContractNameOnRamp],
+		DestNonceManager: contracts[consts.ContractNameNonceManager][cdp.dest],
 	}, nil
 }
 
@@ -94,14 +96,11 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			fChainObs[chainSel] = append(fChainObs[chainSel], f)
 		}
 	}
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range fChainObs {
-		fMin[chain] = cdp.fRoleDON
-	}
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
+	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", fChainObs, donThresh)
+	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
-	fChain := plugincommon.GetConsensusMap(cdp.lggr, "fChain", fChainObs, fMin)
-
-	// onramp address consensus
+	// collect onramp addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
@@ -109,9 +108,26 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		}
 	}
 
+	// collect nonce manager addresses
+	var nonceManagerAddrs [][]byte
+	for _, ao := range aos {
+		nonceManagerAddrs = append(
+			nonceManagerAddrs,
+			ao.Observation.DestNonceManager,
+		)
+	}
+
+	contracts := make(reader.ContractAddresses)
+	contracts[consts.ContractNameOnRamp] = consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+
+	contracts[consts.ContractNameNonceManager] = consensus.GetConsensusMap(
+		cdp.lggr,
+		"nonceManager",
+		map[cciptypes.ChainSelector][][]byte{cdp.dest: nonceManagerAddrs},
+		fChainThresh,
+	)
+
 	// call Sync to bind contracts.
-	contracts := make(map[string]map[cciptypes.ChainSelector][]byte)
-	contracts[consts.ContractNameOnRamp] = plugincommon.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChain)
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}

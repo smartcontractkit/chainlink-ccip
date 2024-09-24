@@ -25,7 +25,7 @@ type processor struct {
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader reader.PriceReader
 	homeChain        reader.HomeChain
-	bigF             int
+	fRoleDON         int
 }
 
 // nolint: revive
@@ -36,7 +36,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	tokenPriceReader reader.PriceReader,
 	homeChain reader.HomeChain,
-	bigF int,
+	fRoleDON int,
 ) *processor {
 	return &processor{
 		oracleID:         oracleID,
@@ -45,7 +45,7 @@ func NewProcessor(
 		chainSupport:     chainSupport,
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
-		bigF:             bigF,
+		fRoleDON:         fRoleDON,
 	}
 }
 

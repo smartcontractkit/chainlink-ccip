@@ -30,7 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
-	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"

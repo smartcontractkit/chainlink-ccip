@@ -22,25 +22,3 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 	diff.Div(diff, x2)
 	return diff.Cmp(big.NewInt(ppb)) > 0 // diff > ppb
 }
-
-func TwoFPlus1(f int) int {
-	return 2*f + 1
-}
-
-// RepeatedF returns a map of F() for each key in keys
-func RepeatedF[K comparable](F func() int, keys []K) map[K]int {
-	f := make(map[K]int)
-	for _, key := range keys {
-		f[key] = F()
-	}
-	return f
-}
-
-// TwoFPlus1Map returns a map of 2*f+1 for each value in fMap
-func TwoFPlus1Map[K comparable](fMap map[K]int) map[K]int {
-	f := make(map[K]int)
-	for key, fVal := range fMap {
-		f[key] = TwoFPlus1(fVal)
-	}
-	return f
-}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -80,8 +79,6 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		DestChain:                          destChain,
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
-		SyncTimeout:                        10 * time.Second,
-		SyncFrequency:                      time.Hour,
 	}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))

@@ -16,12 +16,6 @@ type ExecutePluginConfig struct {
 	// DestChain is the ccip destination chain configured for the execute DON.
 	DestChain cciptypes.ChainSelector `json:"destChain"`
 
-	// SyncTimeout is the timeout for syncing the exec plugin ccip reader.
-	SyncTimeout time.Duration `json:"syncTimeout"`
-
-	// SyncFrequency is the frequency at which the exec plugin ccip reader should sync.
-	SyncFrequency time.Duration `json:"syncFrequency"`
-
 	// OffchainConfig is the offchain config set for the exec DON.
 	OffchainConfig ExecuteOffchainConfig `json:"offchainConfig"`
 }

@@ -5,14 +5,14 @@ import (
 	"sort"
 	"time"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
@@ -21,11 +21,10 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := mathslib.RepeatedF(func() int { return p.bigF }, maps.Keys(aggObs.FChain))
-
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
-	fChains := plugincommon.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
+	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
 
 	fDestChain, exists := fChains[p.cfg.DestChain]
 	if !exists {
@@ -39,38 +38,48 @@ func (p *processor) getConsensusObservation(
 			fmt.Errorf("no consensus value for f for FeedChain: %d", p.cfg.OffchainConfig.PriceFeedChainSelector)
 	}
 
-	feedPricesConsensus := plugincommon.GetConsensusMapAggregator(
+	feedPricesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		mathslib.RepeatedF(
-			func() int { return mathslib.TwoFPlus1(fFeedChain) },
-			maps.Keys(aggObs.FeedTokenPrices),
-		),
+		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fFeedChain)),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
-			return plugincommon.Median(vals, plugincommon.TokenPriceComparator)
+			return consensus.Median(vals, consensus.TokenPriceComparator)
 		},
 	)
 
-	feeQuoterUpdatesConsensus := plugincommon.GetConsensusMapAggregator(
+	feeQuoterUpdatesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		mathslib.RepeatedF(
-			func() int { return mathslib.TwoFPlus1(fDestChain) },
-			maps.Keys(aggObs.FeeQuoterTokenUpdates),
-		),
-		plugincommon.TimestampedBigAggregator,
+		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fDestChain)),
+		feeQuoterAggregator,
 	)
 
 	consensusObs := ConsensusObservation{
 		FChain:                fChains,
-		Timestamp:             plugincommon.Median(aggObs.Timestamps, plugincommon.TimestampComparator),
+		Timestamp:             consensus.Median(aggObs.Timestamps, consensus.TimestampComparator),
 		FeedTokenPrices:       feedPricesConsensus,
 		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus,
 	}
 
 	return consensusObs, nil
+}
+
+// feeQuoterAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
+var feeQuoterAggregator = func(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
+	timestamps := make([]time.Time, len(updates))
+	prices := make([]cciptypes.BigInt, len(updates))
+	for i := range updates {
+		timestamps[i] = updates[i].Timestamp
+		prices[i] = updates[i].Value
+	}
+	medianPrice := consensus.Median(prices, consensus.BigIntComparator)
+	medianTimestamp := consensus.Median(timestamps, consensus.TimestampComparator)
+	return plugintypes.TimestampedBig{
+		Value:     medianPrice,
+		Timestamp: medianTimestamp,
+	}
 }
 
 // selectTokensForUpdate checks which tokens need to be updated based on the observed token prices and
