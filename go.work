@@ -5,7 +5,5 @@ toolchain go1.21.11
 use (
 	cli
 	dashboard-lib
-	deployments/ccip
-	deployments/core
 	deployments/chainlink
 )
