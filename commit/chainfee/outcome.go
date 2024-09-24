@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
@@ -18,10 +18,10 @@ func (p *processor) getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := mathslib.RepeatedF(func() int { return p.bigF }, maps.Keys(aggObs.FChain))
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
-	fChains := plugincommon.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
+	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
 
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
@@ -29,20 +29,17 @@ func (p *processor) getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
 
-	timestamp := plugincommon.Median(aggObs.Timestamps, plugincommon.TimestampComparator)
-	chainFeeUpdatesConsensus := plugincommon.GetConsensusMapAggregator(
+	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
+	chainFeeUpdatesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"ChainFeePriceUpdates",
 		aggObs.ChainFeePriceUpdates,
-		mathslib.RepeatedF(
-			func() int { return mathslib.TwoFPlus1(fDestChain) },
-			maps.Keys(aggObs.ChainFeePriceUpdates),
-		),
-		plugincommon.TimestampedBigAggregator,
+		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
+		consensus.TimestampedBigAggregator,
 	)
 
 	// Stop early if earliest updated timestamp is still fresh
-	earliestUpdateTime := plugincommon.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus), timestamp)
+	earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus), timestamp)
 	nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
 	if earliestUpdateTime.Before(nextUpdateTime) {
 		return ConsensusObservation{
@@ -50,11 +47,13 @@ func (p *processor) getConsensusObservation(
 		}, nil
 	}
 
-	feeComponents := plugincommon.GetConsensusMapAggregator(
+	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
+
+	feeComponents := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"FeeComponents",
 		aggObs.FeeComponents,
-		mathslib.TwoFPlus1Map(fChains),
+		twoFPlus1,
 		func(vals []types.ChainFeeComponents) types.ChainFeeComponents {
 			executionFees := make([]cciptypes.BigInt, len(vals))
 			dataAvailabilityFees := make([]cciptypes.BigInt, len(vals))
@@ -63,19 +62,19 @@ func (p *processor) getConsensusObservation(
 				dataAvailabilityFees[i] = cciptypes.NewBigInt(feeComp.DataAvailabilityFee)
 			}
 			return types.ChainFeeComponents{
-				ExecutionFee:        plugincommon.Median(executionFees, plugincommon.BigIntComparator).Int,
-				DataAvailabilityFee: plugincommon.Median(dataAvailabilityFees, plugincommon.BigIntComparator).Int,
+				ExecutionFee:        consensus.Median(executionFees, consensus.BigIntComparator).Int,
+				DataAvailabilityFee: consensus.Median(dataAvailabilityFees, consensus.BigIntComparator).Int,
 			}
 		},
 	)
 
-	nativeTokenPrices := plugincommon.GetConsensusMapAggregator(
+	nativeTokenPrices := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"NativeTokenPrices",
 		aggObs.NativeTokenPrices,
-		mathslib.TwoFPlus1Map(fChains),
+		twoFPlus1,
 		func(vals []cciptypes.BigInt) cciptypes.BigInt {
-			return plugincommon.Median(vals, plugincommon.BigIntComparator)
+			return consensus.Median(vals, consensus.BigIntComparator)
 		},
 	)
 

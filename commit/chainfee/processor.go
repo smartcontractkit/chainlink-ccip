@@ -23,7 +23,7 @@ type processor struct {
 	homeChain                        reader.HomeChain
 	ccipReader                       readerpkg.CCIPReader
 	ChainFeePriceBatchWriteFrequency commonconfig.Duration
-	bigF                             int
+	fRoleDON                         int
 }
 
 // nolint: revive
@@ -33,7 +33,7 @@ func NewProcessor(
 	homeChain reader.HomeChain,
 	ccipReader readerpkg.CCIPReader,
 	chainFeePriceBatchWriteFrequency commonconfig.Duration,
-	bigF int,
+	fRoleDON int,
 ) *processor {
 	return &processor{
 		lggr:                             lggr,
@@ -41,7 +41,7 @@ func NewProcessor(
 		homeChain:                        homeChain,
 		ccipReader:                       ccipReader,
 		ChainFeePriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
-		bigF:                             bigF,
+		fRoleDON:                         fRoleDON,
 	}
 }
 
