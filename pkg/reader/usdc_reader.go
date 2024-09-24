@@ -93,7 +93,7 @@ func NewUSDCMessageReader(
 			bytesAddress,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("unable to bind message transmitter for chain %d: %w", chainSelector, err)
+			return nil, err
 		}
 		boundContracts[chainSelector] = contract
 	}
@@ -179,7 +179,7 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 
 		destDomain, ok := u.cctpDestDomain[uint64(destChainSelector)]
 		if !ok {
-			return nil, fmt.Errorf("destination domain not found for chain %s", destChainSelector)
+			return nil, fmt.Errorf("destination domain not found for chain %d", destChainSelector)
 		}
 
 		// nolint:lll

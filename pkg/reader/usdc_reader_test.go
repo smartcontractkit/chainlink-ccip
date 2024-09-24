@@ -48,7 +48,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				},
 			},
 			readers:      emptyReaders,
-			errorMessage: "unable to bind message transmitter for chain 1",
+			errorMessage: "validate reader existence: chain 1: contract reader not found",
 		},
 		{
 			name: "binding errors",
@@ -112,7 +112,6 @@ func Test_USDCMessageReader_New(t *testing.T) {
 
 func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
-	emptyChainCCTP := CCTPDestDomains[uint64(emptyChain)]
 	emptyReader := reader.NewMockContractReaderFacade(t)
 	emptyReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	emptyReader.EXPECT().QueryKey(
@@ -141,6 +140,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 	}
 
 	validChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector)
+	validChainCCTP := CCTPDestDomains[uint64(validChain)]
 	validReader := reader.NewMockContractReaderFacade(t)
 	validReader.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	validReader.EXPECT().QueryKey(
@@ -174,7 +174,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 
 	tokens := map[exectypes.MessageTokenID]cciptypes.RampTokenAmount{
 		exectypes.NewMessageTokenID(1, 1): {
-			ExtraData: NewSourceTokenDataPayload(11, emptyChainCCTP).ToBytes(),
+			ExtraData: NewSourceTokenDataPayload(11, validChainCCTP).ToBytes(),
 		},
 	}
 
@@ -198,19 +198,19 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 			name:           "should return error when chain reader errors",
 			sourceSelector: faultyChain,
 			destSelector:   emptyChain,
-			errorMessage:   "error querying contract reader for chain 6433500567565415381",
+			errorMessage:   fmt.Sprintf("error querying contract reader for chain %d", faultyChain),
 		},
 		{
 			name:           "should return error when CCTP domain is not supported",
 			sourceSelector: emptyChain,
 			destSelector:   cciptypes.ChainSelector(2),
-			errorMessage:   "destination domain not found for chain ChainSelector(2)",
+			errorMessage:   "destination domain not found for chain 2",
 		},
 		{
 			name:           "should return error when CCTP domain is not supported",
 			sourceSelector: cciptypes.ChainSelector(sel.POLYGON_MAINNET.Selector),
 			destSelector:   emptyChain,
-			errorMessage:   "no contract bound for chain 4051577828743386545",
+			errorMessage:   fmt.Sprintf("no contract bound for chain %d", sel.POLYGON_MAINNET.Selector),
 		},
 		{
 			name:           "valid chain return events but nothing is matched",
