@@ -6,10 +6,12 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/commontypes"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/libocr/commontypes"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -41,20 +43,31 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
 		source: []byte("onRamp"),
 	}
+	expectedFeeQuoter := map[cciptypes.ChainSelector][]byte{
+		source: []byte("onRamp"),
+		dest:   []byte("dest"),
+	}
 	expectedRMNRemote := []byte("rmnRemote")
+	expectedRouter := []byte("router")
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 			dest: expectedNonceManager,
 		},
-		consts.ContractNameOnRamp: expectedOnRamp,
+		consts.ContractNameOnRamp:    expectedOnRamp,
+		consts.ContractNameFeeQuoter: expectedFeeQuoter,
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
+		consts.ContractNameRouter: map[cciptypes.ChainSelector][]byte{
+			dest: expectedRouter,
+		},
 	}
+	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, dest).
+		DiscoverContracts(mock.Anything, emptySelectors).
 		Return(expectedContracts, nil)
+
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
@@ -71,9 +84,15 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedFChain, observation.FChain)
-	assert.Equal(t, expectedOnRamp, observation.OnRamp)
-	assert.Equal(t, expectedNonceManager, observation.DestNonceManager)
-	assert.Equal(t, expectedRMNRemote, observation.RMNRemote)
+	assert.Equal(t, expectedOnRamp, observation.Addresses[consts.ContractNameOnRamp])
+	assert.Equal(t, expectedFeeQuoter, observation.Addresses[consts.ContractNameFeeQuoter])
+
+	require.Len(t, observation.Addresses[consts.ContractNameNonceManager], 1)
+	assert.Equal(t, expectedNonceManager, observation.Addresses[consts.ContractNameNonceManager][dest])
+	require.Len(t, observation.Addresses[consts.ContractNameRMNRemote], 1)
+	assert.Equal(t, expectedRMNRemote, observation.Addresses[consts.ContractNameRMNRemote][dest])
+	require.Len(t, observation.Addresses[consts.ContractNameRouter], 1)
+	assert.Equal(t, expectedRouter, observation.Addresses[consts.ContractNameRouter][dest])
 }
 
 func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T) {
@@ -101,9 +120,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.Error(t, err)
-	assert.Empty(t, observation.DestNonceManager)
-	assert.Empty(t, observation.OnRamp)
-	assert.Empty(t, observation.RMNRemote)
+	assert.Empty(t, observation.Addresses)
 	assert.Empty(t, observation.FChain)
 }
 
@@ -121,10 +138,12 @@ func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFCha
 		dest:   1,
 		source: 2,
 	}
+	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, dest).
+		DiscoverContracts(mock.Anything, emptySelectors).
 		Return(nil, reader.ErrContractReaderNotFound)
+
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
 	defer mockHomeChain.AssertExpectations(t)
@@ -141,9 +160,7 @@ func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFCha
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.NoError(t, err)
 	assert.Equal(t, expectedFChain, observation.FChain)
-	assert.Empty(t, observation.DestNonceManager)
-	assert.Empty(t, observation.OnRamp)
-	assert.Empty(t, observation.RMNRemote)
+	assert.Empty(t, observation.Addresses)
 }
 
 func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *testing.T) {
@@ -161,9 +178,10 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 		source: 2,
 	}
 	discoveryErr := fmt.Errorf("discovery error")
+	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, dest).
+		DiscoverContracts(mock.Anything, emptySelectors).
 		Return(nil, discoveryErr)
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
@@ -181,9 +199,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	observation, err := cdp.Observation(ctx, discoverytypes.Outcome{}, discoverytypes.Query{})
 	assert.Error(t, err)
 	assert.Empty(t, observation.FChain)
-	assert.Empty(t, observation.DestNonceManager)
-	assert.Empty(t, observation.OnRamp)
-	assert.Empty(t, observation.RMNRemote)
+	assert.Empty(t, observation.Addresses)
 }
 
 func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
@@ -217,6 +233,8 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
+		consts.ContractNameFeeQuoter: {},
+		consts.ContractNameRouter:    {},
 	}
 	mockReader.
 		EXPECT().
@@ -234,10 +252,16 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	)
 
 	obs := discoverytypes.Observation{
-		FChain:           expectedFChain,
-		OnRamp:           expectedOnRamp,
-		DestNonceManager: expectedNonceManager,
-		RMNRemote:        expectedRMNRemote,
+		FChain: expectedFChain,
+		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			consts.ContractNameOnRamp: expectedOnRamp,
+			consts.ContractNameNonceManager: {
+				dest: expectedNonceManager,
+			},
+			consts.ContractNameRMNRemote: {
+				dest: expectedRMNRemote,
+			},
+		},
 	}
 	// here we have:
 	// 2*fRoleDON + 1 observations of fChain
@@ -284,6 +308,8 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
+		consts.ContractNameFeeQuoter: {},
+		consts.ContractNameRouter:    {},
 	}
 	mockReader.
 		EXPECT().
@@ -304,10 +330,16 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		FChain: expectedFChain,
 	}
 	destObs := discoverytypes.Observation{
-		FChain:           expectedFChain,
-		OnRamp:           expectedOnRamp,
-		DestNonceManager: expectedNonceManager,
-		RMNRemote:        expectedRMNRemote,
+		FChain: expectedFChain,
+		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			consts.ContractNameOnRamp: expectedOnRamp,
+			consts.ContractNameNonceManager: {
+				dest: expectedNonceManager,
+			},
+			consts.ContractNameRMNRemote: {
+				dest: expectedRMNRemote,
+			},
+		},
 	}
 	// here we have:
 	// 2*fRoleDON + 1 == 7 observations of fChain
@@ -353,9 +385,11 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	}
 	// we expect no contracts here due to not enough observations to come to consensus.
 	expectedContracts := reader.ContractAddresses{
-		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{},
-		consts.ContractNameOnRamp:       map[cciptypes.ChainSelector][]byte{},
-		consts.ContractNameRMNRemote:    map[cciptypes.ChainSelector][]byte{},
+		consts.ContractNameNonceManager: {},
+		consts.ContractNameOnRamp:       {},
+		consts.ContractNameRMNRemote:    {},
+		consts.ContractNameFeeQuoter:    {},
+		consts.ContractNameRouter:       {},
 	}
 	mockReader.
 		EXPECT().
@@ -376,10 +410,18 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		FChain: expectedFChain,
 	}
 	destObs := discoverytypes.Observation{
-		FChain:           expectedFChain,
-		OnRamp:           observedOnRamp,
-		DestNonceManager: observedNonceManager,
-		RMNRemote:        observedRMNRemote,
+		FChain: expectedFChain,
+		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			consts.ContractNameOnRamp: observedOnRamp,
+			consts.ContractNameNonceManager: {
+				dest: observedNonceManager,
+			},
+			consts.ContractNameRMNRemote: {
+				dest: observedRMNRemote,
+			},
+			consts.ContractNameFeeQuoter: {},
+			consts.ContractNameRouter:    {},
+		},
 	}
 	// here we have:
 	// 2*fRoleDON + 1 == 7 observations of fChain
@@ -421,15 +463,17 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
 		dest: []byte("onRamp"),
 	}
-	expectedRmnRemote := []byte("rmnRemote")
+	expectedRMNRemote := []byte("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
-			dest: expectedRmnRemote,
+			dest: expectedRMNRemote,
 		},
+		consts.ContractNameFeeQuoter: {},
+		consts.ContractNameRouter:    {},
 	}
 	syncErr := errors.New("sync error")
 	mockReader.
@@ -448,10 +492,16 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	)
 
 	obs := discoverytypes.Observation{
-		FChain:           expectedFChain,
-		OnRamp:           expectedOnRamp,
-		DestNonceManager: expectedNonceManager,
-		RMNRemote:        expectedRmnRemote,
+		FChain: expectedFChain,
+		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			consts.ContractNameOnRamp: expectedOnRamp,
+			consts.ContractNameNonceManager: {
+				dest: expectedNonceManager,
+			},
+			consts.ContractNameRMNRemote: {
+				dest: expectedRMNRemote,
+			},
+		},
 	}
 	// here we have:
 	// 2*fRoleDON + 1 observations of fChain

@@ -7,13 +7,13 @@ const (
 	ContractNameOffRamp                = "OffRamp"
 	ContractNameOnRamp                 = "OnRamp"
 	ContractNameFeeQuoter              = "FeeQuoter"
-	ContractNameRouter                 = "Router"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
 	ContractNameCCIPConfig             = "CCIPConfig"
 	ContractNamePriceAggregator        = "AggregatorV3Interface"
 	ContractNameNonceManager           = "NonceManager"
 	ContractNameRMNHome                = "RMNHome"
 	ContractNameRMNRemote              = "RMNRemote"
+	ContractNameRouter                 = "Router"
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
 )
 
@@ -23,18 +23,19 @@ const (
 	// Router methods
 	MethodNameRouterGetWrappedNative = "GetWrappedNative"
 
-	// Offramp methods
+	// OffRamp methods
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
-	MethodNameOfframpGetDynamicConfig      = "OfframpGetDynamicConfig"
-	MethodNameOfframpGetStaticConfig       = "OfframpGetStaticConfig"
+	MethodNameOffRampGetDynamicConfig      = "OffRampGetDynamicConfig"
+	MethodNameOffRampGetStaticConfig       = "OffRampGetStaticConfig"
+	MethodNameOffRampGetDestChainConfig    = "GetDestChainConfig"
 	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                    = "IsBlessed"
 	MethodNameGetMerkleRoot                = "GetMerkleRoot"
 	MethodNameGetExecutionState            = "GetExecutionState"
 
-	// Onramp methods
-	MethodNameOnrampGetDynamicConfig        = "OnrampGetDynamicConfig"
-	MethodNameOnrampGetStaticConfig         = "OnrampGetStaticConfig"
+	// OnRamp methods
+	MethodNameOnRampGetDynamicConfig        = "OnRampGetDynamicConfig"
+	MethodNameOnRampGetStaticConfig         = "OnRampGetStaticConfig"
 	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
 
 	// FeeQuoter view/pure methods
@@ -56,6 +57,12 @@ const (
 	// NonceManager methods
 	MethodNameGetInboundNonce  = "GetInboundNonce"
 	MethodNameGetOutboundNonce = "GetOutboundNonce"
+
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOfframpGetDynamicConfig = "OfframpGetDynamicConfig"
+	MethodNameOfframpGetStaticConfig  = "OfframpGetStaticConfig"
+	MethodNameOnrampGetDynamicConfig  = "OnrampGetDynamicConfig"
+	MethodNameOnrampGetStaticConfig   = "OnrampGetStaticConfig"
 
 	/*
 		// On EVM:

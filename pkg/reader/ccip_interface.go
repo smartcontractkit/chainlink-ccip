@@ -24,6 +24,18 @@ var (
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
 
+func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
+	resp := ca
+	if resp == nil {
+		resp = make(ContractAddresses)
+	}
+	if resp[contract] == nil {
+		resp[contract] = make(map[cciptypes.ChainSelector][]byte)
+	}
+	resp[contract][chain] = address
+	return resp
+}
+
 func NewCCIPChainReader(
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
@@ -122,7 +134,7 @@ type CCIPReader interface {
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.
-	DiscoverContracts(ctx context.Context, destChain cciptypes.ChainSelector) (ContractAddresses, error)
+	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
