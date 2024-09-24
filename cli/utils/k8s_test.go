@@ -2,11 +2,11 @@ package utils
 
 import (
 	"context"
-	"fmt"
+	"encoding/base64"
 	"io/fs"
-	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -34,7 +34,8 @@ func MockKubeConfigFile(content []byte, perm fs.FileMode) *os.File {
 }
 
 // AssertEqualKubeConfigs compares the fields we modify from two clientcmdapi.Config instances
-// TODO: use golang reflect to compare the entire object and recurse into subtypes
+// TODO: use golang reflect to compare the entire object and recurse into subtypes whilst ignoring
+// fields such as LocationOfOrigin (which varies when dealing with tmpfiles)
 func AssertEqualKubeConfigs(t *testing.T, want *clientcmdapi.Config, got *clientcmdapi.Config) {
 	assert.Len(t, got.Clusters, len(want.Clusters))
 	for name, wantCluster := range want.Clusters {
@@ -68,14 +69,14 @@ func AssertEqualKubeConfigs(t *testing.T, want *clientcmdapi.Config, got *client
 }
 
 func TestSetupKubeConfigNonExisting(t *testing.T) {
-	mockedKubeConfig := MockKubeConfigFile([]byte(""), 0666)
-	defer os.Remove(mockedKubeConfig.Name())
+	nonExistingKubeConfig := filepath.Join(t.TempDir(), "non-existing")
 
 	// mocking return of eks.DescribeCluster
 	eksClusterName := "test-eks-cluster"
 	eksClusterAlias := "test-eks-cluster-alias"
 	eksClusterArn := "arn:aws:eks:ap-southeast-1:123456789000:cluster/test-eks-cluster"
 	eksClusterEndpoint := "https://cluster.endpoint"
+	eksEncodedCAData := base64.StdEncoding.EncodeToString([]byte("cadata"))
 	mockEksClient := wrappermocks.NewEKSAPI(t)
 	mockEksClient.EXPECT().
 		DescribeCluster(
@@ -85,21 +86,36 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 			Cluster: &ekstypes.Cluster{
 				Arn:                  &eksClusterArn,
 				Endpoint:             &eksClusterEndpoint,
-				CertificateAuthority: &ekstypes.Certificate{Data: &eksClusterArn},
+				CertificateAuthority: &ekstypes.Certificate{Data: &eksEncodedCAData},
 			},
 		}, nil,
 	)
-	require.NoError(t, SetupKubeConfig(mockEksClient, mockedKubeConfig.Name(), eksClusterName, eksClusterAlias, "ap-southeast-1", true))
 
-	got, err := clientcmd.LoadFromFile(mockedKubeConfig.Name())
+	setupKubeConfigInput := &SetupKubeConfigInput{
+		EksClient:            mockEksClient,
+		KubeconfigPath:       nonExistingKubeConfig,
+		EksClusterName:       eksClusterName,
+		EksAliasName:         eksClusterAlias,
+		CribNamespace:        "crib-test",
+		AwsProfile:           "profile-test",
+		AwsRegion:            "ap-southeast-1",
+		ChangeDefaultContext: true,
+	}
+	require.NoError(t, SetupKubeConfig(setupKubeConfigInput))
+	require.FileExists(t, nonExistingKubeConfig)
+
+	got, err := clientcmd.LoadFromFile(nonExistingKubeConfig)
 	require.NoError(t, err)
 
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			eksClusterArn: &clientcmdapi.AuthInfo{
 				Exec: &clientcmdapi.ExecConfig{
-					Command:         "aws",
-					Args:            []string{"eks", "get-token", "--cluster-name", eksClusterName},
+					Command: "aws",
+					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
+					Env: []clientcmdapi.ExecEnvVar{
+						{Name: "AWS_PROFILE", Value: "profile-test"},
+					},
 					APIVersion:      "client.authentication.k8s.io/v1beta1",
 					InteractiveMode: "IfAvailable",
 				},
@@ -108,7 +124,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 		Clusters: map[string]*clientcmdapi.Cluster{
 			eksClusterArn: &clientcmdapi.Cluster{
 				Server:                   eksClusterEndpoint,
-				CertificateAuthorityData: []byte(eksClusterArn),
+				CertificateAuthorityData: []byte("cadata"),
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
@@ -126,7 +142,7 @@ func TestSetupKubeConfigExistsButDiverges(t *testing.T) {
 	mockedKubeConfig := MockKubeConfigFile([]byte(`apiVersion: v1
 clusters:
 - cluster:
-    certificate-authority-data: c29tZXRoaW5nCg==  # base64-encoded string "something"
+    certificate-authority-data: c29tZXRoaW5n  # base64-encoded string "something"
     server: https://unrelated.endpoint
   name: arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch
 - cluster:
@@ -140,6 +156,7 @@ contexts:
   name: context-we-should-not-touch
 - context:
     cluster: arn:aws:eks:us-east-1:123456789000:cluster/test-eks-cluster
+    namespace: crib-test
     user: arn:aws:eks:us-east-1:123456789000:cluster/test-eks-cluster
   name: test-eks-cluster-alias
 current-context: context-we-should-not-touch
@@ -170,6 +187,7 @@ users:
 	eksClusterAlias := "test-eks-cluster-alias"
 	eksClusterArn := "arn:aws:eks:ap-southeast-1:123456789000:cluster/test-eks-cluster"
 	eksClusterEndpoint := "https://cluster.endpoint"
+	eksEncodedCAData := base64.StdEncoding.EncodeToString([]byte("cadata"))
 	mockEksClient := wrappermocks.NewEKSAPI(t)
 	mockEksClient.EXPECT().
 		DescribeCluster(
@@ -179,11 +197,22 @@ users:
 			Cluster: &ekstypes.Cluster{
 				Arn:                  &eksClusterArn,
 				Endpoint:             &eksClusterEndpoint,
-				CertificateAuthority: &ekstypes.Certificate{Data: &eksClusterArn},
+				CertificateAuthority: &ekstypes.Certificate{Data: &eksEncodedCAData},
 			},
 		}, nil,
 	)
-	require.NoError(t, SetupKubeConfig(mockEksClient, mockedKubeConfig.Name(), eksClusterName, eksClusterAlias, "ap-southeast-1", true))
+
+	setupKubeConfigInput := &SetupKubeConfigInput{
+		EksClient:            mockEksClient,
+		KubeconfigPath:       mockedKubeConfig.Name(),
+		EksClusterName:       eksClusterName,
+		EksAliasName:         eksClusterAlias,
+		CribNamespace:        "crib-test",
+		AwsProfile:           "profile-test",
+		AwsRegion:            "ap-southeast-1",
+		ChangeDefaultContext: true,
+	}
+	require.NoError(t, SetupKubeConfig(setupKubeConfigInput))
 
 	got, err := clientcmd.LoadFromFile(mockedKubeConfig.Name())
 	require.NoError(t, err)
@@ -192,8 +221,11 @@ users:
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			eksClusterArn: &clientcmdapi.AuthInfo{
 				Exec: &clientcmdapi.ExecConfig{
-					Command:         "aws",
-					Args:            []string{"eks", "get-token", "--cluster-name", eksClusterName},
+					Command: "aws",
+					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
+					Env: []clientcmdapi.ExecEnvVar{
+						{Name: "AWS_PROFILE", Value: "profile-test"},
+					},
 					APIVersion:      "client.authentication.k8s.io/v1beta1",
 					InteractiveMode: "IfAvailable",
 				},
@@ -206,7 +238,7 @@ users:
 		Clusters: map[string]*clientcmdapi.Cluster{
 			eksClusterArn: &clientcmdapi.Cluster{
 				Server:                   eksClusterEndpoint,
-				CertificateAuthorityData: []byte(eksClusterArn),
+				CertificateAuthorityData: []byte("cadata"),
 			},
 			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": &clientcmdapi.Cluster{
 				Server:                   "https://unrelated.endpoint",
@@ -226,12 +258,4 @@ users:
 		CurrentContext: eksClusterAlias,
 	}
 	AssertEqualKubeConfigs(t, want, got)
-
-	// reading file content
-	content, err := ioutil.ReadFile(mockedKubeConfig.Name()) // the file is inside the local directory
-	if err != nil {
-		fmt.Println("Err")
-	}
-	fmt.Println(string(content)) // This is some content
-	t.Fail()
 }
