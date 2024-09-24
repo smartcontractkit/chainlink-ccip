@@ -229,7 +229,7 @@ func mergeMessageObservations(
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = consensus.NewMinObservation[cciptypes.Message](consensus.Threshold(f+1), nil)
+		validators[selector] = consensus.NewMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -274,7 +274,7 @@ func mergeCommitObservations(
 	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
 		validators[selector] =
-			consensus.NewMinObservation[exectypes.CommitData](consensus.Threshold(f+1), nil)
+			consensus.NewMinObservation[exectypes.CommitData](consensus.FPlus1(f), nil)
 	}
 
 	// Add reports to the validator for each chain selector.
@@ -346,7 +346,7 @@ func mergeNonceObservations(
 	}
 
 	// Create one validator because nonces are only observed from the destination chain.
-	validator := consensus.NewMinObservation[NonceTriplet](consensus.Threshold(fChainDest+1), nil)
+	validator := consensus.NewMinObservation[NonceTriplet](consensus.FPlus1(fChainDest), nil)
 
 	// Add reports to the validator for each chain selector.
 	for _, ao := range daos {
