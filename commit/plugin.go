@@ -218,6 +218,10 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 	return fChain
 }
 
+func logOutcome(lggr logger.Logger, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation) {
+	lggr.Infow("Raw outcome", "outcome", map[string]any{"outCtx": outCtx, "q": q, "aos": aos})
+}
+
 // Outcome depending on the current state, either:
 // - chooses the seq num ranges for the next round
 // - builds a report
@@ -225,6 +229,7 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	logOutcome(p.lggr, outCtx, q, aos)
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 
 	decodedQ, err := DecodeCommitPluginQuery(q)
