@@ -517,6 +517,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
+			contractName, chainSel, address := contractName, chainSel, address
 			// try to bind
 			_, err := bindExtendedReaderContract(ctx, r.contractReaders, chainSel, contractName, address)
 			if err != nil {
