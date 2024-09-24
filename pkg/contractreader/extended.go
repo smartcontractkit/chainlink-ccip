@@ -12,7 +12,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 )
 
 var (
@@ -54,12 +53,12 @@ type ExtendedBoundContract struct {
 
 // extendedContractReader is an extended version of the contract reader.
 type extendedContractReader struct {
-	contractreader.ContractReaderFacade
+	ContractReaderFacade
 	contractBindingsByName map[string][]ExtendedBoundContract
 	mu                     *sync.RWMutex
 }
 
-func NewExtendedContractReader(baseContractReader contractreader.ContractReaderFacade) Extended {
+func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended {
 	return &extendedContractReader{
 		ContractReaderFacade:   baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),

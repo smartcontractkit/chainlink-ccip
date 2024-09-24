@@ -18,9 +18,6 @@ packages:
             RMNRemote:
             CCIP:
             PriceReader:
-    github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader:
-        interfaces:
-            ContractReaderFacade:
     github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
         interfaces:
             ChainSupport:
@@ -34,3 +31,4 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
         interfaces:
             Extended:
+            ContractReaderFacade:

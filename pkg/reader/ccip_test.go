@@ -16,9 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
-	reader "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
 	contractreader2 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
@@ -59,7 +58,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
 		logger.Test(t),
-		map[cciptypes.ChainSelector]reader2.ContractReaderFacade{
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
