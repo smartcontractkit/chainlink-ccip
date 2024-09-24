@@ -88,6 +88,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	_ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	// come to consensus on the onramp addresses and update the chainreader.
+	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
 
 	// fChain consensus - uses the role DON F value because all nodes can observe the home chain.
 	fChainObs := make(map[cciptypes.ChainSelector][]int)
@@ -104,6 +105,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
+			cdp.lggr.Infow("Adding onramp address to mapping", "chain", chain, "address", addr)
 			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
 		}
 	}
@@ -118,7 +120,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	contracts := make(reader.ContractAddresses)
-	contracts[consts.ContractNameOnRamp] = consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	onrampConsensus := consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	cdp.lggr.Infow("Onramp consensus", "onramp", onrampConsensus)
+	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
 	contracts[consts.ContractNameNonceManager] = consensus.GetConsensusMap(
 		cdp.lggr,
