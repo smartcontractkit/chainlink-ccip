@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -65,6 +66,7 @@ type PluginFactory struct {
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
 	rmnPeerClient   rmn.PeerClient
+	rmnCrypto       cciptypes.RMNCrypto
 }
 
 func NewPluginFactory(
@@ -77,6 +79,7 @@ func NewPluginFactory(
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	rmnPeerClient rmn.PeerClient,
+	rmnCrypto cciptypes.RMNCrypto,
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:            lggr,
@@ -88,6 +91,7 @@ func NewPluginFactory(
 		contractReaders: contractReaders,
 		chainWriters:    chainWriters,
 		rmnPeerClient:   rmnPeerClient,
+		rmnCrypto:       rmnCrypto,
 	}
 }
 
@@ -141,6 +145,17 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 	)
+
+	rmnConfig := rmn.Config{} // todo
+	rmnController := rmn.NewController(
+		p.lggr,
+		p.rmnCrypto,
+		p.rmnPeerClient,
+		rmnConfig,
+		time.Second*2, // todo
+		time.Second*2, // todo
+	)
+
 	plugin := NewPlugin(
 		p.donID,
 		config.OracleID,
@@ -158,7 +173,9 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.lggr,
 		p.homeChainReader,
 		config,
-		rmn.Config{}, // todo
+		rmnConfig,
+		p.rmnCrypto,
+		rmnController,
 	)
 	if err = plugin.Start(ctx); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start plugin: %w", err)

@@ -49,6 +49,7 @@ type Plugin struct {
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
 	rmnConfig           rmn.Config
+	rmnController       rmn.Controller
 
 	// state
 	contractsInitialized bool
@@ -67,6 +68,8 @@ func NewPlugin(
 	homeChain reader.HomeChain,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	rmnConfig rmn.Config,
+	rmnCrypto cciptypes.RMNCrypto,
+	rmnController rmn.Controller,
 ) *Plugin {
 	if cfg.MaxMerkleTreeSize == 0 {
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
@@ -98,8 +101,8 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		rmn.Controller(nil),      // todo
-		cciptypes.RMNCrypto(nil), // todo
+		rmnCrypto,
+		rmnController,
 		rmnConfig,
 	)
 
