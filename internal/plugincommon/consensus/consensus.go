@@ -87,6 +87,10 @@ func TimestampComparator(a, b time.Time) bool {
 	return a.Before(b)
 }
 
+func TimestampMedianAggregator(timestamps []time.Time) time.Time {
+	return Median(timestamps, TimestampComparator)
+}
+
 func BigIntComparator(a, b cciptypes.BigInt) bool {
 	return a.Cmp(b.Int) == -1
 }
@@ -111,14 +115,16 @@ var TimestampedBigAggregator = func(updates []plugintypes.TimestampedBig) plugin
 	}
 }
 
-func EarliestTimestamp(updates []plugintypes.TimestampedBig) time.Time {
-	if len(updates) == 0 {
-		return time.Time{}
+// EarliestTimestamp returns the earliest timestamp from a slice of timestamped big integers
+// or the zero time if the slice is empty.
+func EarliestTimestamp(times []time.Time) time.Time {
+	if len(times) == 0 {
+		return time.UnixMicro(0)
 	}
-	earliest := updates[0].Timestamp
-	for _, update := range updates {
-		if update.Timestamp.Before(earliest) {
-			earliest = update.Timestamp
+	earliest := times[0]
+	for _, ts := range times {
+		if ts.Before(earliest) {
+			earliest = ts
 		}
 	}
 	return earliest

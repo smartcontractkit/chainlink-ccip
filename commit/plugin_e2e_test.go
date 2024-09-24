@@ -213,6 +213,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				n.ccipReader.EXPECT().
 					GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
+				n.ccipReader.EXPECT().
+					GetChainFeePriceUpdate(ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					assert.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))

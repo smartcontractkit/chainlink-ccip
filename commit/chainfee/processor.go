@@ -56,11 +56,18 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx)
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
+	chainFeePriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, maps.Keys(feeComponents))
+	latestTimestamps := make(map[cciptypes.ChainSelector]time.Time, len(chainFeePriceUpdates))
+	for chain, update := range chainFeePriceUpdates {
+		latestTimestamps[chain] = update.Timestamp
+	}
+
 	return Observation{
-		FChain:           p.ObserveFChain(),
-		FeeComponents:    feeComponents,
-		NativeTokenPrice: nativeTokenPrices,
-		Timestamp:        time.Now().UTC(),
+		FChain:                p.ObserveFChain(),
+		FeeComponents:         feeComponents,
+		NativeTokenPrice:      nativeTokenPrices,
+		ChainFeeLatestUpdates: latestTimestamps,
+		Timestamp:             time.Now().UTC(),
 	}, nil
 }
 

@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 )
 
 func (p *processor) getConsensusObservation(
@@ -32,16 +31,16 @@ func (p *processor) getConsensusObservation(
 	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
 	chainFeeUpdatesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
-		"ChainFeePriceUpdates",
-		aggObs.ChainFeePriceUpdates,
+		"ChainFeeLatestUpdates",
+		aggObs.ChainFeeLatestUpdates,
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
-		consensus.TimestampedBigAggregator,
+		consensus.TimestampMedianAggregator,
 	)
 
 	// Stop early if earliest updated timestamp is still fresh
 	earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus))
 	nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
-	if nextUpdateTime.Before(timestamp) {
+	if nextUpdateTime.Before(timestamp) && len(chainFeeUpdatesConsensus) != 0 {
 		return ConsensusObservation{
 			ShouldUpdate: false,
 		}, nil
@@ -54,6 +53,7 @@ func (p *processor) getConsensusObservation(
 		"FeeComponents",
 		aggObs.FeeComponents,
 		twoFPlus1,
+		// Aggregator function
 		func(vals []types.ChainFeeComponents) types.ChainFeeComponents {
 			executionFees := make([]cciptypes.BigInt, len(vals))
 			dataAvailabilityFees := make([]cciptypes.BigInt, len(vals))
@@ -73,18 +73,19 @@ func (p *processor) getConsensusObservation(
 		"NativeTokenPrices",
 		aggObs.NativeTokenPrices,
 		twoFPlus1,
+		// Aggregator function
 		func(vals []cciptypes.BigInt) cciptypes.BigInt {
 			return consensus.Median(vals, consensus.BigIntComparator)
 		},
 	)
 
 	consensusObs := ConsensusObservation{
-		FChain:               fChains,
-		FeeComponents:        feeComponents,
-		NativeTokenPrices:    nativeTokenPrices,
-		ChainFeePriceUpdates: chainFeeUpdatesConsensus,
-		Timestamp:            timestamp,
-		ShouldUpdate:         true,
+		FChain:                fChains,
+		FeeComponents:         feeComponents,
+		NativeTokenPrices:     nativeTokenPrices,
+		ChainFeeLatestUpdates: chainFeeUpdatesConsensus,
+		Timestamp:             timestamp,
+		ShouldUpdate:          true,
 	}
 
 	return consensusObs, nil
@@ -92,11 +93,11 @@ func (p *processor) getConsensusObservation(
 
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
-		FeeComponents:        make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
-		NativeTokenPrices:    make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
-		FChain:               make(map[cciptypes.ChainSelector][]int),
-		ChainFeePriceUpdates: make(map[cciptypes.ChainSelector][]plugintypes.TimestampedBig),
-		Timestamps:           []time.Time{},
+		FeeComponents:         make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
+		NativeTokenPrices:     make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
+		FChain:                make(map[cciptypes.ChainSelector][]int),
+		ChainFeeLatestUpdates: make(map[cciptypes.ChainSelector][]time.Time),
+		Timestamps:            []time.Time{},
 	}
 
 	for _, ao := range aos {
@@ -117,8 +118,8 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
 		}
 
-		for chainSel, feeUpdate := range obs.ChainFeePriceUpdates {
-			aggObs.ChainFeePriceUpdates[chainSel] = append(aggObs.ChainFeePriceUpdates[chainSel], feeUpdate)
+		for chainSel, feeUpdate := range obs.ChainFeeLatestUpdates {
+			aggObs.ChainFeeLatestUpdates[chainSel] = append(aggObs.ChainFeeLatestUpdates[chainSel], feeUpdate)
 		}
 
 		// Timestamps
