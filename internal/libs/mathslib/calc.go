@@ -22,7 +22,3 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 	diff.Div(diff, x2)
 	return diff.Cmp(big.NewInt(ppb)) > 0 // diff > ppb
 }
-
-func TwoFPlus1(f int) int {
-	return 2*f + 1
-}
