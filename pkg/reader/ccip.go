@@ -519,6 +519,10 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 		for chainSel, address := range chainSelToAddress {
 			contractName, chainSel, address := contractName, chainSel, address
 			// try to bind
+			r.lggr.Infow("trying to bind contract",
+				"contractName", contractName,
+				"chainSel", chainSel,
+				"address", address)
 			_, err := bindExtendedReaderContract(ctx, r.contractReaders, chainSel, contractName, address)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {

@@ -104,6 +104,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
+			cdp.lggr.Infow("Adding onramp address to mapping", "chain", chain, "address", addr)
 			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
 		}
 	}
@@ -118,7 +119,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	contracts := make(reader.ContractAddresses)
-	contracts[consts.ContractNameOnRamp] = consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	onrampConsensus := consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	cdp.lggr.Infow("Onramp consensus", "onramp", onrampConsensus)
+	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
 	contracts[consts.ContractNameNonceManager] = consensus.GetConsensusMap(
 		cdp.lggr,
