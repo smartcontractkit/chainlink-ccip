@@ -19,6 +19,8 @@ mkShell' {
     nodejs
     nodePackages.pnpm
 
+    go-mockery
+
     # tooling
     gotools
     gopls

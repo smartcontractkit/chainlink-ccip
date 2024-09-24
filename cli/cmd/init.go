@@ -15,6 +15,9 @@ var initCmd = &cobra.Command{
 
 		// TODO: call SetupAwsProfile when applicable
 		// e.g. utils.SetupAwsProfile("$HOME/.aws/config", viper.GetString("crib.awsProfileName"), viper.GetString("aws.accountId"), viper.GetString("aws.region"), viper.GetString("aws.ssoRoleName"), viper.GetString("aws.ssoStartUrl"))
+
+		// TODO: call SetupKubeConfig when applicable
+		// e.g. utils.SetupKubeConfig("./kubeconfig", viper.GetString("eks.clusterName"), viper.GetString("eks.clusterAlias"), viper.GetString("aws.region"), true)
 	},
 }
 
