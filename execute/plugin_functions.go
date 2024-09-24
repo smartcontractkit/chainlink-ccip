@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -226,9 +227,9 @@ func mergeMessageObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.MessageObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]plugincommon.MinObservation[cciptypes.Message])
+	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = plugincommon.NewMinObservation[cciptypes.Message](f+1, nil)
+		validators[selector] = consensus.NewMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -270,10 +271,10 @@ func mergeCommitObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.CommitObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]plugincommon.MinObservation[exectypes.CommitData])
+	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
 		validators[selector] =
-			plugincommon.NewMinObservation[exectypes.CommitData](f+1, nil)
+			consensus.NewMinObservation[exectypes.CommitData](consensus.FPlus1(f), nil)
 	}
 
 	// Add reports to the validator for each chain selector.
@@ -345,7 +346,7 @@ func mergeNonceObservations(
 	}
 
 	// Create one validator because nonces are only observed from the destination chain.
-	validator := plugincommon.NewMinObservation[NonceTriplet](fChainDest, nil)
+	validator := consensus.NewMinObservation[NonceTriplet](consensus.FPlus1(fChainDest), nil)
 
 	// Add reports to the validator for each chain selector.
 	for _, ao := range daos {

@@ -18,6 +18,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -28,11 +31,11 @@ type TokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Obse
 type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
+	donID               plugintypes.DonID
 	nodeID              commontypes.OracleID
 	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
 	ccipReader          readerpkg.CCIPReader
-	readerSyncer        *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader   reader.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
@@ -42,11 +45,16 @@ type Plugin struct {
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
+	discoveryProcessor  *discovery.ContractDiscoveryProcessor
 	rmnConfig           rmn.Config
+
+	// state
+	contractsInitialized bool
 }
 
 func NewPlugin(
 	_ context.Context,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg pluginconfig.CommitPluginConfig,
@@ -60,18 +68,9 @@ func NewPlugin(
 	rmnConfig rmn.Config,
 ) *Plugin {
 	if cfg.MaxMerkleTreeSize == 0 {
-		lggr.Warnw("MaxMerkleTreeSize not set, using default value", "default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
+		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
+			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
 		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
-	}
-
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		syncFrequency(cfg.SyncFrequency),
-	)
-	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
@@ -95,6 +94,7 @@ func NewPlugin(
 		cciptypes.RMNCrypto(nil), // todo
 		rmnConfig,
 	)
+
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		nodeID,
 		lggr,
@@ -105,7 +105,16 @@ func NewPlugin(
 		reportingCfg.F,
 	)
 
+	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
+		lggr,
+		&ccipReader,
+		homeChain,
+		cfg.DestChain,
+		reportingCfg.F,
+	)
+
 	return &Plugin{
+		donID:               donID,
 		nodeID:              nodeID,
 		oracleIDToP2pID:     oracleIDToP2pID,
 		lggr:                lggr,
@@ -113,13 +122,13 @@ func NewPlugin(
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,
-		readerSyncer:        readerSyncer,
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainfee.NewProcessor(),
+		discoveryProcessor:  discoveryProcessor,
 		rmnConfig:           rmnConfig,
 	}
 }
@@ -164,6 +173,18 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
+	var discoveryObs dt.Observation
+	if p.discoveryProcessor != nil {
+		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+		if err != nil {
+			p.lggr.Errorw("failed to discover contracts", "err", err)
+		}
+		if !p.contractsInitialized {
+			p.lggr.Infow("contracts not initialized, only making discovery observations")
+			return Observation{DiscoveryObs: discoveryObs}.Encode()
+		}
+	}
+
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
@@ -181,6 +202,7 @@ func (p *Plugin) Observation(
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		ChainFeeObs:   chainFeeObs,
+		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
 	return obs.Encode()
@@ -213,6 +235,7 @@ func (p *Plugin) Outcome(
 	var merkleObservations []MerkleRootObservation
 	var tokensObservations []TokenPricesObservation
 	var feeObservations []ChainFeeObservation
+	var discoveryObservations []plugincommon.AttributedObservation[dt.Observation]
 
 	for _, ao := range aos {
 		obs, err := DecodeCommitPluginObservation(ao.Observation)
@@ -240,6 +263,20 @@ func (p *Plugin) Outcome(
 				Observation: obs.ChainFeeObs,
 			},
 		)
+
+		discoveryObservations = append(discoveryObservations,
+			plugincommon.AttributedObservation[dt.Observation]{
+				OracleID:    ao.Observer,
+				Observation: obs.DiscoveryObs,
+			})
+	}
+
+	if p.discoveryProcessor != nil {
+		_, err = p.discoveryProcessor.Outcome(dt.Outcome{}, dt.Query{}, discoveryObservations)
+		if err != nil {
+			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
+		}
+		p.contractsInitialized = true
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
@@ -281,10 +318,6 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
-	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Errorw("error closing reader syncer", "err", err)
-	}
-
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
@@ -304,20 +337,6 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
 	}
 
 	return decodedOutcome
-}
-
-func syncFrequency(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 10 * time.Second
-	}
-	return configuredValue
-}
-
-func syncTimeout(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 3 * time.Second
-	}
-	return configuredValue
 }
 
 // Interface compatibility checks.

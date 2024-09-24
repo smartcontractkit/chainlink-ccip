@@ -660,7 +660,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			name: "one consensus observation",
 			args: args{
 				fChain: map[cciptypes.ChainSelector]int{
-					1: 1,
+					1: 0,
 				},
 				observation: []exectypes.Observation{
 					{
@@ -685,7 +685,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			name: "one ignored consensus observation",
 			args: args{
 				fChain: map[cciptypes.ChainSelector]int{
-					1: 2,
+					1: 1,
 				},
 				observation: []exectypes.Observation{
 					{
@@ -704,7 +704,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			name: "3 observers required to reach consensus on 4 sender values",
 			args: args{
 				fChain: map[cciptypes.ChainSelector]int{
-					1: 2,
+					1: 1, // f + 1
 				},
 				// Across 3 observers
 				observation: []exectypes.Observation{

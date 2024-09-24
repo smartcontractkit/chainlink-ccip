@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader/contractreader"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 )
 
 var (

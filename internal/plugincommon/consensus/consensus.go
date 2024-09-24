@@ -1,4 +1,4 @@
-package plugincommon
+package consensus
 
 import (
 	"sort"
@@ -12,17 +12,17 @@ import (
 // return a mapping from chains to a single consensus item.
 // The consensus item for a given chain is the item with the
 // most observations that was observed at least fChain times.
-func GetConsensusMap[T any](
+func GetConsensusMap[K comparable, T any](
 	lggr logger.Logger,
 	objectName string,
-	itemsByChain map[cciptypes.ChainSelector][]T,
-	minObs map[cciptypes.ChainSelector]int,
-) map[cciptypes.ChainSelector]T {
-	consensus := make(map[cciptypes.ChainSelector]T)
+	itemsByChain map[K][]T,
+	minObs MultiThreshold[K],
+) map[K]T {
+	consensus := make(map[K]T)
 
 	for chain, items := range itemsByChain {
-		if min, exists := minObs[chain]; exists {
-			minObservations := NewMinObservation[T](min, nil)
+		if minThresh, exists := minObs.Get(chain); exists {
+			minObservations := NewMinObservation[T](minThresh, nil)
 			for _, item := range items {
 				minObservations.Add(item)
 			}
@@ -32,7 +32,7 @@ func GetConsensusMap[T any](
 				lggr.Warnf("failed to reach consensus on a %s's for chain %d "+
 					"because no single item was observed more than the expected min (%d) times, "+
 					"all observed items: %v",
-					objectName, chain, min, items)
+					objectName, chain, minThresh, items)
 			} else {
 				consensus[chain] = items[0]
 			}
@@ -51,13 +51,13 @@ func GetConsensusMapAggregator[K comparable, T any](
 	lggr logger.Logger,
 	objectName string,
 	items map[K][]T,
-	f int,
+	f MultiThreshold[K],
 	agg Aggregator[T],
 ) map[K]T {
 	consensus := make(map[K]T)
 
 	for key, values := range items {
-		if len(values) < f {
+		if thresh, ok := f.Get(key); ok && len(values) < int(thresh) {
 			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
 			continue
 		}
@@ -81,14 +81,14 @@ func Median[T any](vals []T, less func(T, T) bool) T {
 	return valsCopy[len(valsCopy)/2]
 }
 
-var TimestampComparator = func(a, b time.Time) bool {
+func TimestampComparator(a, b time.Time) bool {
 	return a.Before(b)
 }
 
-var BigIntComparator = func(a, b cciptypes.BigInt) bool {
+func BigIntComparator(a, b cciptypes.BigInt) bool {
 	return a.Cmp(b.Int) == -1
 }
 
-var TokenPriceComparator = func(a, b cciptypes.TokenPrice) bool {
+func TokenPriceComparator(a, b cciptypes.TokenPrice) bool {
 	return a.Price.Int.Cmp(b.Price.Int) == -1
 }

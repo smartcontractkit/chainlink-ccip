@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 )
 
 type Query struct {
@@ -31,6 +32,7 @@ type Observation struct {
 	MerkleRootObs merkleroot.Observation          `json:"merkleObs"`
 	TokenPriceObs tokenprice.Observation          `json:"tokenObs"`
 	ChainFeeObs   chainfee.Observation            `json:"chainFeeObs"`
+	DiscoveryObs  dt.Observation                  `json:"discoveryObs"`
 	FChain        map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 

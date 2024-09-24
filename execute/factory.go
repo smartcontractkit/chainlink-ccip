@@ -17,8 +17,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -51,6 +52,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr              logger.Logger
+	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
 	execCodec         cciptypes.ExecutePluginCodec
 	msgHasher         cciptypes.MessageHasher
@@ -63,6 +65,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
@@ -74,6 +77,7 @@ func NewPluginFactory(
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:              lggr,
+		donID:             donID,
 		ocrConfig:         ocrConfig,
 		execCodec:         execCodec,
 		msgHasher:         msgHasher,
@@ -97,11 +101,6 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 
-	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(p.lggr, offchainConfig.TokenDataObservers)
-	if err != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
-	}
-
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
@@ -121,7 +120,18 @@ func (p PluginFactory) NewReportingPlugin(
 		p.ocrConfig.Config.OfframpAddress,
 	)
 
+	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+		p.lggr,
+		p.ocrConfig.Config.ChainSelector,
+		offchainConfig.TokenDataObservers,
+		readers,
+	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
+	}
+
 	return NewPlugin(
+			p.donID,
 			config,
 			pluginconfig.ExecutePluginConfig{
 				DestChain:      p.ocrConfig.Config.ChainSelector,
