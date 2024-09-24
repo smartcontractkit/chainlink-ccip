@@ -1,7 +1,6 @@
 package reader
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
@@ -33,13 +32,18 @@ const (
 
 // TODO, this should be fetched from USDC Token Pool and cached
 var CCTPDestDomains = map[uint64]uint32{
-	sel.ETHEREUM_MAINNET.Selector:            0,
-	sel.AVALANCHE_MAINNET.Selector:           1,
-	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector: 2,
-	sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector: 3,
-	sel.ETHEREUM_MAINNET_BASE_1.Selector:     6,
-	sel.POLYGON_MAINNET.Selector:             7,
-	sel.AVALANCHE_TESTNET_FUJI.Selector:      1,
+	sel.ETHEREUM_MAINNET.Selector:                    0,
+	sel.AVALANCHE_MAINNET.Selector:                   1,
+	sel.ETHEREUM_MAINNET_OPTIMISM_1.Selector:         2,
+	sel.ETHEREUM_MAINNET_ARBITRUM_1.Selector:         3,
+	sel.ETHEREUM_MAINNET_BASE_1.Selector:             6,
+	sel.POLYGON_MAINNET.Selector:                     7,
+	sel.ETHEREUM_TESTNET_SEPOLIA.Selector:            0,
+	sel.AVALANCHE_TESTNET_FUJI.Selector:              1,
+	sel.ETHEREUM_TESTNET_SEPOLIA_OPTIMISM_1.Selector: 2,
+	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
+	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
+	sel.POLYGON_TESTNET_AMOY.Selector:                7,
 }
 
 type usdcMessageReader struct {
@@ -166,6 +170,12 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 			return nil, err
 		}
 
+		destDomain, ok := u.cctpDestDomain[uint64(destChainSelector)]
+		if !ok {
+			return nil, fmt.Errorf("destination domain not found for chain %s", destChainSelector)
+		}
+
+		// nolint:lll
 		// USDC message payload:
 		// uint32 _msgVersion,
 		// uint32 _msgSourceDomain,
@@ -173,33 +183,18 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 		// uint64 _msgNonce,
 		// bytes32 _msgSender,
 		// Since it's packed, all of these values contribute to the first slot
-
-		msgVersionBytes := [4]byte{}
-		binary.BigEndian.PutUint32(msgVersionBytes[:], CCTPMessageVersion)
-
-		sourceDomainBytes := [4]byte{}
-		binary.BigEndian.PutUint32(sourceDomainBytes[:], sourceTokenPayload.SourceDomain)
-
-		destDomain, ok := u.cctpDestDomain[uint64(destChainSelector)]
-		if !ok {
-			return nil, fmt.Errorf("destination domain not found for chain %s", destChainSelector)
-		}
-
-		destDomainBytes := [4]byte{}
-		binary.BigEndian.PutUint32(destDomainBytes[:], destDomain)
-
-		nonceBytes := [8]byte{}
-		binary.BigEndian.PutUint64(nonceBytes[:], sourceTokenPayload.Nonce)
-
+		// https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/MessageTransmitter.sol#L41
+		// https://github.com/circlefin/evm-cctp-contracts/blob/377c9bd813fb86a42d900ae4003599d82aef635a/src/MessageTransmitter.sol#L365
+		var buf []byte
+		buf = binary.BigEndian.AppendUint32(buf, CCTPMessageVersion)
+		buf = binary.BigEndian.AppendUint32(buf, sourceTokenPayload.SourceDomain)
+		buf = binary.BigEndian.AppendUint32(buf, destDomain)
+		buf = binary.BigEndian.AppendUint64(buf, sourceTokenPayload.Nonce)
+		// First 12 bytes of the sender address are always empty for EVM
 		senderBytes := [12]byte{}
+		buf = append(buf, senderBytes[:]...)
 
-		var buf bytes.Buffer
-		buf.Write(msgVersionBytes[:])
-		buf.Write(sourceDomainBytes[:])
-		buf.Write(destDomainBytes[:])
-		buf.Write(nonceBytes[:])
-		buf.Write(senderBytes[:])
-		messageTransmitterEvents[id] = [32]byte(buf.Bytes()[:32])
+		messageTransmitterEvents[id] = [32]byte(buf[:32])
 	}
 	return messageTransmitterEvents, nil
 }
