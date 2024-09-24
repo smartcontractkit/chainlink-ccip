@@ -499,6 +499,7 @@ func (r *ccipChainReader) DiscoverContracts(
 			destChain: staticConfig.NonceManager,
 		},
 	}
+	r.lggr.Infow("DiscoverContracts", "resp", resp, "OnRamps", onramps)
 	return resp, nil
 }
 

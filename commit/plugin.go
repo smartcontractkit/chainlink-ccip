@@ -180,7 +180,7 @@ func (p *Plugin) Observation(
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
 		if !p.contractsInitialized {
-			p.lggr.Infow("contracts not initialized, only making discovery observations")
+			p.lggr.Infow("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
 			return Observation{DiscoveryObs: discoveryObs}.Encode()
 		}
 	}
