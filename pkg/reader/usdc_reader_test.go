@@ -21,34 +21,41 @@ import (
 )
 
 func Test_USDCMessageReader_New(t *testing.T) {
-	tests := []struct {
+	address1 := "0x0000000000000000000000000000000000000001"
+	address2 := "0x0000000000000000000000000000000000000002"
+
+	emptyReaders := func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
+		return map[cciptypes.ChainSelector]*reader.MockContractReaderFacade{}
+	}
+
+	tt := []struct {
 		name         string
 		tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig
-		readers      map[cciptypes.ChainSelector]*reader.MockContractReaderFacade
+		readers      func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade
 		errorMessage string
 	}{
 		{
 			name:         "empty tokens and readers works",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{},
-			readers:      map[cciptypes.ChainSelector]*reader.MockContractReaderFacade{},
+			readers:      emptyReaders,
 		},
 		{
 			name: "missing readers",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				cciptypes.ChainSelector(1): {
-					SourcePoolAddress:            "0xA",
-					SourceMessageTransmitterAddr: "0xB",
+					SourcePoolAddress:            address1,
+					SourceMessageTransmitterAddr: address2,
 				},
 			},
-			readers:      map[cciptypes.ChainSelector]*reader.MockContractReaderFacade{},
-			errorMessage: "no contract reader found for chain 1",
+			readers:      emptyReaders,
+			errorMessage: "unable to bind message transmitter for chain 1",
 		},
 		{
 			name: "binding errors",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 				cciptypes.ChainSelector(1): {
-					SourcePoolAddress:            "0xA",
-					SourceMessageTransmitterAddr: "0xB",
+					SourcePoolAddress:            address1,
+					SourceMessageTransmitterAddr: address2,
 				},
 			},
 			readers: func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
@@ -57,15 +64,15 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				m.EXPECT().Bind(mock.Anything, mock.Anything).Return(errors.New("error"))
 				readers[cciptypes.ChainSelector(1)] = m
 				return readers
-			}(),
+			},
 			errorMessage: "unable to bind MessageTransmitter for chain 1",
 		},
 		{
 			name: "happy path",
 			tokensConfig: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-				cciptypes.ChainSelector(1): {
-					SourcePoolAddress:            "0xA",
-					SourceMessageTransmitterAddr: "0xB",
+				cciptypes.ChainSelector(2): {
+					SourcePoolAddress:            address1,
+					SourceMessageTransmitterAddr: address2,
 				},
 			},
 			readers: func() map[cciptypes.ChainSelector]*reader.MockContractReaderFacade {
@@ -73,28 +80,28 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				m := reader.NewMockContractReaderFacade(t)
 				m.EXPECT().Bind(mock.Anything, []types.BoundContract{
 					{
-						Address: "0xB",
+						Address: address2,
 						Name:    consts.ContractNameCCTPMessageTransmitter,
 					},
 				}).Return(nil)
 
-				readers[cciptypes.ChainSelector(1)] = m
+				readers[cciptypes.ChainSelector(2)] = m
 				return readers
-			}(),
+			},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
 			readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
-			for k, v := range tt.readers {
+			for k, v := range tc.readers() {
 				readers[k] = v
 			}
 
-			r, err := NewUSDCMessageReader(tt.tokensConfig, readers)
-			if tt.errorMessage != "" {
+			r, err := NewUSDCMessageReader(tc.tokensConfig, readers)
+			if tc.errorMessage != "" {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errorMessage)
+				require.Contains(t, err.Error(), tc.errorMessage)
 			} else {
 				require.NoError(t, err)
 				require.NotNil(t, r)
@@ -146,16 +153,16 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 
 	tokensConfigs := map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 		faultyChain: {
-			SourcePoolAddress:            "0xA",
-			SourceMessageTransmitterAddr: "0xB",
+			SourcePoolAddress:            "0x000000000000000000000000000000000000000A",
+			SourceMessageTransmitterAddr: "0x000000000000000000000000000000000000000B",
 		},
 		emptyChain: {
-			SourcePoolAddress:            "0xC",
-			SourceMessageTransmitterAddr: "0xD",
+			SourcePoolAddress:            "0x000000000000000000000000000000000000000C",
+			SourceMessageTransmitterAddr: "0x000000000000000000000000000000000000000D",
 		},
 		validChain: {
-			SourcePoolAddress:            "0xE",
-			SourceMessageTransmitterAddr: "0xF",
+			SourcePoolAddress:            "0x000000000000000000000000000000000000000E",
+			SourceMessageTransmitterAddr: "0x000000000000000000000000000000000000000F",
 		},
 	}
 

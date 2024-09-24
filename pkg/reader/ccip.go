@@ -78,7 +78,7 @@ func (r *ccipChainReader) WithExtendedContractReader(
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
 ) ([]plugintypes2.CommitPluginReportWithMeta, error) {
-	if err := r.validateReaderExistence(dest); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
 		return nil, err
 	}
 
@@ -214,7 +214,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 func (r *ccipChainReader) ExecutedMessageRanges(
 	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNumRange, error) {
-	if err := r.validateReaderExistence(dest); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
 		return nil, err
 	}
 
@@ -270,7 +270,7 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return nil, err
 	}
 
@@ -345,7 +345,7 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
 	}
 
-	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return 0, err
 	}
 
@@ -395,7 +395,7 @@ func (r *ccipChainReader) Nonces(
 	sourceChainSelector, destChainSelector cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
-	if err := r.validateReaderExistence(destChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
 		return nil, err
 	}
 
@@ -440,7 +440,7 @@ func (r *ccipChainReader) Nonces(
 }
 
 func (r *ccipChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
-	if err := r.validateWriterExistence(chains...); err != nil {
+	if err := validateWriterExistence(r.contractWriters, chains...); err != nil {
 		return nil, err
 	}
 
@@ -468,7 +468,7 @@ func (r *ccipChainReader) DiscoverContracts(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
-	if err := r.validateReaderExistence(destChain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, destChain); err != nil {
 		return nil, err
 	}
 
@@ -502,39 +502,6 @@ func (r *ccipChainReader) DiscoverContracts(
 	return resp, nil
 }
 
-// bindReaderContract is a generic helper for binding contracts to readers, the addresses input is the same object
-// returned by DiscoverContracts.
-//
-// No error is returned if contractName is not found in the contracts. This allows calling the function before all
-// contracts are discovered.
-func (r *ccipChainReader) bindReaderContract(
-	ctx context.Context,
-	chainSel cciptypes.ChainSelector,
-	contractName string,
-	address []byte,
-) error {
-	if err := r.validateReaderExistence(chainSel); err != nil {
-		return fmt.Errorf("validate reader existence: %w", err)
-	}
-
-	encAddress := typeconv.AddressBytesToString(address, uint64(chainSel))
-
-	// Bind the contract address to the reader.
-	// If the same address exists -> no-op
-	// If the address is changed -> updates the address, overwrites the existing one
-	// If the contract not bound -> binds to the new address
-	if err := r.contractReaders[chainSel].Bind(ctx, []types.BoundContract{
-		{
-			Address: encAddress,
-			Name:    contractName,
-		},
-	}); err != nil {
-		return fmt.Errorf("unable to bind %s for chain %d: %w", contractName, chainSel, err)
-	}
-
-	return nil
-}
-
 // Sync goes through the input contracts and binds them to the contract reader.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
 	if len(contracts) == 0 {
@@ -550,7 +517,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
 			// try to bind
-			err := r.bindReaderContract(ctx, chainSel, contractName, address)
+			_, err := bindExtendedReaderContract(ctx, r.contractReaders, chainSel, contractName, address)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {
 					// don't support this chain
@@ -586,7 +553,7 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
 func (r *ccipChainReader) getSourceChainsConfig(
 	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
-	if err := r.validateReaderExistence(r.destChain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -638,32 +605,12 @@ type sourceChainConfig struct {
 	MinSeqNr  uint64
 }
 
-func (r *ccipChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
-	for _, ch := range chains {
-		_, exists := r.contractReaders[ch]
-		if !exists {
-			return fmt.Errorf("chain %d: %w", ch, ErrContractReaderNotFound)
-		}
-	}
-	return nil
-}
-
-func (r *ccipChainReader) validateWriterExistence(chains ...cciptypes.ChainSelector) error {
-	for _, ch := range chains {
-		_, exists := r.contractWriters[ch]
-		if !exists {
-			return fmt.Errorf("chain %d: %w", ch, ErrContractWriterNotFound)
-		}
-	}
-	return nil
-}
-
 // getSourceChainsConfig returns the destination offRamp contract's static chain configuration.
 func (r *ccipChainReader) getOfframpStaticConfig(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 ) (offrampStaticChainConfig, error) {
-	if err := r.validateReaderExistence(chain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
 		return offrampStaticChainConfig{}, err
 	}
 

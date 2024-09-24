@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -79,11 +80,17 @@ func NewUSDCMessageReader(
 ) (USDCMessageReader, error) {
 	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
 	for chainSelector, token := range tokensConfig {
-		contract, err := bindMessageTransmitters(
+		bytesAddress, err := typconv.AddressStringToBytes(token.SourceMessageTransmitterAddr, uint64(chainSelector))
+		if err != nil {
+			return nil, err
+		}
+
+		contract, err := bindFacadeReaderContract(
 			context.Background(),
 			contractReaders,
 			chainSelector,
-			token.SourceMessageTransmitterAddr,
+			consts.ContractNameCCTPMessageTransmitter,
+			bytesAddress,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to bind message transmitter for chain %d: %w", chainSelector, err)
@@ -197,33 +204,6 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 		messageTransmitterEvents[id] = [32]byte(buf[:32])
 	}
 	return messageTransmitterEvents, nil
-}
-
-func bindMessageTransmitters(
-	ctx context.Context,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	chainSel cciptypes.ChainSelector,
-	address string,
-) (types.BoundContract, error) {
-	var empty types.BoundContract
-	r, ok := readers[chainSel]
-	if !ok {
-		return empty, fmt.Errorf("no contract reader found for chain %d", chainSel)
-	}
-
-	contract := types.BoundContract{
-		Address: address,
-		Name:    consts.ContractNameCCTPMessageTransmitter,
-	}
-	if err := r.Bind(ctx, []types.BoundContract{contract}); err != nil {
-		return empty,
-			fmt.Errorf(
-				"unable to bind %s for chain %d: %w",
-				consts.ContractNameCCTPMessageTransmitter, chainSel, err,
-			)
-	}
-
-	return contract, nil
 }
 
 // SourceTokenDataPayload extracts the nonce and source domain from the USDC message.
