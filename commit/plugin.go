@@ -36,7 +36,6 @@ type Plugin struct {
 	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
 	ccipReader          readerpkg.CCIPReader
-	readerSyncer        *plugincommon.BackgroundReaderSyncer
 	tokenPricesReader   reader.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
@@ -72,16 +71,6 @@ func NewPlugin(
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
 			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
 		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
-	}
-
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		syncFrequency(cfg.SyncFrequency),
-	)
-	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Errorw("error starting background reader syncer", "err", err)
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
@@ -133,7 +122,6 @@ func NewPlugin(
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,
-		readerSyncer:        readerSyncer,
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
 		chainSupport:        chainSupport,
@@ -330,10 +318,6 @@ func (p *Plugin) Close() error {
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
 
-	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Errorw("error closing reader syncer", "err", err)
-	}
-
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
 	}
@@ -353,20 +337,6 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
 	}
 
 	return decodedOutcome
-}
-
-func syncFrequency(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 10 * time.Second
-	}
-	return configuredValue
-}
-
-func syncTimeout(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 3 * time.Second
-	}
-	return configuredValue
 }
 
 // Interface compatibility checks.
