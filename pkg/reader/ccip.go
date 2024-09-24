@@ -518,6 +518,13 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
 			contractName, chainSel, address := contractName, chainSel, address
+			// if the address is empty, skip
+			if len(address) == 0 {
+				r.lggr.Infow("skipping empty address",
+					"contractName", contractName,
+					"chainSel", chainSel)
+				continue
+			}
 			// try to bind
 			r.lggr.Infow("trying to bind contract",
 				"contractName", contractName,
