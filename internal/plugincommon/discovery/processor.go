@@ -88,6 +88,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	_ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	// come to consensus on the onramp addresses and update the chainreader.
+	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
 
 	// fChain consensus - uses the role DON F value because all nodes can observe the home chain.
 	fChainObs := make(map[cciptypes.ChainSelector][]int)
