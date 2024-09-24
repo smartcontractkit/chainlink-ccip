@@ -377,12 +377,17 @@ func selectReport(
 	return execReports, stillPendingReports, err
 }
 
+func logOutcome(lggr logger.Logger, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation) {
+	lggr.Infow("Raw outcome", "outcome", map[string]any{"outCtx": outCtx, "q": q, "aos": aos})
+}
+
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
 // nolint:gocyclo // todo
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	logOutcome(p.lggr, outctx, query, aos)
 	var previousOutcome exectypes.Outcome
 	if outctx.PreviousOutcome != nil {
 		var err error
