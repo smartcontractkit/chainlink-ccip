@@ -1,0 +1,37 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      now="$(date +%s)"
+      create_deployments besu-prysm \
+        --set helm.values.genesis.values.currentUnixTimestamp="$now" \
+        --set helm.values.eth2-common.genesis.values.currentUnixTimestamp="$now"
+vars:
+  DEVSPACE_ENV_FILE: .env
+  CHAINLINK_CODE_DIR:
+    source: env
+deployments:
+  besu-prysm:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        repo: https://raw.githubusercontent.com/smartcontractkit/qa-charts/gh-pages/
+        name: besu-prysm
+        version: 0.3.2
+      values:
+        eth2-common:
+          general:
+            networkId: 2337
+        general:
+          networkId: 2337
+profiles:
+  - name: local-charts
+    merge:
+      deployments:
+        geth:
+          helm:
+            chart:
+              name: besu-prysm
+              path: ${CHAINLINK_CODE_DIR}/chainlink-testing-framework/lib/charts/besu-prysm
+              version: null

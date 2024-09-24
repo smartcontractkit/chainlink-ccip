@@ -1,7 +1,13 @@
 # Make sure to check the documentation at https://goreleaser.com
 version: 2
 
-project_name: crib
+project_name: cli
+
+monorepo:
+  # tag format imposed by changesets on monorepos.
+  # see: https://github.com/changesets/changesets/blob/main/docs/command-line-options.md#tag
+  tag_prefix: cli@
+  dir: cli
 
 before:
   hooks:
@@ -10,28 +16,27 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
 
+# See https://goreleaser.com/customization/build/
 builds:
-  - env:
+  - binary: crib-cli
+    env:
       - CGO_ENABLED=0
+    main: ./cmd
+    goarch:
+      - arm64
+      - amd64
     goos:
       - linux
-      - windows
       - darwin
 
-archives:
-  - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of `uname`.
-    name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
-    format_overrides:
-      - goos: windows
-        format: zip
+checksum:
+  name_template: checksums.txt
+
+release:
+  github:
+    owner: smartcontractkit
+    name: crib
+  prerelease: auto
 
 changelog:
   sort: asc

@@ -1,0 +1,97 @@
+name: push-main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.filter.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # TODO: populate filters values from pnpm-workspace.yaml
+          filters: |
+            ./cli: './cli/**'
+
+  ci-lint:
+    needs: changes
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: ci-lint
+        uses: smartcontractkit/.github/actions/ci-lint-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # ci-lint-go@0.2.4
+        with:
+          # grafana inputs
+          metrics-job-name: ci-lint (${{ matrix.package }})
+          gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          go-directory: ${{ matrix.package }}
+          go-version-file: ${{ matrix.package }}/go.mod
+
+  ci-test:
+    needs: changes
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: ci-test
+        uses: smartcontractkit/.github/actions/ci-test-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # ci-test-go@0.1.5
+        with:
+          # grafana inputs
+          metrics-job-name: ci-test (${{ matrix.package }})
+          gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          go-version-file: ${{ matrix.package }}/go.mod
+          go-cache-dep-path: ${{ matrix.package }}/go.sum
+          go-test-cmd: "go test ${{ matrix.package }}/..."
+
+  cd-release:
+    needs: [changes, ci-lint, ci-test]
+    if: ${{ success() && needs.changes.outputs.packages }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+    steps:
+      - name: cd-release
+        uses: smartcontractkit/.github/actions/cicd-changesets@7a4d99cb349ea8f25195d2390d157942031f8a57 # cicd-changesets@0.3.4
+        with:
+          # general inputs
+          git-user: app-token-issuer-infra-releng[bot]
+          git-email: app-token-issuer-infra-releng[bot]@users.noreply.github.com
+          node-version-file: package.json
+          # aws inputs
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-role-arn: ${{ secrets.AWS_OIDC_IAM_ROLE_ARN_GATI }}
+          aws-lambda-url: ${{ secrets.AWS_LAMBDA_URL_GATI }}
+          # grafana inputs
+          metrics-job-name: cd-release
+          gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
