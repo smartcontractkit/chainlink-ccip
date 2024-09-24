@@ -70,27 +70,27 @@ pipelines:
 profiles:
   - name: core
     patches:
-    - op: add
-      path: vars
-      value:
-        DEVSPACE_IMAGE:
-          source: env
-          default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
-        DEVSPACE_IMAGE_TAG:
-          source: env
-          default: ""
-        CHAINLINK_REPO_DIR:
-          source: env
-          default: "${CHAINLINK_CODE_DIR}/chainlink"
-    - op: add
-      path: dependencies
-      value:
-        crib-chainlink-cluster:
-          path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
-          overwriteVars: true
-          namespace: ${DEVSPACE_NAMESPACE}
-          profiles:
-            - core
+      - op: add
+        path: vars
+        value:
+          DEVSPACE_IMAGE:
+            source: env
+            default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
+          DEVSPACE_IMAGE_TAG:
+            source: env
+            default: ""
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/chainlink"
+      - op: add
+        path: dependencies
+        value:
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - core
   - name: core-dev-ocr2-external-network
     parents:
       - profile: core
@@ -141,44 +141,44 @@ profiles:
         value: keystone
   - name: ccip
     patches:
-    - op: add
-      path: vars
-      value:
-        DEVSPACE_IMAGE:
-          source: env
-          default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip-devspace"
-        DEVSPACE_IMAGE_TAG:
-          source: env
-          default: ""
-        CHAINLINK_REPO_DIR:
-          source: env
-          default: "${CHAINLINK_CODE_DIR}/ccip"
-        # Env Vars Required for ccip-scripts based contracts and jobs deployment
-        # Image URI required for deploying CCIP Contracts and Jobs
-        DEVSPACE_CCIP_SCRIPTS_IMAGE:
-          source: env
-          default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
-        # AWS Role ARN required for uploading deploy job output to s3
-        DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
-          source: env
-          default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
-        # AWS S3 bucket name required for uploading deploy job output to s3
-        DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
-          source: env
-          default: "cl-stage-ccip-scripts-deploy-output"
-    - op: add
-      path: dependencies
-      value:
-        crib-chainlink-cluster:
-          path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
-          overwriteVars: true
-          namespace: ${DEVSPACE_NAMESPACE}
-          profiles:
-            - ccip
-        crib-ccip-scripts:
-          path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
-          overwriteVars: true
-          namespace: ${DEVSPACE_NAMESPACE}
+      - op: add
+        path: vars
+        value:
+          DEVSPACE_IMAGE:
+            source: env
+            default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip-devspace"
+          DEVSPACE_IMAGE_TAG:
+            source: env
+            default: ""
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/ccip"
+          # Env Vars Required for ccip-scripts based contracts and jobs deployment
+          # Image URI required for deploying CCIP Contracts and Jobs
+          DEVSPACE_CCIP_SCRIPTS_IMAGE:
+            source: env
+            default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
+          # AWS Role ARN required for uploading deploy job output to s3
+          DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
+            source: env
+            default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
+          # AWS S3 bucket name required for uploading deploy job output to s3
+          DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
+            source: env
+            default: "cl-stage-ccip-scripts-deploy-output"
+      - op: add
+        path: dependencies
+        value:
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
+          crib-ccip-scripts:
+            path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
   - name: ccip-local
     parents:
       - profile: ccip
@@ -211,27 +211,27 @@ profiles:
           - kind
   - name: kind-dependencies
     patches:
-    - op: add
-      path: dependencies
-      value:
-        grafana:
-          path: ${DEPENDENCIES_DIR}/grafana
-          namespace: ${DEVSPACE_NAMESPACE}
-          overwriteVars: true
-          profiles:
-            - kind
-        loki:
-          path: ${DEPENDENCIES_DIR}/loki
-          namespace: ${DEVSPACE_NAMESPACE}
-          overwriteVars: true
-          profiles:
-            - kind
-        promtail:
-          path: ${DEPENDENCIES_DIR}/promtail
-          namespace: ${DEVSPACE_NAMESPACE}
-          overwriteVars: true
-          profiles:
-            - default
+      - op: add
+        path: dependencies
+        value:
+          grafana:
+            path: ${DEPENDENCIES_DIR}/grafana
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - kind
+          loki:
+            path: ${DEPENDENCIES_DIR}/loki
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - kind
+          promtail:
+            path: ${DEPENDENCIES_DIR}/promtail
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - default
   - name: core-kind
     parents:
       - profile: core

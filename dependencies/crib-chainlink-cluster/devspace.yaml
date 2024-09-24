@@ -60,19 +60,19 @@ pipelines:
       # Source the shared functions file.
       # shellcheck disable=SC1091
       source "../../scripts/lib/shared_functions.sh"
-      
+
       tagOverride=${DEVSPACE_IMAGE_TAG}
 
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image"
-      
+
         args=""
         for i in {1..5}; do
           args+="--set=helm.values.chainlink.nodes.node$i.image=$image "
         done
         echo $args
-      
+
         create_deployments app $args
       elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
@@ -82,7 +82,7 @@ pipelines:
         build_images --all
         create_deployments app
       fi
-      
+
       kubectl label namespace/${DEVSPACE_NAMESPACE} network=crib > /dev/null 2>&1 || true
 
   keystone:
@@ -445,7 +445,7 @@ profiles:
         path: hooks
         value:
           command: ${SCRIPTS_DIR}/check_env_vars.sh
-          events: [ "before:deploy:app" ]
+          events: ["before:deploy:app"]
     merge:
       images:
         app:
@@ -510,8 +510,8 @@ profiles:
         path: hooks
         value:
           command: ${SCRIPTS_DIR}/check_env_vars.sh
-          args: [ "ccip" ]
-          events: [ "before:deploy:app" ]
+          args: ["ccip"]
+          events: ["before:deploy:app"]
     merge:
       images:
         app:
@@ -774,7 +774,7 @@ profiles:
         value: false
       - op: replace
         path: deployments.app.helm.upgradeArgs
-        value: [ "--timeout", "20m" ]
+        value: ["--timeout", "20m"]
   - name: ccip-kind-bix-ship
     description: The profile is supposed to be used with local deployment on a Kind cluster for bix-ship
     # This profile will be automatically activated

@@ -200,8 +200,8 @@ profiles:
           helm:
             values:
               beholder-test-client:
-                affinity: [ ]
-                topologySpreadConstraints: [ ]
+                affinity: []
+                topologySpreadConstraints: []
                 imagePullSecrets:
                   - name: regcred-beholder
 #  - name: kind
