@@ -8,10 +8,10 @@ on:
     paths:
       # Include common changes
       - "*"
-      - "components/**"
+      - "dependencies/**"
       - "scripts/**"
       # Include crib ccip changes
-      - "deployments/ccip/**"
+      - "deployments/chainlink/**"
       - ".github/workflows/crib-ccip-atlas-smoke-test.yml"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
@@ -23,10 +23,10 @@ on:
     paths:
       # Include common changes
       - "*"
-      - "components/**"
+      - "dependencies/**"
       - "scripts/**"
       # Include crib ccip changes
-      - "deployments/ccip/**"
+      - "deployments/chainlink/**"
       - ".github/workflows/crib-ccip-atlas-smoke-test.yml"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
@@ -51,7 +51,7 @@ jobs:
     steps:
       - name: Deploy and validate CRIB Environment for CCIP
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@1fbf0b36c26d2159c513e28194d81e6fb54a4ab7 # crib-deploy-environment@1.3.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@c6070403bb88c9d62c9cbdb8038c445663b4e46a # crib-deploy-environment@1.3.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -59,7 +59,7 @@ jobs:
           ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
-          product: "ccip"
+          command: "ccip-atlas"
           product-image: "${{ secrets.AWS_ACCOUNT_ID_PROD }}.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip"
           product-image-tag: "ccip-develop"
           # Send alerts only for push to main
