@@ -8,10 +8,10 @@ on:
     paths:
       # Include common changes
       - "*"
-      - "components/**"
+      - "dependencies/**"
       - "scripts/**"
       # Include crib core changes
-      - "deployments/core/**"
+      - "deployments/chainlink/**"
       - ".github/workflows/crib-core-smoke-test.yml"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
@@ -27,10 +27,10 @@ on:
     paths:
       # Include common changes
       - "*"
-      - "components/**"
+      - "dependencies/**"
       - "scripts/**"
       # Include crib core changes
-      - "deployments/core/**"
+      - "deployments/chainlink/**"
       - ".github/workflows/crib-core-smoke-test.yml"
       # Exclude doc updates
       - "!**/*.md" # Exclude doc updates
@@ -63,7 +63,7 @@ jobs:
       - name: Deploy and validate CRIB Environment for Core
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@1fbf0b36c26d2159c513e28194d81e6fb54a4ab7 # crib-deploy-environment@1.3.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@fa63a0fb95039c4d89fec6a9a78b53c0cacf5457 # crib-deploy-environment@2.0.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -71,7 +71,7 @@ jobs:
           ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
-          product: "core"
+          command: "core"
           # Send alerts only for push to main
           send-alerts: ${{ github.event_name == 'push' && 'true' || 'false'}}
           crib-alert-slack-webhook: ${{ secrets.CRIB_ALERT_SLACK_WEBHOOK }}

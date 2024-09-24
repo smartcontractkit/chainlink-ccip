@@ -10,12 +10,6 @@ vars:
     source: env
     default: crib
 
-dependencies:
-  atlas:
-    path: ${IMPORTS_DIR}/atlas/atlas.yaml
-    pipeline: atlas
-    namespace: ${DEVSPACE_NAMESPACE}
-
 pipelines:
   ccip-ui:
     run: |-
@@ -90,22 +84,3 @@ deployments:
           requests:
             cpu: 100m
             memory: 128Mi
-
-profiles:
-  - name: ccip-ui-ingress
-    activation:
-      - vars:
-          CCIP_UI_ENABLED: true
-    patches:
-      - op: add
-        path: deployments.app.helm.values.crib-chainlink-cluster.ingress.hosts
-        value:
-          host: ${DEVSPACE_NAMESPACE}-ccip-ui.${DEVSPACE_INGRESS_BASE_DOMAIN}
-          http:
-            paths:
-              - path: /
-                backend:
-                  service:
-                    name: ccip-ui
-                    port:
-                      number: 3000

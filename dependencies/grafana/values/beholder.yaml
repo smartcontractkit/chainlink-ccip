@@ -4,6 +4,9 @@ env:
   GF_AUTH_DISABLE_LOGIN_FORM: "true"
   GF_FEATURE_TOGGLES_ENABLE: "traceqlEditor tempoSearch tempoServiceGraph"
 
+rbac:
+  create: false
+
 datasources:
   datasources.yml:
     apiVersion: 1

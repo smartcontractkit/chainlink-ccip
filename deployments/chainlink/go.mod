@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/crib/deployments/core
+module github.com/smartcontractkit/crib/deployments/chainlink
 
 go 1.22.5
 
@@ -12,6 +12,7 @@ require (
 	github.com/K-Phoen/sdk v0.12.4 // indirect
 	github.com/gosimple/slug v1.13.1 // indirect
 	github.com/gosimple/unidecode v1.0.1 // indirect
+	github.com/grafana/grafana-foundation-sdk/go v0.0.0-20240326122733-6f96a993222b // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

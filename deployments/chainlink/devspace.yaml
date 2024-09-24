@@ -1,0 +1,389 @@
+version: v2beta1
+name: chainlink
+
+vars:
+  SCRIPTS_DIR:
+    source: env
+    default: "../../scripts"
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "../../imports"
+  # "The provider being used to deploy CRIB"
+  PROVIDER:
+    source: all
+    default: "aws"
+  CHAINLINK_CODE_DIR:
+    source: env
+    default: "../../.."
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+
+
+pipelines:
+  core:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster
+
+  ccip:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster
+      run_dependency_pipelines crib-ccip-scripts
+
+  kind-dependencies:
+    run: |-
+      run_dependency_pipelines loki
+      run_dependency_pipelines promtail
+      run_dependency_pipelines grafana
+
+  core-kind:
+    run: |-
+      run_pipelines kind-dependencies
+      run_pipelines core
+
+  ccip-kind:
+    run: |-
+      run_pipelines kind-dependencies
+      run_pipelines ccip
+
+  ccip-atlas:
+    run: |-
+      run_pipelines ccip
+      run_dependency_pipelines atlas
+
+  ccip-atlas-ui:
+    run: |-
+      run_pipelines ccip-atlas
+      run_dependency_pipelines ccip-ui
+
+  beholder:
+    run: |-
+      run_dependency_pipelines beholder
+
+  purge:
+    run: |-
+      kubectl delete ns ${DEVSPACE_NAMESPACE}
+
+profiles:
+  - name: core
+    patches:
+      - op: add
+        path: vars
+        value:
+          DEVSPACE_IMAGE:
+            source: env
+            default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
+          DEVSPACE_IMAGE_TAG:
+            source: env
+            default: ""
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/chainlink"
+      - op: add
+        path: dependencies
+        value:
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - core
+  - name: core-dev-ocr2-external-network
+    parents:
+      - profile: core
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - local-dev
+  - name: core-dev-simulated-core-ocr1-stateless
+    parents:
+      - profile: core
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - local-dev-simulated-core-ocr1-stateless
+  - name: core-dev-simulated-core-ocr1
+    parents:
+      - profile: core
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - local-dev-simulated-core-ocr1
+  - name: keystone
+    parents:
+      - profile: core
+    patches:
+      - op: add
+        path: vars
+        value:
+          # For keystone provisioning
+          # The websocket of the blockchain node to connect each CL node to. Needs to be Sepolia endpoint.
+          KEYSTONE_ETH_WS_URL:
+            source: env
+          # The http endpoint of the blockchain node to connect each CL node to. Needs to be Sepolia endpoint.
+          KEYSTONE_ETH_HTTP_URL:
+            source: env
+          # A private key that contains sepolia ETH to use for contract deployment and funding transmitters.
+          KEYSTONE_ACCOUNT_KEY:
+            source: env
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - keystone
+      - op: add
+        path: dependencies.crib-chainlink-cluster.pipeline
+        value: keystone
+  - name: ccip
+    patches:
+      - op: add
+        path: vars
+        value:
+          DEVSPACE_IMAGE:
+            source: env
+            default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip-devspace"
+          DEVSPACE_IMAGE_TAG:
+            source: env
+            default: ""
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/ccip"
+          # Env Vars Required for ccip-scripts based contracts and jobs deployment
+          # Image URI required for deploying CCIP Contracts and Jobs
+          DEVSPACE_CCIP_SCRIPTS_IMAGE:
+            source: env
+            default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
+          # AWS Role ARN required for uploading deploy job output to s3
+          DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
+            source: env
+            default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
+          # AWS S3 bucket name required for uploading deploy job output to s3
+          DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
+            source: env
+            default: "cl-stage-ccip-scripts-deploy-output"
+      - op: add
+        path: dependencies
+        value:
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
+          crib-ccip-scripts:
+            path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+  - name: ccip-local
+    parents:
+      - profile: ccip
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip
+          - local-charts
+      - op: add
+        path: dependencies.crib-ccip-scripts.profiles
+        value:
+          - local-charts
+  - name: ccip-eks-bix-ship
+    parents:
+      - profile: ccip
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip-eks-bix-ship
+  - name: ccip-kind-bix-ship
+    parents:
+      - profile: ccip
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip-kind-bix-ship
+          - kind
+  - name: kind-dependencies
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          grafana:
+            path: ${DEPENDENCIES_DIR}/grafana
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - kind
+          loki:
+            path: ${DEPENDENCIES_DIR}/loki
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - kind
+          promtail:
+            path: ${DEPENDENCIES_DIR}/promtail
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            profiles:
+              - default
+  - name: core-kind
+    parents:
+      - profile: core
+      - profile: kind-dependencies
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - core
+          - kind
+      - op: add
+        path: dependencies.crib-chainlink-cluster.pipeline
+        value: kind
+  - name: ccip-kind
+    parents:
+      - profile: ccip
+      - profile: kind-dependencies
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip
+          - kind
+      - op: add
+        path: dependencies.crib-chainlink-cluster.pipeline
+        value: kind
+      - op: add
+        path: dependencies.crib-ccip-scripts.profiles
+        value:
+          - kind
+      - op: add
+        path: dependencies.crib-ccip-scripts.pipeline
+        value: kind
+  - name: atlas
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          atlas:
+            path: ${DEPENDENCIES_DIR}/atlas/atlas.yaml
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            pipeline: atlas
+  - name: ccip-atlas
+    parents:
+      - profile: ccip
+      - profile: atlas
+  - name: ccip-atlas-ui
+    parents:
+      - profile: ccip
+      - profile: atlas
+    patches:
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip
+          - ccip-ui-ingress
+      - op: add
+        path: dependencies
+        value:
+          ccip-ui:
+            path: ${DEPENDENCIES_DIR}/ccip-ui
+            namespace: ${DEVSPACE_NAMESPACE}
+            overwriteVars: true
+            pipeline: ccip-ui
+  - name: beholder
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          beholder:
+            path: ${DEPENDENCIES_DIR}/beholder
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+  - name: beholder-kind
+    parents:
+      - profile: beholder
+    patches:
+      - op: replace
+        path: dependencies.beholder.profiles
+        value:
+          - kind
+      - op: add
+        path: dependencies.beholder.pipeline
+        value: kind
+
+commands:
+  core:
+    command: devspace run-pipeline core -p core
+    description: Run the Core pipeline.
+    appendArgs: true
+  core-kind:
+    command: devspace run-pipeline core-kind -p core-kind
+    description: Run the Core pipeline for Kind.
+    appendArgs: true
+  core-dev-ocr2-external-network:
+    command: devspace run-pipeline core -p core-dev-ocr2-external-network
+    description: Run the Core pipeline with external network.
+    appendArgs: true
+  core-dev-simulated-core-ocr1-stateless:
+    command: devspace run-pipeline core -p core-dev-simulated-core-ocr1-stateless
+    description: Run the Core pipeline with external network.
+    appendArgs: true
+  core-dev-simulated-core-ocr1:
+    command: devspace run-pipeline core -p core-dev-simulated-core-ocr1
+    description: Run the Core pipeline with external network.
+    appendArgs: true
+  keystone:
+    command: devspace run-pipeline core -p keystone
+    description: Run the Core pipeline with Keystone.
+    appendArgs: true
+  ccip:
+    command: devspace run-pipeline ccip -p ccip
+    description: Run the CCIP pipeline.
+    appendArgs: true
+  ccip-kind:
+    command: devspace run-pipeline ccip-kind -p ccip-kind
+    description: Run the Core pipeline for Kind.
+    appendArgs: true
+  ccip-local-charts:
+    command: devspace run-pipeline ccip -p ccip-local
+    description: Run the CCIP pipeline with local charts.
+    appendArgs: true
+  ccip-eks-bix-ship:
+    command: devspace run-pipeline ccip -p ccip-eks-bix-ship
+    description: Run the CCIP pipeline with EKS Bix Ship.
+    appendArgs: true
+  ccip-kind-bix-ship:
+    command: devspace run-pipeline ccip -p ccip-kind-bix-ship
+    description: Run the CCIP pipeline with Kind Bix Ship.
+    appendArgs: true
+  ccip-atlas:
+    command: devspace run-pipeline ccip-atlas -p ccip-atlas
+    description: Run the CCIP pipeline with Atlas.
+    appendArgs: true
+  ccip-atlas-ui:
+    command: devspace run-pipeline ccip-atlas-ui -p ccip-atlas-ui
+    description: Run the CCIP pipeline with Atlas and UI.
+    appendArgs: true
+  beholder:
+    command: devspace run-pipeline beholder -p beholder
+    description: Run the Beholder pipeline.
+    appendArgs: true
+  beholder-kind:
+    command: devspace run-pipeline beholder -p beholder-kind
+    description: Run the Beholder pipeline for Kind.
+    appendArgs: true
+  purge-kind:
+    command: |-
+      if [[ ${PROVIDER} == "kind" ]]; then
+        ${SCRIPTS_DIR}/manage_kind.sh purge
+      else
+        echo "This command should be executed only when using Kind provider locally"
+      fi
+    description: Purge the local Kind cluster.

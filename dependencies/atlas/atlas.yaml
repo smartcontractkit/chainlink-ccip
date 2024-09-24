@@ -2,14 +2,14 @@
 version: v2beta1
 
 vars:
-  IMPORTS_DIR:
+  DEPENDENCIES_DIR:
     source: env
     default: "../"
   # Env vars required for Atlas Monitoring
   # Enables or disables Atlas components/pipeline
   MONITORING_SCRIPT:
     source: env
-    default: "./${IMPORTS_DIR}/atlas/init"
+    default: "./${DEPENDENCIES_DIR}/atlas/init"
   MONITORING_NETWORK_2_VALUES_PATH:
     source: env
     default: "${MONITORING_SCRIPT}/output/values-network-2.yaml"

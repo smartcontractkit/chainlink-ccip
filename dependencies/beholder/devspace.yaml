@@ -36,12 +36,14 @@ pullSecrets:
     secret: regcred-beholder
 
 pipelines:
-  beholder:
+  kind:
     run: |-
       run_dependency_pipelines prometheus grafana loki tempo redpanda
-      if [[ ${PROVIDER:-} == "kind" ]]; then
-        ensure_pull_secrets regcred-beholder
-      fi
+      ensure_pull_secrets regcred-beholder
+      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
+  deploy:
+    run: |-
+      run_dependency_pipelines prometheus grafana loki tempo redpanda
       create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
 
 deployments:
@@ -191,6 +193,24 @@ deployments:
                 exporters: [debug, kafka]
 
 profiles:
+  - name: kind
+    merge:
+      deployments:
+        beholder-test-client:
+          helm:
+            values:
+              beholder-test-client:
+                affinity: []
+                topologySpreadConstraints: []
+                imagePullSecrets:
+                  - name: regcred-beholder
+#  - name: kind
+#    patches:
+#      - op: replace
+#        path: deployments.beholder-test-client.helm.values.beholder-test-client
+#        value:
+#          imagePullSecrets:
+#            - name: regcred-beholder
   - name: local-charts
     merge:
       deployments:

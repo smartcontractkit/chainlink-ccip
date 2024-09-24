@@ -1,0 +1,76 @@
+version: v2beta1
+name: crib-ccip-scripts
+
+vars:
+  # Env Vars Required for ccip-scripts based contracts and jobs deployment
+  # Image URI required for deploying CCIP Contracts and Jobs
+  DEVSPACE_CCIP_SCRIPTS_IMAGE:
+    source: env
+    default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
+  # AWS Role ARN required for uploading deploy job output to s3
+  DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
+    source: env
+    default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
+  # AWS S3 bucket name required for uploading deploy job output to s3
+  DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
+    source: env
+    default: "cl-stage-ccip-scripts-deploy-output"
+
+commands:
+  get_test_input:
+    command: aws s3 cp s3://${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}/${DEVSPACE_NAMESPACE}-testInput.toml override.toml
+    description: Download the testInput.toml file from the S3 bucket
+
+pullSecrets:
+  regcred-ccip:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-ccip
+
+pipelines:
+  kind:
+    run: |-
+      ensure_pull_secrets --all
+      run_pipelines deploy
+  deploy:
+    run: |-
+      create_deployments ccip-scripts
+
+deployments:
+  ccip-scripts:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      upgradeArgs: ["--timeout", "10m"]
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip-scripts
+        version: "0.1.0"
+      values:
+        enabled: true
+        image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
+        oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
+        outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
+        chainlink:
+          releaseName: app
+
+profiles:
+  - name: kind
+    description: The profile is supposed to be used with local deployment on a Kind cluster
+    merge:
+      deployments:
+        ccip-scripts:
+          helm:
+            values:
+              extraEnvs:
+                - name: AWS_IAM_ENABLED
+                  value: "false"
+              imagePullSecrets:
+                - name: regcred-ccip
+  - name: local-charts
+    merge:
+      deployments:
+        ccip-scripts:
+          helm:
+            chart:
+              name: crib-ccip-scripts
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/ccip-scripts
+              version: null
