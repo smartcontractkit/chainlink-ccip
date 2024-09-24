@@ -18,7 +18,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
