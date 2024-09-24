@@ -76,6 +76,9 @@ profiles:
         DEVSPACE_IMAGE:
           source: env
           default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
+        DEVSPACE_IMAGE_TAG:
+          source: env
+          default: ""
         CHAINLINK_REPO_DIR:
           source: env
           default: "${CHAINLINK_CODE_DIR}/chainlink"
@@ -144,6 +147,9 @@ profiles:
         DEVSPACE_IMAGE:
           source: env
           default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip-devspace"
+        DEVSPACE_IMAGE_TAG:
+          source: env
+          default: ""
         CHAINLINK_REPO_DIR:
           source: env
           default: "${CHAINLINK_CODE_DIR}/ccip"

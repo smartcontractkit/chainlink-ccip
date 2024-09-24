@@ -16,6 +16,9 @@ vars:
   DEVSPACE_IMAGE:
     source: env
     default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
+  DEVSPACE_IMAGE_TAG:
+    source: env
+    default: ""
   # This is a comma separated list of CIDR blocks that will be allowed to access the ingress.
   DEVSPACE_INGRESS_CIDRS:
     source: env
@@ -53,18 +56,13 @@ pipelines:
       ensure_pull_secrets --all
       run_pipelines deploy
   deploy:
-    flags:
-      - name: override-image-tag
-        short: o
-        type: string
-        description: "If specified, the specified tag will be used instead of building a new image"
     run: |-
       # Source the shared functions file.
       # shellcheck disable=SC1091
       source "../../scripts/lib/shared_functions.sh"
       
-      tagOverride=$(get_flag "override-image-tag")
-      
+      tagOverride=${DEVSPACE_IMAGE_TAG}
+
       if [[ -n "${tagOverride}" ]]; then
         image=${DEVSPACE_IMAGE}:${tagOverride}
         echo "Using user provided image: $image"
@@ -78,7 +76,7 @@ pipelines:
         create_deployments app $args
       elif is_custom_image "${DEVSPACE_IMAGE}"; then
         echo "Your configuration uses custom DEVSPACE_IMAGE: $DEVSPACE_IMAGE"
-        echo "You need to provide an explicit image tag via \"-o\" flag. e.g. devspace deploy --skip-build -o=latest"
+        echo "You need to provide an explicit image tag via the DEVSPACE_IMAGE_TAG variable."
         exit 1
       else
         build_images --all
