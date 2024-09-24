@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 )
 
 var (
@@ -29,17 +29,17 @@ type PeerResponse struct {
 }
 
 type peerClient struct {
-	ragep2ptypes.Address
-	peer       ragep2ptypes.PeerInfo
+	netEndpointFactory ocrnetworking.GenericNetworkEndpointFactory
+
+	// ragep2ptypes.Address
+	// peer       ragep2ptypes.PeerInfo
 	rmnPeerIDs mapset.Set[NodeID]
 	respChan   chan PeerResponse
 }
 
-func NewPeerClient(peer ragep2ptypes.PeerInfo, rmnNodeIDs []NodeID) PeerClient {
+func NewPeerClient(netEndpointFactory ocrnetworking.GenericNetworkEndpointFactory) PeerClient {
 	return &peerClient{
-		peer:       peer,
-		rmnPeerIDs: mapset.NewSet(rmnNodeIDs...),
-		respChan:   make(chan PeerResponse),
+		netEndpointFactory: netEndpointFactory,
 	}
 }
 

@@ -64,6 +64,7 @@ type PluginFactory struct {
 	homeChainReader reader.HomeChain
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
+	rmnPeerClient   rmn.PeerClient
 }
 
 func NewPluginFactory(
@@ -75,6 +76,7 @@ func NewPluginFactory(
 	homeChainReader reader.HomeChain,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	rmnPeerClient rmn.PeerClient,
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:            lggr,
@@ -85,6 +87,7 @@ func NewPluginFactory(
 		homeChainReader: homeChainReader,
 		contractReaders: contractReaders,
 		chainWriters:    chainWriters,
+		rmnPeerClient:   rmnPeerClient,
 	}
 }
 
