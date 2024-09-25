@@ -162,7 +162,8 @@ func attestationToTokenData(
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
-	return exectypes.NewSuccessTokenData(status.Data[:])
+	// TODO TokenData = abi.encode(messageHash, attestation)
+	return exectypes.NewSuccessTokenData(status.Attestation[:])
 }
 
 func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {
