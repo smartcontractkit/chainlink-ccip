@@ -24,17 +24,17 @@ func Test_AttestationClient(t *testing.T) {
 
 	messageA := example{
 		hash:   []byte{0xA},
-		keccak: "0ef9d8f8804d174666011a394cab7901679a8944d24249fd148a6a36071151f8",
+		keccak: "0x0ef9d8f8804d174666011a394cab7901679a8944d24249fd148a6a36071151f8",
 	}
 
 	messageB := example{
 		hash:   []byte{0xB},
-		keccak: "60811857dd566889ff6255277d82526f2d9b3bbcb96076be22a5860765ac3d06",
+		keccak: "0x60811857dd566889ff6255277d82526f2d9b3bbcb96076be22a5860765ac3d06",
 	}
 
 	messageC := example{
 		hash:   []byte{0xC},
-		keccak: "4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
+		keccak: "0x4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
 	}
 
 	tt := []struct {
@@ -171,7 +171,7 @@ func Test_AttestationClient(t *testing.T) {
 func groupedByURI(hashes []string) map[string]string {
 	out := make(map[string]string)
 	for _, hash := range hashes {
-		out["/v1/attestations/0x"+hash] = hash
+		out["/v1/attestations/"+hash] = hash
 	}
 	return out
 }

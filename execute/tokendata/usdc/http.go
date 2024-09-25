@@ -2,7 +2,6 @@ package usdc
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,10 +9,10 @@ import (
 	"net/url"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/time/rate"
 )
 
@@ -41,7 +40,7 @@ type HTTPClient interface {
 	//
 	//	https://developers.circle.com/stablecoins/reference/getattestation
 	//	https://developers.circle.com/stablecoins/docs/transfer-usdc-on-testnet-from-ethereum-to-avalanche
-	Get(ctx context.Context, messageHash [32]byte) ([]byte, HTTPStatus, error)
+	Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error)
 }
 
 // httpClient is a client for the USDC attestation API. It encapsulates all the details specific to the Attestation API:
@@ -99,26 +98,25 @@ func (r httpResponse) validate() error {
 	return nil
 }
 
-func (r httpResponse) attestationToBytes() ([]byte, error) {
-	attestationBytes, err := hex.DecodeString(strings.TrimPrefix(r.Attestation, "0x"))
+func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
+	attestationBytes, err := cciptypes.NewBytesFromString(r.Attestation)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode attestation hex: %w", err)
 	}
 	return attestationBytes, nil
 }
 
-func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, HTTPStatus, error) {
-	var empty []byte
+func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error) {
 	// Terminate immediately when rate limited
 	if h.inCoolDownPeriod() {
-		return empty, http.StatusTooManyRequests, ErrRateLimit
+		return nil, http.StatusTooManyRequests, ErrRateLimit
 	}
 
 	if h.rate != nil {
 		// Wait blocks until it the attestation API can be called or the
 		// context is Done.
 		if waitErr := h.rate.Wait(ctx); waitErr != nil {
-			return empty, http.StatusTooManyRequests, ErrRateLimit
+			return nil, http.StatusTooManyRequests, ErrRateLimit
 		}
 	}
 
@@ -128,7 +126,7 @@ func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, HTT
 	defer cancel()
 
 	requestURL := *h.apiURL
-	requestURL.Path = path.Join(requestURL.Path, apiVersion, attestationPath, fmt.Sprintf("0x%x", messageHash))
+	requestURL.Path = path.Join(requestURL.Path, apiVersion, attestationPath, messageHash.String())
 	return h.callAPI(timeoutCtx, requestURL)
 }
 
@@ -168,7 +166,7 @@ func (h *httpClient) callAPI(ctx context.Context, url url.URL) ([]byte, HTTPStat
 	return response, status, err
 }
 
-func (h *httpClient) parsePayload(res *http.Response) ([]byte, error) {
+func (h *httpClient) parsePayload(res *http.Response) (cciptypes.Bytes, error) {
 	if res == nil {
 		return nil, ErrUnknownResponse
 	}
@@ -204,3 +202,5 @@ func (h *httpClient) inCoolDownPeriod() bool {
 	defer h.coolDownMu.RUnlock()
 	return time.Now().Before(h.coolDownUntil)
 }
+
+var _ HTTPClient = (*httpClient)(nil)

@@ -46,8 +46,8 @@ func (mtd MessageTokenData) ToByteSlice() [][]byte {
 // TokenData is the token data for a single token in a message.
 // It contains the token data and a flag indicating if the data is ready.
 type TokenData struct {
-	Ready bool   `json:"ready"`
-	Data  []byte `json:"data"`
+	Ready bool            `json:"ready"`
+	Data  cciptypes.Bytes `json:"data"`
 	// Error and Supported are used only for internal processing, we don't want nodes to gossip about the
 	// internals they see during processing
 	Error     error `json:"-"`
