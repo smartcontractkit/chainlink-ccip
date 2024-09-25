@@ -2,7 +2,6 @@ package commit
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -30,6 +29,7 @@ import (
 
 const maxReportTransmissionCheckAttempts = 5
 const maxQueryLength = 1024 * 1024 // 1MB
+const rmnEnabled = false
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -107,34 +107,30 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	}
 
 	// Bind the RMNHome contract
-	// TODO: replace when RMNHome has been added in the OCR3Config
-	// rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
-	rmnHomeAddress := make([]byte, 20)
-	_, err = rand.Read(rmnHomeAddress)
-	if err != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to generate random address: %w", err)
-	}
-	fmt.Println("home chain selector", p.homeChainSelector.String())
-	rmnCr, ok := p.contractReaders[p.homeChainSelector]
-	if !ok {
-		return nil,
-			ocr3types.ReportingPluginInfo{},
-			fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
-	}
-	rmnHomeBoundContract := types.BoundContract{
-		Address: "0x" + hex.EncodeToString(rmnHomeAddress), // TODO: replace with actual address
-		Name:    consts.ContractNameRMNHome,
-	}
+	rmnHomeReader := reader.RMNHome(nil)
+	if rmnEnabled {
+		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
+		rmnCr, ok := p.contractReaders[p.homeChainSelector]
+		if !ok {
+			return nil,
+				ocr3types.ReportingPluginInfo{},
+				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
+		}
+		rmnHomeBoundContract := types.BoundContract{
+			Address: "0x" + hex.EncodeToString(rmnHomeAddress),
+			Name:    consts.ContractNameRMNHome,
+		}
 
-	if err1 := rmnCr.Bind(context.Background(), []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
+		if err1 := rmnCr.Bind(context.Background(), []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
+		}
+		rmnHomeReader = reader.NewRMNHomePoller(
+			rmnCr,
+			rmnHomeBoundContract,
+			p.lggr,
+			100*time.Millisecond,
+		)
 	}
-	rmnHomeReader := reader.NewRMNHomePoller(
-		rmnCr,
-		rmnHomeBoundContract,
-		p.lggr,
-		100*time.Millisecond,
-	)
 
 	var onChainTokenPricesReader reader.PriceReader
 	// The node supports the chain that the token prices are on.
@@ -179,6 +175,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
 				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
 				OffchainConfig:                     offchainConfig,
+				RMNEnabled:                         rmnEnabled,
 			},
 			ccipReader,
 			onChainTokenPricesReader,
