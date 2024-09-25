@@ -689,7 +689,12 @@ func (c *controller) marshalAndSend(req *rmnpb.Request, nodeID NodeID) error {
 		return fmt.Errorf("proto marshal RMN request: %w", err)
 	}
 
-	if err := c.peerClient.Send(nodeID, reqBytes); err != nil {
+	node, exists := c.getRmnNodeByID(nodeID)
+	if !exists {
+		return fmt.Errorf("rmn node %d not found", nodeID)
+	}
+
+	if err := c.peerClient.Send(node, reqBytes); err != nil {
 		return fmt.Errorf("send rmn request: %w", err)
 	}
 

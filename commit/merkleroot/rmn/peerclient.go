@@ -4,10 +4,13 @@ package rmn
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"sync"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ocrnetworking "github.com/smartcontractkit/libocr/networking"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -18,13 +21,18 @@ import (
 type PeerClient interface {
 	// InitConnection initializes the connection to the generic peer endpoint and must be called before
 	// further PeerClient interaction.
-	InitConnection(ctx context.Context /* and some other params */) error
+	InitConnection(
+		ctx context.Context,
+		commitConfigDigest, rmnHomeConfigDigest cciptypes.Bytes32,
+		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
+		bootstrappers []commontypes.BootstrapperLocator,
+	) error
 
 	// Close closes all the streams and connections.
 	Close(ctx context.Context) error
 
 	// Send sends a request to the RMN node with the given NodeID.
-	Send(rmnNodeID NodeID, request []byte) error
+	Send(rmnNodeID RMNNodeInfo, request []byte) error
 
 	// Recv returns a channel which can be used to listen on for
 	// responses by all RMN nodes. This is expected to be monitored
@@ -39,58 +47,50 @@ type PeerResponse struct {
 }
 
 type peerClient struct {
-	netEndpointFactory                ocrnetworking.GenericNetworkEndpointFactory
-	respChan                          chan PeerResponse
-	genericEndpoint                   ocrnetworking.GenericNetworkEndpoint // might be nil initially
-	genericEndpointConfigDigestPrefix ocr2types.ConfigDigestPrefix
-	rageP2PStreams                    map[NodeID]*ragep2p.Stream
-	mu                                *sync.RWMutex
+	lggr                        logger.Logger
+	netEndpointFactory          ocrnetworking.GenericNetworkEndpointFactory
+	respChan                    chan PeerResponse
+	genericEndpoint             ocrnetworking.GenericNetworkEndpoint // might be nil initially
+	genericEndpointConfigDigest cciptypes.Bytes32
+	rageP2PStreams              map[NodeID]*ragep2p.Stream
+	mu                          *sync.RWMutex
 }
 
-func NewPeerClient(netEndpointFactory ocrnetworking.GenericNetworkEndpointFactory) PeerClient {
+func NewPeerClient(lggr logger.Logger, netEndpointFactory ocrnetworking.GenericNetworkEndpointFactory) PeerClient {
 	return &peerClient{
 		netEndpointFactory: netEndpointFactory,
 		respChan:           make(chan PeerResponse),
 
-		genericEndpoint:                   nil,
-		rageP2PStreams:                    make(map[NodeID]*ragep2p.Stream),
-		genericEndpointConfigDigestPrefix: 0,
-		mu:                                &sync.RWMutex{},
+		genericEndpoint:             nil,
+		rageP2PStreams:              make(map[NodeID]*ragep2p.Stream),
+		genericEndpointConfigDigest: cciptypes.Bytes32{},
+		mu:                          &sync.RWMutex{},
 	}
 }
 
-func (r *peerClient) InitConnection(ctx context.Context) error {
+func (r *peerClient) InitConnection(
+	ctx context.Context,
+	commitConfigDigest, rmnHomeConfigDigest cciptypes.Bytes32,
+	peerIDs []string,
+	bootstrappers []commontypes.BootstrapperLocator,
+) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	// configDigest = prefix(ConfigDigestPrefixCCIPMultiRoleRMNCombo, sha256(commitConfigDigest | rmnHomeConfigDigest))
-	r.genericEndpointConfigDigestPrefix = 0
-
-	/*
-		prefix(
-			ConfigDigestPrefixCCIPMultiRoleRMNCombo,
-			sha256(
-				commit OCR config digest | RMN home config digest
-			)
-		)
-	*/
-
-	// peerIDs := union(oraclePeerIDs, rmnNodePeerIDs)
-	var peerIDs []string
-
-	// ?????
-	var bootstrappers []commontypes.BootstrapperLocator
+	h := sha256.Sum256(append(commitConfigDigest[:], rmnHomeConfigDigest[:]...))
+	r.genericEndpointConfigDigest = writePrefix(ocr2types.ConfigDigestPrefixCCIPMultiRoleRMNCombo, h)
 
 	genericEndpoint, err := r.netEndpointFactory.NewGenericEndpoint(
-		[32]byte{},
+		[32]byte(r.genericEndpointConfigDigest),
 		peerIDs,
 		bootstrappers,
 	)
-	fmt.Println(genericEndpoint)
 
 	if err != nil {
 		return fmt.Errorf("new generic endpoint: %w", err)
 	}
+
+	r.genericEndpoint = genericEndpoint
 	return nil
 }
 
@@ -98,17 +98,16 @@ func (r *peerClient) Close(ctx context.Context) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, stream := range r.rageP2PStreams {
-		if err := stream.Close(); err != nil {
-			// todo: lggr
-			continue
-		}
+	// individual streams are closed by the generic endpoint
+	if err := r.genericEndpoint.Close(); err != nil {
+		return fmt.Errorf("close generic endpoint: %w", err)
 	}
-	return r.genericEndpoint.Close()
+
+	return nil
 }
 
-func (r *peerClient) Send(rmnNodeID NodeID, request []byte) error {
-	stream, err := r.getOrCreateRageP2PStream(rmnNodeID)
+func (r *peerClient) Send(rmnNode RMNNodeInfo, request []byte) error {
+	stream, err := r.getOrCreateRageP2PStream(rmnNode)
 	if err != nil {
 		return fmt.Errorf("get or create rage p2p stream: %w", err)
 	}
@@ -124,9 +123,9 @@ func (r *peerClient) Recv() <-chan PeerResponse {
 	return r.respChan
 }
 
-func (r *peerClient) getOrCreateRageP2PStream(rmnNodeID NodeID) (*ragep2p.Stream, error) {
+func (r *peerClient) getOrCreateRageP2PStream(rmnNode RMNNodeInfo) (*ragep2p.Stream, error) {
 	r.mu.RLock()
-	stream, ok := r.rageP2PStreams[rmnNodeID]
+	stream, ok := r.rageP2PStreams[rmnNode.ID]
 	r.mu.RUnlock()
 	if ok {
 		return stream, nil
@@ -135,16 +134,23 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNodeID NodeID) (*ragep2p.Stream
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	var ragePeerID [32]byte
-	uint32Bytes := make([]byte, 4)
-	binary.BigEndian.PutUint32(uint32Bytes, uint32(rmnNodeID)) // todo: what's the rage peer id
+	// libocr accepts peer IDs either as string or [32]byte. Essentially it's a 32 byte hex string.
+	ragePeerID, err := cciptypes.NewBytes32FromString(rmnNode.PeerID)
+	if err != nil {
+		return nil, fmt.Errorf("decode peer ID: %w", err)
+	}
 
-	// todo: params configurable and param tuning
-	stream, err := r.genericEndpoint.NewStream(
-		ragePeerID,
-		fmt.Sprintf("ccip-rmn/v1_6/%d", r.genericEndpointConfigDigestPrefix), // todo: version
-		100,
-		100,
+	// todo: to be defined if encoded config digest has '0x' prefix.
+	// todo: versioning for stream names e.g. for 'v1_7'
+	streamName := fmt.Sprintf("ccip-rmn/v1_6/%x", r.genericEndpointConfigDigest)
+	r.lggr.Info("Creating new stream", "streamName", streamName)
+
+	// todo: params configurable and param tuning after consulting with research team
+	stream, err = r.genericEndpoint.NewStream(
+		[32]byte(ragePeerID),
+		streamName,
+		1,
+		1,
 		2_097_152, // 2MB
 		ragep2p.TokenBucketParams{ /* messages rate limit*/
 			Rate:     20,
@@ -156,11 +162,11 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNodeID NodeID) (*ragep2p.Stream
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("new stream: %w", err)
+		return nil, fmt.Errorf("new stream %s: %w", streamName, err)
 	}
 
-	r.rageP2PStreams[rmnNodeID] = stream
-	go r.listenToStream(rmnNodeID, stream)
+	r.rageP2PStreams[rmnNode.ID] = stream
+	go r.listenToStream(rmnNode.ID, stream)
 	return stream, nil
 }
 
@@ -171,4 +177,11 @@ func (r *peerClient) listenToStream(rmnNodeID NodeID, stream *ragep2p.Stream) {
 			Body:      msg,
 		}
 	}
+}
+
+// writePrefix writes the prefix to the rightmost 2 bytes of the hash.
+func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cciptypes.Bytes32 {
+	hCopy := hash
+	binary.BigEndian.PutUint16(hCopy[30:], uint16(prefix))
+	return hCopy
 }

@@ -29,6 +29,7 @@ type RMNRemoteConfig struct {
 type RMNNodeInfo struct {
 	// ID is the index of this node in the RMN config
 	ID                        NodeID
+	PeerID                    string
 	SupportedSourceChains     mapset.Set[cciptypes.ChainSelector]
 	IsSigner                  bool
 	SignReportsAddress        cciptypes.Bytes
