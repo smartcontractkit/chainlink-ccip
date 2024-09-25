@@ -39,7 +39,6 @@ type ConsensusObservation struct {
 	FChain                map[cciptypes.ChainSelector]int                      `json:"fChain"`
 	ChainFeeLatestUpdates map[cciptypes.ChainSelector]time.Time                `json:"chainFeePriceUpdates"`
 	Timestamp             time.Time                                            `json:"timestamp"`
-	ShouldUpdate          bool                                                 `json:"shouldUpdate"`
 }
 
 var EmptyConsensusObservation = ConsensusObservation{}

@@ -3,9 +3,12 @@ package chainfee
 import (
 	"context"
 	"fmt"
+	"math/big"
+	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -82,31 +85,44 @@ func (p *processor) Outcome(
 		return Outcome{}, err
 	}
 	// No need to update yet
-	if !consensusObs.ShouldUpdate || len(consensusObs.FeeComponents) == 0 {
+	if len(consensusObs.FeeComponents) == 0 {
 		return Outcome{}, nil
 	}
+
+	// Stop early if earliest updated timestamp is still fresh
+	earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(consensusObs.ChainFeeLatestUpdates))
+	nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
+	if nextUpdateTime.After(consensusObs.Timestamp) {
+		return Outcome{}, nil
+	}
+
 	gasPrices := make([]cciptypes.GasPriceChain, 0, len(consensusObs.FeeComponents))
 	for chain, feeComp := range consensusObs.FeeComponents {
 		// GasPrice is a Bitwise operation here like:
-		// (dataAvFee * nativeTokenPrice) << 112 | executionFee * nativeTokenPrice
+		// (dataAvFeeNative * nativeTokenPriceUSD) << 112 | (executionFeeNative * nativeTokenPrice)
+		// e.g. (dataAvFeeWei * WeiUSD) << 112 | (executionFeeWei * WeiUSD)
 		// nolint:lll
 		// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
+		nativeTokenPriceUSD := consensusObs.NativeTokenPrices[chain].Int
 
-		dataAvailabilityPrice := cciptypes.NewBigIntFromInt64(1).
-			Mul(consensusObs.NativeTokenPrices[chain].Int,
-				feeComp.DataAvailabilityFee)
-		execPrice := cciptypes.NewBigIntFromInt64(1).
-			Mul(consensusObs.NativeTokenPrices[chain].Int,
-				feeComp.ExecutionFee)
-		price := dataAvailabilityPrice.Lsh(dataAvailabilityPrice, 112)
-		combinedPrice := price.Or(price, execPrice)
+		dataAvailabilityPriceUSD := new(big.Int).Mul(nativeTokenPriceUSD, feeComp.DataAvailabilityFee)
+		execPriceUSD := new(big.Int).Mul(nativeTokenPriceUSD, feeComp.ExecutionFee)
+
+		// Price is the combination ofr both dataAvailabilityPriceUSD and execPriceUSD
+		price := dataAvailabilityPriceUSD.Lsh(dataAvailabilityPriceUSD, 112)
+		combinedPricesUSD := new(big.Int).Or(price, execPriceUSD)
 
 		gasPrice := cciptypes.GasPriceChain{
 			ChainSel: chain,
-			GasPrice: cciptypes.NewBigInt(combinedPrice),
+			GasPrice: cciptypes.NewBigInt(combinedPricesUSD),
 		}
 		gasPrices = append(gasPrices, gasPrice)
 	}
+
+	// sort gasPrices based on chainSel
+	sort.Slice(gasPrices, func(i, j int) bool {
+		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
+	})
 
 	return Outcome{
 		GasPrices: gasPrices,

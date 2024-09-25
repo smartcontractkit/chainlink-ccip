@@ -4,12 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"golang.org/x/exp/maps"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func (p *processor) getConsensusObservation(
@@ -36,15 +34,6 @@ func (p *processor) getConsensusObservation(
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
 		consensus.TimestampMedianAggregator,
 	)
-
-	// Stop early if earliest updated timestamp is still fresh
-	earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(chainFeeUpdatesConsensus))
-	nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
-	if nextUpdateTime.Before(timestamp) && len(chainFeeUpdatesConsensus) != 0 {
-		return ConsensusObservation{
-			ShouldUpdate: false,
-		}, nil
-	}
 
 	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 
@@ -85,7 +74,6 @@ func (p *processor) getConsensusObservation(
 		NativeTokenPrices:     nativeTokenPrices,
 		ChainFeeLatestUpdates: chainFeeUpdatesConsensus,
 		Timestamp:             timestamp,
-		ShouldUpdate:          true,
 	}
 
 	return consensusObs, nil
