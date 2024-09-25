@@ -83,6 +83,7 @@ func NewPluginFactory(
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:              lggr,
+		donID:             donID,
 		ocrConfig:         ocrConfig,
 		commitCodec:       commitCodec,
 		msgHasher:         msgHasher,
