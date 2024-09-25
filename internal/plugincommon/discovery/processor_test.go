@@ -172,6 +172,7 @@ func TestContractDiscoveryProcessor_Observation(t *testing.T) {
 	})
 
 }
+
 func TestContractDiscoveryProcessor_Outcome(t *testing.T) {
 	t.Run("happy path, enough agreeing observations", func(t *testing.T) {
 		mockReader := mock_reader.NewMockCCIPReader(t)
@@ -234,7 +235,7 @@ func TestContractDiscoveryProcessor_Outcome(t *testing.T) {
 		assert.Empty(t, outcome)
 	})
 
-	t.Run("not enough onramp observations", func(t *testing.T) {
+	t.Run("fRoleDON and fDestChain are different", func(t *testing.T) {
 		mockReader := mock_reader.NewMockCCIPReader(t)
 		mockReaderIface := reader.CCIPReader(mockReader)
 		mockHomeChain := mock_home_chain.NewMockHomeChain(t)
@@ -242,8 +243,8 @@ func TestContractDiscoveryProcessor_Outcome(t *testing.T) {
 		dest := cciptypes.ChainSelector(1)
 		source1 := cciptypes.ChainSelector(2)
 		source2 := cciptypes.ChainSelector(3)
-		fRoleDON := 1
-		fDest := 1
+		fRoleDON := 3
+		fDest := 2
 		fSource1 := 1
 		fSource2 := 1
 
@@ -253,7 +254,9 @@ func TestContractDiscoveryProcessor_Outcome(t *testing.T) {
 			source2: fSource2,
 		}
 		expectedNonceManager := []byte("nonceManager")
-		expectedOnRamp := map[cciptypes.ChainSelector][]byte{}
+		expectedOnRamp := map[cciptypes.ChainSelector][]byte{
+			dest: []byte("onRamp"),
+		}
 		expectedContracts := reader.ContractAddresses{
 			consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 				dest: expectedNonceManager,
@@ -274,37 +277,93 @@ func TestContractDiscoveryProcessor_Outcome(t *testing.T) {
 			fRoleDON,
 		)
 
+		fChainObs := discoverytypes.Observation{
+			FChain: expectedFChain,
+		}
+		destObs := discoverytypes.Observation{
+			FChain:           expectedFChain,
+			OnRamp:           expectedOnRamp,
+			DestNonceManager: expectedNonceManager,
+		}
 		// here we have:
-		// 2*fRoleDON + 1 observations of fChain
-		// 2*fDest observations of the onramps (not enough)
-		// 2*fDest + 1 observations of the dest nonce manager
+		// 2*fRoleDON + 1 == 7 observations of fChain
+		// 2*fDest + 1 == 5 observations of the onramps and the dest nonce manager
 		aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
-			{
-				Observation: discoverytypes.Observation{
-					FChain: expectedFChain,
-					OnRamp: map[cciptypes.ChainSelector][]byte{
-						source1: []byte("onRamp1"),
-						source2: []byte("onRamp2"),
-					},
-					DestNonceManager: expectedNonceManager,
-				},
-			},
-			{
-				Observation: discoverytypes.Observation{
-					FChain: expectedFChain,
-					OnRamp: map[cciptypes.ChainSelector][]byte{
-						source1: []byte("onRamp1"),
-						source2: []byte("onRamp2"),
-					},
-					DestNonceManager: expectedNonceManager,
-				},
-			},
-			{
-				Observation: discoverytypes.Observation{
-					FChain:           expectedFChain,
-					DestNonceManager: expectedNonceManager,
-				},
-			},
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: fChainObs},
+			{Observation: fChainObs},
+		}
+
+		outcome, err := cdp.Outcome(discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
+		assert.NoError(t, err)
+		assert.Empty(t, outcome)
+	})
+
+	t.Run("not enough onramp observations", func(t *testing.T) {
+		mockReader := mock_reader.NewMockCCIPReader(t)
+		mockReaderIface := reader.CCIPReader(mockReader)
+		mockHomeChain := mock_home_chain.NewMockHomeChain(t)
+		lggr := logger.Test(t)
+		dest := cciptypes.ChainSelector(1)
+		source1 := cciptypes.ChainSelector(2)
+		source2 := cciptypes.ChainSelector(3)
+		fRoleDON := 3
+		fDest := 2
+		fSource1 := 1
+		fSource2 := 1
+
+		expectedFChain := map[cciptypes.ChainSelector]int{
+			dest:    fDest,
+			source1: fSource1,
+			source2: fSource2,
+		}
+		observedNonceManager := []byte("nonceManager")
+		observedOnRamp := map[cciptypes.ChainSelector][]byte{
+			source1: []byte("onRamp"),
+			source2: []byte("onRamp"),
+		}
+		// we expect no contracts here due to not enough observations to come to consensus.
+		expectedContracts := reader.ContractAddresses{
+			consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{},
+			consts.ContractNameOnRamp:       map[cciptypes.ChainSelector][]byte{},
+		}
+		mockReader.
+			EXPECT().
+			Sync(mock.Anything, expectedContracts).
+			Return(nil)
+		defer mockReader.AssertExpectations(t)
+
+		cdp := NewContractDiscoveryProcessor(
+			lggr,
+			&mockReaderIface,
+			mockHomeChain,
+			dest,
+			fRoleDON,
+		)
+
+		fChainObs := discoverytypes.Observation{
+			FChain: expectedFChain,
+		}
+		destObs := discoverytypes.Observation{
+			FChain:           expectedFChain,
+			OnRamp:           observedOnRamp,
+			DestNonceManager: observedNonceManager,
+		}
+		// here we have:
+		// 2*fRoleDON + 1 == 7 observations of fChain
+		// 2*fDest == 4 observations of the onramps and the dest nonce manager (not enough).
+		aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: destObs},
+			{Observation: fChainObs},
+			{Observation: fChainObs},
+			{Observation: fChainObs},
 		}
 
 		outcome, err := cdp.Outcome(discoverytypes.Outcome{}, discoverytypes.Query{}, aos)

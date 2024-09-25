@@ -108,7 +108,6 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
 	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", fChainObs, donThresh)
-	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
 	// collect onramp and nonce manager addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
@@ -132,31 +131,38 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	contracts := make(reader.ContractAddresses)
-	// TODO: doesn't seem correct to use the fChain of the source chain to determine consensus on onramps,
-	// which are read from the dest chain.
-	onrampConsensus := consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	// onramps and dest nonce managers are determined by reading the _dest_ chain, therefore
+	// we MUST use the fChain value of the dest chain to determine
+	// the consensus onramp.
+	fDestChainThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](
+		consensus.TwoFPlus1(fChain[cdp.dest]),
+	)
+	onrampConsensus := consensus.GetConsensusMap(
+		cdp.lggr,
+		"onramp",
+		onrampAddrs,
+		fDestChainThresh,
+	)
 	cdp.lggr.Infow("Determined consensus onramps",
 		"onrampConsensus", onrampConsensus,
 		"onrampAddrs", onrampAddrs,
-		"fChainThresh", fChainThresh,
+		"fDestChainThresh", fDestChainThresh,
 	)
 	if len(onrampConsensus) == 0 {
 		cdp.lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
 	}
 	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
-	// TODO: doesn't seem correct to use the fChain of the source chain to determine consensus on onramps,
-	// which are read from the dest chain.
 	nonceManagerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"nonceManager",
 		map[cciptypes.ChainSelector][][]byte{cdp.dest: nonceManagerAddrs},
-		fChainThresh,
+		fDestChainThresh,
 	)
 	cdp.lggr.Infow("Determined consensus nonce manager",
 		"nonceManagerConsensus", nonceManagerConsensus,
 		"nonceManagerAddrs", nonceManagerAddrs,
-		"fChainThresh", fChainThresh,
+		"fDestChainThresh", fDestChainThresh,
 	)
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
