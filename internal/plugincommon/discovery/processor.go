@@ -110,8 +110,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", fChainObs, donThresh)
 	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
-	// collect onramp addresses
+	// collect onramp and nonce manager addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
+	var nonceManagerAddrs [][]byte
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
 			// we don't want invalid observations to "poison" the consensus.
@@ -120,11 +121,10 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			}
 			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
 		}
-	}
 
-	// collect nonce manager addresses
-	var nonceManagerAddrs [][]byte
-	for _, ao := range aos {
+		if len(ao.Observation.DestNonceManager) == 0 {
+			continue
+		}
 		nonceManagerAddrs = append(
 			nonceManagerAddrs,
 			ao.Observation.DestNonceManager,
@@ -132,6 +132,8 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	contracts := make(reader.ContractAddresses)
+	// TODO: doesn't seem correct to use the fChain of the source chain to determine consensus on onramps,
+	// which are read from the dest chain.
 	onrampConsensus := consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
 	cdp.lggr.Infow("Determined consensus onramps",
 		"onrampConsensus", onrampConsensus,
@@ -143,12 +145,20 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
-	contracts[consts.ContractNameNonceManager] = consensus.GetConsensusMap(
+	// TODO: doesn't seem correct to use the fChain of the source chain to determine consensus on onramps,
+	// which are read from the dest chain.
+	nonceManagerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"nonceManager",
 		map[cciptypes.ChainSelector][][]byte{cdp.dest: nonceManagerAddrs},
 		fChainThresh,
 	)
+	cdp.lggr.Infow("Determined consensus nonce manager",
+		"nonceManagerConsensus", nonceManagerConsensus,
+		"nonceManagerAddrs", nonceManagerAddrs,
+		"fChainThresh", fChainThresh,
+	)
+	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
 	// call Sync to bind contracts.
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
