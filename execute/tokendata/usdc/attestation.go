@@ -3,12 +3,12 @@ package usdc
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -20,16 +20,19 @@ var (
 	ErrUnknownResponse = errors.New("unexpected response from attestation API")
 )
 
+// AttestationStatus is a struct holding all the necessary information to build payload to
+// mint USDC on the destination chain. Valid AttestationStatus always contains MessageHash and Attestation.
+// In case of failure, Error is populated with more details.
 type AttestationStatus struct {
 	// MessageHash is the hash of the message that the attestation was fetched for. It's going to be MessageSent event hash
-	MessageHash []byte
+	MessageHash cciptypes.Bytes
 	// Attestation is the attestation data fetched from the API, encoded in bytes
-	Attestation []byte
+	Attestation cciptypes.Bytes
 	// Error is the error that occurred during fetching the attestation data
 	Error error
 }
 
-func SuccessAttestationStatus(messageHash []byte, attestation []byte) AttestationStatus {
+func SuccessAttestationStatus(messageHash cciptypes.Bytes, attestation cciptypes.Bytes) AttestationStatus {
 	return AttestationStatus{MessageHash: messageHash, Attestation: attestation}
 }
 
@@ -50,7 +53,7 @@ func ErrorAttestationStatus(err error) AttestationStatus {
 type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
-		msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+		msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 	) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error)
 }
 
@@ -59,15 +62,14 @@ type sequentialAttestationClient struct {
 	hasher hashutil.Hasher[[32]byte]
 }
 
-//nolint:revive
-func NewAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (*sequentialAttestationClient, error) {
+func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (AttestationClient, error) {
 	client, err := NewHTTPClient(
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
 	return &sequentialAttestationClient{
 		client: client,
@@ -77,7 +79,7 @@ func NewAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (*sequenti
 
 func (s *sequentialAttestationClient) Attestations(
 	ctx context.Context,
-	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
 	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
 
@@ -92,7 +94,10 @@ func (s *sequentialAttestationClient) Attestations(
 	return outcome, nil
 }
 
-func (s *sequentialAttestationClient) fetchSingleMessage(ctx context.Context, messageHash []byte) AttestationStatus {
+func (s *sequentialAttestationClient) fetchSingleMessage(
+	ctx context.Context,
+	messageHash cciptypes.Bytes,
+) AttestationStatus {
 	response, _, err := s.client.Get(ctx, s.hasher.Hash(messageHash))
 	if err != nil {
 		return ErrorAttestationStatus(err)
@@ -107,7 +112,7 @@ type FakeAttestationClient struct {
 
 func (f FakeAttestationClient) Attestations(
 	_ context.Context,
-	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
 	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
 

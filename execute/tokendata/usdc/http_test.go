@@ -2,7 +2,6 @@ package usdc
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,8 +68,8 @@ func Test_HTTPClient_Get(t *testing.T) {
 		timeout            time.Duration
 		messageHash        [32]byte
 		expectedError      error
-		expectedResponse   []byte
-		expectedStatusCode int
+		expectedResponse   cciptypes.Bytes
+		expectedStatusCode HTTPStatus
 	}{
 		{
 			name: "server error",
@@ -123,7 +123,9 @@ func Test_HTTPClient_Get(t *testing.T) {
 			},
 			timeout:            longTimeout,
 			expectedStatusCode: http.StatusOK,
-			expectedError:      fmt.Errorf("encoding/hex: odd length hex string"),
+			expectedError: fmt.Errorf(
+				"failed to decode attestation hex: Bytes must be of at least length 2 (i.e, '0x' prefix): 0",
+			),
 		},
 		{
 			name: "invalid attestation",
@@ -198,7 +200,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			messageHash:        [32]byte{1, 2, 3, 4},
 			timeout:            longTimeout,
 			expectedStatusCode: http.StatusOK,
-			expectedResponse:   mustDecode("720502893578a89a8a87982982ef781c18b193"),
+			expectedResponse:   mustDecode("0x720502893578a89a8a87982982ef781c18b193"),
 		},
 	}
 
@@ -402,7 +404,7 @@ func Test_httpResponse(t *testing.T) {
 		name                string
 		response            httpResponse
 		expectedError       error
-		expectedAttestation []byte
+		expectedAttestation cciptypes.Bytes
 	}{
 		{
 			name: "success",
@@ -410,7 +412,7 @@ func Test_httpResponse(t *testing.T) {
 				Status:      attestationStatusSuccess,
 				Attestation: "0x720502893578a89a8a87982982ef781c18b193",
 			},
-			expectedAttestation: mustDecode("720502893578a89a8a87982982ef781c18b193"),
+			expectedAttestation: mustDecode("0x720502893578a89a8a87982982ef781c18b193"),
 		},
 		{
 			name: "pending",
@@ -449,8 +451,8 @@ func Test_httpResponse(t *testing.T) {
 	}
 }
 
-func mustDecode(s string) []byte {
-	b, err := hex.DecodeString(s)
+func mustDecode(s string) cciptypes.Bytes {
+	b, err := cciptypes.NewBytesFromString(s)
 	if err != nil {
 		panic(err)
 	}
