@@ -53,19 +53,25 @@ func (cdp *ContractDiscoveryProcessor) Query(_ context.Context, _ dt.Outcome) (d
 func (cdp *ContractDiscoveryProcessor) Observation(
 	ctx context.Context, _ dt.Outcome, _ dt.Query,
 ) (dt.Observation, error) {
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, cdp.dest)
-	if err != nil {
-		if errors.Is(err, reader.ErrContractReaderNotFound) {
-			// Not a dest reader, no observations will be made.
-			// Processor is not disabled because the outcome phase will bind observed contracts.
-			return dt.Observation{}, nil
-		}
-		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
-	}
-
+	// all oracles should be able to read from the home chain, so we
+	// can fetch f chain reliably.
 	fChain, err := cdp.homechain.GetFChain()
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to get fchain: %w", err)
+	}
+
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, cdp.dest)
+	if err != nil {
+		if errors.Is(err, reader.ErrContractReaderNotFound) {
+			// Not a dest reader, only fChain observation will be made.
+			// Processor is not disabled because the outcome phase will bind observed contracts.
+			return dt.Observation{
+				FChain: fChain,
+			}, nil
+		}
+
+		// otherwise a legitimate error occurred when discovering.
+		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
 	}
 
 	return dt.Observation{
@@ -87,6 +93,7 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 func (cdp *ContractDiscoveryProcessor) Outcome(
 	_ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
+	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
 	// come to consensus on the onramp addresses and update the chainreader.
 
 	// fChain consensus - uses the role DON F value because all nodes can observe the home chain.
@@ -98,19 +105,24 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
 	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", fChainObs, donThresh)
-	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
 
-	// collect onramp addresses
+	// collect onramp and nonce manager addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
-	for _, ao := range aos {
-		for chain, addr := range ao.Observation.OnRamp {
-			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
-		}
-	}
-
-	// collect nonce manager addresses
 	var nonceManagerAddrs [][]byte
 	for _, ao := range aos {
+		for chain, addr := range ao.Observation.OnRamp {
+			// we don't want invalid observations to "poison" the consensus.
+			if len(addr) == 0 {
+				cdp.lggr.Warnf("skipping empty onramp address in observation from Oracle %d", ao.OracleID)
+				continue
+			}
+			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
+		}
+
+		if len(ao.Observation.DestNonceManager) == 0 {
+			cdp.lggr.Warnf("skipping empty nonce manager address in observation from Oracle %d", ao.OracleID)
+			continue
+		}
 		nonceManagerAddrs = append(
 			nonceManagerAddrs,
 			ao.Observation.DestNonceManager,
@@ -118,14 +130,40 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	contracts := make(reader.ContractAddresses)
-	contracts[consts.ContractNameOnRamp] = consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	// onramps and dest nonce managers are determined by reading the _dest_ chain, therefore
+	// we MUST use the fChain value of the dest chain to determine
+	// the consensus onramp.
+	fDestChainThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](
+		consensus.TwoFPlus1(fChain[cdp.dest]),
+	)
+	onrampConsensus := consensus.GetConsensusMap(
+		cdp.lggr,
+		"onramp",
+		onrampAddrs,
+		fDestChainThresh,
+	)
+	cdp.lggr.Infow("Determined consensus onramps",
+		"onrampConsensus", onrampConsensus,
+		"onrampAddrs", onrampAddrs,
+		"fDestChainThresh", fDestChainThresh,
+	)
+	if len(onrampConsensus) == 0 {
+		cdp.lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
+	}
+	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
-	contracts[consts.ContractNameNonceManager] = consensus.GetConsensusMap(
+	nonceManagerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"nonceManager",
 		map[cciptypes.ChainSelector][][]byte{cdp.dest: nonceManagerAddrs},
-		fChainThresh,
+		fDestChainThresh,
 	)
+	cdp.lggr.Infow("Determined consensus nonce manager",
+		"nonceManagerConsensus", nonceManagerConsensus,
+		"nonceManagerAddrs", nonceManagerAddrs,
+		"fDestChainThresh", fDestChainThresh,
+	)
+	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
 	// call Sync to bind contracts.
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
