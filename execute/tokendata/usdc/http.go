@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -157,20 +156,13 @@ func (h *httpClient) callAPI(ctx context.Context, url string) ([]byte, int, erro
 }
 
 func (h *httpClient) parsePayload(res *http.Response) ([]byte, int, error) {
-	var empty []byte
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return empty, res.StatusCode, err
-	}
-
 	var response httpResponse
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return empty, res.StatusCode, err
+	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		return nil, res.StatusCode, fmt.Errorf("failed to decode json: %w", err)
 	}
 
 	if err1 := response.validate(); err1 != nil {
-		return empty, res.StatusCode, err1
+		return nil, res.StatusCode, err1
 	}
 
 	attestationBytes, err := response.attestationToBytes()
