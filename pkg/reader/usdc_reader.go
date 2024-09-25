@@ -257,14 +257,8 @@ type FakeUSDCMessageReader struct {
 	Messages map[exectypes.MessageTokenID]cciptypes.Bytes
 }
 
-func NewFakeUSDCMessageReader(messages map[cciptypes.SeqNum]map[int][]byte) FakeUSDCMessageReader {
-	out := make(map[exectypes.MessageTokenID]cciptypes.Bytes)
-	for seqNum, message := range messages {
-		for tokenID, hash := range message {
-			out[exectypes.NewMessageTokenID(seqNum, tokenID)] = hash
-		}
-	}
-	return FakeUSDCMessageReader{Messages: out}
+func NewFakeUSDCMessageReader(messages map[exectypes.MessageTokenID]cciptypes.Bytes) FakeUSDCMessageReader {
+	return FakeUSDCMessageReader{Messages: messages}
 }
 
 func (f FakeUSDCMessageReader) MessageHashes(

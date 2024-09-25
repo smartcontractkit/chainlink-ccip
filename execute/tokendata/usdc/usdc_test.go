@@ -71,13 +71,9 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[cciptypes.SeqNum]map[int][]byte{
-					10: {
-						0: []byte("message10"),
-					},
-					12: {
-						0: []byte("message12"),
-					},
+				map[exectypes.MessageTokenID]cciptypes.Bytes{
+					exectypes.NewMessageTokenID(10, 0): []byte("message10"),
+					exectypes.NewMessageTokenID(12, 0): []byte("message12"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
@@ -106,16 +102,10 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[cciptypes.SeqNum]map[int][]byte{
-					10: {
-						1: []byte("message10_1"),
-					},
-					11: {
-						1: []byte("message11_1"),
-					},
-					12: {
-						2: []byte("message12_2"),
-					},
+				map[exectypes.MessageTokenID]cciptypes.Bytes{
+					exectypes.NewMessageTokenID(10, 1): []byte("message10_1"),
+					exectypes.NewMessageTokenID(11, 1): []byte("message11_1"),
+					exectypes.NewMessageTokenID(12, 2): []byte("message12_2"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
@@ -156,16 +146,12 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[cciptypes.SeqNum]map[int][]byte{
-					10: {
-						0: []byte("message10_0"),
-						1: []byte("message10_1"),
-						2: []byte("message10_2"),
-					},
-					12: {
-						0: []byte("message12_0"),
-						1: []byte("message12_1"),
-					},
+				map[exectypes.MessageTokenID]cciptypes.Bytes{
+					exectypes.NewMessageTokenID(10, 0): []byte("message10_0"),
+					exectypes.NewMessageTokenID(10, 1): []byte("message10_1"),
+					exectypes.NewMessageTokenID(10, 2): []byte("message10_2"),
+					exectypes.NewMessageTokenID(12, 0): []byte("message12_0"),
+					exectypes.NewMessageTokenID(12, 1): []byte("message12_1"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
@@ -201,11 +187,9 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[cciptypes.SeqNum]map[int][]byte{
-					10: {
-						0: []byte("message10_0"),
-						1: []byte("message10_1"),
-					},
+				map[exectypes.MessageTokenID]cciptypes.Bytes{
+					exectypes.NewMessageTokenID(10, 0): []byte("message10_0"),
+					exectypes.NewMessageTokenID(10, 1): []byte("message10_1"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{

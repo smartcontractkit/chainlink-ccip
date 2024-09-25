@@ -130,7 +130,7 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 	return h.callAPI(timeoutCtx, requestURL)
 }
 
-func (h *httpClient) callAPI(ctx context.Context, url url.URL) ([]byte, HTTPStatus, error) {
+func (h *httpClient) callAPI(ctx context.Context, url url.URL) (cciptypes.Bytes, HTTPStatus, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return nil, http.StatusBadRequest, err

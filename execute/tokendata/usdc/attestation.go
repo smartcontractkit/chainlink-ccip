@@ -94,7 +94,10 @@ func (s *sequentialAttestationClient) Attestations(
 	return outcome, nil
 }
 
-func (s *sequentialAttestationClient) fetchSingleMessage(ctx context.Context, messageHash []byte) AttestationStatus {
+func (s *sequentialAttestationClient) fetchSingleMessage(
+	ctx context.Context,
+	messageHash cciptypes.Bytes,
+) AttestationStatus {
 	response, _, err := s.client.Get(ctx, s.hasher.Hash(messageHash))
 	if err != nil {
 		return ErrorAttestationStatus(err)
