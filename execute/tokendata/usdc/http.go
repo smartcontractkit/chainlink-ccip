@@ -202,5 +202,3 @@ func (h *httpClient) inCoolDownPeriod() bool {
 	defer h.coolDownMu.RUnlock()
 	return time.Now().Before(h.coolDownUntil)
 }
-
-var _ HTTPClient = (*httpClient)(nil)

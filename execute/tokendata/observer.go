@@ -3,6 +3,7 @@ package tokendata
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -60,7 +61,7 @@ func NewConfigBasedCompositeObservers(
 		case c.USDCCCTPObserverConfig != nil:
 			observer, err := createUSDCTokenObserver(lggr, destChainSelector, *c.USDCCCTPObserverConfig, readers)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
 			observers[i] = observer
 		default:
@@ -86,7 +87,7 @@ func createUSDCTokenObserver(
 
 	client, err := usdc.NewSequentialAttestationClient(cctpConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create attestation client: %w", err)
 	}
 
 	return usdc.NewTokenDataObserver(

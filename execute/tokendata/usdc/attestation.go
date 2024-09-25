@@ -69,7 +69,7 @@ func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) 
 		config.AttestationAPITimeout.Duration(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
 	return &sequentialAttestationClient{
 		client: client,
