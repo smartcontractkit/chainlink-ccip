@@ -156,6 +156,7 @@ func TestProcessor_Outcome(t *testing.T) {
 			},
 			chainFeeWriteFrequency: chainFeePriceBatchWriteFrequency,
 		},
+		//TODO: Add test to check that deviated prices updates
 	}
 
 	for _, tt := range tests {
