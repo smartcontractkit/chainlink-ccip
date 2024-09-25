@@ -45,7 +45,7 @@ on:
         required: false
 jobs:
   run-crib-core-smoke-test:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       id-token: write
