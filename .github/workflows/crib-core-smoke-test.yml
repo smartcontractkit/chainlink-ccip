@@ -8,7 +8,7 @@ on:
     paths:
       # Include common changes
       - "*"
-      - "dependencies/**"
+      - "dependencies/crib-chainlink-cluster/**"
       - "scripts/**"
       # Include crib core changes
       - "deployments/chainlink/**"
@@ -27,7 +27,7 @@ on:
     paths:
       # Include common changes
       - "*"
-      - "dependencies/**"
+      - "dependencies/crib-chainlink-cluster/**"
       - "scripts/**"
       # Include crib core changes
       - "deployments/chainlink/**"
