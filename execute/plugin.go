@@ -186,7 +186,8 @@ func (p *Plugin) Observation(
 		}
 
 		if !p.contractsInitialized {
-			p.lggr.Infow("contracts not initialized, only making discovery observations")
+			p.lggr.Infow("contracts not initialized, only making discovery observations",
+				"discoveryObs", discoveryObs)
 			return exectypes.Observation{Contracts: discoveryObs}.Encode()
 		}
 	}
@@ -406,6 +407,7 @@ func (p *Plugin) Outcome(
 				Observation: decodedAos[i].Observation.Contracts,
 			}
 		}
+		p.lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryAos)
 		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
