@@ -17,7 +17,7 @@ type Outcome struct {
 
 type Observation struct {
 	FeeComponents         map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
-	NativeTokenPrice      map[cciptypes.ChainSelector]cciptypes.BigInt         `json:"nativeTokenPrice"`
+	NativeTokenPrices     map[cciptypes.ChainSelector]cciptypes.BigInt         `json:"nativeTokenPrice"`
 	FChain                map[cciptypes.ChainSelector]int                      `json:"fChain"`
 	ChainFeeLatestUpdates map[cciptypes.ChainSelector]time.Time                `json:"chainFeePriceUpdates"`
 	Timestamp             time.Time                                            `json:"timestamp"`
@@ -31,14 +31,3 @@ type AggregateObservation struct {
 	ChainFeeLatestUpdates map[cciptypes.ChainSelector][]time.Time                `json:"chainFeePriceUpdate"`
 	Timestamps            []time.Time                                            `json:"timestamps"`
 }
-
-// ConsensusObservation holds the consensus values for all observations in a round
-type ConsensusObservation struct {
-	FeeComponents         map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
-	NativeTokenPrices     map[cciptypes.ChainSelector]cciptypes.BigInt         `json:"nativeTokenPrice"`
-	FChain                map[cciptypes.ChainSelector]int                      `json:"fChain"`
-	ChainFeeLatestUpdates map[cciptypes.ChainSelector]time.Time                `json:"chainFeePriceUpdates"`
-	Timestamp             time.Time                                            `json:"timestamp"`
-}
-
-var EmptyConsensusObservation = ConsensusObservation{}

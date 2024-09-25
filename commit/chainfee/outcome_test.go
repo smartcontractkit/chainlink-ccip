@@ -35,9 +35,9 @@ var fChains = map[cciptypes.ChainSelector]int{
 }
 
 var obsNeedUpdate = Observation{
-	FeeComponents:    feeComponentsMap,
-	NativeTokenPrice: nativeTokenPricesMap,
-	FChain:           fChains,
+	FeeComponents:     feeComponentsMap,
+	NativeTokenPrices: nativeTokenPricesMap,
+	FChain:            fChains,
 	ChainFeeLatestUpdates: map[cciptypes.ChainSelector]time.Time{
 		1: ts,
 		2: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2), // Needs updating
@@ -46,9 +46,9 @@ var obsNeedUpdate = Observation{
 }
 
 var obsNoUpdate = Observation{
-	FeeComponents:    feeComponentsMap,
-	NativeTokenPrice: nativeTokenPricesMap,
-	FChain:           fChains,
+	FeeComponents:     feeComponentsMap,
+	NativeTokenPrices: nativeTokenPricesMap,
+	FChain:            fChains,
 	ChainFeeLatestUpdates: map[cciptypes.ChainSelector]time.Time{
 		1: ts,
 		2: ts,

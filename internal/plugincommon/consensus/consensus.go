@@ -100,7 +100,7 @@ func TokenPriceComparator(a, b cciptypes.TokenPrice) bool {
 }
 
 // TimestampedBigAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
-var TimestampedBigAggregator = func(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
+func TimestampedBigAggregator(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
 	timestamps := make([]time.Time, len(updates))
 	prices := make([]cciptypes.BigInt, len(updates))
 	for i := range updates {

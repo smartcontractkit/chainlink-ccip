@@ -69,7 +69,7 @@ func (p *processor) Observation(
 	return Observation{
 		FChain:                p.ObserveFChain(),
 		FeeComponents:         feeComponents,
-		NativeTokenPrice:      nativeTokenPrices,
+		NativeTokenPrices:     nativeTokenPrices,
 		ChainFeeLatestUpdates: latestTimestamps,
 		Timestamp:             time.Now().UTC(),
 	}, nil

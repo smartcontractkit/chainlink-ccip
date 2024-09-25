@@ -13,7 +13,7 @@ import (
 
 func (p *processor) getConsensusObservation(
 	aos []plugincommon.AttributedObservation[Observation],
-) (ConsensusObservation, error) {
+) (Observation, error) {
 	aggObs := aggregateObservations(aos)
 
 	// consensus on the fChain map uses the role DON F value
@@ -23,7 +23,7 @@ func (p *processor) getConsensusObservation(
 
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
-		return ConsensusObservation{},
+		return Observation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
 
@@ -69,7 +69,7 @@ func (p *processor) getConsensusObservation(
 		},
 	)
 
-	consensusObs := ConsensusObservation{
+	consensusObs := Observation{
 		FChain:                fChains,
 		FeeComponents:         feeComponents,
 		NativeTokenPrices:     nativeTokenPrices,
@@ -98,7 +98,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		}
 
 		// NativeTokenPrices
-		for chainSel, tokenPrice := range obs.NativeTokenPrice {
+		for chainSel, tokenPrice := range obs.NativeTokenPrices {
 			aggObs.NativeTokenPrices[chainSel] = append(aggObs.NativeTokenPrices[chainSel], tokenPrice)
 		}
 
