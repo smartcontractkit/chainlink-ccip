@@ -20,16 +20,19 @@ var (
 	ErrUnknownResponse = errors.New("unexpected response from attestation API")
 )
 
+// AttestationStatus is a struct holding all the necessary information to build payload to
+// mint USDC on the destination chain. Valid AttestationStatus always contains MessageHash and Attestation.
+// In case of failure, Error is populated with more details.
 type AttestationStatus struct {
 	// MessageHash is the hash of the message that the attestation was fetched for. It's going to be MessageSent event hash
-	MessageHash []byte
+	MessageHash cciptypes.Bytes
 	// Attestation is the attestation data fetched from the API, encoded in bytes
-	Attestation []byte
+	Attestation cciptypes.Bytes
 	// Error is the error that occurred during fetching the attestation data
 	Error error
 }
 
-func SuccessAttestationStatus(messageHash []byte, attestation []byte) AttestationStatus {
+func SuccessAttestationStatus(messageHash cciptypes.Bytes, attestation cciptypes.Bytes) AttestationStatus {
 	return AttestationStatus{MessageHash: messageHash, Attestation: attestation}
 }
 
