@@ -4,16 +4,17 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
-	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
-	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 func TestContractDiscoveryProcessor_Observation(t *testing.T) {
