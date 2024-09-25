@@ -384,6 +384,10 @@ func selectReport(
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	p.lggr.Debugw("Execute plugin performing outcome",
+		"outctx", outctx,
+		"query", query,
+		"attributedObservations", aos)
 	var previousOutcome exectypes.Outcome
 	if outctx.PreviousOutcome != nil {
 		var err error
@@ -407,7 +411,6 @@ func (p *Plugin) Outcome(
 				Observation: decodedAos[i].Observation.Contracts,
 			}
 		}
-		p.lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryAos)
 		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)

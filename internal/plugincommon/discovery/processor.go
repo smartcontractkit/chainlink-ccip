@@ -55,8 +55,6 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 ) (dt.Observation, error) {
 	// all oracles should be able to read from the home chain, so we
 	// can fetch f chain reliably.
-	// TODO: should we error out here or just try to "observe everything we can"?
-	// i.e, similar to the commit plugin.
 	fChain, err := cdp.homechain.GetFChain()
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to get fchain: %w", err)
@@ -73,7 +71,6 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		}
 
 		// otherwise a legitimate error occurred when discovering.
-		// TODO: should we still return the f chain observation w/ a nil error?
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
 	}
 
@@ -116,12 +113,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		for chain, addr := range ao.Observation.OnRamp {
 			// we don't want invalid observations to "poison" the consensus.
 			if len(addr) == 0 {
+				cdp.lggr.Warnf("skipping empty onramp address in observation from Oracle %d", ao.OracleID)
 				continue
 			}
 			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
 		}
 
 		if len(ao.Observation.DestNonceManager) == 0 {
+			cdp.lggr.Warnf("skipping empty nonce manager address in observation from Oracle %d", ao.OracleID)
 			continue
 		}
 		nonceManagerAddrs = append(
