@@ -126,7 +126,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	}
 
 	if err1 := rmnCr.Bind(context.Background(), []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
-		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMN contract: %w", err1)
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
 	}
 	rmnHomeReader := reader.NewRMNHomePoller(
 		rmnCr,
