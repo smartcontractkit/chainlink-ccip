@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/smartcontractkit/libocr/commontypes"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -26,6 +27,15 @@ func (w *Processor) Outcome(
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
+
+	w.rmnController.InitConnection(
+		ctx,
+		cciptypes.Bytes32(w.reportingCfg.ConfigDigest),
+		w.rmnConfig.Home.ConfigDigest,
+		[]string{},                          // peerIDs - union of rmn node peerIDs and ocr peer ids
+		[]commontypes.BootstrapperLocator{}, // is this part of RMN home config?
+	)
+
 	tStart := time.Now()
 	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
 	w.lggr.Infow("Sending Outcome",

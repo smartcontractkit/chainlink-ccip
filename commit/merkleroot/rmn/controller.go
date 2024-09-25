@@ -18,6 +18,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -46,6 +47,15 @@ type Controller interface {
 		destChain *rmnpb.LaneDest,
 		requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
 	) (*ReportSignatures, error)
+
+	// InitConnection initializes the connection to the generic peer endpoint and must be called before
+	// further PeerClient interaction. If called twice it overwrites the previous connection.
+	InitConnection(
+		ctx context.Context,
+		commitConfigDigest, rmnHomeConfigDigest cciptypes.Bytes32,
+		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
+		bootstrappers []commontypes.BootstrapperLocator,
+	) error
 }
 
 type ReportSignatures struct {
@@ -139,6 +149,15 @@ func (c *controller) ComputeReportSignatures(
 	}
 
 	return rmnReportSignatures, nil
+}
+
+func (c *controller) InitConnection(
+	ctx context.Context,
+	commitConfigDigest, rmnHomeConfigDigest cciptypes.Bytes32,
+	peerIDs []string,
+	bootstrappers []commontypes.BootstrapperLocator,
+) error {
+	return c.peerClient.InitConnection(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs, bootstrappers)
 }
 
 func (c *controller) getRmnSignedObservations(

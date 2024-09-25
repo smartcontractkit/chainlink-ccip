@@ -140,9 +140,8 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode RMNNodeInfo) (*ragep2p.Str
 		return nil, fmt.Errorf("decode peer ID: %w", err)
 	}
 
-	// todo: to be defined if encoded config digest has '0x' prefix.
 	// todo: versioning for stream names e.g. for 'v1_7'
-	streamName := fmt.Sprintf("ccip-rmn/v1_6/%x", r.genericEndpointConfigDigest)
+	streamName := fmt.Sprintf("ccip-rmn/v1_6/%x", r.genericEndpointConfigDigest) // no '0x' prefix
 	r.lggr.Info("Creating new stream", "streamName", streamName)
 
 	// todo: params configurable and param tuning after consulting with research team
@@ -180,8 +179,21 @@ func (r *peerClient) listenToStream(rmnNodeID NodeID, stream *ragep2p.Stream) {
 }
 
 // writePrefix writes the prefix to the rightmost 2 bytes of the hash.
+//
+// Example:
+//
+//	prefix = [2]byte{10, 20}
+//	h = [32]byte{1, 2, 3.....}
+//	result = [32]byte{10, 20, 3, 4, ...}
+//
+// NOT TESTED!
 func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cciptypes.Bytes32 {
+	var prefixBytes [2]byte
+	binary.BigEndian.PutUint16(prefixBytes[:], uint16(prefix))
+
 	hCopy := hash
-	binary.BigEndian.PutUint16(hCopy[30:], uint16(prefix))
+	hCopy[0] = prefixBytes[0]
+	hCopy[1] = prefixBytes[1]
+
 	return hCopy
 }
