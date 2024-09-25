@@ -131,10 +131,7 @@ func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	return nil
 }
 
-func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
-	ctx context.Context,
-	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+func (r InMemoryCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate {
 	return nil
 }
 

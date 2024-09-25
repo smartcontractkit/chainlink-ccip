@@ -117,7 +117,7 @@ type CCIPReader interface {
 	GetChainFeePriceUpdate(
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+	) map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

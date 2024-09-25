@@ -505,14 +505,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	return prices
 }
 
-// GetChainFeePriceUpdate Read from FeeQuoter latest fee updates for the provided chains.
+// GetChainFeePriceUpdate Read from Destination chain FeeQuoter latest fee updates for the provided chains.
 // nolint:lll
+// TODO: Get from the destination chain
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
-func (r *ccipChainReader) GetChainFeePriceUpdate(
-	ctx context.Context,
-	selectors []cciptypes.ChainSelector,
-) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
-	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate {
+	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate, len(selectors))
 	for _, chain := range selectors {
 		update := plugintypes.TimestampedBig{}
 		// Read from dest chain
@@ -531,7 +529,10 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(
 			r.lggr.Errorw("failed to get chain fee price update", "chain", chain, "err", err)
 			continue
 		}
-		feeUpdates[chain] = update
+		feeUpdates[chain] = plugintypes.ChainFeeUpdate{
+			Timestamp: update.Timestamp,
+			ChainFee:  plugintypes.FromPackedFee(update.Value.Int),
+		}
 	}
 
 	return feeUpdates

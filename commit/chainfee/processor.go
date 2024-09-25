@@ -8,12 +8,12 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/exp/maps"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -58,8 +58,11 @@ func (p *processor) Observation(
 	prevOutcome Outcome,
 	query Query,
 ) (Observation, error) {
+	// Get the fee components for all available chains that we can read from
 	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx)
+	// Get the native token prices for all available chains that we can read from
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
+	// Get the latest chain fee price updates for the source chains
 	chainFeePriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, maps.Keys(feeComponents))
 	latestTimestamps := make(map[cciptypes.ChainSelector]time.Time, len(chainFeePriceUpdates))
 	for chain, update := range chainFeePriceUpdates {
@@ -99,23 +102,25 @@ func (p *processor) Outcome(
 
 	gasPrices := make([]cciptypes.GasPriceChain, 0, len(consensusObs.FeeComponents))
 	for chain, feeComp := range consensusObs.FeeComponents {
-		// GasPrice is a Bitwise operation here like:
-		// (dataAvFeeNative * nativeTokenPriceUSD) << 112 | (executionFeeNative * nativeTokenPrice)
-		// e.g. (dataAvFeeWei * WeiUSD) << 112 | (executionFeeWei * WeiUSD)
+		// We need to report a packed GasPrice
+		// The packed GasPrice is a 224-bit integer with the following format:
+		// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
 		// nolint:lll
 		// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
 		nativeTokenPriceUSD := consensusObs.NativeTokenPrices[chain].Int
 
-		dataAvailabilityPriceUSD := new(big.Int).Mul(nativeTokenPriceUSD, feeComp.DataAvailabilityFee)
-		execPriceUSD := new(big.Int).Mul(nativeTokenPriceUSD, feeComp.ExecutionFee)
+		// Calculate the price in USD for the data availability and execution fees.
+		// Raw fee components are in native token units
+		chainFeeUsd := plugintypes.ChainFeePrices{
+			ExecutionFeePriceUSD: new(big.Int).Mul(nativeTokenPriceUSD, feeComp.ExecutionFee),
+			DataAvFeePriceUSD:    new(big.Int).Mul(nativeTokenPriceUSD, feeComp.DataAvailabilityFee),
+		}
 
-		// Price is the combination ofr both dataAvailabilityPriceUSD and execPriceUSD
-		price := dataAvailabilityPriceUSD.Lsh(dataAvailabilityPriceUSD, 112)
-		combinedPricesUSD := new(big.Int).Or(price, execPriceUSD)
+		packedPrice := chainFeeUsd.ToPackedFee()
 
 		gasPrice := cciptypes.GasPriceChain{
 			ChainSel: chain,
-			GasPrice: cciptypes.NewBigInt(combinedPricesUSD),
+			GasPrice: cciptypes.NewBigInt(packedPrice),
 		}
 		gasPrices = append(gasPrices, gasPrice)
 	}
