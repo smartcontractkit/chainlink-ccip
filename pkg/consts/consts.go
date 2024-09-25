@@ -4,15 +4,16 @@ package consts
 
 // Contract Names
 const (
-	ContractNameOffRamp              = "OffRamp"
-	ContractNameOnRamp               = "OnRamp"
-	ContractNameFeeQuoter            = "FeeQuoter"
-	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
-	ContractNameCCIPConfig           = "CCIPConfig"
-	ContractNamePriceAggregator      = "AggregatorV3Interface"
-	ContractNameNonceManager         = "NonceManager"
-	ContractNameRMNHome              = "RMNHome"
-	ContractNameRMNRemote            = "RMNRemote"
+	ContractNameOffRamp                = "OffRamp"
+	ContractNameOnRamp                 = "OnRamp"
+	ContractNameFeeQuoter              = "FeeQuoter"
+	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
+	ContractNameCCIPConfig             = "CCIPConfig"
+	ContractNamePriceAggregator        = "AggregatorV3Interface"
+	ContractNameNonceManager           = "NonceManager"
+	ContractNameRMNHome                = "RMNHome"
+	ContractNameRMNRemote              = "RMNRemote"
+	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
 )
 
 // Method Names
@@ -86,6 +87,7 @@ const (
 	EventNameCCIPMessageSent       = "CCIPMessageSent"
 	EventNameExecutionStateChanged = "ExecutionStateChanged"
 	EventNameCommitReportAccepted  = "CommitReportAccepted"
+	EventNameCCTPMessageSent       = "MessageSent"
 )
 
 // Event Attributes
@@ -93,4 +95,10 @@ const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "destChain"
+)
+
+// Mirrors of Internal.sol's OCRPluginType
+const (
+	PluginTypeCommit  uint8 = 0
+	PluginTypeExecute uint8 = 1
 )

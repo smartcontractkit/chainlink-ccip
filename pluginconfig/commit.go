@@ -30,12 +30,6 @@ type CommitPluginConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint
 
-	// SyncTimeout is the timeout for syncing the commit plugin reader.
-	SyncTimeout time.Duration `json:"syncTimeout"`
-
-	// SyncFrequency is the frequency at which the commit plugin reader should sync.
-	SyncFrequency time.Duration `json:"syncFrequency"`
-
 	// OffchainConfig is the offchain config set for the commit DON.
 	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
 

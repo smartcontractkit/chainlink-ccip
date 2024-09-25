@@ -20,9 +20,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -59,6 +60,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr              logger.Logger
+	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
 	msgHasher         cciptypes.MessageHasher
@@ -70,6 +72,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
@@ -168,6 +171,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	)
 	return NewPlugin(
 			context.Background(),
+			p.donID,
 			config.OracleID,
 			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{

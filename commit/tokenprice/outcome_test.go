@@ -68,7 +68,7 @@ func TestGetConsensusObservation(t *testing.T) {
 			DestChain:      destChainSel,
 			OffchainConfig: offChainCfg,
 		},
-		bigF: 1,
+		fRoleDON: 1,
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
@@ -117,7 +117,7 @@ func TestSelectTokensForUpdate(t *testing.T) {
 			DestChain:      destChainSel,
 			OffchainConfig: offChainCfg,
 		},
-		bigF: 1,
+		fRoleDON: 1,
 	}
 
 	conObs := ConsensusObservation{
@@ -146,7 +146,7 @@ func TestOutcome(t *testing.T) {
 			DestChain:      destChainSel,
 			OffchainConfig: offChainCfg,
 		},
-		bigF: 1,
+		fRoleDON: 1,
 	}
 
 	outcome, err := p.Outcome(Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{
