@@ -41,6 +41,12 @@ type HTTPClient interface {
 	Get(ctx context.Context, messageHash [32]byte) ([]byte, int, error)
 }
 
+// httpClient is a client for the USDC attestation API. It encapsulates all the details specific to the Attestation API:
+// - rate limiting
+// - cool down period
+// - parsing JSON response and handling errors
+// Therefore AttestationClient is a higher level abstraction that uses httpClient to fetch attestations and can be more
+// oriented around caching/processing the attestation data instead of handling the API specifics.
 type httpClient struct {
 	apiURL     string
 	apiTimeout time.Duration

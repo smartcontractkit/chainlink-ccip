@@ -162,6 +162,7 @@ func attestationToTokenData(
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
+	// TODO TokenData = abi.encode(messageHash, attestation)
 	return exectypes.NewSuccessTokenData(status.Attestation[:])
 }
 

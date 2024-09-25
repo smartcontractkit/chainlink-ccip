@@ -114,6 +114,23 @@ func Test_HTTPClient_Get(t *testing.T) {
 			expectedError:      fmt.Errorf("invalid attestation response"),
 		},
 		{
+			name: "malformed response",
+			getTs: func() *httptest.Server {
+				attestationResponse := []byte(`
+				{
+					"field": 2137
+				}`)
+
+				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					_, err := w.Write(attestationResponse)
+					require.NoError(t, err)
+				}))
+			},
+			timeout:            longTimeout,
+			expectedStatusCode: http.StatusOK,
+			expectedError:      fmt.Errorf("invalid attestation response"),
+		},
+		{
 			name: "rate limit",
 			getTs: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +199,6 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 	var requestCount int
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
-		require.LessOrEqual(t, requestCount, 2)
 		if requestCount%2 == 1 {
 			w.WriteHeader(http.StatusInternalServerError)
 		} else {
@@ -204,6 +220,40 @@ func Test_HTTPClient_Cooldown(t *testing.T) {
 		_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
 		require.EqualError(t, err, ErrRateLimit.Error())
 	}
+	require.Equal(t, requestCount, 2)
+}
+
+func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
+	var requestCount int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount%2 == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+		}
+	}))
+	defer ts.Close()
+
+	attestationURI, err := url.ParseRequestURI(ts.URL)
+	require.NoError(t, err)
+
+	client := NewHTTPClient(attestationURI.String(), 1*time.Millisecond, longTimeout)
+	_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
+	require.EqualError(t, err, ErrUnknownResponse.Error())
+
+	// Getting rate limited, cooling down for 1 second
+	_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
+	require.EqualError(t, err, ErrRateLimit.Error())
+
+	time.Sleep(2 * time.Second)
+
+	// Next request should go through and reach API
+	_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
+	require.EqualError(t, err, ErrUnknownResponse.Error())
+
+	require.Equal(t, requestCount, 3)
 }
 
 func mustDecode(s string) []byte {

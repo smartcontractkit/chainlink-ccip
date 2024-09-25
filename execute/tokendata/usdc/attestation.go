@@ -21,9 +21,12 @@ var (
 )
 
 type AttestationStatus struct {
+	// MessageHash is the hash of the message that the attestation was fetched for. It's going to be MessageSent event hash
 	MessageHash []byte
+	// Attestation is the attestation data fetched from the API, encoded in bytes
 	Attestation []byte
-	Error       error
+	// Error is the error that occurred during fetching the attestation data
+	Error error
 }
 
 func SuccessAttestationStatus(messageHash []byte, attestation []byte) AttestationStatus {
