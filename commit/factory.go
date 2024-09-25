@@ -114,6 +114,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to generate random address: %w", err)
 	}
+	fmt.Println("home chain selector", p.homeChainSelector.String())
 	rmnCr, ok := p.contractReaders[p.homeChainSelector]
 	if !ok {
 		return nil,
