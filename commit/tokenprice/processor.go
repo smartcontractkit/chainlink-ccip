@@ -36,7 +36,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	tokenPriceReader reader.PriceReader,
 	homeChain reader.HomeChain,
-	bigF int,
+	fRoleDON int,
 ) *processor {
 	return &processor{
 		oracleID:         oracleID,
@@ -45,7 +45,7 @@ func NewProcessor(
 		chainSupport:     chainSupport,
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
-		fRoleDON:         bigF,
+		fRoleDON:         fRoleDON,
 	}
 }
 
