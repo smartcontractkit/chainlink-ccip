@@ -256,6 +256,60 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	require.Equal(t, requestCount, 3)
 }
 
+func Test_httpResponse(t *testing.T) {
+	t.Parallel()
+
+	tt := []struct {
+		name                string
+		response            httpResponse
+		expectedError       error
+		expectedAttestation []byte
+	}{
+		{
+			name: "success",
+			response: httpResponse{
+				Status:      attestationStatusSuccess,
+				Attestation: "0x720502893578a89a8a87982982ef781c18b193",
+			},
+			expectedAttestation: mustDecode("720502893578a89a8a87982982ef781c18b193"),
+		},
+		{
+			name: "pending",
+			response: httpResponse{
+				Status: attestationStatusPending,
+			},
+			expectedError: ErrNotReady,
+		},
+		{
+			name: "error",
+			response: httpResponse{
+				Error: "some error",
+			},
+			expectedError: fmt.Errorf("attestation API error: some error"),
+		},
+		{
+			name:          "empty",
+			response:      httpResponse{},
+			expectedError: fmt.Errorf("invalid attestation response"),
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.response.validate()
+			if tc.expectedError != nil {
+				require.EqualError(t, err, tc.expectedError.Error())
+				return
+			}
+
+			require.NoError(t, err)
+			attestation, err1 := tc.response.attestationToBytes()
+			require.NoError(t, err1)
+			require.Equal(t, tc.expectedAttestation, attestation)
+		})
+	}
+}
+
 func mustDecode(s string) []byte {
 	b, err := hex.DecodeString(s)
 	if err != nil {
