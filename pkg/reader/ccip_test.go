@@ -142,235 +142,233 @@ func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	})
 }
 
-func TestCCIPChainReader_Sync(t *testing.T) {
-	t.Run("binds contracts successfully", func(t *testing.T) {
-		ctx := tests.Context(t)
-		destChain := cciptypes.ChainSelector(1)
-		sourceChain1 := cciptypes.ChainSelector(2)
-		sourceChain2 := cciptypes.ChainSelector(3)
-		s1Onramp := []byte{0x1}
-		s2Onramp := []byte{0x2}
-		destNonceMgr := []byte{0x3}
-		destExtended := reader.NewMockExtended(t)
-		destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameNonceManager,
-				Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
-			},
-		}).Return(nil)
+func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T) {
+	ctx := tests.Context(t)
+	destChain := cciptypes.ChainSelector(1)
+	sourceChain1 := cciptypes.ChainSelector(2)
+	sourceChain2 := cciptypes.ChainSelector(3)
+	s1Onramp := []byte{0x1}
+	s2Onramp := []byte{0x2}
+	destNonceMgr := []byte{0x3}
+	destExtended := reader.NewMockExtended(t)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameNonceManager,
+			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+		},
+	}).Return(nil)
 
-		source1Extended := reader.NewMockExtended(t)
-		source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameOnRamp,
-				Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
-			},
-		}).Return(nil)
+	source1Extended := reader.NewMockExtended(t)
+	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOnRamp,
+			Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
+		},
+	}).Return(nil)
 
-		source2Extended := reader.NewMockExtended(t)
-		source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameOnRamp,
-				Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
-			},
-		}).Return(nil)
+	source2Extended := reader.NewMockExtended(t)
+	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOnRamp,
+			Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
+		},
+	}).Return(nil)
 
-		defer destExtended.AssertExpectations(t)
-		defer source1Extended.AssertExpectations(t)
-		defer source2Extended.AssertExpectations(t)
+	defer destExtended.AssertExpectations(t)
+	defer source1Extended.AssertExpectations(t)
+	defer source2Extended.AssertExpectations(t)
 
-		ccipReader := &ccipChainReader{
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-				destChain:    destExtended,
-				sourceChain1: source1Extended,
-				sourceChain2: source2Extended,
-			},
-			destChain: destChain,
-			lggr:      logger.Test(t),
-		}
+	ccipReader := &ccipChainReader{
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			destChain:    destExtended,
+			sourceChain1: source1Extended,
+			sourceChain2: source2Extended,
+		},
+		destChain: destChain,
+		lggr:      logger.Test(t),
+	}
 
-		contracts := ContractAddresses{
-			consts.ContractNameOnRamp: {
-				sourceChain1: s1Onramp,
-				sourceChain2: s2Onramp,
-			},
-			consts.ContractNameNonceManager: {
-				destChain: destNonceMgr,
-			},
-		}
+	contracts := ContractAddresses{
+		consts.ContractNameOnRamp: {
+			sourceChain1: s1Onramp,
+			sourceChain2: s2Onramp,
+		},
+		consts.ContractNameNonceManager: {
+			destChain: destNonceMgr,
+		},
+	}
 
-		err := ccipReader.Sync(ctx, contracts)
-		require.NoError(t, err)
-	})
+	err := ccipReader.Sync(ctx, contracts)
+	require.NoError(t, err)
+}
 
-	t.Run("skips empty addresses", func(t *testing.T) {
-		ctx := tests.Context(t)
-		destChain := cciptypes.ChainSelector(1)
-		sourceChain1 := cciptypes.ChainSelector(2)
-		sourceChain2 := cciptypes.ChainSelector(3)
-		s1Onramp := []byte{0x1}
+func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
+	ctx := tests.Context(t)
+	destChain := cciptypes.ChainSelector(1)
+	sourceChain1 := cciptypes.ChainSelector(2)
+	sourceChain2 := cciptypes.ChainSelector(3)
+	s1Onramp := []byte{0x1}
 
-		// empty address, should get skipped
-		s2Onramp := []byte{}
+	// empty address, should get skipped
+	s2Onramp := []byte{}
 
-		destNonceMgr := []byte{0x3}
-		destExtended := reader.NewMockExtended(t)
-		destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameNonceManager,
-				Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
-			},
-		}).Return(nil)
+	destNonceMgr := []byte{0x3}
+	destExtended := reader.NewMockExtended(t)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameNonceManager,
+			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+		},
+	}).Return(nil)
 
-		source1Extended := reader.NewMockExtended(t)
-		source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameOnRamp,
-				Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
-			},
-		}).Return(nil)
+	source1Extended := reader.NewMockExtended(t)
+	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOnRamp,
+			Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
+		},
+	}).Return(nil)
 
-		// bind should not be called on this one.
-		source2Extended := reader.NewMockExtended(t)
+	// bind should not be called on this one.
+	source2Extended := reader.NewMockExtended(t)
 
-		defer destExtended.AssertExpectations(t)
-		defer source1Extended.AssertExpectations(t)
-		defer source2Extended.AssertExpectations(t)
+	defer destExtended.AssertExpectations(t)
+	defer source1Extended.AssertExpectations(t)
+	defer source2Extended.AssertExpectations(t)
 
-		ccipReader := &ccipChainReader{
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-				destChain:    destExtended,
-				sourceChain1: source1Extended,
-				sourceChain2: source2Extended,
-			},
-			destChain: destChain,
-			lggr:      logger.Test(t),
-		}
+	ccipReader := &ccipChainReader{
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			destChain:    destExtended,
+			sourceChain1: source1Extended,
+			sourceChain2: source2Extended,
+		},
+		destChain: destChain,
+		lggr:      logger.Test(t),
+	}
 
-		contracts := ContractAddresses{
-			consts.ContractNameOnRamp: {
-				sourceChain1: s1Onramp,
-				sourceChain2: s2Onramp,
-			},
-			consts.ContractNameNonceManager: {
-				destChain: destNonceMgr,
-			},
-		}
+	contracts := ContractAddresses{
+		consts.ContractNameOnRamp: {
+			sourceChain1: s1Onramp,
+			sourceChain2: s2Onramp,
+		},
+		consts.ContractNameNonceManager: {
+			destChain: destNonceMgr,
+		},
+	}
 
-		err := ccipReader.Sync(ctx, contracts)
-		require.NoError(t, err)
-	})
+	err := ccipReader.Sync(ctx, contracts)
+	require.NoError(t, err)
+}
 
-	t.Run("don't support all chains", func(t *testing.T) {
-		ctx := tests.Context(t)
-		destChain := cciptypes.ChainSelector(1)
-		sourceChain1 := cciptypes.ChainSelector(2)
-		sourceChain2 := cciptypes.ChainSelector(3)
-		s1Onramp := []byte{0x1}
-		s2Onramp := []byte{0x2}
-		destNonceMgr := []byte{0x3}
-		destExtended := reader.NewMockExtended(t)
-		destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameNonceManager,
-				Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
-			},
-		}).Return(nil)
+func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
+	ctx := tests.Context(t)
+	destChain := cciptypes.ChainSelector(1)
+	sourceChain1 := cciptypes.ChainSelector(2)
+	sourceChain2 := cciptypes.ChainSelector(3)
+	s1Onramp := []byte{0x1}
+	s2Onramp := []byte{0x2}
+	destNonceMgr := []byte{0x3}
+	destExtended := reader.NewMockExtended(t)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameNonceManager,
+			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+		},
+	}).Return(nil)
 
-		// only support source2, source1 unsupported.
-		source2Extended := reader.NewMockExtended(t)
-		source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameOnRamp,
-				Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
-			},
-		}).Return(nil)
+	// only support source2, source1 unsupported.
+	source2Extended := reader.NewMockExtended(t)
+	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOnRamp,
+			Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
+		},
+	}).Return(nil)
 
-		defer destExtended.AssertExpectations(t)
-		defer source2Extended.AssertExpectations(t)
+	defer destExtended.AssertExpectations(t)
+	defer source2Extended.AssertExpectations(t)
 
-		ccipReader := &ccipChainReader{
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-				destChain:    destExtended,
-				sourceChain2: source2Extended,
-			},
-			destChain: destChain,
-			lggr:      logger.Test(t),
-		}
+	ccipReader := &ccipChainReader{
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			destChain:    destExtended,
+			sourceChain2: source2Extended,
+		},
+		destChain: destChain,
+		lggr:      logger.Test(t),
+	}
 
-		contracts := ContractAddresses{
-			consts.ContractNameOnRamp: {
-				sourceChain1: s1Onramp,
-				sourceChain2: s2Onramp,
-			},
-			consts.ContractNameNonceManager: {
-				destChain: destNonceMgr,
-			},
-		}
+	contracts := ContractAddresses{
+		consts.ContractNameOnRamp: {
+			sourceChain1: s1Onramp,
+			sourceChain2: s2Onramp,
+		},
+		consts.ContractNameNonceManager: {
+			destChain: destNonceMgr,
+		},
+	}
 
-		err := ccipReader.Sync(ctx, contracts)
-		require.NoError(t, err)
-	})
+	err := ccipReader.Sync(ctx, contracts)
+	require.NoError(t, err)
+}
 
-	t.Run("handles binding errors", func(t *testing.T) {
-		ctx := tests.Context(t)
-		destChain := cciptypes.ChainSelector(1)
-		sourceChain1 := cciptypes.ChainSelector(2)
-		sourceChain2 := cciptypes.ChainSelector(3)
-		s1Onramp := []byte{0x1}
-		s2Onramp := []byte{0x2}
-		destNonceMgr := []byte{0x3}
-		destExtended := reader.NewMockExtended(t)
-		destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameNonceManager,
-				Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
-			},
-		}).Return(nil)
+func TestCCIPChainReader_Sync_BindError(t *testing.T) {
+	ctx := tests.Context(t)
+	destChain := cciptypes.ChainSelector(1)
+	sourceChain1 := cciptypes.ChainSelector(2)
+	sourceChain2 := cciptypes.ChainSelector(3)
+	s1Onramp := []byte{0x1}
+	s2Onramp := []byte{0x2}
+	destNonceMgr := []byte{0x3}
+	destExtended := reader.NewMockExtended(t)
+	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameNonceManager,
+			Address: typeconv.AddressBytesToString(destNonceMgr, uint64(destChain)),
+		},
+	}).Return(nil)
 
-		expectedErr := errors.New("some error")
-		source1Extended := reader.NewMockExtended(t)
-		source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameOnRamp,
-				Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
-			},
-		}).Return(expectedErr)
+	expectedErr := errors.New("some error")
+	source1Extended := reader.NewMockExtended(t)
+	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOnRamp,
+			Address: typeconv.AddressBytesToString(s1Onramp, uint64(sourceChain1)),
+		},
+	}).Return(expectedErr)
 
-		source2Extended := reader.NewMockExtended(t)
-		source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
-			{
-				Name:    consts.ContractNameOnRamp,
-				Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
-			},
-		}).Return(nil)
+	source2Extended := reader.NewMockExtended(t)
+	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
+		{
+			Name:    consts.ContractNameOnRamp,
+			Address: typeconv.AddressBytesToString(s2Onramp, uint64(sourceChain2)),
+		},
+	}).Return(nil)
 
-		defer destExtended.AssertExpectations(t)
-		defer source1Extended.AssertExpectations(t)
-		defer source2Extended.AssertExpectations(t)
+	defer destExtended.AssertExpectations(t)
+	defer source1Extended.AssertExpectations(t)
+	defer source2Extended.AssertExpectations(t)
 
-		ccipReader := &ccipChainReader{
-			contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-				destChain:    destExtended,
-				sourceChain1: source1Extended,
-				sourceChain2: source2Extended,
-			},
-			destChain: destChain,
-			lggr:      logger.Test(t),
-		}
+	ccipReader := &ccipChainReader{
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			destChain:    destExtended,
+			sourceChain1: source1Extended,
+			sourceChain2: source2Extended,
+		},
+		destChain: destChain,
+		lggr:      logger.Test(t),
+	}
 
-		contracts := ContractAddresses{
-			consts.ContractNameOnRamp: {
-				sourceChain1: s1Onramp,
-				sourceChain2: s2Onramp,
-			},
-			consts.ContractNameNonceManager: {
-				destChain: destNonceMgr,
-			},
-		}
+	contracts := ContractAddresses{
+		consts.ContractNameOnRamp: {
+			sourceChain1: s1Onramp,
+			sourceChain2: s2Onramp,
+		},
+		consts.ContractNameNonceManager: {
+			destChain: destNonceMgr,
+		},
+	}
 
-		err := ccipReader.Sync(ctx, contracts)
-		require.Error(t, err)
-		require.ErrorIs(t, err, expectedErr)
-	})
+	err := ccipReader.Sync(ctx, contracts)
+	require.Error(t, err)
+	require.ErrorIs(t, err, expectedErr)
 }
