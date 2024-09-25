@@ -18,8 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	contractreader2 "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
@@ -31,13 +30,13 @@ var (
 )
 
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
-	sourceCRs := make(map[cciptypes.ChainSelector]*reader.MockContractReaderFacade)
+	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
-		sourceCRs[chain] = reader.NewMockContractReaderFacade(t)
+		sourceCRs[chain] = reader_mocks.NewMockContractReaderFacade(t)
 		sourceCRs[chain].EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	}
 
-	destCR := reader.NewMockContractReaderFacade(t)
+	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
@@ -85,7 +84,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 }
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
-	ecr := contractreader2.NewMockExtended(t)
+	ecr := reader_mocks.NewMockExtended(t)
 
 	ccipReader := ccipChainReader{
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
@@ -150,7 +149,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
-	destExtended := reader.NewMockExtended(t)
+	destExtended := reader_mocks.NewMockExtended(t)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -158,7 +157,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 		},
 	}).Return(nil)
 
-	source1Extended := reader.NewMockExtended(t)
+	source1Extended := reader_mocks.NewMockExtended(t)
 	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
@@ -166,7 +165,7 @@ func TestCCIPChainReader_Sync_HappyPath_BindsContractsSuccessfully(t *testing.T)
 		},
 	}).Return(nil)
 
-	source2Extended := reader.NewMockExtended(t)
+	source2Extended := reader_mocks.NewMockExtended(t)
 	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
@@ -213,7 +212,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 	s2Onramp := []byte{}
 
 	destNonceMgr := []byte{0x3}
-	destExtended := reader.NewMockExtended(t)
+	destExtended := reader_mocks.NewMockExtended(t)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -221,7 +220,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 		},
 	}).Return(nil)
 
-	source1Extended := reader.NewMockExtended(t)
+	source1Extended := reader_mocks.NewMockExtended(t)
 	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
@@ -230,7 +229,7 @@ func TestCCIPChainReader_Sync_HappyPath_SkipsEmptyAddress(t *testing.T) {
 	}).Return(nil)
 
 	// bind should not be called on this one.
-	source2Extended := reader.NewMockExtended(t)
+	source2Extended := reader_mocks.NewMockExtended(t)
 
 	defer destExtended.AssertExpectations(t)
 	defer source1Extended.AssertExpectations(t)
@@ -268,7 +267,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
-	destExtended := reader.NewMockExtended(t)
+	destExtended := reader_mocks.NewMockExtended(t)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -277,7 +276,7 @@ func TestCCIPChainReader_Sync_HappyPath_DontSupportAllChains(t *testing.T) {
 	}).Return(nil)
 
 	// only support source2, source1 unsupported.
-	source2Extended := reader.NewMockExtended(t)
+	source2Extended := reader_mocks.NewMockExtended(t)
 	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
@@ -319,7 +318,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
-	destExtended := reader.NewMockExtended(t)
+	destExtended := reader_mocks.NewMockExtended(t)
 	destExtended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameNonceManager,
@@ -328,7 +327,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 	}).Return(nil)
 
 	expectedErr := errors.New("some error")
-	source1Extended := reader.NewMockExtended(t)
+	source1Extended := reader_mocks.NewMockExtended(t)
 	source1Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
@@ -336,7 +335,7 @@ func TestCCIPChainReader_Sync_BindError(t *testing.T) {
 		},
 	}).Return(expectedErr)
 
-	source2Extended := reader.NewMockExtended(t)
+	source2Extended := reader_mocks.NewMockExtended(t)
 	source2Extended.EXPECT().Bind(mock.Anything, []types.BoundContract{
 		{
 			Name:    consts.ContractNameOnRamp,
