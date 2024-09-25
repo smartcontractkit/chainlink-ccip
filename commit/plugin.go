@@ -180,7 +180,8 @@ func (p *Plugin) Observation(
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
 		if !p.contractsInitialized {
-			p.lggr.Infow("contracts not initialized, only making discovery observations")
+			p.lggr.Infow("contracts not initialized, only making discovery observations",
+				"discoveryObs", discoveryObs)
 			return Observation{DiscoveryObs: discoveryObs}.Encode()
 		}
 	}
@@ -225,6 +226,11 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	p.lggr.Debugw("Commit plugin performing outcome",
+		"outctx", outCtx,
+		"query", q,
+		"attributedObservations", aos)
+
 	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
 
 	decodedQ, err := DecodeCommitPluginQuery(q)
@@ -272,6 +278,7 @@ func (p *Plugin) Outcome(
 	}
 
 	if p.discoveryProcessor != nil {
+		p.lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
 		_, err = p.discoveryProcessor.Outcome(dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)

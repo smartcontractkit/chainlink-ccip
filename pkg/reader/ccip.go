@@ -504,18 +504,19 @@ func (r *ccipChainReader) DiscoverContracts(
 
 // Sync goes through the input contracts and binds them to the contract reader.
 func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
-	if len(contracts) == 0 {
-		// TODO: stop calling DiscoverContracts here once the contracts are passed in via observations.
-		var err error
-		contracts, err = r.DiscoverContracts(ctx, r.destChain)
-		if err != nil {
-			return fmt.Errorf("sync: %w", err)
-		}
-	}
-
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
+			// defense in depth: don't bind if the address is empty.
+			// callers should ensure this but we double check here.
+			if len(address) == 0 {
+				r.lggr.Warnw("skipping binding empty address for contract",
+					"contractName", contractName,
+					"chainSel", chainSel,
+				)
+				continue
+			}
+
 			// try to bind
 			_, err := bindExtendedReaderContract(ctx, r.contractReaders, chainSel, contractName, address)
 			if err != nil {
@@ -529,6 +530,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 			}
 		}
 	}
+
 	return errors.Join(errs...)
 }
 
@@ -566,6 +568,7 @@ func (r *ccipChainReader) getSourceChainsConfig(
 			continue
 		}
 
+		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
 		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
@@ -582,6 +585,23 @@ func (r *ccipChainReader) getSourceChainsConfig(
 			if err != nil {
 				return fmt.Errorf("failed to get source chain config: %w", err)
 			}
+
+			// This may happen due to some sort of regression in the codec that unmarshals
+			// chain data -> go struct.
+			if len(resp.OnRamp) == 0 {
+				return fmt.Errorf(
+					"onRamp misconfigured/didn't unmarshal for chain %d: %x",
+					chainSel,
+					resp.OnRamp,
+				)
+			}
+
+			if !resp.IsEnabled {
+				// We don't want to process disabled chains prematurely.
+				r.lggr.Debugw("source chain is disabled", "chain", chainSel)
+				return nil
+			}
+
 			mu.Lock()
 			res[chainSel] = resp
 			mu.Unlock()
