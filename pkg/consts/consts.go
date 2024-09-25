@@ -7,6 +7,7 @@ const (
 	ContractNameOffRamp                = "OffRamp"
 	ContractNameOnRamp                 = "OnRamp"
 	ContractNameFeeQuoter              = "FeeQuoter"
+	ContractNameRouter                 = "Router"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
 	ContractNameCCIPConfig             = "CCIPConfig"
 	ContractNamePriceAggregator        = "AggregatorV3Interface"
@@ -19,6 +20,9 @@ const (
 // Method Names
 // TODO: these should be better organized, maybe separate packages.
 const (
+	// Router methods
+	MethodNameRouterGetWrappedNative = "GetWrappedNative"
+
 	// Offramp methods
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
 	MethodNameOfframpGetDynamicConfig      = "OfframpGetDynamicConfig"

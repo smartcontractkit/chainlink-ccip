@@ -460,14 +460,47 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
-	//TODO:
-	// nolint:lll
 	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
 	// nolint:lll
 	// 2. Call FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, len(selectors))
 	for _, chain := range selectors {
-		prices[chain] = cciptypes.NewBigIntFromInt64(1)
+		reader, ok := r.contractReaders[chain]
+		if !ok {
+			r.lggr.Warnw("contract reader not found", "chain", chain)
+			continue
+		}
+
+		var nativeTokenAddress types2.Account
+		err := reader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameRouter,
+			consts.MethodNameRouterGetWrappedNative,
+			primitives.Unconfirmed,
+			nil,
+			&nativeTokenAddress)
+
+		if err != nil {
+			r.lggr.Errorw("failed to get native token address", "chain", chain, "err", err)
+			continue
+		}
+
+		var price *big.Int
+		err = reader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrices,
+			primitives.Unconfirmed,
+			map[string]any{
+				"token": nativeTokenAddress,
+			},
+			&price,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get native token price", "chain", chain, "err", err)
+			continue
+		}
+		prices[chain] = cciptypes.NewBigInt(price)
 	}
 	return prices
 }
