@@ -29,6 +29,8 @@ const (
 	maxCoolDownDuration = 10 * time.Minute
 )
 
+type HTTPStatus int
+
 type HTTPClient interface {
 	// Get calls the USDC attestation API with the given USDC message hash.
 	// The attestation service rate limit is 10 requests per second. If you exceed 10 requests
@@ -39,7 +41,7 @@ type HTTPClient interface {
 	//
 	//	https://developers.circle.com/stablecoins/reference/getattestation
 	//	https://developers.circle.com/stablecoins/docs/transfer-usdc-on-testnet-from-ethereum-to-avalanche
-	Get(ctx context.Context, messageHash [32]byte) ([]byte, int, error)
+	Get(ctx context.Context, messageHash [32]byte) ([]byte, HTTPStatus, error)
 }
 
 // httpClient is a client for the USDC attestation API. It encapsulates all the details specific to the Attestation API:
@@ -100,12 +102,12 @@ func (r httpResponse) validate() error {
 func (r httpResponse) attestationToBytes() ([]byte, error) {
 	attestationBytes, err := hex.DecodeString(strings.TrimPrefix(r.Attestation, "0x"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode attestation hex: %w", err)
 	}
 	return attestationBytes, nil
 }
 
-func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, int, error) {
+func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, HTTPStatus, error) {
 	var empty []byte
 	// Terminate immediately when rate limited
 	if h.inCoolDownPeriod() {
@@ -120,6 +122,8 @@ func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, int
 		}
 	}
 
+	// Use a timeout to guard against attestation API hanging, causing observation timeout and
+	// failing to make any progress.
 	timeoutCtx, cancel := context.WithTimeoutCause(ctx, h.apiTimeout, ErrTimeout)
 	defer cancel()
 
@@ -128,52 +132,57 @@ func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, int
 	return h.callAPI(timeoutCtx, requestURL)
 }
 
-func (h *httpClient) callAPI(ctx context.Context, url url.URL) ([]byte, int, error) {
-	var response []byte
-	// Use a timeout to guard against attestation API hanging, causing observation timeout and
-	// failing to make any progress.
+func (h *httpClient) callAPI(ctx context.Context, url url.URL) ([]byte, HTTPStatus, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
-		return response, http.StatusBadRequest, err
+		return nil, http.StatusBadRequest, err
 	}
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return response, http.StatusRequestTimeout, ErrTimeout
+			return nil, http.StatusRequestTimeout, ErrTimeout
 		}
 		// On error, res is nil in most cases, do not read res.StatusCode, return BadRequest
-		return response, http.StatusBadRequest, err
+		return nil, http.StatusBadRequest, err
 	}
-	defer res.Body.Close()
 
+	var status HTTPStatus
+	if res != nil {
+		defer res.Body.Close()
+		status = HTTPStatus(res.StatusCode)
+	}
 	// Explicitly signal if the API is being rate limited
 	if res.StatusCode == http.StatusTooManyRequests {
 		h.setCoolDownPeriod(res.Header)
-		return response, res.StatusCode, ErrRateLimit
+		return nil, status, ErrRateLimit
 	}
 	if res.StatusCode == http.StatusNotFound {
-		return response, res.StatusCode, ErrNotReady
+		return nil, status, ErrNotReady
 	}
 	if res.StatusCode != http.StatusOK {
-		return response, res.StatusCode, ErrUnknownResponse
+		return nil, status, ErrUnknownResponse
 	}
 
-	return h.parsePayload(res)
+	response, err := h.parsePayload(res)
+	return response, status, err
 }
 
-func (h *httpClient) parsePayload(res *http.Response) ([]byte, int, error) {
+func (h *httpClient) parsePayload(res *http.Response) ([]byte, error) {
+	if res == nil {
+		return nil, ErrUnknownResponse
+	}
+
 	var response httpResponse
 	if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
-		return nil, res.StatusCode, fmt.Errorf("failed to decode json: %w", err)
+		return nil, fmt.Errorf("failed to decode json: %w", err)
 	}
 
-	if err1 := response.validate(); err1 != nil {
-		return nil, res.StatusCode, err1
+	if err := response.validate(); err != nil {
+		return nil, err
 	}
 
-	attestationBytes, err := response.attestationToBytes()
-	return attestationBytes, res.StatusCode, err
+	return response.attestationToBytes()
 }
 
 func (h *httpClient) setCoolDownPeriod(headers http.Header) {

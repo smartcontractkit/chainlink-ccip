@@ -69,7 +69,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 		messageHash        [32]byte
 		expectedError      error
 		expectedResponse   []byte
-		expectedStatusCode int
+		expectedStatusCode HTTPStatus
 	}{
 		{
 			name: "server error",
@@ -123,7 +123,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 			},
 			timeout:            longTimeout,
 			expectedStatusCode: http.StatusOK,
-			expectedError:      fmt.Errorf("encoding/hex: odd length hex string"),
+			expectedError:      fmt.Errorf("failed to decode attestation hex: encoding/hex: odd length hex string"),
 		},
 		{
 			name: "invalid attestation",

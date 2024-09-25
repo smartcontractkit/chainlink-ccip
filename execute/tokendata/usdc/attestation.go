@@ -3,6 +3,7 @@ package usdc
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -66,7 +67,7 @@ func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) 
 		config.AttestationAPITimeout.Duration(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 	return &sequentialAttestationClient{
 		client: client,

@@ -17,59 +17,25 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-func createHandler(t *testing.T, success []string, pending []string) http.HandlerFunc {
-	successes := make(map[string]string)
-	for _, hash := range success {
-		successes["/v1/attestations/0x"+hash] = hash
-	}
-
-	pendings := make(map[string]string)
-	for _, hash := range pending {
-		pendings["/v1/attestations/0x"+hash] = hash
-	}
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		if hash, ok := successes[r.URL.String()]; ok {
-			response := fmt.Sprintf(`
-			{
-					"status": "complete",
-					"attestation": "%s"
-			}`, hash)
-			_, err := w.Write([]byte(response))
-			require.NoError(t, err)
-		} else if hash1, ok1 := pendings[r.URL.String()]; ok1 {
-			response := fmt.Sprintf(`
-			{
-					"status": "pending_confirmations",
-					"attestation": "%s"
-			}`, hash1)
-			_, err := w.Write([]byte(response))
-			require.NoError(t, err)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	}
-}
-
 func Test_AttestationClient(t *testing.T) {
 	type example struct {
 		hash   []byte
-		keecak string
+		keccak string
 	}
 
 	messageA := example{
 		hash:   []byte{0xA},
-		keecak: "0ef9d8f8804d174666011a394cab7901679a8944d24249fd148a6a36071151f8",
+		keccak: "0ef9d8f8804d174666011a394cab7901679a8944d24249fd148a6a36071151f8",
 	}
 
 	messageB := example{
 		hash:   []byte{0xB},
-		keecak: "60811857dd566889ff6255277d82526f2d9b3bbcb96076be22a5860765ac3d06",
+		keccak: "60811857dd566889ff6255277d82526f2d9b3bbcb96076be22a5860765ac3d06",
 	}
 
 	messageC := example{
 		hash:   []byte{0xC},
-		keecak: "4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
+		keccak: "4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
 	}
 
 	tt := []struct {
@@ -86,7 +52,7 @@ func Test_AttestationClient(t *testing.T) {
 		},
 		{
 			name:    "single success",
-			success: []string{messageA.keecak},
+			success: []string{messageA.keccak},
 			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
@@ -94,13 +60,13 @@ func Test_AttestationClient(t *testing.T) {
 			},
 			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keecak)),
+					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
 				},
 			},
 		},
 		{
 			name:    "single pending",
-			pending: []string{messageA.keecak},
+			pending: []string{messageA.keccak},
 			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
@@ -114,7 +80,7 @@ func Test_AttestationClient(t *testing.T) {
 		},
 		{
 			name:    "multiple success",
-			success: []string{messageA.keecak, messageB.keecak, messageC.keecak},
+			success: []string{messageA.keccak, messageB.keccak, messageC.keccak},
 			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
@@ -126,17 +92,17 @@ func Test_AttestationClient(t *testing.T) {
 			},
 			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keecak)),
-					exectypes.NewMessageTokenID(1, 2): SuccessAttestationStatus(messageB.hash, mustDecode(messageB.keecak)),
+					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
+					exectypes.NewMessageTokenID(1, 2): SuccessAttestationStatus(messageB.hash, mustDecode(messageB.keccak)),
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keecak)),
+					exectypes.NewMessageTokenID(2, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
 				},
 			},
 		},
 		{
 			name:    "multiple failures - A, C not ready but B internal error",
-			pending: []string{messageA.keecak, messageC.keecak},
+			pending: []string{messageA.keccak, messageC.keccak},
 			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
@@ -158,8 +124,8 @@ func Test_AttestationClient(t *testing.T) {
 		},
 		{
 			name:    "mixed success and failure",
-			success: []string{messageA.keecak, messageC.keecak},
-			pending: []string{messageB.keecak},
+			success: []string{messageA.keccak, messageC.keccak},
+			pending: []string{messageB.keccak},
 			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
@@ -173,13 +139,13 @@ func Test_AttestationClient(t *testing.T) {
 			},
 			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keecak)),
+					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
 				},
 				cciptypes.ChainSelector(2): {
 					exectypes.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
 				},
 				cciptypes.ChainSelector(3): {
-					exectypes.NewMessageTokenID(3, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keecak)),
+					exectypes.NewMessageTokenID(3, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
 				},
 			},
 		},
@@ -200,5 +166,38 @@ func Test_AttestationClient(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, attestations)
 		})
+	}
+}
+
+func groupedByURI(hashes []string) map[string]string {
+	out := make(map[string]string)
+	for _, hash := range hashes {
+		out["/v1/attestations/0x"+hash] = hash
+	}
+	return out
+}
+
+func writeJSONResponse(t *testing.T, w http.ResponseWriter, status, attestation string) {
+	response := fmt.Sprintf(`
+	{
+			"status": "%s",
+			"attestation": "%s"
+	}`, status, attestation)
+	_, err := w.Write([]byte(response))
+	require.NoError(t, err)
+}
+
+func createHandler(t *testing.T, success []string, pending []string) http.HandlerFunc {
+	successURIs := groupedByURI(success)
+	pendingURIs := groupedByURI(pending)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if hash, ok := successURIs[r.URL.String()]; ok {
+			writeJSONResponse(t, w, "complete", hash)
+		} else if hash1, ok1 := pendingURIs[r.URL.String()]; ok1 {
+			writeJSONResponse(t, w, "pending_confirmations", hash1)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 }
