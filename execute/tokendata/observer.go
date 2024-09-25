@@ -60,7 +60,7 @@ func NewConfigBasedCompositeObservers(
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observer, err1 := createUSDCTokenObserver(lggr, destChainSelector, c.USDCCCTPObserverConfig.Tokens, readers)
+			observer, err1 := createUSDCTokenObserver(lggr, destChainSelector, *c.USDCCCTPObserverConfig, readers)
 			if err1 != nil {
 				return nil, err1
 			}
@@ -75,11 +75,11 @@ func NewConfigBasedCompositeObservers(
 func createUSDCTokenObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
-	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
+	cctpConfig pluginconfig.USDCCCTPObserverConfig,
 	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (TokenDataObserver, error) {
 	usdcReader, err := reader.NewUSDCMessageReader(
-		tokensConfig,
+		cctpConfig.Tokens,
 		readers,
 	)
 	if err != nil {
@@ -89,9 +89,9 @@ func createUSDCTokenObserver(
 	return usdc.NewTokenDataObserver(
 		lggr,
 		destChainSelector,
-		tokensConfig,
+		cctpConfig.Tokens,
 		usdcReader,
-		nil,
+		usdc.NewAttestationClient(cctpConfig),
 	), nil
 }
 

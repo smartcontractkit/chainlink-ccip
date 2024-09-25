@@ -82,16 +82,16 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
-					"message10": {Data: [32]byte{10_1}},
-					"message12": {Data: [32]byte{12_1}},
+					"message10": {Attestation: []byte{10_1}},
+					"message12": {Attestation: []byte{12_1}},
 				},
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
-					10: exectypes.NewMessageTokenData(newReadyTokenData([32]byte{10_1})),
+					10: exectypes.NewMessageTokenData(newReadyTokenData([]byte{10_1})),
 				},
 				2: {
-					12: exectypes.NewMessageTokenData(newReadyTokenData([32]byte{12_1})),
+					12: exectypes.NewMessageTokenData(newReadyTokenData([]byte{12_1})),
 				},
 			},
 		},
@@ -120,26 +120,26 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
-					"message10_1": {Data: [32]byte{10_1}},
-					"message11_1": {Data: [32]byte{11_1}},
-					"message12_2": {Data: [32]byte{12_2}},
+					"message10_1": {Attestation: []byte{10_1}},
+					"message11_1": {Attestation: []byte{11_1}},
+					"message12_2": {Attestation: []byte{12_2}},
 				},
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
 						exectypes.NotSupportedTokenData(),
-						newReadyTokenData([32]byte{10_1}),
+						newReadyTokenData([]byte{10_1}),
 					),
 					11: exectypes.NewMessageTokenData(
 						exectypes.NotSupportedTokenData(),
-						newReadyTokenData([32]byte{11_1}),
+						newReadyTokenData([]byte{11_1}),
 						exectypes.NotSupportedTokenData(),
 					),
 					12: exectypes.NewMessageTokenData(
 						exectypes.NotSupportedTokenData(),
 						exectypes.NotSupportedTokenData(),
-						newReadyTokenData([32]byte{12_2}),
+						newReadyTokenData([]byte{12_2}),
 					),
 					13: exectypes.NewMessageTokenData(),
 				},
@@ -170,25 +170,25 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
-					"message10_0": {Data: [32]byte{10_0}},
-					"message10_1": {Data: [32]byte{10_1}},
-					"message10_2": {Data: [32]byte{10_2}},
-					"message12_0": {Data: [32]byte{12_0}},
-					"message12_1": {Data: [32]byte{12_1}},
+					"message10_0": {Attestation: []byte{10_0}},
+					"message10_1": {Attestation: []byte{10_1}},
+					"message10_2": {Attestation: []byte{10_2}},
+					"message12_0": {Attestation: []byte{12_0}},
+					"message12_1": {Attestation: []byte{12_1}},
 				},
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						newReadyTokenData([32]byte{10_0}),
-						newReadyTokenData([32]byte{10_1}),
-						newReadyTokenData([32]byte{10_2}),
+						newReadyTokenData([]byte{10_0}),
+						newReadyTokenData([]byte{10_1}),
+						newReadyTokenData([]byte{10_2}),
 					),
 				},
 				2: {
 					12: exectypes.NewMessageTokenData(
-						newReadyTokenData([32]byte{12_0}),
-						newReadyTokenData([32]byte{12_1}),
+						newReadyTokenData([]byte{12_0}),
+						newReadyTokenData([]byte{12_1}),
 					),
 				},
 			},
@@ -210,14 +210,14 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 			),
 			attestationClient: usdc.FakeAttestationClient{
 				Data: map[string]usdc.AttestationStatus{
-					"message10_0": {Data: [32]byte{10_0}},
+					"message10_0": {Attestation: []byte{10_0}},
 					"message10_1": {Error: usdc.ErrNotReady},
 				},
 			},
 			expectedTokenData: exectypes.TokenDataObservations{
 				1: {
 					10: exectypes.NewMessageTokenData(
-						newReadyTokenData([32]byte{10_0}),
+						newReadyTokenData([]byte{10_0}),
 						exectypes.TokenData{
 							Ready:     false,
 							Data:      nil,
@@ -243,11 +243,11 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 	}
 }
 
-func newReadyTokenData(data [32]byte) exectypes.TokenData {
+func newReadyTokenData(data []byte) exectypes.TokenData {
 	return exectypes.TokenData{
 		Ready:     true,
 		Error:     nil,
-		Data:      data[:],
+		Data:      data,
 		Supported: true,
 	}
 }

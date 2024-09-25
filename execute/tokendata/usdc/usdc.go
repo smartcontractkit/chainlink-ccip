@@ -162,7 +162,7 @@ func attestationToTokenData(
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
-	return exectypes.NewSuccessTokenData(status.Data[:])
+	return exectypes.NewSuccessTokenData(status.Attestation[:])
 }
 
 func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {
