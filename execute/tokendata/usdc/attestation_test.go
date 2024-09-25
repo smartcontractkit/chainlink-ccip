@@ -190,11 +190,12 @@ func Test_AttestationClient(t *testing.T) {
 			server := httptest.NewServer(createHandler(t, tc.success, tc.pending))
 			defer server.Close()
 
-			client := NewAttestationClient(pluginconfig.USDCCCTPObserverConfig{
+			client, err := NewAttestationClient(pluginconfig.USDCCCTPObserverConfig{
 				AttestationAPI:         server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Minute),
 			})
+			require.NoError(t, err)
 			attestations, err := client.Attestations(tests.Context(t), tc.input)
 			require.NoError(t, err)
 			require.Equal(t, tc.expected, attestations)

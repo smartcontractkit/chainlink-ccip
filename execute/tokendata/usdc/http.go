@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,7 +49,7 @@ type HTTPClient interface {
 // Therefore AttestationClient is a higher level abstraction that uses httpClient to fetch attestations and can be more
 // oriented around caching/processing the attestation data instead of handling the API specifics.
 type httpClient struct {
-	apiURL     string
+	apiURL     *url.URL
 	apiTimeout time.Duration
 	rate       *rate.Limiter
 	// coolDownUntil defines whether requests are blocked or not.
@@ -56,13 +58,18 @@ type httpClient struct {
 }
 
 //nolint:revive
-func NewHTTPClient(api string, apiInterval time.Duration, apiTimeout time.Duration) *httpClient {
+func NewHTTPClient(api string, apiInterval time.Duration, apiTimeout time.Duration) (*httpClient, error) {
+	u, err := url.ParseRequestURI(api)
+	if err != nil {
+		return nil, err
+	}
+
 	return &httpClient{
-		apiURL:     api,
+		apiURL:     u,
 		apiTimeout: apiTimeout,
 		rate:       rate.NewLimiter(rate.Every(apiInterval), 1),
 		coolDownMu: &sync.RWMutex{},
-	}
+	}, nil
 }
 
 type attestationStatus string
@@ -117,15 +124,16 @@ func (h *httpClient) Get(ctx context.Context, messageHash [32]byte) ([]byte, int
 	timeoutCtx, cancel := context.WithTimeoutCause(ctx, h.apiTimeout, ErrTimeout)
 	defer cancel()
 
-	url := fmt.Sprintf("%s/%s/%s/0x%x", h.apiURL, apiVersion, attestationPath, messageHash)
-	return h.callAPI(timeoutCtx, url)
+	requestURL := *h.apiURL
+	requestURL.Path = path.Join(requestURL.Path, apiVersion, attestationPath, fmt.Sprintf("0x%x", messageHash))
+	return h.callAPI(timeoutCtx, requestURL)
 }
 
-func (h *httpClient) callAPI(ctx context.Context, url string) ([]byte, int, error) {
+func (h *httpClient) callAPI(ctx context.Context, url url.URL) ([]byte, int, error) {
 	var response []byte
 	// Use a timeout to guard against attestation API hanging, causing observation timeout and
 	// failing to make any progress.
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
 	if err != nil {
 		return response, http.StatusBadRequest, err
 	}

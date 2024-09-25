@@ -60,15 +60,19 @@ type sequentialAttestationClient struct {
 }
 
 //nolint:revive
-func NewAttestationClient(config pluginconfig.USDCCCTPObserverConfig) *sequentialAttestationClient {
-	return &sequentialAttestationClient{
-		client: NewHTTPClient(
-			config.AttestationAPI,
-			config.AttestationAPIInterval.Duration(),
-			config.AttestationAPITimeout.Duration(),
-		),
-		hasher: hashutil.NewKeccak(),
+func NewAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (*sequentialAttestationClient, error) {
+	client, err := NewHTTPClient(
+		config.AttestationAPI,
+		config.AttestationAPIInterval.Duration(),
+		config.AttestationAPITimeout.Duration(),
+	)
+	if err != nil {
+		return nil, err
 	}
+	return &sequentialAttestationClient{
+		client: client,
+		hasher: hashutil.NewKeccak(),
+	}, nil
 }
 
 func (s *sequentialAttestationClient) Attestations(

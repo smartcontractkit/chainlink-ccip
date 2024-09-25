@@ -86,12 +86,17 @@ func createUSDCTokenObserver(
 		return nil, err
 	}
 
+	client, err := usdc.NewAttestationClient(cctpConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	return usdc.NewTokenDataObserver(
 		lggr,
 		destChainSelector,
 		cctpConfig.Tokens,
 		usdcReader,
-		usdc.NewAttestationClient(cctpConfig),
+		client,
 	), nil
 }
 
