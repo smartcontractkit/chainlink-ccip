@@ -26,8 +26,13 @@ func (p *processor) getConsensusObservation(
 		return Observation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
-
+	if len(aggObs.Timestamps) < fDestChain {
+		return Observation{},
+			fmt.Errorf("not enough observations for timestamps to reach consensus, have %d, need %d",
+				len(aggObs.Timestamps), fDestChain)
+	}
 	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
+
 	chainFeeUpdatesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"ChainFeeLatestUpdates",
