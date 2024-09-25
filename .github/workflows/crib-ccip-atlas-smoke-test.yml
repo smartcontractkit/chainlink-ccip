@@ -46,8 +46,8 @@ on:
 
 jobs:
   run-crib-ccip-atlas-smoke-test:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read
