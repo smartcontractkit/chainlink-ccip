@@ -9,9 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 

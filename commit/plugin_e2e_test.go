@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

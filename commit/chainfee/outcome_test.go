@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -13,6 +12,8 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
@@ -25,9 +26,6 @@ var feeComponentsMap = map[cciptypes.ChainSelector]types.ChainFeeComponents{
 }
 
 var chainFeePriceBatchWriteFrequency = *commonconfig.MustNewDuration(time.Minute)
-var offChainCfg = pluginconfig.CommitOffchainConfig{
-	RemoteGasPriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
-}
 
 var nativeTokenPricesMap = map[cciptypes.ChainSelector]cciptypes.BigInt{
 	1: cciptypes.NewBigInt(big.NewInt(10)),
