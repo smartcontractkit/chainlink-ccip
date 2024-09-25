@@ -57,8 +57,7 @@ type httpClient struct {
 	coolDownMu    *sync.RWMutex
 }
 
-//nolint:revive
-func NewHTTPClient(api string, apiInterval time.Duration, apiTimeout time.Duration) (*httpClient, error) {
+func NewHTTPClient(api string, apiInterval time.Duration, apiTimeout time.Duration) (HTTPClient, error) {
 	u, err := url.ParseRequestURI(api)
 	if err != nil {
 		return nil, err

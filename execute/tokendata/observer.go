@@ -46,23 +46,21 @@ type compositeTokenDataObserver struct {
 // Slice of []pluginconfig.TokenDataObserverConfig must be deduped and validated by the plugin.
 // Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
 // This constructor that should be used by the plugin.
-//
-//nolint:revive
 func NewConfigBasedCompositeObservers(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
 	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-) (*compositeTokenDataObserver, error) {
+) (TokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
 		// TODO consider if we can get rid of this switch stmt by moving the logic to the config
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observer, err1 := createUSDCTokenObserver(lggr, destChainSelector, *c.USDCCCTPObserverConfig, readers)
-			if err1 != nil {
-				return nil, err1
+			observer, err := createUSDCTokenObserver(lggr, destChainSelector, *c.USDCCCTPObserverConfig, readers)
+			if err != nil {
+				return nil, err
 			}
 			observers[i] = observer
 		default:
@@ -86,7 +84,7 @@ func createUSDCTokenObserver(
 		return nil, err
 	}
 
-	client, err := usdc.NewAttestationClient(cctpConfig)
+	client, err := usdc.NewSequentialAttestationClient(cctpConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +101,7 @@ func createUSDCTokenObserver(
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.
 // Created mostly for tests purposes, it allows the user to specify custom observers and skip the part
 // in which we match the configuration to the proper TokenDataObserver.
-//
-//nolint:revive
-func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) *compositeTokenDataObserver {
+func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) TokenDataObserver {
 	return &compositeTokenDataObserver{lggr: lggr, observers: observers}
 }
 

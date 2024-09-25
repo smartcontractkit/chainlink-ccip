@@ -59,8 +59,7 @@ type sequentialAttestationClient struct {
 	hasher hashutil.Hasher[[32]byte]
 }
 
-//nolint:revive
-func NewAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (*sequentialAttestationClient, error) {
+func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (AttestationClient, error) {
 	client, err := NewHTTPClient(
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
