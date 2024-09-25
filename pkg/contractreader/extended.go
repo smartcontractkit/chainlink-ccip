@@ -130,7 +130,7 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 
 	err := e.ContractReaderFacade.Bind(ctx, validBindings)
 	if err != nil {
-		return fmt.Errorf("bind: %w", err)
+		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
 	}
 
 	e.mu.Lock()
