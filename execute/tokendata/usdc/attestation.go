@@ -9,7 +9,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -51,7 +50,7 @@ func ErrorAttestationStatus(err error) AttestationStatus {
 type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
-		msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+		msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 	) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error)
 }
 
@@ -77,7 +76,7 @@ func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) 
 
 func (s *sequentialAttestationClient) Attestations(
 	ctx context.Context,
-	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
 	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
 
@@ -107,7 +106,7 @@ type FakeAttestationClient struct {
 
 func (f FakeAttestationClient) Attestations(
 	_ context.Context,
-	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
 	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
 

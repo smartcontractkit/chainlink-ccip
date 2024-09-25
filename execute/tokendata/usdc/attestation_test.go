@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -42,18 +41,18 @@ func Test_AttestationClient(t *testing.T) {
 		name     string
 		success  []string
 		pending  []string
-		input    map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash
+		input    map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes
 		expected map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus
 	}{
 		{
 			name:     "empty input",
-			input:    map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{},
+			input:    map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{},
 			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{},
 		},
 		{
 			name:    "single success",
 			success: []string{messageA.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
+			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
 				},
@@ -67,7 +66,7 @@ func Test_AttestationClient(t *testing.T) {
 		{
 			name:    "single pending",
 			pending: []string{messageA.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
+			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
 				},
@@ -81,7 +80,7 @@ func Test_AttestationClient(t *testing.T) {
 		{
 			name:    "multiple success",
 			success: []string{messageA.keccak, messageB.keccak, messageC.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
+			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
 					exectypes.NewMessageTokenID(1, 2): messageB.hash,
@@ -103,7 +102,7 @@ func Test_AttestationClient(t *testing.T) {
 		{
 			name:    "multiple failures - A, C not ready but B internal error",
 			pending: []string{messageA.keccak, messageC.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
+			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
 					exectypes.NewMessageTokenID(1, 2): messageB.hash,
@@ -126,7 +125,7 @@ func Test_AttestationClient(t *testing.T) {
 			name:    "mixed success and failure",
 			success: []string{messageA.keccak, messageC.keccak},
 			pending: []string{messageB.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash{
+			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
 					exectypes.NewMessageTokenID(1, 1): messageA.hash,
 				},

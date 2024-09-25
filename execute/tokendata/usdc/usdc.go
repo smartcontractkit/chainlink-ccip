@@ -95,8 +95,8 @@ func (u *TokenDataObserver) pickOnlyUSDCMessages(
 func (u *TokenDataObserver) fetchUSDCMessageHashes(
 	ctx context.Context,
 	usdcMessages map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash, error) {
-	output := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash)
+) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes, error) {
+	output := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes)
 
 	for chainSelector, messages := range usdcMessages {
 		if len(messages) == 0 {
@@ -115,7 +115,7 @@ func (u *TokenDataObserver) fetchUSDCMessageHashes(
 
 func (u *TokenDataObserver) fetchAttestations(
 	ctx context.Context,
-	usdcMessages map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	usdcMessages map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
 	attestations, err := u.attestationClient.Attestations(ctx, usdcMessages)
 	if err != nil {
