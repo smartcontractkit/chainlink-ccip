@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
@@ -506,11 +507,11 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 }
 
 // GetChainFeePriceUpdate Read from Destination chain FeeQuoter latest fee updates for the provided chains.
+// It unpacks the packed fee into the ChainFeeUSDPrices struct.
 // nolint:lll
-// TODO: Get from the destination chain
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
-func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate {
-	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate, len(selectors))
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate {
+	feeUpdates := make(map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate, len(selectors))
 	for _, chain := range selectors {
 		update := plugintypes.TimestampedBig{}
 		// Read from dest chain
@@ -529,9 +530,9 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			r.lggr.Errorw("failed to get chain fee price update", "chain", chain, "err", err)
 			continue
 		}
-		feeUpdates[chain] = plugintypes.ChainFeeUpdate{
+		feeUpdates[chain] = plugincommon.ChainFeeUpdate{
 			Timestamp: update.Timestamp,
-			ChainFee:  plugintypes.FromPackedFee(update.Value.Int),
+			ChainFee:  plugincommon.FromPackedFee(update.Value.Int),
 		}
 	}
 

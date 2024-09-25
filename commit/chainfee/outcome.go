@@ -2,8 +2,10 @@ package chainfee
 
 import (
 	"fmt"
+	"sort"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -35,10 +37,10 @@ func (p *processor) getConsensusObservation(
 
 	chainFeeUpdatesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
-		"ChainFeeLatestUpdates",
-		aggObs.ChainFeeLatestUpdates,
+		"ChainFeeUpdates",
+		aggObs.ChainFeeUpdates,
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
-		consensus.TimestampMedianAggregator,
+		plugincommon.ChainFeeUpdateAggregator,
 	)
 
 	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
@@ -75,11 +77,11 @@ func (p *processor) getConsensusObservation(
 	)
 
 	consensusObs := Observation{
-		FChain:                fChains,
-		FeeComponents:         feeComponents,
-		NativeTokenPrices:     nativeTokenPrices,
-		ChainFeeLatestUpdates: chainFeeUpdatesConsensus,
-		Timestamp:             timestamp,
+		FChain:            fChains,
+		FeeComponents:     feeComponents,
+		NativeTokenPrices: nativeTokenPrices,
+		ChainFeeUpdates:   chainFeeUpdatesConsensus,
+		Timestamp:         timestamp,
 	}
 
 	return consensusObs, nil
@@ -87,11 +89,11 @@ func (p *processor) getConsensusObservation(
 
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
-		FeeComponents:         make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
-		NativeTokenPrices:     make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
-		FChain:                make(map[cciptypes.ChainSelector][]int),
-		ChainFeeLatestUpdates: make(map[cciptypes.ChainSelector][]time.Time),
-		Timestamps:            []time.Time{},
+		FeeComponents:     make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
+		NativeTokenPrices: make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
+		FChain:            make(map[cciptypes.ChainSelector][]int),
+		ChainFeeUpdates:   make(map[cciptypes.ChainSelector][]plugincommon.ChainFeeUpdate),
+		Timestamps:        []time.Time{},
 	}
 
 	for _, ao := range aos {
@@ -112,8 +114,8 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
 		}
 
-		for chainSel, feeUpdate := range obs.ChainFeeLatestUpdates {
-			aggObs.ChainFeeLatestUpdates[chainSel] = append(aggObs.ChainFeeLatestUpdates[chainSel], feeUpdate)
+		for chainSel, feeUpdate := range obs.ChainFeeUpdates {
+			aggObs.ChainFeeUpdates[chainSel] = append(aggObs.ChainFeeUpdates[chainSel], feeUpdate)
 		}
 
 		// Timestamps
@@ -121,4 +123,62 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 	}
 
 	return aggObs
+}
+
+// getGasPricesToUpdate checks which chain fees need to be updated based on the observed chain fee prices and
+// the fee quoter updates.
+// A chain fee is selected for update if it meets one of 2 conditions:
+// 1. If time passed since the last update is greater than the stale threshold.
+// 2. If deviation between the fee quoter and feed exceeds the chain's configured threshold.
+func (p *processor) getGasPricesToUpdate(
+	currentChainUSDFees map[cciptypes.ChainSelector]plugincommon.ChainFeeUSDPrices,
+	latestUpdates map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate,
+	obsTimestamp time.Time,
+) []cciptypes.GasPriceChain {
+	var gasPrices []cciptypes.GasPriceChain
+	feeInfo := p.cfg.FeeInfo
+
+	for chain, currentChainFee := range currentChainUSDFees {
+		packedFee := cciptypes.NewBigInt(currentChainFee.ToPackedFee())
+		lastUpdate, exists := latestUpdates[chain]
+		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
+		// If the chain is not in the fee quoter updates or is stale, then we should update it
+		if !exists || obsTimestamp.After(nextUpdateTime) {
+			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
+				ChainSel: chain,
+				GasPrice: packedFee,
+			})
+			continue
+		}
+
+		if feeInfo == nil {
+			continue
+		}
+		ci, ok := feeInfo[chain]
+		if !ok {
+			p.lggr.Warnf("could not find fee info for chain %d", chain)
+			continue
+		}
+
+		// Checks if executionFee or dataAvFee deviates from the last update
+		if mathslib.Deviates(
+			currentChainFee.ExecutionFeePriceUSD,
+			lastUpdate.ChainFee.ExecutionFeePriceUSD,
+			ci.ExecDeviationPPB.Int64()) ||
+			mathslib.Deviates(
+				currentChainFee.DataAvFeePriceUSD,
+				lastUpdate.ChainFee.DataAvFeePriceUSD,
+				ci.DataAvDeviationPPB.Int64()) {
+			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
+				ChainSel: chain,
+				GasPrice: packedFee,
+			})
+		}
+	}
+
+	// sort chainFeeUSDPrices based on chainSel
+	sort.Slice(gasPrices, func(i, j int) bool {
+		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
+	})
+	return gasPrices
 }

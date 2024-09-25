@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -24,6 +25,10 @@ var feeComponentsMap = map[cciptypes.ChainSelector]types.ChainFeeComponents{
 }
 
 var chainFeePriceBatchWriteFrequency = *commonconfig.MustNewDuration(time.Minute)
+var offChainCfg = pluginconfig.CommitOffchainConfig{
+	RemoteGasPriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
+}
+
 var nativeTokenPricesMap = map[cciptypes.ChainSelector]cciptypes.BigInt{
 	1: cciptypes.NewBigInt(big.NewInt(10)),
 	2: cciptypes.NewBigInt(big.NewInt(20)),
@@ -38,9 +43,9 @@ var obsNeedUpdate = Observation{
 	FeeComponents:     feeComponentsMap,
 	NativeTokenPrices: nativeTokenPricesMap,
 	FChain:            fChains,
-	ChainFeeLatestUpdates: map[cciptypes.ChainSelector]time.Time{
-		1: ts,
-		2: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2), // Needs updating
+	ChainFeeUpdates: map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate{
+		1: {Timestamp: ts},
+		2: {Timestamp: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2)}, // Needs updating
 	},
 	Timestamp: ts,
 }
@@ -49,9 +54,9 @@ var obsNoUpdate = Observation{
 	FeeComponents:     feeComponentsMap,
 	NativeTokenPrices: nativeTokenPricesMap,
 	FChain:            fChains,
-	ChainFeeLatestUpdates: map[cciptypes.ChainSelector]time.Time{
-		1: ts,
-		2: ts,
+	ChainFeeUpdates: map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate{
+		1: {Timestamp: ts},
+		2: {Timestamp: ts},
 	},
 	Timestamp: ts,
 }
@@ -104,49 +109,11 @@ func TestGetConsensusObservation(t *testing.T) {
 	assert.Len(t, consensusObs.NativeTokenPrices, 2)
 }
 
-func TestOutcome(t *testing.T) {
-	lggr := logger.Test(t)
-	p := &processor{
-		lggr:                             lggr,
-		destChain:                        1,
-		fRoleDON:                         1,
-		ChainFeePriceBatchWriteFrequency: chainFeePriceBatchWriteFrequency,
-	}
-
-	outcome, err := p.Outcome(Outcome{}, Query{}, SameObs(5, obsNeedUpdate))
-
-	gas1 := new(big.Int)
-	// (200 * 10) << 112 | (100 * 10)
-	gas1, ok := gas1.SetString("10384593717069655257060992658440193000", 10) // base 10
-	require.True(t, ok)
-
-	gas2 := new(big.Int)
-	// (250 * 20) << 112 | (150 * 20)
-	gas2, ok = gas2.SetString("25961484292674138142652481646100483000", 10) // base 10
-	require.True(t, ok)
-	// Gas prices sorted by chain selector
-	expectedOutcome := Outcome{
-		GasPrices: []cciptypes.GasPriceChain{
-			{
-				ChainSel: 1,
-				GasPrice: cciptypes.NewBigInt(gas1),
-			},
-			{
-				ChainSel: 2,
-				GasPrice: cciptypes.NewBigInt(gas2),
-			},
-		},
-	}
-
-	require.NoError(t, err)
-	assert.Equal(t, expectedOutcome, outcome)
-}
-
 func TestProcessor_Outcome(t *testing.T) {
 	tests := []struct {
 		name                   string
 		chainFeeWriteFrequency commonconfig.Duration
-		chainFeeLatestUpdates  map[cciptypes.ChainSelector]time.Time
+		feeInfo                map[cciptypes.ChainSelector]pluginconfig.FeeInfo
 		aos                    []plugincommon.AttributedObservation[Observation]
 		expectedError          bool
 		expectedOutcome        func() Outcome
@@ -156,24 +123,14 @@ func TestProcessor_Outcome(t *testing.T) {
 			aos:           SameObs(5, obsNeedUpdate),
 			expectedError: false,
 			expectedOutcome: func() Outcome {
-				gas1 := new(big.Int)
-				// {ExecutionFee: big.NewInt(100), DataAvailabilityFee: big.NewInt(200)},
-				// (200 * 10) << 112 | (100 * 10)
-				gas1, ok := gas1.SetString("10384593717069655257060992658440193000", 10) // base 10
-				require.True(t, ok)
-
 				gas2 := new(big.Int)
 				// {ExecutionFee: big.NewInt(150), DataAvailabilityFee: big.NewInt(250)}
 				// (250 * 20) << 112 | (150 * 20)
-				gas2, ok = gas2.SetString("25961484292674138142652481646100483000", 10) // base 10
+				gas2, ok := gas2.SetString("25961484292674138142652481646100483000", 10) // base 10
 				require.True(t, ok)
-				// Gas prices sorted by chain selector
+				// Only chain selector 2 will be updated because last update is stale
 				expectedOutcome := Outcome{
 					GasPrices: []cciptypes.GasPriceChain{
-						{
-							ChainSel: 1,
-							GasPrice: cciptypes.NewBigInt(gas1),
-						},
 						{
 							ChainSel: 2,
 							GasPrice: cciptypes.NewBigInt(gas2),
@@ -206,9 +163,11 @@ func TestProcessor_Outcome(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &processor{
-				destChain:                        1,
-				fRoleDON:                         1,
-				ChainFeePriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
+				destChain: 1,
+				fRoleDON:  1,
+				cfg: pluginconfig.CommitOffchainConfig{
+					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
+				},
 			}
 
 			outcome, err := p.Outcome(Outcome{}, Query{}, tt.aos)

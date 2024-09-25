@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/stretchr/testify/assert"
@@ -215,7 +216,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
 				n.ccipReader.EXPECT().
 					GetChainFeePriceUpdate(ctx, mock.Anything).
-					Return(map[ccipocr3.ChainSelector]plugintypes.ChainFeeUpdate{}).Maybe()
+					Return(map[ccipocr3.ChainSelector]plugincommon.ChainFeeUpdate{}).Maybe()
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					assert.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))

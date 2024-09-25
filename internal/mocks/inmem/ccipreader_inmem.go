@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -131,7 +130,7 @@ func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	return nil
 }
 
-func (r InMemoryCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.ChainFeeUpdate {
+func (r InMemoryCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate {
 	return nil
 }
 

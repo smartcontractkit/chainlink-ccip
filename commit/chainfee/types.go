@@ -3,6 +3,7 @@ package chainfee
 import (
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -16,18 +17,18 @@ type Outcome struct {
 }
 
 type Observation struct {
-	FeeComponents         map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
-	NativeTokenPrices     map[cciptypes.ChainSelector]cciptypes.BigInt         `json:"nativeTokenPrice"`
-	FChain                map[cciptypes.ChainSelector]int                      `json:"fChain"`
-	ChainFeeLatestUpdates map[cciptypes.ChainSelector]time.Time                `json:"chainFeePriceUpdates"`
-	Timestamp             time.Time                                            `json:"timestamp"`
+	FeeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents    `json:"feeComponents"`
+	NativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt            `json:"nativeTokenPrice"`
+	FChain            map[cciptypes.ChainSelector]int                         `json:"fChain"`
+	ChainFeeUpdates   map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate `json:"chainFeeUpdates"`
+	Timestamp         time.Time                                               `json:"timestamp"`
 }
 
 // AggregateObservation is the aggregation of a list of observations
 type AggregateObservation struct {
-	FeeComponents         map[cciptypes.ChainSelector][]types.ChainFeeComponents `json:"feeComponents"`
-	NativeTokenPrices     map[cciptypes.ChainSelector][]cciptypes.BigInt         `json:"nativeTokenPrice"`
-	FChain                map[cciptypes.ChainSelector][]int                      `json:"fChain"`
-	ChainFeeLatestUpdates map[cciptypes.ChainSelector][]time.Time                `json:"chainFeePriceUpdate"`
-	Timestamps            []time.Time                                            `json:"timestamps"`
+	FeeComponents     map[cciptypes.ChainSelector][]types.ChainFeeComponents    `json:"feeComponents"`
+	NativeTokenPrices map[cciptypes.ChainSelector][]cciptypes.BigInt            `json:"nativeTokenPrice"`
+	FChain            map[cciptypes.ChainSelector][]int                         `json:"fChain"`
+	ChainFeeUpdates   map[cciptypes.ChainSelector][]plugincommon.ChainFeeUpdate `json:"chainFeeUpdates"`
+	Timestamps        []time.Time                                               `json:"timestamps"`
 }

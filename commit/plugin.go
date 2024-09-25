@@ -118,7 +118,7 @@ func NewPlugin(
 		cfg.DestChain,
 		homeChain,
 		ccipReader,
-		cfg.OffchainConfig.RemoteGasPriceBatchWriteFrequency,
+		cfg.OffchainConfig,
 		reportingCfg.F,
 	)
 
