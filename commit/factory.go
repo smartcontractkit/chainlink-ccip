@@ -111,7 +111,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	}
 
 	// Bind the RMNHome contract
-	rmnHomeReader := reader.RMNHome(nil)
+	var rmnHomeReader reader.RMNHome
 	if rmnEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
 		rmnCr, ok := p.contractReaders[p.homeChainSelector]
