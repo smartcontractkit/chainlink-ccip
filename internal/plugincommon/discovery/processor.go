@@ -53,19 +53,28 @@ func (cdp *ContractDiscoveryProcessor) Query(_ context.Context, _ dt.Outcome) (d
 func (cdp *ContractDiscoveryProcessor) Observation(
 	ctx context.Context, _ dt.Outcome, _ dt.Query,
 ) (dt.Observation, error) {
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, cdp.dest)
-	if err != nil {
-		if errors.Is(err, reader.ErrContractReaderNotFound) {
-			// Not a dest reader, no observations will be made.
-			// Processor is not disabled because the outcome phase will bind observed contracts.
-			return dt.Observation{}, nil
-		}
-		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
-	}
-
+	// all oracles should be able to read from the home chain, so we
+	// can fetch f chain reliably.
+	// TODO: should we error out here or just try to "observe everything we can"?
+	// i.e, similar to the commit plugin.
 	fChain, err := cdp.homechain.GetFChain()
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to get fchain: %w", err)
+	}
+
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx, cdp.dest)
+	if err != nil {
+		if errors.Is(err, reader.ErrContractReaderNotFound) {
+			// Not a dest reader, only fChain observation will be made.
+			// Processor is not disabled because the outcome phase will bind observed contracts.
+			return dt.Observation{
+				FChain: fChain,
+			}, nil
+		}
+
+		// otherwise a legitimate error occurred when discovering.
+		// TODO: should we still return the f chain observation w/ a nil error?
+		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
 	}
 
 	return dt.Observation{
@@ -87,6 +96,7 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 func (cdp *ContractDiscoveryProcessor) Outcome(
 	_ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
+	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
 	// come to consensus on the onramp addresses and update the chainreader.
 
 	// fChain consensus - uses the role DON F value because all nodes can observe the home chain.
@@ -104,6 +114,10 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
+			// we don't want invalid observations to "poison" the consensus.
+			if len(addr) == 0 {
+				continue
+			}
 			onrampAddrs[chain] = append(onrampAddrs[chain], addr)
 		}
 	}
@@ -118,7 +132,16 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 
 	contracts := make(reader.ContractAddresses)
-	contracts[consts.ContractNameOnRamp] = consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	onrampConsensus := consensus.GetConsensusMap(cdp.lggr, "onramp", onrampAddrs, fChainThresh)
+	cdp.lggr.Infow("Determined consensus onramps",
+		"onrampConsensus", onrampConsensus,
+		"onrampAddrs", onrampAddrs,
+		"fChainThresh", fChainThresh,
+	)
+	if len(onrampConsensus) == 0 {
+		cdp.lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
+	}
+	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
 	contracts[consts.ContractNameNonceManager] = consensus.GetConsensusMap(
 		cdp.lggr,
