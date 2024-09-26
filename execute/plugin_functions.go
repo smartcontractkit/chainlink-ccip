@@ -305,15 +305,13 @@ func mergeCommitObservations(
 	return results, nil
 }
 
-// TODO: implement mergeTokenObservations
 func mergeTokenObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.TokenDataObservations, error) {
-	// We need to find a consensus per token within a single message
+	// We need to find a consensus per token per message
 	validators := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 
-	// Add reports to the seqNrs for each chain selector.
 	for _, ao := range aos {
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
@@ -331,7 +329,7 @@ func mergeTokenObservations(
 					_, ok1 := validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)]
 					if !ok1 {
 						validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)] =
-							consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), nil)
+							consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
 					}
 					validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)].Add(tokenData)
 				}
@@ -344,17 +342,18 @@ func mergeTokenObservations(
 		results[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 
 		for tokenId, validator := range seqNrs {
-			if _, ok := results[selector][tokenId.SeqNr]; !ok {
-				results[selector][tokenId.SeqNr] = exectypes.NewMessageTokenData()
+			mtd, ok := results[selector][tokenId.SeqNr]
+			if !ok {
+				mtd = exectypes.NewMessageTokenData()
 			}
 
-			x := results[selector][tokenId.SeqNr]
 			if values := validator.GetValid(); len(values) > 0 {
-				x.Append(tokenId.Index, values[0])
+				mtd = mtd.Append(tokenId.Index, values[0])
 			} else {
-				x.Append(tokenId.Index, exectypes.NotReadyToken())
+				// Can't reach consensus for this particular token, marking it's as not ready
+				mtd = mtd.Append(tokenId.Index, exectypes.NotReadyToken())
 			}
-			results[selector][tokenId.SeqNr] = x
+			results[selector][tokenId.SeqNr] = mtd
 		}
 	}
 

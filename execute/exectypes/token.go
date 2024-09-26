@@ -4,16 +4,11 @@ import (
 	"fmt"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/crypto/sha3"
 )
 
 type MessageTokenData struct {
 	TokenData []TokenData
-	ready     bool
-	error     error
-}
-
-func NewNotReady() MessageTokenData {
-	return MessageTokenData{TokenData: []TokenData{}, ready: false}
 }
 
 func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
@@ -22,12 +17,10 @@ func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
 	}
 	return MessageTokenData{
 		TokenData: tokenData,
-		ready:     isReady(tokenData),
-		error:     nil,
 	}
 }
 
-func (mtd *MessageTokenData) Append(index int, td TokenData) {
+func (mtd MessageTokenData) Append(index int, td TokenData) MessageTokenData {
 	if index >= len(mtd.TokenData) {
 		newSize := index + 1
 		newTokenData := make([]TokenData, newSize)
@@ -39,19 +32,10 @@ func (mtd *MessageTokenData) Append(index int, td TokenData) {
 		mtd.TokenData = newTokenData
 	}
 	mtd.TokenData[index] = td
-	mtd.ready = mtd.IsReady()
+	return mtd
 }
 
-func isReady(tokenData []TokenData) bool {
-	for _, td := range tokenData {
-		if !td.Ready {
-			return false
-		}
-	}
-	return true
-}
-
-func (mtd *MessageTokenData) IsReady() bool {
+func (mtd MessageTokenData) IsReady() bool {
 	for _, td := range mtd.TokenData {
 		if !td.IsReady() {
 			return false
@@ -60,7 +44,7 @@ func (mtd *MessageTokenData) IsReady() bool {
 	return true
 }
 
-func (mtd *MessageTokenData) Error() error {
+func (mtd MessageTokenData) Error() error {
 	for _, td := range mtd.TokenData {
 		if td.Error != nil {
 			return td.Error
@@ -69,15 +53,12 @@ func (mtd *MessageTokenData) Error() error {
 	return nil
 }
 
-func (mtd *MessageTokenData) ToByteSlice() [][]byte {
+func (mtd MessageTokenData) ToByteSlice() [][]byte {
 	out := make([][]byte, len(mtd.TokenData))
 	for i, td := range mtd.TokenData {
 		out[i] = td.Data
 	}
 	return out
-}
-
-type AccumulatingTokenData struct {
 }
 
 // TokenData is the token data for a single token in a message.
@@ -138,6 +119,12 @@ func NewErrorTokenData(err error) TokenData {
 // By setting them as `Ready=false`, higher level knows this message has to be ignored
 func NotReadyToken() TokenData {
 	return TokenData{Ready: false}
+}
+
+// TokenDataHash returns a hash of the token data. It's used during the consensus process to identify unique token data.
+// It intentionally skips the fields that are not relevant for the consensus process and are not serialized when nodes gossiping
+func TokenDataHash(td TokenData) [32]byte {
+	return sha3.Sum256([]byte(fmt.Sprintf("%v_%v", td.Ready, td.Data)))
 }
 
 func (td TokenData) IsReady() bool {
