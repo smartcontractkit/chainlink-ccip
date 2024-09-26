@@ -111,6 +111,7 @@ func NewPlugin(
 		homeChain,
 		cfg.DestChain,
 		reportingCfg.F,
+		oracleIDToP2pID,
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
