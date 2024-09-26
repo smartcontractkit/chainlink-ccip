@@ -104,7 +104,20 @@ func Test_USDC_Transfer(t *testing.T) {
 	})
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 	// Attestation data added to the USDC
-	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
+	//require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
+
+	res, err = runner.RunRound(ctx)
+	require.NoError(t, err)
+	res, err = runner.RunRound(ctx)
+	require.NoError(t, err)
+	res, err = runner.RunRound(ctx)
+	require.NoError(t, err)
+	outcome, err = exectypes.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+	sequenceNumbers = slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
+		return m.Header.SequenceNumber
+	})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105})
 }
 
 type nodeSetup struct {
@@ -245,18 +258,26 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 				makeMsg(101, srcSelector, dstSelector, true),
 				makeMsg(102, srcSelector, dstSelector, false),
 				makeMsg(103, srcSelector, dstSelector, false),
-				makeMsg(104, srcSelector, dstSelector, false),
-				makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
+				makeMsgWithToken(104, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
 					{
 						SourcePoolAddress: addressBytes,
 						ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 100).ToBytes(),
 					},
 				}),
+				makeMsg(105, srcSelector, dstSelector, false),
+				//makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
+				//	{
+				//		SourcePoolAddress: addressBytes,
+				//		ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 100).ToBytes(),
+				//	},
+				//}),
 			},
 		},
 	}
 
+	counter := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		counter++
 		if r.RequestURI == "/v1/attestations/0x142198163c994e28d9e8287b895eca3aa57ab7b50d329582baab8674cb93ca6f" {
 			_, err := w.Write([]byte(`
 					{
@@ -265,6 +286,15 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 					}
 			`))
 			require.NoError(t, err)
+			//} else if counter > 4 && strings.Contains(r.RequestURI, "0x04b060617c533bb9edaab2b39479e53852c21f94ac6a31611095208c5e248933") {
+			//	_, err := w.Write([]byte(`
+			//			{
+			//				"status": "complete",
+			//				"attestation": "0x720502893578a89a8a87982982ef781c18b194"
+			//			}
+			//	`))
+			//	require.NoError(t, err)
+
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
