@@ -390,7 +390,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain1},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s1Onramp
 		v.IsEnabled = true
@@ -403,7 +409,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain2},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s2Onramp
 		v.IsEnabled = true
@@ -416,7 +428,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
 	})
@@ -464,7 +482,13 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
 	})
@@ -510,7 +534,13 @@ func TestCCIPChainReader_DiscoverContracts_GetSourceChainConfig_Errors(t *testin
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain1},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s1Onramp
 		v.IsEnabled = true
@@ -566,7 +596,13 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain1},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s1Onramp
 		v.IsEnabled = true
@@ -579,7 +615,13 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain2},
 		mock.Anything,
-	).Return(nil).Run(func(ctx context.Context, contractName, methodName string, confidenceLevel primitives.ConfidenceLevel, params, returnVal interface{}) {
+	).Return(nil).Run(func(
+		ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s2Onramp
 		v.IsEnabled = true
