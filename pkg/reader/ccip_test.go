@@ -432,7 +432,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
-		v.RmnProxy = rmnRemote
+		v.Rmn = rmnRemote
 	}))
 
 	// create the reader
@@ -486,7 +486,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
-		v.RmnProxy = destRMNRemote
+		v.Rmn = destRMNRemote
 	}))
 
 	// create the reader

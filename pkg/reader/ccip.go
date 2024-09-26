@@ -499,7 +499,7 @@ func (r *ccipChainReader) DiscoverContracts(
 			destChain: staticConfig.NonceManager,
 		},
 		consts.ContractNameRMNRemote: {
-			destChain: staticConfig.RmnProxy,
+			destChain: staticConfig.Rmn,
 		},
 	}
 	return resp, nil
@@ -658,7 +658,7 @@ func (r *ccipChainReader) getOfframpStaticConfig(
 //nolint:lll // It's a URL.
 type offrampStaticChainConfig struct {
 	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	RmnProxy           []byte                  `json:"rmnProxy"`
+	Rmn                []byte                  `json:"rmn"`
 	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
 	NonceManager       []byte                  `json:"nonceManager"`
 }

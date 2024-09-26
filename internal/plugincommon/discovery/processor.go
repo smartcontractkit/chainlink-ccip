@@ -150,6 +150,10 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 			cdp.lggr.Warnf("skipping empty nonce manager address in observation from Oracle %d", ao.OracleID)
 			continue
 		}
+		if len(ao.Observation.RMNRemote) == 0 {
+			cdp.lggr.Warnf("skipping empty RMNRemote address in observation from Oracle %d", ao.OracleID)
+			continue
+		}
 		nonceManagerAddrs = append(
 			nonceManagerAddrs,
 			ao.Observation.DestNonceManager,
