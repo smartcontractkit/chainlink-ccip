@@ -4,10 +4,11 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 type Query struct {
@@ -48,7 +49,9 @@ type Update struct {
 	Timestamp time.Time           `json:"timestamp"`
 }
 
-func FeeUpdatesFromTimestampedBig(updates map[cciptypes.ChainSelector]plugintypes.TimestampedBig) map[cciptypes.ChainSelector]Update {
+func FeeUpdatesFromTimestampedBig(
+	updates map[cciptypes.ChainSelector]plugintypes.TimestampedBig,
+) map[cciptypes.ChainSelector]Update {
 	chainFeeUpdates := make(map[cciptypes.ChainSelector]Update, len(updates))
 	for chain, u := range updates {
 		chainFeeUpdates[chain] = Update{
