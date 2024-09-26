@@ -3,7 +3,6 @@ package chainfee
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"sort"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
@@ -116,13 +116,20 @@ func (p *processor) Outcome(
 	// In next loop we calculate the price in USD for the data availability and execution fees.
 	// And getGasPricesToUpdate will select and calculate the **packed** gas price to update based.
 	for chain, feeComp := range consensusObs.FeeComponents {
-		nativeTokenPriceUSD := consensusObs.NativeTokenPrices[chain].Int
+		// The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
+		// 1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
+		// 1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
+		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
+		usdPerFeeToken := consensusObs.NativeTokenPrices[chain].Int
 
-		// Calculate the price in USD for the data availability and execution fees.
-		// Raw fee components are in native token units
+		// Example with Wei as the lowest denominator and Eth as the Fee token
+		// usdPerEthToken = Xe18USD18
+		// Price per Wei = Xe18USD18/1e18 = XUSD18
+		// 1 gas = 1 wei = XUSD18
+		// execFee = 30 Gwei = 30e9 wei = 30e9 * XUSD18
 		chainFeeUsd := ComponentsUSDPrices{
-			ExecutionFeePriceUSD: new(big.Int).Mul(nativeTokenPriceUSD, feeComp.ExecutionFee),
-			DataAvFeePriceUSD:    new(big.Int).Mul(nativeTokenPriceUSD, feeComp.DataAvailabilityFee),
+			ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComp.ExecutionFee, usdPerFeeToken),
+			DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComp.DataAvailabilityFee, usdPerFeeToken),
 		}
 
 		chainFeeUSDPrices[chain] = chainFeeUsd
