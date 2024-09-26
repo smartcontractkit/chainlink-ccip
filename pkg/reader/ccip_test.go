@@ -380,6 +380,15 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+	expectedContractAddresses := ContractAddresses{
+		consts.ContractNameOnRamp: {
+			sourceChain1: s1Onramp,
+			sourceChain2: s2Onramp,
+		},
+		consts.ContractNameNonceManager: {
+			destChain: destNonceMgr,
+		},
+	}
 	destExtended := reader_mocks.NewMockExtended(t)
 
 	// mock the call for sourceChain1
@@ -390,17 +399,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain1},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s1Onramp
 		v.IsEnabled = true
-	})
+	}))
 	// mock the call for sourceChain2
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
@@ -409,17 +412,11 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain2},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s2Onramp
 		v.IsEnabled = true
-	})
+	}))
 	// mock the call to get the nonce manager
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
@@ -428,17 +425,10 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
-	})
-	defer destExtended.AssertExpectations(t)
+	}))
 
 	// create the reader
 	ccipChainReader := &ccipChainReader{
@@ -456,15 +446,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, destChain)
 	require.NoError(t, err)
-	expectedContractAddresses := ContractAddresses{
-		consts.ContractNameOnRamp: {
-			sourceChain1: s1Onramp,
-			sourceChain2: s2Onramp,
-		},
-		consts.ContractNameNonceManager: {
-			destChain: destNonceMgr,
-		},
-	}
+
 	require.Equal(t, expectedContractAddresses, contractAddresses)
 }
 
@@ -472,6 +454,16 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	ctx := tests.Context(t)
 	destChain := cciptypes.ChainSelector(1)
 	destNonceMgr := []byte{0x3}
+	expectedContractAddresses := ContractAddresses{
+		// since the source chains are not supported, we should not have any onramp addresses
+		// after discovery.
+		consts.ContractNameOnRamp: {},
+		// the nonce manager doesn't require source chain support though,
+		// so we should discover that always if we support the dest.
+		consts.ContractNameNonceManager: {
+			destChain: destNonceMgr,
+		},
+	}
 	destExtended := reader_mocks.NewMockExtended(t)
 
 	// mock the call to get the nonce manager
@@ -482,17 +474,10 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
-	})
-	defer destExtended.AssertExpectations(t)
+	}))
 
 	// create the reader
 	ccipChainReader := &ccipChainReader{
@@ -505,16 +490,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, destChain)
 	require.NoError(t, err)
-	expectedContractAddresses := ContractAddresses{
-		// since the source chains are not supported, we should not have any onramp addresses
-		// after discovery.
-		consts.ContractNameOnRamp: {},
-		// the nonce manager doesn't require source chain support though,
-		// so we should discover that always if we support the dest.
-		consts.ContractNameNonceManager: {
-			destChain: destNonceMgr,
-		},
-	}
 	require.Equal(t, expectedContractAddresses, contractAddresses)
 }
 
@@ -534,17 +509,11 @@ func TestCCIPChainReader_DiscoverContracts_GetSourceChainConfig_Errors(t *testin
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain1},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s1Onramp
 		v.IsEnabled = true
-	})
+	}))
 
 	// mock the call for sourceChain2 - failure
 	getLatestValueErr := errors.New("some error")
@@ -558,7 +527,6 @@ func TestCCIPChainReader_DiscoverContracts_GetSourceChainConfig_Errors(t *testin
 	).Return(getLatestValueErr)
 
 	// get static config call won't occur because the source chain config call failed.
-	defer destExtended.AssertExpectations(t)
 
 	// create the reader
 	ccipChainReader := &ccipChainReader{
@@ -596,17 +564,11 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain1},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s1Onramp
 		v.IsEnabled = true
-	})
+	}))
 	// mock the call for sourceChain2 - successful
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
@@ -615,17 +577,11 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		primitives.Unconfirmed,
 		map[string]any{"sourceChainSelector": sourceChain2},
 		mock.Anything,
-	).Return(nil).Run(func(
-		ctx context.Context,
-		contractName,
-		methodName string,
-		confidenceLevel primitives.ConfidenceLevel,
-		params,
-		returnVal interface{}) {
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*sourceChainConfig)
 		v.OnRamp = s2Onramp
 		v.IsEnabled = true
-	})
+	}))
 	// mock the call to get the nonce manager - failure
 	getLatestValueErr := errors.New("some error")
 	destExtended.EXPECT().ExtendedGetLatestValue(
@@ -636,7 +592,6 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		map[string]any{},
 		mock.Anything,
 	).Return(getLatestValueErr)
-	defer destExtended.AssertExpectations(t)
 
 	// create the reader
 	ccipChainReader := &ccipChainReader{
@@ -655,4 +610,22 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	_, err := ccipChainReader.DiscoverContracts(ctx, destChain)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
+}
+
+// withReturnValueOverridden is a helper function to override the return value of a mocked out
+// ExtendedGetLatestValue call.
+func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx context.Context,
+	contractName,
+	methodName string,
+	confidenceLevel primitives.ConfidenceLevel,
+	params,
+	returnVal interface{}) {
+	return func(ctx context.Context,
+		contractName,
+		methodName string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params,
+		returnVal interface{}) {
+		mapper(returnVal)
+	}
 }
