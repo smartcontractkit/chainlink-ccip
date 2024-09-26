@@ -1,0 +1,3 @@
+# Disable geth if using existing testnets.
+geth:
+  enabled: false

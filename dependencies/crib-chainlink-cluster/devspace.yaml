@@ -796,6 +796,15 @@ profiles:
       - op: replace
         path: deployments.ccip-scripts.helm.values.enabled
         value: false
+  - name: ccip-v16
+    parent: ccip
+    patches:
+      - op: add
+        path: deployments.app.helm.valuesFiles
+        value:
+          [
+            "./values-profiles/values-dev-ccip-v16.yaml",
+          ]
   - name: local-charts
     merge:
       deployments:

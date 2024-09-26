@@ -5,6 +5,7 @@ vars:
   SCRIPTS_DIR:
     source: env
     default: "../../scripts"
+  DEVSPACE_ENV_FILE: .env
   DEPENDENCIES_DIR:
     source: env
     default: "../../dependencies"
@@ -32,6 +33,14 @@ pipelines:
     run: |-
       run_dependency_pipelines crib-chainlink-cluster
       run_dependency_pipelines crib-ccip-scripts
+
+  ccip-v16:
+    run: |-
+      run_dependency_pipelines geth
+      # todo: Deploy job-distributor
+      # run_dependency_pipelines job-distributor
+      # Deploy CCIP enabled DON
+      run_dependency_pipelines crib-chainlink-cluster
 
   kind-dependencies:
     run: |-
@@ -209,6 +218,21 @@ profiles:
         value:
           - ccip-kind-bix-ship
           - kind
+  - name: ccip-v16
+    parents:
+      - profile: ccip
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          geth:
+            path: ${DEPENDENCIES_DIR}/geth
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip-v16
   - name: kind-dependencies
     patches:
       - op: add
@@ -370,6 +394,10 @@ commands:
   ccip-atlas-ui:
     command: devspace run-pipeline ccip-atlas-ui -p ccip-atlas-ui
     description: Run the CCIP pipeline with Atlas and UI.
+    appendArgs: true
+  ccip-v16:
+    command: devspace run-pipeline ccip-v16 -p ccip-v16
+    description: Run the ccip v1.6 pipeline.
     appendArgs: true
   beholder:
     command: devspace run-pipeline beholder -p beholder

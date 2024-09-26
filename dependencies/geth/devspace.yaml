@@ -1,0 +1,190 @@
+---
+version: v2beta1
+name: geth
+
+vars:
+  SCRIPTS_DIR:
+    source: env
+    default: "../../scripts"
+  DEVSPACE_ENV_FILE: .env
+  # The list of default ENV Vars for CRIB, you can override any of them in the .env file
+  # AWS Account ID used for deploying CRIB environment
+  AWS_ACCOUNT_ID:
+    source: env
+    default: 323150190480
+  # This is a comma separated list of CIDR blocks that will be allowed to access the ingress.
+  DEVSPACE_INGRESS_CIDRS:
+    source: env
+    default: "0.0.0.0/0"
+  # This is the base domain in AWS Route 53 that our ingress subdomains will use.
+  DEVSPACE_INGRESS_BASE_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
+  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
+  DEVSPACE_INGRESS_CERT_ARN:
+    source: env
+    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
+  # Time to wait for pods to be in `Ready` condition
+  DEVSPACE_K8S_POD_WAIT_TIMEOUT:
+    source: env
+    default: 1200s
+  # Helm repo URI for the crib-ccip helm chart
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "../../imports"
+  CHAINLINK_CLUSTER_HELM_CHART_URI:
+    source: env
+    default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
+
+pipelines:
+  kind:
+    run: |-
+      ensure_pull_secrets --all
+      run_pipelines deploy
+  deploy:
+    run: |-
+      create_deployments geth
+
+
+pullSecrets:
+  regcred-don:
+    registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-don
+    serviceAccounts:
+      - default
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        # vars don't work here, = releaseName
+        release: "geth"
+    events: ["after:deploy:geth"]
+
+# This is a list of `deployments` that DevSpace can create for this project
+deployments:
+  geth:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: "geth"
+      chart:
+        name: ${CHAINLINK_CLUSTER_HELM_CHART_URI}
+        version: "1.x"
+      # for simplicity, we define all the values here
+      # they can be defined the same way in values.yml
+      # devspace merges these "values" with the "values.yaml" before deploy
+      values:
+        podSecurityContext:
+          fsGroup: 999
+        chainlink:
+          enabled: false
+        db:
+          enabled: false
+        # default cluster shipped with latest Geth ( dev mode by default )
+        mockserver:
+          enabled: false
+        opentelemetry-collector:
+          enabled: false
+        tempo:
+          enabled: false
+        grafana:
+          enabled: false
+        geth:
+          enabled: true
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+          version: v1.12.0
+          wsRpcPort: 8546
+          httpRpcPort: 8544
+          chains:
+            - networkId: 1337
+              customEVMConfigToml: |
+                [EVM.GasEstimator]
+                PriceMax = '200 gwei'
+                LimitDefault = 6000000
+                FeeCapDefault = '200 gwei'
+            - networkId: 2337
+              customEVMConfigToml: |
+                [EVM.GasEstimator]
+                PriceMax = '200 gwei'
+                LimitDefault = 6000000
+                FeeCapDefault = '200 gwei'
+          blocktime: 1
+
+        # These ingresses create AWS ALB resources and Route 53 Records.
+        ingress:
+          enabled: true
+          annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
+          annotation_group_name: ${DEVSPACE_NAMESPACE}
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-1337
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-geth-1337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-1337
+                        port:
+                          number: 8546
+            - host: ${DEVSPACE_NAMESPACE}-geth-2337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-2337
+                        port:
+                          number: 8544
+            - host: ${DEVSPACE_NAMESPACE}-geth-2337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: geth-2337
+                        port:
+                          number: 8546
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+
+profiles:
+  - name: local-charts
+    merge:
+      deployments:
+        app:
+          helm:
+            chart:
+              name: crib-chainlink-cluster
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-chainlink-cluster
+              version: null
