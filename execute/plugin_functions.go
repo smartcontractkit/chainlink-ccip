@@ -307,29 +307,62 @@ func mergeCommitObservations(
 
 // TODO: implement mergeTokenObservations
 func mergeTokenObservations(
-	observations []plugincommon.AttributedObservation[exectypes.Observation],
-	_ map[cciptypes.ChainSelector]int,
-) exectypes.TokenDataObservations {
-	// Finds the observation with 'the most token data'.
-	// This is a dummy algorithm, proper consensus should be implemented.
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) (exectypes.TokenDataObservations, error) {
+	// We need to find a consensus per token within a single message
+	validators := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 
-	maxCnt := -1
-	maxV := exectypes.TokenDataObservations{}
-	for _, ao := range observations {
-		cnt := 0
-		for _, tokenData := range ao.Observation.TokenData {
-			cnt += len(tokenData)
-		}
-		if cnt > maxCnt {
-			maxCnt = cnt
-			maxV = ao.Observation.TokenData
+	// Add reports to the seqNrs for each chain selector.
+	for _, ao := range aos {
+		for selector, seqMap := range ao.Observation.TokenData {
+			f, ok := fChain[selector]
+			if !ok {
+				return exectypes.TokenDataObservations{}, fmt.Errorf("no seqNrs for chain %d", selector)
+			}
+
+			_, ok = validators[selector]
+			if !ok {
+				validators[selector] = make(map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+			}
+
+			for seqNr, msgTokenData := range seqMap {
+				for tokenIndex, tokenData := range msgTokenData.TokenData {
+					_, ok1 := validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)]
+					if !ok1 {
+						validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)] =
+							consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), nil)
+					}
+					validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)].Add(tokenData)
+				}
+			}
 		}
 	}
 
-	if maxCnt == -1 {
-		return nil
+	results := make(exectypes.TokenDataObservations)
+	for selector, seqNrs := range validators {
+		results[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+
+		for tokenId, validator := range seqNrs {
+			if _, ok := results[selector][tokenId.SeqNr]; !ok {
+				results[selector][tokenId.SeqNr] = exectypes.NewMessageTokenData()
+			}
+
+			x := results[selector][tokenId.SeqNr]
+			if values := validator.GetValid(); len(values) > 0 {
+				x.Append(tokenId.Index, values[0])
+			} else {
+				x.Append(tokenId.Index, exectypes.NotReadyToken())
+			}
+			results[selector][tokenId.SeqNr] = x
+		}
 	}
-	return maxV
+
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	return results, nil
 }
 
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
@@ -419,7 +452,7 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations := mergeTokenObservations(aos, fChain)
+	mergedTokenObservations, _ := mergeTokenObservations(aos, fChain)
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
 		"oracle", oracleID,

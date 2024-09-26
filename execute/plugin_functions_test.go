@@ -837,7 +837,7 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 			},
 		},
 		{
-			name: "only one token has enough observations",
+			name: "message not ready - only one token has enough observations",
 			F:    2,
 			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				{
@@ -871,21 +871,21 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 			},
 		},
 		{
-			name: "some of the tokens have enough observations",
+			name: "message not ready - only some of the tokens have enough observations",
 			F:    1,
 			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
 				{
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewNoopTokenData(),
 						exectypes.NewSuccessTokenData([]byte{2}),
-						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+						exectypes.NewErrorTokenData(fmt.Errorf("error1")),
 					),
 				},
 				{
 					1: exectypes.NewMessageTokenData(
 						exectypes.NewSuccessTokenData([]byte{1}),
 						exectypes.NewNoopTokenData(),
-						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+						exectypes.NewErrorTokenData(fmt.Errorf("error2")),
 					),
 				},
 				{
@@ -901,6 +901,40 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					exectypes.NewSuccessTokenData([]byte{1}),
 					exectypes.NewSuccessTokenData([]byte{2}),
 					exectypes.NotReadyToken(),
+				),
+			},
+		},
+		{
+			name: "message ready - all tokens have enough observations",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+			},
+			want: map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				1: exectypes.NewMessageTokenData(
+					exectypes.NewSuccessTokenData([]byte{1}),
+					exectypes.NewSuccessTokenData([]byte{2}),
+					exectypes.NewSuccessTokenData([]byte{3}),
 				),
 			},
 		},
@@ -1004,7 +1038,8 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				chainSelector: tc.want,
 			}
 
-			obs := mergeTokenObservations(ao, fChain)
+			obs, err := mergeTokenObservations(ao, fChain)
+			require.NoError(t, err)
 			require.Equal(t, want, obs)
 		})
 	}

@@ -8,16 +8,50 @@ import (
 
 type MessageTokenData struct {
 	TokenData []TokenData
+	ready     bool
+	error     error
+}
+
+func NewNotReady() MessageTokenData {
+	return MessageTokenData{TokenData: []TokenData{}, ready: false}
 }
 
 func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
 	if len(tokenData) == 0 {
 		return MessageTokenData{TokenData: []TokenData{}}
 	}
-	return MessageTokenData{TokenData: tokenData}
+	return MessageTokenData{
+		TokenData: tokenData,
+		ready:     isReady(tokenData),
+		error:     nil,
+	}
 }
 
-func (mtd MessageTokenData) IsReady() bool {
+func (mtd *MessageTokenData) Append(index int, td TokenData) {
+	if index >= len(mtd.TokenData) {
+		newSize := index + 1
+		newTokenData := make([]TokenData, newSize)
+
+		// Copy the contents of the old slice into the new slice
+		copy(newTokenData, mtd.TokenData)
+
+		// Assign the new slice to mtd.TokenData
+		mtd.TokenData = newTokenData
+	}
+	mtd.TokenData[index] = td
+	mtd.ready = mtd.IsReady()
+}
+
+func isReady(tokenData []TokenData) bool {
+	for _, td := range tokenData {
+		if !td.Ready {
+			return false
+		}
+	}
+	return true
+}
+
+func (mtd *MessageTokenData) IsReady() bool {
 	for _, td := range mtd.TokenData {
 		if !td.IsReady() {
 			return false
@@ -26,7 +60,7 @@ func (mtd MessageTokenData) IsReady() bool {
 	return true
 }
 
-func (mtd MessageTokenData) Error() error {
+func (mtd *MessageTokenData) Error() error {
 	for _, td := range mtd.TokenData {
 		if td.Error != nil {
 			return td.Error
@@ -35,12 +69,15 @@ func (mtd MessageTokenData) Error() error {
 	return nil
 }
 
-func (mtd MessageTokenData) ToByteSlice() [][]byte {
+func (mtd *MessageTokenData) ToByteSlice() [][]byte {
 	out := make([][]byte, len(mtd.TokenData))
 	for i, td := range mtd.TokenData {
 		out[i] = td.Data
 	}
 	return out
+}
+
+type AccumulatingTokenData struct {
 }
 
 // TokenData is the token data for a single token in a message.
