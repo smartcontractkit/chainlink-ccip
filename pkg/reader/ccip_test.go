@@ -380,6 +380,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 	s1Onramp := []byte{0x1}
 	s2Onramp := []byte{0x2}
 	destNonceMgr := []byte{0x3}
+	rmnRemote := []byte{0x4}
 	expectedContractAddresses := ContractAddresses{
 		consts.ContractNameOnRamp: {
 			sourceChain1: s1Onramp,
@@ -387,6 +388,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 		},
 		consts.ContractNameNonceManager: {
 			destChain: destNonceMgr,
+		},
+		consts.ContractNameRMNRemote: {
+			destChain: rmnRemote,
 		},
 	}
 	destExtended := reader_mocks.NewMockExtended(t)
@@ -428,6 +432,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath(t *testing.T) {
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
+		v.RmnProxy = rmnRemote
 	}))
 
 	// create the reader
@@ -454,6 +459,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	ctx := tests.Context(t)
 	destChain := cciptypes.ChainSelector(1)
 	destNonceMgr := []byte{0x3}
+	destRMNRemote := []byte{0x4}
 	expectedContractAddresses := ContractAddresses{
 		// since the source chains are not supported, we should not have any onramp addresses
 		// after discovery.
@@ -462,6 +468,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 		// so we should discover that always if we support the dest.
 		consts.ContractNameNonceManager: {
 			destChain: destNonceMgr,
+		},
+		consts.ContractNameRMNRemote: {
+			destChain: destRMNRemote,
 		},
 	}
 	destExtended := reader_mocks.NewMockExtended(t)
@@ -477,6 +486,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offrampStaticChainConfig)
 		v.NonceManager = destNonceMgr
+		v.RmnProxy = destRMNRemote
 	}))
 
 	// create the reader
