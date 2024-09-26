@@ -15,13 +15,13 @@ import (
 func GetConsensusMap[K comparable, T any](
 	lggr logger.Logger,
 	objectName string,
-	itemsByChain map[K][]T,
+	itemsByKey map[K][]T,
 	minObs MultiThreshold[K],
 ) map[K]T {
 	consensus := make(map[K]T)
 
-	for chain, items := range itemsByChain {
-		if minThresh, exists := minObs.Get(chain); exists {
+	for key, items := range itemsByKey {
+		if minThresh, exists := minObs.Get(key); exists {
 			minObservations := NewMinObservation[T](minThresh, nil)
 			for _, item := range items {
 				minObservations.Add(item)
@@ -29,16 +29,16 @@ func GetConsensusMap[K comparable, T any](
 			items = minObservations.GetValid()
 			if len(items) != 1 {
 				// TODO: metrics
-				lggr.Warnf("failed to reach consensus on a %s's for chain %d "+
+				lggr.Warnf("failed to reach consensus on a %s's for key %+v "+
 					"because no single item was observed more than the expected min (%d) times, "+
 					"all observed items: %v",
-					objectName, chain, minThresh, items)
+					objectName, key, minThresh, items)
 			} else {
-				consensus[chain] = items[0]
+				consensus[key] = items[0]
 			}
 		} else {
 			// TODO: metrics
-			lggr.Warnf("getConsensus(%s): min not found for chain %d", objectName, chain)
+			lggr.Warnf("getConsensus(%s): min not found for chain %d", objectName, key)
 		}
 	}
 	return consensus

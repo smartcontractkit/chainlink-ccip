@@ -87,6 +87,7 @@ func NewPlugin(
 			homeChain,
 			cfg.DestChain,
 			reportingCfg.F,
+			oracleIDToP2pID,
 		),
 	}
 }
@@ -186,7 +187,8 @@ func (p *Plugin) Observation(
 		}
 
 		if !p.contractsInitialized {
-			p.lggr.Infow("contracts not initialized, only making discovery observations")
+			p.lggr.Infow("contracts not initialized, only making discovery observations",
+				"discoveryObs", discoveryObs)
 			return exectypes.Observation{Contracts: discoveryObs}.Encode()
 		}
 	}
@@ -383,6 +385,10 @@ func selectReport(
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	p.lggr.Debugw("Execute plugin performing outcome",
+		"outctx", outctx,
+		"query", query,
+		"attributedObservations", aos)
 	var previousOutcome exectypes.Outcome
 	if outctx.PreviousOutcome != nil {
 		var err error

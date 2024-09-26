@@ -5,13 +5,14 @@ go 1.22.5
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/smartcontractkit/chain-selectors v1.0.23
-	github.com/smartcontractkit/chainlink-common v0.2.3-0.20240919092417-53e784c2e420
+	github.com/smartcontractkit/chainlink-common v0.2.3-0.20240925085218-aded1b263ecc
 	github.com/smartcontractkit/libocr v0.0.0-20240717100443-f6226e09bee7
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.27.0
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 	golang.org/x/sync v0.8.0
+	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 )

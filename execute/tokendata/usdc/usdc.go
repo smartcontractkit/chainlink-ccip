@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-type tokenDataObserver struct {
+type TokenDataObserver struct {
 	lggr              logger.Logger
 	destChainSelector cciptypes.ChainSelector
 	supportedTokens   map[string]struct{}
@@ -20,21 +20,20 @@ type tokenDataObserver struct {
 	attestationClient AttestationClient
 }
 
-//nolint:revive
 func NewTokenDataObserver(
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	tokens map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
 	usdcMessageReader reader.USDCMessageReader,
 	attestationClient AttestationClient,
-) *tokenDataObserver {
+) *TokenDataObserver {
 	supportedTokens := make(map[string]struct{})
 	for chainSelector, tokenConfig := range tokens {
 		key := sourceTokenIdentifier(chainSelector, tokenConfig.SourcePoolAddress)
 		supportedTokens[key] = struct{}{}
 	}
 
-	return &tokenDataObserver{
+	return &TokenDataObserver{
 		lggr:              lggr,
 		destChainSelector: destChainSelector,
 		supportedTokens:   supportedTokens,
@@ -43,7 +42,7 @@ func NewTokenDataObserver(
 	}
 }
 
-func (u *tokenDataObserver) Observe(
+func (u *TokenDataObserver) Observe(
 	ctx context.Context,
 	messages exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
@@ -66,7 +65,7 @@ func (u *tokenDataObserver) Observe(
 	return u.extractTokenData(messages, attestations)
 }
 
-func (u *tokenDataObserver) IsTokenSupported(
+func (u *TokenDataObserver) IsTokenSupported(
 	sourceChain cciptypes.ChainSelector,
 	msgToken cciptypes.RampTokenAmount,
 ) bool {
@@ -74,7 +73,7 @@ func (u *tokenDataObserver) IsTokenSupported(
 	return ok
 }
 
-func (u *tokenDataObserver) pickOnlyUSDCMessages(
+func (u *TokenDataObserver) pickOnlyUSDCMessages(
 	messageObservations exectypes.MessageObservations,
 ) map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.RampTokenAmount {
 	usdcMessages := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.RampTokenAmount)
@@ -93,11 +92,11 @@ func (u *tokenDataObserver) pickOnlyUSDCMessages(
 	return usdcMessages
 }
 
-func (u *tokenDataObserver) fetchUSDCMessageHashes(
+func (u *TokenDataObserver) fetchUSDCMessageHashes(
 	ctx context.Context,
 	usdcMessages map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash, error) {
-	output := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash)
+) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes, error) {
+	output := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes)
 
 	for chainSelector, messages := range usdcMessages {
 		if len(messages) == 0 {
@@ -114,9 +113,9 @@ func (u *tokenDataObserver) fetchUSDCMessageHashes(
 	return output, nil
 }
 
-func (u *tokenDataObserver) fetchAttestations(
+func (u *TokenDataObserver) fetchAttestations(
 	ctx context.Context,
-	usdcMessages map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]reader.MessageHash,
+	usdcMessages map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
 ) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
 	attestations, err := u.attestationClient.Attestations(ctx, usdcMessages)
 	if err != nil {
@@ -125,7 +124,7 @@ func (u *tokenDataObserver) fetchAttestations(
 	return attestations, nil
 }
 
-func (u *tokenDataObserver) extractTokenData(
+func (u *TokenDataObserver) extractTokenData(
 	messages exectypes.MessageObservations,
 	attestations map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus,
 ) (exectypes.TokenDataObservations, error) {
@@ -162,7 +161,8 @@ func attestationToTokenData(
 	if status.Error != nil {
 		return exectypes.NewErrorTokenData(status.Error)
 	}
-	return exectypes.NewSuccessTokenData(status.Data[:])
+	// TODO TokenData = abi.encode(messageHash, attestation)
+	return exectypes.NewSuccessTokenData(status.Attestation[:])
 }
 
 func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {
