@@ -122,13 +122,6 @@ func (p *processor) Outcome(
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 		usdPerFeeToken := consensusObs.NativeTokenPrices[chain].Int
 
-		if feeComp.ExecutionFee == nil || feeComp.DataAvailabilityFee == nil {
-			p.lggr.Errorw("fee component is nil",
-				"chain", chain,
-				"feeComp", feeComp,
-			)
-			continue
-		}
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18
 		// Price per Wei = Xe18USD18/1e18 = XUSD18
@@ -168,6 +161,8 @@ func (p *processor) ValidateObservation(
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
 	// TODO: Validate token prices
+	//  Validate FChain
+	//  Validate no nil token prices
 	return nil
 }
 

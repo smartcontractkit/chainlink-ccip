@@ -463,7 +463,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
 	// nolint:lll
 	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
-	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, len(selectors))
+	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
 	for _, chain := range selectors {
 		reader, ok := r.contractReaders[chain]
 		if !ok {
