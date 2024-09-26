@@ -48,28 +48,32 @@ Additionally, if you are deploying **CCIP** or **Atlas**, you will need to pull 
 
 2. Execute `nix develop` to set up the development environment with all necessary tools and enter the `Nix` shell.
 
-3. After copying the .env file from the example (`.deployments/(core|ccip)/.env.example` to `.deployments/(core|ccip)/.env`), configure the following two environment variables in the relevant `.env` file within the product directory (e.g., `deployments/ccip/.env` or `deployments/core/.env`):
-
-   ```
-   DEVSPACE_IMAGE="localhost:5001/chainlink-devspace"
-   DEVSPACE_CCIP_SCRIPTS_IMAGE="localhost:5001/ccip-scripts:latest"
-   ```
-
-4. Note that the `CHAINLINK_CODE_DIR=../../..` environment variable should be the parent directory that contains the [chainlink](https://github.com/smartcontractkit/chainlink) directory. For running CRIB locally, Docker images need to be built and pushed to the local registry. Please make sure you have a fresh version of the [chainlink](https://github.com/smartcontractkit/chainlink) repo.
-
-5. Depending on the product, change to the appropriate directory (e.g., `deployments/ccip` or `deployments/core`), and run `./cribbit.sh`. (can be ran multiple times, it’s idempotent) with your namespace name to configure provider and credentials:
-
+3. Create or update the .env file in the deployments/chainlink directory by copying from the example:
+   
    ```bash
+    cp deployments/chainlink/.env.example deployments/chainlink/.env
+   ```
+4. Note that the `CHAINLINK_CODE_DIR=../../..` environment variable should be the parent directory that contains the [chainlink](https://github.com/smartcontractkit/chainlink) directory. For running CRIB locally, Docker images need to be built and pushed to the local registry. Please make sure you have a fresh version of the [chainlink](https://github.com/smartcontractkit/chainlink) repo.
+5. Run `cribbit.sh` Script:
+   
+   Change to the `deployments/chainlink` directory and run `./cribbit.sh` with your namespace name to configure the provider and credentials. This script can be run multiple times; it's idempotent.
+   ```bash
+   cd deployments/chainlink
    ./cribbit.sh crib-local
    ```
+   You will then be prompted to choose a provider. Since we are deploying locally using Kind, type kind and press Enter.
 
-   You will then be prompted to choose a provider. If you are deploying to an AWS EKS cluster, simply press Enter, and the script will proceed with the next steps. If you are using the Kind provider, type kind and press Enter.
-   If the provider type is `kind`, the `crib-local` namespace will be auto-selected. This approach helps avoid the need to update the local hosts file for ingress each time, which requires an admin password.
+   - If the provider type is kind, the crib-local namespace will be auto-selected. This approach helps avoid the need to update the local hosts file for ingress each time, which requires admin privileges.
 
-6. Deploy CRIB by executing the following command:
-
+6. Deploy CRIB:
+   Depending on what you want to deploy, execute one of the following commands:
+   - For Core Deployment:
    ```bash
-   devspace deploy --profile kind
+   devspace run core-kind
+   ```
+   - For CCIP Deployment:
+   ```bash
+   devspace run ccip-kind
    ```
 
 ## Cleaning Up the Environment
