@@ -120,7 +120,13 @@ func (p *processor) Outcome(
 		// 1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
 		// 1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
-		usdPerFeeToken := consensusObs.NativeTokenPrices[chain].Int
+		usdPerFeeToken, ok := consensusObs.NativeTokenPrices[chain]
+		if !ok {
+			p.lggr.Warnw("missing native token price for chain",
+				"chain", chain,
+			)
+			continue
+		}
 
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18
@@ -128,8 +134,8 @@ func (p *processor) Outcome(
 		// 1 gas = 1 wei = XUSD18
 		// execFee = 30 Gwei = 30e9 wei = 30e9 * XUSD18
 		chainFeeUsd := ComponentsUSDPrices{
-			ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComp.ExecutionFee, usdPerFeeToken),
-			DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComp.DataAvailabilityFee, usdPerFeeToken),
+			ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(feeComp.ExecutionFee, usdPerFeeToken.Int),
+			DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComp.DataAvailabilityFee, usdPerFeeToken.Int),
 		}
 
 		chainFeeUSDPrices[chain] = chainFeeUsd
