@@ -204,13 +204,6 @@ profiles:
                 topologySpreadConstraints: []
                 imagePullSecrets:
                   - name: regcred-beholder
-#  - name: kind
-#    patches:
-#      - op: replace
-#        path: deployments.beholder-test-client.helm.values.beholder-test-client
-#        value:
-#          imagePullSecrets:
-#            - name: regcred-beholder
   - name: local-charts
     merge:
       deployments:
