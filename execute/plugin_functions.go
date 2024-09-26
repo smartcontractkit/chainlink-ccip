@@ -463,7 +463,10 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations, _ := mergeTokenObservations(aos, fChain)
+	mergedTokenObservations, err := mergeTokenObservations(aos, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge token data observations: %w", err)
+	}
 	lggr.Debugw(
 		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
 		"oracle", oracleID,

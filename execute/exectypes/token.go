@@ -15,9 +15,7 @@ func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
 	if len(tokenData) == 0 {
 		return MessageTokenData{TokenData: []TokenData{}}
 	}
-	return MessageTokenData{
-		TokenData: tokenData,
-	}
+	return MessageTokenData{TokenData: tokenData}
 }
 
 func (mtd MessageTokenData) Append(index int, td TokenData) MessageTokenData {
