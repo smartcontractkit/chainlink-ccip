@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/crypto/sha3"
 )
 
 type MessageTokenData struct {
@@ -17,6 +18,19 @@ func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
 	return MessageTokenData{TokenData: tokenData}
 }
 
+func (mtd MessageTokenData) Append(index int, td TokenData) MessageTokenData {
+	out := mtd
+	if index >= len(out.TokenData) {
+		newSize := index + 1
+		newTokenData := make([]TokenData, newSize)
+		// Copy the contents of the old slice into the new slice
+		copy(newTokenData, out.TokenData)
+		out.TokenData = newTokenData
+	}
+	out.TokenData[index] = td
+	return out
+}
+
 func (mtd MessageTokenData) IsReady() bool {
 	for _, td := range mtd.TokenData {
 		if !td.IsReady() {
@@ -24,15 +38,6 @@ func (mtd MessageTokenData) IsReady() bool {
 		}
 	}
 	return true
-}
-
-func (mtd MessageTokenData) Error() error {
-	for _, td := range mtd.TokenData {
-		if td.Error != nil {
-			return td.Error
-		}
-	}
-	return nil
 }
 
 func (mtd MessageTokenData) ToByteSlice() [][]byte {
@@ -94,6 +99,20 @@ func NewErrorTokenData(err error) TokenData {
 		Data:      nil,
 		Supported: true,
 	}
+}
+
+// NotReadyToken returns a TokenData object with Ready set to false. It doesn't carry additional information,
+// it's used to mark tokens which are not ready because consensus hasn't been reached on them.
+// By setting them as `Ready=false`, higher level knows this message has to be ignored
+func NotReadyToken() TokenData {
+	return TokenData{Ready: false}
+}
+
+// TokenDataHash returns a hash of the token data. It's used during the consensus process to identify unique token data.
+// It intentionally skips the fields that are not relevant for the consensus process and are
+// not serialized when nodes gossiping
+func TokenDataHash(td TokenData) [32]byte {
+	return sha3.Sum256([]byte(fmt.Sprintf("%v_%v", td.Ready, td.Data)))
 }
 
 func (td TokenData) IsReady() bool {
