@@ -108,7 +108,6 @@ func (r *rmnHomePoller) poll() {
 			r.mutex.Unlock()
 			return
 		case <-ticker.C:
-			fmt.Println("failedPolls", r.failedPolls)
 			if err := r.fetchAndSetRmnHomeConfigs(ctx); err != nil {
 				r.mutex.Lock()
 				r.failedPolls++
