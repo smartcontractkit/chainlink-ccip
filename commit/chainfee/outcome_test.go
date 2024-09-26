@@ -45,7 +45,7 @@ var obsNeedUpdate = Observation{
 		1: {Timestamp: ts},
 		2: {Timestamp: ts.Add(-chainFeePriceBatchWriteFrequency.Duration() * 2)}, // Needs updating
 	},
-	Timestamp: ts,
+	TimestampNow: ts,
 }
 
 var obsNoUpdate = Observation{
@@ -56,7 +56,7 @@ var obsNoUpdate = Observation{
 		1: {Timestamp: ts},
 		2: {Timestamp: ts},
 	},
-	Timestamp: ts,
+	TimestampNow: ts,
 }
 
 func SameObs(n int, obs Observation) []plugincommon.AttributedObservation[Observation] {
@@ -85,7 +85,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	// Only chain selector 1 will have consensus
 	// That's why we assert having only 1 fee component, and 1 native token price.
 	assert.NotNil(t, consensusObs)
-	assert.Equal(t, ts, consensusObs.Timestamp)
+	assert.Equal(t, ts, consensusObs.TimestampNow)
 	assert.Len(t, consensusObs.FeeComponents, 1)
 	assert.Equal(t, feeComponentsMap[1], consensusObs.FeeComponents[1])
 	assert.Len(t, consensusObs.NativeTokenPrices, 1)
@@ -101,7 +101,7 @@ func TestGetConsensusObservation(t *testing.T) {
 
 	// Both chain selectors 1 and 2 will have consensus
 	assert.NotNil(t, consensusObs)
-	assert.Equal(t, ts, consensusObs.Timestamp)
+	assert.Equal(t, ts, consensusObs.TimestampNow)
 	assert.Len(t, consensusObs.FeeComponents, 2)
 	assert.Equal(t, feeComponentsMap, consensusObs.FeeComponents)
 	assert.Len(t, consensusObs.NativeTokenPrices, 2)

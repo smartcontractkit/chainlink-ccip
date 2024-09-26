@@ -18,11 +18,14 @@ type Outcome struct {
 }
 
 type Observation struct {
-	FeeComponents     map[cciptypes.ChainSelector]types.ChainFeeComponents    `json:"feeComponents"`
-	NativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt            `json:"nativeTokenPrice"`
-	FChain            map[cciptypes.ChainSelector]int                         `json:"fChain"`
-	ChainFeeUpdates   map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate `json:"chainFeeUpdates"`
-	Timestamp         time.Time                                               `json:"timestamp"`
+	// FeeComponents: from the source chains, via chain writer
+	FeeComponents map[cciptypes.ChainSelector]types.ChainFeeComponents `json:"feeComponents"`
+	//NativeTokenPrices: from the source chains, via fee quoter (after getting the native token address from Router)
+	NativeTokenPrices map[cciptypes.ChainSelector]cciptypes.BigInt `json:"nativeTokenPrice"`
+	//ChainFeeUpdates: from the dest chain, via fee quoter
+	ChainFeeUpdates map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate `json:"chainFeeUpdates"`
+	FChain          map[cciptypes.ChainSelector]int                         `json:"fChain"`
+	TimestampNow    time.Time                                               `json:"timestamp"`
 }
 
 // AggregateObservation is the aggregation of a list of observations

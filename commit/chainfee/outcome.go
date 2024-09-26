@@ -2,7 +2,6 @@ package chainfee
 
 import (
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -29,7 +28,8 @@ func (p *processor) getConsensusObservation(
 		return Observation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
-	if len(aggObs.Timestamps) < fDestChain {
+
+	if len(aggObs.Timestamps) < int(consensus.TwoFPlus1(fDestChain)) {
 		return Observation{},
 			fmt.Errorf("not enough observations for timestamps to reach consensus, have %d, need %d",
 				len(aggObs.Timestamps), fDestChain)
@@ -44,13 +44,13 @@ func (p *processor) getConsensusObservation(
 		plugincommon.ChainFeeUpdateAggregator,
 	)
 
-	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
+	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 
 	feeComponents := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"FeeComponents",
 		aggObs.FeeComponents,
-		twoFPlus1,
+		twoFChainPlus1,
 		// Aggregator function
 		func(vals []types.ChainFeeComponents) types.ChainFeeComponents {
 			executionFees := make([]cciptypes.BigInt, len(vals))
@@ -70,7 +70,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"NativeTokenPrices",
 		aggObs.NativeTokenPrices,
-		twoFPlus1,
+		twoFChainPlus1,
 		// Aggregator function
 		func(vals []cciptypes.BigInt) cciptypes.BigInt {
 			return consensus.Median(vals, consensus.BigIntComparator)
@@ -82,7 +82,7 @@ func (p *processor) getConsensusObservation(
 		FeeComponents:     feeComponents,
 		NativeTokenPrices: nativeTokenPrices,
 		ChainFeeUpdates:   chainFeeUpdatesConsensus,
-		Timestamp:         timestamp,
+		TimestampNow:      timestamp,
 	}
 
 	return consensusObs, nil
@@ -120,7 +120,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		}
 
 		// Timestamps
-		aggObs.Timestamps = append(aggObs.Timestamps, obs.Timestamp)
+		aggObs.Timestamps = append(aggObs.Timestamps, obs.TimestampNow)
 	}
 
 	return aggObs
@@ -130,7 +130,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 // the fee quoter updates.
 // A chain fee is selected for update if it meets one of 2 conditions:
 // 1. If time passed since the last update is greater than the stale threshold.
-// 2. If deviation between the fee quoter and feed exceeds the chain's configured threshold.
+// 2. If deviation between the fee quoter and latest observed chain fee exceeds the chain's configured threshold.
 func (p *processor) getGasPricesToUpdate(
 	currentChainUSDFees map[cciptypes.ChainSelector]plugincommon.ChainFeeUSDPrices,
 	latestUpdates map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate,
@@ -161,15 +161,19 @@ func (p *processor) getGasPricesToUpdate(
 			continue
 		}
 
-		// Checks if executionFee or dataAvFee deviates from the last update
-		if mathslib.Deviates(
+		executionFeeDeviates := mathslib.Deviates(
 			currentChainFee.ExecutionFeePriceUSD,
 			lastUpdate.ChainFee.ExecutionFeePriceUSD,
-			ci.ExecDeviationPPB.Int64()) ||
-			mathslib.Deviates(
-				currentChainFee.DataAvFeePriceUSD,
-				lastUpdate.ChainFee.DataAvFeePriceUSD,
-				ci.DataAvDeviationPPB.Int64()) {
+			ci.ExecDeviationPPB.Int64(),
+		)
+
+		dataAvFeeDeviates := mathslib.Deviates(
+			currentChainFee.DataAvFeePriceUSD,
+			lastUpdate.ChainFee.DataAvFeePriceUSD,
+			ci.DataAvDeviationPPB.Int64(),
+		)
+
+		if executionFeeDeviates || dataAvFeeDeviates {
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -177,9 +181,5 @@ func (p *processor) getGasPricesToUpdate(
 		}
 	}
 
-	// sort chainFeeUSDPrices based on chainSel
-	sort.Slice(gasPrices, func(i, j int) bool {
-		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
-	})
 	return gasPrices
 }

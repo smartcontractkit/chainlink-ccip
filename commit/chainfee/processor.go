@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -28,7 +29,6 @@ type processor struct {
 	fRoleDON   int
 }
 
-// nolint: revive
 func NewProcessor(
 	lggr logger.Logger,
 	destChain cciptypes.ChainSelector,
@@ -36,7 +36,7 @@ func NewProcessor(
 	ccipReader readerpkg.CCIPReader,
 	offChainConfig pluginconfig.CommitOffchainConfig,
 	fRoleDON int,
-) *processor {
+) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		lggr:       lggr,
 		destChain:  destChain,
@@ -68,7 +68,7 @@ func (p *processor) Observation(
 		FeeComponents:     feeComponents,
 		NativeTokenPrices: nativeTokenPrices,
 		ChainFeeUpdates:   chainFeePriceUpdates,
-		Timestamp:         time.Now().UTC(),
+		TimestampNow:      time.Now().UTC(),
 	}, nil
 }
 
@@ -80,27 +80,31 @@ func (p *processor) Outcome(
 
 	consensusObs, err := p.getConsensusObservation(aos)
 	if err != nil {
-		return Outcome{}, err
+		return Outcome{}, fmt.Errorf("failed to get consensus observation: %w", err)
 	}
 	// No need to update yet
 	if len(consensusObs.FeeComponents) == 0 {
+		p.lggr.Debug("no consensus on fee components, nothing to update",
+			"consensusObs", consensusObs)
 		return Outcome{}, nil
 	}
 
 	// Stop early if earliest updated timestamp is still fresh
 	//earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(consensusObs.ChainFeeUpdates))
 	//nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
-	//if nextUpdateTime.After(consensusObs.Timestamp) {
+	//if nextUpdateTime.After(consensusObs.TimestampNow) {
 	//	return Outcome{}, nil
 	//}
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]plugincommon.ChainFeeUSDPrices)
+	// We need to report a packed GasPrice
+	// The packed GasPrice is a 224-bit integer with the following format:
+	// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
+	// nolint:lll
+	// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
+	// In next loop we calculate the price in USD for the data availability and execution fees.
+	// And getGasPricesToUpdate will select and calculate the **packed** gas price to update based.
 	for chain, feeComp := range consensusObs.FeeComponents {
-		// We need to report a packed GasPrice
-		// The packed GasPrice is a 224-bit integer with the following format:
-		// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
-		// nolint:lll
-		// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
 		nativeTokenPriceUSD := consensusObs.NativeTokenPrices[chain].Int
 
 		// Calculate the price in USD for the data availability and execution fees.
@@ -113,12 +117,19 @@ func (p *processor) Outcome(
 		chainFeeUSDPrices[chain] = chainFeeUsd
 	}
 
+	gasPrices := p.getGasPricesToUpdate(
+		chainFeeUSDPrices,
+		consensusObs.ChainFeeUpdates,
+		consensusObs.TimestampNow,
+	)
+
+	// sort chainFeeUSDPrices based on chainSel
+	sort.Slice(gasPrices, func(i, j int) bool {
+		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
+	})
+
 	return Outcome{
-		GasPrices: p.getGasPricesToUpdate(
-			chainFeeUSDPrices,
-			consensusObs.ChainFeeUpdates,
-			consensusObs.Timestamp,
-		),
+		GasPrices: gasPrices,
 	}, nil
 }
 
