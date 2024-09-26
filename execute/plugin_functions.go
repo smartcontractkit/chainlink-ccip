@@ -318,7 +318,7 @@ func mergeTokenObservations(
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
 			if !ok {
-				return exectypes.TokenDataObservations{}, fmt.Errorf("no seqNrs for chain %d", selector)
+				return exectypes.TokenDataObservations{}, fmt.Errorf("no F defined for chain %d", selector)
 			}
 
 			if _, ok1 := results[selector]; !ok1 {
