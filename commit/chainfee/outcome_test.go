@@ -28,8 +28,8 @@ var feeComponentsMap = map[cciptypes.ChainSelector]types.ChainFeeComponents{
 var chainFeePriceBatchWriteFrequency = *commonconfig.MustNewDuration(time.Minute)
 
 var nativeTokenPricesMap = map[cciptypes.ChainSelector]cciptypes.BigInt{
-	1: cciptypes.NewBigInt(big.NewInt(10)),
-	2: cciptypes.NewBigInt(big.NewInt(20)),
+	1: cciptypes.NewBigInt(big.NewInt(1e18)),
+	2: cciptypes.NewBigInt(big.NewInt(2e18)),
 }
 
 var fChains = map[cciptypes.ChainSelector]int{
@@ -123,8 +123,8 @@ func TestProcessor_Outcome(t *testing.T) {
 			expectedOutcome: func() Outcome {
 				gas2 := new(big.Int)
 				// {ExecutionFee: big.NewInt(150), DataAvailabilityFee: big.NewInt(250)}
-				// (250 * 20) << 112 | (150 * 20)
-				gas2, ok := gas2.SetString("25961484292674138142652481646100483000", 10) // base 10
+				// (250 * 2e18/e18) << 112 | (150 * 2e18/e18) -- check `CalculateUsdPerUnitGas`
+				gas2, ok := gas2.SetString("2596148429267413814265248164610048300", 10) // base 10
 				require.True(t, ok)
 				// Only chain selector 2 will be updated because last update is stale
 				expectedOutcome := Outcome{
@@ -162,6 +162,7 @@ func TestProcessor_Outcome(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := &processor{
+				lggr:      logger.Test(t),
 				destChain: 1,
 				fRoleDON:  1,
 				cfg: pluginconfig.CommitOffchainConfig{
