@@ -820,6 +820,27 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 		expected    map[cciptypes.SeqNum]expected
 	}{
 		{
+			name: "messages without token data",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(),
+					2: exectypes.NewMessageTokenData(),
+					3: exectypes.NewMessageTokenData(),
+				},
+				{
+					1: exectypes.NewMessageTokenData(),
+					2: exectypes.NewMessageTokenData(),
+					3: exectypes.NewMessageTokenData(),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{}},
+				2: {ready: true, data: [][]byte{}},
+				3: {ready: true, data: [][]byte{}},
+			},
+		},
+		{
 			name: "messages with empty token data",
 			F:    1,
 			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
@@ -1053,7 +1074,10 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 			require.NoError(t, err)
 
 			for seqNum, exp := range tc.expected {
-				assert.Equal(t, exp.ready, obs[chainSelector][seqNum].IsReady())
+				mtd, ok := obs[chainSelector][seqNum]
+				assert.True(t, ok)
+
+				assert.Equal(t, exp.ready, mtd.IsReady())
 				// No need to compare bytes when not ready
 				if exp.ready {
 					assert.Equal(t, exp.data, obs[chainSelector][seqNum].ToByteSlice())

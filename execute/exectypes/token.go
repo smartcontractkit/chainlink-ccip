@@ -21,18 +21,19 @@ func NewMessageTokenData(tokenData ...TokenData) MessageTokenData {
 }
 
 func (mtd MessageTokenData) Append(index int, td TokenData) MessageTokenData {
-	if index >= len(mtd.TokenData) {
+	out := mtd
+	if index >= len(out.TokenData) {
 		newSize := index + 1
 		newTokenData := make([]TokenData, newSize)
 
 		// Copy the contents of the old slice into the new slice
-		copy(newTokenData, mtd.TokenData)
+		copy(newTokenData, out.TokenData)
 
 		// Assign the new slice to mtd.TokenData
-		mtd.TokenData = newTokenData
+		out.TokenData = newTokenData
 	}
-	mtd.TokenData[index] = td
-	return mtd
+	out.TokenData[index] = td
+	return out
 }
 
 func (mtd MessageTokenData) IsReady() bool {
@@ -42,15 +43,6 @@ func (mtd MessageTokenData) IsReady() bool {
 		}
 	}
 	return true
-}
-
-func (mtd MessageTokenData) Error() error {
-	for _, td := range mtd.TokenData {
-		if td.Error != nil {
-			return td.Error
-		}
-	}
-	return nil
 }
 
 func (mtd MessageTokenData) ToByteSlice() [][]byte {
@@ -122,7 +114,8 @@ func NotReadyToken() TokenData {
 }
 
 // TokenDataHash returns a hash of the token data. It's used during the consensus process to identify unique token data.
-// It intentionally skips the fields that are not relevant for the consensus process and are not serialized when nodes gossiping
+// It intentionally skips the fields that are not relevant for the consensus process and are
+// not serialized when nodes gossiping
 func TokenDataHash(td TokenData) [32]byte {
 	return sha3.Sum256([]byte(fmt.Sprintf("%v_%v", td.Ready, td.Data)))
 }

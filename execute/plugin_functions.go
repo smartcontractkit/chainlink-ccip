@@ -305,12 +305,15 @@ func mergeCommitObservations(
 	return results, nil
 }
 
+//nolint:gocyclo
 func mergeTokenObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.TokenDataObservations, error) {
-	// We need to find a consensus per token per message
+	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
+	//nolint:lll
 	validators := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+	results := make(exectypes.TokenDataObservations)
 
 	for _, ao := range aos {
 		for selector, seqMap := range ao.Observation.TokenData {
@@ -319,12 +322,19 @@ func mergeTokenObservations(
 				return exectypes.TokenDataObservations{}, fmt.Errorf("no seqNrs for chain %d", selector)
 			}
 
-			_, ok = validators[selector]
-			if !ok {
+			if _, ok1 := results[selector]; !ok1 {
+				results[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+			}
+
+			if _, ok1 := validators[selector]; !ok1 {
 				validators[selector] = make(map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 			}
 
 			for seqNr, msgTokenData := range seqMap {
+				if _, ok1 := results[selector][seqNr]; !ok1 {
+					results[selector][seqNr] = exectypes.NewMessageTokenData()
+				}
+
 				for tokenIndex, tokenData := range msgTokenData.TokenData {
 					_, ok1 := validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)]
 					if !ok1 {
@@ -337,23 +347,16 @@ func mergeTokenObservations(
 		}
 	}
 
-	results := make(exectypes.TokenDataObservations)
 	for selector, seqNrs := range validators {
-		results[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-
-		for tokenId, validator := range seqNrs {
-			mtd, ok := results[selector][tokenId.SeqNr]
-			if !ok {
-				mtd = exectypes.NewMessageTokenData()
-			}
-
+		for tokenID, validator := range seqNrs {
+			mtd := results[selector][tokenID.SeqNr]
 			if values := validator.GetValid(); len(values) > 0 {
-				mtd = mtd.Append(tokenId.Index, values[0])
+				mtd = mtd.Append(tokenID.Index, values[0])
 			} else {
 				// Can't reach consensus for this particular token, marking it's as not ready
-				mtd = mtd.Append(tokenId.Index, exectypes.NotReadyToken())
+				mtd = mtd.Append(tokenID.Index, exectypes.NotReadyToken())
 			}
-			results[selector][tokenId.SeqNr] = mtd
+			results[selector][tokenID.SeqNr] = mtd
 		}
 	}
 
