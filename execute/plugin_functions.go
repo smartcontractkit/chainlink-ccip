@@ -336,7 +336,7 @@ func mergeTokenObservations(
 	for selector, seqNrs := range validators {
 		for tokenID, validator := range seqNrs {
 			mtd := results[selector][tokenID.SeqNr]
-			if values := validator.GetValid(); len(values) > 0 {
+			if values := validator.GetValid(); len(values) == 1 {
 				mtd = mtd.Append(tokenID.Index, values[0])
 			} else {
 				// Can't reach consensus for this particular token, marking it's as not ready
