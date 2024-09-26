@@ -15,6 +15,21 @@ var initCmd = &cobra.Command{
 
 		// TODO: call SetupAwsProfile when applicable
 		// e.g. utils.SetupAwsProfile("$HOME/.aws/config", viper.GetString("crib.awsProfileName"), viper.GetString("aws.accountId"), viper.GetString("aws.region"), viper.GetString("aws.ssoRoleName"), viper.GetString("aws.ssoStartUrl"))
+
+		// TODO: call SetupKubeConfig when applicable
+		// setupKubeConfigInput := &utils.SetupKubeConfigInput{
+		// 	EksClient:            eksClient,
+		// 	KubeconfigPath:       "./kubeconfig",
+		// 	EksClusterName:       viper.GetString("eks.clusterName"),
+		// 	EksAliasName:         viper.GetString("eks.clusterAlias"),
+		// 	CribNamespace:        "crib-someone",
+		// 	AwsProfile:           viper.GetString("crib.awsProfileName"),
+		// 	AwsRegion:            viper.GetString("aws.region"),
+		// 	ChangeDefaultContext: true,
+		// }
+		// if err := utils.SetupKubeConfig(setupKubeConfigInput); err != nil {
+		// 	log.Fatalf("Failed to setup kubeconfig: %v", err)
+		// }
 	},
 }
 
