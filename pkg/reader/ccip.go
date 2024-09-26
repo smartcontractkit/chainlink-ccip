@@ -628,7 +628,7 @@ type sourceChainConfig struct {
 	MinSeqNr  uint64
 }
 
-// getSourceChainsConfig returns the destination offRamp contract's static chain configuration.
+// getOfframpStaticConfig returns the destination offRamp contract's static configuration.
 func (r *ccipChainReader) getOfframpStaticConfig(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
