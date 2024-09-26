@@ -23,7 +23,6 @@ const (
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
 	MethodNameOfframpGetDynamicConfig      = "OfframpGetDynamicConfig"
 	MethodNameOfframpGetStaticConfig       = "OfframpGetStaticConfig"
-	MethodNameOfframpGetRMNRemoteConfig    = "OfframpGetRMNRemoteConfig" // todo check the name
 	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                    = "IsBlessed"
 	MethodNameGetMerkleRoot                = "GetMerkleRoot"
