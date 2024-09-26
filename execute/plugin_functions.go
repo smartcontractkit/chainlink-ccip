@@ -305,7 +305,6 @@ func mergeCommitObservations(
 	return results, nil
 }
 
-//nolint:gocyclo
 func mergeTokenObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
@@ -330,20 +329,7 @@ func mergeTokenObservations(
 				validators[selector] = make(map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 			}
 
-			for seqNr, msgTokenData := range seqMap {
-				if _, ok1 := results[selector][seqNr]; !ok1 {
-					results[selector][seqNr] = exectypes.NewMessageTokenData()
-				}
-
-				for tokenIndex, tokenData := range msgTokenData.TokenData {
-					_, ok1 := validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)]
-					if !ok1 {
-						validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)] =
-							consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
-					}
-					validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)].Add(tokenData)
-				}
-			}
+			initResultsAndValidators(selector, f, seqMap, results, validators)
 		}
 	}
 
@@ -365,6 +351,29 @@ func mergeTokenObservations(
 	}
 
 	return results, nil
+}
+
+func initResultsAndValidators(
+	selector cciptypes.ChainSelector,
+	f int,
+	seqMap map[cciptypes.SeqNum]exectypes.MessageTokenData,
+	results exectypes.TokenDataObservations,
+	validators map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
+) {
+	for seqNr, msgTokenData := range seqMap {
+		if _, ok := results[selector][seqNr]; !ok {
+			results[selector][seqNr] = exectypes.NewMessageTokenData()
+		}
+
+		for tokenIndex, tokenData := range msgTokenData.TokenData {
+			_, ok := validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)]
+			if !ok {
+				validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)] =
+					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
+			}
+			validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)].Add(tokenData)
+		}
+	}
 }
 
 // mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
