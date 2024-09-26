@@ -43,6 +43,9 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
+	// For tests
+	1: 100,
+	2: 101,
 }
 
 type usdcMessageReader struct {
@@ -56,6 +59,20 @@ type eventID [32]byte
 // MessageSentEvent represents `MessageSent(bytes)` event emitted by the MessageTransmitter contract
 type MessageSentEvent struct {
 	Arg0 []byte
+}
+
+func NewMessageSentEvent(sourceDomain uint32, destDomain uint32, nonce uint64, payload []byte) *MessageSentEvent {
+	var buf []byte
+	buf = binary.BigEndian.AppendUint32(buf, CCTPMessageVersion)
+	buf = binary.BigEndian.AppendUint32(buf, sourceDomain)
+	buf = binary.BigEndian.AppendUint32(buf, destDomain)
+	buf = binary.BigEndian.AppendUint64(buf, nonce)
+
+	senderBytes := [12]byte{}
+	buf = append(buf, senderBytes[:]...)
+	buf = append(buf, payload...)
+
+	return &MessageSentEvent{Arg0: buf}
 }
 
 func (m MessageSentEvent) unpackID() (eventID, error) {
