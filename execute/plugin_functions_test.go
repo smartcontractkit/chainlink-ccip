@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -802,6 +802,210 @@ func Test_getConsensusObservation(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "getConsensusObservation(...)")
+		})
+	}
+}
+
+func Test_mergeTokenDataObservation(t *testing.T) {
+	chainSelector := cciptypes.ChainSelector(1)
+
+	tt := []struct {
+		name        string
+		F           int
+		observation []map[cciptypes.SeqNum]exectypes.MessageTokenData
+		want        map[cciptypes.SeqNum]exectypes.MessageTokenData
+	}{
+		{
+			name: "messages with empty token data",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+				},
+			},
+			want: map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				1: exectypes.NewMessageTokenData(
+					exectypes.NewNoopTokenData(),
+				),
+			},
+		},
+		{
+			name: "only one token has enough observations",
+			F:    2,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+			},
+			want: map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				1: exectypes.NewMessageTokenData(
+					exectypes.NotReadyToken(),
+					exectypes.NewSuccessTokenData([]byte{2}),
+					exectypes.NotReadyToken(),
+				),
+			},
+		},
+		{
+			name: "some of the tokens have enough observations",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+			},
+			want: map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				1: exectypes.NewMessageTokenData(
+					exectypes.NewSuccessTokenData([]byte{1}),
+					exectypes.NewSuccessTokenData([]byte{2}),
+					exectypes.NotReadyToken(),
+				),
+			},
+		},
+		{
+			name: "all messages have enough observations",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{90}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+			},
+			want: map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				1: exectypes.NewMessageTokenData(
+					exectypes.NewSuccessTokenData([]byte{1}),
+				),
+				2: exectypes.NewMessageTokenData(
+					exectypes.NewSuccessTokenData([]byte{2}),
+				),
+			},
+		},
+		{
+			name: "consensus is not reached for some of the messages",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{4}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+			},
+			want: map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				1: exectypes.NewMessageTokenData(
+					exectypes.NotReadyToken(),
+				),
+				2: exectypes.NewMessageTokenData(
+					exectypes.NewSuccessTokenData([]byte{2}),
+				),
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			fChain := make(map[cciptypes.ChainSelector]int)
+			fChain[chainSelector] = tc.F
+
+			var ao []plugincommon.AttributedObservation[exectypes.Observation]
+			for i, observation := range tc.observation {
+				formatted := make(exectypes.TokenDataObservations)
+				formatted[chainSelector] = observation
+
+				ao = append(ao, plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{
+						TokenData: formatted,
+					},
+					OracleID: commontypes.OracleID(i),
+				})
+			}
+
+			want := exectypes.TokenDataObservations{
+				chainSelector: tc.want,
+			}
+
+			obs := mergeTokenObservations(ao, fChain)
+			require.Equal(t, want, obs)
 		})
 	}
 }

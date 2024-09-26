@@ -96,6 +96,13 @@ func NewErrorTokenData(err error) TokenData {
 	}
 }
 
+// NotReadyToken returns a TokenData object with Ready set to false. It doesn't carry additional information,
+// it's used to mark tokens which are not ready because consensus hasn't been reached on them.
+// By setting them as `Ready=false`, higher level knows this message has to be ignored
+func NotReadyToken() TokenData {
+	return TokenData{Ready: false}
+}
+
 func (td TokenData) IsReady() bool {
 	return td.Ready
 }
