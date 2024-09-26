@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/stretchr/testify/mock"
 
@@ -47,6 +47,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
+	donID := uint32(1)
 	oracleIDs := []commontypes.OracleID{1, 2, 3}
 	peerIDs := []libocrtypes.PeerID{{1}, {2}, {3}}
 	require.Equal(t, len(oracleIDs), len(peerIDs))
@@ -77,8 +78,6 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		DestChain:                          destChain,
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
-		SyncTimeout:                        10 * time.Second,
-		SyncFrequency:                      time.Hour,
 	}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
@@ -200,7 +199,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				n := setupNode(ctx, t, lggr, oracleIDs[i], reportingCfg, oracleIDToPeerID,
+				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
 					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
 				nodes[i] = n.node
 				if i == 0 {
@@ -262,6 +261,7 @@ func setupNode(
 	ctx context.Context,
 	t *testing.T,
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -290,6 +290,9 @@ func setupNode(
 	}
 
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
+	homeChainReader.EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeCommit).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil).Maybe()
 
 	for peerID, supportedChains := range supportedChainsForPeer {
 		homeChainReader.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil).Maybe()
@@ -353,6 +356,7 @@ func setupNode(
 
 	p := NewPlugin(
 		ctx,
+		donID,
 		nodeID,
 		oracleIDToP2pID,
 		pluginCfg,

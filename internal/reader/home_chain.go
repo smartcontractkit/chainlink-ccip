@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 const (
@@ -52,17 +52,14 @@ type state struct {
 }
 
 type homeChainPoller struct {
-	wg              sync.WaitGroup
-	stopCh          services.StopChan
-	sync            services.StateMachine
-	homeChainReader contractreader.ContractReaderFacade
-	lggr            logger.Logger
-	mutex           *sync.RWMutex
-	state           state
-	failedPolls     uint
-	// TODO: currently unused but will be passed into GetLatestValue
-	// once the chainlink-common breaking change comes in
-	// (https://github.com/smartcontractkit/chainlink-common/pull/603).
+	wg                      sync.WaitGroup
+	stopCh                  services.StopChan
+	sync                    services.StateMachine
+	homeChainReader         contractreader.ContractReaderFacade
+	lggr                    logger.Logger
+	mutex                   *sync.RWMutex
+	state                   state
+	failedPolls             uint
 	ccipConfigBoundContract types.BoundContract
 	// How frequently the poller fetches the chain configs
 	pollingDuration time.Duration

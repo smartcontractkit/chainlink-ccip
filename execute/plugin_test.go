@@ -23,11 +23,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gen"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -170,8 +171,7 @@ func TestPlugin_Close(t *testing.T) {
 	mockReader.On("Close", mock.Anything).Return(nil)
 
 	lggr := logger.Test(t)
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(lggr, mockReader, 50*time.Millisecond, 100*time.Millisecond)
-	p := &Plugin{lggr: lggr, ccipReader: mockReader, readerSyncer: readerSyncer}
+	p := &Plugin{lggr: lggr, ccipReader: mockReader}
 	require.NoError(t, p.Close())
 }
 
@@ -511,13 +511,19 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
+	const donID = uint32(1)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	homeChain.
+		EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeExecute).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
 	p := &Plugin{
+		donID:        donID,
 		lggr:         logger.Test(t),
 		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
@@ -534,14 +540,20 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
+	const donID = uint32(1)
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	homeChain.
+		EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeExecute).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 
 	p := &Plugin{
+		donID:        donID,
 		lggr:         lggr,
 		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},

@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
@@ -205,19 +206,16 @@ func checkForReportTransmission(
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func getConsensusObservation(
 	lggr logger.Logger,
-	F int,
+	fRoleDON int,
 	destChain cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = F
-	}
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
-	fChains := plugincommon.GetConsensusMap(lggr, "fChain", aggObs.FChain, fMin)
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fRoleDON))
+	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
 
 	_, exists := fChains[destChain]
 	if !exists {
@@ -225,15 +223,12 @@ func getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
-	twoFPlus1 := make(map[cciptypes.ChainSelector]int)
-	for chain, f := range fChains {
-		twoFPlus1[chain] = 2*f + 1
-	}
-
+	// Get consensus using strict 2f+1 threshold.
+	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	consensusObs := ConsensusObservation{
-		MerkleRoots:        plugincommon.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, fChains),
-		OnRampMaxSeqNums:   plugincommon.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
-		OffRampNextSeqNums: plugincommon.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, fChains),
+		MerkleRoots:        consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFPlus1),
+		OnRampMaxSeqNums:   consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
+		OffRampNextSeqNums: consensus.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, twoFPlus1),
 		FChain:             fChains,
 	}
 

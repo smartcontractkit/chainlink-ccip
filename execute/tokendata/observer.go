@@ -3,12 +3,15 @@ package tokendata
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -44,19 +47,23 @@ type compositeTokenDataObserver struct {
 // Slice of []pluginconfig.TokenDataObserverConfig must be deduped and validated by the plugin.
 // Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
 // This constructor that should be used by the plugin.
-//
-//nolint:revive
 func NewConfigBasedCompositeObservers(
 	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
-) (*compositeTokenDataObserver, error) {
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+) (TokenDataObserver, error) {
 	observers := make([]TokenDataObserver, len(config))
 	for i, c := range config {
 		// TODO consider if we can get rid of this switch stmt by moving the logic to the config
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observers[i] = usdc.NewTokenDataObserver(lggr, *c.USDCCCTPObserverConfig, nil, nil)
+			observer, err := createUSDCTokenObserver(lggr, destChainSelector, *c.USDCCCTPObserverConfig, readers)
+			if err != nil {
+				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
+			}
+			observers[i] = observer
 		default:
 			return nil, errors.New("unsupported token data observer")
 		}
@@ -64,12 +71,38 @@ func NewConfigBasedCompositeObservers(
 	return NewCompositeObservers(lggr, observers...), nil
 }
 
+func createUSDCTokenObserver(
+	lggr logger.Logger,
+	destChainSelector cciptypes.ChainSelector,
+	cctpConfig pluginconfig.USDCCCTPObserverConfig,
+	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+) (TokenDataObserver, error) {
+	usdcReader, err := reader.NewUSDCMessageReader(
+		cctpConfig.Tokens,
+		readers,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := usdc.NewSequentialAttestationClient(cctpConfig)
+	if err != nil {
+		return nil, fmt.Errorf("create attestation client: %w", err)
+	}
+
+	return usdc.NewTokenDataObserver(
+		lggr,
+		destChainSelector,
+		cctpConfig.Tokens,
+		usdcReader,
+		client,
+	), nil
+}
+
 // NewCompositeObservers creates a compositeTokenDataObserver based on the provided observers.
 // Created mostly for tests purposes, it allows the user to specify custom observers and skip the part
 // in which we match the configuration to the proper TokenDataObserver.
-//
-//nolint:revive
-func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) *compositeTokenDataObserver {
+func NewCompositeObservers(lggr logger.Logger, observers ...TokenDataObserver) TokenDataObserver {
 	return &compositeTokenDataObserver{lggr: lggr, observers: observers}
 }
 

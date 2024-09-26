@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -113,8 +113,6 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		idx := idx
 		token := token
 		eg.Go(func() error {
-			// TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
-			// are merged we'll need to use the bound contract
 			boundContract := commontypes.BoundContract{
 				Address: pr.TokenInfo[token].AggregatorAddress,
 				Name:    consts.ContractNamePriceAggregator,

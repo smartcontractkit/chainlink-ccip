@@ -2,6 +2,7 @@ package contractreader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -11,7 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader/contractreader"
+)
+
+var (
+	ErrTooManyBindings = errors.New("contract binding not found")
+	ErrNoBindings      = errors.New("no bindings found")
 )
 
 // Extended version of a ContractReader.
@@ -48,16 +53,30 @@ type ExtendedBoundContract struct {
 
 // extendedContractReader is an extended version of the contract reader.
 type extendedContractReader struct {
-	contractreader.ContractReaderFacade
+	ContractReaderFacade
 	contractBindingsByName map[string][]ExtendedBoundContract
 	mu                     *sync.RWMutex
 }
 
-func NewExtendedContractReader(baseContractReader contractreader.ContractReaderFacade) Extended {
+func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended {
 	return &extendedContractReader{
 		ContractReaderFacade:   baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
 		mu:                     &sync.RWMutex{},
+	}
+}
+
+func (e *extendedContractReader) getOneBinding(contractName string) (ExtendedBoundContract, error) {
+	extendedBindings := e.GetBindings(contractName)
+	switch numBindings := len(extendedBindings); numBindings {
+	case 1:
+		return extendedBindings[0], nil
+	case 0:
+		return ExtendedBoundContract{}, fmt.Errorf(
+			"getOneBinding: no binding found for %s contract: %w", contractName, ErrNoBindings)
+	default:
+		return ExtendedBoundContract{}, fmt.Errorf(
+			"getOneBinding: expected one binding got %d: %w", numBindings, ErrTooManyBindings)
 	}
 }
 
@@ -68,16 +87,14 @@ func (e *extendedContractReader) ExtendedQueryKey(
 	limitAndSort query.LimitAndSort,
 	sequenceDataType any,
 ) ([]types.Sequence, error) {
-	extendedBindings := e.GetBindings(contractName)
-	if len(extendedBindings) != 1 {
-		return nil, fmt.Errorf(
-			"ExtendedQueryKey: expected one binding for %s contract, got %d", contractName, len(extendedBindings))
+	binding, err := e.getOneBinding(contractName)
+	if err != nil {
+		return nil, fmt.Errorf("ExtendedQueryKey: %w", err)
 	}
-	contractBinding := extendedBindings[0].Binding
 
 	return e.QueryKey(
 		ctx,
-		contractBinding,
+		binding.Binding,
 		filter,
 		limitAndSort,
 		sequenceDataType,
@@ -90,13 +107,11 @@ func (e *extendedContractReader) ExtendedGetLatestValue(
 	confidenceLevel primitives.ConfidenceLevel,
 	params, returnVal any,
 ) error {
-	extendedBindings := e.GetBindings(contractName)
-	if len(extendedBindings) != 1 {
-		return fmt.Errorf(
-			"ExtendedGetLatestValue: expected one binding for the %s contract, got %d", contractName, len(extendedBindings))
+	binding, err := e.getOneBinding(contractName)
+	if err != nil {
+		return fmt.Errorf("ExtendedGetLatestValue: %w", err)
 	}
-	contractBinding := extendedBindings[0].Binding
-	readIdentifier := contractBinding.ReadIdentifier(methodName)
+	readIdentifier := binding.Binding.ReadIdentifier(methodName)
 
 	return e.GetLatestValue(
 		ctx,
@@ -115,7 +130,7 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 
 	err := e.ContractReaderFacade.Bind(ctx, validBindings)
 	if err != nil {
-		return fmt.Errorf("bind: %w", err)
+		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
 	}
 
 	e.mu.Lock()
