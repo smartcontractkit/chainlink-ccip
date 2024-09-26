@@ -486,6 +486,11 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
+		if nativeTokenAddress == "" {
+			r.lggr.Errorw("native token address is empty", "chain", chain)
+			continue
+		}
+
 		var price *big.Int
 		err = reader.ExtendedGetLatestValue(
 			ctx,
@@ -499,6 +504,11 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		)
 		if err != nil {
 			r.lggr.Errorw("failed to get native token price", "chain", chain, "err", err)
+			continue
+		}
+
+		if price == nil {
+			r.lggr.Errorw("native token price is nil", "chain", chain)
 			continue
 		}
 		prices[chain] = cciptypes.NewBigInt(price)

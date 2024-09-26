@@ -62,12 +62,23 @@ func (p *processor) Observation(
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
 	// Get the latest chain fee price updates for the source chains
 	timestampedPriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, maps.Keys(feeComponents))
+	// Convert the timestamped price updates to a map of chain fee updates
+	chainFeeUpdates := FeeUpdatesFromTimestampedBig(timestampedPriceUpdates)
+
+	fChain := p.ObserveFChain()
+
+	p.lggr.Infow("observed fee components",
+		"feeComponents", feeComponents,
+		"nativeTokenPrices", nativeTokenPrices,
+		"chainFeeUpdates", chainFeeUpdates,
+		"fChain", fChain,
+	)
 
 	return Observation{
-		FChain:            p.ObserveFChain(),
+		FChain:            fChain,
 		FeeComponents:     feeComponents,
 		NativeTokenPrices: nativeTokenPrices,
-		ChainFeeUpdates:   FeeUpdatesFromTimestampedBig(timestampedPriceUpdates),
+		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      time.Now().UTC(),
 	}, nil
 }
@@ -127,6 +138,10 @@ func (p *processor) Outcome(
 	sort.Slice(gasPrices, func(i, j int) bool {
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
+
+	p.lggr.Infow("Gas Prices Outcome",
+		"gasPrices", gasPrices,
+	)
 
 	return Outcome{
 		GasPrices: gasPrices,

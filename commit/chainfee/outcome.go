@@ -32,7 +32,7 @@ func (p *processor) getConsensusObservation(
 	if len(aggObs.Timestamps) < int(consensus.TwoFPlus1(fDestChain)) {
 		return Observation{},
 			fmt.Errorf("not enough observations for timestamps to reach consensus, have %d, need %d",
-				len(aggObs.Timestamps), fDestChain)
+				len(aggObs.Timestamps), consensus.TwoFPlus1(fDestChain))
 	}
 	timestamp := consensus.Median(aggObs.Timestamps, consensus.TimestampComparator)
 
