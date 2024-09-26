@@ -909,6 +909,35 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 			},
 		},
 		{
+			name: "some tokens are not observed by one of the nodes",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{13}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewSuccessTokenData([]byte{12}),
+						exectypes.NewSuccessTokenData([]byte{13}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{{11}, {}, {13}}},
+			},
+		},
+		{
 			name: "message not ready - only one token has enough observations",
 			F:    2,
 			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
