@@ -7,6 +7,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/libocr/commontypes"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -20,11 +22,12 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
-	lggr      logger.Logger
-	reader    *reader.CCIPReader
-	homechain reader.HomeChain
-	dest      cciptypes.ChainSelector
-	fRoleDON  int
+	lggr            logger.Logger
+	reader          *reader.CCIPReader
+	homechain       reader.HomeChain
+	dest            cciptypes.ChainSelector
+	fRoleDON        int
+	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID
 }
 
 func NewContractDiscoveryProcessor(
@@ -33,13 +36,15 @@ func NewContractDiscoveryProcessor(
 	homechain reader.HomeChain,
 	dest cciptypes.ChainSelector,
 	fRoleDON int,
+	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
-		lggr:      lggr,
-		reader:    reader,
-		homechain: homechain,
-		dest:      dest,
-		fRoleDON:  fRoleDON,
+		lggr:            lggr,
+		reader:          reader,
+		homechain:       homechain,
+		dest:            dest,
+		fRoleDON:        fRoleDON,
+		oracleIDToP2PID: oracleIDToP2PID,
 	}
 }
 
@@ -82,9 +87,28 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 }
 
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
-	_ dt.Outcome, _ dt.Query, _ plugincommon.AttributedObservation[dt.Observation],
+	_ dt.Outcome, _ dt.Query, ao plugincommon.AttributedObservation[dt.Observation],
 ) error {
-	// TODO: make sure all observations come from dest readers.
+	oraclePeerID, ok := cdp.oracleIDToP2PID[ao.OracleID]
+	if !ok {
+		// should never happen in practice.
+		return fmt.Errorf("no peer ID found for Oracle %d", ao.OracleID)
+	}
+
+	supportedChains, err := cdp.homechain.GetSupportedChainsForPeer(oraclePeerID)
+	if err != nil {
+		return fmt.Errorf("unable to get supported chains for Oracle %d: %w", ao.OracleID, err)
+	}
+
+	// check that the oracle is allowed to observe the dest chain.
+	if !supportedChains.Contains(cdp.dest) {
+		return fmt.Errorf("oracle %d is not allowed to observe chain %s", ao.OracleID, cdp.dest)
+	}
+
+	// NOTE: once oracles can also discover things on source chains, we must
+	// check that they can read whatever source chain is used to determine the
+	// address, e.g source fee quoter / router.
+
 	return nil
 }
 

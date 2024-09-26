@@ -113,8 +113,6 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		idx := idx
 		token := token
 		eg.Go(func() error {
-			// TODO: Once chainreader new changes https://github.com/smartcontractkit/chainlink-common/pull/603
-			// are merged we'll need to use the bound contract
 			boundContract := commontypes.BoundContract{
 				Address: pr.TokenInfo[token].AggregatorAddress,
 				Name:    consts.ContractNamePriceAggregator,

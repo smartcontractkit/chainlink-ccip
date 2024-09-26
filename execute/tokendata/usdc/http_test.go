@@ -60,8 +60,6 @@ func Test_NewHTTPClient_New(t *testing.T) {
 }
 
 func Test_HTTPClient_Get(t *testing.T) {
-	t.Parallel()
-
 	tt := []struct {
 		name               string
 		getTs              func() *httptest.Server
@@ -332,8 +330,6 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, err := w.Write(validAttestationResponse)
 				require.NoError(t, err)
@@ -398,8 +394,6 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 }
 
 func Test_httpResponse(t *testing.T) {
-	t.Parallel()
-
 	tt := []struct {
 		name                string
 		response            httpResponse
