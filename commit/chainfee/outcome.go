@@ -41,7 +41,7 @@ func (p *processor) getConsensusObservation(
 		"ChainFeeUpdates",
 		aggObs.ChainFeeUpdates,
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
-		plugincommon.ChainFeeUpdateAggregator,
+		ChainFeeUpdateAggregator,
 	)
 
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
@@ -93,7 +93,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		FeeComponents:     make(map[cciptypes.ChainSelector][]types.ChainFeeComponents),
 		NativeTokenPrices: make(map[cciptypes.ChainSelector][]cciptypes.BigInt),
 		FChain:            make(map[cciptypes.ChainSelector][]int),
-		ChainFeeUpdates:   make(map[cciptypes.ChainSelector][]plugincommon.ChainFeeUpdate),
+		ChainFeeUpdates:   make(map[cciptypes.ChainSelector][]Update),
 		Timestamps:        []time.Time{},
 	}
 
@@ -132,8 +132,8 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 // 1. If time passed since the last update is greater than the stale threshold.
 // 2. If deviation between the fee quoter and latest observed chain fee exceeds the chain's configured threshold.
 func (p *processor) getGasPricesToUpdate(
-	currentChainUSDFees map[cciptypes.ChainSelector]plugincommon.ChainFeeUSDPrices,
-	latestUpdates map[cciptypes.ChainSelector]plugincommon.ChainFeeUpdate,
+	currentChainUSDFees map[cciptypes.ChainSelector]ComponentsUSDPrices,
+	latestUpdates map[cciptypes.ChainSelector]Update,
 	obsTimestamp time.Time,
 ) []cciptypes.GasPriceChain {
 	var gasPrices []cciptypes.GasPriceChain

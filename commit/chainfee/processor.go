@@ -61,13 +61,13 @@ func (p *processor) Observation(
 	// Get the native token prices for all available chains that we can read from
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, maps.Keys(feeComponents))
 	// Get the latest chain fee price updates for the source chains
-	chainFeePriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, maps.Keys(feeComponents))
+	timestampedPriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, maps.Keys(feeComponents))
 
 	return Observation{
 		FChain:            p.ObserveFChain(),
 		FeeComponents:     feeComponents,
 		NativeTokenPrices: nativeTokenPrices,
-		ChainFeeUpdates:   chainFeePriceUpdates,
+		ChainFeeUpdates:   FeeUpdatesFromTimestampedBig(timestampedPriceUpdates),
 		TimestampNow:      time.Now().UTC(),
 	}, nil
 }
@@ -96,7 +96,7 @@ func (p *processor) Outcome(
 	//	return Outcome{}, nil
 	//}
 
-	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]plugincommon.ChainFeeUSDPrices)
+	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
 	// We need to report a packed GasPrice
 	// The packed GasPrice is a 224-bit integer with the following format:
 	// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
@@ -109,7 +109,7 @@ func (p *processor) Outcome(
 
 		// Calculate the price in USD for the data availability and execution fees.
 		// Raw fee components are in native token units
-		chainFeeUsd := plugincommon.ChainFeeUSDPrices{
+		chainFeeUsd := ComponentsUSDPrices{
 			ExecutionFeePriceUSD: new(big.Int).Mul(nativeTokenPriceUSD, feeComp.ExecutionFee),
 			DataAvFeePriceUSD:    new(big.Int).Mul(nativeTokenPriceUSD, feeComp.DataAvailabilityFee),
 		}
