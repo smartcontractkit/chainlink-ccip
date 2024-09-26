@@ -23,11 +23,8 @@ func (mtd MessageTokenData) Append(index int, td TokenData) MessageTokenData {
 	if index >= len(out.TokenData) {
 		newSize := index + 1
 		newTokenData := make([]TokenData, newSize)
-
 		// Copy the contents of the old slice into the new slice
 		copy(newTokenData, out.TokenData)
-
-		// Assign the new slice to mtd.TokenData
 		out.TokenData = newTokenData
 	}
 	out.TokenData[index] = td
