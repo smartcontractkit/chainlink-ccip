@@ -63,9 +63,10 @@ func (c CommitPluginConfig) Validate() error {
 }
 
 type FeeInfo struct {
-	ExecDeviationPPB   cciptypes.BigInt `json:"execDeviationPPB"`
-	DataAvDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
+	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
 }
+
 type TokenInfo struct {
 	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on the feed chain.
 	AggregatorAddress string `json:"aggregatorAddress"`

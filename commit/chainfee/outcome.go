@@ -170,7 +170,7 @@ func (p *processor) getGasPricesToUpdate(
 		dataAvFeeDeviates := mathslib.Deviates(
 			currentChainFee.DataAvFeePriceUSD,
 			lastUpdate.ChainFee.DataAvFeePriceUSD,
-			ci.DataAvDeviationPPB.Int64(),
+			ci.DataAvailabilityDeviationPPB.Int64(),
 		)
 
 		if executionFeeDeviates || dataAvFeeDeviates {

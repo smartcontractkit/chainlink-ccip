@@ -14,7 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -180,7 +180,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: types2.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
+				TokenID: ocr3types.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
@@ -462,7 +462,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
 	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
 	// nolint:lll
-	// 2. Call FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
+	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt, len(selectors))
 	for _, chain := range selectors {
 		reader, ok := r.contractReaders[chain]
@@ -471,7 +471,8 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		var nativeTokenAddress types2.Account
+		//TODO: Use batching in the future
+		var nativeTokenAddress ocr3types.Account
 		err := reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameRouter,
