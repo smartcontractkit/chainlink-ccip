@@ -860,6 +860,55 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 			},
 		},
 		{
+			name: "plugins seeing completely different tokens",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
+					),
+					2: exectypes.NewMessageTokenData(),
+					3: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{31}),
+					),
+					5: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{51}),
+						exectypes.NewSuccessTokenData([]byte{52}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewNoopTokenData(),
+					),
+					3: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{31}),
+						exectypes.NewSuccessTokenData([]byte{32}),
+						exectypes.NewSuccessTokenData([]byte{33}),
+					),
+					4: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{41}),
+						exectypes.NewSuccessTokenData([]byte{42}),
+					),
+					5: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{51}),
+						exectypes.NewSuccessTokenData([]byte{52}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: false},
+				2: {ready: false},
+				3: {ready: false},
+				4: {ready: false},
+				5: {ready: true, data: [][]byte{{51}, {52}}},
+			},
+		},
+		{
 			name: "message not ready - only one token has enough observations",
 			F:    2,
 			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{

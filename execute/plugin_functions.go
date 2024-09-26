@@ -366,12 +366,12 @@ func initResultsAndValidators(
 		}
 
 		for tokenIndex, tokenData := range msgTokenData.TokenData {
-			_, ok := validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)]
-			if !ok {
-				validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)] =
+			messageTokenID := exectypes.NewMessageTokenID(seqNr, tokenIndex)
+			if _, ok := validators[selector][messageTokenID]; !ok {
+				validators[selector][messageTokenID] =
 					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
 			}
-			validators[selector][exectypes.NewMessageTokenID(seqNr, tokenIndex)].Add(tokenData)
+			validators[selector][messageTokenID].Add(tokenData)
 		}
 	}
 }
