@@ -10,13 +10,12 @@ To learn more about CRIB please the general documentation in Confluence:
 ## Project Structure
 ```
 .
-├── cli (CLI for CRIB - currently under development)
-├── dependencies (devspace components used as dependencies)
-├── imports (devspace components used as imports)
-├── deployments/ccip (CCIP CRIB)
-├── deployments/core (CORE CRIB)
-├── dashboards-lib (Library for generating Grafana dashboards)
-└── scripts (reusable scripts)
+├── cli                 (CLI for CRIB - currently under development)
+├── dependencies        (DevSpace components used as dependencies)
+├── deployments
+│   └── chainlink       (Consolidated Chainlink deployment)
+├── dashboards-lib      (Library for generating Grafana dashboards)
+└── scripts             (Reusable scripts)
 ```
 
 ## Contributing
@@ -46,34 +45,35 @@ If the Linting workflows fails on your PR, you can use local tooling to fix erro
 ## Testing changes in CRIB Charts before merge to main
 CRIB devspace config orchestrates deployment of multiple helm charts. CRIB internal Charts are managed in the [smartcontract/infra-charts](https://github.com/smartcontractkit/infra-charts) repository.
 
-### Scenario 1) Test changes made in the devspace chart dependency
+### Test changes made in the devspace chart dependency
 To test changes in a chart before publishing stable version to ECR you can test it in 2 ways.
 
 * [Test using preview version](https://github.com/smartcontractkit/infra-charts?tab=readme-ov-file#testing-a-chart-before-merging-it-to-main)
 * Pin to local version of the chart in your filesystem
 
 #### Pin to local version of the chart in your filesystem
-You need to clone infra-charts repo, so it's available in the `CHAINLINK_CODE_DIR` directory.
+1. Clone the `infra-charts` repository:
+   
+    Clone the `infra-charts` repo so it's available in the `CHAINLINK_CODE_DIR` directory.
+2. Use the `local-charts` DevSpace Profile:
+   
+    Now you can use the `local-charts` DevSpace profile to override chart paths.
 
-Now you can use the `local-charts` devspace profile to override chart paths.
+ For Core Deployment:
+```bash
+devspace run core -p local-charts
+```
+For CCIP Deployment:
+```bash
+devspace run ccip-local
+```
 
-`devspace deploy -p local-charts`
-
-You can also inspect the devspace config with the following command.
-
-`devspace print -p local-charts`
-
-It prints the final config, including patches from the selected profile.
-
-### Scenario 2) Test changes made in the subchart
-In this scenario we want to verify changes in the crib-chainlink-cluster chart, by running devspace deploy in the CCIP CRIB.
-
-In `$CHAINLINK_CODE_DIR/infra-charts/crib-ccip/Chart.yaml` we need to change the reference of crib-chainlink-cluster chart, so it uses the local file
-
-replace: `repository: 'oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts'`
-with `repository: "file://../crib-chainlink-cluster"`
-
-Now follow the steps from [Scenario 1)](#pin-to-local-version-of-the-chart-in-your-filesystem) and run `devspace deploy -p local-charts`, using devspace profile that relies on the local charts.
+3. Inspect the DevSpace Configuration:
+   You can inspect the DevSpace config with the following command:
+```bash
+devspace print --var=CHAINLINK_CODE_DIR=../.. -p local-charts
+```
+This prints the final config, including patches from the selected profile.
 
 ## Repository Management and Contribution Guidelines
 
