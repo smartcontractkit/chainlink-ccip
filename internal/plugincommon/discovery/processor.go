@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -83,6 +84,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 		FChain:           fChain,
 		OnRamp:           contracts[consts.ContractNameOnRamp],
 		DestNonceManager: contracts[consts.ContractNameNonceManager][cdp.dest],
+		RMNRemote:        contracts[consts.ContractNameRMNRemote][cdp.dest],
 	}, nil
 }
 
@@ -133,6 +135,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	// collect onramp and nonce manager addresses
 	onrampAddrs := make(map[cciptypes.ChainSelector][][]byte)
 	var nonceManagerAddrs [][]byte
+	var rmnRemoteAddrs [][]byte
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.OnRamp {
 			// we don't want invalid observations to "poison" the consensus.
@@ -150,6 +153,14 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		nonceManagerAddrs = append(
 			nonceManagerAddrs,
 			ao.Observation.DestNonceManager,
+		)
+		if len(ao.Observation.RMNRemote) == 0 {
+			cdp.lggr.Warnf("skipping empty RMNRemote address in observation from Oracle %d", ao.OracleID)
+			continue
+		}
+		rmnRemoteAddrs = append(
+			rmnRemoteAddrs,
+			ao.Observation.RMNRemote,
 		)
 	}
 
@@ -188,6 +199,20 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"fDestChainThresh", fDestChainThresh,
 	)
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
+
+	// RMNRemote address consensus
+	rmnRemoteConsensus := consensus.GetConsensusMap(
+		cdp.lggr,
+		"rmnRemote",
+		map[cciptypes.ChainSelector][][]byte{cdp.dest: rmnRemoteAddrs},
+		fDestChainThresh,
+	)
+	cdp.lggr.Infow("Determined consensus RMNRemote",
+		"rmnRemoteConsensus", rmnRemoteConsensus,
+		"rmnRemoteAddrs", rmnRemoteAddrs,
+		"fDestChainThresh", fDestChainThresh,
+	)
+	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
 	// call Sync to bind contracts.
 	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
