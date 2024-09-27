@@ -57,7 +57,7 @@ jobs:
               repo,
               issue_number
             });
-            const coverageCommentPrefix = "### Test Coverage";
+            const coverageCommentPrefix = "| Metric |";
             for (const comment of comments.data) {
               if (comment.body.startsWith(coverageCommentPrefix)) {
                 await github.rest.issues.deleteComment({
@@ -79,5 +79,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `### Test Coverage\n\n| Branch          | Coverage        |\n|-----------------|-----------------|\n| ${{ github.head_ref }}  | ${coverage}           |\n| ${{ github.base_ref }}   | ${coverage_target}           |`
+              body: `| Metric | \`${{ github.head_ref }}\` | \`${{ github.base_ref }}\` |\n|--|--|--|\n| **Coverage** | ${coverage} | ${coverage_target} |`
             });
