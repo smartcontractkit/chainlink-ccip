@@ -125,14 +125,14 @@ var (
 	}
 
 	//https://sepolia.etherscan.io/tx/0x028a2a08f9b6cd74aa013b5300768585eb2ef10a11e24c25bc456eb2223ad34e
-	//https://iris-api-sandbox.circle.com/v1/attestations/0x4055282ce9d64f8fb216c3f6ebd121d4601f0292684ebe4850ad80bd28df7581
+	//https://iris-api-sandbox.circle.com/v1/attestations/0x06b43b556e8ad2eb18aecd6051139641fe9e022b4a1af91a05a726d5005aba59
 	m5 = usdcMessage{
 		sourceDomain:   0, // Ethereum Sepolia
 		nonce:          262601,
 		eventPayload:   "00000000000000000000000600000000000401C90000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA5000000000000000000000000C08835ADF4884E51FF076066706E407506826D9D000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000004F32AE7F112C26B109357785E5C66DC5D747FBCE00000000000000000000000000000000000000000000000000000000000027100000000000000000000000003FF675B880AC9F67AC6F4342FFD9E99B80469BAD",
-		urlMessageHash: "0x4055282ce9d64f8fb216c3f6ebd121d4601f0292684ebe4850ad80bd28df7581",
+		urlMessageHash: "0x06b43b556e8ad2eb18aecd6051139641fe9e022b4a1af91a05a726d5005aba59",
 		attestationResponse: `{
-			"attestation":"0xc9f7eb19bb1828413abc2db13fa941b00d0b52f7519b49c44932562612ebd5956a12e04c034f23e749edc9a68f6aff847d201def0860377efe8d92a64d1fc1af1c11f2e8b12b5142f9c37dd6d0429b8d9dd8ea6a032626819a6252ebc813d4907653c95f8a8a51ab534bc744d5a88499cab0887df73b7cc139a636eb9f05f1996d1c",
+			"attestation":"0x365d2c7ebc971426b4de119723f56d8c303bd02ba6d93f74bb45766beb8c09ad626171621bbba543acf5adb5c79af1c3358e85ae3553e357f5aa1e42f22799fb1c8efd51b8e32368fce2bafc608070bd4132eedca53b0b4e29d0c4bb22a171aa8602833cd4398098a075d9e1be636d60f277b506f5f0acee6dff298b3893fcd51c1b",
 			"status":"complete"
 		}`,
 		attestationResponseStatus: 200,
@@ -167,7 +167,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	}
 
 	fuji := []usdcMessage{m1, m2, m3}
-	sepolia := []usdcMessage{m4}
+	sepolia := []usdcMessage{m4, m5}
 	all := []usdcMessage{m1, m2, m3, m4, m5}
 
 	// Mock http server to return proper payloads
@@ -278,6 +278,53 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 					10: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
 							exectypes.NewSuccessTokenData(m4.tokenData()),
+							exectypes.NewSuccessTokenData(m5.tokenData()),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple source chain tokens",
+			messages: exectypes.MessageObservations{
+				fujiChain: {
+					1: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m1.nonce, m1.sourceDomain, fujiPool),
+							createToken(t, m2.nonce, m2.sourceDomain, fujiPool),
+						},
+					},
+				},
+				sepoliaChain: {
+					10: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m4.nonce, m4.sourceDomain, sepoliaPool),
+						},
+					},
+					11: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m5.nonce, m5.sourceDomain, sepoliaPool),
+						},
+					},
+				},
+			},
+			want: exectypes.TokenDataObservations{
+				fujiChain: {
+					1: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewSuccessTokenData(m1.tokenData()),
+							exectypes.NewSuccessTokenData(m2.tokenData()),
+						},
+					},
+				},
+				sepoliaChain: {
+					10: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewSuccessTokenData(m4.tokenData()),
+						},
+					},
+					11: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
 							exectypes.NewSuccessTokenData(m5.tokenData()),
 						},
 					},
