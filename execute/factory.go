@@ -93,7 +93,6 @@ func (p PluginFactory) NewReportingPlugin(
 	config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
-	fmt.Println("offchainConfig", offchainConfig)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
 	}

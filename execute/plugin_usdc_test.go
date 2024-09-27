@@ -102,7 +102,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104})
 	// Attestation data added to the USDC
 	//require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
 
@@ -117,7 +117,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	sequenceNumbers = slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{105})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
 
 type nodeSetup struct {
@@ -264,13 +264,12 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 						ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 100).ToBytes(),
 					},
 				}),
-				makeMsg(105, srcSelector, dstSelector, false),
-				//makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
-				//	{
-				//		SourcePoolAddress: addressBytes,
-				//		ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 100).ToBytes(),
-				//	},
-				//}),
+				makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: addressBytes,
+						ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 100).ToBytes(),
+					},
+				}),
 			},
 		},
 	}
@@ -286,14 +285,14 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 					}
 			`))
 			require.NoError(t, err)
-			//} else if counter > 4 && strings.Contains(r.RequestURI, "0x04b060617c533bb9edaab2b39479e53852c21f94ac6a31611095208c5e248933") {
-			//	_, err := w.Write([]byte(`
-			//			{
-			//				"status": "complete",
-			//				"attestation": "0x720502893578a89a8a87982982ef781c18b194"
-			//			}
-			//	`))
-			//	require.NoError(t, err)
+		} else if counter > 4 && strings.Contains(r.RequestURI, "0x04b060617c533bb9edaab2b39479e53852c21f94ac6a31611095208c5e248933") {
+			_, err := w.Write([]byte(`
+					{
+						"status": "complete",
+						"attestation": "0x720502893578a89a8a87982982ef781c18b194"
+					}
+			`))
+			require.NoError(t, err)
 
 		} else {
 			w.WriteHeader(http.StatusNotFound)
