@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -220,13 +221,17 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
-				prevSourceChain := uint64(0)
-				for _, src := range reqs[0].GetObservationRequest().GetFixedDestLaneUpdateRequests() {
-					requestedChains[nodeID].Add(src.LaneSource.SourceChainSelector)
 
-					// make sure the source chains are in ASC order
-					assert.Greater(ts.t, src.LaneSource.SourceChainSelector, prevSourceChain)
-					prevSourceChain = src.LaneSource.SourceChainSelector
+				for _, req := range reqs {
+					reqUpdates := req.GetObservationRequest().GetFixedDestLaneUpdateRequests()
+
+					assert.True(ts.t, sort.SliceIsSorted(reqUpdates, func(i, j int) bool {
+						return reqUpdates[i].LaneSource.SourceChainSelector < reqUpdates[j].LaneSource.SourceChainSelector
+					}), "SourceChainSelector should be in ASC order")
+
+					for _, src := range reqUpdates {
+						requestedChains[nodeID].Add(src.LaneSource.SourceChainSelector)
+					}
 				}
 			}
 
@@ -316,16 +321,18 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 					continue
 				}
 				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= minObservers)
-				prevRmnNodeIDX := uint32(0)
-				for _, ao := range req.GetReportSignatureRequest().AttributedSignedObservations {
-					assert.Greater(t, ao.SignerNodeIndex, prevRmnNodeIDX)
-					prevRmnNodeIDX = ao.SignerNodeIndex
 
-					prevSrcChain := uint64(0)
-					for _, lu := range ao.SignedObservation.Observation.FixedDestLaneUpdates {
-						assert.Greater(t, lu.LaneSource.SourceChainSelector, prevSrcChain)
-						prevSrcChain = lu.LaneSource.SourceChainSelector
-					}
+				aos := req.GetReportSignatureRequest().AttributedSignedObservations
+
+				assert.True(t, sort.SliceIsSorted(aos, func(i, j int) bool {
+					return aos[i].SignerNodeIndex < aos[j].SignerNodeIndex
+				}), "SignerNodeIndex should be in ASC order")
+
+				for _, ao := range aos {
+					lus := ao.SignedObservation.Observation.FixedDestLaneUpdates
+					assert.True(t, sort.SliceIsSorted(lus, func(i, j int) bool {
+						return lus[i].LaneSource.SourceChainSelector < lus[j].LaneSource.SourceChainSelector
+					}), "LaneSource.SourceChainSelector should be in ASC order")
 				}
 				cntValid++
 			}
