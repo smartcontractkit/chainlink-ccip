@@ -57,7 +57,7 @@ jobs:
               repo,
               issue_number
             });
-            const coverageCommentPrefix = "### Test Coverage";
+            const coverageCommentPrefix = "| Metric |";
             for (const comment of comments.data) {
               if (comment.body.startsWith(coverageCommentPrefix)) {
                 await github.rest.issues.deleteComment({
