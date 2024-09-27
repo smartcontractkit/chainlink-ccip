@@ -2,6 +2,7 @@ package execute_test
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
@@ -352,9 +353,9 @@ func setupSimpleTest(
 	require.NoError(t, err, "failed to start home chain poller")
 
 	usdcEvents := []types.Sequence{
-		{Data: readerpkg.NewMessageSentEvent(0, 6, 1, []byte{1})},
-		{Data: readerpkg.NewMessageSentEvent(0, 6, 2, []byte{2})},
-		{Data: readerpkg.NewMessageSentEvent(0, 6, 3, []byte{3})},
+		{Data: newMessageSentEvent(0, 6, 1, []byte{1})},
+		{Data: newMessageSentEvent(0, 6, 2, []byte{2})},
+		{Data: newMessageSentEvent(0, 6, 3, []byte{3})},
 	}
 
 	r := readermock.NewMockContractReaderFacade(t)
@@ -492,4 +493,23 @@ func (c *configurableAttestationServer) AddResponse(url, response string) {
 
 func (c *configurableAttestationServer) Close() {
 	c.server.Close()
+}
+
+func newMessageSentEvent(
+	sourceDomain uint32,
+	destDomain uint32,
+	nonce uint64,
+	payload []byte,
+) *readerpkg.MessageSentEvent {
+	var buf []byte
+	buf = binary.BigEndian.AppendUint32(buf, readerpkg.CCTPMessageVersion)
+	buf = binary.BigEndian.AppendUint32(buf, sourceDomain)
+	buf = binary.BigEndian.AppendUint32(buf, destDomain)
+	buf = binary.BigEndian.AppendUint64(buf, nonce)
+
+	senderBytes := [12]byte{}
+	buf = append(buf, senderBytes[:]...)
+	buf = append(buf, payload...)
+
+	return &readerpkg.MessageSentEvent{Arg0: buf}
 }

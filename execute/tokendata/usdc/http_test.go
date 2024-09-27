@@ -2,6 +2,7 @@ package usdc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -281,7 +282,7 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
-		return err == ErrUnknownResponse
+		return errors.Is(err, ErrUnknownResponse)
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 	require.Equal(t, requestCount, 3)
 }

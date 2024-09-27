@@ -58,20 +58,6 @@ type MessageSentEvent struct {
 	Arg0 []byte
 }
 
-func NewMessageSentEvent(sourceDomain uint32, destDomain uint32, nonce uint64, payload []byte) *MessageSentEvent {
-	var buf []byte
-	buf = binary.BigEndian.AppendUint32(buf, CCTPMessageVersion)
-	buf = binary.BigEndian.AppendUint32(buf, sourceDomain)
-	buf = binary.BigEndian.AppendUint32(buf, destDomain)
-	buf = binary.BigEndian.AppendUint64(buf, nonce)
-
-	senderBytes := [12]byte{}
-	buf = append(buf, senderBytes[:]...)
-	buf = append(buf, payload...)
-
-	return &MessageSentEvent{Arg0: buf}
-}
-
 func (m MessageSentEvent) unpackID() (eventID, error) {
 	var result [32]byte
 
