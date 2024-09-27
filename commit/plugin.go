@@ -239,7 +239,7 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 func (p *Plugin) Outcome(
 	outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
-	p.lggr.Debugw("Commit plugin performing outcome",
+	p.lggr.Infow("Commit plugin performing outcome",
 		"outctx", outCtx,
 		"query", q,
 		"attributedObservations", aos)
