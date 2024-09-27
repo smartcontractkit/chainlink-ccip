@@ -120,6 +120,7 @@ func NewPlugin(
 		homeChain,
 		ccipReader,
 		cfg.OffchainConfig,
+		chainSupport,
 		reportingCfg.F,
 	)
 
