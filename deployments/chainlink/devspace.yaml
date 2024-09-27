@@ -23,16 +23,22 @@ vars:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
 
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
 
 pipelines:
   core:
     run: |-
       run_dependency_pipelines crib-chainlink-cluster
+      run_pipelines ingress-check
 
   ccip:
     run: |-
       run_dependency_pipelines crib-chainlink-cluster
       run_dependency_pipelines crib-ccip-scripts
+      run_pipelines ingress-check
 
   ccip-v16:
     run: |-
@@ -41,6 +47,7 @@ pipelines:
       # run_dependency_pipelines job-distributor
       # Deploy CCIP enabled DON
       run_dependency_pipelines crib-chainlink-cluster
+      run_pipelines ingress-check
 
   kind-dependencies:
     run: |-
@@ -72,22 +79,12 @@ pipelines:
     run: |-
       run_dependency_pipelines beholder
 
-  purge:
-    run: |-
-      kubectl delete ns ${DEVSPACE_NAMESPACE}
-
 profiles:
   - name: core
     patches:
       - op: add
         path: vars
         value:
-          DEVSPACE_IMAGE:
-            source: env
-            default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
-          DEVSPACE_IMAGE_TAG:
-            source: env
-            default: ""
           CHAINLINK_REPO_DIR:
             source: env
             default: "${CHAINLINK_CODE_DIR}/chainlink"
@@ -151,31 +148,6 @@ profiles:
   - name: ccip
     patches:
       - op: add
-        path: vars
-        value:
-          DEVSPACE_IMAGE:
-            source: env
-            default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-ccip-devspace"
-          DEVSPACE_IMAGE_TAG:
-            source: env
-            default: ""
-          CHAINLINK_REPO_DIR:
-            source: env
-            default: "${CHAINLINK_CODE_DIR}/ccip"
-          # Env Vars Required for ccip-scripts based contracts and jobs deployment
-          # Image URI required for deploying CCIP Contracts and Jobs
-          DEVSPACE_CCIP_SCRIPTS_IMAGE:
-            source: env
-            default: "804282218731.dkr.ecr.us-west-2.amazonaws.com/ccip-scripts:latest"
-          # AWS Role ARN required for uploading deploy job output to s3
-          DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN:
-            source: env
-            default: "arn:aws:iam::323150190480:role/ccip-scripts-deployer-upload"
-          # AWS S3 bucket name required for uploading deploy job output to s3
-          DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME:
-            source: env
-            default: "cl-stage-ccip-scripts-deploy-output"
-      - op: add
         path: dependencies
         value:
           crib-chainlink-cluster:
@@ -219,8 +191,6 @@ profiles:
           - ccip-kind-bix-ship
           - kind
   - name: ccip-v16
-    parents:
-      - profile: ccip
     patches:
       - op: add
         path: dependencies
@@ -229,10 +199,12 @@ profiles:
             path: ${DEPENDENCIES_DIR}/geth
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-      - op: replace
-        path: dependencies.crib-chainlink-cluster.profiles
-        value:
-          - ccip-v16
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip-v16
   - name: kind-dependencies
     patches:
       - op: add
@@ -407,11 +379,3 @@ commands:
     command: devspace run-pipeline beholder -p beholder-kind
     description: Run the Beholder pipeline for Kind.
     appendArgs: true
-  purge-kind:
-    command: |-
-      if [[ ${PROVIDER} == "kind" ]]; then
-        ${SCRIPTS_DIR}/manage_kind.sh purge
-      else
-        echo "This command should be executed only when using Kind provider locally"
-      fi
-    description: Purge the local Kind cluster.

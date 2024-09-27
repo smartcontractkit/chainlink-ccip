@@ -6,9 +6,9 @@ set -euo pipefail
 # To be invoked by `devspace` after a successful DevSpace deploy via a hook.
 ###
 
-# Check if DEVSPACE_HOOK_KUBE_NAMESPACE is set
-if [[ -z ${DEVSPACE_HOOK_KUBE_NAMESPACE:-} ]]; then
-	echo "Error: 'DEVSPACE_HOOK_KUBE_NAMESPACE' env variable isn't set. Make sure to run from devspace."
+# Check if DEVSPACE_NAMESPACE is set
+if [[ -z ${DEVSPACE_NAMESPACE:-} ]]; then
+	echo "Error: 'DEVSPACE_NAMESPACE' env variable isn't set. Make sure to run from devspace."
 	exit 1
 fi
 
@@ -18,7 +18,7 @@ sleep_duration_retry=10     # 10 seconds
 sleep_duration_propagate=60 # 60 seconds
 timeout=$((60 * 2))         # 2 minutes
 elapsed=0                   # Track the elapsed time
-namespace=${DEVSPACE_HOOK_KUBE_NAMESPACE}
+namespace=${DEVSPACE_NAMESPACE}
 
 # Function to check if a hostname can be resolved
 check_hostname_resolution() {
@@ -30,7 +30,7 @@ check_hostname_resolution() {
 }
 
 # Get all ingress names in the current namespace
-if ! mapfile -t ingresses < <(kubectl get ingress -n "${namespace}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); then
+if ! mapfile -t ingresses < <(kubectl get ingress -n "${namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null); then
 	echo "Error: Failed to retrieve ingresses from namespace '${namespace}'."
 	exit 1
 fi

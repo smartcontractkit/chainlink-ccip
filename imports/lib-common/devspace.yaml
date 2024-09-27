@@ -1,0 +1,26 @@
+version: v2beta1
+name: lib-common
+
+vars:
+  SCRIPTS_DIR:
+    source: env
+    default: "../../scripts"
+  DEVSPACE_ENV_FILE: .env
+  # The list of default ENV Vars for CRIB, you can override any of them in the .env file
+  # AWS Account ID used for deploying CRIB environment
+  AWS_ACCOUNT_ID:
+    source: env
+    default: 323150190480
+  # Time to wait for pods to be in `Ready` condition
+  DEVSPACE_K8S_POD_WAIT_TIMEOUT:
+    source: env
+    default: 1200s
+  # Helm repo URI for the crib-ccip helm chart
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+
+pipelines:
+  purge:
+    run: |-
+      kubectl delete ns ${DEVSPACE_NAMESPACE}

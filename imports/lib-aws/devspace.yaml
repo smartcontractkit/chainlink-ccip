@@ -1,0 +1,54 @@
+version: v2beta1
+name: lib-aws
+
+vars:
+  # The image that will be used for the Chainlink nodes.
+  DEVSPACE_IMAGE:
+    source: env
+    default: "323150190480.dkr.ecr.us-west-2.amazonaws.com/chainlink-devspace"
+  DEVSPACE_IMAGE_TAG:
+    source: env
+    default: ""
+  # This is a comma separated list of CIDR blocks that will be allowed to access the ingress.
+  DEVSPACE_INGRESS_CIDRS:
+    source: env
+    default: "0.0.0.0/0"
+  # This is the base domain in AWS Route 53 that our ingress subdomains will use.
+  DEVSPACE_INGRESS_BASE_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
+  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
+  DEVSPACE_INGRESS_CERT_ARN:
+    source: env
+    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "../../imports"
+
+# Common commands applicable to all workloads deployed in Remote Devspace namespace
+commands:
+  ingress-hosts:
+    command: >-
+      kubectl get ingress -n ${DEVSPACE_NAMESPACE}
+      -o=jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
+    description: List Kubernetes ingress hostnames in the namespace.
+  connect:
+    command: |-
+      echo "Exposing services from ${DEVSPACE_NAMESPACE} CRIB namespace locally..."
+      sudo kubefwd svc -n $DEVSPACE_NAMESPACE
+    description: >-
+      Expose Kubernetes services from the CRIB namespace to local machine for direct,
+      secure access during development. It facilitates debugging and access to ports not exposed through Ingress.
+  ttl:
+    command: ./${SCRIPTS_DIR}/manage_namespace.sh label $1 --overwrite
+    description: Configure TTL for devspace resource cleanup. Default is 72h.
+  man:
+    command: ${SCRIPTS_DIR}/man.sh $1
+    description: Display man pages
+pipelines:
+  ingress-check:
+    run: |-
+      ./${SCRIPTS_DIR}/ingress_check.sh

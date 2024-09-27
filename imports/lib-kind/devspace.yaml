@@ -1,0 +1,12 @@
+version: v2beta1
+name: lib-kind
+
+# Common commands applicable to all workloads deployed in Kind
+purge-kind:
+  command: |-
+    if [[ ${PROVIDER} == "kind" ]]; then
+      ${SCRIPTS_DIR}/manage_kind.sh purge
+    else
+      echo "This command should be executed only when using Kind provider locally"
+    fi
+  description: Purge the local Kind cluster.
