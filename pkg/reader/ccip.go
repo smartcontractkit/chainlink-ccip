@@ -566,7 +566,7 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 	}
 
-	// NonceManager and RMNRemote are in the offramp static config
+	// NonceManager is in the offramp static config.
 	staticConfig, err := r.getOfframpStaticConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
@@ -584,9 +584,6 @@ func (r *ccipChainReader) DiscoverContracts(
 		consts.ContractNameOnRamp: onramps,
 		consts.ContractNameNonceManager: {
 			destChain: staticConfig.NonceManager,
-		},
-		consts.ContractNameRMNRemote: {
-			destChain: staticConfig.Rmn,
 		},
 	}
 	return resp, nil
@@ -745,7 +742,7 @@ func (r *ccipChainReader) getOfframpStaticConfig(
 //nolint:lll // It's a URL.
 type offrampStaticChainConfig struct {
 	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	Rmn                []byte                  `json:"rmn"`
+	RmnProxy           []byte                  `json:"rmnProxy"`
 	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
 	NonceManager       []byte                  `json:"nonceManager"`
 }
