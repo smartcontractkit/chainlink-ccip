@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -168,11 +169,11 @@ var (
 func Test_USDC_CCTP_Flow(t *testing.T) {
 	fujiChain := cciptypes.ChainSelector(sel.AVALANCHE_TESTNET_FUJI.Selector)
 	fujiPool := internal.RandBytes().String()
-	fujiTransmitter := "0xa9fB1b3009DCb79E2fe346c16a604B8Fa8aE0a79"
+	fujiTransmitter := "0xa9fb1b3009dcb79e2fe346c16a604b8fa8ae0a79"
 
 	sepoliaChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	sepoliaPool := internal.RandBytes().String()
-	sepoliaTransmitter := "0x7865fAfC2db2093669d92c0F33AeEF291086BEFD"
+	sepoliaTransmitter := "0x7865fafc2db2093669d92c0f33aeef291086befd"
 
 	baseChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector)
 
@@ -189,15 +190,15 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 
 	fuji := []usdcMessage{m1, m2, m3}
 	sepolia := []usdcMessage{m4, m5, m6, m7}
-	all := []usdcMessage{m1, m2, m3, m4, m5, m6, m7}
+	httpMessages := []usdcMessage{m1, m2, m3, m4, m5, m6, m7}
 
 	// Mock http server to return proper payloads
-	server := mockHTTPServerResponse(t, all)
+	server := mockHTTPServerResponse(t, httpMessages)
 	defer server.Close()
 
-	// Always return all the events
-	fujiReader := mockReader(t, fuji)
-	sepoliaReader := mockReader(t, sepolia)
+	// Always return events per chain
+	fujiReader := mockReader(t, fujiTransmitter, fuji)
+	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
 
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
 		config,
@@ -439,17 +440,22 @@ func createToken(t *testing.T, nonce uint64, sourceDomain uint32, pool string) c
 	}
 }
 
-func mockReader(t *testing.T, message []usdcMessage) *readermock.MockContractReaderFacade {
+func mockReader(t *testing.T, contractAddress string, message []usdcMessage) *readermock.MockContractReaderFacade {
 	items := make([]types.Sequence, len(message))
 	for i, m := range message {
 		items[i] = types.Sequence{Data: newUSDCMessageEvent(t, m.eventPayload)}
+	}
+
+	contract := types.BoundContract{
+		Address: contractAddress,
+		Name:    consts.ContractNameCCTPMessageTransmitter,
 	}
 
 	r := readermock.NewMockContractReaderFacade(t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,
-		mock.Anything,
+		contract,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
