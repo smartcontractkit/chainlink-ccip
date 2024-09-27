@@ -62,6 +62,11 @@ func (c CommitPluginConfig) Validate() error {
 	return c.OffchainConfig.Validate()
 }
 
+type FeeInfo struct {
+	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
+	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
+}
+
 type TokenInfo struct {
 	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on the feed chain.
 	AggregatorAddress string `json:"aggregatorAddress"`
@@ -106,7 +111,10 @@ func (a TokenInfo) Validate() error {
 type CommitOffchainConfig struct {
 	// RemoteGasPriceBatchWriteFrequency is the frequency at which the commit plugin
 	// should write gas prices to the remote chain.
+	//TODO: Rename to something with ChainFee
 	RemoteGasPriceBatchWriteFrequency commonconfig.Duration `json:"remoteGasPriceBatchWriteFrequency"`
+
+	FeeInfo map[cciptypes.ChainSelector]FeeInfo `json:"feeInfo"`
 
 	// TokenPriceBatchWriteFrequency is the frequency at which the commit plugin should
 	// write token prices to the remote chain.

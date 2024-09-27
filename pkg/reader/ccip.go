@@ -12,7 +12,9 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+
+	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -178,7 +180,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: types2.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
+				TokenID: ocr3types.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
@@ -439,29 +441,113 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
-	if err := validateWriterExistence(r.contractWriters, chains...); err != nil {
-		return nil, err
+func (r *ccipChainReader) GetAvailableChainsFeeComponents(
+	ctx context.Context,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
+	for chain, chainWriter := range r.contractWriters {
+		feeComponent, err := chainWriter.GetFeeComponents(ctx)
+		if err != nil {
+			r.lggr.Errorw("failed to get chain fee components for chain %d: %w", chain, err)
+			continue
+		}
+		feeComponents[chain] = *feeComponent
+	}
+	return feeComponents
+}
+
+func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
+	// nolint:lll
+	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
+	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
+	for _, chain := range selectors {
+		reader, ok := r.contractReaders[chain]
+		if !ok {
+			r.lggr.Warnw("contract reader not found", "chain", chain)
+			continue
+		}
+
+		//TODO: Use batching in the future
+		var nativeTokenAddress ocr3types.Account
+		err := reader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameRouter,
+			consts.MethodNameRouterGetWrappedNative,
+			primitives.Unconfirmed,
+			nil,
+			&nativeTokenAddress)
+
+		if err != nil {
+			r.lggr.Errorw("failed to get native token address", "chain", chain, "err", err)
+			continue
+		}
+
+		if nativeTokenAddress == "" {
+			r.lggr.Errorw("native token address is empty", "chain", chain)
+			continue
+		}
+
+		var price *big.Int
+		err = reader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrices,
+			primitives.Unconfirmed,
+			map[string]any{
+				"token": nativeTokenAddress,
+			},
+			&price,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get native token price", "chain", chain, "err", err)
+			continue
+		}
+
+		if price == nil {
+			r.lggr.Errorw("native token price is nil", "chain", chain)
+			continue
+		}
+		prices[chain] = cciptypes.NewBigInt(price)
+	}
+	return prices
+}
+
+// GetChainFeePriceUpdate Read from Destination chain FeeQuoter latest fee updates for the provided chains.
+// It unpacks the packed fee into the ChainFeeUSDPrices struct.
+// nolint:lll
+// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
+	for _, chain := range selectors {
+		update := plugintypes.TimestampedBig{}
+		// Read from dest chain
+		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameGetFeePriceUpdate,
+			primitives.Unconfirmed,
+			map[string]any{
+				// That actually means that this selector is a source chain for the destChain
+				"destChainSelector": chain,
+			},
+			&update,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get chain fee price update", "chain", chain, "err", err)
+			continue
+		}
+		feeUpdates[chain] = update
+		//feeUpdates[chain] = chainfee.ChainFeeUpdate{
+		//	Timestamp: update.Timestamp,
+		//	ChainFee:  chainfee.FromPackedFee(update.Value.Int),
+		//}
 	}
 
-	eg := new(errgroup.Group)
-	gasPrices := make([]cciptypes.BigInt, len(chains))
-	for i, chain := range chains {
-		i, chain := i, chain
-		eg.Go(func() error {
-			gasPrice, err := r.contractWriters[chain].GetFeeComponents(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get gas price: %w", err)
-			}
-			gasPrices[i] = cciptypes.NewBigInt(gasPrice.ExecutionFee)
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-	return gasPrices, nil
+	return feeUpdates
 }
 
 func (r *ccipChainReader) DiscoverContracts(
@@ -486,7 +572,8 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
-	// TODO: Lookup fee quoter?
+	// TODO: Lookup FeeQuoter (from onRamp DynamicConfig)
+	// TODO: Lookup Router (from onRamp DestChainConfig)
 
 	// Build response object.
 	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))
