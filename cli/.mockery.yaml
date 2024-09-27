@@ -6,4 +6,7 @@ with-expecter: true
 packages:
     github.com/smartcontractkit/crib/cli/wrappers:
         interfaces:
+            DockerAPI:
+            DockerCLI:
+            ECRAPI:
             EKSAPI:

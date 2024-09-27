@@ -2,6 +2,8 @@ package utils
 
 import (
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -10,6 +12,10 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	"github.com/smartcontractkit/crib/cli/wrappers"
+	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/ini.v1"
@@ -185,4 +191,109 @@ sso_role_name = outdated-role`), 0666)
 	_, _ = section.NewKey("output", "text")
 
 	AssertEqualIniSections(t, want.Section("default"), got.Section("default"))
+}
+
+func TestGetDecodedECRAuthorizationTokenSingle(t *testing.T) {
+	authToken := base64.StdEncoding.EncodeToString([]byte("user:password"))
+	proxyEndpoint := "https://012345678910.dkr.ecr.us-east-1.amazonaws.com"
+	mockEcrClient := wrappermocks.NewECRAPI(t)
+	mockEcrClient.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(
+		&ecr.GetAuthorizationTokenOutput{
+			AuthorizationData: []ecrtypes.AuthorizationData{
+				{AuthorizationToken: &authToken, ProxyEndpoint: &proxyEndpoint},
+			},
+		}, nil,
+	)
+
+	want := []*GetDecodedECRAuthorizationTokenOutput{
+		{Username: "user", Password: "password", RegistryURL: proxyEndpoint},
+	}
+	got, err := GetDecodedECRAuthorizationToken(mockEcrClient)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+func TestGetDecodedECRAuthorizationTokenMultiple(t *testing.T) {
+	authToken1 := base64.StdEncoding.EncodeToString([]byte("user:password"))
+	proxyEndpoint1 := "https://012345678910.dkr.ecr.us-east-1.amazonaws.com"
+	authToken2 := base64.StdEncoding.EncodeToString([]byte("anotheruser:anotherpassword"))
+	proxyEndpoint2 := "https://012345678910.dkr.ecr.us-west-2.amazonaws.com"
+	mockEcrClient := wrappermocks.NewECRAPI(t)
+	mockEcrClient.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(
+		&ecr.GetAuthorizationTokenOutput{
+			AuthorizationData: []ecrtypes.AuthorizationData{
+				{AuthorizationToken: &authToken1, ProxyEndpoint: &proxyEndpoint1},
+				{AuthorizationToken: &authToken2, ProxyEndpoint: &proxyEndpoint2},
+			},
+		}, nil,
+	)
+
+	want := []*GetDecodedECRAuthorizationTokenOutput{
+		{Username: "user", Password: "password", RegistryURL: proxyEndpoint1},
+		{Username: "anotheruser", Password: "anotherpassword", RegistryURL: proxyEndpoint2},
+	}
+	got, err := GetDecodedECRAuthorizationToken(mockEcrClient)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+func TestGetDecodedECRAuthorizationTokenErrors(t *testing.T) {
+	type errorTestCases struct {
+		description   string
+		mockEcrClient wrappers.ECRAPI
+		wantError     string
+	}
+
+	mockEcrClientLackOfIAMPermissions := wrappermocks.NewECRAPI(t)
+	mockEcrClientLackOfIAMPermissions.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(nil, fmt.Errorf("unable to fetch ECR authorization token, %v", errors.New("some problem in AWS")))
+
+	mockEcrClientNoAuthData := wrappermocks.NewECRAPI(t)
+	mockEcrClientNoAuthData.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(&ecr.GetAuthorizationTokenOutput{AuthorizationData: []ecrtypes.AuthorizationData{}}, nil)
+
+	mockEcrClientInvalidTokenFormat := wrappermocks.NewECRAPI(t)
+	faultyToken := base64.StdEncoding.EncodeToString([]byte("user:password:"))
+	proxyEndpoint := "https://some.ecr.url"
+	mockEcrClientInvalidTokenFormat.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(
+		&ecr.GetAuthorizationTokenOutput{AuthorizationData: []ecrtypes.AuthorizationData{
+			{AuthorizationToken: &faultyToken, ProxyEndpoint: &proxyEndpoint},
+		}}, nil)
+
+	for _, scenario := range []errorTestCases{
+		{
+			description:   "lack of permission",
+			mockEcrClient: mockEcrClientLackOfIAMPermissions,
+			wantError:     "unable to fetch ECR authorization token",
+		},
+		{
+			description:   "empty response from GetAuthorizationToken",
+			mockEcrClient: mockEcrClientNoAuthData,
+			wantError:     "no authorization data returned",
+		},
+		{
+			description:   "invalid token format",
+			mockEcrClient: mockEcrClientInvalidTokenFormat,
+			wantError:     "unexpected token format",
+		},
+	} {
+		t.Run(scenario.description, func(t *testing.T) {
+			got, err := GetDecodedECRAuthorizationToken(scenario.mockEcrClient)
+			assert.ErrorContains(t, err, scenario.wantError)
+			assert.Nil(t, got)
+		})
+	}
 }
