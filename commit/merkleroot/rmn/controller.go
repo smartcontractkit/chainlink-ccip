@@ -192,6 +192,10 @@ func (c *controller) sendObservationRequests(
 	requestIDs = mapset.NewSet[uint64]()
 
 	for nodeID, requests := range requestsPerNode {
+		sort.Slice(requests, func(i, j int) bool {
+			return requests[i].LaneSource.SourceChainSelector < requests[j].LaneSource.SourceChainSelector
+		})
+
 		req := &rmnpb.Request{
 			RequestId: newRequestID(),
 			Request: &rmnpb.Request_ObservationRequest{

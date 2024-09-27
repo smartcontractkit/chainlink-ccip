@@ -220,10 +220,14 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
+				prevSourceChain := uint64(0)
 				for _, src := range reqs[0].GetObservationRequest().GetFixedDestLaneUpdateRequests() {
 					requestedChains[nodeID].Add(src.LaneSource.SourceChainSelector)
-				}
 
+					// make sure the source chains are in ASC order
+					assert.Greater(ts.t, src.LaneSource.SourceChainSelector, prevSourceChain)
+					prevSourceChain = src.LaneSource.SourceChainSelector
+				}
 			}
 
 			rmnClient.resetReceivedRequests()
