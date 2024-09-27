@@ -726,8 +726,6 @@ profiles:
       # This will be configured via a values file.
       - op: remove
         path: deployments.app.helm.values.chainlink.global.overridesToml
-      - op: remove
-        path: deployments.ccip-scripts.helm.values.chains
       - op: add
         path: deployments.app.helm.valuesFiles
         value:
@@ -738,9 +736,6 @@ profiles:
       - op: replace
         path: deployments.app.helm.values.geth.enabled
         value: false
-      - op: replace
-        path: deployments.app.helm.upgradeArgs
-        value: ["--timeout", "20m"]
   - name: ccip-kind-bix-ship
     description: The profile is supposed to be used with local deployment on a Kind cluster for bix-ship
     # This profile will be automatically activated

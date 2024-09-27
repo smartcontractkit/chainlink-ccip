@@ -40,6 +40,14 @@ pipelines:
       run_dependency_pipelines crib-ccip-scripts
       run_pipelines ingress-check
 
+  ccip-don:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster
+
+  ccip-scripts:
+    run: |-
+      run_dependency_pipelines crib-ccip-scripts
+
   ccip-v16:
     run: |-
       run_dependency_pipelines geth
@@ -179,6 +187,10 @@ profiles:
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
+        value:
+          - ccip-eks-bix-ship
+      - op: replace
+        path: dependencies.crib-ccip-scripts.profiles
         value:
           - ccip-eks-bix-ship
   - name: ccip-kind-bix-ship
@@ -351,8 +363,12 @@ commands:
     command: devspace run-pipeline ccip -p ccip-local
     description: Run the CCIP pipeline with local charts.
     appendArgs: true
-  ccip-eks-bix-ship:
-    command: devspace run-pipeline ccip -p ccip-eks-bix-ship
+  ccip-don-eks-bix-ship:
+    command: devspace run-pipeline ccip-don -p ccip-eks-bix-ship
+    description: Run the CCIP pipeline with EKS Bix Ship.
+    appendArgs: true
+  ccip-scripts-eks-bix-ship:
+    command: devspace run-pipeline ccip-scripts -p ccip-eks-bix-ship
     description: Run the CCIP pipeline with EKS Bix Ship.
     appendArgs: true
   ccip-kind-bix-ship:

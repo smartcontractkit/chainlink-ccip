@@ -43,7 +43,7 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip-scripts
-        version: "0.1.0"
+        version: "0.1.1"
       values:
         enabled: true
         image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
@@ -72,5 +72,12 @@ profiles:
           helm:
             chart:
               name: crib-ccip-scripts
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/ccip-scripts
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip-scripts
               version: null
+  - name: ccip-eks-bix-ship
+    merge:
+      deployments:
+        ccip-scripts:
+          helm:
+            valuesFiles:
+              ["./values-profiles/values-dev-eks-bix-ship-ccip-scripts.yaml"]
