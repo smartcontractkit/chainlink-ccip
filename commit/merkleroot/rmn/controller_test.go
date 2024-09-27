@@ -308,6 +308,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 			continue
 		}
 
+		cntValid := 0
 		// check that the requests the node received are correct
 		for _, reqs := range recvReqs {
 			for _, req := range reqs {
@@ -315,7 +316,12 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 					continue
 				}
 				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= minObservers)
+				cntValid++
 			}
+		}
+
+		if cntValid < expectedResponses {
+			continue
 		}
 
 		for nodeID, reqs := range recvReqs {
