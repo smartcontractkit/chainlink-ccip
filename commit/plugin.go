@@ -210,7 +210,7 @@ func (p *Plugin) Observation(
 		p.lggr.Errorw("failed to get gas prices", "err", err)
 	}
 
-	p.lggr.Debugw("nogo observed", "merkleRootObs", merkleRootObs, "tokenPriceObs", tokenPriceObs, "chainFeeObs", chainFeeObs, "discoveryObs", discoveryObs, "fChain", fChain)
+	p.lggr.Infow("nogo observed", "merkleRootObs", merkleRootObs, "tokenPriceObs", tokenPriceObs, "chainFeeObs", chainFeeObs, "discoveryObs", discoveryObs, "fChain", fChain)
 
 	obs := Observation{
 		MerkleRootObs: merkleRootObs,

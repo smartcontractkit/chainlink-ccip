@@ -216,7 +216,7 @@ func (r *homeChainPoller) GetKnownCCIPChains() (mapset.Set[cciptypes.ChainSelect
 func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	r.lggr.Debugw("nogo GetFChain", "fChain", r.state.fChain)
+	r.lggr.Infow("nogo GetFChain", "fChain", r.state.fChain)
 	return r.state.fChain, nil
 }
 
@@ -312,7 +312,7 @@ func convertOnChainConfigToHomeChainConfig(
 			continue
 		}
 
-		lggr.Debugw("nogo home chain reader", "fChain", chainConfig.FChain)
+		lggr.Infow("nogo home chain reader", "fChain", chainConfig.FChain)
 
 		chainConfigs[chainSelector] = ChainConfig{
 			FChain:         int(chainConfig.FChain),
