@@ -103,8 +103,15 @@ func Test_USDC_Transfer(t *testing.T) {
 		return m.Header.SequenceNumber
 	})
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104})
-	// Attestation data added to the USDC
-	//require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
+	//Attestation data added to the USDC
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
+
+	server.AddResponse(
+		"0x04b060617c533bb9edaab2b39479e53852c21f94ac6a31611095208c5e248933",
+		`{
+						"status": "complete",
+						"attestation": "0x720502893578a89a8a87982982ef781c18b194"
+					}`)
 
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
@@ -118,6 +125,9 @@ func Test_USDC_Transfer(t *testing.T) {
 		return m.Header.SequenceNumber
 	})
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+	//Attestation data added to the USDC
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
 }
 
 type nodeSetup struct {
@@ -207,7 +217,7 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 	}
 }
 
-func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) ([]nodeSetup, *httptest.Server) {
+func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) ([]nodeSetup, *configurableAttestationServer) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -274,30 +284,12 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 		},
 	}
 
-	counter := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		counter++
-		if r.RequestURI == "/v1/attestations/0x142198163c994e28d9e8287b895eca3aa57ab7b50d329582baab8674cb93ca6f" {
-			_, err := w.Write([]byte(`
-					{
-						"status": "complete",
-						"attestation": "0x720502893578a89a8a87982982ef781c18b193"
-					}
-			`))
-			require.NoError(t, err)
-		} else if counter > 4 && strings.Contains(r.RequestURI, "0x04b060617c533bb9edaab2b39479e53852c21f94ac6a31611095208c5e248933") {
-			_, err := w.Write([]byte(`
-					{
-						"status": "complete",
-						"attestation": "0x720502893578a89a8a87982982ef781c18b194"
-					}
-			`))
-			require.NoError(t, err)
-
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
+	server := newConfigurableAttestationServer(map[string]string{
+		"0x142198163c994e28d9e8287b895eca3aa57ab7b50d329582baab8674cb93ca6f": `{
+			"status": "complete",
+			"attestation": "0x720502893578a89a8a87982982ef781c18b193"
+		}`,
+	})
 
 	cfg := pluginconfig.ExecutePluginConfig{
 		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
@@ -314,7 +306,7 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 								SourceMessageTransmitterAddr: address,
 							},
 						},
-						AttestationAPI:         server.URL,
+						AttestationAPI:         server.server.URL,
 						AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Second),
 						AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
 					},
@@ -451,4 +443,38 @@ func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
 		panic(err)
 	}
 	return encoded
+}
+
+type configurableAttestationServer struct {
+	responses map[string]string
+	server    *httptest.Server
+}
+
+func newConfigurableAttestationServer(responses map[string]string) *configurableAttestationServer {
+	c := &configurableAttestationServer{
+		responses: responses,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for url, response := range c.responses {
+			if strings.Contains(r.RequestURI, url) {
+				_, err := w.Write([]byte(response))
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	c.server = server
+	return c
+}
+
+func (c *configurableAttestationServer) AddResponse(url, response string) {
+	c.responses[url] = response
+}
+
+func (c *configurableAttestationServer) Close() {
+	c.server.Close()
 }
