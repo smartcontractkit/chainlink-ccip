@@ -49,14 +49,14 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate token prices observation: %w", err)
 	}
 
-	gasObs := ChainFeeObservation{
-		OracleID:    ao.Observer,
-		Observation: obs.ChainFeeObs,
-	}
-	err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
-	if err != nil {
-		return fmt.Errorf("validate chain fee observation: %w", err)
-	}
+	// gasObs := ChainFeeObservation{
+	// 	OracleID:    ao.Observer,
+	// 	Observation: obs.ChainFeeObs,
+	// }
+	// err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
+	// if err != nil {
+	// 	return fmt.Errorf("validate chain fee observation: %w", err)
+	// }
 
 	return nil
 }
