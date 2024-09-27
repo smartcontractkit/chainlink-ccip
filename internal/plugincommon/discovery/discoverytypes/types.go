@@ -16,6 +16,7 @@ type Observation struct {
 	FChain           map[ccipocr3.ChainSelector]int
 	OnRamp           map[ccipocr3.ChainSelector][]byte
 	DestNonceManager []byte
+	RMNRemote        []byte
 
 	// TODO: some sort of request flag to avoid including this every time.
 	// Request bool
