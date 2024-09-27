@@ -107,7 +107,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
 
 	server.AddResponse(
-		"0x04b060617c533bb9edaab2b39479e53852c21f94ac6a31611095208c5e248933",
+		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
 		`{
 						"status": "complete",
 						"attestation": "0x720502893578a89a8a87982982ef781c18b194"
@@ -277,13 +277,13 @@ func setupSimpleTest(
 				makeMsgWithToken(104, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
 					{
 						SourcePoolAddress: addressBytes,
-						ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 100).ToBytes(),
+						ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
 					},
 				}),
 				makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
 					{
 						SourcePoolAddress: addressBytes,
-						ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 100).ToBytes(),
+						ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 0).ToBytes(),
 					},
 				}),
 			},
@@ -291,7 +291,7 @@ func setupSimpleTest(
 	}
 
 	server := newConfigurableAttestationServer(map[string]string{
-		"0x142198163c994e28d9e8287b895eca3aa57ab7b50d329582baab8674cb93ca6f": `{
+		"0x0f43587da5355551d234a2ba24dde8edfe0e385346465d6d53653b6aa642992e": `{
 			"status": "complete",
 			"attestation": "0x720502893578a89a8a87982982ef781c18b193"
 		}`,
@@ -348,9 +348,9 @@ func setupSimpleTest(
 	require.NoError(t, err, "failed to start home chain poller")
 
 	usdcEvents := []types.Sequence{
-		{Data: readerpkg.NewMessageSentEvent(100, 101, 1, []byte{1})},
-		{Data: readerpkg.NewMessageSentEvent(100, 101, 2, []byte{2})},
-		{Data: readerpkg.NewMessageSentEvent(100, 101, 3, []byte{3})},
+		{Data: readerpkg.NewMessageSentEvent(0, 6, 1, []byte{1})},
+		{Data: readerpkg.NewMessageSentEvent(0, 6, 2, []byte{2})},
+		{Data: readerpkg.NewMessageSentEvent(0, 6, 3, []byte{3})},
 	}
 
 	r := readermock.NewMockContractReaderFacade(t)
