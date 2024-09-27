@@ -35,6 +35,8 @@ type usdcMessage struct {
 	// eventPayload is the data from the MessageSent(bytes) event, taken directly from chain explorer
 	eventPayload string
 	// urlMessageHash is the keccak of the eventPayload, used as msg identifier in Attestation API
+	//body, _ := hex.DecodeString(eventPayload)
+	//urlMessageHash := utils.Keccak256Fixed(body)
 	urlMessageHash string
 	// attestationResponse is the response from the Attestation API
 	attestationResponse string
@@ -42,7 +44,9 @@ type usdcMessage struct {
 	attestationResponseStatus int
 }
 
-func (u *usdcMessage) attestationBytes() []byte {
+// TODO actual tokenData bytes would be abi encoded, but we can't use abi in the repo so only
+// passing attestation as it is
+func (u *usdcMessage) tokenData() []byte {
 	var result map[string]interface{}
 
 	err := json.Unmarshal([]byte(u.attestationResponse), &result)
@@ -59,7 +63,7 @@ func (u *usdcMessage) attestationBytes() []byte {
 	if err != nil {
 		panic(err)
 	}
-	return bytes
+	return []byte(bytes)
 }
 
 //nolint:lll
@@ -107,15 +111,31 @@ var (
 	}
 
 	//https://sepolia.etherscan.io/tx/0x63eddd816fbf10872aaf27905a07c37cd5c675c785f55175e9f5529bf94ff7e5
+	//https://iris-api-sandbox.circle.com/v1/attestations/0x4055282ce9d64f8fb216c3f6ebd121d4601f0292684ebe4850ad80bd28df7581
 	m4 = usdcMessage{
-		sourceDomain: 0, // Ethereum Sepolia
-		eventPayload: "00000000000000000000000300000000000401C30000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C7238000000000000000000000000FF814813D48D79A6A81E55EF2F96426BA1E37AF50000000000000000000000000000000000000000000000000000000000A037A0000000000000000000000000C5D952CE7100D7D1A9A578FB55346B870062BAFC",
+		sourceDomain:   0, // Ethereum Sepolia
+		nonce:          262600,
+		eventPayload:   "00000000000000000000000600000000000401C80000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA5000000000000000000000000C08835ADF4884E51FF076066706E407506826D9D000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000004F32AE7F112C26B109357785E5C66DC5D747FBCE00000000000000000000000000000000000000000000000000000000000027100000000000000000000000003FF675B880AC9F67AC6F4342FFD9E99B80469BAD",
+		urlMessageHash: "0x4055282ce9d64f8fb216c3f6ebd121d4601f0292684ebe4850ad80bd28df7581",
+		attestationResponse: `{
+			"attestation":"0xc9f7eb19bb1828413abc2db13fa941b00d0b52f7519b49c44932562612ebd5956a12e04c034f23e749edc9a68f6aff847d201def0860377efe8d92a64d1fc1af1c11f2e8b12b5142f9c37dd6d0429b8d9dd8ea6a032626819a6252ebc813d4907653c95f8a8a51ab534bc744d5a88499cab0887df73b7cc139a636eb9f05f1996d1c",
+			"status":"complete"
+		}`,
+		attestationResponseStatus: 200,
 	}
 
 	//https://sepolia.etherscan.io/tx/0x028a2a08f9b6cd74aa013b5300768585eb2ef10a11e24c25bc456eb2223ad34e
+	//https://iris-api-sandbox.circle.com/v1/attestations/0x4055282ce9d64f8fb216c3f6ebd121d4601f0292684ebe4850ad80bd28df7581
 	m5 = usdcMessage{
-		sourceDomain: 0, // Ethereum Sepolia
-		eventPayload: "https://sepolia.etherscan.io/tx/0x028a2a08f9b6cd74aa013b5300768585eb2ef10a11e24c25bc456eb2223ad34e",
+		sourceDomain:   0, // Ethereum Sepolia
+		nonce:          262601,
+		eventPayload:   "00000000000000000000000600000000000401C90000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA5000000000000000000000000C08835ADF4884E51FF076066706E407506826D9D000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000004F32AE7F112C26B109357785E5C66DC5D747FBCE00000000000000000000000000000000000000000000000000000000000027100000000000000000000000003FF675B880AC9F67AC6F4342FFD9E99B80469BAD",
+		urlMessageHash: "0x4055282ce9d64f8fb216c3f6ebd121d4601f0292684ebe4850ad80bd28df7581",
+		attestationResponse: `{
+			"attestation":"0xc9f7eb19bb1828413abc2db13fa941b00d0b52f7519b49c44932562612ebd5956a12e04c034f23e749edc9a68f6aff847d201def0860377efe8d92a64d1fc1af1c11f2e8b12b5142f9c37dd6d0429b8d9dd8ea6a032626819a6252ebc813d4907653c95f8a8a51ab534bc744d5a88499cab0887df73b7cc139a636eb9f05f1996d1c",
+			"status":"complete"
+		}`,
+		attestationResponseStatus: 200,
 	}
 )
 
@@ -147,7 +167,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	}
 
 	fuji := []usdcMessage{m1, m2, m3}
-	sepolia := []usdcMessage{}
+	sepolia := []usdcMessage{m4}
 	all := []usdcMessage{m1, m2, m3, m4, m5}
 
 	// Mock http server to return proper payloads
@@ -202,7 +222,63 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 				fujiChain: {
 					1: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
-							exectypes.NewSuccessTokenData(m1.attestationBytes()),
+							exectypes.NewSuccessTokenData(m1.tokenData()),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple valid messages and tokens from fuji to base",
+			messages: exectypes.MessageObservations{
+				fujiChain: {
+					1: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m1.nonce, m1.sourceDomain, fujiPool),
+							createToken(t, m2.nonce, m2.sourceDomain, fujiPool),
+						},
+					},
+					2: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m3.nonce, m3.sourceDomain, fujiPool),
+						},
+					},
+				},
+			},
+			want: exectypes.TokenDataObservations{
+				fujiChain: {
+					1: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewSuccessTokenData(m1.tokenData()),
+							exectypes.NewSuccessTokenData(m2.tokenData()),
+						},
+					},
+					2: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewSuccessTokenData(m3.tokenData()),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "multiple sepolia tokens within a single message to base",
+			messages: exectypes.MessageObservations{
+				sepoliaChain: {
+					10: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m4.nonce, m4.sourceDomain, sepoliaPool),
+							createToken(t, m5.nonce, m5.sourceDomain, sepoliaPool),
+						},
+					},
+				},
+			},
+			want: exectypes.TokenDataObservations{
+				sepoliaChain: {
+					10: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewSuccessTokenData(m4.tokenData()),
+							exectypes.NewSuccessTokenData(m5.tokenData()),
 						},
 					},
 				},
@@ -256,10 +332,10 @@ func mockHTTPServerResponse(t *testing.T, messages []usdcMessage) *httptest.Serv
 				w.WriteHeader(m.attestationResponseStatus)
 				_, err := w.Write([]byte(m.attestationResponse))
 				require.NoError(t, err)
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
+				return
 			}
 		}
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	return ts
 }
