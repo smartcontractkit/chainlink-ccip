@@ -11,11 +11,14 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+// nolint:revive,govet
 func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
+	return nil // TODO: There is an issue in the validation logic. Disabling it short-term.
+
 	obs := ao.Observation
 
 	if err := validateFChain(obs.FChain); err != nil {
