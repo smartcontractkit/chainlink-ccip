@@ -102,6 +102,11 @@ func (p *processor) Outcome(
 		return Outcome{}, nil
 	}
 
+	p.lggr.Infow(
+		"nogo obs",
+		"observations", aos,
+	)
+
 	consensusObservation, err := p.getConsensusObservation(aos)
 	if err != nil {
 		return Outcome{}, err

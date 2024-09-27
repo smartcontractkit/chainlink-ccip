@@ -7,6 +7,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
@@ -19,7 +20,7 @@ import (
 func (p *processor) getConsensusObservation(
 	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
-	aggObs := aggregateObservations(aos)
+	aggObs := aggregateObservations(p.lggr, aos)
 
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
@@ -118,7 +119,7 @@ func (p *processor) selectTokensForUpdate(
 }
 
 // aggregateObservations takes a list of observations and produces an AggregateObservation
-func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
+func aggregateObservations(lggr logger.Logger, aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
 		FeeQuoterTokenUpdates: make(map[types.Account][]plugintypes.TimestampedBig),
@@ -128,6 +129,13 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 
 	for _, ao := range aos {
 		obs := ao.Observation
+		lggr.Infow(
+			"nogo inside obs",
+			"feed prices", obs.FeedTokenPrices,
+			"fee quoter updates", obs.FeeQuoterTokenUpdates,
+			"timestamp", obs.Timestamp,
+			"fChain", obs.FChain,
+		)
 		// FeedTokenPrices
 		for _, tokenPrice := range obs.FeedTokenPrices {
 			aggObs.FeedTokenPrices[tokenPrice.TokenID] = append(aggObs.FeedTokenPrices[tokenPrice.TokenID], tokenPrice)
