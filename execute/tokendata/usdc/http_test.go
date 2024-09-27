@@ -279,12 +279,10 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
 	require.EqualError(t, err, ErrRateLimit.Error())
 
-	time.Sleep(2 * time.Second)
-
-	// Next request should go through and reach API
-	_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
-	require.EqualError(t, err, ErrUnknownResponse.Error())
-
+	require.Eventually(t, func() bool {
+		_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
+		return err == ErrUnknownResponse
+	}, tests.WaitTimeout(t), 50*time.Millisecond)
 	require.Equal(t, requestCount, 3)
 }
 

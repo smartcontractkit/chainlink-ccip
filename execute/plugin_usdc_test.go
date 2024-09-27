@@ -113,6 +113,7 @@ func Test_USDC_Transfer(t *testing.T) {
 						"attestation": "0x720502893578a89a8a87982982ef781c18b194"
 					}`)
 
+	// Run 3 more rounds to get all attestations
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
 	res, err = runner.RunRound(ctx)
@@ -125,7 +126,7 @@ func Test_USDC_Transfer(t *testing.T) {
 		return m.Header.SequenceNumber
 	})
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
-	//Attestation data added to the USDC
+	//Attestation data added to the both USDC messages
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
 }
@@ -217,7 +218,12 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 	}
 }
 
-func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) ([]nodeSetup, *configurableAttestationServer) {
+func setupSimpleTest(
+	ctx context.Context,
+	t *testing.T,
+	lggr logger.Logger,
+	srcSelector, dstSelector cciptypes.ChainSelector,
+) ([]nodeSetup, *configurableAttestationServer) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -357,7 +363,7 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 		mock.Anything,
 	).Return(usdcEvents, nil)
 
-	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		lggr,
 		cfg.DestChain,
 		cfg.OffchainConfig.TokenDataObservers,
@@ -370,9 +376,9 @@ func setupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -423,7 +429,12 @@ func newNode(
 	}
 }
 
-func makeMsgWithToken(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool, tokens []cciptypes.RampTokenAmount) inmem.MessagesWithMetadata {
+func makeMsgWithToken(
+	seqNum cciptypes.SeqNum,
+	src, dest cciptypes.ChainSelector,
+	executed bool,
+	tokens []cciptypes.RampTokenAmount,
+) inmem.MessagesWithMetadata {
 	msg := makeMsg(seqNum, src, dest, executed)
 	msg.Message.TokenAmounts = tokens
 	return msg
