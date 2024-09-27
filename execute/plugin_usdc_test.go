@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -51,7 +52,10 @@ func Test_USDC_Transfer(t *testing.T) {
 	ctx := context.Background()
 	lggr := logger.Test(t)
 
-	nodesSetup, server := setupSimpleTest(ctx, t, lggr, 1, 2)
+	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
+
+	nodesSetup, server := setupSimpleTest(ctx, t, lggr, sourceChain, destChain)
 	defer server.Close()
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], 0, len(nodesSetup))
@@ -368,8 +372,8 @@ func setupSimpleTest(
 		cfg.DestChain,
 		cfg.OffchainConfig.TokenDataObservers,
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			cciptypes.ChainSelector(1): r,
-			cciptypes.ChainSelector(2): r,
+			srcSelector: r,
+			dstSelector: r,
 		},
 	)
 	require.NoError(t, err)

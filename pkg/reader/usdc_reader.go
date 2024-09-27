@@ -43,9 +43,6 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
-	// For tests
-	1: 0,
-	2: 6,
 }
 
 type usdcMessageReader struct {
