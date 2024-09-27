@@ -2,6 +2,7 @@ package tokenprice
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -19,6 +20,7 @@ func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
 		p.lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
+	p.lggr.Infow(fmt.Sprintf("[oracle %d] observed FChain", p.oracleID), "fChain", fChain)
 	return fChain
 }
 

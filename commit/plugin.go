@@ -114,7 +114,8 @@ func NewPlugin(
 		oracleIDToP2pID,
 	)
 
-	chainFeeProcessr := chainfee.NewProcessor(
+	chainFeeProcessor := chainfee.NewProcessor(
+		reportingCfg.OracleID,
 		lggr,
 		cfg.DestChain,
 		homeChain,
@@ -138,7 +139,7 @@ func NewPlugin(
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
-		chainFeeProcessor:   chainFeeProcessr,
+		chainFeeProcessor:   chainFeeProcessor,
 		discoveryProcessor:  discoveryProcessor,
 		rmnConfig:           rmnConfig,
 	}

@@ -44,7 +44,7 @@ func (w *Processor) Observation(
 
 	tStart := time.Now()
 	observation, nextState := w.getObservation(ctx, q, prevOutcome)
-	w.lggr.Infow("Sending MerkleRootObs",
+	w.lggr.Infow(fmt.Sprintf("[oracle %d] Sending MerkleRootObs", w.oracleID),
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
 }
@@ -160,7 +160,7 @@ type Observer interface {
 type ObserverImpl struct {
 	lggr         logger.Logger
 	homeChain    reader.HomeChain
-	nodeID       commontypes.OracleID
+	oracleID     commontypes.OracleID
 	chainSupport plugincommon.ChainSupport
 	ccipReader   readerpkg.CCIPReader
 	msgHasher    cciptypes.MessageHasher
@@ -168,7 +168,7 @@ type ObserverImpl struct {
 
 // ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
 func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
-	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.nodeID)
+	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.oracleID)
 	if err != nil {
 		o.lggr.Warnw("call to SupportsDestChain failed", "err", err)
 		return nil
@@ -215,7 +215,7 @@ func (o ObserverImpl) ObserveLatestOnRampSeqNums(
 		return nil
 	}
 
-	supportedChains, err := o.chainSupport.SupportedChains(o.nodeID)
+	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
 	if err != nil {
 		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
@@ -260,7 +260,7 @@ func (o ObserverImpl) ObserveMerkleRoots(
 	ranges []plugintypes.ChainRange,
 ) []cciptypes.MerkleRootChain {
 
-	supportedChains, err := o.chainSupport.SupportedChains(o.nodeID)
+	supportedChains, err := o.chainSupport.SupportedChains(o.oracleID)
 	if err != nil {
 		o.lggr.Warnw("call to supportedChains failed", "err", err)
 		return nil
@@ -347,5 +347,6 @@ func (o ObserverImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 		o.lggr.Warnw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
+	o.lggr.Infow(fmt.Sprintf("[oracle %d] ObserveFChain", o.oracleID), "fChain", fChain)
 	return fChain
 }

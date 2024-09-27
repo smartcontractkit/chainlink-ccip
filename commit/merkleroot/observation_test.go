@@ -216,7 +216,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			defer ccipReader.AssertExpectations(t)
 
 			o := ObserverImpl{
-				nodeID:       nodeID,
+				oracleID:     nodeID,
 				lggr:         logger.Test(t),
 				msgHasher:    mocks.NewMessageHasher(),
 				ccipReader:   ccipReader,
@@ -431,7 +431,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			}
 
 			o := ObserverImpl{
-				nodeID:       nodeID,
+				oracleID:     nodeID,
 				lggr:         logger.Test(t),
 				msgHasher:    mocks.NewMessageHasher(),
 				ccipReader:   reader,

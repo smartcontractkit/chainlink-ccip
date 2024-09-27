@@ -3,6 +3,8 @@ package chainfee
 import (
 	"context"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -14,6 +16,7 @@ import (
 )
 
 type processor struct {
+	oracleID     commontypes.OracleID
 	destChain    cciptypes.ChainSelector
 	lggr         logger.Logger
 	homeChain    reader.HomeChain
@@ -24,6 +27,7 @@ type processor struct {
 }
 
 func NewProcessor(
+	oracleID commontypes.OracleID,
 	lggr logger.Logger,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
@@ -33,6 +37,7 @@ func NewProcessor(
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
+		oracleID:     oracleID,
 		lggr:         lggr,
 		destChain:    destChain,
 		homeChain:    homeChain,
