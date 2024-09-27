@@ -315,6 +315,19 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 					continue
 				}
 				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= minObservers)
+
+				prevRmnNodeIDX := uint32(0)
+				for _, ao := range req.GetReportSignatureRequest().AttributedSignedObservations {
+					assert.Greater(t, ao.SignerNodeIndex, prevRmnNodeIDX)
+					prevRmnNodeIDX = ao.SignerNodeIndex
+
+					prevSrcChain := uint64(0)
+					for _, lu := range ao.SignedObservation.Observation.FixedDestLaneUpdates {
+						assert.Greater(t, lu.LaneSource.SourceChainSelector, prevSrcChain)
+						prevSrcChain = lu.LaneSource.SourceChainSelector
+					}
+				}
+
 			}
 		}
 
