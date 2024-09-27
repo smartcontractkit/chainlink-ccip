@@ -137,6 +137,17 @@ var (
 		}`,
 		attestationResponseStatus: 200,
 	}
+
+	//https://sepolia.etherscan.io/tx/0xad89c8a5b54a9db693c045918e6714553acd217cc50ce6e73d41043baa324722#eventlog
+	//https://iris-api-sandbox.circle.com/v1/attestations/0x038cf8dab6b9ec34741ec65aa347eec8690fca821fd2743a1c78efc6a906d28d
+	m6 = usdcMessage{
+		sourceDomain:              0, // Ethereum Sepolia
+		nonce:                     262602,
+		eventPayload:              "00000000000000000000000600000000000401D10000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA50000000000000000000000009F3B8679C73C2FEF8B59B4F3444D4E156FB70AA5000000000000000000000000C08835ADF4884E51FF076066706E407506826D9D000000000000000000000000000000001C7D4B196CB0C7B01D743FBC6116A902379C72380000000000000000000000004F32AE7F112C26B109357785E5C66DC5D747FBCE00000000000000000000000000000000000000000000000000000000000000640000000000000000000000003FF675B880AC9F67AC6F4342FFD9E99B80469BAD",
+		urlMessageHash:            "0x038cf8dab6b9ec34741ec65aa347eec8690fca821fd2743a1c78efc6a906d28d",
+		attestationResponse:       `{"attestation":"PENDING","status":"pending_confirmations"}`,
+		attestationResponseStatus: 404,
+	}
 )
 
 // This test focuses on almost e2e flows for USDC message
@@ -167,8 +178,8 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	}
 
 	fuji := []usdcMessage{m1, m2, m3}
-	sepolia := []usdcMessage{m4, m5}
-	all := []usdcMessage{m1, m2, m3, m4, m5}
+	sepolia := []usdcMessage{m4, m5, m6}
+	all := []usdcMessage{m1, m2, m3, m4, m5, m6}
 
 	// Mock http server to return proper payloads
 	server := mockHTTPServerResponse(t, all)
@@ -326,6 +337,59 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 					11: exectypes.MessageTokenData{
 						TokenData: []exectypes.TokenData{
 							exectypes.NewSuccessTokenData(m5.tokenData()),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "not matching tokens",
+			messages: exectypes.MessageObservations{
+				fujiChain: {
+					1: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							createToken(t, m1.nonce, m1.sourceDomain, fujiPool),
+							// not matching pool, marked as not supported
+							createToken(t, m2.nonce, m2.sourceDomain, sepoliaPool),
+							// not matching domain marked as not ready
+							createToken(t, m3.nonce, m5.sourceDomain, fujiPool),
+						},
+					},
+					2: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							// not matching nonce
+							createToken(t, 123456789, m3.sourceDomain, fujiPool),
+						},
+					},
+				},
+				sepoliaChain: {
+					10: cciptypes.Message{
+						TokenAmounts: []cciptypes.RampTokenAmount{
+							// message pending
+							createToken(t, m6.nonce, m6.sourceDomain, sepoliaPool),
+						},
+					},
+				},
+			},
+			want: exectypes.TokenDataObservations{
+				fujiChain: {
+					1: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewSuccessTokenData(m1.tokenData()),
+							exectypes.NotSupportedTokenData(),
+							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+						},
+					},
+					2: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
+						},
+					},
+				},
+				sepoliaChain: {
+					10: exectypes.MessageTokenData{
+						TokenData: []exectypes.TokenData{
+							exectypes.NewErrorTokenData(usdc.ErrDataMissing),
 						},
 					},
 				},
