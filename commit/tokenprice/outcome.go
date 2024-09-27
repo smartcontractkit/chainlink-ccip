@@ -29,8 +29,8 @@ func (p *processor) getConsensusObservation(
 	fDestChain, exists := fChains[p.cfg.DestChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v",
-				p.cfg.DestChain, aggObs.FChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v, threshold: %d",
+				p.cfg.DestChain, aggObs.FChain, consensus.TwoFPlus1(p.fRoleDON))
 	}
 
 	fFeedChain, exists := fChains[p.cfg.OffchainConfig.PriceFeedChainSelector]
