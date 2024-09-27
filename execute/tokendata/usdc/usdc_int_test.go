@@ -221,11 +221,11 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 }
 
 func createToken(t *testing.T, nonce uint64, sourceDomain uint32, pool string) cciptypes.RampTokenAmount {
-	p, err := cciptypes.NewBytesFromString(pool)
+	bytesPool, err := cciptypes.NewBytesFromString(pool)
 	require.NoError(t, err)
 
 	return cciptypes.RampTokenAmount{
-		SourcePoolAddress: p,
+		SourcePoolAddress: bytesPool,
 		ExtraData:         readerpkg.NewSourceTokenDataPayload(nonce, sourceDomain).ToBytes(),
 		Amount:            cciptypes.NewBigIntFromInt64(100),
 	}
@@ -256,7 +256,8 @@ func mockHTTPServerResponse(t *testing.T, messages []usdcMessage) *httptest.Serv
 				w.WriteHeader(m.attestationResponseStatus)
 				_, err := w.Write([]byte(m.attestationResponse))
 				require.NoError(t, err)
-				return
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
 			}
 		}
 	}))
@@ -266,7 +267,6 @@ func mockHTTPServerResponse(t *testing.T, messages []usdcMessage) *httptest.Serv
 func newUSDCMessageEvent(t *testing.T, messageBody string) *readerpkg.MessageSentEvent {
 	body, err := hex.DecodeString(messageBody)
 	require.NoError(t, err)
-
 	return &readerpkg.MessageSentEvent{
 		Arg0: body,
 	}
