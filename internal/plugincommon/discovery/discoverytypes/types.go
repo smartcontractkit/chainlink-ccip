@@ -13,7 +13,7 @@ type Query []byte
 
 // Observation of contract addresses.
 type Observation struct {
-	FChain           map[ccipocr3.ChainSelector]int
+	FChain           map[ccipocr3.ChainSelector]int `json:"fChain"`
 	OnRamp           map[ccipocr3.ChainSelector][]byte
 	DestNonceManager []byte
 	RMNRemote        []byte
