@@ -104,7 +104,8 @@ func (p *processor) getConsensusObservation(
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
 		return Observation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v",
+				p.destChain, aggObs.FChain)
 	}
 
 	if len(aggObs.Timestamps) < int(consensus.TwoFPlus1(fDestChain)) {

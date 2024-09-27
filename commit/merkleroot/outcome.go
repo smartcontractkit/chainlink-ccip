@@ -220,7 +220,8 @@ func getConsensusObservation(
 	_, exists := fChains[destChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v",
+				destChain, aggObs.FChain)
 	}
 
 	// Get consensus using strict 2f+1 threshold.
