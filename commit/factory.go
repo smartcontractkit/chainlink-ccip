@@ -17,7 +17,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -52,6 +57,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr            logger.Logger
+	donID           plugintypes.DonID
 	ocrConfig       reader.OCR3ConfigWithMeta
 	commitCodec     cciptypes.CommitPluginCodec
 	msgHasher       cciptypes.MessageHasher
@@ -62,6 +68,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
@@ -71,6 +78,7 @@ func NewPluginFactory(
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:            lggr,
+		donID:           donID,
 		ocrConfig:       ocrConfig,
 		commitCodec:     commitCodec,
 		msgHasher:       msgHasher,
@@ -96,25 +104,43 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
-	var onChainTokenPricesReader reader.TokenPrices
+	var onChainTokenPricesReader reader.PriceReader
 	// The node supports the chain that the token prices are on.
-	tokenPricesCr, ok := p.contractReaders[cciptypes.ChainSelector(offchainConfig.TokenPriceChainSelector)]
+	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
 	if ok {
+		// Bind all token aggregate contracts
+		var bcs []types.BoundContract
+		for _, info := range offchainConfig.TokenInfo {
+			bcs = append(bcs, types.BoundContract{
+				Address: info.AggregatorAddress,
+				Name:    consts.ContractNamePriceAggregator,
+			})
+		}
+		if err1 := tokenPricesCr.Bind(context.Background(), bcs); err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
+		}
 		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
 			tokenPricesCr,
-			offchainConfig.PriceSources,
-			offchainConfig.TokenDecimals,
+			offchainConfig.TokenInfo,
 		)
 	}
 
-	ccipReader := reader.NewCCIPChainReader(
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
+	ccipReader := readerpkg.NewCCIPChainReader(
 		p.lggr,
-		p.contractReaders,
+		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
+		p.ocrConfig.Config.OfframpAddress,
 	)
 	return NewPlugin(
 			context.Background(),
+			p.donID,
 			config.OracleID,
 			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{
@@ -130,6 +156,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.lggr,
 			p.homeChainReader,
 			config,
+			rmn.Config{}, // todo
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

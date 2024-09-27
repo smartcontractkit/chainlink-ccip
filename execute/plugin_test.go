@@ -23,17 +23,20 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gen"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_getPendingExecutedReports(t *testing.T) {
 	tests := []struct {
 		name    string
-		reports []plugintypes.CommitPluginReportWithMeta
+		reports []plugintypes2.CommitPluginReportWithMeta
 		ranges  map[cciptypes.ChainSelector][]cciptypes.SeqNumRange
 		want    exectypes.CommitObservations
 		wantErr assert.ErrorAssertionFunc
@@ -47,7 +50,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		},
 		{
 			name: "single non-executed report",
-			reports: []plugintypes.CommitPluginReportWithMeta{
+			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -78,7 +81,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		},
 		{
 			name: "single half-executed report",
-			reports: []plugintypes.CommitPluginReportWithMeta{
+			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -113,7 +116,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		},
 		{
 			name: "last timestamp",
-			reports: []plugintypes.CommitPluginReportWithMeta{
+			reports: []plugintypes2.CommitPluginReportWithMeta{
 				{
 					BlockNum:  999,
 					Timestamp: time.UnixMilli(10101010101),
@@ -135,7 +138,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockReader := reader_mock.NewMockCCIP(t)
+			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			mockReader.On(
 				"CommitReportsGTETimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything,
 			).Return(tt.reports, nil)
@@ -164,12 +167,11 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	mockReader := reader_mock.NewMockCCIP(t)
+	mockReader := readerpkg_mock.NewMockCCIPReader(t)
 	mockReader.On("Close", mock.Anything).Return(nil)
 
 	lggr := logger.Test(t)
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(lggr, mockReader, 50*time.Millisecond, 100*time.Millisecond)
-	p := &Plugin{lggr: lggr, ccipReader: mockReader, readerSyncer: readerSyncer}
+	p := &Plugin{lggr: lggr, ccipReader: mockReader}
 	require.NoError(t, p.Close())
 }
 
@@ -228,7 +230,7 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 				},
 			},
 		},
-	}, nil)
+	}, nil, nil, dt.Observation{})
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -260,7 +262,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 			{MerkleRoot: root},
 		},
 	}
-	observation := exectypes.NewObservation(commitReports, nil, nil)
+	observation := exectypes.NewObservation(commitReports, nil, nil, nil, dt.Observation{})
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -310,7 +312,10 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
+	homeChain := reader_mock.NewMockHomeChain(t)
+	homeChain.EXPECT().GetFChain().Return(nil, nil)
 	p := &Plugin{
+		homeChain: homeChain,
 		reportingCfg: ocr3types.ReportingPluginConfig{
 			F: 1,
 		},
@@ -350,7 +355,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := exectypes.NewObservation(commitReports, nil, nil).Encode()
+	observation, err := exectypes.NewObservation(commitReports, nil, nil, nil, dt.Observation{}).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -383,7 +388,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := exectypes.NewObservation(nil, messages, nil).Encode()
+	observation, err := exectypes.NewObservation(nil, messages, nil, nil, dt.Observation{}).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -506,13 +511,19 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
+	const donID = uint32(1)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	homeChain.
+		EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeExecute).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
 
 	p := &Plugin{
+		donID:        donID,
 		lggr:         logger.Test(t),
 		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
@@ -529,14 +540,20 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 }
 
 func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
+	const donID = uint32(1)
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
+	homeChain.
+		EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeExecute).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
 
 	p := &Plugin{
+		donID:        donID,
 		lggr:         lggr,
 		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},

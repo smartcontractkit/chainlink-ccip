@@ -16,21 +16,25 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
 	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func TestPlugin(t *testing.T) {
@@ -51,18 +55,25 @@ func TestPlugin(t *testing.T) {
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
-	// Round 1.
-	// One pending commit report only.
-	// Two of the messages are executed which should be indicated in the Outcome.
+	// Contract Discovery round.
 	res, err := runner.RunRound(ctx)
 	require.NoError(t, err)
 	outcome, err := exectypes.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// Round 1 - Get Commit Reports
+	// One pending commit report only.
+	// Two of the messages are executed which should be indicated in the Outcome.
+	res, err = runner.RunRound(ctx)
+	require.NoError(t, err)
+	outcome, err = exectypes.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
-	// Round 2.
+	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
@@ -71,7 +82,7 @@ func TestPlugin(t *testing.T) {
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 
-	// Round 3.
+	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	res, err = runner.RunRound(ctx)
 	require.NoError(t, err)
@@ -93,15 +104,18 @@ type nodeSetup struct {
 
 func setupHomeChainPoller(
 	t *testing.T,
+	donID plugintypes.DonID,
 	lggr logger.Logger,
-	chainConfigInfos []reader.ChainConfigInfo) reader.HomeChain {
-	homeChainReader := chainreadermocks.NewMockChainReader(t)
+	chainConfigInfos []reader.ChainConfigInfo,
+) reader.HomeChain {
+	const ccipConfigAddress = "0xCCIPConfigFakeAddress"
+
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
-		consts.ContractNameCCIPConfig,
-		consts.MethodNameGetAllChainConfigs,
+		mock.Anything,
 		mock.Anything,
 		mock.MatchedBy(func(input map[string]interface{}) bool {
 			_, pageIndexExists := input["pageIndex"]
@@ -111,7 +125,7 @@ func setupHomeChainPoller(
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(5).(*[]reader.ChainConfigInfo)
+			arg := args.Get(4).(*[]reader.ChainConfigInfo)
 			if firstCall {
 				*arg = chainConfigInfos
 				firstCall = false
@@ -120,6 +134,26 @@ func setupHomeChainPoller(
 			}
 		}).Return(nil)
 
+	homeChainReader.EXPECT().
+		GetLatestValue(mock.Anything, types.BoundContract{
+			Address: ccipConfigAddress,
+			Name:    consts.ContractNameCCIPConfig,
+		}.ReadIdentifier(consts.MethodNameGetOCRConfig), primitives.Unconfirmed, map[string]any{
+			"donId":      donID,
+			"pluginType": consts.PluginTypeExecute,
+		}, mock.Anything).
+		Run(
+			func(
+				ctx context.Context,
+				readIdentifier string,
+				confidenceLevel primitives.ConfidenceLevel,
+				params,
+				returnVal interface{},
+			) {
+				*returnVal.(*[]reader.OCR3ConfigWithMeta) = []reader.OCR3ConfigWithMeta{{}}
+			}).
+		Return(nil)
+
 	homeChain := reader.NewHomeChainConfigPoller(
 		homeChainReader,
 		lggr,
@@ -127,7 +161,7 @@ func setupHomeChainPoller(
 		// lower polling interval make it catch up faster
 		time.Minute,
 		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
+			Address: ccipConfigAddress,
 			Name:    consts.ContractNameCCIPConfig,
 		},
 	)
@@ -151,6 +185,8 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 func setupSimpleTest(
 	ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector,
 ) []nodeSetup {
+	donID := uint32(1)
+
 	msgHasher := mocks.NewMessageHasher()
 
 	messages := []inmem.MessagesWithMetadata{
@@ -175,7 +211,7 @@ func setupSimpleTest(
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
 		Dest: dstSelector,
-		Reports: []plugintypes.CommitPluginReportWithMeta{
+		Reports: []plugintypes2.CommitPluginReportWithMeta{
 			{
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
@@ -217,9 +253,7 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
-					FinalityDepth: 1,
-				}),
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
 			},
 		}, {
 			ChainSelector: dstSelector,
@@ -228,25 +262,22 @@ func setupSimpleTest(
 				Readers: []libocrtypes.PeerID{
 					{1}, {2}, {3},
 				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{
-					FinalityDepth: 1,
-				}),
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
 			},
 		},
 	}
 
-	homeChain := setupHomeChainPoller(t, lggr, chainConfigInfos)
+	homeChain := setupHomeChainPoller(t, donID, lggr, chainConfigInfos)
 	err = homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 
-	tokenDataReader := mock_types.NewMockTokenDataReader(t)
-	tokenDataReader.On("ReadTokenData", mock.Anything, mock.Anything, mock.Anything).Return([][]byte{}, nil)
+	tokenDataObserver := &tokendata.NoopTokenDataObserver{}
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataReader, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -259,12 +290,13 @@ func setupSimpleTest(
 func newNode(
 	_ context.Context,
 	_ *testing.T,
+	donID plugintypes.DonID,
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
 	msgHasher cciptypes.MessageHasher,
-	ccipReader reader.CCIP,
+	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
-	tokenDataReader exectypes.TokenDataReader,
+	tokenDataObserver tokendata.TokenDataObserver,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
@@ -277,6 +309,7 @@ func newNode(
 	}
 
 	node1 := NewPlugin(
+		donID,
 		rCfg,
 		cfg,
 		oracleIDToP2pID,
@@ -284,7 +317,7 @@ func newNode(
 		reportCodec,
 		msgHasher,
 		homeChain,
-		tokenDataReader,
+		tokenDataObserver,
 		evm.EstimateProvider{},
 		lggr)
 

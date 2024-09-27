@@ -4,13 +4,16 @@ package consts
 
 // Contract Names
 const (
-	ContractNameOffRamp              = "OffRamp"
-	ContractNameOnRamp               = "OnRamp"
-	ContractNamePriceRegistry        = "PriceRegistry"
-	ContractNameCapabilitiesRegistry = "CapabilitiesRegistry"
-	ContractNameCCIPConfig           = "CCIPConfig"
-	ContractNamePriceAggregator      = "AggregatorV3Interface"
-	ContractNameNonceManager         = "NonceManager"
+	ContractNameOffRamp                = "OffRamp"
+	ContractNameOnRamp                 = "OnRamp"
+	ContractNameFeeQuoter              = "FeeQuoter"
+	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
+	ContractNameCCIPConfig             = "CCIPConfig"
+	ContractNamePriceAggregator        = "AggregatorV3Interface"
+	ContractNameNonceManager           = "NonceManager"
+	ContractNameRMNHome                = "RMNHome"
+	ContractNameRMNRemote              = "RMNRemote"
+	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
 )
 
 // Method Names
@@ -30,8 +33,9 @@ const (
 	MethodNameOnrampGetStaticConfig         = "OnrampGetStaticConfig"
 	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
 
-	// Price registry view/pure methods
-	MethodNamePriceRegistryGetStaticConfig  = "GetStaticConfig"
+	// FeeQuoter view/pure methods
+	MethodNameFeeQuoterGetTokenPrices       = "GetTokenPrices"
+	MethodNameFeeQuoterGetStaticConfig      = "GetStaticConfig"
 	MethodNameGetDestChainConfig            = "GetDestChainConfig"
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
@@ -72,13 +76,18 @@ const (
 	// Used by the home chain reader.
 	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
 	MethodNameGetOCRConfig       = "GetOCRConfig"
+
+	// RMNHome.sol methods
+	// Used by the rmn home reader.
+	MethodNameGetAllConfigs = "GetAllConfigs"
 )
 
 // Event Names
 const (
-	EventNameCCIPSendRequested     = "CCIPSendRequested"
+	EventNameCCIPMessageSent       = "CCIPMessageSent"
 	EventNameExecutionStateChanged = "ExecutionStateChanged"
 	EventNameCommitReportAccepted  = "CommitReportAccepted"
+	EventNameCCTPMessageSent       = "MessageSent"
 )
 
 // Event Attributes
@@ -86,4 +95,10 @@ const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "destChain"
+)
+
+// Mirrors of Internal.sol's OCRPluginType
+const (
+	PluginTypeCommit  uint8 = 0
+	PluginTypeExecute uint8 = 1
 )

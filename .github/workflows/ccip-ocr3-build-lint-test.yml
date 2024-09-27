@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - 'ccip-develop'
+      - 'main'
 
 jobs:
   build-lint-test:

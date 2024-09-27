@@ -5,15 +5,16 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/stretchr/testify/assert"
-
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_validateObserverReadingEligibility(t *testing.T) {
@@ -263,7 +264,7 @@ func Test_computeRanges(t *testing.T) {
 
 func Test_groupByChainSelector(t *testing.T) {
 	type args struct {
-		reports []plugintypes.CommitPluginReportWithMeta
+		reports []plugintypes2.CommitPluginReportWithMeta
 	}
 	tests := []struct {
 		name string
@@ -272,12 +273,12 @@ func Test_groupByChainSelector(t *testing.T) {
 	}{
 		{
 			name: "empty",
-			args: args{reports: []plugintypes.CommitPluginReportWithMeta{}},
+			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{}},
 			want: exectypes.CommitObservations{},
 		},
 		{
 			name: "reports",
-			args: args{reports: []plugintypes.CommitPluginReportWithMeta{{
+			args: args{reports: []plugintypes2.CommitPluginReportWithMeta{{
 				Report: cciptypes.CommitPluginReport{
 					MerkleRoots: []cciptypes.MerkleRootChain{
 						{ChainSel: 1, SeqNumsRange: cciptypes.NewSeqNumRange(10, 20), MerkleRoot: cciptypes.Bytes32{1}},
@@ -534,13 +535,13 @@ func Test_decodeAttributedObservations(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    []types.AttributedObservation
-		want    []decodedAttributedObservation
+		want    []plugincommon.AttributedObservation[exectypes.Observation]
 		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name:    "empty",
 			args:    nil,
-			want:    []decodedAttributedObservation{},
+			want:    []plugincommon.AttributedObservation[exectypes.Observation]{},
 			wantErr: assert.NoError,
 		},
 		{
@@ -555,9 +556,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					}),
 				},
 			},
-			want: []decodedAttributedObservation{
+			want: []plugincommon.AttributedObservation[exectypes.Observation]{
 				{
-					Observer: commontypes.OracleID(1),
+					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
@@ -587,9 +588,9 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					}),
 				},
 			},
-			want: []decodedAttributedObservation{
+			want: []plugincommon.AttributedObservation[exectypes.Observation]{
 				{
-					Observer: commontypes.OracleID(1),
+					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
@@ -597,7 +598,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					},
 				},
 				{
-					Observer: commontypes.OracleID(2),
+					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
 							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
@@ -626,6 +627,540 @@ func Test_decodeAttributedObservations(t *testing.T) {
 				return
 			}
 			assert.Equalf(t, tt.want, got, "decodeAttributedObservations(%v)", tt.args)
+		})
+	}
+}
+
+func Test_getConsensusObservation(t *testing.T) {
+	type args struct {
+		observation []exectypes.Observation
+		F           int
+		fChain      map[cciptypes.ChainSelector]int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    exectypes.Observation
+		wantErr assert.ErrorAssertionFunc
+	}{
+
+		{
+			name: "empty",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 1,
+				},
+				observation: nil,
+			},
+			want:    exectypes.Observation{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "one consensus observation",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 0,
+				},
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+							},
+						},
+					},
+				},
+			},
+			want: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					1: {
+						"0x1": 1,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "one ignored consensus observation",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 1,
+				},
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+							},
+						},
+					},
+				},
+			},
+			want:    exectypes.Observation{},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "3 observers required to reach consensus on 4 sender values",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 1, // f + 1
+				},
+				// Across 3 observers
+				observation: []exectypes.Observation{
+					{
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+								"0x2": 2,
+								"0x3": 3,
+								"0x4": 4,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+								"0x4": 4,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x2": 2,
+								"0x3": 3,
+							},
+						},
+					},
+				},
+			},
+			want: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					1: {
+						"0x1": 1,
+						"0x2": 2,
+						"0x3": 3,
+						"0x4": 4,
+					},
+				},
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "3 observers but different nonce values. No consensus.",
+			args: args{
+				fChain: map[cciptypes.ChainSelector]int{
+					1: 2,
+				},
+				// Across 3 observers
+				observation: []exectypes.Observation{
+					{
+						//
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 9,
+								"0x2": 9,
+								"0x3": 9,
+								"0x4": 9,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x1": 1,
+								"0x4": 4,
+							},
+						},
+					}, {
+						Nonces: exectypes.NonceObservations{
+							1: {
+								"0x2": 2,
+								"0x3": 3,
+							},
+						},
+					},
+				},
+			},
+			want:    exectypes.Observation{},
+			wantErr: assert.NoError,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Convert observations to the expected decoded type.
+			var ao []plugincommon.AttributedObservation[exectypes.Observation]
+			for i, observation := range tt.args.observation {
+				ao = append(ao, plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: observation,
+					OracleID:    commontypes.OracleID(i),
+				})
+			}
+
+			lggr := logger.Test(t)
+			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain)
+			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "getConsensusObservation(...)")
+		})
+	}
+}
+
+func Test_mergeTokenDataObservation(t *testing.T) {
+	chainSelector := cciptypes.ChainSelector(1)
+
+	type expected struct {
+		ready bool
+		data  [][]byte
+	}
+
+	tt := []struct {
+		name        string
+		F           int
+		observation []map[cciptypes.SeqNum]exectypes.MessageTokenData
+		expected    map[cciptypes.SeqNum]expected
+	}{
+		{
+			name: "messages without token data",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(),
+					2: exectypes.NewMessageTokenData(),
+					3: exectypes.NewMessageTokenData(),
+				},
+				{
+					1: exectypes.NewMessageTokenData(),
+					2: exectypes.NewMessageTokenData(),
+					3: exectypes.NewMessageTokenData(),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{}},
+				2: {ready: true, data: [][]byte{}},
+				3: {ready: true, data: [][]byte{}},
+			},
+		},
+		{
+			name: "messages with empty token data",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{{}}},
+			},
+		},
+		{
+			name: "plugins seeing completely different tokens",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
+					),
+					2: exectypes.NewMessageTokenData(),
+					3: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{31}),
+					),
+					5: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{51}),
+						exectypes.NewSuccessTokenData([]byte{52}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewNoopTokenData(),
+					),
+					3: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{31}),
+						exectypes.NewSuccessTokenData([]byte{32}),
+						exectypes.NewSuccessTokenData([]byte{33}),
+					),
+					4: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{41}),
+						exectypes.NewSuccessTokenData([]byte{42}),
+					),
+					5: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{51}),
+						exectypes.NewSuccessTokenData([]byte{52}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: false},
+				2: {ready: false},
+				3: {ready: false},
+				4: {ready: false},
+				5: {ready: true, data: [][]byte{{51}, {52}}},
+			},
+		},
+		{
+			name: "some tokens are not observed by one of the nodes",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{13}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewNoopTokenData(),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{11}),
+						exectypes.NewSuccessTokenData([]byte{12}),
+						exectypes.NewSuccessTokenData([]byte{13}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{{11}, {}, {13}}},
+			},
+		},
+		{
+			name: "message not ready - only one token has enough observations",
+			F:    2,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: false},
+			},
+		},
+		{
+			name: "message not ready - only some of the tokens have enough observations",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error1")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewErrorTokenData(fmt.Errorf("error2")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: false},
+			},
+		},
+		{
+			name: "message ready - all tokens have enough observations",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewNoopTokenData(),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+						exectypes.NewSuccessTokenData([]byte{2}),
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{{1}, {2}, {3}}},
+			},
+		},
+		{
+			name: "all messages have enough observations",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{90}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: true, data: [][]byte{{1}}},
+				2: {ready: true, data: [][]byte{{2}}},
+			},
+		},
+		{
+			name: "consensus is not reached for some of the messages",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{1}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{3}),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{4}),
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte{2}),
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: false},
+				2: {ready: true, data: [][]byte{{2}}},
+			},
+		},
+		{
+			name: "message ready - only ready and data are used for reaching consensus",
+			F:    1,
+			observation: []map[cciptypes.SeqNum]exectypes.MessageTokenData{
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{1}},
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: true},
+					),
+					3: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{3}, Supported: false},
+					),
+				},
+				{
+					1: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{2}},
+					),
+					2: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{2}, Supported: false},
+					),
+					3: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: true, Data: []byte{3}, Supported: false, Error: fmt.Errorf("error")},
+					),
+				},
+			},
+			expected: map[cciptypes.SeqNum]expected{
+				1: {ready: false},
+				2: {ready: true, data: [][]byte{{2}}},
+				3: {ready: true, data: [][]byte{{3}}},
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			fChain := make(map[cciptypes.ChainSelector]int)
+			fChain[chainSelector] = tc.F
+
+			var ao []plugincommon.AttributedObservation[exectypes.Observation]
+			for i, observation := range tc.observation {
+				formatted := make(exectypes.TokenDataObservations)
+				formatted[chainSelector] = observation
+
+				ao = append(ao, plugincommon.AttributedObservation[exectypes.Observation]{
+					Observation: exectypes.Observation{
+						TokenData: formatted,
+					},
+					OracleID: commontypes.OracleID(i),
+				})
+			}
+
+			obs, err := mergeTokenObservations(ao, fChain)
+			require.NoError(t, err)
+
+			for seqNum, exp := range tc.expected {
+				mtd, ok := obs[chainSelector][seqNum]
+				assert.True(t, ok)
+
+				assert.Equal(t, exp.ready, mtd.IsReady())
+				// No need to compare bytes when not ready
+				if exp.ready {
+					assert.Equal(t, exp.data, obs[chainSelector][seqNum].ToByteSlice())
+				}
+			}
 		})
 	}
 }

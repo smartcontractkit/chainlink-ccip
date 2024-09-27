@@ -6,16 +6,18 @@ import (
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/crypto/sha3"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/validation"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // validateObserverReadingEligibility checks if the observer is eligible to observe the messages it observed.
@@ -23,6 +25,8 @@ func validateObserverReadingEligibility(
 	supportedChains mapset.Set[cciptypes.ChainSelector],
 	observedMsgs exectypes.MessageObservations,
 ) error {
+	// TODO: validate that CommitReports and Nonces are only observed if the destChain is supported.
+
 	for chainSel, msgs := range observedMsgs {
 		if len(msgs) == 0 {
 			continue
@@ -109,7 +113,7 @@ func computeRanges(reports []exectypes.CommitData) ([]cciptypes.SeqNumRange, err
 }
 
 func groupByChainSelector(
-	reports []plugintypes.CommitPluginReportWithMeta) exectypes.CommitObservations {
+	reports []plugintypes2.CommitPluginReportWithMeta) exectypes.CommitObservations {
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for _, report := range reports {
 		for _, singleReport := range report.Report.MerkleRoots {
@@ -128,6 +132,7 @@ func groupByChainSelector(
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
+// nolint:gocyclo // todo
 func filterOutExecutedMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ([]exectypes.CommitData, error) {
@@ -201,36 +206,30 @@ func filterOutExecutedMessages(
 	return filtered, nil
 }
 
-type decodedAttributedObservation struct {
-	Observation exectypes.Observation
-	Observer    commontypes.OracleID
-}
-
-func decodeAttributedObservations(aos []types.AttributedObservation) ([]decodedAttributedObservation, error) {
-	decoded := make([]decodedAttributedObservation, len(aos))
+func decodeAttributedObservations(
+	aos []types.AttributedObservation,
+) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
+	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], len(aos))
 	for i, ao := range aos {
 		observation, err := exectypes.DecodeObservation(ao.Observation)
 		if err != nil {
 			return nil, err
 		}
-		decoded[i] = decodedAttributedObservation{
+		decoded[i] = plugincommon.AttributedObservation[exectypes.Observation]{
 			Observation: observation,
-			Observer:    ao.Observer,
+			OracleID:    ao.Observer,
 		}
 	}
 	return decoded, nil
 }
 
 func mergeMessageObservations(
-	aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int,
+	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.MessageObservations, error) {
 	// Create a validator for each chain
-	validators := make(map[cciptypes.ChainSelector]validation.MinObservationFilter[cciptypes.Message])
-	idFunc := func(data cciptypes.Message) [32]byte {
-		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
-	}
+	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[cciptypes.Message])
 	for selector, f := range fChain {
-		validators[selector] = validation.NewMinObservationValidator[cciptypes.Message](f+1, idFunc)
+		validators[selector] = consensus.NewMinObservation[cciptypes.Message](consensus.FPlus1(f), nil)
 	}
 
 	// Add messages to the validator for each chain selector.
@@ -249,13 +248,18 @@ func mergeMessageObservations(
 
 	results := make(exectypes.MessageObservations)
 	for selector, validator := range validators {
-		msgs := validator.GetValid()
-		if _, ok := results[selector]; !ok {
-			results[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		if msgs := validator.GetValid(); len(msgs) > 0 {
+			if _, ok := results[selector]; !ok {
+				results[selector] = make(map[cciptypes.SeqNum]cciptypes.Message)
+			}
+			for _, msg := range msgs {
+				results[selector][msg.Header.SequenceNumber] = msg
+			}
 		}
-		for _, msg := range msgs {
-			results[selector][msg.Header.SequenceNumber] = msg
-		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
 	}
 
 	return results, nil
@@ -264,17 +268,13 @@ func mergeMessageObservations(
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
-	aos []decodedAttributedObservation, fChain map[cciptypes.ChainSelector]int,
+	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.CommitObservations, error) {
 	// Create a validator for each chain
-	validators :=
-		make(map[cciptypes.ChainSelector]validation.MinObservationFilter[exectypes.CommitData])
-	idFunc := func(data exectypes.CommitData) [32]byte {
-		return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
-	}
+	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
 		validators[selector] =
-			validation.NewMinObservationValidator[exectypes.CommitData](f+1, idFunc)
+			consensus.NewMinObservation[exectypes.CommitData](consensus.FPlus1(f), nil)
 	}
 
 	// Add reports to the validator for each chain selector.
@@ -293,8 +293,199 @@ func mergeCommitObservations(
 
 	results := make(exectypes.CommitObservations)
 	for selector, validator := range validators {
-		results[selector] = validator.GetValid()
+		if values := validator.GetValid(); len(values) > 0 {
+			results[selector] = validator.GetValid()
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
 	}
 
 	return results, nil
+}
+
+func mergeTokenObservations(
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) (exectypes.TokenDataObservations, error) {
+	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
+	//nolint:lll
+	validators := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+	results := make(exectypes.TokenDataObservations)
+
+	for _, ao := range aos {
+		for selector, seqMap := range ao.Observation.TokenData {
+			f, ok := fChain[selector]
+			if !ok {
+				return exectypes.TokenDataObservations{}, fmt.Errorf("no F defined for chain %d", selector)
+			}
+
+			if _, ok1 := results[selector]; !ok1 {
+				results[selector] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+			}
+
+			if _, ok1 := validators[selector]; !ok1 {
+				validators[selector] = make(map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+			}
+
+			initResultsAndValidators(selector, f, seqMap, results, validators)
+		}
+	}
+
+	for selector, seqNrs := range validators {
+		for tokenID, validator := range seqNrs {
+			mtd := results[selector][tokenID.SeqNr]
+			if values := validator.GetValid(); len(values) == 1 {
+				mtd = mtd.Append(tokenID.Index, values[0])
+			} else {
+				// Can't reach consensus for this particular token, marking it's as not ready
+				mtd = mtd.Append(tokenID.Index, exectypes.NotReadyToken())
+			}
+			results[selector][tokenID.SeqNr] = mtd
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	return results, nil
+}
+
+func initResultsAndValidators(
+	selector cciptypes.ChainSelector,
+	f int,
+	seqMap map[cciptypes.SeqNum]exectypes.MessageTokenData,
+	results exectypes.TokenDataObservations,
+	validators map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
+) {
+	for seqNr, msgTokenData := range seqMap {
+		if _, ok := results[selector][seqNr]; !ok {
+			results[selector][seqNr] = exectypes.NewMessageTokenData()
+		}
+
+		for tokenIndex, tokenData := range msgTokenData.TokenData {
+			messageTokenID := exectypes.NewMessageTokenID(seqNr, tokenIndex)
+			if _, ok := validators[selector][messageTokenID]; !ok {
+				validators[selector][messageTokenID] =
+					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
+			}
+			validators[selector][messageTokenID].Add(tokenData)
+		}
+	}
+}
+
+// mergeNonceObservations merges all observations which reach the fChain threshold into a single result.
+// Any observations, or subsets of observations, which do not reach the threshold are ignored.
+func mergeNonceObservations(
+	daos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChainDest int,
+) exectypes.NonceObservations {
+	// Nonces store context in a map key, so a different container type is needed for the observation filter.
+	type NonceTriplet struct {
+		source cciptypes.ChainSelector
+		sender []byte
+		nonce  uint64
+	}
+
+	// Create one validator because nonces are only observed from the destination chain.
+	validator := consensus.NewMinObservation[NonceTriplet](consensus.FPlus1(fChainDest), nil)
+
+	// Add reports to the validator for each chain selector.
+	for _, ao := range daos {
+		if len(ao.Observation.Nonces) == 0 {
+			continue
+		}
+
+		for sourceSelector, nonces := range ao.Observation.Nonces {
+			for sender, nonce := range nonces {
+				validator.Add(NonceTriplet{
+					source: sourceSelector,
+					sender: []byte(sender),
+					nonce:  nonce,
+				})
+			}
+		}
+	}
+
+	// Convert back to the observation format.
+	results := make(exectypes.NonceObservations)
+	nonces := validator.GetValid()
+	for _, nonce := range nonces {
+		if _, ok := results[nonce.source]; !ok {
+			results[nonce.source] = make(map[string]uint64)
+		}
+		results[nonce.source][string(nonce.sender)] = nonce.nonce
+	}
+
+	if len(results) == 0 {
+		return nil
+	}
+
+	return results
+}
+
+// getConsensusObservation merges all attributed observations into a single observation based on which values have
+// consensus among the observers.
+func getConsensusObservation(
+	lggr logger.Logger,
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	oracleID commontypes.OracleID,
+	destChainSelector cciptypes.ChainSelector,
+	F int,
+	fChain map[cciptypes.ChainSelector]int,
+) (exectypes.Observation, error) {
+	if len(aos) < F {
+		return exectypes.Observation{}, fmt.Errorf("below F threshold")
+	}
+
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", oracleID),
+		"oracle", oracleID,
+		"aos", aos)
+
+	mergedCommitObservations, err := mergeCommitObservations(aos, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge commit report observations: %w", err)
+	}
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged commit observations", oracleID),
+		"oracle", oracleID,
+		"mergedCommitObservations", mergedCommitObservations)
+
+	mergedMessageObservations, err := mergeMessageObservations(aos, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge message observations: %w", err)
+	}
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", oracleID),
+		"oracle", oracleID,
+		"mergedMessageObservations", mergedMessageObservations)
+
+	mergedTokenObservations, err := mergeTokenObservations(aos, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge token data observations: %w", err)
+	}
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
+		"oracle", oracleID,
+		"mergedTokenObservations", mergedTokenObservations)
+
+	mergedNonceObservations :=
+		mergeNonceObservations(aos, fChain[destChainSelector])
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged nonce observations", oracleID),
+		"oracle", oracleID,
+		"mergedNonceObservations", mergedNonceObservations)
+
+	observation := exectypes.NewObservation(
+		mergedCommitObservations,
+		mergedMessageObservations,
+		mergedTokenObservations,
+		mergedNonceObservations,
+		dt.Observation{},
+	)
+
+	return observation, nil
 }

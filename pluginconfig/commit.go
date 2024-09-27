@@ -9,11 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+// EvmDefaultMaxMerkleTreeSize is the default number of max new messages to put in a merkle tree.
+// We use this default value when the config is not set for a specific chain.
+const EvmDefaultMaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 
 type CommitPluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
@@ -25,14 +30,20 @@ type CommitPluginConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint
 
-	// SyncTimeout is the timeout for syncing the commit plugin reader.
-	SyncTimeout time.Duration `json:"syncTimeout"`
-
-	// SyncFrequency is the frequency at which the commit plugin reader should sync.
-	SyncFrequency time.Duration `json:"syncFrequency"`
-
 	// OffchainConfig is the offchain config set for the commit DON.
 	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
+
+	// RMNEnabled is a flag to enable/disable RMN signature verification.
+	RMNEnabled bool `json:"rmnEnabled"`
+
+	// RMNSignaturesTimeout is the timeout for RMN signature verification.
+	// Typically set to `MaxQueryDuration - e`, where e some small duration.
+	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+
+	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
+	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
+	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
+	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
 }
 
 func (c CommitPluginConfig) Validate() error {
@@ -44,23 +55,26 @@ func (c CommitPluginConfig) Validate() error {
 		return fmt.Errorf("newMsgScanBatchSize not set")
 	}
 
+	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
+		return fmt.Errorf("rmnSignaturesTimeout not set")
+	}
+
 	return c.OffchainConfig.Validate()
 }
 
-// ArbitrumPriceSource is the source of the TOKEN/USD price data of a particular token
-// on Arbitrum.
-// The commit plugin will use this to fetch prices for a particular token.
-// See the PriceSources mapping in the CommitOffchainConfig struct.
-type ArbitrumPriceSource struct {
-	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on arbitrum.
+type TokenInfo struct {
+	// AggregatorAddress is the address of the price feed TOKEN/USD aggregator on the feed chain.
 	AggregatorAddress string `json:"aggregatorAddress"`
 
 	// DeviationPPB is the deviation in parts per billion that the price feed is allowed to deviate
 	// from the last written price on-chain before we write a new price.
 	DeviationPPB cciptypes.BigInt `json:"deviationPPB"`
+
+	// Decimals is the number of decimals for the token (NOT the feed).
+	Decimals uint8 `json:"decimals"`
 }
 
-func (a ArbitrumPriceSource) Validate() error {
+func (a TokenInfo) Validate() error {
 	if a.AggregatorAddress == "" {
 		return errors.New("aggregatorAddress not set")
 	}
@@ -76,6 +90,10 @@ func (a ArbitrumPriceSource) Validate() error {
 
 	if a.DeviationPPB.Int.Cmp(big.NewInt(0)) <= 0 {
 		return errors.New("deviationPPB not set or negative, must be positive")
+	}
+
+	if a.Decimals == 0 {
+		return fmt.Errorf("tokenDecimals can't be zero")
 	}
 
 	return nil
@@ -95,23 +113,15 @@ type CommitOffchainConfig struct {
 	// If set to zero, no prices will be written (i.e keystone feeds would be active).
 	TokenPriceBatchWriteFrequency commonconfig.Duration `json:"tokenPriceBatchWriteFrequency"`
 
-	// PriceSources is a map of Arbitrum price sources for each token.
+	// TokenInfo is a map of Arbitrum price sources for each token.
 	// Note that the token address is that on the remote chain.
-	PriceSources map[types.Account]ArbitrumPriceSource `json:"priceSources"`
+	TokenInfo map[types.Account]TokenInfo `json:"tokenInfo"`
 
-	// TokenDecimals is a map of token decimals for each token.
-	// As **not necessarily** each node supports both the
-	// 1. Token price feed chain (where we get the token price in USD)
-	// 2. Destination chain (where we can get the token decimals from PriceRegistry).
-	// So to be able to calculate the effective price we need both token decimals and feed decimals.
-	// This is why we need to store the token decimals in the config.
-	TokenDecimals map[types.Account]uint8 `json:"decimals"`
-
-	// TokenPriceChainSelector is the chain selector for the chain on which
+	// PriceFeedChainSelector is the chain selector for the chain on which
 	// the token prices are read from.
 	// This will typically be an arbitrum testnet/mainnet chain depending on
 	// the deployment.
-	TokenPriceChainSelector uint64 `json:"tokenPriceChainSelector"`
+	PriceFeedChainSelector cciptypes.ChainSelector `json:"tokenPriceChainSelector"`
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -123,26 +133,17 @@ func (c CommitOffchainConfig) Validate() error {
 	// are enabled for the chain.
 	// If price sources are provided the batch write frequency and token price chain selector
 	// config fields MUST be provided.
-	if len(c.PriceSources) > 0 &&
-		(c.TokenPriceBatchWriteFrequency.Duration() == 0 || c.TokenPriceChainSelector == 0) {
+	if len(c.TokenInfo) > 0 &&
+		(c.TokenPriceBatchWriteFrequency.Duration() == 0 || c.PriceFeedChainSelector == 0) {
 		return fmt.Errorf("tokenPriceBatchWriteFrequency (%s) or tokenPriceChainSelector (%d) not set",
-			c.TokenPriceBatchWriteFrequency, c.TokenPriceChainSelector)
+			c.TokenPriceBatchWriteFrequency, c.PriceFeedChainSelector)
 	}
 
-	for token, arbSource := range c.PriceSources {
-		if err := arbSource.Validate(); err != nil {
-			return fmt.Errorf("invalid arbitrum price source for token %s: %w", token, err)
-		}
-
-		if _, exists := c.TokenDecimals[token]; !exists {
-			return fmt.Errorf("missing TokenDecimals for token: %s", token)
-		}
-		if c.TokenDecimals[token] == 0 {
-			return fmt.Errorf("invalid TokenDecimals for token: %s", token)
+	for token, tokenInfo := range c.TokenInfo {
+		if err := tokenInfo.Validate(); err != nil {
+			return fmt.Errorf("invalid token info for token %s: %w", token, err)
 		}
 	}
-
-	// if len(c.PriceSources) == 0 the other fields are ignored.
 
 	return nil
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 )
 
 // CommitObservations contain the commit plugin report data organized by the source chain selector.
@@ -17,6 +19,18 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 // Nonces are organized by source chain selector and the string encoded sender address. The address
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
 type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
+
+// TokenDataObservations contain token data for messages organized by source chain selector and sequence number.
+// There could be multiple tokens per a single message, so MessageTokenData is a slice of TokenData.
+// TokenDataObservations are populated during the Observation phase and depend on previously fetched
+// MessageObservations details and the `tokenDataObservers` configured in the ExecuteOffchainConfig.
+// Content of the MessageTokenData is determined by the tokendata.TokenDataObserver implementations.
+//   - if Message doesn't have any tokens, TokenData slice will be empty.
+//   - if Message has tokens, but these tokens don't require any special treatment,
+//     TokenData slice will contain empty TokenData objects.
+//   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
+//     specific tokendata.TokenDataObserver will be used to populate the TokenData slice.
+type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
 
 // Observation is the observation of the ExecutePlugin.
 // TODO: revisit observation types. The maps used here are more space efficient and easier to work
@@ -32,18 +46,32 @@ type Observation struct {
 	// execute report.
 	Messages MessageObservations `json:"messages"`
 
+	// TokenData are determined during the second phase of execute.
+	// It contains the token data for the messages identified in the same stage as Messages
+	TokenData TokenDataObservations `json:"tokenDataObservations"`
+
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
+
+	// Contracts are part of the initial discovery phase which runs to initialize the CCIP Reader.
+	Contracts dt.Observation `json:"contracts"`
 }
 
-// NewObservation constructs a Observation object.
+// NewObservation constructs an Observation object.
 func NewObservation(
-	commitReports CommitObservations, messages MessageObservations, nonces NonceObservations) Observation {
+	commitReports CommitObservations,
+	messages MessageObservations,
+	tokenData TokenDataObservations,
+	nonces NonceObservations,
+	contracts dt.Observation,
+) Observation {
 	return Observation{
 		CommitReports: commitReports,
 		Messages:      messages,
+		TokenData:     tokenData,
 		Nonces:        nonces,
+		Contracts:     contracts,
 	}
 }
 

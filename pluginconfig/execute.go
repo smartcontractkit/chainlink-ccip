@@ -3,7 +3,6 @@ package pluginconfig
 import (
 	"encoding/json"
 	"errors"
-	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -15,12 +14,6 @@ import (
 type ExecutePluginConfig struct {
 	// DestChain is the ccip destination chain configured for the execute DON.
 	DestChain cciptypes.ChainSelector `json:"destChain"`
-
-	// SyncTimeout is the timeout for syncing the exec plugin ccip reader.
-	SyncTimeout time.Duration `json:"syncTimeout"`
-
-	// SyncFrequency is the frequency at which the exec plugin ccip reader should sync.
-	SyncFrequency time.Duration `json:"syncFrequency"`
 
 	// OffchainConfig is the offchain config set for the exec DON.
 	OffchainConfig ExecuteOffchainConfig `json:"offchainConfig"`
@@ -52,6 +45,9 @@ type ExecuteOffchainConfig struct {
 
 	// BatchingStrategyID is the strategy to use for batching messages.
 	BatchingStrategyID uint32 `json:"batchingStrategyID"`
+
+	// TokenDataObservers registers different strategies for processing token data.
+	TokenDataObservers []TokenDataObserverConfig `json:"tokenDataObservers"`
 }
 
 func (e ExecuteOffchainConfig) Validate() error {
@@ -78,6 +74,18 @@ func (e ExecuteOffchainConfig) Validate() error {
 		return errors.New("MessageVisibilityInterval not set")
 	}
 
+	set := make(map[string]struct{})
+	for _, ob := range e.TokenDataObservers {
+		if err := ob.Validate(); err != nil {
+			return err
+		}
+
+		key := ob.Type + ob.Version
+		if _, exists := set[key]; exists {
+			return errors.New("duplicate token data observer type and version")
+		}
+		set[key] = struct{}{}
+	}
 	return nil
 }
 
@@ -92,5 +100,12 @@ func DecodeExecuteOffchainConfig(encodedExecuteOffchainConfig []byte) (ExecuteOf
 	if err := json.Unmarshal(encodedExecuteOffchainConfig, &e); err != nil {
 		return e, err
 	}
+
+	for _, ob := range e.TokenDataObservers {
+		if err := ob.WellFormed(); err != nil {
+			return e, err
+		}
+	}
+
 	return e, nil
 }

@@ -7,8 +7,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type MessagesWithMetadata struct {
@@ -19,13 +19,17 @@ type MessagesWithMetadata struct {
 
 type InMemoryCCIPReader struct {
 	// Reports that may be returned.
-	Reports []plugintypes.CommitPluginReportWithMeta
+	Reports []plugintypes2.CommitPluginReportWithMeta
 
 	// Messages that may be returned.
 	Messages map[cciptypes.ChainSelector][]MessagesWithMetadata
 
 	// Dest is used implicitly in some functions
 	Dest cciptypes.ChainSelector
+}
+
+func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
+	panic("not implemented")
 }
 
 // GetExpectedNextSequenceNumber implements reader.CCIP.
@@ -37,8 +41,8 @@ func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
-	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+	results := slicelib.Filter(r.Reports, func(report plugintypes2.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
 	if len(results) > limit {
@@ -109,7 +113,7 @@ func (r InMemoryCCIPReader) Nonces(
 	source, dest cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
-	panic("implement me")
+	return nil, nil
 }
 
 func (r InMemoryCCIPReader) GasPrices(
@@ -118,15 +122,21 @@ func (r InMemoryCCIPReader) GasPrices(
 	panic("implement me")
 }
 
+func (r InMemoryCCIPReader) DiscoverContracts(
+	ctx context.Context, destChain cciptypes.ChainSelector,
+) (reader.ContractAddresses, error) {
+	return nil, nil
+}
+
 func (r InMemoryCCIPReader) Close(ctx context.Context) error {
 	return nil
 }
 
 // Sync can be used to perform frequent syncing operations inside the reader implementation.
 // Returns a bool indicating whether something was updated.
-func (r InMemoryCCIPReader) Sync(ctx context.Context) (bool, error) {
-	return false, nil
+func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) error {
+	return nil
 }
 
 // Interface compatibility check.
-var _ reader.CCIP = InMemoryCCIPReader{}
+var _ reader.CCIPReader = InMemoryCCIPReader{}

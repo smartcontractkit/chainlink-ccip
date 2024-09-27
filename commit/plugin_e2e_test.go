@@ -6,25 +6,35 @@ import (
 	"fmt"
 	"sort"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 const (
@@ -37,6 +47,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
+	donID := uint32(1)
 	oracleIDs := []commontypes.OracleID{1, 2, 3}
 	peerIDs := []libocrtypes.PeerID{{1}, {2}, {3}}
 	require.Equal(t, len(oracleIDs), len(peerIDs))
@@ -48,9 +59,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 	peerIDsMap := mapset.NewSet(peerIDs...)
 	homeChainConfig := map[ccipocr3.ChainSelector]reader.ChainConfig{
-		destChain:    {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{FinalityDepth: 1}},
-		sourceChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{FinalityDepth: 1}},
-		sourceChain2: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{FinalityDepth: 1}},
+		destChain:    {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		sourceChain1: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
+		sourceChain2: {FChain: 1, SupportedNodes: peerIDsMap, Config: chainconfig.ChainConfig{}},
 	}
 
 	offRampNextSeqNum := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
@@ -67,8 +78,6 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		DestChain:                          destChain,
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
-		SyncTimeout:                        10 * time.Second,
-		SyncFrequency:                      time.Hour,
 	}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
@@ -76,36 +85,39 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
 
 	outcomeIntervalsSelected := Outcome{
-		OutcomeType: ReportIntervalsSelected,
-		RangesSelectedForReport: []plugintypes.ChainRange{
-			{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
-			{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
-		},
-		OffRampNextSeqNums: []plugintypes.SeqNumChain{
-			{ChainSel: sourceChain1, SeqNum: 10},
-			{ChainSel: sourceChain2, SeqNum: 20},
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType: merkleroot.ReportIntervalsSelected,
+			RangesSelectedForReport: []plugintypes.ChainRange{
+				{ChainSel: sourceChain1, SeqNumRange: ccipocr3.SeqNumRange{10, 10}},
+				{ChainSel: sourceChain2, SeqNumRange: ccipocr3.SeqNumRange{20, 20}},
+			},
+			OffRampNextSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: sourceChain1, SeqNum: 10},
+				{ChainSel: sourceChain2, SeqNum: 20},
+			},
 		},
 	}
 
 	outcomeReportGenerated := Outcome{
-		OutcomeType: ReportGenerated,
-		RootsToReport: []ccipocr3.MerkleRootChain{
-			{
-				ChainSel:     sourceChain1,
-				SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
-				MerkleRoot:   merkleRoot1,
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType: merkleroot.ReportGenerated,
+			RootsToReport: []ccipocr3.MerkleRootChain{
+				{
+					ChainSel:     sourceChain1,
+					SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
+					MerkleRoot:   merkleRoot1,
+				},
 			},
+			OffRampNextSeqNums: []plugintypes.SeqNumChain{
+				{ChainSel: sourceChain1, SeqNum: 10},
+				{ChainSel: sourceChain2, SeqNum: 20},
+			},
+			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
 		},
-		OffRampNextSeqNums: []plugintypes.SeqNumChain{
-			{ChainSel: sourceChain1, SeqNum: 10},
-			{ChainSel: sourceChain2, SeqNum: 20},
-		},
-		TokenPrices: make([]ccipocr3.TokenPrice, 0),
-		GasPrices:   make([]ccipocr3.GasPriceChain, 0),
 	}
 
 	outcomeReportGeneratedOneInflightCheck := outcomeReportGenerated
-	outcomeReportGeneratedOneInflightCheck.ReportTransmissionCheckAttempts = 1
+	outcomeReportGeneratedOneInflightCheck.MerkleRootOutcome.ReportTransmissionCheckAttempts = 1
 
 	testCases := []struct {
 		name                  string
@@ -115,11 +127,19 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
 		offRampNextSeqNumDefaultOverrideValues []ccipocr3.SeqNum
+
+		enableDiscovery bool
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
 			prevOutcome: Outcome{},
 			expOutcome:  outcomeIntervalsSelected,
+		},
+		{
+			name:            "discovery enabled, should discover contracts",
+			prevOutcome:     Outcome{},
+			expOutcome:      Outcome{},
+			enableDiscovery: true,
 		},
 		{
 			name:        "selected ranges for report in previous outcome",
@@ -134,10 +154,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 							MerkleRoot:   merkleRoot1,
 						},
 					},
-					PriceUpdates: ccipocr3.PriceUpdates{
-						TokenPriceUpdates: []ccipocr3.TokenPrice{},
-						GasPriceUpdates:   []ccipocr3.GasPriceChain{},
-					},
+					PriceUpdates:  ccipocr3.PriceUpdates{},
+					RMNSignatures: []ccipocr3.RMNECDSASignature{},
 				},
 			},
 		},
@@ -145,11 +163,13 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			name:        "report generated in previous outcome, still inflight",
 			prevOutcome: outcomeReportGenerated,
 			expOutcome: Outcome{
-				OutcomeType:                     ReportInFlight,
-				ReportTransmissionCheckAttempts: 1,
-				OffRampNextSeqNums: []plugintypes.SeqNumChain{
-					{ChainSel: sourceChain1, SeqNum: 10},
-					{ChainSel: sourceChain2, SeqNum: 20},
+				MerkleRootOutcome: merkleroot.Outcome{
+					OutcomeType:                     merkleroot.ReportInFlight,
+					ReportTransmissionCheckAttempts: 1,
+					OffRampNextSeqNums: []plugintypes.SeqNumChain{
+						{ChainSel: sourceChain1, SeqNum: 10},
+						{ChainSel: sourceChain2, SeqNum: 20},
+					},
 				},
 			},
 		},
@@ -157,8 +177,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			name:        "report generated in previous outcome, still inflight, reached all inflight check attempts",
 			prevOutcome: outcomeReportGeneratedOneInflightCheck,
 			expOutcome: Outcome{
-				OutcomeType:                     ReportTransmissionFailed,
-				ReportTransmissionCheckAttempts: 0,
+				MerkleRootOutcome: merkleroot.Outcome{
+					OutcomeType: merkleroot.ReportTransmissionFailed,
+				},
 			},
 		},
 		{
@@ -167,8 +188,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
 			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
 			expOutcome: Outcome{
-				OutcomeType:                     ReportTransmitted,
-				ReportTransmissionCheckAttempts: 0,
+				MerkleRootOutcome: merkleroot.Outcome{
+					OutcomeType: merkleroot.ReportTransmitted,
+				},
 			},
 		},
 	}
@@ -177,7 +199,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				n := setupNode(ctx, t, lggr, oracleIDs[i], reportingCfg, oracleIDToPeerID,
+				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
 					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
 				nodes[i] = n.node
 				if i == 0 {
@@ -191,6 +213,19 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 						NextSeqNum(ctx, tc.offRampNextSeqNumDefaultOverrideKeys).
 						Return(tc.offRampNextSeqNumDefaultOverrideValues, nil).
 						Maybe()
+				}
+				n.priceReader.EXPECT().
+					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
+					Return(
+						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
+					).
+					Maybe()
+
+				if !tc.enableDiscovery {
+					n.node.discoveryProcessor = nil
+				} else {
+					n.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+					n.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 				}
 			}
 
@@ -216,8 +251,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 type nodeSetup struct {
 	node        *Plugin
-	ccipReader  *reader_mock.MockCCIP
-	priceReader *reader_mock.MockTokenPrices
+	ccipReader  *readerpkg_mock.MockCCIPReader
+	priceReader *reader_mock.MockPriceReader
 	reportCodec *mocks.CommitPluginJSONReportCodec
 	msgHasher   *mocks.MessageHasher
 }
@@ -226,6 +261,7 @@ func setupNode(
 	ctx context.Context,
 	t *testing.T,
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -234,8 +270,8 @@ func setupNode(
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 ) nodeSetup {
-	ccipReader := reader_mock.NewMockCCIP(t)
-	tokenPricesReader := reader_mock.NewMockTokenPrices(t)
+	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+	tokenPricesReader := reader_mock.NewMockPriceReader(t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)
@@ -254,6 +290,9 @@ func setupNode(
 	}
 
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
+	homeChainReader.EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeCommit).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil).Maybe()
 
 	for peerID, supportedChains := range supportedChainsForPeer {
 		homeChainReader.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil).Maybe()
@@ -310,8 +349,14 @@ func setupNode(
 	}
 	ccipReader.EXPECT().NextSeqNum(ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
+	for _, ch := range sourceChains {
+		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
+			ctx, ch, destChain).Return(offRampNextSeqNum[ch]+1, nil).Maybe()
+	}
+
 	p := NewPlugin(
 		ctx,
+		donID,
 		nodeID,
 		oracleIDToP2pID,
 		pluginCfg,
@@ -322,6 +367,7 @@ func setupNode(
 		lggr,
 		homeChainReader,
 		reportingCfg,
+		rmn.Config{},
 	)
 
 	return nodeSetup{

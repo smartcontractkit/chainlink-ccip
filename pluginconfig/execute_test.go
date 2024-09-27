@@ -3,8 +3,9 @@ package pluginconfig
 import (
 	"testing"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/stretchr/testify/require"
+
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 )
 
 func TestExecuteOffchainConfig_Validate(t *testing.T) {
@@ -119,6 +120,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 		RootSnoozeTime            commonconfig.Duration
 		MessageVisibilityInterval commonconfig.Duration
 		BatchingStrategyID        uint32
+		TokenDataObserver         []TokenDataObserverConfig
 	}
 	tests := []struct {
 		name   string
@@ -167,6 +169,7 @@ func TestExecuteOffchainConfig_EncodeDecode(t *testing.T) {
 				RootSnoozeTime:            tt.fields.RootSnoozeTime,
 				MessageVisibilityInterval: tt.fields.MessageVisibilityInterval,
 				BatchingStrategyID:        tt.fields.BatchingStrategyID,
+				TokenDataObservers:        tt.fields.TokenDataObserver,
 			}
 			encoded, err := EncodeExecuteOffchainConfig(e)
 			require.NoError(t, err)
