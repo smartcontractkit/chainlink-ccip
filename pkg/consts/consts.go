@@ -80,6 +80,10 @@ const (
 	// RMNHome.sol methods
 	// Used by the rmn home reader.
 	MethodNameGetAllConfigs = "GetAllConfigs"
+
+	// RMNRemote.sol methods
+	// Used by the rmn remote reader.
+	MethodNameGetAllChainConfigsRemote = "GetAllChainConfigs"
 )
 
 // Event Names
