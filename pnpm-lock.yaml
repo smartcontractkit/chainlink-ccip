@@ -17,12 +17,6 @@ importers:
 
   cli: {}
 
-  dashboard-lib: {}
-
-  deployments/ccip: {}
-
-  deployments/core: {}
-
 packages:
 
   '@babel/runtime@7.25.6':

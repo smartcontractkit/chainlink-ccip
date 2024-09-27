@@ -47,9 +47,6 @@ fi
 if [[ $product == "ccip" ]]; then
 	required_vars_ccip=(
 		"CHAINLINK_HELM_REGISTRY_URI"
-		"DEVSPACE_CCIP_SCRIPTS_IMAGE"
-		"DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN"
-		"DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME"
 	)
 	check_vars "${required_vars_ccip[@]}"
 	missing_vars_total=$((missing_vars_total + $?))
