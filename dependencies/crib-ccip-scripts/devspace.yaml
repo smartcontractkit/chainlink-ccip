@@ -72,5 +72,12 @@ profiles:
           helm:
             chart:
               name: crib-ccip-scripts
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/ccip-scripts
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-ccip-scripts
               version: null
+  - name: ccip-eks-bix-ship
+    merge:
+      deployments:
+        ccip-scripts:
+          helm:
+            valuesFiles:
+              ["./values-profiles/values-dev-eks-bix-ship-ccip-scripts.yaml"]

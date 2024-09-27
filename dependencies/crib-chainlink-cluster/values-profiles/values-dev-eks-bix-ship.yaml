@@ -41,12 +41,12 @@ chainlink:
       DeltaReconcile = '5s'
 
       [[EVM]]
-      # Celo Testnet
-      ChainID = "44787"
+      # Ethereum Sepolia
+      ChainID = "11155111"
       MinContractPayment = '0'
       AutoCreateKey = true
       FinalityDepth = 1
       [[EVM.Nodes]]
-      Name = 'celo-testnet'
-      WSURL = 'wss://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/ws'
-      HTTPURL = 'https://celo-testnet-1.simplystaking.xyz/BVJ564KX22BF/rpc'
+      Name = 'sepolia-testnet'
+      WSURL = 'wss://ethereum-sepolia-1.simplystaking.xyz/DFKJSDFKJNSD/ws'
+      HTTPURL = 'https://ethereum-sepolia-1.simplystaking.xyz/DFKJSDFKJNSD/rpc'
