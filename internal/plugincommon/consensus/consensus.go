@@ -6,8 +6,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 // GetConsensusMap takes a mapping from chains to a list of items,
@@ -87,30 +85,10 @@ func TimestampComparator(a, b time.Time) bool {
 	return a.Before(b)
 }
 
-func TimestampsMedian(timestamps []time.Time) time.Time {
-	return Median(timestamps, TimestampComparator)
-}
-
 func BigIntComparator(a, b cciptypes.BigInt) bool {
 	return a.Cmp(b.Int) == -1
 }
 
 func TokenPriceComparator(a, b cciptypes.TokenPrice) bool {
 	return a.Price.Int.Cmp(b.Price.Int) == -1
-}
-
-// TimestampedBigAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
-func TimestampedBigAggregator(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
-	timestamps := make([]time.Time, len(updates))
-	prices := make([]cciptypes.BigInt, len(updates))
-	for i := range updates {
-		timestamps[i] = updates[i].Timestamp
-		prices[i] = updates[i].Value
-	}
-	medianPrice := Median(prices, BigIntComparator)
-	medianTimestamp := Median(timestamps, TimestampComparator)
-	return plugintypes.TimestampedBig{
-		Value:     medianPrice,
-		Timestamp: medianTimestamp,
-	}
 }

@@ -99,32 +99,3 @@ func TestDeviates(t *testing.T) {
 		})
 	}
 }
-
-func TestCalculateUsdPerUnitGas(t *testing.T) {
-	testCases := []struct {
-		name           string
-		sourceGasPrice *big.Int
-		usdPerFeeCoin  *big.Int
-		exp            *big.Int
-	}{
-		{
-			name:           "base case",
-			sourceGasPrice: big.NewInt(2e18),
-			usdPerFeeCoin:  big.NewInt(3e18),
-			exp:            big.NewInt(6e18),
-		},
-		{
-			name:           "small numbers",
-			sourceGasPrice: big.NewInt(1000),
-			usdPerFeeCoin:  big.NewInt(2000),
-			exp:            big.NewInt(0), // What do we do in these cases? Charge the user 0?
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			res := CalculateUsdPerUnitGas(tc.sourceGasPrice, tc.usdPerFeeCoin)
-			assert.Zero(t, tc.exp.Cmp(res))
-		})
-	}
-}

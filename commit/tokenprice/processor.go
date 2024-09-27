@@ -87,7 +87,8 @@ func (p *processor) ValidateObservation(
 	query Query,
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	return validateObservedTokenPrices(ao.Observation.FeedTokenPrices)
+	// TODO: Validate token prices
+	return nil
 }
 
 func (p *processor) Outcome(

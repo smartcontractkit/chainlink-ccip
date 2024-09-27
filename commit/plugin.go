@@ -114,16 +114,6 @@ func NewPlugin(
 		oracleIDToP2pID,
 	)
 
-	chainFeeProcessr := chainfee.NewProcessor(
-		lggr,
-		cfg.DestChain,
-		homeChain,
-		ccipReader,
-		cfg.OffchainConfig,
-		chainSupport,
-		reportingCfg.F,
-	)
-
 	return &Plugin{
 		donID:               donID,
 		nodeID:              nodeID,
@@ -138,7 +128,7 @@ func NewPlugin(
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
-		chainFeeProcessor:   chainFeeProcessr,
+		chainFeeProcessor:   chainfee.NewProcessor(),
 		discoveryProcessor:  discoveryProcessor,
 		rmnConfig:           rmnConfig,
 	}
@@ -224,7 +214,7 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
-		p.lggr.Errorw("call to GetFChain failed", "err", err)
+		p.lggr.Warnw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

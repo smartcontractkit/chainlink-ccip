@@ -9,8 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -105,20 +103,8 @@ type CCIPReader interface {
 		addresses []string,
 	) (map[string]uint64, error)
 
-	// GetAvailableChainsFeeComponents Reads all fee components for known chains (chains that have chain writer defined)
-	GetAvailableChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents
-
-	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
-	GetWrappedNativeTokenPriceUSD(
-		ctx context.Context,
-		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]cciptypes.BigInt
-
-	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
-	GetChainFeePriceUpdate(
-		ctx context.Context,
-		selectors []cciptypes.ChainSelector,
-	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+	// GasPrices reads the provided chains gas prices.
+	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

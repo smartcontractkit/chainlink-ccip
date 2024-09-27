@@ -103,3 +103,16 @@ func validateReaderExistence(
 	}
 	return nil
 }
+
+func validateWriterExistence(
+	writers map[cciptypes.ChainSelector]types.ChainWriter,
+	chains ...cciptypes.ChainSelector,
+) error {
+	for _, ch := range chains {
+		_, exists := writers[ch]
+		if !exists {
+			return fmt.Errorf("chain %d: %w", ch, ErrContractWriterNotFound)
+		}
+	}
+	return nil
+}

@@ -53,9 +53,7 @@ func (p *processor) getConsensusObservation(
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
 		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fDestChain)),
-		// each key will have one object with the median for timestamps as timestamp value
-		// and the median prices as price value
-		consensus.TimestampedBigAggregator,
+		feeQuoterAggregator,
 	)
 
 	consensusObs := ConsensusObservation{
@@ -66,6 +64,22 @@ func (p *processor) getConsensusObservation(
 	}
 
 	return consensusObs, nil
+}
+
+// feeQuoterAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
+var feeQuoterAggregator = func(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
+	timestamps := make([]time.Time, len(updates))
+	prices := make([]cciptypes.BigInt, len(updates))
+	for i := range updates {
+		timestamps[i] = updates[i].Timestamp
+		prices[i] = updates[i].Value
+	}
+	medianPrice := consensus.Median(prices, consensus.BigIntComparator)
+	medianTimestamp := consensus.Median(timestamps, consensus.TimestampComparator)
+	return plugintypes.TimestampedBig{
+		Value:     medianPrice,
+		Timestamp: medianTimestamp,
+	}
 }
 
 // selectTokensForUpdate checks which tokens need to be updated based on the observed token prices and

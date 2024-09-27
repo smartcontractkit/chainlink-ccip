@@ -22,10 +22,3 @@ func Deviates(x1, x2 *big.Int, ppb int64) bool {
 	diff.Div(diff, x2)
 	return diff.Cmp(big.NewInt(ppb)) > 0 // diff > ppb
 }
-
-// CalculateUsdPerUnitGas returns: (sourceGasPrice * usdPerFeeCoin) / 1e18
-func CalculateUsdPerUnitGas(sourceGasPrice *big.Int, usdPerFeeCoin *big.Int) *big.Int {
-	// (wei / gas) * (usd / eth) * (1 eth / 1e18 wei)  = usd/gas
-	tmp := new(big.Int).Mul(sourceGasPrice, usdPerFeeCoin)
-	return tmp.Div(tmp, big.NewInt(1e18))
-}
