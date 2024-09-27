@@ -633,6 +633,8 @@ func (c *controller) listenForRmnReportSignatures(
 						ReportSignatureRequest: reportSigReq,
 					},
 				}
+
+				c.lggr.Infow("sending report signature request", "node", node.ID, "requestID", req.RequestId)
 				if err := c.marshalAndSend(req, node.ID); err != nil {
 					c.lggr.Errorw("failed to send report signature request", "node_id", node.ID, "err", err)
 					continue
