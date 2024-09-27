@@ -482,12 +482,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			&nativeTokenAddress)
 
 		if err != nil {
-			r.lggr.Errorw("failed to get native token address", "chain", chain, "err", err)
+			r.lggr.Warnw("failed to get native token address", "chain", chain, "err", err)
 			continue
 		}
 
 		if nativeTokenAddress == "" {
-			r.lggr.Errorw("native token address is empty", "chain", chain)
+			r.lggr.Warnw("native token address is empty", "chain", chain)
 			continue
 		}
 
@@ -508,7 +508,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 
 		if price == nil {
-			r.lggr.Errorw("native token price is nil", "chain", chain)
+			r.lggr.Warnw("native token price is nil", "chain", chain)
 			continue
 		}
 		prices[chain] = cciptypes.NewBigInt(price)
