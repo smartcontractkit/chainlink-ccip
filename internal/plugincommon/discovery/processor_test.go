@@ -6,13 +6,14 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -40,11 +41,15 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
 		source: []byte("onRamp"),
 	}
+	expectedRMNRemote := []byte("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+			dest: expectedRMNRemote,
+		},
 	}
 	mockReader.
 		EXPECT().
@@ -68,6 +73,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	assert.Equal(t, expectedFChain, observation.FChain)
 	assert.Equal(t, expectedOnRamp, observation.OnRamp)
 	assert.Equal(t, expectedNonceManager, observation.DestNonceManager)
+	assert.Equal(t, expectedRMNRemote, observation.RMNRemote)
 }
 
 func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T) {
@@ -97,6 +103,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	assert.Error(t, err)
 	assert.Empty(t, observation.DestNonceManager)
 	assert.Empty(t, observation.OnRamp)
+	assert.Empty(t, observation.RMNRemote)
 	assert.Empty(t, observation.FChain)
 }
 
@@ -136,6 +143,7 @@ func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFCha
 	assert.Equal(t, expectedFChain, observation.FChain)
 	assert.Empty(t, observation.DestNonceManager)
 	assert.Empty(t, observation.OnRamp)
+	assert.Empty(t, observation.RMNRemote)
 }
 
 func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *testing.T) {
@@ -175,6 +183,7 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 	assert.Empty(t, observation.FChain)
 	assert.Empty(t, observation.DestNonceManager)
 	assert.Empty(t, observation.OnRamp)
+	assert.Empty(t, observation.RMNRemote)
 }
 
 func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
@@ -199,11 +208,15 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
 		dest: []byte("onRamp"),
 	}
+	expectedRMNRemote := []byte("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+			dest: expectedRMNRemote,
+		},
 	}
 	mockReader.
 		EXPECT().
@@ -224,6 +237,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		FChain:           expectedFChain,
 		OnRamp:           expectedOnRamp,
 		DestNonceManager: expectedNonceManager,
+		RMNRemote:        expectedRMNRemote,
 	}
 	// here we have:
 	// 2*fRoleDON + 1 observations of fChain
@@ -261,11 +275,15 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
 		dest: []byte("onRamp"),
 	}
+	expectedRMNRemote := []byte("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+			dest: expectedRMNRemote,
+		},
 	}
 	mockReader.
 		EXPECT().
@@ -289,10 +307,11 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		FChain:           expectedFChain,
 		OnRamp:           expectedOnRamp,
 		DestNonceManager: expectedNonceManager,
+		RMNRemote:        expectedRMNRemote,
 	}
 	// here we have:
 	// 2*fRoleDON + 1 == 7 observations of fChain
-	// 2*fDest + 1 == 5 observations of the onramps and the dest nonce manager
+	// 2*fDest + 1 == 5 observations of the onramps, the dest nonce manager, and the RMNRemote
 	aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
 		{Observation: destObs},
 		{Observation: destObs},
@@ -327,6 +346,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		source2: fSource2,
 	}
 	observedNonceManager := []byte("nonceManager")
+	observedRMNRemote := []byte("rmnRemote")
 	observedOnRamp := map[cciptypes.ChainSelector][]byte{
 		source1: []byte("onRamp"),
 		source2: []byte("onRamp"),
@@ -335,6 +355,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{},
 		consts.ContractNameOnRamp:       map[cciptypes.ChainSelector][]byte{},
+		consts.ContractNameRMNRemote:    map[cciptypes.ChainSelector][]byte{},
 	}
 	mockReader.
 		EXPECT().
@@ -358,10 +379,11 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		FChain:           expectedFChain,
 		OnRamp:           observedOnRamp,
 		DestNonceManager: observedNonceManager,
+		RMNRemote:        observedRMNRemote,
 	}
 	// here we have:
 	// 2*fRoleDON + 1 == 7 observations of fChain
-	// 2*fDest == 4 observations of the onramps and the dest nonce manager (not enough).
+	// 2*fDest == 4 observations of the onramps, the dest nonce manager and the RMNRemote (not enough)
 	aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
 		{Observation: destObs},
 		{Observation: destObs},
@@ -399,11 +421,15 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
 		dest: []byte("onRamp"),
 	}
+	expectedRmnRemote := []byte("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
 		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+			dest: expectedRmnRemote,
+		},
 	}
 	syncErr := errors.New("sync error")
 	mockReader.
@@ -425,10 +451,11 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		FChain:           expectedFChain,
 		OnRamp:           expectedOnRamp,
 		DestNonceManager: expectedNonceManager,
+		RMNRemote:        expectedRmnRemote,
 	}
 	// here we have:
 	// 2*fRoleDON + 1 observations of fChain
-	// 2*fDest + 1 observations of the onramps and the dest nonce manager
+	// 2*fDest + 1 observations of the onramps, the dest nonce manager and the RMNRemote
 	aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
 		{Observation: obs},
 		{Observation: obs},
