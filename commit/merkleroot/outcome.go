@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -138,15 +139,34 @@ func buildReport(
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
-	if q.RMNSignatures == nil {
-		lggr.Warn("RMNSignatures are nil")
-	} else {
+	if q.RMNSignatures != nil { // TODO: should never be nil, error after e2e RMN integration.
 		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
-			lggr.Errorw("Failed to parse RMN signatures", "error", err)
-		} else {
-			sigs = parsedSigs
+			lggr.Errorw("Failed to parse RMN signatures returning an empty outcome", "error", err)
+			return Outcome{}
 		}
+		sigs = parsedSigs
+
+		signedRoots := mapset.NewSet[cciptypes.MerkleRootChain]()
+		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
+			signedRoots.Add(cciptypes.MerkleRootChain{
+				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
+				SeqNumsRange: cciptypes.NewSeqNumRange(
+					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
+					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
+				),
+				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
+			})
+		}
+
+		// Only report roots that are present in RMN signatures.
+		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
+		for _, root := range roots {
+			if signedRoots.Contains(root) {
+				rootsToReport = append(rootsToReport, root)
+			}
+		}
+		roots = rootsToReport
 	}
 
 	outcome := Outcome{
