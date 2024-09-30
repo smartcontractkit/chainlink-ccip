@@ -37,7 +37,7 @@ fi
 
 # Loop through each ingress
 for INGRESS_NAME in "${ingresses[@]}"; do
-	echo "Processing ingress: ${INGRESS_NAME}"
+	echo "Validating ingress [${namespace}/${INGRESS_NAME}]..."
 
 	# Fetch the ingress class from the Ingress object
 	INGRESS_CLASS=$(kubectl get ingress "${INGRESS_NAME}" -n "${namespace}" \
