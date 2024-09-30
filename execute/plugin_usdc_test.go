@@ -115,9 +115,9 @@ func Test_USDC_Transfer(t *testing.T) {
 	server.AddResponse(
 		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
 		`{
-					"status": "complete",
-					"attestation": "0x720502893578a89a8a87982982ef781c18b194"
-			 	 }`)
+			"status": "complete",
+			"attestation": "0x720502893578a89a8a87982982ef781c18b194"
+		}`)
 
 	// Run 3 more rounds to get all attestations
 	for i := 0; i < 3; i++ {
