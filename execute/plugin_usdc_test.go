@@ -372,6 +372,7 @@ func setupSimpleTest(
 		lggr,
 		cfg.DestChain,
 		cfg.OffchainConfig.TokenDataObservers,
+		testhelpers.TokenDataEncoderInstance,
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			srcSelector: r,
 			dstSelector: r,

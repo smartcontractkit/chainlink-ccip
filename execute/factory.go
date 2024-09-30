@@ -59,6 +59,7 @@ type PluginFactory struct {
 	homeChainReader   reader.HomeChain
 	estimateProvider  gas.EstimateProvider
 	tokenDataObserver tokendata.TokenDataObserver
+	tokenDataEncoder  cciptypes.TokenDataEncoder
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
 }
@@ -71,6 +72,7 @@ func NewPluginFactory(
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,
+	tokenDataEncoder cciptypes.TokenDataEncoder,
 	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
@@ -86,6 +88,7 @@ func NewPluginFactory(
 		contractReaders:   contractReaders,
 		chainWriters:      chainWriters,
 		tokenDataObserver: tokenDataObserver,
+		tokenDataEncoder:  tokenDataEncoder,
 	}
 }
 
@@ -124,6 +127,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.lggr,
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
+		p.tokenDataEncoder,
 		readers,
 	)
 	if err != nil {
