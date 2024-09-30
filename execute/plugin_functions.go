@@ -426,6 +426,30 @@ func mergeNonceObservations(
 	return results
 }
 
+// mergeCostlyMessages merges all costly message observations. A message is considered costly if it is observed by more
+// than `fChainDest` observers.
+func mergeCostlyMessages(
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChainDest int,
+) []cciptypes.Bytes32 {
+	costlyMessages := mapset.NewSet[cciptypes.Bytes32]()
+	counts := make(map[cciptypes.Bytes32]int)
+	for _, ao := range aos {
+		for _, costlyMessage := range ao.Observation.CostlyMessages {
+			counts[costlyMessage]++
+			if counts[costlyMessage] >= int(consensus.FPlus1(fChainDest)) {
+				costlyMessages.Add(costlyMessage)
+			}
+		}
+	}
+
+	if costlyMessages.Cardinality() == 0 {
+		return nil
+	}
+
+	return costlyMessages.ToSlice()
+}
+
 // getConsensusObservation merges all attributed observations into a single observation based on which values have
 // consensus among the observers.
 func getConsensusObservation(
@@ -472,6 +496,12 @@ func getConsensusObservation(
 		"oracle", oracleID,
 		"mergedTokenObservations", mergedTokenObservations)
 
+	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
+	lggr.Debugw(
+		fmt.Sprintf("[oracle %d] exec outcome: merged costly messages", oracleID),
+		"oracle", oracleID,
+		"mergedCostlyMessages", mergedCostlyMessages)
+
 	mergedNonceObservations :=
 		mergeNonceObservations(aos, fChain[destChainSelector])
 	lggr.Debugw(
@@ -482,6 +512,7 @@ func getConsensusObservation(
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations,
+		mergedCostlyMessages,
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},
