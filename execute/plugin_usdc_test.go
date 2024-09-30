@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -46,11 +47,11 @@ import (
 )
 
 const (
-	address = "0x888888cfaebbed5554c3f36bfbd233f822e9455f"
+	randomEthAddress = "0x00000000000000000000000000001234"
 )
 
 func Test_USDC_Transfer(t *testing.T) {
-	ctx := context.Background()
+	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
@@ -114,17 +115,16 @@ func Test_USDC_Transfer(t *testing.T) {
 	server.AddResponse(
 		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
 		`{
-						"status": "complete",
-						"attestation": "0x720502893578a89a8a87982982ef781c18b194"
-					}`)
+					"status": "complete",
+					"attestation": "0x720502893578a89a8a87982982ef781c18b194"
+			 	 }`)
 
 	// Run 3 more rounds to get all attestations
-	res, err = runner.RunRound(ctx)
-	require.NoError(t, err)
-	res, err = runner.RunRound(ctx)
-	require.NoError(t, err)
-	res, err = runner.RunRound(ctx)
-	require.NoError(t, err)
+	for i := 0; i < 3; i++ {
+		res, err = runner.RunRound(ctx)
+		require.NoError(t, err)
+	}
+
 	outcome, err = exectypes.DecodeOutcome(res.Outcome)
 	require.NoError(t, err)
 	sequenceNumbers = slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
@@ -252,7 +252,7 @@ func setupSimpleTest(
 	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(t))
 	require.NoError(t, err, "failed to construct merkle tree")
 
-	addressBytes, err := hex.DecodeString(strings.TrimPrefix(address, "0x"))
+	addressBytes, err := hex.DecodeString(strings.TrimPrefix(randomEthAddress, "0x"))
 	require.NoError(t, err)
 
 	// Initialize reader with some data
@@ -313,8 +313,8 @@ func setupSimpleTest(
 					USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
 						Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 							srcSelector: {
-								SourcePoolAddress:            address,
-								SourceMessageTransmitterAddr: address,
+								SourcePoolAddress:            randomEthAddress,
+								SourceMessageTransmitterAddr: randomEthAddress,
 							},
 						},
 						AttestationAPI:         server.server.URL,
