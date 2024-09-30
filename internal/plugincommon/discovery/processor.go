@@ -116,9 +116,9 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 type aggObs struct {
 	onrampAddrs       map[cciptypes.ChainSelector][][]byte
 	feeQuoterAddrs    map[cciptypes.ChainSelector][][]byte
-	nonceManagerAddrs [][]byte
-	rmnRemoteAddrs    [][]byte
-	routerAddrs       [][]byte
+	nonceManagerAddrs map[cciptypes.ChainSelector][][]byte
+	rmnRemoteAddrs    map[cciptypes.ChainSelector][][]byte
+	routerAddrs       map[cciptypes.ChainSelector][][]byte
 }
 
 func aggregateObservations(
@@ -127,8 +127,11 @@ func aggregateObservations(
 	aos []plugincommon.AttributedObservation[dt.Observation],
 ) aggObs {
 	obs := aggObs{
-		onrampAddrs:    make(map[cciptypes.ChainSelector][][]byte),
-		feeQuoterAddrs: make(map[cciptypes.ChainSelector][][]byte),
+		onrampAddrs:       make(map[cciptypes.ChainSelector][][]byte),
+		feeQuoterAddrs:    make(map[cciptypes.ChainSelector][][]byte),
+		nonceManagerAddrs: make(map[cciptypes.ChainSelector][][]byte),
+		rmnRemoteAddrs:    make(map[cciptypes.ChainSelector][][]byte),
+		routerAddrs:       make(map[cciptypes.ChainSelector][][]byte),
 	}
 	for _, ao := range aos {
 		for chain, addr := range ao.Observation.Addresses[consts.ContractNameOnRamp] {
@@ -143,8 +146,8 @@ func aggregateObservations(
 		if len(ao.Observation.Addresses[consts.ContractNameNonceManager][dest]) == 0 {
 			lggr.Warnf("skipping empty nonce manager address in observation from Oracle %d", ao.OracleID)
 		} else {
-			obs.nonceManagerAddrs = append(
-				obs.nonceManagerAddrs,
+			obs.nonceManagerAddrs[dest] = append(
+				obs.nonceManagerAddrs[dest],
 				ao.Observation.Addresses[consts.ContractNameNonceManager][dest],
 			)
 		}
@@ -152,8 +155,8 @@ func aggregateObservations(
 		if len(ao.Observation.Addresses[consts.ContractNameRMNRemote][dest]) == 0 {
 			lggr.Warnf("skipping empty RMNRemote address in observation from Oracle %d", ao.OracleID)
 		} else {
-			obs.rmnRemoteAddrs = append(
-				obs.rmnRemoteAddrs,
+			obs.rmnRemoteAddrs[dest] = append(
+				obs.rmnRemoteAddrs[dest],
 				ao.Observation.Addresses[consts.ContractNameRMNRemote][dest],
 			)
 		}
@@ -161,8 +164,8 @@ func aggregateObservations(
 		if len(ao.Observation.Addresses[consts.ContractNameRouter][dest]) == 0 {
 			lggr.Warnf("skipping empty Router address in observation from Oracle %d", ao.OracleID)
 		} else {
-			obs.routerAddrs = append(
-				obs.routerAddrs,
+			obs.routerAddrs[dest] = append(
+				obs.routerAddrs[dest],
 				ao.Observation.Addresses[consts.ContractNameRouter][dest],
 			)
 		}
@@ -196,26 +199,22 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	}
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
 	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", fChainObs, donThresh)
+	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
+	destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
 
 	agg := aggregateObservations(cdp.lggr, cdp.dest, aos)
 
 	contracts := make(reader.ContractAddresses)
-	// onramps and dest nonce managers are determined by reading the _dest_ chain, therefore
-	// we MUST use the fChain value of the dest chain to determine
-	// the consensus onramp.
-	fDestChainThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](
-		consensus.TwoFPlus1(fChain[cdp.dest]),
-	)
 	onrampConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"onramp",
 		agg.onrampAddrs,
-		fDestChainThresh,
+		destThresh,
 	)
 	cdp.lggr.Infow("Determined consensus onramps",
 		"onrampConsensus", onrampConsensus,
 		"onrampAddrs", agg.onrampAddrs,
-		"fDestChainThresh", fDestChainThresh,
+		"fChainThresh", fChainThresh,
 	)
 	if len(onrampConsensus) == 0 {
 		cdp.lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
@@ -225,13 +224,13 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	nonceManagerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"nonceManager",
-		map[cciptypes.ChainSelector][][]byte{cdp.dest: agg.nonceManagerAddrs},
-		fDestChainThresh,
+		agg.nonceManagerAddrs,
+		fChainThresh,
 	)
 	cdp.lggr.Infow("Determined consensus nonce manager",
 		"nonceManagerConsensus", nonceManagerConsensus,
 		"nonceManagerAddrs", agg.nonceManagerAddrs,
-		"fDestChainThresh", fDestChainThresh,
+		"fChainThresh", fChainThresh,
 	)
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
@@ -239,13 +238,13 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	rmnRemoteConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"rmnRemote",
-		map[cciptypes.ChainSelector][][]byte{cdp.dest: agg.rmnRemoteAddrs},
-		fDestChainThresh,
+		agg.rmnRemoteAddrs,
+		fChainThresh,
 	)
 	cdp.lggr.Infow("Determined consensus RMNRemote",
 		"rmnRemoteConsensus", rmnRemoteConsensus,
 		"rmnRemoteAddrs", agg.rmnRemoteAddrs,
-		"fDestChainThresh", fDestChainThresh,
+		"fChainThresh", fChainThresh,
 	)
 	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
@@ -253,13 +252,13 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	routerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
 		"router",
-		map[cciptypes.ChainSelector][][]byte{cdp.dest: agg.routerAddrs},
-		fDestChainThresh,
+		agg.routerAddrs,
+		fChainThresh,
 	)
 	cdp.lggr.Infow("Determined consensus Router",
 		"RouterConsensus", routerConsensus,
 		"RouterAddrs", agg.routerAddrs,
-		"fDestChainThresh", fDestChainThresh,
+		"fChainThresh", fChainThresh,
 	)
 	contracts[consts.ContractNameRouter] = routerConsensus
 
@@ -267,12 +266,12 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		cdp.lggr,
 		"fee quoter",
 		agg.feeQuoterAddrs,
-		fDestChainThresh,
+		fChainThresh,
 	)
 	cdp.lggr.Infow("Determined consensus fee quoter",
 		"feeQuoterConsensus", feeQuoterConsensus,
 		"feeQuoterAddrs", agg.feeQuoterAddrs,
-		"fDestChainThresh", fDestChainThresh,
+		"fChainThresh", fChainThresh,
 	)
 	if len(feeQuoterConsensus) == 0 {
 		cdp.lggr.Warnw("No consensus on fee quoters, feeQuoterConsensus map is empty")

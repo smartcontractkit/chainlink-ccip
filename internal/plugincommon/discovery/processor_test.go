@@ -44,8 +44,8 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 		source: []byte("onRamp"),
 	}
 	expectedFeeQuoter := map[cciptypes.ChainSelector][]byte{
-		source: []byte("onRamp"),
-		dest:   []byte("dest"),
+		source: []byte("from_source_onramp"),
+		dest:   []byte("from_dest_offramp"),
 	}
 	expectedRMNRemote := []byte("rmnRemote")
 	expectedRouter := []byte("router")
@@ -430,7 +430,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		{Observation: destObs},
 		{Observation: destObs},
 		{Observation: destObs},
-		{Observation: destObs},
+		{Observation: destObs}, // dest requires 2*f+1, for f=2 we need 5 observations
 		{Observation: fChainObs},
 		{Observation: fChainObs},
 		{Observation: fChainObs},
