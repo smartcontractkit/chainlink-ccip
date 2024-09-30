@@ -70,7 +70,8 @@ func NewPlugin(
 	rmnConfig rmn.Config,
 ) *Plugin {
 	lggr = logger.Named(lggr, "CommitPlugin")
-	lggr = logger.With(lggr, "donID", donID, "oracleID", oracleID)
+	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
+	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	if cfg.MaxMerkleTreeSize == 0 {
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
