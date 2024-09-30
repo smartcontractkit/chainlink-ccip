@@ -162,3 +162,15 @@ profiles:
                   memory: 256Mi
               statefulSet:
                 enabled: false
+              ingress:
+                ingressClassName: nginx
+  - name: local-dev-simulated-core-ocr1
+    merge:
+      deployments:
+        geth:
+          helm:
+            values:
+              statefulSet:
+                enabled: true
+                storageClassName: gp3
+                capacity: 4Gi

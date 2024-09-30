@@ -34,9 +34,20 @@ pipelines:
       run_dependency_pipelines crib-chainlink-cluster geth mockserver
       run_pipelines ingress-check
 
+  core-no-geth:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster mockserver
+      run_pipelines ingress-check
+
   ccip:
     run: |-
       run_dependency_pipelines crib-chainlink-cluster geth mockserver
+      run_dependency_pipelines crib-ccip-scripts
+      run_pipelines ingress-check
+
+  ccip-no-geth:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster mockserver
       run_dependency_pipelines crib-ccip-scripts
       run_pipelines ingress-check
 
@@ -113,10 +124,30 @@ profiles:
             path: ${DEPENDENCIES_DIR}/mockserver
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-
+  - name: core-no-geth
+    patches:
+      - op: add
+        path: vars
+        value:
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/chainlink"
+      - op: add
+        path: dependencies
+        value:
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - core
+          mockserver:
+            path: ${DEPENDENCIES_DIR}/mockserver
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
   - name: core-dev-ocr2-external-network
     parents:
-      - profile: core
+      - profile: core-no-geth
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
@@ -138,9 +169,13 @@ profiles:
         path: dependencies.crib-chainlink-cluster.profiles
         value:
           - local-dev-simulated-core-ocr1
+      - op: replace
+        path: dependencies.geth.profiles
+        value:
+          - local-dev-simulated-core-ocr1
   - name: keystone
     parents:
-      - profile: core
+      - profile: core-no-geth
     patches:
       - op: add
         path: vars
@@ -193,6 +228,31 @@ profiles:
             path: ${DEPENDENCIES_DIR}/mockserver
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: ccip-no-geth
+    patches:
+      - op: add
+        path: vars
+        value:
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/ccip"
+      - op: add
+        path: dependencies
+        value:
+          crib-chainlink-cluster:
+            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
+          crib-ccip-scripts:
+            path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          mockserver:
+            path: ${DEPENDENCIES_DIR}/mockserver
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
   - name: ccip-local
     parents:
       - profile: ccip
@@ -206,9 +266,13 @@ profiles:
         path: dependencies.crib-ccip-scripts.profiles
         value:
           - local-charts
+      - op: add
+        path: dependencies.geth.profiles
+        value:
+          - local-charts
   - name: ccip-eks-bix-ship
     parents:
-      - profile: ccip
+      - profile: ccip-no-geth
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
@@ -220,7 +284,7 @@ profiles:
           - ccip-eks-bix-ship
   - name: ccip-kind-bix-ship
     parents:
-      - profile: ccip
+      - profile: ccip-no-geth
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
@@ -280,6 +344,14 @@ profiles:
       - op: add
         path: dependencies.crib-chainlink-cluster.pipeline
         value: kind
+      - op: replace
+        path: dependencies.geth.profiles
+        value:
+          - kind
+      - op: replace
+        path: dependencies.mockserver.profiles
+        value:
+          - kind
   - name: ccip-kind
     parents:
       - profile: ccip
@@ -300,6 +372,15 @@ profiles:
       - op: add
         path: dependencies.crib-ccip-scripts.pipeline
         value: kind
+      - op: replace
+        path: dependencies.geth.profiles
+        value:
+          - ccip
+          - kind
+      - op: replace
+        path: dependencies.mockserver.profiles
+        value:
+          - kind
   - name: atlas
     patches:
       - op: add
@@ -363,7 +444,7 @@ commands:
     description: Run the Core pipeline for Kind.
     appendArgs: true
   core-dev-ocr2-external-network:
-    command: devspace run-pipeline core -p core-dev-ocr2-external-network
+    command: devspace run-pipeline core-no-geth -p core-dev-ocr2-external-network
     description: Run the Core pipeline with external network.
     appendArgs: true
   core-dev-simulated-core-ocr1-stateless:
@@ -375,7 +456,7 @@ commands:
     description: Run the Core pipeline with external network.
     appendArgs: true
   keystone:
-    command: devspace run-pipeline core -p keystone
+    command: devspace run-pipeline core-no-geth -p keystone
     description: Run the Core pipeline with Keystone.
     appendArgs: true
   ccip:
@@ -399,7 +480,7 @@ commands:
     description: Run the CCIP pipeline with EKS Bix Ship.
     appendArgs: true
   ccip-kind-bix-ship:
-    command: devspace run-pipeline ccip -p ccip-kind-bix-ship
+    command: devspace run-pipeline ccip-no-geth -p ccip-kind-bix-ship
     description: Run the CCIP pipeline with Kind Bix Ship.
     appendArgs: true
   ccip-atlas:

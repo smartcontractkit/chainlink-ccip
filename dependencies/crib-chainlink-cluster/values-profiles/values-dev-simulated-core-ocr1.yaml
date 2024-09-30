@@ -1,9 +1,3 @@
-geth:
-  enabled: true
-  statefulSet:
-    enabled: true
-    storageClassName: gp3
-    capacity: 4Gi
 db:
   statefulSet:
     enabled: true

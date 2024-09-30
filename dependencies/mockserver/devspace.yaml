@@ -63,6 +63,8 @@ profiles:
         mockserver:
           helm:
             values:
+              ingress:
+                ingressClassName: nginx
               resources:
                 requests:
                   cpu: 50m

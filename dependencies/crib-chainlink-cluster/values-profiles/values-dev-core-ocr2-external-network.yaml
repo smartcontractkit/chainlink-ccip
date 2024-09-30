@@ -1,5 +1,3 @@
-geth:
-  enabled: false
 db:
   statefulSet:
     enabled: true
