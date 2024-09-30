@@ -134,6 +134,8 @@ type CCIPReader interface {
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.
+	// allChains is needed because there is currently no way to discover all source contracts. So we allow them
+	// to be passed in here. We'll attempt to fetch the source config from the offramp for each of them.
 	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
