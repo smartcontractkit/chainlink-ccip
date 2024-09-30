@@ -38,7 +38,7 @@ deployments:
       releaseName: "geth"
       chart:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
-        version: "0.1.0-preview-1636-2782c69"
+        version: "0.1.0"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy

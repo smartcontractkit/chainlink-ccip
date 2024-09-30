@@ -15,7 +15,7 @@ deployments:
       releaseName: "mockserver"
       chart:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-mockserver"
-        version: "0.1.0-preview-1637-fd07404"
+        version: "0.1.0"
       values:
         podSecurityContext:
           fsGroup: 999
