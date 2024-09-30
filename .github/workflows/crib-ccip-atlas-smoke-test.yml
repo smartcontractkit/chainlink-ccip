@@ -31,6 +31,7 @@ on:
       - "*"
       - "dependencies/crib-chainlink-cluster/**"
       - "dependencies/crib-ccip-scripts/**"
+      - "imports/**"
       - "scripts/**"
       # Include crib ccip changes
       - "deployments/chainlink/**"
