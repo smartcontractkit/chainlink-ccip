@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -220,10 +221,18 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
-				for _, src := range reqs[0].GetObservationRequest().GetFixedDestLaneUpdateRequests() {
-					requestedChains[nodeID].Add(src.LaneSource.SourceChainSelector)
-				}
 
+				for _, req := range reqs {
+					reqUpdates := req.GetObservationRequest().GetFixedDestLaneUpdateRequests()
+
+					assert.True(ts.t, sort.SliceIsSorted(reqUpdates, func(i, j int) bool {
+						return reqUpdates[i].LaneSource.SourceChainSelector < reqUpdates[j].LaneSource.SourceChainSelector
+					}), "SourceChainSelector should be in ASC order")
+
+					for _, src := range reqUpdates {
+						requestedChains[nodeID].Add(src.LaneSource.SourceChainSelector)
+					}
+				}
 			}
 
 			rmnClient.resetReceivedRequests()
@@ -231,7 +240,7 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 		}
 		continue
 	}
-	ts.t.Logf("nodes received the observation requests: %v", requestIDs)
+	ts.t.Logf("test/mock nodes received the observation requests: %v", requestIDs)
 	return requestIDs, requestedChains
 }
 
@@ -279,6 +288,7 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 		b, err := proto.Marshal(resp)
 		require.NoError(ts.t, err)
 
+		ts.t.Logf("test/mock node %d responds to %d", nodeID, resp.RequestId)
 		rmnClient.resChan <- PeerResponse{
 			RMNNodeID: nodeID,
 			Body:      b,
@@ -312,6 +322,19 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 					continue
 				}
 				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= minObservers)
+
+				aos := req.GetReportSignatureRequest().AttributedSignedObservations
+
+				assert.True(t, sort.SliceIsSorted(aos, func(i, j int) bool {
+					return aos[i].SignerNodeIndex < aos[j].SignerNodeIndex
+				}), "SignerNodeIndex should be in ASC order")
+
+				for _, ao := range aos {
+					lus := ao.SignedObservation.Observation.FixedDestLaneUpdates
+					assert.True(t, sort.SliceIsSorted(lus, func(i, j int) bool {
+						return lus[i].LaneSource.SourceChainSelector < lus[j].LaneSource.SourceChainSelector
+					}), "LaneSource.SourceChainSelector should be in ASC order")
+				}
 				cntValid++
 			}
 		}
