@@ -164,6 +164,8 @@ func buildReport(
 		for _, root := range roots {
 			if signedRoots.Contains(root) {
 				rootsToReport = append(rootsToReport, root)
+			} else {
+				lggr.Warnw("skipping merkle root not signed by RMN", "root", root)
 			}
 		}
 		roots = rootsToReport

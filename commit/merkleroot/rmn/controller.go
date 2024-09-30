@@ -639,7 +639,8 @@ func (c *controller) sendReportSignatureRequest(reportSigReq *rmnpb.ReportSignat
 	return requestIDs, signersRequested, nil
 }
 
-// reportSigWithSignerAddress is a helper struct to store the report signature and the address of the SK that signed it.
+// reportSigWithSignerAddress is a helper struct to store the report signature and
+// the address of the private key that signed it.
 type reportSigWithSignerAddress struct {
 	reportSig     *rmnpb.ReportSignature
 	signerAddress cciptypes.Bytes
