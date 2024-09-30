@@ -5,27 +5,26 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *processor) getConsensusObservation(
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = p.bigF
-	}
-
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
-	fChains := shared.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, fMin)
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
+	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
 
 	fDestChain, exists := fChains[p.cfg.DestChain]
 	if !exists {
@@ -39,48 +38,34 @@ func (p *processor) getConsensusObservation(
 			fmt.Errorf("no consensus value for f for FeedChain: %d", p.cfg.OffchainConfig.PriceFeedChainSelector)
 	}
 
-	feedPricesConsensus := shared.GetConsensusMapAggregator(
+	feedPricesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		shared.TwoFPlus1(fFeedChain),
+		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fFeedChain)),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
-			return shared.Median(vals, shared.TokenPriceComparator)
+			return consensus.Median(vals, consensus.TokenPriceComparator)
 		},
 	)
 
-	feeQuoterUpdatesConsensus := shared.GetConsensusMapAggregator(
+	feeQuoterUpdatesConsensus := consensus.GetConsensusMapAggregator(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		shared.TwoFPlus1(fDestChain),
-		feeQuoterAggregator,
+		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fDestChain)),
+		// each key will have one object with the median for timestamps as timestamp value
+		// and the median prices as price value
+		consensus.TimestampedBigAggregator,
 	)
 
 	consensusObs := ConsensusObservation{
 		FChain:                fChains,
-		Timestamp:             shared.Median(aggObs.Timestamps, shared.TimestampComparator),
+		Timestamp:             consensus.Median(aggObs.Timestamps, consensus.TimestampComparator),
 		FeedTokenPrices:       feedPricesConsensus,
 		FeeQuoterTokenUpdates: feeQuoterUpdatesConsensus,
 	}
 
 	return consensusObs, nil
-}
-
-// feeQuoterAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
-var feeQuoterAggregator = func(updates []shared.TimestampedBig) shared.TimestampedBig {
-	timestamps := make([]time.Time, len(updates))
-	prices := make([]cciptypes.BigInt, len(updates))
-	for i := range updates {
-		timestamps[i] = updates[i].Timestamp
-		prices[i] = updates[i].Value
-	}
-	medianPrice := shared.Median(prices, shared.BigIntComparator)
-	medianTimestamp := shared.Median(timestamps, shared.TimestampComparator)
-	return shared.TimestampedBig{
-		Value:     medianPrice,
-		Timestamp: medianTimestamp,
-	}
 }
 
 // selectTokensForUpdate checks which tokens need to be updated based on the observed token prices and
@@ -115,7 +100,7 @@ func (p *processor) selectTokensForUpdate(
 		nextUpdateTime := lastUpdate.Timestamp.Add(cfg.TokenPriceBatchWriteFrequency.Duration())
 		shouldUpdate :=
 			obs.Timestamp.After(nextUpdateTime) ||
-				shared.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
+				mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
 		if shouldUpdate {
 			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
 				TokenID: token,
@@ -132,10 +117,10 @@ func (p *processor) selectTokensForUpdate(
 }
 
 // aggregateObservations takes a list of observations and produces an AggregateObservation
-func aggregateObservations(aos []shared.AttributedObservation[Observation]) AggregateObservation {
+func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
 		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
-		FeeQuoterTokenUpdates: make(map[types.Account][]shared.TimestampedBig),
+		FeeQuoterTokenUpdates: make(map[types.Account][]plugintypes.TimestampedBig),
 		FChain:                make(map[cciptypes.ChainSelector][]int),
 		Timestamps:            []time.Time{},
 	}

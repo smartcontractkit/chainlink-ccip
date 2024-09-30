@@ -4,9 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	internaltypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -116,10 +118,23 @@ func (r InMemoryCCIPReader) Nonces(
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GasPrices(
-	ctx context.Context, chains []cciptypes.ChainSelector,
-) ([]cciptypes.BigInt, error) {
+func (r InMemoryCCIPReader) GetAvailableChainsFeeComponents(
+	ctx context.Context,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	panic("implement me")
+}
+func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	return nil
+}
+
+func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]internaltypes.TimestampedBig {
+	return nil
 }
 
 func (r InMemoryCCIPReader) DiscoverContracts(

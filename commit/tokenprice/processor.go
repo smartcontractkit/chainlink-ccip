@@ -7,13 +7,12 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -26,7 +25,7 @@ type processor struct {
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader reader.PriceReader
 	homeChain        reader.HomeChain
-	bigF             int
+	fRoleDON         int
 }
 
 // nolint: revive
@@ -37,7 +36,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	tokenPriceReader reader.PriceReader,
 	homeChain reader.HomeChain,
-	bigF int,
+	fRoleDON int,
 ) *processor {
 	return &processor{
 		oracleID:         oracleID,
@@ -46,7 +45,7 @@ func NewProcessor(
 		chainSupport:     chainSupport,
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
-		bigF:             bigF,
+		fRoleDON:         fRoleDON,
 	}
 }
 
@@ -65,28 +64,38 @@ func (p *processor) Observation(
 		return Observation{}, nil
 	}
 
+	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
+	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
+	ts := time.Now().UTC()
+	p.lggr.Infow(
+		"observed token prices",
+		"feed prices", feedTokenPrices,
+		"fee quoter updates", feeQuoterUpdates,
+		"timestamp", ts,
+	)
+
 	return Observation{
-		FeedTokenPrices:       p.ObserveFeedTokenPrices(ctx),
-		FeeQuoterTokenUpdates: p.ObserveFeeQuoterTokenUpdates(ctx),
+		FeedTokenPrices:       feedTokenPrices,
+		FeeQuoterTokenUpdates: feeQuoterUpdates,
 		FChain:                fChain,
-		Timestamp:             time.Now().UTC(),
+		Timestamp:             ts,
 	}, nil
 }
 
 func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,
-	ao shared.AttributedObservation[Observation],
+	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	//TODO: Validate token prices
-	return nil
+	return validateObservedTokenPrices(ao.Observation.FeedTokenPrices)
 }
 
 func (p *processor) Outcome(
 	_ Outcome,
 	_ Query,
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
+	p.lggr.Infow("processing token price outcome")
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
@@ -99,6 +108,10 @@ func (p *processor) Outcome(
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(consensusObservation)
+	p.lggr.Infow(
+		"outcome token prices",
+		"token prices", tokenPriceOutcome,
+	)
 	return Outcome{
 		TokenPrices: tokenPriceOutcome,
 	}, nil
@@ -119,4 +132,4 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	return nil
 }
 
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}

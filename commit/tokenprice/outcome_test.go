@@ -4,12 +4,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -32,7 +33,7 @@ var feedTokenPrices = []cciptypes.TokenPrice{
 	feedTokenPricesMap[tokenD],
 }
 
-var feeQuoterUpdates = map[types.Account]shared.TimestampedBig{
+var feeQuoterUpdates = map[types.Account]plugintypes.TimestampedBig{
 	tokenA: {Timestamp: ts.Add(-2 * time.Minute), Value: cbi100},     // Update because of time
 	tokenB: {Timestamp: ts, Value: cbi100},                           // update because of deviation
 	tokenD: {Timestamp: ts, Value: feedTokenPricesMap[tokenD].Price}, // no update, same price and timestamp
@@ -67,11 +68,11 @@ func TestGetConsensusObservation(t *testing.T) {
 			DestChain:      destChainSel,
 			OffchainConfig: offChainCfg,
 		},
-		bigF: 1,
+		fRoleDON: 1,
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
-	aos := []shared.AttributedObservation[Observation]{
+	aos := []plugincommon.AttributedObservation[Observation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},
@@ -89,7 +90,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	assert.Len(t, consensusObs.FeedTokenPrices, 0)
 
 	// Same but with 5 oracles, will have consensus on both feedprice and feequoter
-	aos = []shared.AttributedObservation[Observation]{
+	aos = []plugincommon.AttributedObservation[Observation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},
@@ -116,7 +117,7 @@ func TestSelectTokensForUpdate(t *testing.T) {
 			DestChain:      destChainSel,
 			OffchainConfig: offChainCfg,
 		},
-		bigF: 1,
+		fRoleDON: 1,
 	}
 
 	conObs := ConsensusObservation{
@@ -128,7 +129,7 @@ func TestSelectTokensForUpdate(t *testing.T) {
 	// tokenA Will be updated because of time
 	// tokenB will be updated because of deviation
 	// tokenC will be updated because it's not available on feeQuoter
-	//tokenD will not be updated because it's same price and time is not passed
+	// tokenD will not be updated because it's same price and time is not passed
 	tokenPrices := p.selectTokensForUpdate(conObs)
 	assert.Len(t, tokenPrices, 3)
 	assert.Equal(t, conObs.FeedTokenPrices[tokenA], tokenPrices[0])
@@ -145,10 +146,10 @@ func TestOutcome(t *testing.T) {
 			DestChain:      destChainSel,
 			OffchainConfig: offChainCfg,
 		},
-		bigF: 1,
+		fRoleDON: 1,
 	}
 
-	outcome, err := p.Outcome(Outcome{}, Query{}, []shared.AttributedObservation[Observation]{
+	outcome, err := p.Outcome(Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},

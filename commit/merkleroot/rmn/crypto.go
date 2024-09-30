@@ -1,3 +1,6 @@
+// crypto.go contains functions and types related to cryptographic operations
+// within the RMN package, e.g. signature verification.
+
 package rmn
 
 import (

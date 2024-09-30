@@ -17,7 +17,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -50,6 +52,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr              logger.Logger
+	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
 	execCodec         cciptypes.ExecutePluginCodec
 	msgHasher         cciptypes.MessageHasher
@@ -62,6 +65,7 @@ type PluginFactory struct {
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
@@ -73,6 +77,7 @@ func NewPluginFactory(
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:              lggr,
+		donID:             donID,
 		ocrConfig:         ocrConfig,
 		execCodec:         execCodec,
 		msgHasher:         msgHasher,
@@ -101,15 +106,32 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
 	}
 
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
 	ccipReader := readerpkg.NewCCIPChainReader(
 		p.lggr,
-		p.contractReaders,
+		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 	)
 
+	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+		p.lggr,
+		p.ocrConfig.Config.ChainSelector,
+		offchainConfig.TokenDataObservers,
+		readers,
+	)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
+	}
+
 	return NewPlugin(
+			p.donID,
 			config,
 			pluginconfig.ExecutePluginConfig{
 				DestChain:      p.ocrConfig.Config.ChainSelector,
@@ -120,7 +142,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.execCodec,
 			p.msgHasher,
 			p.homeChainReader,
-			p.tokenDataObserver,
+			tokenDataObserver,
 			p.estimateProvider,
 			p.lggr,
 		), ocr3types.ReportingPluginInfo{

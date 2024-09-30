@@ -13,8 +13,8 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func Test_validateObservedMerkleRoots(t *testing.T) {

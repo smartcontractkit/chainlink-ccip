@@ -10,15 +10,15 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
 )
 
 func (w *Processor) ValidateObservation(
 	_ Outcome,
 	q Query,
-	ao shared.AttributedObservation[Observation]) error {
+	ao plugincommon.AttributedObservation[Observation]) error {
 
 	if q.RetryRMNSignatures && !ao.Observation.IsEmpty() {
 		return fmt.Errorf("observation should be empty when retrying getting rmn signature")

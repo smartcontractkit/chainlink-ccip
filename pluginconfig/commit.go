@@ -9,10 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
+
+// EvmDefaultMaxMerkleTreeSize is the default number of max new messages to put in a merkle tree.
+// We use this default value when the config is not set for a specific chain.
+const EvmDefaultMaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 
 type CommitPluginConfig struct {
 	// DestChain is the ccip destination chain configured for the commit plugin DON.
@@ -24,12 +30,6 @@ type CommitPluginConfig struct {
 	// The maximum number of times to check if the previous report has been transmitted
 	MaxReportTransmissionCheckAttempts uint
 
-	// SyncTimeout is the timeout for syncing the commit plugin reader.
-	SyncTimeout time.Duration `json:"syncTimeout"`
-
-	// SyncFrequency is the frequency at which the commit plugin reader should sync.
-	SyncFrequency time.Duration `json:"syncFrequency"`
-
 	// OffchainConfig is the offchain config set for the commit DON.
 	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
 
@@ -39,6 +39,11 @@ type CommitPluginConfig struct {
 	// RMNSignaturesTimeout is the timeout for RMN signature verification.
 	// Typically set to `MaxQueryDuration - e`, where e some small duration.
 	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+
+	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
+	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
+	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
+	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
 }
 
 func (c CommitPluginConfig) Validate() error {
@@ -55,6 +60,11 @@ func (c CommitPluginConfig) Validate() error {
 	}
 
 	return c.OffchainConfig.Validate()
+}
+
+type FeeInfo struct {
+	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
+	DataAvailabilityDeviationPPB cciptypes.BigInt `json:"dataAvailabilityDeviationPPB"`
 }
 
 type TokenInfo struct {
@@ -101,7 +111,10 @@ func (a TokenInfo) Validate() error {
 type CommitOffchainConfig struct {
 	// RemoteGasPriceBatchWriteFrequency is the frequency at which the commit plugin
 	// should write gas prices to the remote chain.
+	//TODO: Rename to something with ChainFee
 	RemoteGasPriceBatchWriteFrequency commonconfig.Duration `json:"remoteGasPriceBatchWriteFrequency"`
+
+	FeeInfo map[cciptypes.ChainSelector]FeeInfo `json:"feeInfo"`
 
 	// TokenPriceBatchWriteFrequency is the frequency at which the commit plugin should
 	// write token prices to the remote chain.

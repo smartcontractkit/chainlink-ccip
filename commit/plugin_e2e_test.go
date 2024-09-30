@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sort"
 	"testing"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,14 +27,15 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
+	"github.com/stretchr/testify/mock"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
-	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -47,6 +48,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
+	donID := uint32(1)
 	oracleIDs := []commontypes.OracleID{1, 2, 3}
 	peerIDs := []libocrtypes.PeerID{{1}, {2}, {3}}
 	require.Equal(t, len(oracleIDs), len(peerIDs))
@@ -77,8 +79,6 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		DestChain:                          destChain,
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
-		SyncTimeout:                        10 * time.Second,
-		SyncFrequency:                      time.Hour,
 	}
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
@@ -128,11 +128,19 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
 		offRampNextSeqNumDefaultOverrideValues []ccipocr3.SeqNum
+
+		enableDiscovery bool
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
 			prevOutcome: Outcome{},
 			expOutcome:  outcomeIntervalsSelected,
+		},
+		{
+			name:            "discovery enabled, should discover contracts",
+			prevOutcome:     Outcome{},
+			expOutcome:      Outcome{},
+			enableDiscovery: true,
 		},
 		{
 			name:        "selected ranges for report in previous outcome",
@@ -192,12 +200,22 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				n := setupNode(ctx, t, lggr, oracleIDs[i], reportingCfg, oracleIDToPeerID,
+				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
 					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
+
+				n.ccipReader.EXPECT().
+					GetAvailableChainsFeeComponents(ctx).
+					Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
+				n.ccipReader.EXPECT().
+					GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
+				n.ccipReader.EXPECT().
+					GetChainFeePriceUpdate(ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					assert.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
@@ -210,9 +228,16 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
 					Return(
-						map[ocr2types.Account]shared.TimestampedBig{}, nil,
+						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
+
+				if !tc.enableDiscovery {
+					n.node.discoveryProcessor = nil
+				} else {
+					n.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+					n.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
+				}
 			}
 
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
@@ -247,6 +272,7 @@ func setupNode(
 	ctx context.Context,
 	t *testing.T,
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	nodeID commontypes.OracleID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -260,6 +286,7 @@ func setupNode(
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)
+	rmnHomeReader := reader_mock.NewMockRMNHome(t)
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
@@ -275,6 +302,9 @@ func setupNode(
 	}
 
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
+	homeChainReader.EXPECT().
+		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeCommit).
+		Return([]reader.OCR3ConfigWithMeta{{}}, nil).Maybe()
 
 	for peerID, supportedChains := range supportedChainsForPeer {
 		homeChainReader.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil).Maybe()
@@ -331,8 +361,14 @@ func setupNode(
 	}
 	ccipReader.EXPECT().NextSeqNum(ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
+	for _, ch := range sourceChains {
+		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
+			ctx, ch, destChain).Return(offRampNextSeqNum[ch]+1, nil).Maybe()
+	}
+
 	p := NewPlugin(
 		ctx,
+		donID,
 		nodeID,
 		oracleIDToP2pID,
 		pluginCfg,
@@ -342,6 +378,7 @@ func setupNode(
 		msgHasher,
 		lggr,
 		homeChainReader,
+		rmnHomeReader,
 		reportingCfg,
 		rmn.Config{},
 	)

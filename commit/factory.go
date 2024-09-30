@@ -2,8 +2,10 @@ package commit
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -18,14 +20,17 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 const maxReportTransmissionCheckAttempts = 5
 const maxQueryLength = 1024 * 1024 // 1MB
+const rmnEnabled = false
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -54,32 +59,38 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr            logger.Logger
-	ocrConfig       reader.OCR3ConfigWithMeta
-	commitCodec     cciptypes.CommitPluginCodec
-	msgHasher       cciptypes.MessageHasher
-	homeChainReader reader.HomeChain
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters    map[cciptypes.ChainSelector]types.ChainWriter
+	lggr              logger.Logger
+	donID             plugintypes.DonID
+	ocrConfig         reader.OCR3ConfigWithMeta
+	commitCodec       cciptypes.CommitPluginCodec
+	msgHasher         cciptypes.MessageHasher
+	homeChainReader   reader.HomeChain
+	homeChainSelector cciptypes.ChainSelector
+	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
 	lggr logger.Logger,
+	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	commitCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
+	homeChainSelector cciptypes.ChainSelector,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:            lggr,
-		ocrConfig:       ocrConfig,
-		commitCodec:     commitCodec,
-		msgHasher:       msgHasher,
-		homeChainReader: homeChainReader,
-		contractReaders: contractReaders,
-		chainWriters:    chainWriters,
+		lggr:              lggr,
+		donID:             donID,
+		ocrConfig:         ocrConfig,
+		commitCodec:       commitCodec,
+		msgHasher:         msgHasher,
+		homeChainReader:   homeChainReader,
+		homeChainSelector: homeChainSelector,
+		contractReaders:   contractReaders,
+		chainWriters:      chainWriters,
 	}
 }
 
@@ -97,6 +108,32 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
+	}
+
+	// Bind the RMNHome contract
+	var rmnHomeReader reader.RMNHome
+	if rmnEnabled {
+		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
+		rmnCr, ok := p.contractReaders[p.homeChainSelector]
+		if !ok {
+			return nil,
+				ocr3types.ReportingPluginInfo{},
+				fmt.Errorf("failed to find contract reader for home chain %d", p.homeChainSelector)
+		}
+		rmnHomeBoundContract := types.BoundContract{
+			Address: "0x" + hex.EncodeToString(rmnHomeAddress),
+			Name:    consts.ContractNameRMNHome,
+		}
+
+		if err1 := rmnCr.Bind(context.Background(), []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
+		}
+		rmnHomeReader = reader.NewRMNHomePoller(
+			rmnCr,
+			rmnHomeBoundContract,
+			p.lggr,
+			100*time.Millisecond,
+		)
 	}
 
 	var onChainTokenPricesReader reader.PriceReader
@@ -120,15 +157,22 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		)
 	}
 
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
 	ccipReader := readerpkg.NewCCIPChainReader(
 		p.lggr,
-		p.contractReaders,
+		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 	)
 	return NewPlugin(
 			context.Background(),
+			p.donID,
 			config.OracleID,
 			oracleIDToP2PID,
 			pluginconfig.CommitPluginConfig{
@@ -136,6 +180,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
 				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
 				OffchainConfig:                     offchainConfig,
+				RMNEnabled:                         rmnEnabled,
 			},
 			ccipReader,
 			onChainTokenPricesReader,
@@ -143,6 +188,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.msgHasher,
 			p.lggr,
 			p.homeChainReader,
+			rmnHomeReader,
 			config,
 			rmn.Config{}, // todo
 		), ocr3types.ReportingPluginInfo{

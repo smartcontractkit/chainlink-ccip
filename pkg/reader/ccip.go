@@ -12,7 +12,9 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+
+	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -20,11 +22,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/typconv"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 // TODO: unit test the implementation when the actual contract reader and writer interfaces are finalized and mocks
@@ -39,7 +40,7 @@ type ccipChainReader struct {
 
 func newCCIPChainReaderInternal(
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
+	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
@@ -57,16 +58,14 @@ func newCCIPChainReaderInternal(
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),
 	}
 
-	/*
-		contracts := ContractAddresses{
-			consts.ContractNameOffRamp: {
-				destChain: offrampAddress,
-			},
-		}
-		if err := reader.Sync(context.Background(), contracts); err != nil {
-			lggr.Infow("failed to sync contracts", "err", err)
-		}
-	*/
+	contracts := ContractAddresses{
+		consts.ContractNameOffRamp: {
+			destChain: offrampAddress,
+		},
+	}
+	if err := reader.Sync(context.Background(), contracts); err != nil {
+		lggr.Infow("failed to sync contracts", "err", err)
+	}
 
 	return reader
 }
@@ -80,8 +79,8 @@ func (r *ccipChainReader) WithExtendedContractReader(
 
 func (r *ccipChainReader) CommitReportsGTETimestamp(
 	ctx context.Context, dest cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes.CommitPluginReportWithMeta, error) {
-	if err := r.validateReaderExistence(dest); err != nil {
+) ([]plugintypes2.CommitPluginReportWithMeta, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
 		return nil, err
 	}
 
@@ -124,14 +123,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	ev := CommitReportAcceptedEvent{}
 
-	extendedBindings := r.contractReaders[dest].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-	iter, err := r.contractReaders[dest].QueryKey(
+	iter, err := r.contractReaders[dest].ExtendedQueryKey(
 		ctx,
-		contractBinding,
+		consts.ContractNameOffRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
@@ -151,7 +145,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		"ts", ts,
 		"limit", limit)
 
-	reports := make([]plugintypes.CommitPluginReportWithMeta, 0)
+	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
 		ev, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
@@ -186,7 +180,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: types2.Account(typconv.HexEncode(tokenPriceUpdate.SourceToken)),
+				TokenID: ocr3types.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
@@ -203,7 +197,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("failed to parse block number %s: %w", item.Head.Height, err)
 		}
 
-		reports = append(reports, plugintypes.CommitPluginReportWithMeta{
+		reports = append(reports, plugintypes2.CommitPluginReportWithMeta{
 			Report: cciptypes.CommitPluginReport{
 				MerkleRoots:  merkleRoots,
 				PriceUpdates: priceUpdates,
@@ -222,7 +216,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 func (r *ccipChainReader) ExecutedMessageRanges(
 	ctx context.Context, source, dest cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.SeqNumRange, error) {
-	if err := r.validateReaderExistence(dest); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, dest); err != nil {
 		return nil, err
 	}
 
@@ -234,14 +228,9 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 
 	dataTyp := ExecutionStateChangedEvent{}
 
-	extendedBindings := r.contractReaders[dest].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-	iter, err := r.contractReaders[dest].QueryKey(
+	iter, err := r.contractReaders[dest].ExtendedQueryKey(
 		ctx,
-		contractBinding,
+		consts.ContractNameOffRamp,
 		query.KeyFilter{
 			Key: consts.EventNameExecutionStateChanged,
 			Expressions: []query.Expression{
@@ -283,7 +272,7 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
-	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return nil, err
 	}
 
@@ -297,14 +286,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		Message           cciptypes.Message
 	}
 
-	bindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(bindings) != 1 {
-		return nil, fmt.Errorf("expected one binding for the OnRamp contract, got %d", len(bindings))
-	}
-
-	seq, err := r.contractReaders[sourceChainSelector].QueryKey(
+	seq, err := r.contractReaders[sourceChainSelector].ExtendedQueryKey(
 		ctx,
-		bindings[0].Binding,
+		consts.ContractNameOnRamp,
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
@@ -363,20 +347,15 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
 	}
 
-	if err := r.validateReaderExistence(sourceChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, sourceChainSelector); err != nil {
 		return 0, err
 	}
 
-	extendedBindings := r.contractReaders[sourceChainSelector].GetBindings(consts.ContractNameOnRamp)
-	if len(extendedBindings) != 1 {
-		return 0, fmt.Errorf("expected one binding for the OnRamp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-
 	var expectedNextSequenceNumber uint64
-	err := r.contractReaders[sourceChainSelector].GetLatestValue(
+	err := r.contractReaders[sourceChainSelector].ExtendedGetLatestValue(
 		ctx,
-		contractBinding.ReadIdentifier(consts.MethodNameGetExpectedNextSequenceNumber),
+		consts.ContractNameOnRamp,
+		consts.MethodNameGetExpectedNextSequenceNumber,
 		primitives.Unconfirmed,
 		map[string]any{
 			"destChainSelector": destChainSelector,
@@ -418,7 +397,7 @@ func (r *ccipChainReader) Nonces(
 	sourceChainSelector, destChainSelector cciptypes.ChainSelector,
 	addresses []string,
 ) (map[string]uint64, error) {
-	if err := r.validateReaderExistence(destChainSelector); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
 		return nil, err
 	}
 
@@ -434,16 +413,11 @@ func (r *ccipChainReader) Nonces(
 				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 			}
 
-			extendedBindings := r.contractReaders[destChainSelector].GetBindings(consts.ContractNameNonceManager)
-			if len(extendedBindings) != 1 {
-				return fmt.Errorf("expected one binding for the NonceManager contract, got %d", len(extendedBindings))
-			}
-			contractBinding := extendedBindings[0].Binding
-
 			var resp uint64
-			err = r.contractReaders[destChainSelector].GetLatestValue(
+			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 				ctx,
-				contractBinding.ReadIdentifier(consts.MethodNameGetInboundNonce),
+				consts.ContractNameNonceManager,
+				consts.MethodNameGetInboundNonce,
 				primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": sourceChainSelector,
@@ -467,36 +441,120 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error) {
-	if err := r.validateWriterExistence(chains...); err != nil {
-		return nil, err
+func (r *ccipChainReader) GetAvailableChainsFeeComponents(
+	ctx context.Context,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
+	for chain, chainWriter := range r.contractWriters {
+		feeComponent, err := chainWriter.GetFeeComponents(ctx)
+		if err != nil {
+			r.lggr.Errorw("failed to get chain fee components for chain %d: %w", chain, err)
+			continue
+		}
+		feeComponents[chain] = *feeComponent
+	}
+	return feeComponents
+}
+
+func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
+	// nolint:lll
+	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
+	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
+	for _, chain := range selectors {
+		reader, ok := r.contractReaders[chain]
+		if !ok {
+			r.lggr.Warnw("contract reader not found", "chain", chain)
+			continue
+		}
+
+		//TODO: Use batching in the future
+		var nativeTokenAddress ocr3types.Account
+		err := reader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameRouter,
+			consts.MethodNameRouterGetWrappedNative,
+			primitives.Unconfirmed,
+			nil,
+			&nativeTokenAddress)
+
+		if err != nil {
+			r.lggr.Errorw("failed to get native token address", "chain", chain, "err", err)
+			continue
+		}
+
+		if nativeTokenAddress == "" {
+			r.lggr.Errorw("native token address is empty", "chain", chain)
+			continue
+		}
+
+		var price *big.Int
+		err = reader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameFeeQuoterGetTokenPrices,
+			primitives.Unconfirmed,
+			map[string]any{
+				"token": nativeTokenAddress,
+			},
+			&price,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get native token price", "chain", chain, "err", err)
+			continue
+		}
+
+		if price == nil {
+			r.lggr.Errorw("native token price is nil", "chain", chain)
+			continue
+		}
+		prices[chain] = cciptypes.NewBigInt(price)
+	}
+	return prices
+}
+
+// GetChainFeePriceUpdate Read from Destination chain FeeQuoter latest fee updates for the provided chains.
+// It unpacks the packed fee into the ChainFeeUSDPrices struct.
+// nolint:lll
+// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
+func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
+	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
+	for _, chain := range selectors {
+		update := plugintypes.TimestampedBig{}
+		// Read from dest chain
+		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameGetFeePriceUpdate,
+			primitives.Unconfirmed,
+			map[string]any{
+				// That actually means that this selector is a source chain for the destChain
+				"destChainSelector": chain,
+			},
+			&update,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get chain fee price update", "chain", chain, "err", err)
+			continue
+		}
+		feeUpdates[chain] = update
+		//feeUpdates[chain] = chainfee.ChainFeeUpdate{
+		//	Timestamp: update.Timestamp,
+		//	ChainFee:  chainfee.FromPackedFee(update.Value.Int),
+		//}
 	}
 
-	eg := new(errgroup.Group)
-	gasPrices := make([]cciptypes.BigInt, len(chains))
-	for i, chain := range chains {
-		i, chain := i, chain
-		eg.Go(func() error {
-			gasPrice, err := r.contractWriters[chain].GetFeeComponents(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get gas price: %w", err)
-			}
-			gasPrices[i] = cciptypes.NewBigInt(gasPrice.ExecutionFee)
-			return nil
-		})
-	}
-
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
-	return gasPrices, nil
+	return feeUpdates
 }
 
 func (r *ccipChainReader) DiscoverContracts(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
-	if err := r.validateReaderExistence(destChain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, destChain); err != nil {
 		return nil, err
 	}
 
@@ -508,13 +566,14 @@ func (r *ccipChainReader) DiscoverContracts(
 		return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 	}
 
-	// NonceManager is in the offramp static config.
+	// NonceManager and RMNRemote are in the offramp static config
 	staticConfig, err := r.getOfframpStaticConfig(ctx, r.destChain)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup nonce manager: %w", err)
 	}
 
-	// TODO: Loookup fee quoter?
+	// TODO: Lookup FeeQuoter (from onRamp DynamicConfig)
+	// TODO: Lookup Router (from onRamp DestChainConfig)
 
 	// Build response object.
 	onramps := make(map[cciptypes.ChainSelector][]byte, len(chains))
@@ -526,54 +585,30 @@ func (r *ccipChainReader) DiscoverContracts(
 		consts.ContractNameNonceManager: {
 			destChain: staticConfig.NonceManager,
 		},
+		consts.ContractNameRMNRemote: {
+			destChain: staticConfig.Rmn,
+		},
 	}
 	return resp, nil
 }
 
-// bindReaderContract is a generic helper for binding contracts to readers, the addresses input is the same object
-// returned by DiscoverContracts.
-//
-// No error is returned if contractName is not found in the contracts. This allows calling the function before all
-// contracts are discovered.
-//
-//nolint:unused // it will be used soon.
-func (r *ccipChainReader) bindReaderContract(
-	ctx context.Context,
-	chainSel cciptypes.ChainSelector,
-	contractName string,
-	address []byte,
-) error {
-	if err := r.validateReaderExistence(chainSel); err != nil {
-		return fmt.Errorf("validate reader existence: %w", err)
-	}
-
-	encAddress := typeconv.AddressBytesToString(address, uint64(chainSel))
-
-	// Bind the contract address to the reader.
-	// If the same address exists -> no-op
-	// If the address is changed -> updates the address, overwrites the existing one
-	// If the contract not bound -> binds to the new address
-	if err := r.contractReaders[chainSel].Bind(ctx, []types.BoundContract{
-		{
-			Address: encAddress,
-			Name:    contractName,
-		},
-	}); err != nil {
-		return fmt.Errorf("unable to bind %s for chain %d: %w", contractName, chainSel, err)
-	}
-
-	return nil
-}
-
-// newSync goes through the input contracts and binds them to the contract reader.
-//
-//nolint:unused // it will be used soon.
-func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddresses) error {
+// Sync goes through the input contracts and binds them to the contract reader.
+func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses) error {
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
+			// defense in depth: don't bind if the address is empty.
+			// callers should ensure this but we double check here.
+			if len(address) == 0 {
+				r.lggr.Warnw("skipping binding empty address for contract",
+					"contractName", contractName,
+					"chainSel", chainSel,
+				)
+				continue
+			}
+
 			// try to bind
-			err := r.bindReaderContract(ctx, chainSel, contractName, address)
+			_, err := bindExtendedReaderContract(ctx, r.contractReaders, chainSel, contractName, address)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {
 					// don't support this chain
@@ -583,54 +618,10 @@ func (r *ccipChainReader) newSync(ctx context.Context, contracts ContractAddress
 				// TODO: maybe return early?
 				errs = append(errs, err)
 			}
-			// error is nil, nothing to do
 		}
 	}
+
 	return errors.Join(errs...)
-
-	// OffRamp
-	/*
-		offrampBytes, err := typeconv.AddressStringToBytes(r.offrampAddress, uint64(r.destChain))
-		if err != nil {
-			return err
-		}
-		contracts[consts.ContractNameOffRamp] = map[cciptypes.ChainSelector][]byte{
-			r.destChain: offrampBytes,
-		}
-	*/
-	/*
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameOffRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (offramp): %w", err)
-		}
-
-		// OnRamps
-		err = r.bindReaderContracts(
-			ctx,
-			maps.Keys(r.contractReaders),
-			consts.ContractNameOnRamp,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (onramp): %w", err)
-		}
-
-		// Nonce manager
-		err = r.bindReaderContract(
-			ctx,
-			r.destChain,
-			consts.ContractNameNonceManager,
-			contracts,
-		)
-		if err != nil {
-			return fmt.Errorf("sync error (nonce manager): %w", err)
-		}
-	*/
 }
 
 func (r *ccipChainReader) Close(ctx context.Context) error {
@@ -654,7 +645,7 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 // getSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source chain.
 func (r *ccipChainReader) getSourceChainsConfig(
 	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
-	if err := r.validateReaderExistence(r.destChain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, err
 	}
 
@@ -667,17 +658,14 @@ func (r *ccipChainReader) getSourceChainsConfig(
 			continue
 		}
 
+		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
 		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
-			extendedBindings := r.contractReaders[r.destChain].GetBindings(consts.ContractNameOffRamp)
-			if len(extendedBindings) != 1 {
-				return fmt.Errorf("expected one binding for offRamp contract, got %d", len(extendedBindings))
-			}
-			contractBinding := extendedBindings[0].Binding
-			err := r.contractReaders[r.destChain].GetLatestValue(
+			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 				ctx,
-				contractBinding.ReadIdentifier(consts.MethodNameGetSourceChainConfig),
+				consts.ContractNameOffRamp,
+				consts.MethodNameGetSourceChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{
 					"sourceChainSelector": chainSel,
@@ -687,6 +675,23 @@ func (r *ccipChainReader) getSourceChainsConfig(
 			if err != nil {
 				return fmt.Errorf("failed to get source chain config: %w", err)
 			}
+
+			// This may happen due to some sort of regression in the codec that unmarshals
+			// chain data -> go struct.
+			if len(resp.OnRamp) == 0 {
+				return fmt.Errorf(
+					"onRamp misconfigured/didn't unmarshal for chain %d: %x",
+					chainSel,
+					resp.OnRamp,
+				)
+			}
+
+			if !resp.IsEnabled {
+				// We don't want to process disabled chains prematurely.
+				r.lggr.Debugw("source chain is disabled", "chain", chainSel)
+				return nil
+			}
+
 			mu.Lock()
 			res[chainSel] = resp
 			mu.Unlock()
@@ -710,46 +715,20 @@ type sourceChainConfig struct {
 	MinSeqNr  uint64
 }
 
-func (r *ccipChainReader) validateReaderExistence(chains ...cciptypes.ChainSelector) error {
-	for _, ch := range chains {
-		_, exists := r.contractReaders[ch]
-		if !exists {
-			return fmt.Errorf("chain %d: %w", ch, ErrContractReaderNotFound)
-		}
-	}
-	return nil
-}
-
-func (r *ccipChainReader) validateWriterExistence(chains ...cciptypes.ChainSelector) error {
-	for _, ch := range chains {
-		_, exists := r.contractWriters[ch]
-		if !exists {
-			return fmt.Errorf("chain %d: %w", ch, ErrContractWriterNotFound)
-		}
-	}
-	return nil
-}
-
-// getSourceChainsConfig returns the destination offRamp contract's static chain configuration.
+// getOfframpStaticConfig returns the destination offRamp contract's static configuration.
 func (r *ccipChainReader) getOfframpStaticConfig(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 ) (offrampStaticChainConfig, error) {
-	if err := r.validateReaderExistence(chain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
 		return offrampStaticChainConfig{}, err
 	}
 
-	extendedBindings := r.contractReaders[chain].GetBindings(consts.ContractNameOffRamp)
-	if len(extendedBindings) != 1 {
-		return offrampStaticChainConfig{},
-			fmt.Errorf("expected one binding for Offramp contract, got %d", len(extendedBindings))
-	}
-	contractBinding := extendedBindings[0].Binding
-
 	resp := offrampStaticChainConfig{}
-	err := r.contractReaders[chain].GetLatestValue(
+	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
-		contractBinding.ReadIdentifier(consts.MethodNameOfframpGetStaticConfig),
+		consts.ContractNameOffRamp,
+		consts.MethodNameOfframpGetStaticConfig,
 		primitives.Unconfirmed,
 		map[string]any{},
 		&resp,
@@ -766,7 +745,7 @@ func (r *ccipChainReader) getOfframpStaticConfig(
 //nolint:lll // It's a URL.
 type offrampStaticChainConfig struct {
 	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	RmnProxy           []byte                  `json:"rmnProxy"`
+	Rmn                []byte                  `json:"rmn"`
 	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
 	NonceManager       []byte                  `json:"nonceManager"`
 }

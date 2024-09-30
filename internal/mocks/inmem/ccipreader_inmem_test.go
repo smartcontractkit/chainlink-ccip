@@ -11,12 +11,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 	type fields struct {
-		Reports []plugintypes.CommitPluginReportWithMeta
+		Reports []plugintypes2.CommitPluginReportWithMeta
 	}
 	type args struct {
 		ts    time.Time
@@ -45,7 +45,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				limit: 1000,
 			},
 			fields: fields{
-				Reports: []plugintypes.CommitPluginReportWithMeta{
+				Reports: []plugintypes2.CommitPluginReportWithMeta{
 					{
 						Timestamp: time.UnixMicro(100000000),
 						BlockNum:  1000,
@@ -70,7 +70,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				limit: 1,
 			},
 			fields: fields{
-				Reports: []plugintypes.CommitPluginReportWithMeta{
+				Reports: []plugintypes2.CommitPluginReportWithMeta{
 					{
 						Timestamp: time.UnixMicro(100000000),
 						BlockNum:  1000,
@@ -101,7 +101,7 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 				t.Errorf("CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)
 				return
 			}
-			gotBlocks := slicelib.Map(got, func(report plugintypes.CommitPluginReportWithMeta) expected {
+			gotBlocks := slicelib.Map(got, func(report plugintypes2.CommitPluginReportWithMeta) expected {
 				return expected{block: report.BlockNum}
 			})
 			require.ElementsMatchf(t, gotBlocks, tt.want, "CommitReportsGTETimestamp() got = %v, want %v", got, tt.want)

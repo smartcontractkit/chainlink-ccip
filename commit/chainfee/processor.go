@@ -2,64 +2,49 @@ package chainfee
 
 import (
 	"context"
-	"fmt"
 
-	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
 
-type Processor struct {
+type processor struct {
+	destChain    cciptypes.ChainSelector
+	lggr         logger.Logger
+	homeChain    reader.HomeChain
+	ccipReader   readerpkg.CCIPReader
+	cfg          pluginconfig.CommitOffchainConfig
+	chainSupport plugincommon.ChainSupport
+	fRoleDON     int
 }
 
-func NewProcessor() *Processor {
-	return &Processor{}
+func NewProcessor(
+	lggr logger.Logger,
+	destChain cciptypes.ChainSelector,
+	homeChain reader.HomeChain,
+	ccipReader readerpkg.CCIPReader,
+	offChainConfig pluginconfig.CommitOffchainConfig,
+	chainSupport plugincommon.ChainSupport,
+	fRoleDON int,
+) plugincommon.PluginProcessor[Query, Observation, Outcome] {
+	return &processor{
+		lggr:         lggr,
+		destChain:    destChain,
+		homeChain:    homeChain,
+		ccipReader:   ccipReader,
+		fRoleDON:     fRoleDON,
+		chainSupport: chainSupport,
+		cfg:          offChainConfig,
+	}
 }
 
-func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
 }
 
-func (w *Processor) Observation(
-	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
-) (Observation, error) {
-	return Observation{}, nil
-}
-
-func (w *Processor) Outcome(
-	prevOutcome Outcome,
-	query Query,
-	aos []shared.AttributedObservation[Observation],
-) (Outcome, error) {
-	return Outcome{}, nil
-}
-
-func (w *Processor) ValidateObservation(
-	prevOutcome Outcome,
-	query Query,
-	ao shared.AttributedObservation[Observation],
-) error {
-	//TODO: Validate token prices
-	return nil
-}
-
-func validateObservedGasPrices(gasPrices []cciptypes.GasPriceChain) error {
-	// Duplicate gas prices must not appear for the same chain and must not be empty.
-	gasPriceChains := mapset.NewSet[cciptypes.ChainSelector]()
-	for _, g := range gasPrices {
-		if gasPriceChains.Contains(g.ChainSel) {
-			return fmt.Errorf("duplicate gas price for chain %d", g.ChainSel)
-		}
-		gasPriceChains.Add(g.ChainSel)
-		if g.GasPrice.IsEmpty() {
-			return fmt.Errorf("gas price must not be empty")
-		}
-	}
-
-	return nil
-}
-
-var _ shared.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}

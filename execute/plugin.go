@@ -22,7 +22,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -32,23 +36,28 @@ const maxReportSizeBytes = 250_000
 
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
+	donID        plugintypes.DonID
 	reportingCfg ocr3types.ReportingPluginConfig
 	cfg          pluginconfig.ExecutePluginConfig
 
 	// providers
-	ccipReader   readerpkg.CCIPReader
-	readerSyncer *plugincommon.BackgroundReaderSyncer
-	reportCodec  cciptypes.ExecutePluginCodec
-	msgHasher    cciptypes.MessageHasher
-	homeChain    reader.HomeChain
+	ccipReader  readerpkg.CCIPReader
+	reportCodec cciptypes.ExecutePluginCodec
+	msgHasher   cciptypes.MessageHasher
+	homeChain   reader.HomeChain
+	discovery   *discovery.ContractDiscoveryProcessor
 
 	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver tokendata.TokenDataObserver
 	estimateProvider  gas.EstimateProvider
 	lggr              logger.Logger
+
+	// state
+	contractsInitialized bool
 }
 
 func NewPlugin(
+	donID plugintypes.DonID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	cfg pluginconfig.ExecutePluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -60,28 +69,26 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
-	readerSyncer := plugincommon.NewBackgroundReaderSyncer(
-		lggr,
-		ccipReader,
-		syncTimeout(cfg.SyncTimeout),
-		syncFrequency(cfg.SyncFrequency),
-	)
-	if err := readerSyncer.Start(context.Background()); err != nil {
-		lggr.Errorw("error starting background reader syncer", "err", err)
-	}
-
 	return &Plugin{
+		donID:             donID,
 		reportingCfg:      reportingCfg,
 		cfg:               cfg,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		ccipReader:        ccipReader,
-		readerSyncer:      readerSyncer,
 		reportCodec:       reportCodec,
 		msgHasher:         msgHasher,
 		homeChain:         homeChain,
 		tokenDataObserver: tokenDataObserver,
 		estimateProvider:  estimateProvider,
 		lggr:              lggr,
+		discovery: discovery.NewContractDiscoveryProcessor(
+			lggr,
+			&ccipReader,
+			homeChain,
+			cfg.DestChain,
+			reportingCfg.F,
+			oracleIDToP2pID,
+		),
 	}
 }
 
@@ -156,6 +163,7 @@ func getPendingExecutedReports(
 //
 // Phase 2: Gather messages from the source chains and build the execution
 // report.
+// nolint:gocyclo // todo
 func (p *Plugin) Observation(
 	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
 ) (types.Observation, error) {
@@ -168,6 +176,21 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 		}
 		p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+	}
+
+	var discoveryObs dt.Observation
+	// discovery processor disabled by setting it to nil.
+	if p.discovery != nil {
+		discoveryObs, err = p.discovery.Observation(ctx, dt.Outcome{}, dt.Query{})
+		if err != nil {
+			p.lggr.Errorw("failed to discover contracts", "err", err)
+		}
+
+		if !p.contractsInitialized {
+			p.lggr.Infow("contracts not initialized, only making discovery observations",
+				"discoveryObs", discoveryObs)
+			return exectypes.Observation{Contracts: discoveryObs}.Encode()
+		}
 	}
 
 	state := previousOutcome.State.Next()
@@ -189,7 +212,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil, nil).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil, nil, discoveryObs).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -249,7 +272,7 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 		}
 
-		return exectypes.NewObservation(groupedCommits, messages, tkData, nil).Encode()
+		return exectypes.NewObservation(groupedCommits, messages, tkData, nil, discoveryObs).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -279,7 +302,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nil, nonceObservations).Encode()
+		return exectypes.NewObservation(nil, nil, nil, nonceObservations, discoveryObs).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -358,9 +381,14 @@ func selectReport(
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
+// nolint:gocyclo // todo
 func (p *Plugin) Outcome(
 	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
+	p.lggr.Debugw("Execute plugin performing outcome",
+		"outctx", outctx,
+		"query", query,
+		"attributedObservations", aos)
 	var previousOutcome exectypes.Outcome
 	if outctx.PreviousOutcome != nil {
 		var err error
@@ -370,13 +398,34 @@ func (p *Plugin) Outcome(
 		}
 	}
 
+	decodedAos, err := decodeAttributedObservations(aos)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode observations: %w", err)
+	}
+
+	// discovery processor disabled by setting it to nil.
+	if p.discovery != nil {
+		discoveryAos := make([]plugincommon.AttributedObservation[dt.Observation], len(decodedAos))
+		for i := range decodedAos {
+			discoveryAos[i] = plugincommon.AttributedObservation[dt.Observation]{
+				OracleID:    decodedAos[i].OracleID,
+				Observation: decodedAos[i].Observation.Contracts,
+			}
+		}
+		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
+		if err != nil {
+			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
+		}
+		p.contractsInitialized = true
+	}
+
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
 	}
 
 	observation, err := getConsensusObservation(
-		p.lggr, aos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
+		p.lggr, decodedAos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -448,6 +497,13 @@ func (p *Plugin) Outcome(
 	}
 
 	if outcome.IsEmpty() {
+		p.lggr.Warnw(
+			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
+			"oracle", p.reportingCfg.OracleID,
+			"execPluginState", state)
+		if p.contractsInitialized {
+			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
+		}
 		return nil, nil
 	}
 
@@ -521,6 +577,19 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
+	// we only transmit reports if we are the "blue" instance.
+	// we can check this by reading the OCR conigs home chain.
+	isGreen, err := p.isGreenInstance(ctx)
+	if err != nil {
+		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isGreenInstance: %w", err)
+	}
+
+	if isGreen {
+		p.lggr.Debugw("not the blue instance, skipping report transmission",
+			"myDigest", p.reportingCfg.ConfigDigest.Hex())
+		return false, nil
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
@@ -534,14 +603,19 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	return true, nil
 }
 
+func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
+	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
+	if err != nil {
+		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
+	}
+
+	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
+}
+
 func (p *Plugin) Close() error {
 	timeout := 10 * time.Second // todo: cfg
 	ctx, cf := context.WithTimeout(context.Background(), timeout)
 	defer cf()
-
-	if err := p.readerSyncer.Close(); err != nil {
-		p.lggr.Warnw("error closing reader syncer", "err", err)
-	}
 
 	if err := p.ccipReader.Close(ctx); err != nil {
 		return fmt.Errorf("close ccip reader: %w", err)
@@ -570,20 +644,6 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
 	return chains.Contains(p.cfg.DestChain), nil
-}
-
-func syncFrequency(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 10 * time.Second
-	}
-	return configuredValue
-}
-
-func syncTimeout(configuredValue time.Duration) time.Duration {
-	if configuredValue.Milliseconds() == 0 {
-		return 3 * time.Second
-	}
-	return configuredValue
 }
 
 // Interface compatibility checks.

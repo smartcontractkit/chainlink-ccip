@@ -9,11 +9,10 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	"github.com/smartcontractkit/chainlink-ccip/shared"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -35,9 +34,9 @@ func Test_Observation(t *testing.T) {
 		cciptypes.NewTokenPrice(tokenA, bi100),
 		cciptypes.NewTokenPrice(tokenB, bi200),
 	}
-	feeQuoterTokenUpdates := map[types.Account]shared.TimestampedBig{
-		tokenA: shared.NewTimestampedBig(bi100.Int64(), timestamp),
-		tokenB: shared.NewTimestampedBig(bi200.Int64(), timestamp),
+	feeQuoterTokenUpdates := map[types.Account]plugintypes.TimestampedBig{
+		tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
+		tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
 	}
 
 	testCases := []struct {
@@ -60,9 +59,9 @@ func Test_Observation(t *testing.T) {
 					Return([]*big.Int{bi100, bi200}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
-					map[types.Account]shared.TimestampedBig{
-						tokenA: shared.NewTimestampedBig(bi100.Int64(), timestamp),
-						tokenB: shared.NewTimestampedBig(bi200.Int64(), timestamp),
+					map[types.Account]plugintypes.TimestampedBig{
+						tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
+						tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
 					},
 					nil,
 				)
@@ -80,7 +79,7 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
-					bigF:             f,
+					fRoleDON:         f,
 				}
 			},
 			expObs: Observation{
@@ -106,7 +105,7 @@ func Test_Observation(t *testing.T) {
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
 					cfg:              defaultCfg,
-					bigF:             f,
+					fRoleDON:         f,
 				}
 			},
 			expObs: Observation{},

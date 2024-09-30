@@ -7,38 +7,29 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
-	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-
-	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
-	chainreadermocks "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
+	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
 var (
-	chainA       = cciptypes.ChainSelector(1)
-	chainB       = cciptypes.ChainSelector(2)
-	chainC       = cciptypes.ChainSelector(3)
-	oracleAId    = commontypes.OracleID(1)
-	p2pOracleAId = libocrtypes.PeerID{byte(oracleAId)}
-	oracleBId    = commontypes.OracleID(2)
-	p2pOracleBId = libocrtypes.PeerID{byte(oracleBId)}
-	oracleCId    = commontypes.OracleID(3)
-	p2pOracleCId = libocrtypes.PeerID{byte(oracleCId)}
+	ccipConfigBoundContract = types.BoundContract{
+		Address: "0xCCIPConfigFakeAddress",
+		Name:    consts.ContractNameCCIPConfig,
+	}
 )
 
 func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
-	homeChainReader := chainreadermocks.NewMockContractReader(t)
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -55,10 +46,7 @@ func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
-		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
-			Name:    consts.ContractNameCCIPConfig,
-		},
+		ccipConfigBoundContract,
 	)
 	require.NoError(t, configPoller.Start(context.Background()))
 	// Initially it's healthy
@@ -129,7 +117,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
-	homeChainReader := chainreadermocks.NewMockContractReader(t)
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -154,10 +142,7 @@ func Test_PollingWorking(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		tickTime,
-		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
-			Name:    consts.ContractNameCCIPConfig,
-		},
+		ccipConfigBoundContract,
 	)
 
 	require.NoError(t, configPoller.Start(context.Background()))
@@ -183,7 +168,7 @@ func Test_PollingWorking(t *testing.T) {
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	donID := uint32(1)
 	pluginType := uint8(1) // execution
-	homeChainReader := chainreadermocks.NewMockContractReader(t)
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -212,10 +197,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 		homeChainReader,
 		logger.Test(t),
 		10*time.Millisecond,
-		types.BoundContract{
-			Address: "0xCCIPConfigFakeAddress",
-			Name:    consts.ContractNameCCIPConfig,
-		},
+		ccipConfigBoundContract,
 	)
 
 	configs, err := configPoller.GetOCRConfigs(context.Background(), donID, pluginType)

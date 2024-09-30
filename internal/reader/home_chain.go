@@ -18,6 +18,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 const (
@@ -51,17 +52,14 @@ type state struct {
 }
 
 type homeChainPoller struct {
-	wg              sync.WaitGroup
-	stopCh          services.StopChan
-	sync            services.StateMachine
-	homeChainReader types.ContractReader
-	lggr            logger.Logger
-	mutex           *sync.RWMutex
-	state           state
-	failedPolls     uint
-	// TODO: currently unused but will be passed into GetLatestValue
-	// once the chainlink-common breaking change comes in
-	// (https://github.com/smartcontractkit/chainlink-common/pull/603).
+	wg                      sync.WaitGroup
+	stopCh                  services.StopChan
+	sync                    services.StateMachine
+	homeChainReader         contractreader.ContractReaderFacade
+	lggr                    logger.Logger
+	mutex                   *sync.RWMutex
+	state                   state
+	failedPolls             uint
 	ccipConfigBoundContract types.BoundContract
 	// How frequently the poller fetches the chain configs
 	pollingDuration time.Duration
@@ -70,7 +68,7 @@ type homeChainPoller struct {
 const MaxFailedPolls = 10
 
 func NewHomeChainConfigPoller(
-	homeChainReader types.ContractReader,
+	homeChainReader contractreader.ContractReaderFacade,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
@@ -357,6 +355,7 @@ type OCR3Config struct {
 	F                     uint8                   `json:"F"`
 	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
 	OfframpAddress        []byte                  `json:"offrampAddress"`
+	RmnHomeAddress        []byte                  `json:"rmnHomeAddress"`
 	P2PIds                [][32]byte              `json:"p2pIds"`
 	Signers               [][]byte                `json:"signers"`
 	Transmitters          [][]byte                `json:"transmitters"`

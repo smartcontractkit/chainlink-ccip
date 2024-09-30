@@ -6,20 +6,20 @@ import (
 	"math/big"
 	"testing"
 
-	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/cl-common/chainreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
+	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
-	"github.com/stretchr/testify/require"
-
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 const (
@@ -93,9 +93,9 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 	for _, tc := range testCases {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
 		tokenPricesReader := OnchainTokenPricesReader{
-			ContractReader: contractReader,
-			TokenInfo:      tc.tokenInfo,
-			enabled:        true,
+			ContractReader:   contractReader,
+			TokenInfo:        tc.tokenInfo,
+			feeQuoterEnabled: true,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -157,8 +157,8 @@ func createMockReader(
 	mockPrices map[ocr2types.Account]*big.Int,
 	errorAccounts []ocr2types.Account,
 	tokenInfo map[ocr2types.Account]pluginconfig.TokenInfo,
-) *readermock.MockContractReader {
-	reader := readermock.NewMockContractReader(t)
+) *readermock.MockContractReaderFacade {
+	reader := readermock.NewMockContractReaderFacade(t)
 
 	for token, price := range mockPrices {
 		info := tokenInfo[token]

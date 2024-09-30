@@ -4,9 +4,9 @@ import (
 	"context"
 	"sort"
 
-	"github.com/smartcontractkit/chainlink-ccip/shared"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -16,7 +16,7 @@ import (
 func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.lggr.Warnw("call to GetFChain failed", "err", err)
+		p.lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
@@ -41,7 +41,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	}
 
 	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
-	//sort tokens to query to ensure deterministic order
+	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
 	tokenPrices, err := p.tokenPriceReader.GetTokenFeedPricesUSD(ctx, tokensToQuery)
@@ -53,6 +53,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	// If we couldn't fetch all prices log and return only the ones we could fetch
 	if len(tokenPrices) != len(tokensToQuery) {
 		p.lggr.Errorw("token prices length mismatch", "got", tokenPrices, "want", tokensToQuery)
+		return []cciptypes.TokenPrice{}
 	}
 
 	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokenPrices))
@@ -63,36 +64,36 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	return tokenPricesUSD
 }
 
-func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]shared.TimestampedBig {
+func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]plugintypes.TimestampedBig {
 	if p.tokenPriceReader == nil {
 		p.lggr.Debugw("no token price reader available")
-		return map[types.Account]shared.TimestampedBig{}
+		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 
 	supportsDestChain, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
 		p.lggr.Warnw("call to SupportsDestChain failed", "err", err)
-		return map[types.Account]shared.TimestampedBig{}
+		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 	if !supportsDestChain {
-		p.lggr.Debugw("oracle does not support price registry observation", "oracleID", p.oracleID)
-		return map[types.Account]shared.TimestampedBig{}
+		p.lggr.Debugw("oracle does not support fee quoter observation", "oracleID", p.oracleID)
+		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 
 	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
-	//sort tokens to query to ensure deterministic order
+	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
-	p.lggr.Infow("observing price registry token updates")
+	p.lggr.Infow("observing fee quoter token updates")
 	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery)
 	if err != nil {
 		p.lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
-		return map[types.Account]shared.TimestampedBig{}
+		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 
-	tokenUpdates := make(map[types.Account]shared.TimestampedBig)
+	tokenUpdates := make(map[types.Account]plugintypes.TimestampedBig)
 
 	for token, update := range priceUpdates {
-		tokenUpdates[token] = shared.TimestampedBig{
+		tokenUpdates[token] = plugintypes.TimestampedBig{
 			Value:     update.Value,
 			Timestamp: update.Timestamp,
 		}

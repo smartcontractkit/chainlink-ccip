@@ -11,8 +11,9 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
-	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/shared"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
 
 // Outcome depending on the current state, either:
@@ -22,7 +23,7 @@ import (
 func (w *Processor) Outcome(
 	prevOutcome Outcome,
 	query Query,
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	tStart := time.Now()
 	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
@@ -34,7 +35,7 @@ func (w *Processor) Outcome(
 func (w *Processor) getOutcome(
 	previousOutcome Outcome,
 	q Query,
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, State) {
 	nextState := previousOutcome.NextState()
 
@@ -46,7 +47,7 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(q, consensusObservation), nextState
+		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize), nextState
 	case BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
@@ -64,10 +65,11 @@ func (w *Processor) getOutcome(
 }
 
 // reportRangesOutcome determines the sequence number ranges for each chain to build a report from in the next round
-// TODO: ensure each range is below a limit
 func reportRangesOutcome(
 	_ Query,
+	lggr logger.Logger,
 	consensusObservation ConsensusObservation,
+	maxMerkleTreeSize uint64,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
@@ -82,11 +84,19 @@ func reportRangesOutcome(
 		}
 
 		if offRampNextSeqNum <= onRampMaxSeqNum {
+			rng := cciptypes.NewSeqNumRange(offRampNextSeqNum, onRampMaxSeqNum)
+
 			chainRange := plugintypes.ChainRange{
 				ChainSel:    chainSel,
-				SeqNumRange: [2]cciptypes.SeqNum{offRampNextSeqNum, onRampMaxSeqNum},
+				SeqNumRange: rng.Limit(maxMerkleTreeSize),
 			}
 			rangesToReport = append(rangesToReport, chainRange)
+
+			if rng.End() != chainRange.SeqNumRange.End() { // Check if the range was truncated.
+				lggr.Infof("Range for chain %d: %s (before truncate: %v)", chainSel, chainRange.SeqNumRange, rng)
+			} else {
+				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
+			}
 		}
 
 		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
@@ -196,19 +206,16 @@ func checkForReportTransmission(
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func getConsensusObservation(
 	lggr logger.Logger,
-	F int,
+	fRoleDON int,
 	destChain cciptypes.ChainSelector,
-	aos []shared.AttributedObservation[Observation],
+	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	fMin := make(map[cciptypes.ChainSelector]int)
-	for chain := range aggObs.FChain {
-		fMin[chain] = F
-	}
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
-	fChains := shared.GetConsensusMap(lggr, "fChain", aggObs.FChain, fMin)
+	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fRoleDON))
+	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
 
 	_, exists := fChains[destChain]
 	if !exists {
@@ -216,15 +223,12 @@ func getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
-	twoFPlus1 := make(map[cciptypes.ChainSelector]int)
-	for chain, f := range fChains {
-		twoFPlus1[chain] = 2*f + 1
-	}
-
+	// Get consensus using strict 2f+1 threshold.
+	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	consensusObs := ConsensusObservation{
-		MerkleRoots:        shared.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, fChains),
-		OnRampMaxSeqNums:   shared.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
-		OffRampNextSeqNums: shared.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, fChains),
+		MerkleRoots:        consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFPlus1),
+		OnRampMaxSeqNums:   consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
+		OffRampNextSeqNums: consensus.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, twoFPlus1),
 		FChain:             fChains,
 	}
 
