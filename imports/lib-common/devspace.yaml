@@ -19,9 +19,6 @@ vars:
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
-#  CHAINLINK_REPO_DIR:
-#    source: env
-#    default: "${CHAINLINK_CODE_DIR}/chainlink"
 
 pipelines:
   purge:
