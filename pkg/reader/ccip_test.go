@@ -381,7 +381,7 @@ func addDestinationContractAssertions(
 	extended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
+		consts.MethodNameOfframpGetStaticConfig, //nolint:staticcheck // TODO: use the new name.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
@@ -394,7 +394,7 @@ func addDestinationContractAssertions(
 	extended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetDynamicConfig,
+		consts.MethodNameOfframpGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
@@ -456,7 +456,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
 			mock.Anything,
 			consts.ContractNameOnRamp,
-			consts.MethodNameOnRampGetDynamicConfig,
+			consts.MethodNameOnrampGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
 			primitives.Unconfirmed,
 			map[string]any{},
 			mock.Anything,
@@ -541,7 +541,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
 			mock.Anything,
 			consts.ContractNameOnRamp,
-			consts.MethodNameOnRampGetDynamicConfig,
+			consts.MethodNameOnrampGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
 			primitives.Unconfirmed,
 			map[string]any{},
 			mock.Anything,
@@ -611,7 +611,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
+		consts.MethodNameOfframpGetStaticConfig, //nolint:staticcheck // TODO: use the new name.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
@@ -624,7 +624,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetDynamicConfig,
+		consts.MethodNameOfframpGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,
@@ -757,7 +757,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
+		consts.MethodNameOfframpGetStaticConfig, //nolint:staticcheck // TODO: use the new name.
 		primitives.Unconfirmed,
 		map[string]any{},
 		mock.Anything,

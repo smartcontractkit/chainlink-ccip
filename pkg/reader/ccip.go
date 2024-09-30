@@ -577,7 +577,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		ctx,
 		r.destChain,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
+		consts.MethodNameOfframpGetStaticConfig, //nolint:staticcheck // TODO: use the new name.
 		&staticConfig,
 	)
 	if err != nil {
@@ -592,7 +592,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		ctx,
 		r.destChain,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetDynamicConfig,
+		consts.MethodNameOfframpGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
 		&dynamicConfig,
 	)
 	if err != nil {
@@ -876,7 +876,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
-				consts.MethodNameOnRampGetDynamicConfig,
+				consts.MethodNameOnrampGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
 				primitives.Unconfirmed,
 				map[string]any{},
 				&resp,

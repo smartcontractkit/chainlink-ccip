@@ -60,9 +60,12 @@ const (
 
 	// Deprecated: TODO: remove after chainlink is updated.
 	MethodNameOfframpGetDynamicConfig = "OfframpGetDynamicConfig"
-	MethodNameOfframpGetStaticConfig  = "OfframpGetStaticConfig"
-	MethodNameOnrampGetDynamicConfig  = "OnrampGetDynamicConfig"
-	MethodNameOnrampGetStaticConfig   = "OnrampGetStaticConfig"
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOfframpGetStaticConfig = "OfframpGetStaticConfig"
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOnrampGetDynamicConfig = "OnrampGetDynamicConfig"
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOnrampGetStaticConfig = "OnrampGetStaticConfig"
 
 	/*
 		// On EVM:
