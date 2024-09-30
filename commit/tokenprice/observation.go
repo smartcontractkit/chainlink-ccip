@@ -35,7 +35,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	}
 
 	if !supportedChains.Contains(p.cfg.OffchainConfig.PriceFeedChainSelector) {
-		p.lggr.Debugw("oracle does not support token price observation", "oracleID", p.oracleID)
+		p.lggr.Debugw("oracle does not support token price observation")
 		return []cciptypes.TokenPrice{}
 
 	}
@@ -76,7 +76,7 @@ func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 	if !supportsDestChain {
-		p.lggr.Debugw("oracle does not support fee quoter observation", "oracleID", p.oracleID)
+		p.lggr.Debugw("oracle does not support fee quoter observation")
 		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 
