@@ -17,9 +17,8 @@ func (p *processor) ValidateObservation(
 	query Query,
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
-	return nil // TODO: There is an issue in the validation logic. Disabling it short-term.
-
 	obs := ao.Observation
+	zero := big.NewInt(0)
 
 	if err := validateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
@@ -39,37 +38,24 @@ func (p *processor) ValidateObservation(
 	}
 
 	for _, feeComponent := range obs.FeeComponents {
-		err := validateBigInt(feeComponent.ExecutionFee, "execution fee")
-		if err != nil {
-			return err
+		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(zero) <= 0 {
+			return fmt.Errorf("nil or non-positive %s", "execution fee")
 		}
 
-		err = validateBigInt(feeComponent.DataAvailabilityFee, "data availability fee")
-		if err != nil {
-			return err
+		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(zero) < 0 {
+			return fmt.Errorf("nil or negative %s", "data availability fee")
 		}
-
 	}
 
 	for _, token := range obs.NativeTokenPrices {
-		err := validateBigInt(token.Int, "native token price")
-		if err != nil {
-			return err
+		if token.Int == nil || token.Int.Cmp(zero) <= 0 {
+			return fmt.Errorf("nil or non-positive %s", "execution fee")
 		}
 	}
+
 	return nil
 }
 
-func validateBigInt(b *big.Int, name string) error {
-	zero := big.NewInt(0)
-	if b == nil {
-		return fmt.Errorf("nil %s", name)
-	}
-	if b.Cmp(zero) < 0 || b.Cmp(zero) == 0 {
-		return fmt.Errorf("%s must be positive", name)
-	}
-	return nil
-}
 func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
 	for _, f := range fChain {
 		if f < 0 {
