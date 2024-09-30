@@ -66,7 +66,7 @@ func Test_USDC_Transfer(t *testing.T) {
 
 	nodeIDs := make([]commontypes.OracleID, 0, len(nodesSetup))
 	for _, n := range nodesSetup {
-		nodeIDs = append(nodeIDs, n.node.RreportingCfg().OracleID)
+		nodeIDs = append(nodeIDs, n.node.ReportingCfg().OracleID)
 	}
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)

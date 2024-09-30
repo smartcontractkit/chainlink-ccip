@@ -56,7 +56,7 @@ type Plugin struct {
 	contractsInitialized bool
 }
 
-func (p *Plugin) RreportingCfg() ocr3types.ReportingPluginConfig {
+func (p *Plugin) ReportingCfg() ocr3types.ReportingPluginConfig {
 	return p.reportingCfg
 }
 
