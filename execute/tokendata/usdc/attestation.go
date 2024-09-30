@@ -40,6 +40,8 @@ func ErrorAttestationStatus(err error) AttestationStatus {
 	return AttestationStatus{Error: err}
 }
 
+type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
+
 // AttestationClient is an interface for fetching attestation data from the Circle API.
 // It returns a data grouped by chainSelector, sequenceNumber and tokenIndex
 //

@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -220,6 +221,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		logger.Test(t),
 		baseChain,
 		config,
+		testhelpers.USDCEncoder,
 		usdcReader,
 		attestation,
 	)

@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -217,7 +218,14 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			observer := usdc.NewTokenDataObserver(logger.Test(t), 1, config, test.usdcReader, test.attestationClient)
+			observer := usdc.NewTokenDataObserver(
+				logger.Test(t),
+				1,
+				config,
+				testhelpers.USDCEncoder,
+				test.usdcReader,
+				test.attestationClient,
+			)
 
 			tkData, err := observer.Observe(context.Background(), test.messageObservations)
 			require.NoError(t, err)
