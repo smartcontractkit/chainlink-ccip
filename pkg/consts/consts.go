@@ -27,7 +27,7 @@ const (
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
 	MethodNameOffRampGetDynamicConfig      = "OffRampGetDynamicConfig"
 	MethodNameOffRampGetStaticConfig       = "OffRampGetStaticConfig"
-	MethodNameOffRampGetDestChainConfig    = "GetDestChainConfig"
+	MethodNameOffRampGetDestChainConfig    = "OffRampGetDestChainConfig"
 	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                    = "IsBlessed"
 	MethodNameGetMerkleRoot                = "GetMerkleRoot"
