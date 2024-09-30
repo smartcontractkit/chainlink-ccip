@@ -232,6 +232,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"nonceManagerAddrs", agg.nonceManagerAddrs,
 		"fChainThresh", fChainThresh,
 	)
+	if len(nonceManagerConsensus) == 0 {
+		cdp.lggr.Warnw("No consensus on nonce manager, nonceManagerConsensus map is empty")
+	}
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
 	// RMNRemote address consensus
@@ -246,6 +249,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"rmnRemoteAddrs", agg.rmnRemoteAddrs,
 		"fChainThresh", fChainThresh,
 	)
+	if len(rmnRemoteConsensus) == 0 {
+		cdp.lggr.Warnw("No consensus on RMNRemote, rmnRemoteConsensus map is empty")
+	}
 	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
 	// Router address consensus
@@ -260,6 +266,9 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"RouterAddrs", agg.routerAddrs,
 		"fChainThresh", fChainThresh,
 	)
+	if len(routerConsensus) == 0 {
+		cdp.lggr.Warnw("No consensus on router, routerConsensus map is empty")
+	}
 	contracts[consts.ContractNameRouter] = routerConsensus
 
 	feeQuoterConsensus := consensus.GetConsensusMap(
