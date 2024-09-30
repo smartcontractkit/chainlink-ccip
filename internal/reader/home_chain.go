@@ -355,6 +355,7 @@ type OCR3Config struct {
 	F                     uint8                   `json:"F"`
 	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
 	OfframpAddress        []byte                  `json:"offrampAddress"`
+	RmnHomeAddress        []byte                  `json:"rmnHomeAddress"`
 	P2PIds                [][32]byte              `json:"p2pIds"`
 	Signers               [][]byte                `json:"signers"`
 	Transmitters          [][]byte                `json:"transmitters"`
