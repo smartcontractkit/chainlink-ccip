@@ -2,11 +2,6 @@
 version: v2beta1
 name: geth
 
-vars:
-  CHAINLINK_CLUSTER_HELM_CHART_URI:
-    source: env
-    default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
-
 pipelines:
   kind:
     run: |-
@@ -15,7 +10,6 @@ pipelines:
   deploy:
     run: |-
       create_deployments geth
-
 
 pullSecrets:
   regcred-don:
@@ -43,54 +37,27 @@ deployments:
     helm:
       releaseName: "geth"
       chart:
-        name: ${CHAINLINK_CLUSTER_HELM_CHART_URI}
-        version: "1.x"
+        name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
+        version: "0.1.0-preview-1636-2782c69"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
       values:
-        podSecurityContext:
-          fsGroup: 999
-        chainlink:
-          enabled: false
-        db:
-          enabled: false
-        # default cluster shipped with latest Geth ( dev mode by default )
-        mockserver:
-          enabled: false
-        opentelemetry-collector:
-          enabled: false
-        tempo:
-          enabled: false
-        grafana:
-          enabled: false
-        geth:
-          enabled: true
-          securityContext:
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
-          version: v1.12.0
-          wsRpcPort: 8546
-          httpRpcPort: 8544
-          chains:
-            - networkId: 1337
-              customEVMConfigToml: |
-                [EVM.GasEstimator]
-                PriceMax = '200 gwei'
-                LimitDefault = 6000000
-                FeeCapDefault = '200 gwei'
-            - networkId: 2337
-              customEVMConfigToml: |
-                [EVM.GasEstimator]
-                PriceMax = '200 gwei'
-                LimitDefault = 6000000
-                FeeCapDefault = '200 gwei'
-          blocktime: 1
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+        version: v1.12.0
+        wsRpcPort: 8546
+        httpRpcPort: 8544
+        chains:
+          - networkId: 1337
+          - networkId: 2337
+        blocktime: 1
 
         # These ingresses create AWS ALB resources and Route 53 Records.
         ingress:
@@ -146,9 +113,52 @@ profiles:
   - name: local-charts
     merge:
       deployments:
-        app:
+        geth:
           helm:
             chart:
-              name: crib-chainlink-cluster
-              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-chainlink-cluster
+              name: crib-geth
+              path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-geth
               version: null
+  - name: ccip
+    merge:
+      deployments:
+        geth:
+          helm:
+            values:
+              statefulSet:
+                # Set to true to use StatefulSet instead of Deployment.
+                enabled: true
+              networkPolicy:
+                # Allow additional services to access geth
+                extraIngressSelectors:
+                  - podSelector:
+                      matchLabels:
+                        app: atlas
+                  - podSelector:
+                      matchLabels:
+                        app: ccip-scripts-deployer
+              chains:
+                - networkId: 1337
+                  customEVMConfigToml: |
+                    [EVM.GasEstimator]
+                    PriceMax = '200 gwei'
+                    LimitDefault = 6000000
+                    FeeCapDefault = '200 gwei'
+                - networkId: 2337
+                  customEVMConfigToml: |
+                    [EVM.GasEstimator]
+                    PriceMax = '200 gwei'
+                    LimitDefault = 6000000
+                    FeeCapDefault = '200 gwei'
+  - name: kind
+    merge:
+      deployments:
+        geth:
+          helm:
+            values:
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+              statefulSet:
+                enabled: false

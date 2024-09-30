@@ -31,12 +31,12 @@ imports:
 pipelines:
   core:
     run: |-
-      run_dependency_pipelines crib-chainlink-cluster
+      run_dependency_pipelines crib-chainlink-cluster geth mockserver
       run_pipelines ingress-check
 
   ccip:
     run: |-
-      run_dependency_pipelines crib-chainlink-cluster
+      run_dependency_pipelines crib-chainlink-cluster geth mockserver
       run_dependency_pipelines crib-ccip-scripts
       run_pipelines ingress-check
 
@@ -105,6 +105,15 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - core
+          geth:
+            path: ${DEPENDENCIES_DIR}/geth
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          mockserver:
+            path: ${DEPENDENCIES_DIR}/mockserver
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+
   - name: core-dev-ocr2-external-network
     parents:
       - profile: core
@@ -156,6 +165,12 @@ profiles:
   - name: ccip
     patches:
       - op: add
+        path: vars
+        value:
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/ccip"
+      - op: add
         path: dependencies
         value:
           crib-chainlink-cluster:
@@ -166,6 +181,16 @@ profiles:
               - ccip
           crib-ccip-scripts:
             path: ${DEPENDENCIES_DIR}/crib-ccip-scripts
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          geth:
+            path: ${DEPENDENCIES_DIR}/geth
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
+          mockserver:
+            path: ${DEPENDENCIES_DIR}/mockserver
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
   - name: ccip-local
@@ -211,6 +236,8 @@ profiles:
             path: ${DEPENDENCIES_DIR}/geth
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
           crib-chainlink-cluster:
             path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
             overwriteVars: true
