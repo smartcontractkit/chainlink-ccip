@@ -116,10 +116,10 @@ func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
 
 func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error) {
 	// Terminate immediately when rate limited
-	if h.inCoolDownPeriod() {
+	if coolDown, duration := h.inCoolDownPeriod(); coolDown {
 		h.lggr.Errorw(
 			"Rate limited by the Attestation API, dropping all requests",
-			"coolDownDuration", h.coolDownDuration(),
+			"coolDownDuration", duration,
 		)
 		return nil, http.StatusTooManyRequests, ErrRateLimit
 	}
@@ -224,14 +224,8 @@ func (h *httpClient) setCoolDownPeriod(headers http.Header) {
 	h.coolDownUntil = time.Now().Add(coolDownDuration)
 }
 
-func (h *httpClient) inCoolDownPeriod() bool {
+func (h *httpClient) inCoolDownPeriod() (bool, time.Duration) {
 	h.coolDownMu.RLock()
 	defer h.coolDownMu.RUnlock()
-	return time.Now().Before(h.coolDownUntil)
-}
-
-func (h *httpClient) coolDownDuration() time.Duration {
-	h.coolDownMu.RLock()
-	defer h.coolDownMu.RUnlock()
-	return time.Until(h.coolDownUntil)
+	return time.Now().Before(h.coolDownUntil), time.Until(h.coolDownUntil)
 }
