@@ -483,10 +483,7 @@ func getConsensusObservation(
 	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
 
 	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
-	lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged costly messages", oracleID),
-		"oracle", oracleID,
-		"mergedCostlyMessages", mergedCostlyMessages)
+	lggr.Debugw("merged costly messages", "mergedCostlyMessages", mergedCostlyMessages)
 
 	mergedNonceObservations :=
 		mergeNonceObservations(aos, fChain[destChainSelector])
