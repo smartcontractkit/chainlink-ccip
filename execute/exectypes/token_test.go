@@ -125,3 +125,35 @@ func Test_MessageTokensData_ToByteSlice(t *testing.T) {
 		})
 	}
 }
+
+func Test_MessageTokenData_Append(t *testing.T) {
+	t.Run("append token to the firs empty slot", func(t *testing.T) {
+		msg := NewMessageTokenData()
+		msg = msg.Append(0, NewSuccessTokenData([]byte{1}))
+		assert.Equal(t, 1, len(msg.TokenData))
+		assert.True(t, msg.IsReady())
+	})
+
+	t.Run("append error to the next slot", func(t *testing.T) {
+		msg := NewMessageTokenData()
+		msg = msg.Append(0, NewSuccessTokenData([]byte{1}))
+		msg = msg.Append(1, NewErrorTokenData(fmt.Errorf("token not supported")))
+		assert.Equal(t, 2, len(msg.TokenData))
+		assert.False(t, msg.IsReady())
+		assert.Equal(t, "token not supported", msg.Error().Error())
+	})
+
+	t.Run("append token to the very last slot", func(t *testing.T) {
+		msg := NewMessageTokenData()
+		msg = msg.Append(10, NewSuccessTokenData([]byte{10}))
+		assert.Equal(t, 11, len(msg.TokenData))
+		assert.False(t, msg.IsReady())
+		assert.Nil(t, msg.Error())
+
+		for i := 0; i < 10; i++ {
+			assert.Nil(t, msg.TokenData[i].Data)
+			msg = msg.Append(i, NewSuccessTokenData([]byte{byte(i)}))
+		}
+		assert.True(t, msg.IsReady())
+	})
+}
