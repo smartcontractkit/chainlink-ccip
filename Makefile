@@ -14,17 +14,21 @@ else
 endif
 PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v28.0/$(PROTOC_ZIP)
 
-PROTOC_BIN := /usr/local/bin/protoc
+PROTOC_BIN ?= /usr/local/bin/protoc
 
 build: ensure_go_version
 	go build -v ./...
 
+# If you have a different version of protoc installed, you can use the following command to generate the protobuf files
+# make generate PROTOC_BIN=/path/to/protoc
 generate: ensure_go_version clean-generate generate-protobuf generate-mocks
 
 generate-mocks: ensure_go_version
 	go install github.com/vektra/mockery/v2@v2.43.2
 	mockery
 
+# If you have a different version of protoc installed, you can use the following command to generate the protobuf files
+# make generate-protobuf PROTOC_BIN=/path/to/protoc
 generate-protobuf: ensure_go_version ensure_protoc_28_0
 	$(PROTOC_BIN) --go_out=./commit/merkleroot/rmn/rmnpb --go_opt=paths=source_relative rmn_offchain.proto
 
@@ -47,7 +51,7 @@ install-protoc:
 	sudo unzip -o $(PROTOC_ZIP) -d /usr/local bin/protoc
 	sudo unzip -o $(PROTOC_ZIP) -d /usr/local 'include/*'
 	rm -f $(PROTOC_ZIP)
-	sudo chmod +x /usr/local/bin/protoc
+	sudo chmod +x $(PROTOC_BIN)
 	@echo "Installed protoc version:"
 	$(PROTOC_BIN) --version
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
