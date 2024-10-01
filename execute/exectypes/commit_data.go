@@ -25,6 +25,11 @@ type CommitData struct {
 	// ExecutedMessages are the messages in this report that have already been executed.
 	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
 
+	// CostlyMessages are the message IDs of messages that cost more to execute than was paid to execute them (i.e.
+	// source fee < execution cost). These messages will not be executed in the current round, but may be executed in
+	// future rounds (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
+	CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
+
 	// TokenData for each message.
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }

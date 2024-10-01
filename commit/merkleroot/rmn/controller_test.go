@@ -240,7 +240,7 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 		}
 		continue
 	}
-	ts.t.Logf("nodes received the observation requests: %v", requestIDs)
+	ts.t.Logf("test/mock nodes received the observation requests: %v", requestIDs)
 	return requestIDs, requestedChains
 }
 
@@ -288,6 +288,7 @@ func (ts *testSetup) nodesRespondToTheObservationRequests(
 		b, err := proto.Marshal(resp)
 		require.NoError(ts.t, err)
 
+		ts.t.Logf("test/mock node %d responds to %d", nodeID, resp.RequestId)
 		rmnClient.resChan <- PeerResponse{
 			RMNNodeID: nodeID,
 			Body:      b,

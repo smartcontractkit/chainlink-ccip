@@ -9,12 +9,13 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -47,13 +48,18 @@ type Plugin struct {
 	homeChain   reader.HomeChain
 	discovery   *discovery.ContractDiscoveryProcessor
 
-	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	tokenDataObserver tokendata.TokenDataObserver
-	estimateProvider  gas.EstimateProvider
-	lggr              logger.Logger
+	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
+	tokenDataObserver     tokendata.TokenDataObserver
+	costlyMessageObserver exectypes.CostlyMessageObserver
+	estimateProvider      gas.EstimateProvider
+	lggr                  logger.Logger
 
 	// state
 	contractsInitialized bool
+}
+
+func (p *Plugin) ReportingCfg() ocr3types.ReportingPluginConfig {
+	return p.reportingCfg
 }
 
 func NewPlugin(
@@ -81,6 +87,8 @@ func NewPlugin(
 		tokenDataObserver: tokenDataObserver,
 		estimateProvider:  estimateProvider,
 		lggr:              lggr,
+		// TODO: implement
+		costlyMessageObserver: &exectypes.NoOpCostlyMessageObserver{},
 		discovery: discovery.NewContractDiscoveryProcessor(
 			lggr,
 			&ccipReader,
@@ -212,7 +220,7 @@ func (p *Plugin) Observation(
 			}
 
 			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil, nil, discoveryObs).Encode()
+			return exectypes.NewObservation(groupedCommits, nil, nil, nil, nil, discoveryObs).Encode()
 		}
 
 		// No observation for non-dest readers.
@@ -272,7 +280,13 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 		}
 
-		return exectypes.NewObservation(groupedCommits, messages, tkData, nil, discoveryObs).Encode()
+		costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages)
+		if err != nil {
+			return types.Observation{}, fmt.Errorf("unable to observe costly messages %w", err)
+		}
+
+		return exectypes.NewObservation(
+			groupedCommits, messages, costlyMessages, tkData, nil, discoveryObs).Encode()
 
 	case exectypes.Filter:
 		// Phase 3: observe nonce for each unique source/sender pair.
@@ -302,7 +316,7 @@ func (p *Plugin) Observation(
 			nonceObservations[srcChain] = nonces
 		}
 
-		return exectypes.NewObservation(nil, nil, nil, nonceObservations, discoveryObs).Encode()
+		return exectypes.NewObservation(nil, nil, nil, nil, nonceObservations, discoveryObs).Encode()
 	default:
 		return types.Observation{}, fmt.Errorf("unknown state")
 	}
@@ -446,13 +460,21 @@ func (p *Plugin) Outcome(
 		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
 	case exectypes.GetMessages:
 		commitReports := previousOutcome.PendingCommitReports
+		costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
+		for _, msgID := range observation.CostlyMessages {
+			costlyMessagesSet.Add(msgID)
+		}
 
 		// add messages to their commitReports.
 		for i, report := range commitReports {
 			report.Messages = nil
+			report.CostlyMessages = nil
 			for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
 				if msg, ok := observation.Messages[report.SourceChain][j]; ok {
 					report.Messages = append(report.Messages, msg)
+					if costlyMessagesSet.Contains(msg.Header.MessageID) {
+						report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
+					}
 				}
 
 				if tokenData, ok := observation.TokenData[report.SourceChain][j]; ok {
@@ -461,6 +483,7 @@ func (p *Plugin) Outcome(
 			}
 			commitReports[i].Messages = report.Messages
 			commitReports[i].MessageTokenData = report.MessageTokenData
+			commitReports[i].CostlyMessages = report.CostlyMessages
 		}
 
 		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})

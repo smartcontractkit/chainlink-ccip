@@ -35,3 +35,5 @@ type RMNNodeInfo struct {
 	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
 	SignObservationPrefix     string             // e.g. "chainlink ccip 1.6 rmn observation"
 }
+
+type NodeID uint32

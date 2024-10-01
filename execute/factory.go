@@ -51,16 +51,16 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr              logger.Logger
-	donID             plugintypes.DonID
-	ocrConfig         reader.OCR3ConfigWithMeta
-	execCodec         cciptypes.ExecutePluginCodec
-	msgHasher         cciptypes.MessageHasher
-	homeChainReader   reader.HomeChain
-	estimateProvider  gas.EstimateProvider
-	tokenDataObserver tokendata.TokenDataObserver
-	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
+	lggr             logger.Logger
+	donID            plugintypes.DonID
+	ocrConfig        reader.OCR3ConfigWithMeta
+	execCodec        cciptypes.ExecutePluginCodec
+	msgHasher        cciptypes.MessageHasher
+	homeChainReader  reader.HomeChain
+	estimateProvider gas.EstimateProvider
+	tokenDataEncoder cciptypes.TokenDataEncoder
+	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
+	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
 }
 
 func NewPluginFactory(
@@ -70,22 +70,22 @@ func NewPluginFactory(
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
-	tokenDataObserver tokendata.TokenDataObserver,
+	tokenDataEncoder cciptypes.TokenDataEncoder,
 	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:              lggr,
-		donID:             donID,
-		ocrConfig:         ocrConfig,
-		execCodec:         execCodec,
-		msgHasher:         msgHasher,
-		homeChainReader:   homeChainReader,
-		estimateProvider:  estimateProvider,
-		contractReaders:   contractReaders,
-		chainWriters:      chainWriters,
-		tokenDataObserver: tokenDataObserver,
+		lggr:             lggr,
+		donID:            donID,
+		ocrConfig:        ocrConfig,
+		execCodec:        execCodec,
+		msgHasher:        msgHasher,
+		homeChainReader:  homeChainReader,
+		estimateProvider: estimateProvider,
+		contractReaders:  contractReaders,
+		chainWriters:     chainWriters,
+		tokenDataEncoder: tokenDataEncoder,
 	}
 }
 
@@ -124,6 +124,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.lggr,
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
+		p.tokenDataEncoder,
 		readers,
 	)
 	if err != nil {
