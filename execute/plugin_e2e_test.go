@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	mock_types "github.com/smartcontractkit/chainlink-ccip/mocks/execute/exectypes"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -96,10 +95,9 @@ func TestPlugin(t *testing.T) {
 }
 
 type nodeSetup struct {
-	node            *Plugin
-	reportCodec     cciptypes.ExecutePluginCodec
-	msgHasher       cciptypes.MessageHasher
-	TokenDataReader *mock_types.MockTokenDataReader
+	node        *Plugin
+	reportCodec cciptypes.ExecutePluginCodec
+	msgHasher   cciptypes.MessageHasher
 }
 
 func setupHomeChainPoller(
