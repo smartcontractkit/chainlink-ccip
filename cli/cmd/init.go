@@ -30,6 +30,11 @@ var initCmd = &cobra.Command{
 		// if err := utils.SetupKubeConfig(setupKubeConfigInput); err != nil {
 		// 	log.Fatalf("Failed to setup kubeconfig: %v", err)
 		// }
+
+		// TODO: call DockerLogin w/ ECR token when applicable
+		// dockerCli, err := utils.InitializeDockerCLI()
+		// ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient) // ecrAuthToken contains a list of authData
+		// utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL)
 	},
 }
 
