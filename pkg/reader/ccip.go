@@ -608,63 +608,6 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}, nil
 }
 
-func (r *ccipChainReader) GetRMNRemoteConfig(
-	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
-) (rmntypes.RMNRemoteConfig, error) {
-	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
-		return rmntypes.RMNRemoteConfig{}, err
-	}
-
-	contractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, destChainSelector)
-	if err != nil {
-		return rmntypes.RMNRemoteConfig{}, fmt.Errorf("get RMNRemote contract address: %w", err)
-	}
-
-	var vc versionnedConfig
-	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameRMNRemote,
-		consts.MethodNameGetVersionedConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&vc,
-	)
-	if err != nil {
-		return rmntypes.RMNRemoteConfig{}, fmt.Errorf("failed to get RMNRemote config: %w", err)
-	}
-
-	var dh string
-	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
-		ctx,
-		consts.ContractNameRMNRemote,
-		consts.MethodNameGetReportDigestHeader,
-		primitives.Unconfirmed,
-		map[string]any{},
-		&dh,
-	)
-	if err != nil {
-		return rmntypes.RMNRemoteConfig{}, fmt.Errorf("failed to get RMNRemote report digest header: %w", err)
-	}
-
-	signers := make([]rmntypes.RMNRemoteSignerInfo, 0, len(vc.Config.Signers))
-	for _, signer := range vc.Config.Signers {
-		signers = append(signers, rmntypes.RMNRemoteSignerInfo{
-			OnchainPublicKey: signer.OnchainPublicKey,
-			NodeIndex:        signer.NodeIndex,
-		})
-	}
-
-	return rmntypes.RMNRemoteConfig{
-		ContractAddress:  contractAddress,
-		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
-		Signers:          signers,
-		MinSigners:       vc.Config.MinSigners,
-		ConfigVersion:    vc.Version,
-		RmnReportVersion: dh,
-	}, nil
-}
-
 func (r *ccipChainReader) discoverDestinationContracts(
 	ctx context.Context,
 	allChains []cciptypes.ChainSelector,
