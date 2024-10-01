@@ -1,0 +1,71 @@
+---
+version: v2beta1
+name: mockserver
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments mockserver
+
+deployments:
+  mockserver:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: "mockserver"
+      chart:
+        name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-mockserver"
+        version: "0.1.0"
+      values:
+        podSecurityContext:
+          fsGroup: 999
+        securityContext:
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+        releasenameOverride: mockserver
+        app:
+          runAsUser: 999
+          readOnlyRootFilesystem: false
+        port: 1080
+        prometheusMonitor: true
+        ingress:
+          enabled: true
+          annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
+          annotation_group_name: ${DEVSPACE_NAMESPACE}
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-mockserver.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              http:
+                paths:
+                  - path: /
+                    backend:
+                      service:
+                        name: mockserver
+                        port:
+                          number: 1080
+
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+
+profiles:
+  - name: kind
+    merge:
+      deployments:
+        mockserver:
+          helm:
+            values:
+              ingress:
+                ingressClassName: nginx
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi

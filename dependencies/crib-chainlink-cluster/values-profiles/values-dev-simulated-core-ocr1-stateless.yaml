@@ -1,5 +1,3 @@
-geth:
-  enabled: true
 chainlink:
   global:
     toml: |-
