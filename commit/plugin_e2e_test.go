@@ -267,7 +267,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 			decodedOutcome, err := DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expOutcome, decodedOutcome)
+			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
@@ -277,6 +277,15 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			}
 		})
 	}
+}
+
+// normalizeOutcome converts empty slices to nil or nil slices to empty where needed.
+func normalizeOutcome(o Outcome) Outcome {
+	if len(o.MerkleRootOutcome.RMNRemoteCfg.ContractAddress) == 0 {
+		// Normalize to `nil` if it's an empty slice
+		o.MerkleRootOutcome.RMNRemoteCfg.ContractAddress = nil
+	}
+	return o
 }
 
 type nodeSetup struct {
