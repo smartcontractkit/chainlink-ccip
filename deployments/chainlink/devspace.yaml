@@ -62,8 +62,8 @@ pipelines:
   ccip-v16:
     run: |-
       run_dependency_pipelines geth
-      # todo: Deploy job-distributor
-      # run_dependency_pipelines job-distributor
+      # Deploy job-distributor
+      run_dependency_pipelines job-distributor
       # Deploy CCIP enabled DON
       run_dependency_pipelines crib-chainlink-cluster
       run_pipelines ingress-check
@@ -296,6 +296,10 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - ccip
+          job-distributor:
+            path: ${DEPENDENCIES_DIR}/job-distributor
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
           crib-chainlink-cluster:
             path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
             overwriteVars: true

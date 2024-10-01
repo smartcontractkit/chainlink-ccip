@@ -1,0 +1,41 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments postgres
+
+deployments:
+  postgres:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: oci://registry-1.docker.io/bitnamicharts/postgresql
+      values:
+        architecture: standalone
+        fullnameOverride: postgres
+        auth:
+          enablePostgresUser: true
+          postgresPassword: postgres
+          username: chainlink
+          password: JGVgp7M2Emcg7Av8KKVUgMZb
+          database: chainlink
+          existingSecret: ''
+        image:
+          registry: docker.io
+          repository: bitnami/postgresql
+        tls:
+          enabled: false
+        containerPorts:
+          postgresql: 5432
+        primary:
+          persistence:
+            enabled: false
+            size: 5Gi
+            storageClass: gp2
+        networkPolicy:
+          enabled: false
+        volumePermissions:
+          enabled: false
+        metrics:
+          enabled: false

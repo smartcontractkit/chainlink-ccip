@@ -1,0 +1,72 @@
+version: v2beta1
+
+vars:
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  DEVSPACE_INGRESS_CIDRS:
+    source: env
+    default: "0.0.0.0/0"
+  # This is the base domain in AWS Route 53 that our ingress subdomains will use.
+  DEVSPACE_INGRESS_BASE_DOMAIN:
+    source: env
+    default: "main.stage.cldev.sh"
+  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
+  DEVSPACE_INGRESS_CERT_ARN:
+    source: env
+    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
+
+dependencies:
+  postgres:
+    path: ${DEPENDENCIES_DIR}/postgres/devspace.yaml
+    namespace: ${DEVSPACE_NAMESPACE}
+
+pipelines:
+  deploy:
+    run: |-
+      run_dependency_pipelines postgres
+
+      create_deployments job-distributor
+
+deployments:
+  job-distributor:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      releaseName: "job-distributor"
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/job-distributor
+        version: "0.1.5"
+      values:
+        envVars:
+          ENVIRONMENT: development
+          DATABASE_URL: postgresql://chainlink:JGVgp7M2Emcg7Av8KKVUgMZb@postgres:5432/chainlink?sslmode=disable
+          CSA_KEY_ENCRYPTION_SECRET: supersecret
+          SERVER_ENABLE_REFLECTION: true
+        noderpc:
+          annotations:
+            external-dns.alpha.kubernetes.io/hostname: ${DEVSPACE_NAMESPACE}-job-distributor-node-rpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
+            service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+            service.beta.kubernetes.io/load-balancer-source-ranges: "10.0.0.0/8"
+            service.beta.kubernetes.io/aws-load-balancer-type: "external"
+            service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
+        ingress:
+          enabled: true
+          className: "alb"
+          host: ${DEVSPACE_NAMESPACE}-job-distributor-grpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
+          annotations:
+            alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+            alb.ingress.kubernetes.io/ssl-redirect: "443"
+            alb.ingress.kubernetes.io/backend-protocol-version: "GRPC"
+            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+            alb.ingress.kubernetes.io/certificate-arn: ${DEVSPACE_INGRESS_CERT_ARN}
+            alb.ingress.kubernetes.io/group.name: ${DEVSPACE_NAMESPACE}
+            alb.ingress.kubernetes.io/scheme: internal
+            alb.ingress.kubernetes.io/target-type: ip
+            external-dns.alpha.kubernetes.io/ttl: "120"
+        networkPolicyDefault:
+          ingress:
+            allowCustomCidrs: true
+            # Should be a comma separated list of CIDR blocks. To include
+            # AWS ALB private CIDRs and optionally other custom CIDRs.
+            # Example format: 10.0.0.0/16,192.168.0.1/24
+            customCidrs: ${DEVSPACE_INGRESS_CIDRS}
