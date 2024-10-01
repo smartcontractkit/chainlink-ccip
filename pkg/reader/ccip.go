@@ -12,6 +12,7 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -550,6 +551,63 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 	return feeUpdates
 }
 
+func (r *ccipChainReader) GetRMNRemoteConfig(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+) (rmntypes.RMNRemoteConfig, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
+		return rmntypes.RMNRemoteConfig{}, err
+	}
+
+	contractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, destChainSelector)
+	if err != nil {
+		return rmntypes.RMNRemoteConfig{}, fmt.Errorf("get RMNRemote contract address: %w", err)
+	}
+
+	var vc versionnedConfig
+	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameRMNRemote,
+		consts.MethodNameGetVersionedConfig,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&vc,
+	)
+	if err != nil {
+		return rmntypes.RMNRemoteConfig{}, fmt.Errorf("failed to get RMNRemote config: %w", err)
+	}
+
+	var dh string
+	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameRMNRemote,
+		consts.MethodNameGetReportDigestHeader,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&dh,
+	)
+	if err != nil {
+		return rmntypes.RMNRemoteConfig{}, fmt.Errorf("failed to get RMNRemote report digest header: %w", err)
+	}
+
+	signers := make([]rmntypes.RMNRemoteSignerInfo, 0, len(vc.Config.Signers))
+	for _, signer := range vc.Config.Signers {
+		signers = append(signers, rmntypes.RMNRemoteSignerInfo{
+			OnchainPublicKey: signer.OnchainPublicKey,
+			NodeIndex:        signer.NodeIndex,
+		})
+	}
+
+	return rmntypes.RMNRemoteConfig{
+		ContractAddress:  contractAddress,
+		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
+		Signers:          signers,
+		MinSigners:       vc.Config.MinSigners,
+		ConfigVersion:    vc.Version,
+		RmnReportVersion: dh,
+	}, nil
+}
+
 func (r *ccipChainReader) DiscoverContracts(
 	ctx context.Context,
 	destChain cciptypes.ChainSelector,
@@ -748,6 +806,34 @@ type offrampStaticChainConfig struct {
 	Rmn                []byte                  `json:"rmn"`
 	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
 	NonceManager       []byte                  `json:"nonceManager"`
+}
+
+// signer is used to parse the response from the RMNRemote contract's getVersionedConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L42-L45
+//
+//nolint:lll // It's a URL.
+type signer struct {
+	OnchainPublicKey []byte `json:"onchainPublicKey"`
+	NodeIndex        uint64 `json:"nodeIndex"`
+}
+
+// config is used to parse the response from the RMNRemote contract's getVersionedConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L49-L53
+//
+//nolint:lll // It's a URL.
+type config struct {
+	RMNHomeContractConfigDigest []byte   `json:"rmnHomeContractConfigDigest"`
+	Signers                     []signer `json:"signers"`
+	MinSigners                  uint64   `json:"minSigners"`
+}
+
+// versionnedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L167-L169
+//
+//nolint:lll // It's a URL.
+type versionnedConfig struct {
+	Version uint32 `json:"version"`
+	Config  config `json:"config"`
 }
 
 // Interface compliance check

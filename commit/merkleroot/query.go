@@ -48,6 +48,10 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		})
 	}
 
+	if prevOutcome.RMNRemoteCfg.IsEmpty() {
+		return Query{}, fmt.Errorf("RMN report config is empty")
+	}
+
 	ctxQuery, cancel := context.WithTimeout(ctx, w.cfg.RMNSignaturesTimeout)
 	defer cancel()
 

@@ -11,6 +11,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -47,7 +48,7 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize), nextState
+		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize, w.cfg.DestChain), nextState
 	case BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
@@ -70,12 +71,16 @@ func reportRangesOutcome(
 	lggr logger.Logger,
 	consensusObservation ConsensusObservation,
 	maxMerkleTreeSize uint64,
+	dstChain cciptypes.ChainSelector,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
 	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
 	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
+	observedRMNRemoteConfig := consensusObservation.RMNRemoteConfig
+
 	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
+	rmnRemoteConfig := rmntypes.RMNRemoteConfig{}
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
@@ -111,10 +116,17 @@ func reportRangesOutcome(
 		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
 	})
 
+	if observedRMNRemoteConfig[dstChain].IsEmpty() {
+		lggr.Warn("RMNRemoteConfig is nil")
+	} else {
+		rmnRemoteConfig = observedRMNRemoteConfig[dstChain]
+	}
+
 	outcome := Outcome{
 		OutcomeType:             ReportIntervalsSelected,
 		RangesSelectedForReport: rangesToReport,
 		OffRampNextSeqNums:      offRampNextSeqNums,
+		RMNRemoteCfg:            rmnRemoteConfig,
 	}
 
 	return outcome
@@ -223,12 +235,16 @@ func getConsensusObservation(
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
 	}
 
+	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs
+	rmnRemoteConfigs := map[cciptypes.ChainSelector][]rmntypes.RMNRemoteConfig{destChain: aggObs.RMNRemoteConfigs}
+
 	// Get consensus using strict 2f+1 threshold.
 	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	consensusObs := ConsensusObservation{
 		MerkleRoots:        consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFPlus1),
 		OnRampMaxSeqNums:   consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
 		OffRampNextSeqNums: consensus.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, twoFPlus1),
+		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFPlus1),
 		FChain:             fChains,
 	}
 

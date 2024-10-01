@@ -6,9 +6,10 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -48,6 +49,10 @@ func (w *Processor) ValidateObservation(
 
 	if err := validateObservedOffRampMaxSeqNums(obs.OffRampNextSeqNums, ao.OracleID, supportsDestChain); err != nil {
 		return fmt.Errorf("failed to validate OffRampNextSeqNums: %w", err)
+	}
+
+	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain); err != nil {
+		return fmt.Errorf("failed to validate RMNRemoteConfig: %w", err)
 	}
 
 	return nil
@@ -124,6 +129,17 @@ func validateObservedOffRampMaxSeqNums(
 			return fmt.Errorf("duplicate offRampMaxSeqNum for chain %d", seqNumChain.ChainSel)
 		}
 		seenChains.Add(seqNumChain.ChainSel)
+	}
+
+	return nil
+}
+
+func validateRMNRemoteConfig(
+	observer commontypes.OracleID,
+	supportsDestChain bool,
+) error {
+	if !supportsDestChain {
+		return fmt.Errorf("observer %d does not support dest chain, but has observed a RMNRemoteConfig", observer)
 	}
 
 	return nil

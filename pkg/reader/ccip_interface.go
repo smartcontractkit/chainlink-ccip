@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -119,6 +120,11 @@ type CCIPReader interface {
 		ctx context.Context,
 		selectors []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+
+	GetRMNRemoteConfig(
+		ctx context.Context,
+		destChainSelector cciptypes.ChainSelector,
+	) (rmntypes.RMNRemoteConfig, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

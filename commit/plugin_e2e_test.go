@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/stretchr/testify/assert"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/stretchr/testify/mock"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
@@ -75,6 +77,21 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		sourceChain2: 19, // no new msg, still on 19
 	}
 
+	rmnReportCfg := rmntypes.RMNRemoteConfig{
+		ContractAddress: []byte("0x1234567890123456789012345678901234567893"),
+		ConfigDigest:    ccipocr3.Bytes32{1},
+		Signers: []rmntypes.RMNRemoteSignerInfo{
+			{
+				OnchainPublicKey:      []byte("0x1234567890123456789012345678901234567894"),
+				NodeIndex:             1,
+				SignObservationPrefix: "prefix",
+			},
+		},
+		MinSigners:       1,
+		ConfigVersion:    1,
+		RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
+	}
+
 	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:                          destChain,
 		NewMsgScanBatchSize:                100,
@@ -96,6 +113,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
+			RMNRemoteCfg: rmnReportCfg,
 		},
 	}
 
@@ -201,7 +219,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
 				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
-					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum)
+					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum, rmnReportCfg)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
@@ -237,6 +255,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				} else {
 					n.ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
 					n.ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
+					n.ccipReader.EXPECT().NextSeqNum(ctx, tc.offRampNextSeqNumDefaultOverrideKeys).Unset()
 				}
 			}
 
@@ -280,6 +299,7 @@ func setupNode(
 	chainCfg map[ccipocr3.ChainSelector]reader.ChainConfig,
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
+	rmnReportCfg rmntypes.RMNRemoteConfig,
 ) nodeSetup {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
 	tokenPricesReader := reader_mock.NewMockPriceReader(t)
@@ -365,6 +385,10 @@ func setupNode(
 		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
 			ctx, ch, destChain).Return(offRampNextSeqNum[ch]+1, nil).Maybe()
 	}
+
+	ccipReader.EXPECT().
+		GetRMNRemoteConfig(ctx, mock.Anything).
+		Return(rmnReportCfg, nil).Maybe()
 
 	p := NewPlugin(
 		ctx,

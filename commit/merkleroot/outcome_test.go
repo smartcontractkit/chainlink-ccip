@@ -3,8 +3,9 @@ package merkleroot
 import (
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -42,6 +43,8 @@ func Test_buildReport(t *testing.T) {
 
 func Test_reportRangesOutcome(t *testing.T) {
 	lggr := logger.Test(t)
+
+	destChain := cciptypes.ChainSelector(4)
 
 	testCases := []struct {
 		name                 string
@@ -111,7 +114,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			outc := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit)
+			outc := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain)
 			require.Equal(t, tc.expectedOutcome, outc)
 		})
 	}
