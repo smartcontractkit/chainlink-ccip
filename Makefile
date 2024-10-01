@@ -14,6 +14,8 @@ else
 endif
 PROTOC_URL := https://github.com/protocolbuffers/protobuf/releases/download/v28.0/$(PROTOC_ZIP)
 
+PROTOC_BIN := /usr/local/bin/protoc
+
 build: ensure_go_version
 	go build -v ./...
 
@@ -24,7 +26,7 @@ generate-mocks: ensure_go_version
 	mockery
 
 generate-protobuf: ensure_go_version ensure_protoc_28_0
-	protoc --go_out=./commit/merkleroot/rmn/rmnpb --go_opt=paths=source_relative rmn_offchain.proto
+	$(PROTOC_BIN) --go_out=./commit/merkleroot/rmn/rmnpb --go_opt=paths=source_relative rmn_offchain.proto
 
 clean-generate: ensure_go_version
 	rm -rf ./commit/merkleroot/rmn/rmnpb/*
@@ -47,7 +49,7 @@ install-protoc:
 	rm -f $(PROTOC_ZIP)
 	sudo chmod +x /usr/local/bin/protoc
 	@echo "Installed protoc version:"
-	protoc --version
+	$(PROTOC_BIN) --version
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
 
 install-golangcilint:
@@ -60,4 +62,4 @@ ensure_golangcilint_1_59:
 	@golangci-lint --version | grep -q '1.59' || (echo "Please use golangci-lint 1.59" && exit 1)
 
 ensure_protoc_28_0:
-	@protoc --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0, (make install-protoc)" && exit 1)
+	@$(PROTOC_BIN) --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0, (make install-protoc)" && exit 1)
