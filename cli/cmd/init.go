@@ -35,6 +35,11 @@ var initCmd = &cobra.Command{
 		// dockerCli, err := utils.InitializeDockerCLI()
 		// ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient) // ecrAuthToken contains a list of authData
 		// utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL)
+
+		// TODO: call HelmRegistryLogin w/ ECR token when applicable
+		// helmRegistryClient, err := utils.InitializeHelmRegistryClient(nil)
+		// ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient) // ecrAuthToken contains a list of authData
+		// utils.HelmRegistryLogin(helmRegistryClient, authData.Username, authData.Password, authData.RegistryURL)
 	},
 }
 
