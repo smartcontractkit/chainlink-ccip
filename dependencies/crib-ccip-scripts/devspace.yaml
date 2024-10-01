@@ -43,9 +43,10 @@ deployments:
       upgradeArgs: ["--timeout", "10m"]
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip-scripts
-        version: "0.1.1"
+        version: "0.1.2"
       values:
         enabled: true
+        waitForJob: true
         image: ${DEVSPACE_CCIP_SCRIPTS_IMAGE}
         oidcRoleARN: ${DEVSPACE_CCIP_SCRIPTS_OIDC_ROLE_ARN}
         outputBucketName: ${DEVSPACE_CCIP_SCRIPTS_OUTPUT_BUCKET_NAME}
