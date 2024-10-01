@@ -30,13 +30,12 @@ type RMNHomeNodeInfo struct {
 
 // RMNRemoteConfig contains the configuration fetched from the RMNRemote contract.
 type RMNRemoteConfig struct {
-	ContractAddress cciptypes.Bytes       `json:"contractAddress"`
-	ConfigDigest    cciptypes.Bytes32     `json:"configDigest"`
-	Signers         []RMNRemoteSignerInfo `json:"signers"`
-	MinSigners      uint64                `json:"minSigners"`
-	ConfigVersion   uint32                `json:"configVersion"`
-	// todo: where is this defined? Not in the RMNRemote not in RMNHome contracts
-	RmnReportVersion string `json:"rmnReportVersion"` // e.g., "RMN_V1_6_ANY2EVM_REPORT"
+	ContractAddress  cciptypes.Bytes       `json:"contractAddress"`
+	ConfigDigest     cciptypes.Bytes32     `json:"configDigest"`
+	Signers          []RMNRemoteSignerInfo `json:"signers"`
+	MinSigners       uint64                `json:"minSigners"`
+	ConfigVersion    uint32                `json:"configVersion"`
+	RmnReportVersion string                `json:"rmnReportVersion"` // e.g., "RMN_V1_6_ANY2EVM_REPORT"
 }
 
 func (r RMNRemoteConfig) IsEmpty() bool {
