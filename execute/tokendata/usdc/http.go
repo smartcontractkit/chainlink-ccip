@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/time/rate"
 )
@@ -50,6 +51,7 @@ type HTTPClient interface {
 // Therefore AttestationClient is a higher level abstraction that uses httpClient to fetch attestations and can be more
 // oriented around caching/processing the attestation data instead of handling the API specifics.
 type httpClient struct {
+	lggr       logger.Logger
 	apiURL     *url.URL
 	apiTimeout time.Duration
 	rate       *rate.Limiter
@@ -58,13 +60,19 @@ type httpClient struct {
 	coolDownMu    *sync.RWMutex
 }
 
-func NewHTTPClient(api string, apiInterval time.Duration, apiTimeout time.Duration) (HTTPClient, error) {
+func NewHTTPClient(
+	lggr logger.Logger,
+	api string,
+	apiInterval time.Duration,
+	apiTimeout time.Duration,
+) (HTTPClient, error) {
 	u, err := url.ParseRequestURI(api)
 	if err != nil {
 		return nil, err
 	}
 
 	return &httpClient{
+		lggr:       lggr,
 		apiURL:     u,
 		apiTimeout: apiTimeout,
 		rate:       rate.NewLimiter(rate.Every(apiInterval), 1),
@@ -109,6 +117,10 @@ func (r httpResponse) attestationToBytes() (cciptypes.Bytes, error) {
 func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cciptypes.Bytes, HTTPStatus, error) {
 	// Terminate immediately when rate limited
 	if h.inCoolDownPeriod() {
+		h.lggr.Errorw(
+			"Rate limited by the Attestation API, dropping all requests",
+			"coolDownDuration", h.coolDownDuration(),
+		)
 		return nil, http.StatusTooManyRequests, ErrRateLimit
 	}
 
@@ -116,6 +128,7 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 		// Wait blocks until it the attestation API can be called or the
 		// context is Done.
 		if waitErr := h.rate.Wait(ctx); waitErr != nil {
+			h.lggr.Warnw("Self rate-limited, sending too many requests to the Attestation API")
 			return nil, http.StatusTooManyRequests, ErrRateLimit
 		}
 	}
@@ -127,7 +140,15 @@ func (h *httpClient) Get(ctx context.Context, messageHash cciptypes.Bytes32) (cc
 
 	requestURL := *h.apiURL
 	requestURL.Path = path.Join(requestURL.Path, apiVersion, attestationPath, messageHash.String())
-	return h.callAPI(timeoutCtx, requestURL)
+
+	response, httpStatus, err := h.callAPI(timeoutCtx, requestURL)
+	h.lggr.Debugw(
+		"Response from attestation API",
+		"messageHash", messageHash,
+		"status", httpStatus,
+		"err", err,
+	)
+	return response, httpStatus, err
 }
 
 func (h *httpClient) callAPI(ctx context.Context, url url.URL) (cciptypes.Bytes, HTTPStatus, error) {
@@ -191,9 +212,15 @@ func (h *httpClient) setCoolDownPeriod(headers http.Header) {
 		}
 	}
 
+	coolDownDuration = min(coolDownDuration, maxCoolDownDuration)
+	//Logging on the error level, because we should always self-rate limit before hitting the API rate limit
+	h.lggr.Errorw(
+		"Rate limited by the Attestation API, setting cool down",
+		"coolDownDuration", coolDownDuration,
+	)
+
 	h.coolDownMu.Lock()
 	defer h.coolDownMu.Unlock()
-	coolDownDuration = min(coolDownDuration, maxCoolDownDuration)
 	h.coolDownUntil = time.Now().Add(coolDownDuration)
 }
 
@@ -201,4 +228,10 @@ func (h *httpClient) inCoolDownPeriod() bool {
 	h.coolDownMu.RLock()
 	defer h.coolDownMu.RUnlock()
 	return time.Now().Before(h.coolDownUntil)
+}
+
+func (h *httpClient) coolDownDuration() time.Duration {
+	h.coolDownMu.RLock()
+	defer h.coolDownMu.RUnlock()
+	return time.Until(h.coolDownUntil)
 }
