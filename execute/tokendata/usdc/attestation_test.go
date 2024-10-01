@@ -8,6 +8,7 @@ import (
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
@@ -155,7 +156,7 @@ func Test_AttestationClient(t *testing.T) {
 			server := httptest.NewServer(createHandler(t, tc.success, tc.pending))
 			defer server.Close()
 
-			client, err := NewSequentialAttestationClient(pluginconfig.USDCCCTPObserverConfig{
+			client, err := NewSequentialAttestationClient(logger.Test(t), pluginconfig.USDCCCTPObserverConfig{
 				AttestationAPI:         server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Minute),

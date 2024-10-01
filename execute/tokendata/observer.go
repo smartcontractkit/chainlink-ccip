@@ -87,7 +87,7 @@ func createUSDCTokenObserver(
 		return nil, err
 	}
 
-	client, err := usdc.NewSequentialAttestationClient(cctpConfig)
+	client, err := usdc.NewSequentialAttestationClient(lggr, cctpConfig)
 	if err != nil {
 		return nil, fmt.Errorf("create attestation client: %w", err)
 	}

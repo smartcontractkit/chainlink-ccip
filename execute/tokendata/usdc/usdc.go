@@ -6,6 +6,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -29,11 +30,16 @@ func NewTokenDataObserver(
 	usdcMessageReader reader.USDCMessageReader,
 	attestationClient AttestationClient,
 ) *TokenDataObserver {
+	supportedPoolsBySelector := make(map[string]string)
 	supportedTokens := make(map[string]struct{})
 	for chainSelector, tokenConfig := range tokens {
 		key := sourceTokenIdentifier(chainSelector, tokenConfig.SourcePoolAddress)
 		supportedTokens[key] = struct{}{}
+		supportedPoolsBySelector[chainSelector.String()] = tokenConfig.SourcePoolAddress
 	}
+	lggr.Infow("Created USDC Token Data Observer",
+		"supportedTokenPools", supportedPoolsBySelector,
+	)
 
 	return &TokenDataObserver{
 		lggr:               lggr,
@@ -85,10 +91,19 @@ func (u *TokenDataObserver) pickOnlyUSDCMessages(
 		for seqNum, message := range messages {
 			for i, tokenAmount := range message.TokenAmounts {
 				tokenIdentifier := sourceTokenIdentifier(chainSelector, tokenAmount.SourcePoolAddress.String())
-				if _, ok := u.supportedTokens[tokenIdentifier]; !ok {
-					continue
+				_, ok := u.supportedTokens[tokenIdentifier]
+				if ok {
+					usdcMessages[chainSelector][exectypes.NewMessageTokenID(seqNum, i)] = tokenAmount
 				}
-				usdcMessages[chainSelector][exectypes.NewMessageTokenID(seqNum, i)] = tokenAmount
+
+				u.lggr.Debugw(
+					"Scanning message's tokens for USDC data",
+					"isUSDC", ok,
+					"seqNum", seqNum,
+					"sourceChainSelector", chainSelector,
+					"sourcePoolAddress", tokenAmount.SourcePoolAddress.String(),
+					"destTokenAddress", tokenAmount.DestTokenAddress.String(),
+				)
 			}
 		}
 	}
@@ -109,6 +124,13 @@ func (u *TokenDataObserver) fetchUSDCMessageHashes(
 		// TODO Sequential reading USDC messages from the source chain
 		usdcHashes, err := u.usdcMessageReader.MessageHashes(ctx, chainSelector, u.destChainSelector, messages)
 		if err != nil {
+			u.lggr.Errorw(
+				"Failed fetching USDC events from the source chain",
+				"sourceChainSelector", chainSelector,
+				"destChainSelector", u.destChainSelector,
+				"messageTokenIDs", maps.Keys(messages),
+				"error", err,
+			)
 			return nil, err
 		}
 		output[chainSelector] = usdcHashes
@@ -141,6 +163,13 @@ func (u *TokenDataObserver) extractTokenData(
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i, tokenAmount := range message.TokenAmounts {
 				if !u.IsTokenSupported(chainSelector, tokenAmount) {
+					u.lggr.Debugw(
+						"Ignoring unsupported token",
+						"seqNum", seqNum,
+						"sourceChainSelector", chainSelector,
+						"sourcePoolAddress", tokenAmount.SourcePoolAddress.String(),
+						"destTokenAddress", tokenAmount.DestTokenAddress.String(),
+					)
 					tokenData[i] = exectypes.NotSupportedTokenData()
 				} else {
 					tokenData[i] = u.attestationToTokenData(ctx, seqNum, i, attestations[chainSelector])
