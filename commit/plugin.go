@@ -32,8 +32,8 @@ type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observati
 
 type Plugin struct {
 	donID               plugintypes.DonID
-	nodeID              commontypes.OracleID
-	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
+	oracleID            commontypes.OracleID
+	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
 	ccipReader          readerpkg.CCIPReader
 	tokenPricesReader   reader.PriceReader
@@ -133,8 +133,8 @@ func NewPlugin(
 
 	return &Plugin{
 		donID:               donID,
-		nodeID:              oracleID,
-		oracleIDToP2pID:     oracleIDToP2pID,
+		oracleID:            oracleID,
+		oracleIDToP2PID:     oracleIDToP2pID,
 		lggr:                lggr,
 		cfg:                 cfg,
 		tokenPricesReader:   tokenPricesReader,
