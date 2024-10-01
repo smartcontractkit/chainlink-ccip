@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -208,18 +209,18 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		})
 	require.NoError(t, err)
 
-	attestation, err := usdc.NewSequentialAttestationClient(
-		pluginconfig.USDCCCTPObserverConfig{
-			AttestationAPI:         server.URL,
-			AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
-			AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
-		})
+	attestation, err := usdc.NewSequentialAttestationClient(logger.Test(t), pluginconfig.USDCCCTPObserverConfig{
+		AttestationAPI:         server.URL,
+		AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Microsecond),
+		AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+	})
 	require.NoError(t, err)
 
 	tkReader := usdc.NewTokenDataObserver(
 		logger.Test(t),
 		baseChain,
 		config,
+		testhelpers.USDCEncoder,
 		usdcReader,
 		attestation,
 	)

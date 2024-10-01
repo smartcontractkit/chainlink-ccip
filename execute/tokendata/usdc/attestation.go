@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -40,6 +41,8 @@ func ErrorAttestationStatus(err error) AttestationStatus {
 	return AttestationStatus{Error: err}
 }
 
+type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) (cciptypes.Bytes, error)
+
 // AttestationClient is an interface for fetching attestation data from the Circle API.
 // It returns a data grouped by chainSelector, sequenceNumber and tokenIndex
 //
@@ -58,12 +61,17 @@ type AttestationClient interface {
 }
 
 type sequentialAttestationClient struct {
+	lggr   logger.Logger
 	client HTTPClient
 	hasher hashutil.Hasher[[32]byte]
 }
 
-func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) (AttestationClient, error) {
+func NewSequentialAttestationClient(
+	lggr logger.Logger,
+	config pluginconfig.USDCCCTPObserverConfig,
+) (AttestationClient, error) {
 	client, err := NewHTTPClient(
+		lggr,
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
 		config.AttestationAPITimeout.Duration(),
@@ -72,6 +80,7 @@ func NewSequentialAttestationClient(config pluginconfig.USDCCCTPObserverConfig) 
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
 	return &sequentialAttestationClient{
+		lggr:   lggr,
 		client: client,
 		hasher: hashutil.NewKeccak(),
 	}, nil
@@ -87,6 +96,12 @@ func (s *sequentialAttestationClient) Attestations(
 		outcome[chainSelector] = make(map[exectypes.MessageTokenID]AttestationStatus)
 
 		for tokenID, messageHash := range hashes {
+			s.lggr.Debugw(
+				"Fetching attestation from the API",
+				"chainSelector", chainSelector,
+				"messageHash", messageHash,
+				"messageTokenID", tokenID,
+			)
 			// TODO sequential processing
 			outcome[chainSelector][tokenID] = s.fetchSingleMessage(ctx, messageHash)
 		}

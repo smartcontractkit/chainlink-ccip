@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -796,7 +798,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain)
+			got, err := getConsensusObservation(lggr, ao, 1, tt.args.F, tt.args.fChain)
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
@@ -1161,6 +1163,80 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 					assert.Equal(t, exp.data, obs[chainSelector][seqNum].ToByteSlice())
 				}
 			}
+		})
+	}
+}
+
+func Test_mergeCostlyMessages(t *testing.T) {
+	tests := []struct {
+		name       string
+		aos        []plugincommon.AttributedObservation[exectypes.Observation]
+		fChainDest int
+		want       []cciptypes.Bytes32
+	}{
+		{
+			name:       "no observations",
+			aos:        []plugincommon.AttributedObservation[exectypes.Observation]{},
+			fChainDest: 1,
+			want:       nil,
+		},
+		{
+			name: "observations below threshold",
+			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
+				{
+					Observation: exectypes.Observation{
+						CostlyMessages: []cciptypes.Bytes32{
+							{0x01},
+						},
+					},
+				},
+				{
+					Observation: exectypes.Observation{
+						CostlyMessages: []cciptypes.Bytes32{
+							{0x01},
+						},
+					},
+				},
+			},
+			fChainDest: 3,
+			want:       nil,
+		},
+		{
+			name: "observations above threshold",
+			aos: []plugincommon.AttributedObservation[exectypes.Observation]{
+				{
+					Observation: exectypes.Observation{
+						CostlyMessages: []cciptypes.Bytes32{
+							{0x01},
+						},
+					},
+				},
+				{
+					Observation: exectypes.Observation{
+						CostlyMessages: []cciptypes.Bytes32{
+							{0x01},
+						},
+					},
+				},
+				{
+					Observation: exectypes.Observation{
+						CostlyMessages: []cciptypes.Bytes32{
+							{0x01},
+						},
+					},
+				},
+			},
+			fChainDest: 2,
+			want: []cciptypes.Bytes32{
+				{0x01},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mergeCostlyMessages(tt.aos, tt.fChainDest)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

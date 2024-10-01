@@ -1,10 +1,17 @@
-package execute
+package execute_test
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	sel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -19,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
+	"github.com/smartcontractkit/chainlink-ccip/execute"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
@@ -31,16 +39,25 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-func TestPlugin(t *testing.T) {
-	ctx := context.Background()
+const (
+	randomEthAddress = "0x00000000000000000000000000001234"
+)
+
+func Test_USDC_Transfer(t *testing.T) {
+	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
-	nodesSetup := setupSimpleTest(ctx, t, lggr, 1, 2)
+	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
+	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
+
+	nodesSetup, server := setupSimpleTest(ctx, t, lggr, sourceChain, destChain)
+	defer server.Close()
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], 0, len(nodesSetup))
 	for _, n := range nodesSetup {
@@ -49,7 +66,7 @@ func TestPlugin(t *testing.T) {
 
 	nodeIDs := make([]commontypes.OracleID, 0, len(nodesSetup))
 	for _, n := range nodesSetup {
-		nodeIDs = append(nodeIDs, n.node.reportingCfg.OracleID)
+		nodeIDs = append(nodeIDs, n.node.ReportingCfg().OracleID)
 	}
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
@@ -90,12 +107,36 @@ func TestPlugin(t *testing.T) {
 	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
-	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104})
+	//Attestation data added to the USDC
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
 
+	server.AddResponse(
+		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
+		`{
+			"status": "complete",
+			"attestation": "0x720502893578a89a8a87982982ef781c18b194"
+		}`)
+
+	// Run 3 more rounds to get all attestations
+	for i := 0; i < 3; i++ {
+		res, err = runner.RunRound(ctx)
+		require.NoError(t, err)
+	}
+
+	outcome, err = exectypes.DecodeOutcome(res.Outcome)
+	require.NoError(t, err)
+	sequenceNumbers = slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
+		return m.Header.SequenceNumber
+	})
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+	//Attestation data added to the both USDC messages
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
+	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
 }
 
 type nodeSetup struct {
-	node        *Plugin
+	node        *execute.Plugin
 	reportCodec cciptypes.ExecutePluginCodec
 	msgHasher   cciptypes.MessageHasher
 }
@@ -181,8 +222,11 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 }
 
 func setupSimpleTest(
-	ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector,
-) []nodeSetup {
+	ctx context.Context,
+	t *testing.T,
+	lggr logger.Logger,
+	srcSelector, dstSelector cciptypes.ChainSelector,
+) ([]nodeSetup, *configurableAttestationServer) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -205,6 +249,9 @@ func setupSimpleTest(
 
 	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(t))
 	require.NoError(t, err, "failed to construct merkle tree")
+
+	addressBytes, err := hex.DecodeString(strings.TrimPrefix(randomEthAddress, "0x"))
+	require.NoError(t, err)
 
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
@@ -230,16 +277,50 @@ func setupSimpleTest(
 				makeMsg(101, srcSelector, dstSelector, true),
 				makeMsg(102, srcSelector, dstSelector, false),
 				makeMsg(103, srcSelector, dstSelector, false),
-				makeMsg(104, srcSelector, dstSelector, false),
-				makeMsg(105, srcSelector, dstSelector, false),
+				makeMsgWithToken(104, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: addressBytes,
+						ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
+					},
+				}),
+				makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: addressBytes,
+						ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 0).ToBytes(),
+					},
+				}),
 			},
 		},
 	}
+
+	server := newConfigurableAttestationServer(map[string]string{
+		"0x0f43587da5355551d234a2ba24dde8edfe0e385346465d6d53653b6aa642992e": `{
+			"status": "complete",
+			"attestation": "0x720502893578a89a8a87982982ef781c18b193"
+		}`,
+	})
 
 	cfg := pluginconfig.ExecutePluginConfig{
 		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
 			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
 			BatchGasLimit:             100000000,
+			TokenDataObservers: []pluginconfig.TokenDataObserverConfig{
+				{
+					Type:    "usdc-cctp",
+					Version: "1",
+					USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
+						Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+							srcSelector: {
+								SourcePoolAddress:            randomEthAddress,
+								SourceMessageTransmitterAddr: randomEthAddress,
+							},
+						},
+						AttestationAPI:         server.server.URL,
+						AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+						AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+					},
+				},
+			},
 		},
 		DestChain: dstSelector,
 	}
@@ -269,20 +350,46 @@ func setupSimpleTest(
 	err = homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 
-	tokenDataObserver := &tokendata.NoopTokenDataObserver{}
+	usdcEvents := []types.Sequence{
+		{Data: newMessageSentEvent(0, 6, 1, []byte{1})},
+		{Data: newMessageSentEvent(0, 6, 2, []byte{2})},
+		{Data: newMessageSentEvent(0, 6, 3, []byte{3})},
+	}
+
+	r := readermock.NewMockContractReaderFacade(t)
+	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	r.EXPECT().QueryKey(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(usdcEvents, nil)
+
+	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
+		lggr,
+		cfg.DestChain,
+		cfg.OffchainConfig.TokenDataObservers,
+		testhelpers.TokenDataEncoderInstance,
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			srcSelector: r,
+			dstSelector: r,
+		},
+	)
+	require.NoError(t, err)
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodes := []nodeSetup{
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tokenDataObserver, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	return nodes
+	return nodes, server
 }
 
 func newNode(
@@ -306,7 +413,7 @@ func newNode(
 		OracleID: commontypes.OracleID(id),
 	}
 
-	node1 := NewPlugin(
+	node1 := execute.NewPlugin(
 		donID,
 		rCfg,
 		cfg,
@@ -326,6 +433,17 @@ func newNode(
 	}
 }
 
+func makeMsgWithToken(
+	seqNum cciptypes.SeqNum,
+	src, dest cciptypes.ChainSelector,
+	executed bool,
+	tokens []cciptypes.RampTokenAmount,
+) inmem.MessagesWithMetadata {
+	msg := makeMsg(seqNum, src, dest, executed)
+	msg.Message.TokenAmounts = tokens
+	return msg
+}
+
 func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
 	for _, id := range ids {
@@ -340,4 +458,57 @@ func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
 		panic(err)
 	}
 	return encoded
+}
+
+type configurableAttestationServer struct {
+	responses map[string]string
+	server    *httptest.Server
+}
+
+func newConfigurableAttestationServer(responses map[string]string) *configurableAttestationServer {
+	c := &configurableAttestationServer{
+		responses: responses,
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for url, response := range c.responses {
+			if strings.Contains(r.RequestURI, url) {
+				_, err := w.Write([]byte(response))
+				if err != nil {
+					panic(err)
+				}
+				return
+			}
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	c.server = server
+	return c
+}
+
+func (c *configurableAttestationServer) AddResponse(url, response string) {
+	c.responses[url] = response
+}
+
+func (c *configurableAttestationServer) Close() {
+	c.server.Close()
+}
+
+func newMessageSentEvent(
+	sourceDomain uint32,
+	destDomain uint32,
+	nonce uint64,
+	payload []byte,
+) *readerpkg.MessageSentEvent {
+	var buf []byte
+	buf = binary.BigEndian.AppendUint32(buf, readerpkg.CCTPMessageVersion)
+	buf = binary.BigEndian.AppendUint32(buf, sourceDomain)
+	buf = binary.BigEndian.AppendUint32(buf, destDomain)
+	buf = binary.BigEndian.AppendUint64(buf, nonce)
+
+	senderBytes := [12]byte{}
+	buf = append(buf, senderBytes[:]...)
+	buf = append(buf, payload...)
+
+	return &readerpkg.MessageSentEvent{Arg0: buf}
 }

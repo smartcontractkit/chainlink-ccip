@@ -1,6 +1,7 @@
 package exectypes
 
 import (
+	"context"
 	"encoding/json"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -50,6 +51,12 @@ type Observation struct {
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
 
+	// CostlyMessages are determined during the third phase of execute.
+	// It contains the message IDs of messages that cost more to execute than their source fees. These messages will not
+	// be executed in the current round, but may be executed in future rounds (e.g. if gas prices decrease or if
+	// these messages' fees are boosted high enough).
+	CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
+
 	// Nonces are determined during the third phase of execute.
 	// It contains the nonces of senders who are being considered for the final report.
 	Nonces NonceObservations `json:"nonces"`
@@ -62,16 +69,18 @@ type Observation struct {
 func NewObservation(
 	commitReports CommitObservations,
 	messages MessageObservations,
+	costlyMessages []cciptypes.Bytes32,
 	tokenData TokenDataObservations,
 	nonces NonceObservations,
 	contracts dt.Observation,
 ) Observation {
 	return Observation{
-		CommitReports: commitReports,
-		Messages:      messages,
-		TokenData:     tokenData,
-		Nonces:        nonces,
-		Contracts:     contracts,
+		CommitReports:  commitReports,
+		Messages:       messages,
+		CostlyMessages: costlyMessages,
+		TokenData:      tokenData,
+		Nonces:         nonces,
+		Contracts:      contracts,
 	}
 }
 
@@ -89,3 +98,17 @@ func DecodeObservation(b []byte) (Observation, error) {
 	err := json.Unmarshal(b, &obs)
 	return obs, err
 }
+
+// CostlyMessageObserver observes messages that are too costly to execute.
+type CostlyMessageObserver interface {
+	// Observe takes a set of messages and returns a slice of message IDs that are too costly to execute.
+	Observe(context.Context, MessageObservations) ([]cciptypes.Bytes32, error)
+}
+
+type NoOpCostlyMessageObserver struct{}
+
+func (n *NoOpCostlyMessageObserver) Observe(_ context.Context, _ MessageObservations) ([]cciptypes.Bytes32, error) {
+	return nil, nil
+}
+
+var _ CostlyMessageObserver = &NoOpCostlyMessageObserver{}

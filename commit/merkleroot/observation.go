@@ -2,7 +2,6 @@ package merkleroot
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"sync"
@@ -340,9 +339,8 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 
 		msgHash, err := o.msgHasher.Hash(ctx, msg)
 		if err != nil {
-			msgID := hex.EncodeToString(msg.Header.MessageID[:])
-			o.lggr.Warnw("failed to hash message", "msg", msg, "msg_id", msgID, "err", err)
-			return cciptypes.Bytes32{}, fmt.Errorf("failed to hash message with id %s: %w", msgID, err)
+			o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+			return cciptypes.Bytes32{}, fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 		}
 
 		hashes = append(hashes, msgHash)
@@ -355,7 +353,7 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	}
 
 	root := tree.Root()
-	o.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", hex.EncodeToString(root[:]))
+	o.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", cciptypes.Bytes32(root).String())
 
 	return root, nil
 }
