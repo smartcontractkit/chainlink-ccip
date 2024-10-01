@@ -1,6 +1,7 @@
 package exectypes
 
 import (
+	"errors"
 	"fmt"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -38,6 +39,20 @@ func (mtd MessageTokenData) IsReady() bool {
 		}
 	}
 	return true
+}
+
+// Error returns combined errors from all the TokenData children.
+// If message IsReady it must return nil. Keep in mind that errors are not preserved when serializing
+// TokenDataObservations, so this method is only useful for internal processing. Observation fetched from
+// other nodes will return nil even if it's faulty.
+func (mtd MessageTokenData) Error() error {
+	err := make([]error, 0)
+	for _, td := range mtd.TokenData {
+		if td.Error != nil {
+			err = append(err, td.Error)
+		}
+	}
+	return errors.Join(err...)
 }
 
 func (mtd MessageTokenData) ToByteSlice() [][]byte {
