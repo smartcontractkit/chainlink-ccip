@@ -76,7 +76,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	isWriter, err := p.chainSupport.SupportsDestChain(p.nodeID)
+	isWriter, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
 		return false, fmt.Errorf("can't know if it's a writer: %w", err)
 	}

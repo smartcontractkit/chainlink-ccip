@@ -31,11 +31,11 @@ func (p *processor) Outcome(
 	}
 
 	// Stop early if earliest updated timestamp is still fresh
-	//earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(consensusObs.ChainFeeUpdates))
-	//nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
-	//if nextUpdateTime.After(consensusObs.TimestampNow) {
+	// earliestUpdateTime := consensus.EarliestTimestamp(maps.Values(consensusObs.ChainFeeUpdates))
+	// nextUpdateTime := earliestUpdateTime.Add(p.ChainFeePriceBatchWriteFrequency.Duration())
+	// if nextUpdateTime.After(consensusObs.TimestampNow) {
 	//	return Outcome{}, nil
-	//}
+	// }
 
 	chainFeeUSDPrices := make(map[cciptypes.ChainSelector]ComponentsUSDPrices)
 	// We need to report a packed GasPrice

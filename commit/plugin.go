@@ -32,8 +32,8 @@ type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observati
 
 type Plugin struct {
 	donID               plugintypes.DonID
-	nodeID              commontypes.OracleID
-	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
+	oracleID            commontypes.OracleID
+	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
 	cfg                 pluginconfig.CommitPluginConfig
 	ccipReader          readerpkg.CCIPReader
 	tokenPricesReader   reader.PriceReader
@@ -56,7 +56,7 @@ type Plugin struct {
 func NewPlugin(
 	_ context.Context,
 	donID plugintypes.DonID,
-	nodeID commontypes.OracleID,
+	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	cfg pluginconfig.CommitPluginConfig,
 	ccipReader readerpkg.CCIPReader,
@@ -69,6 +69,10 @@ func NewPlugin(
 	reportingCfg ocr3types.ReportingPluginConfig,
 	rmnConfig rmn.Config,
 ) *Plugin {
+	lggr = logger.Named(lggr, "CommitPlugin")
+	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
+	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
+
 	if cfg.MaxMerkleTreeSize == 0 {
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
 			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
@@ -79,12 +83,12 @@ func NewPlugin(
 		lggr,
 		homeChain,
 		oracleIDToP2pID,
-		nodeID,
+		oracleID,
 		cfg.DestChain,
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
-		nodeID,
+		oracleID,
 		lggr,
 		cfg,
 		homeChain,
@@ -99,7 +103,7 @@ func NewPlugin(
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
-		nodeID,
+		oracleID,
 		lggr,
 		cfg,
 		chainSupport,
@@ -129,8 +133,8 @@ func NewPlugin(
 
 	return &Plugin{
 		donID:               donID,
-		nodeID:              nodeID,
-		oracleIDToP2pID:     oracleIDToP2pID,
+		oracleID:            oracleID,
+		oracleIDToP2PID:     oracleIDToP2pID,
 		lggr:                lggr,
 		cfg:                 cfg,
 		tokenPricesReader:   tokenPricesReader,

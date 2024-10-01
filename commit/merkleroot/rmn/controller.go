@@ -240,18 +240,10 @@ func (c *controller) sendObservationRequests(
 			},
 		}
 
-		c.lggr.Infow("sending observation request",
-			"node", nodeID,
-			"requestID", req.RequestId,
-			"laneUpdateRequests", requests,
-		)
-
+		lggr := logger.With(c.lggr, "node", nodeID, "requestID", req.RequestId)
+		lggr.Infow("sending observation request", "laneUpdateRequests", requests)
 		if err := c.marshalAndSend(req, nodeID); err != nil {
-			c.lggr.Errorw("failed to send observation request",
-				"node", nodeID,
-				"requestID", req.RequestId,
-				"err", err,
-			)
+			lggr.Errorw("failed to send observation request", "err", err)
 			continue
 		}
 
@@ -625,7 +617,7 @@ func (c *controller) sendReportSignatureRequest(reportSigReq *rmnpb.ReportSignat
 
 		err := c.marshalAndSend(req, node.ID)
 		if err != nil {
-			c.lggr.Warnw("failed to send report signature request", "node_id", node.ID, "err", err)
+			c.lggr.Warnw("failed to send report signature request", "node", node.ID, "err", err)
 			continue
 		}
 
