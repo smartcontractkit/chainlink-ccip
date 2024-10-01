@@ -184,7 +184,7 @@ func (b *execReportBuilder) checkMessage(
 			"messageID", msg.Header.MessageID,
 			"sourceChain", execReport.SourceChain,
 			"seqNum", msg.Header.SequenceNumber,
-			"error", messageTokenData,
+			"error", messageTokenData.Error(),
 			"messageState", TokenDataNotReady)
 		return execReport, TokenDataNotReady, nil
 	}

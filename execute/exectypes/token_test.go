@@ -12,11 +12,13 @@ func Test_MessageTokensData(t *testing.T) {
 		name         string
 		msgTokenData MessageTokenData
 		ready        bool
+		errorMsg     string
 	}{
 		{
 			name:         "empty MessageTokenData is always ready - message doesnt carry tokens",
 			msgTokenData: MessageTokenData{},
 			ready:        true,
+			errorMsg:     "",
 		},
 		{
 			name: "MessageTokenData is ready - all tokens are ready",
@@ -49,7 +51,8 @@ func Test_MessageTokensData(t *testing.T) {
 					},
 				},
 			},
-			ready: false,
+			ready:    false,
+			errorMsg: "some error",
 		},
 		{
 			name: "MessageTokenData is not ready - all tokens are not ready, first error is returned",
@@ -67,13 +70,19 @@ func Test_MessageTokensData(t *testing.T) {
 					},
 				},
 			},
-			ready: false,
+			ready:    false,
+			errorMsg: "error1\nerror2",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.ready, tt.msgTokenData.IsReady())
+			if tt.errorMsg == "" {
+				assert.Nil(t, tt.msgTokenData.Error())
+			} else {
+				assert.Equal(t, tt.errorMsg, tt.msgTokenData.Error().Error())
+			}
 		})
 	}
 }
