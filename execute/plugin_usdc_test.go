@@ -316,7 +316,7 @@ func setupSimpleTest(
 							},
 						},
 						AttestationAPI:         server.server.URL,
-						AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Second),
+						AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 						AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
 					},
 				},
