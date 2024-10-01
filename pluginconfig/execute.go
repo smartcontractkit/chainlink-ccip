@@ -91,7 +91,10 @@ func (e ExecuteOffchainConfig) Validate() error {
 
 func (e ExecuteOffchainConfig) IsUSDCEnabled() bool {
 	for _, ob := range e.TokenDataObservers {
-		if ob.IsUSDC() && ob.WellFormed() == nil {
+		if ob.WellFormed() != nil {
+			continue
+		}
+		if ob.IsUSDC() {
 			return true
 		}
 	}
