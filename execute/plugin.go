@@ -75,6 +75,10 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 ) *Plugin {
+	lggr = logger.Named(lggr, "ExecutePlugin")
+	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
+	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
+
 	return &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
@@ -438,8 +442,7 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
 	}
 
-	observation, err := getConsensusObservation(
-		p.lggr, decodedAos, p.reportingCfg.OracleID, p.cfg.DestChain, p.reportingCfg.F, fChain)
+	observation, err := getConsensusObservation(p.lggr, decodedAos, p.cfg.DestChain, p.reportingCfg.F, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -522,7 +525,6 @@ func (p *Plugin) Outcome(
 	if outcome.IsEmpty() {
 		p.lggr.Warnw(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
-			"oracle", p.reportingCfg.OracleID,
 			"execPluginState", state)
 		if p.contractsInitialized {
 			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
@@ -530,11 +532,7 @@ func (p *Plugin) Outcome(
 		return nil, nil
 	}
 
-	p.lggr.Infow(
-		fmt.Sprintf("[oracle %d] exec outcome: generated outcome", p.reportingCfg.OracleID),
-		"oracle", p.reportingCfg.OracleID,
-		"execPluginState", state,
-		"outcome", outcome)
+	p.lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
 
 	return outcome.Encode()
 }
@@ -620,9 +618,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// TODO: Final validation?
 
-	p.lggr.Infow("transmitting report",
-		"reports", decodedReport.ChainReports,
-	)
+	p.lggr.Infow("transmitting report", "reports", decodedReport.ChainReports)
 	return true, nil
 }
 
@@ -654,7 +650,7 @@ func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.
 	}
 	supportedChains, err := p.homeChain.GetSupportedChainsForPeer(p2pID)
 	if err != nil {
-		p.lggr.Warnw("error getting supported chains", err)
+		p.lggr.Warnw("error getting supported chains", "err", err)
 		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
 	}
 

@@ -29,7 +29,7 @@ func (w *Processor) Outcome(
 	tStart := time.Now()
 	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
 	w.lggr.Infow("Sending Outcome",
-		"outcome", outcome, "oid", w.oracleID, "nextState", nextState, "outcomeDuration", time.Since(tStart))
+		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
 
@@ -42,7 +42,7 @@ func (w *Processor) getOutcome(
 
 	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
 	if err != nil {
-		w.lggr.Warnw("Get consensus observation failed, empty outcome", "error", err)
+		w.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
 		return Outcome{}, nextState
 	}
 
@@ -142,7 +142,7 @@ func buildReport(
 	if q.RMNSignatures != nil { // TODO: should never be nil, error after e2e RMN integration.
 		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
-			lggr.Errorw("Failed to parse RMN signatures returning an empty outcome", "error", err)
+			lggr.Errorw("Failed to parse RMN signatures returning an empty outcome", "err", err)
 			return Outcome{}
 		}
 		sigs = parsedSigs

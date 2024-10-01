@@ -798,7 +798,7 @@ func Test_getConsensusObservation(t *testing.T) {
 			}
 
 			lggr := logger.Test(t)
-			got, err := getConsensusObservation(lggr, ao, 1, 1, tt.args.F, tt.args.fChain)
+			got, err := getConsensusObservation(lggr, ao, 1, tt.args.F, tt.args.fChain)
 			if !tt.wantErr(t, err, "getConsensusObservation(...)") {
 				return
 			}
