@@ -18,6 +18,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
@@ -44,6 +45,8 @@ func Test_Observation(t *testing.T) {
 		872: 3,
 	}
 
+	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
+
 	testCases := []struct {
 		name            string
 		previousOutcome Outcome
@@ -60,11 +63,13 @@ func Test_Observation(t *testing.T) {
 				observer.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Once().Return(offRampNextSeqNums)
 				observer.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything, mock.Anything).Return(onRampLatestSeqNums)
 				observer.EXPECT().ObserveFChain().Once().Return(fChain)
+				observer.EXPECT().ObserveRMNRemoteCfg(mock.Anything, mock.Anything).Once().Return(rmnRemoteCfg)
 				return observer
 			},
 			expObs: Observation{
 				OnRampMaxSeqNums:   onRampLatestSeqNums,
 				OffRampNextSeqNums: offRampNextSeqNums,
+				RMNRemoteConfig:    rmnRemoteCfg,
 				FChain:             fChain,
 			},
 		},

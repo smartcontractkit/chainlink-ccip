@@ -6,6 +6,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
@@ -19,6 +20,7 @@ type Observation struct {
 	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
 	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
 	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
+	RMNRemoteConfig    rmntypes.RemoteConfig           `json:"rmnRemoteConfig"`
 	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
@@ -26,6 +28,7 @@ func (o Observation) IsEmpty() bool {
 	return len(o.MerkleRoots) == 0 &&
 		len(o.OnRampMaxSeqNums) == 0 &&
 		len(o.OffRampNextSeqNums) == 0 &&
+		o.RMNRemoteConfig.IsEmpty() &&
 		len(o.FChain) == 0
 }
 
@@ -40,6 +43,9 @@ type MerkleAggregatedObservation struct {
 	// A map from chain selectors to the list of OffRamp next sequence numbers observed for each chain
 	OffRampNextSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
 
+	// The RMNRemoteConfig observed
+	RMNRemoteConfigs []rmntypes.RemoteConfig
+
 	// A map from chain selectors to the list of f (failure tolerance) observed for each chain
 	FChain map[cciptypes.ChainSelector][]int
 }
@@ -50,6 +56,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
+		RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
 		FChain:             make(map[cciptypes.ChainSelector][]int),
 	}
 
@@ -73,10 +80,16 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 				append(aggObs.OffRampNextSeqNums[seqNumChain.ChainSel], seqNumChain.SeqNum)
 		}
 
+		// RMNRemoteConfig
+		if !obs.RMNRemoteConfig.IsEmpty() {
+			aggObs.RMNRemoteConfigs = append(aggObs.RMNRemoteConfigs, obs.RMNRemoteConfig)
+		}
+
 		// FChain
 		for chainSel, f := range obs.FChain {
 			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
 		}
+
 	}
 
 	return aggObs
@@ -92,6 +105,9 @@ type ConsensusObservation struct {
 
 	// A map from chain selectors to each chain's consensus OffRamp next sequence number
 	OffRampNextSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
+
+	// The consensus RMNRemoteConfig
+	RMNRemoteConfig map[cciptypes.ChainSelector]rmntypes.RemoteConfig
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
@@ -115,6 +131,7 @@ type Outcome struct {
 	OffRampNextSeqNums              []plugintypes.SeqNumChain     `json:"offRampNextSeqNums"`
 	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
 	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
+	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
 }
 
 // Sort all fields of the given Outcome
