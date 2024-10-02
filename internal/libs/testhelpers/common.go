@@ -20,8 +20,8 @@ import (
 func SetupConfigInfo(chainSelector ccipocr3.ChainSelector,
 	readers []libocrtypes.PeerID,
 	fChain uint8,
-	cfg []byte) reader.ChainConfigArgs {
-	return reader.ChainConfigArgs{
+	cfg []byte) reader.ChainConfigInfo {
+	return reader.ChainConfigInfo{
 		ChainSelector: chainSelector,
 		ChainConfig: reader.HomeChainConfigMapper{
 			Readers: readers,

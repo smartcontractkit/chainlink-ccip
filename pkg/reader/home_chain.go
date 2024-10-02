@@ -13,7 +13,7 @@ type HomeChain = reader_internal.HomeChain
 
 type ChainConfig = reader_internal.ChainConfig
 
-type ChainConfigInfo = reader_internal.ChainConfigArgs
+type ChainConfigInfo = reader_internal.ChainConfigInfo
 
 type OCR3ConfigWithMeta = reader_internal.OCR3ConfigWithMeta
 

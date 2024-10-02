@@ -124,11 +124,11 @@ func (r *homeChainPoller) poll() {
 }
 
 func (r *homeChainPoller) fetchAndSetConfigs(ctx context.Context) error {
-	var allChainConfigInfos []ChainConfigArgs
+	var allChainConfigInfos []ChainConfigInfo
 	pageIndex := uint64(0)
 
 	for {
-		var chainConfigInfos []ChainConfigArgs
+		var chainConfigInfos []ChainConfigInfo
 		err := r.homeChainReader.GetLatestValue(
 			ctx,
 			r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetAllChainConfigs),
@@ -299,7 +299,7 @@ func createNodesSupportedChains(
 
 func convertOnChainConfigToHomeChainConfig(
 	lggr logger.Logger,
-	chainConfigInfos []ChainConfigArgs,
+	chainConfigInfos []ChainConfigInfo,
 ) map[cciptypes.ChainSelector]ChainConfig {
 	chainConfigs := make(map[cciptypes.ChainSelector]ChainConfig)
 	for _, chainConfigInfo := range chainConfigInfos {
@@ -328,11 +328,11 @@ type HomeChainConfigMapper struct {
 	Config  []byte               `json:"config"`
 }
 
-// ChainConfigArgs This is a 1-1 mapping between the config that we get from the contract to make
-// nolint:lll // don't split up the long url
-// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L141-L145
+// ChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make
 // se/deserializing easier
-type ChainConfigArgs struct {
+type ChainConfigInfo struct {
+	// nolint:lll // don't split up the long url
+	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPConfig.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }

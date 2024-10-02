@@ -104,7 +104,7 @@ func setupHomeChainPoller(
 	t *testing.T,
 	donID plugintypes.DonID,
 	lggr logger.Logger,
-	chainConfigInfos []reader.ChainConfigArgs,
+	chainConfigInfos []reader.ChainConfigInfo,
 ) reader.HomeChain {
 	const ccipConfigAddress = "0xCCIPConfigFakeAddress"
 
@@ -123,12 +123,12 @@ func setupHomeChainPoller(
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]reader.ChainConfigArgs)
+			arg := args.Get(4).(*[]reader.ChainConfigInfo)
 			if firstCall {
 				*arg = chainConfigInfos
 				firstCall = false
 			} else {
-				*arg = []reader.ChainConfigArgs{} // return empty for other pages
+				*arg = []reader.ChainConfigInfo{} // return empty for other pages
 			}
 		}).Return(nil)
 
@@ -243,7 +243,7 @@ func setupSimpleTest(
 		},
 		DestChain: dstSelector,
 	}
-	chainConfigInfos := []reader.ChainConfigArgs{
+	chainConfigInfos := []reader.ChainConfigInfo{
 		{
 			ChainSelector: srcSelector,
 			ChainConfig: reader.HomeChainConfigMapper{
