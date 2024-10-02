@@ -1,6 +1,8 @@
 package execute_test
 
 import (
+	"encoding/hex"
+	"strings"
 	"testing"
 
 	sel "github.com/smartcontractkit/chain-selectors"
@@ -13,6 +15,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+)
+
+const (
+	randomEthAddress = "0x00000000000000000000000000001234"
 )
 
 func Test_USDC_Transfer(t *testing.T) {
@@ -22,7 +30,29 @@ func Test_USDC_Transfer(t *testing.T) {
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
 
-	runner, server := execute.SetupSimpleTest(ctx, t, lggr, sourceChain, destChain)
+	addressBytes, err := hex.DecodeString(strings.TrimPrefix(randomEthAddress, "0x"))
+	require.NoError(t, err)
+
+	messages := []inmem.MessagesWithMetadata{
+		makeMsg(100, sourceChain, destChain, true),
+		makeMsg(101, sourceChain, destChain, true),
+		makeMsg(102, sourceChain, destChain, false),
+		makeMsg(103, sourceChain, destChain, false),
+		makeMsgWithToken(104, sourceChain, destChain, false, []cciptypes.RampTokenAmount{
+			{
+				SourcePoolAddress: addressBytes,
+				ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
+			},
+		}),
+		makeMsgWithToken(105, sourceChain, destChain, false, []cciptypes.RampTokenAmount{
+			{
+				SourcePoolAddress: addressBytes,
+				ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 0).ToBytes(),
+			},
+		}),
+	}
+
+	runner, server := execute.SetupSimpleTest(ctx, t, lggr, sourceChain, destChain, messages)
 	defer server.Close()
 
 	// Contract Discovery round.
@@ -87,4 +117,28 @@ func Test_USDC_Transfer(t *testing.T) {
 	//Attestation data added to the both USDC messages
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
+}
+
+func makeMsgWithToken(
+	seqNum cciptypes.SeqNum,
+	src, dest cciptypes.ChainSelector,
+	executed bool,
+	tokens []cciptypes.RampTokenAmount,
+) inmem.MessagesWithMetadata {
+	msg := makeMsg(seqNum, src, dest, executed)
+	msg.Message.TokenAmounts = tokens
+	return msg
+}
+
+func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool) inmem.MessagesWithMetadata {
+	return inmem.MessagesWithMetadata{
+		Message: cciptypes.Message{
+			Header: cciptypes.RampMessageHeader{
+				SourceChainSelector: src,
+				SequenceNumber:      seqNum,
+			},
+		},
+		Destination: dest,
+		Executed:    executed,
+	}
 }

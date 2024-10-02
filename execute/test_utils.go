@@ -3,7 +3,6 @@ package execute
 import (
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,19 +44,25 @@ const (
 	randomEthAddress = "0x00000000000000000000000000001234"
 )
 
-func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) (*testhelpers.OCR3Runner[[]byte], *configurableAttestationServer) {
+func SetupSimpleTest(
+	ctx context.Context,
+	t *testing.T,
+	lggr logger.Logger,
+	srcSelector, dstSelector cciptypes.ChainSelector,
+	messages []inmem.MessagesWithMetadata,
+) (*testhelpers.OCR3Runner[[]byte], *configurableAttestationServer) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
 
-	messages := []inmem.MessagesWithMetadata{
-		makeMsg(100, srcSelector, dstSelector, true),
-		makeMsg(101, srcSelector, dstSelector, true),
-		makeMsg(102, srcSelector, dstSelector, false),
-		makeMsg(103, srcSelector, dstSelector, false),
-		makeMsg(104, srcSelector, dstSelector, false),
-		makeMsg(105, srcSelector, dstSelector, false),
-	}
+	//messages := []inmem.MessagesWithMetadata{
+	//	makeMsg(100, srcSelector, dstSelector, true),
+	//	makeMsg(101, srcSelector, dstSelector, true),
+	//	makeMsg(102, srcSelector, dstSelector, false),
+	//	makeMsg(103, srcSelector, dstSelector, false),
+	//	makeMsg(104, srcSelector, dstSelector, false),
+	//	makeMsg(105, srcSelector, dstSelector, false),
+	//}
 
 	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
 	reportData := exectypes.CommitData{
@@ -68,9 +73,6 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 
 	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(t))
 	require.NoError(t, err, "failed to construct merkle tree")
-
-	addressBytes, err := hex.DecodeString(strings.TrimPrefix(randomEthAddress, "0x"))
-	require.NoError(t, err)
 
 	// Initialize reader with some data
 	ccipReader := inmem.InMemoryCCIPReader{
@@ -91,24 +93,7 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 			},
 		},
 		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
-			srcSelector: {
-				makeMsg(100, srcSelector, dstSelector, true),
-				makeMsg(101, srcSelector, dstSelector, true),
-				makeMsg(102, srcSelector, dstSelector, false),
-				makeMsg(103, srcSelector, dstSelector, false),
-				makeMsgWithToken(104, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
-					{
-						SourcePoolAddress: addressBytes,
-						ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
-					},
-				}),
-				makeMsgWithToken(105, srcSelector, dstSelector, false, []cciptypes.RampTokenAmount{
-					{
-						SourcePoolAddress: addressBytes,
-						ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 0).ToBytes(),
-					},
-				}),
-			},
+			srcSelector: messages,
 		},
 	}
 
