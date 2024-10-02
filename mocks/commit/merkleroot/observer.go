@@ -221,18 +221,18 @@ func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) RunAndReturn(run func(con
 }
 
 // ObserveRMNRemoteCfg provides a mock function with given fields: ctx, dstChain
-func (_m *MockObserver) ObserveRMNRemoteCfg(ctx context.Context, dstChain ccipocr3.ChainSelector) types.RMNRemoteConfig {
+func (_m *MockObserver) ObserveRMNRemoteCfg(ctx context.Context, dstChain ccipocr3.ChainSelector) types.RemoteConfig {
 	ret := _m.Called(ctx, dstChain)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ObserveRMNRemoteCfg")
 	}
 
-	var r0 types.RMNRemoteConfig
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) types.RMNRemoteConfig); ok {
+	var r0 types.RemoteConfig
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) types.RemoteConfig); ok {
 		r0 = rf(ctx, dstChain)
 	} else {
-		r0 = ret.Get(0).(types.RMNRemoteConfig)
+		r0 = ret.Get(0).(types.RemoteConfig)
 	}
 
 	return r0
@@ -257,12 +257,12 @@ func (_c *MockObserver_ObserveRMNRemoteCfg_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockObserver_ObserveRMNRemoteCfg_Call) Return(_a0 types.RMNRemoteConfig) *MockObserver_ObserveRMNRemoteCfg_Call {
+func (_c *MockObserver_ObserveRMNRemoteCfg_Call) Return(_a0 types.RemoteConfig) *MockObserver_ObserveRMNRemoteCfg_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockObserver_ObserveRMNRemoteCfg_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) types.RMNRemoteConfig) *MockObserver_ObserveRMNRemoteCfg_Call {
+func (_c *MockObserver_ObserveRMNRemoteCfg_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) types.RemoteConfig) *MockObserver_ObserveRMNRemoteCfg_Call {
 	_c.Call.Return(run)
 	return _c
 }

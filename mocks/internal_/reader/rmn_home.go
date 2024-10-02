@@ -187,23 +187,23 @@ func (_c *MockRMNHome_GetOffChainConfig_Call) RunAndReturn(run func(ccipocr3.Byt
 }
 
 // GetRMNNodesInfo provides a mock function with given fields: configDigest
-func (_m *MockRMNHome) GetRMNNodesInfo(configDigest ccipocr3.Bytes32) ([]types.RMNHomeNodeInfo, error) {
+func (_m *MockRMNHome) GetRMNNodesInfo(configDigest ccipocr3.Bytes32) ([]types.HomeNodeInfo, error) {
 	ret := _m.Called(configDigest)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRMNNodesInfo")
 	}
 
-	var r0 []types.RMNHomeNodeInfo
+	var r0 []types.HomeNodeInfo
 	var r1 error
-	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) ([]types.RMNHomeNodeInfo, error)); ok {
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) ([]types.HomeNodeInfo, error)); ok {
 		return rf(configDigest)
 	}
-	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) []types.RMNHomeNodeInfo); ok {
+	if rf, ok := ret.Get(0).(func(ccipocr3.Bytes32) []types.HomeNodeInfo); ok {
 		r0 = rf(configDigest)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.RMNHomeNodeInfo)
+			r0 = ret.Get(0).([]types.HomeNodeInfo)
 		}
 	}
 
@@ -234,12 +234,12 @@ func (_c *MockRMNHome_GetRMNNodesInfo_Call) Run(run func(configDigest ccipocr3.B
 	return _c
 }
 
-func (_c *MockRMNHome_GetRMNNodesInfo_Call) Return(_a0 []types.RMNHomeNodeInfo, _a1 error) *MockRMNHome_GetRMNNodesInfo_Call {
+func (_c *MockRMNHome_GetRMNNodesInfo_Call) Return(_a0 []types.HomeNodeInfo, _a1 error) *MockRMNHome_GetRMNNodesInfo_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRMNHome_GetRMNNodesInfo_Call) RunAndReturn(run func(ccipocr3.Bytes32) ([]types.RMNHomeNodeInfo, error)) *MockRMNHome_GetRMNNodesInfo_Call {
+func (_c *MockRMNHome_GetRMNNodesInfo_Call) RunAndReturn(run func(ccipocr3.Bytes32) ([]types.HomeNodeInfo, error)) *MockRMNHome_GetRMNNodesInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

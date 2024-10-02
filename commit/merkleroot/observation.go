@@ -2,6 +2,7 @@ package merkleroot
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -171,7 +172,7 @@ type Observer interface {
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
 
 	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain
-	ObserveRMNRemoteCfg(ctx context.Context, dstChain cciptypes.ChainSelector) rmntypes.RMNRemoteConfig
+	ObserveRMNRemoteCfg(ctx context.Context, dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
@@ -360,22 +361,16 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 
 func (o ObserverImpl) ObserveRMNRemoteCfg(
 	ctx context.Context,
-	dstChain cciptypes.ChainSelector) rmntypes.RMNRemoteConfig {
-	// check if dstChain is supported
-	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.nodeID)
-	if err != nil {
-		o.lggr.Warnw("call to SupportsDestChain failed", "err", err)
-		return rmntypes.RMNRemoteConfig{}
-	}
-
-	if !supportsDestChain {
-		return rmntypes.RMNRemoteConfig{}
-	}
-
+	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
 	if err != nil {
-		o.lggr.Warnw("call to GetRMNRemoteConfig failed", "err", err)
-		return rmntypes.RMNRemoteConfig{}
+		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
+			// destination chain not supported
+			return rmntypes.RemoteConfig{}
+		}
+		// legitimate error
+		o.lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
+		return rmntypes.RemoteConfig{}
 	}
 	return rmnRemoteCfg
 }

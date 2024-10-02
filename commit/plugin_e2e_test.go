@@ -77,20 +77,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		sourceChain2: 19, // no new msg, still on 19
 	}
 
-	rmnReportCfg := rmntypes.RMNRemoteConfig{
-		ContractAddress: []byte("0x1234567890123456789012345678901234567893"),
-		ConfigDigest:    ccipocr3.Bytes32{1},
-		Signers: []rmntypes.RMNRemoteSignerInfo{
-			{
-				OnchainPublicKey:      []byte("0x1234567890123456789012345678901234567894"),
-				NodeIndex:             1,
-				SignObservationPrefix: "prefix",
-			},
-		},
-		MinSigners:       1,
-		ConfigVersion:    1,
-		RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
-	}
+	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
 
 	cfg := pluginconfig.CommitPluginConfig{
 		DestChain:                          destChain,
@@ -113,7 +100,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
-			RMNRemoteCfg: rmnReportCfg,
+			RMNRemoteCfg: rmnRemoteCfg,
 		},
 	}
 
@@ -219,7 +206,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
 				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
-					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum, rmnReportCfg)
+					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum, rmnRemoteCfg)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
@@ -308,7 +295,7 @@ func setupNode(
 	chainCfg map[ccipocr3.ChainSelector]reader.ChainConfig,
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
-	rmnReportCfg rmntypes.RMNRemoteConfig,
+	rmnReportCfg rmntypes.RemoteConfig,
 ) nodeSetup {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
 	tokenPricesReader := reader_mock.NewMockPriceReader(t)

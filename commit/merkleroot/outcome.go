@@ -81,7 +81,7 @@ func reportRangesOutcome(
 	observedRMNRemoteConfig := consensusObservation.RMNRemoteConfig
 
 	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
-	rmnRemoteConfig := rmntypes.RMNRemoteConfig{}
+	rmnRemoteConfig := rmntypes.RemoteConfig{}
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
@@ -258,15 +258,15 @@ func getConsensusObservation(
 	}
 
 	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs
-	rmnRemoteConfigs := map[cciptypes.ChainSelector][]rmntypes.RMNRemoteConfig{destChain: aggObs.RMNRemoteConfigs}
+	rmnRemoteConfigs := map[cciptypes.ChainSelector][]rmntypes.RemoteConfig{destChain: aggObs.RMNRemoteConfigs}
 
-	// Get consensus using strict 2f+1 threshold.
-	twoFPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
+	// Get consensus using strict 2fChain+1 threshold.
+	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
 	consensusObs := ConsensusObservation{
-		MerkleRoots:        consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFPlus1),
-		OnRampMaxSeqNums:   consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFPlus1),
-		OffRampNextSeqNums: consensus.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, twoFPlus1),
-		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFPlus1),
+		MerkleRoots:        consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
+		OnRampMaxSeqNums:   consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
+		OffRampNextSeqNums: consensus.GetConsensusMap(lggr, "OffRamp Next Seq Nums", aggObs.OffRampNextSeqNums, twoFChainPlus1),
+		RMNRemoteConfig:    consensus.GetConsensusMap(lggr, "RMNRemote cfg", rmnRemoteConfigs, twoFChainPlus1),
 		FChain:             fChains,
 	}
 

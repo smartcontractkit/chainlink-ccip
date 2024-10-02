@@ -9,8 +9,12 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 )
+
+var rmnRemoteCfg = testhelpers.CreateRMNRemoteCfg()
 
 func Test_buildReport(t *testing.T) {
 	t.Run("determinism check", func(t *testing.T) {
@@ -28,6 +32,9 @@ func Test_buildReport(t *testing.T) {
 					SeqNumsRange: cciptypes.NewSeqNumRange(20, 30),
 					MerkleRoot:   cciptypes.Bytes32{2},
 				},
+			},
+			RMNRemoteConfig: map[cciptypes.ChainSelector]rmntypes.RemoteConfig{
+				cciptypes.ChainSelector(1): rmnRemoteCfg,
 			},
 		}
 
@@ -58,6 +65,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 				OutcomeType:             ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{},
 				OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
+				RMNRemoteCfg:            rmntypes.RemoteConfig{},
 			},
 		},
 		{
@@ -69,6 +77,9 @@ func Test_reportRangesOutcome(t *testing.T) {
 				OffRampNextSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 					1: 18, // off ramp next is 18, on ramp max is 20 so new msgs are: [18, 19, 20]
 				},
+				RMNRemoteConfig: map[cciptypes.ChainSelector]rmntypes.RemoteConfig{
+					destChain: rmnRemoteCfg,
+				},
 			},
 			merkleTreeSizeLimit: 256, // default limit should be used
 			expectedOutcome: Outcome{
@@ -79,6 +90,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{
 					{ChainSel: 1, SeqNum: 18},
 				},
+				RMNRemoteCfg: rmnRemoteCfg,
 			},
 		},
 		{
@@ -94,6 +106,9 @@ func Test_reportRangesOutcome(t *testing.T) {
 					2: 995, // off ramp next is 995, on ramp max is 1000 so new msgs are: [995, 996, 997, 998, 999, 1000]
 					3: 500, // off ramp next is 500, we have new messages up to 10000 (default limit applied)
 				},
+				RMNRemoteConfig: map[cciptypes.ChainSelector]rmntypes.RemoteConfig{
+					destChain: rmnRemoteCfg,
+				},
 			},
 			merkleTreeSizeLimit: 5,
 			expectedOutcome: Outcome{
@@ -108,6 +123,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 					{ChainSel: 2, SeqNum: 995},
 					{ChainSel: 3, SeqNum: 500},
 				},
+				RMNRemoteCfg: rmnRemoteCfg,
 			},
 		},
 	}

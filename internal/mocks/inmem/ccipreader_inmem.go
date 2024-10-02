@@ -147,8 +147,8 @@ func (r InMemoryCCIPReader) DiscoverContracts(
 func (r InMemoryCCIPReader) GetRMNRemoteConfig(
 	ctx context.Context,
 	destChainSelector cciptypes.ChainSelector,
-) (rmntypes.RMNRemoteConfig, error) {
-	return rmntypes.RMNRemoteConfig{}, nil
+) (rmntypes.RemoteConfig, error) {
+	return rmntypes.RemoteConfig{}, nil
 }
 
 func (r InMemoryCCIPReader) Close(ctx context.Context) error {

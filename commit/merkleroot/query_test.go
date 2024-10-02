@@ -14,7 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	rmnmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -55,20 +55,7 @@ func TestProcessor_Query(t *testing.T) {
 		},
 	}
 
-	rmnReportCfg := rmntypes.RMNRemoteConfig{
-		ContractAddress: []byte("0x1234567890123456789012345678901234567893"),
-		ConfigDigest:    ccipocr3.Bytes32{1},
-		Signers: []rmntypes.RMNRemoteSignerInfo{
-			{
-				OnchainPublicKey:      []byte("0x1234567890123456789012345678901234567894"),
-				NodeIndex:             1,
-				SignObservationPrefix: "prefix",
-			},
-		},
-		MinSigners:       1,
-		ConfigVersion:    1,
-		RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
-	}
+	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
 
 	testCases := []struct {
 		name              string
@@ -87,7 +74,7 @@ func TestProcessor_Query(t *testing.T) {
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
 				},
-				RMNRemoteCfg: rmnReportCfg,
+				RMNRemoteCfg: rmnRemoteCfg,
 			},
 			contractAddresses: contractAddrs,
 			cfg: pluginconfig.CommitPluginConfig{
@@ -138,7 +125,7 @@ func TestProcessor_Query(t *testing.T) {
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
 				},
-				RMNRemoteCfg: rmnReportCfg,
+				RMNRemoteCfg: rmnRemoteCfg,
 			},
 			contractAddresses: contractAddrs,
 			cfg: pluginconfig.CommitPluginConfig{
@@ -167,7 +154,7 @@ func TestProcessor_Query(t *testing.T) {
 					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
 				},
-				RMNRemoteCfg: rmnReportCfg,
+				RMNRemoteCfg: rmnRemoteCfg,
 			},
 			contractAddresses: contractAddrs,
 			cfg: pluginconfig.CommitPluginConfig{
@@ -184,6 +171,35 @@ func TestProcessor_Query(t *testing.T) {
 			},
 			expQuery: Query{},
 			expErr:   true,
+		},
+		{
+			name: "not in building reports state",
+			prevOutcome: Outcome{
+				OutcomeType: ReportInFlight,
+			},
+			cfg: pluginconfig.CommitPluginConfig{
+				RMNEnabled:           true,
+				RMNSignaturesTimeout: 5 * time.Second,
+				DestChain:            dstChain,
+			},
+			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
+			expQuery:  Query{},
+			expErr:    false,
+		},
+		{
+			name: "rmn sig checks disabled",
+			prevOutcome: Outcome{
+				OutcomeType:  ReportIntervalsSelected,
+				RMNRemoteCfg: rmnRemoteCfg,
+			},
+			cfg: pluginconfig.CommitPluginConfig{
+				RMNEnabled:           false, // <-------------- disabled
+				RMNSignaturesTimeout: 5 * time.Second,
+				DestChain:            dstChain,
+			},
+			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
+			expQuery:  Query{},
+			expErr:    false,
 		},
 		{
 			name: "rmn remote config missing",
@@ -204,43 +220,16 @@ func TestProcessor_Query(t *testing.T) {
 			expQuery:  Query{},
 			expErr:    true,
 		},
-		{
-			name: "not in building reports state",
-			prevOutcome: Outcome{
-				OutcomeType: ReportInFlight,
-			},
-			cfg: pluginconfig.CommitPluginConfig{
-				RMNEnabled:           true,
-				RMNSignaturesTimeout: 5 * time.Second,
-				DestChain:            dstChain,
-			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
-			expQuery:  Query{},
-			expErr:    false,
-		},
-		{
-			name: "rmn sig checks disabled",
-			prevOutcome: Outcome{
-				OutcomeType:  ReportIntervalsSelected,
-				RMNRemoteCfg: rmnReportCfg,
-			},
-			cfg: pluginconfig.CommitPluginConfig{
-				RMNEnabled:           false, // <-------------- disabled
-				RMNSignaturesTimeout: 5 * time.Second,
-				DestChain:            dstChain,
-			},
-			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
-			expQuery:  Query{},
-			expErr:    false,
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ccipReader := reader.NewMockCCIPReader(t)
-			for chainSel, contracts := range tc.contractAddresses {
-				for name, addr := range contracts {
-					ccipReader.EXPECT().GetContractAddress(name, chainSel).Return(addr, nil)
+			if !tc.prevOutcome.RMNRemoteCfg.IsEmpty() {
+				for chainSel, contracts := range tc.contractAddresses {
+					for name, addr := range contracts {
+						ccipReader.EXPECT().GetContractAddress(name, chainSel).Return(addr, nil)
+					}
 				}
 			}
 

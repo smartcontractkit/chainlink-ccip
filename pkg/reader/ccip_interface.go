@@ -136,7 +136,7 @@ type CCIPReader interface {
 	GetRMNRemoteConfig(
 		ctx context.Context,
 		destChainSelector cciptypes.ChainSelector,
-	) (rmntypes.RMNRemoteConfig, error)
+	) (rmntypes.RemoteConfig, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.

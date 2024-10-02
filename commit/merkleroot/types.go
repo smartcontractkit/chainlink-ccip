@@ -20,7 +20,7 @@ type Observation struct {
 	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
 	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
 	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
-	RMNRemoteConfig    rmntypes.RMNRemoteConfig        `json:"rmnRemoteConfig"`
+	RMNRemoteConfig    rmntypes.RemoteConfig           `json:"rmnRemoteConfig"`
 	FChain             map[cciptypes.ChainSelector]int `json:"fChain"`
 }
 
@@ -44,7 +44,7 @@ type MerkleAggregatedObservation struct {
 	OffRampNextSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
 
 	// The RMNRemoteConfig observed
-	RMNRemoteConfigs []rmntypes.RMNRemoteConfig
+	RMNRemoteConfigs []rmntypes.RemoteConfig
 
 	// A map from chain selectors to the list of f (failure tolerance) observed for each chain
 	FChain map[cciptypes.ChainSelector][]int
@@ -56,7 +56,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
-		RMNRemoteConfigs:   make([]rmntypes.RMNRemoteConfig, 0),
+		RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
 		FChain:             make(map[cciptypes.ChainSelector][]int),
 	}
 
@@ -81,7 +81,9 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		}
 
 		// RMNRemoteConfig
-		aggObs.RMNRemoteConfigs = append(aggObs.RMNRemoteConfigs, obs.RMNRemoteConfig)
+		if !obs.RMNRemoteConfig.IsEmpty() {
+			aggObs.RMNRemoteConfigs = append(aggObs.RMNRemoteConfigs, obs.RMNRemoteConfig)
+		}
 
 		// FChain
 		for chainSel, f := range obs.FChain {
@@ -105,7 +107,7 @@ type ConsensusObservation struct {
 	OffRampNextSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
 
 	// The consensus RMNRemoteConfig
-	RMNRemoteConfig map[cciptypes.ChainSelector]rmntypes.RMNRemoteConfig
+	RMNRemoteConfig map[cciptypes.ChainSelector]rmntypes.RemoteConfig
 
 	// A map from chain selectors to each chain's consensus f (failure tolerance)
 	FChain map[cciptypes.ChainSelector]int
@@ -129,7 +131,7 @@ type Outcome struct {
 	OffRampNextSeqNums              []plugintypes.SeqNumChain     `json:"offRampNextSeqNums"`
 	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
 	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
-	RMNRemoteCfg                    rmntypes.RMNRemoteConfig      `json:"rmnRemoteCfg"`
+	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
 }
 
 // Sort all fields of the given Outcome

@@ -477,22 +477,22 @@ func (_c *MockCCIPReader_GetExpectedNextSequenceNumber_Call) RunAndReturn(run fu
 }
 
 // GetRMNRemoteConfig provides a mock function with given fields: ctx, destChainSelector
-func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context, destChainSelector ccipocr3.ChainSelector) (rmntypes.RMNRemoteConfig, error) {
+func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context, destChainSelector ccipocr3.ChainSelector) (rmntypes.RemoteConfig, error) {
 	ret := _m.Called(ctx, destChainSelector)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetRMNRemoteConfig")
 	}
 
-	var r0 rmntypes.RMNRemoteConfig
+	var r0 rmntypes.RemoteConfig
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (rmntypes.RMNRemoteConfig, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (rmntypes.RemoteConfig, error)); ok {
 		return rf(ctx, destChainSelector)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) rmntypes.RMNRemoteConfig); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) rmntypes.RemoteConfig); ok {
 		r0 = rf(ctx, destChainSelector)
 	} else {
-		r0 = ret.Get(0).(rmntypes.RMNRemoteConfig)
+		r0 = ret.Get(0).(rmntypes.RemoteConfig)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector) error); ok {
@@ -523,12 +523,12 @@ func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Run(run func(ctx context.Conte
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Return(_a0 rmntypes.RMNRemoteConfig, _a1 error) *MockCCIPReader_GetRMNRemoteConfig_Call {
+func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) Return(_a0 rmntypes.RemoteConfig, _a1 error) *MockCCIPReader_GetRMNRemoteConfig_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (rmntypes.RMNRemoteConfig, error)) *MockCCIPReader_GetRMNRemoteConfig_Call {
+func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (rmntypes.RemoteConfig, error)) *MockCCIPReader_GetRMNRemoteConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }
