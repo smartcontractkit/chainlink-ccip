@@ -51,22 +51,22 @@ func Test_USDC_Transfer(t *testing.T) {
 	defer intTest.Close()
 
 	// Contract Discovery round.
-	outcome := runner.MustRunRound(t, ctx)
+	outcome := runner.MustRunRound(ctx, t)
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
 	// Round 1 - Get Commit Reports
-	outcome = runner.MustRunRound(t, ctx)
+	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 
 	// Round 2 - Get Messages
-	outcome = runner.MustRunRound(t, ctx)
+	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 
 	// Round 3 - Filter
 	// Messages 102-104 are executed, 105 doesn't have token data ready
-	outcome = runner.MustRunRound(t, ctx)
+	outcome = runner.MustRunRound(ctx, t)
 	require.NoError(t, err)
 	sequenceNumbers := testhelpers.ExtractSequenceNumbers(outcome)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104})
@@ -82,7 +82,7 @@ func Test_USDC_Transfer(t *testing.T) {
 
 	// Run 3 more rounds to get all attestations
 	for i := 0; i < 3; i++ {
-		outcome = runner.MustRunRound(t, ctx)
+		outcome = runner.MustRunRound(ctx, t)
 	}
 
 	sequenceNumbers = testhelpers.ExtractSequenceNumbers(outcome)

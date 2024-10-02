@@ -92,7 +92,12 @@ func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNu
 	)
 }
 
-func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) (*IntTest, *testhelpers.OCR3Runner[[]byte]) {
+func SetupSimpleTest(
+	ctx context.Context,
+	t *testing.T,
+	lggr logger.Logger,
+	srcSelector, dstSelector cciptypes.ChainSelector,
+) (*IntTest, *testhelpers.OCR3Runner[[]byte]) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()

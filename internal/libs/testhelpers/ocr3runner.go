@@ -170,7 +170,7 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 	}, nil
 }
 
-func (r *OCR3Runner[RI]) MustRunRound(t *testing.T, ctx context.Context) exectypes.Outcome {
+func (r *OCR3Runner[RI]) MustRunRound(ctx context.Context, t *testing.T) exectypes.Outcome {
 	result, err := r.RunRound(ctx)
 	require.NoError(t, err)
 	outcome, err := exectypes.DecodeOutcome(result.Outcome)

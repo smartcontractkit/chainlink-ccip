@@ -36,26 +36,26 @@ func TestPlugin(t *testing.T) {
 	defer intTest.Close()
 
 	// Contract Discovery round.
-	outcome := runner.MustRunRound(t, ctx)
+	outcome := runner.MustRunRound(ctx, t)
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
 	// Round 1 - Get Commit Reports
 	// One pending commit report only.
 	// Two of the messages are executed which should be indicated in the Outcome.
-	outcome = runner.MustRunRound(t, ctx)
+	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
-	outcome = runner.MustRunRound(t, ctx)
+	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
-	outcome = runner.MustRunRound(t, ctx)
+	outcome = runner.MustRunRound(ctx, t)
 	sequenceNumbers := testhelpers.ExtractSequenceNumbers(outcome)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
