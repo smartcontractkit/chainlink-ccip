@@ -480,7 +480,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2529,
+				maxReportSize: 2654,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -536,7 +536,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "one and half reports",
 			args: args{
-				maxReportSize: 9500,
+				maxReportSize: 9700,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -558,7 +558,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "exactly one report",
 			args: args{
-				maxReportSize: 4600,
+				maxReportSize: 4800,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -580,7 +580,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2600,
+				maxReportSize: 2654,
 				maxGasLimit:   10000000,
 				nonces: map[cciptypes.ChainSelector]map[string]uint64{
 					1: {
@@ -601,7 +601,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed report",
 			args: args{
-				maxReportSize: 2200,
+				maxReportSize: 2270,
 				maxGasLimit:   10000000,
 				nonces: map[cciptypes.ChainSelector]map[string]uint64{
 					1: {
@@ -648,7 +648,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "partially execute remainder of partially executed sparse report",
 			args: args{
-				maxReportSize: 2250,
+				maxReportSize: 2408,
 				maxGasLimit:   10000000,
 				nonces: map[cciptypes.ChainSelector]map[string]uint64{
 					1: {
@@ -863,7 +863,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			},
 			expectedIsValid: true,
 			expectedMetadata: validationMetadata{
-				encodedSizeBytes: 1633,
+				encodedSizeBytes: 1717,
 				gas:              482_240,
 			},
 		},
