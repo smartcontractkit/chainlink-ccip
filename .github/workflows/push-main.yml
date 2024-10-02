@@ -43,6 +43,7 @@ jobs:
           gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
           go-directory: ${{ matrix.package }}
           go-version-file: ${{ matrix.package }}/go.mod
+          golangci-lint-args: "--timeout 5m"
 
   ci-test:
     needs: changes
