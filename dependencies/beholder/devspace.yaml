@@ -132,9 +132,10 @@ deployments:
             alb.ingress.kubernetes.io/target-type: ip
             external-dns.alpha.kubernetes.io/ttl: "120"
           hosts:
-            - host: ${DEVSPACE_NAMESPACE}-opentelemetry-collector.${DEVSPACE_INGRESS_BASE_DOMAIN}
+            - host: ${DEVSPACE_NAMESPACE}-opentelemetry-collector-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
               paths:
                 - path: /
+                  port: 4318
                   pathType: Prefix
 
   beholder-otel-collector-gateway:
