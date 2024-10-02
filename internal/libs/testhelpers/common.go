@@ -12,8 +12,9 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 func SetupConfigInfo(chainSelector ccipocr3.ChainSelector,
