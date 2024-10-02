@@ -55,15 +55,6 @@ func SetupSimpleTest(
 
 	msgHasher := mocks.NewMessageHasher()
 
-	//messages := []inmem.MessagesWithMetadata{
-	//	makeMsg(100, srcSelector, dstSelector, true),
-	//	makeMsg(101, srcSelector, dstSelector, true),
-	//	makeMsg(102, srcSelector, dstSelector, false),
-	//	makeMsg(103, srcSelector, dstSelector, false),
-	//	makeMsg(104, srcSelector, dstSelector, false),
-	//	makeMsg(105, srcSelector, dstSelector, false),
-	//}
-
 	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
 	reportData := exectypes.CommitData{
 		SourceChain:         srcSelector,
@@ -161,14 +152,14 @@ func SetupSimpleTest(
 	}
 
 	r := readermock.NewMockContractReaderFacade(t)
-	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-	).Return(usdcEvents, nil)
+	).Return(usdcEvents, nil).Maybe()
 
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		lggr,
