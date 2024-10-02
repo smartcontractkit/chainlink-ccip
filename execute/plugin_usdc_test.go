@@ -11,7 +11,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
@@ -80,7 +79,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	// Messages 102-104 are executed, 105 doesn't have token data ready
 	outcome = runner.MustRunRound(ctx, t)
 	require.NoError(t, err)
-	sequenceNumbers := testhelpers.ExtractSequenceNumbers(outcome)
+	sequenceNumbers := extractSequenceNumbers(outcome)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104})
 	//Attestation data added to the USDC
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
@@ -97,7 +96,7 @@ func Test_USDC_Transfer(t *testing.T) {
 		outcome = runner.MustRunRound(ctx, t)
 	}
 
-	sequenceNumbers = testhelpers.ExtractSequenceNumbers(outcome)
+	sequenceNumbers = extractSequenceNumbers(outcome)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 	//Attestation data added to the both USDC messages
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])

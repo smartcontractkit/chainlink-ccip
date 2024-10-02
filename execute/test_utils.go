@@ -435,3 +435,10 @@ func setupHomeChainPoller(
 
 	return homeChain
 }
+
+func extractSequenceNumbers(outcome exectypes.Outcome) []cciptypes.SeqNum {
+	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
+		return m.Header.SequenceNumber
+	})
+	return sequenceNumbers
+}

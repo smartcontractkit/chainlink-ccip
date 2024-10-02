@@ -1,8 +1,6 @@
 package testhelpers
 
 import (
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -31,11 +29,4 @@ func CreateOracleIDToP2pID(ids ...int) map[commontypes.OracleID]libocrtypes.Peer
 		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
 	}
 	return res
-}
-
-func ExtractSequenceNumbers(outcome exectypes.Outcome) []ccipocr3.SeqNum {
-	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m ccipocr3.Message) ccipocr3.SeqNum {
-		return m.Header.SequenceNumber
-	})
-	return sequenceNumbers
 }
