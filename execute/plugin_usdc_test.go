@@ -1,8 +1,6 @@
 package execute
 
 import (
-	"encoding/hex"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,11 +18,12 @@ import (
 
 func Test_USDC_Transfer(t *testing.T) {
 	ctx := tests.Context(t)
+	randomEthAddress := "0x00000000000000000000000000001234"
 
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
 
-	addressBytes, err := hex.DecodeString(strings.TrimPrefix(randomEthAddress, "0x"))
+	addressBytes, err := cciptypes.NewBytesFromString(randomEthAddress)
 	require.NoError(t, err)
 
 	messages := []inmem.MessagesWithMetadata{

@@ -41,10 +41,6 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
-const (
-	randomEthAddress = "0x00000000000000000000000000001234"
-)
-
 type IntTest struct {
 	t *testing.T
 
@@ -132,7 +128,7 @@ func (it *IntTest) WithUSDC(
 				Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
 					it.srcSelector: {
 						SourcePoolAddress:            sourcePoolAddress,
-						SourceMessageTransmitterAddr: randomEthAddress,
+						SourceMessageTransmitterAddr: sourcePoolAddress,
 					},
 				},
 				AttestationAPI:         it.server.server.URL,
@@ -222,10 +218,16 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	nodeIDs := make([]commontypes.OracleID, 0, len(nodesSetup))
 	for _, n := range nodesSetup {
-		nodeIDs = append(nodeIDs, n.node.ReportingCfg().OracleID)
+		nodeIDs = append(nodeIDs, n.node.reportingCfg.OracleID)
 	}
 
 	return testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
+}
+
+func (it *IntTest) Close() {
+	if it.server != nil {
+		it.server.Close()
+	}
 }
 
 func newNode(
@@ -432,10 +434,4 @@ func setupHomeChainPoller(
 	)
 
 	return homeChain
-}
-
-func (it *IntTest) Close() {
-	if it.server != nil {
-		it.server.Close()
-	}
 }
