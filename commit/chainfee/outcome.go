@@ -96,7 +96,7 @@ func (p *processor) getConsensusObservation(
 ) (Observation, error) {
 	aggObs := aggregateObservations(aos)
 
-	// consensus on the fChain map uses the role DON F value
+	// consensus on the fChain map uses the role DON fRoleDon value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
 	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)

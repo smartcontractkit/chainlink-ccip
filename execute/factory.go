@@ -102,8 +102,8 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
-	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
-		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
+	for oracleID, node := range p.ocrConfig.Config.Nodes {
+		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2PId
 	}
 
 	// map types to the facade.

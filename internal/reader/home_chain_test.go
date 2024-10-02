@@ -186,7 +186,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 			Config: OCR3Config{
 				PluginType:     pluginType,
 				ChainSelector:  1,
-				F:              1,
+				FRoleDon:       1,
 				OfframpAddress: []byte("offramp"),
 			},
 		})
@@ -205,6 +205,6 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	require.Len(t, configs, 1)
 	require.Equal(t, uint8(1), configs[0].Config.PluginType)
 	require.Equal(t, cciptypes.ChainSelector(1), configs[0].Config.ChainSelector)
-	require.Equal(t, uint8(1), configs[0].Config.F)
+	require.Equal(t, uint8(1), configs[0].Config.FRoleDon)
 	require.Equal(t, []byte("offramp"), configs[0].Config.OfframpAddress)
 }

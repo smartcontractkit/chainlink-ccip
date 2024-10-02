@@ -337,7 +337,7 @@ type ChainConfigInfo struct {
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
 
-// ChainConfig will live on the home chain and will be used to update chain configuration like F value and supported
+// ChainConfig will live on the home chain and will be used to update chain configuration like FRoleDon value and supported
 // nodes dynamically.
 type ChainConfig struct {
 	// FChain defines the FChain value for the chain. FChain is used while forming consensus based on the observations.
@@ -348,21 +348,32 @@ type ChainConfig struct {
 	Config chainconfig.ChainConfig `json:"config"`
 }
 
-// OCR3Config mirrors CCIPConfig.sol's OCR3Config struct
+// nolint: lll
+// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+
+type OCR3Node struct {
+	P2PId          [32]byte `json:"p2pId"`
+	SignerKey      []byte   `json:"signerKey"`
+	TransmitterKey []byte   `json:"transmitterKey"`
+}
+
+// nolint: lll
+// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+
 type OCR3Config struct {
 	PluginType            uint8                   `json:"pluginType"`
 	ChainSelector         cciptypes.ChainSelector `json:"chainSelector"`
-	F                     uint8                   `json:"F"`
+	FRoleDon              uint8                   `json:"FRoleDon"`
 	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
 	OfframpAddress        []byte                  `json:"offrampAddress"`
 	RmnHomeAddress        []byte                  `json:"rmnHomeAddress"`
-	P2PIds                [][32]byte              `json:"p2pIds"`
-	Signers               [][]byte                `json:"signers"`
-	Transmitters          [][]byte                `json:"transmitters"`
+	Nodes                 []OCR3Node              `json:"nodes"`
 	OffchainConfig        []byte                  `json:"offchainConfig"`
 }
 
-// OCR3ConfigWithmeta mirrors CCIPConfig.sol's OCR3ConfigWithMeta struct
+// nolint: lll
+// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+
 type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
 	ConfigCount  uint64     `json:"configCount"`
