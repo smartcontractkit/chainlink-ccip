@@ -27,11 +27,11 @@ func (w *Processor) ValidateObservation(
 
 	obs := ao.Observation
 	if err := validateFChain(obs.FChain); err != nil {
-		return fmt.Errorf("failed to validate FChain: %w", err)
+		return fmt.Errorf("validate FChain: %w", err)
 	}
 	observerSupportedChains, err := w.chainSupport.SupportedChains(ao.OracleID)
 	if err != nil {
-		return fmt.Errorf("failed to get supported chains: %w", err)
+		return fmt.Errorf("get supported chains: %w", err)
 	}
 
 	supportsDestChain, err := w.chainSupport.SupportsDestChain(ao.OracleID)
@@ -40,19 +40,19 @@ func (w *Processor) ValidateObservation(
 	}
 
 	if err := validateObservedMerkleRoots(obs.MerkleRoots, ao.OracleID, observerSupportedChains); err != nil {
-		return fmt.Errorf("failed to validate MerkleRoots: %w", err)
+		return fmt.Errorf("validate MerkleRoots: %w", err)
 	}
 
 	if err := validateObservedOnRampMaxSeqNums(obs.OnRampMaxSeqNums, ao.OracleID, observerSupportedChains); err != nil {
-		return fmt.Errorf("failed to validate OnRampMaxSeqNums: %w", err)
+		return fmt.Errorf("validate OnRampMaxSeqNums: %w", err)
 	}
 
 	if err := validateObservedOffRampMaxSeqNums(obs.OffRampNextSeqNums, ao.OracleID, supportsDestChain); err != nil {
-		return fmt.Errorf("failed to validate OffRampNextSeqNums: %w", err)
+		return fmt.Errorf("validate OffRampNextSeqNums: %w", err)
 	}
 
 	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain); err != nil {
-		return fmt.Errorf("failed to validate RMNRemoteConfig: %w", err)
+		return fmt.Errorf("validate RMNRemoteConfig: %w", err)
 	}
 
 	return nil
@@ -139,7 +139,7 @@ func validateRMNRemoteConfig(
 	supportsDestChain bool,
 ) error {
 	if !supportsDestChain {
-		return fmt.Errorf("observer %d does not support dest chain, but has observed a RMNRemoteConfig", observer)
+		return fmt.Errorf("oracle %d does not support dest chain, but has observed a RMNRemoteConfig", observer)
 	}
 
 	return nil

@@ -564,7 +564,8 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote contract address: %w", err)
 	}
 
-	var vc versionnedConfig
+	// TODO: make the calls in parallel using errgroup
+	var vc versionedConfig
 	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
@@ -577,7 +578,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote config: %w", err)
 	}
 
-	var dh string
+	var dh cciptypes.Bytes32
 	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
@@ -979,7 +980,7 @@ type config struct {
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L167-L169
 //
 //nolint:lll // It's a URL.
-type versionnedConfig struct {
+type versionedConfig struct {
 	Version uint32 `json:"version"`
 	Config  config `json:"config"`
 }

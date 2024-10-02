@@ -81,7 +81,6 @@ func reportRangesOutcome(
 	observedRMNRemoteConfig := consensusObservation.RMNRemoteConfig
 
 	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
-	rmnRemoteConfig := rmntypes.RemoteConfig{}
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
@@ -117,6 +116,7 @@ func reportRangesOutcome(
 		return offRampNextSeqNums[i].ChainSel < offRampNextSeqNums[j].ChainSel
 	})
 
+	var rmnRemoteConfig rmntypes.RemoteConfig
 	if observedRMNRemoteConfig[dstChain].IsEmpty() {
 		lggr.Warn("RMNRemoteConfig is nil")
 	} else {

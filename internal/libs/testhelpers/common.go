@@ -99,11 +99,17 @@ func randomPrefix() string {
 	return hex.EncodeToString(b)
 }
 
-func randomReportVersion() string {
-	versions := []string{
-		"RMN_V1_6_ANY2EVM_REPORT",
-		"RMN_V2_0_ANY2EVM_REPORT",
-		"RMN_V1_6_EVM2EVM_REPORT",
+func randomReportVersion() cciptypes.Bytes32 {
+	versions := []cciptypes.Bytes32{
+		stringToBytes32("RMN_V1_6_ANY2EVM_REPORT"),
+		stringToBytes32("RMN_V2_0_ANY2EVM_REPORT"),
+		stringToBytes32("RMN_V1_6_EVM2EVM_REPORT"),
 	}
 	return versions[randomUint32()%uint32(len(versions))]
+}
+
+func stringToBytes32(s string) cciptypes.Bytes32 {
+	var result cciptypes.Bytes32
+	copy(result[:], s)
+	return result
 }
