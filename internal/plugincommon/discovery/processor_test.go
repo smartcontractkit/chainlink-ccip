@@ -18,6 +18,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -59,7 +60,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 			dest: expectedRMNRemote,
 		},
 		consts.ContractNameRouter: map[cciptypes.ChainSelector][]byte{
-			dest: expectedRouter,
+			source: expectedRouter,
 		},
 	}
 	var emptySelectors []cciptypes.ChainSelector
@@ -92,7 +93,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	require.Len(t, observation.Addresses[consts.ContractNameRMNRemote], 1)
 	assert.Equal(t, expectedRMNRemote, observation.Addresses[consts.ContractNameRMNRemote][dest])
 	require.Len(t, observation.Addresses[consts.ContractNameRouter], 1)
-	assert.Equal(t, expectedRouter, observation.Addresses[consts.ContractNameRouter][dest])
+	assert.Equal(t, expectedRouter, observation.Addresses[consts.ContractNameRouter][source])
 }
 
 func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T) {
@@ -124,7 +125,8 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	assert.Empty(t, observation.FChain)
 }
 
-func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFChain(t *testing.T) {
+// No dest reader and source readers not ready, still observes fChain from home chain.
+func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
@@ -142,7 +144,7 @@ func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFCha
 	mockReader.
 		EXPECT().
 		DiscoverContracts(mock.Anything, emptySelectors).
-		Return(nil, reader.ErrContractReaderNotFound)
+		Return(nil, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
@@ -233,8 +235,13 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
-		consts.ContractNameFeeQuoter: {},
-		consts.ContractNameRouter:    {},
+		consts.ContractNameFeeQuoter: map[cciptypes.ChainSelector][]byte{
+			source1: []byte("feeQuoter1"),
+			source2: []byte("feeQuoter2"),
+		},
+		consts.ContractNameRouter: map[cciptypes.ChainSelector][]byte{
+			dest: []byte("dest_router"),
+		},
 	}
 	mockReader.
 		EXPECT().
@@ -251,7 +258,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		nil, // oracleIDToP2PID, not needed for this test
 	)
 
-	obs := discoverytypes.Observation{
+	obsSrc := discoverytypes.Observation{
 		FChain: expectedFChain,
 		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
 			consts.ContractNameOnRamp: expectedOnRamp,
@@ -261,15 +268,24 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 			consts.ContractNameRMNRemote: {
 				dest: expectedRMNRemote,
 			},
+			consts.ContractNameFeeQuoter: {
+				source1: expectedContracts[consts.ContractNameFeeQuoter][source1],
+				source2: expectedContracts[consts.ContractNameFeeQuoter][source2],
+			},
+			consts.ContractNameRouter: {
+				source1: expectedContracts[consts.ContractNameRouter][dest],
+				source2: expectedContracts[consts.ContractNameRouter][dest],
+			},
 		},
 	}
+
 	// here we have:
 	// 2*fRoleDON + 1 observations of fChain
 	// 2*fDest + 1 observations of the onramps and the dest nonce manager
 	aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
-		{Observation: obs},
-		{Observation: obs},
-		{Observation: obs},
+		{Observation: obsSrc},
+		{Observation: obsSrc},
+		{Observation: obsSrc},
 	}
 
 	ctx := tests.Context(t)
@@ -309,8 +325,8 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
-		consts.ContractNameFeeQuoter: {},
-		consts.ContractNameRouter:    {},
+		consts.ContractNameFeeQuoter: {}, // no consensus
+		consts.ContractNameRouter:    {}, // no consensus
 	}
 	mockReader.
 		EXPECT().
@@ -329,6 +345,16 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 
 	fChainObs := discoverytypes.Observation{
 		FChain: expectedFChain,
+		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			consts.ContractNameRouter: {
+				source1: []byte("router"),
+				source2: []byte("router"),
+			},
+			consts.ContractNameFeeQuoter: {
+				source1: []byte("fee_quoter_1"),
+				source2: []byte("fee_quoter_2"),
+			},
+		},
 	}
 	destObs := discoverytypes.Observation{
 		FChain: expectedFChain,
@@ -352,7 +378,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		{Observation: destObs},
 		{Observation: destObs},
 		{Observation: fChainObs},
-		{Observation: fChainObs},
+		{Observation: fChainObs}, // no consensus on fChainObs
 	}
 
 	ctx := tests.Context(t)
@@ -648,4 +674,71 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), fmt.Sprintf("oracle %d is not allowed to observe chain %s", ao.OracleID, cdp.dest))
+}
+
+func Test_getRouterConsensus(t *testing.T) {
+	tests := []struct {
+		name        string
+		routerAddrs map[cciptypes.ChainSelector][][]byte
+		want        []byte
+		err         string
+	}{
+		{
+			name: "no inputs",
+			err:  "no consensus on router",
+		},
+		{
+			name: "total agreement",
+			routerAddrs: map[cciptypes.ChainSelector][][]byte{
+				1: {{1, 2, 3}, {1, 2, 3}},
+				2: {{1, 2, 3}, {1, 2, 3}},
+				3: {{1, 2, 3}, {1, 2, 3}},
+			},
+			want: []byte{1, 2, 3},
+		},
+		{
+			name: "threshold 2 not reached",
+			routerAddrs: map[cciptypes.ChainSelector][][]byte{
+				1: {{1, 2, 3}},
+				2: {{1, 2, 3}},
+				3: {{1, 2, 3}},
+			},
+			err: "no consensus on router, routerAddrs",
+		},
+		{
+			name: "3 way tie",
+			routerAddrs: map[cciptypes.ChainSelector][][]byte{
+				1: {{1, 1, 1}, {1, 1, 1}},
+				2: {{2, 2, 2}, {2, 2, 2}},
+				3: {{3, 3, 3}, {3, 3, 3}},
+			},
+			err: "no consensus on router, there is a tie multiple routers were seen 1 times",
+		},
+		{
+			name: "majority",
+			routerAddrs: map[cciptypes.ChainSelector][][]byte{
+				1: {{1, 1, 1}, {1, 1, 1}},
+				2: {{2, 2, 2}, {2, 2, 2}},
+				3: {{1, 1, 1}, {1, 1, 1}},
+			},
+			want: []byte{1, 1, 1},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			lggr := logger.Test(t)
+
+			thresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](2)
+			got, err := getOnRampDestRouterConsensus(lggr, tt.routerAddrs, thresh)
+			if tt.err != "" {
+				assert.ErrorContains(t, err, tt.err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equalf(t, tt.want, got, "getOnRampDestRouterConsensus(...)")
+		})
+	}
 }

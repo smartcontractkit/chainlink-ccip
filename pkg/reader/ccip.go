@@ -637,6 +637,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 	}
 	for chain, cfg := range sourceConfigs {
 		resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
+		resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
 	}
 
 	// NonceManager and RMNRemote are in the offramp static config.
@@ -645,7 +646,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		ctx,
 		r.destChain,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOfframpGetStaticConfig, //nolint:staticcheck // TODO: use the new name.
+		consts.MethodNameOffRampGetStaticConfig,
 		&staticConfig,
 	)
 	if err != nil {
@@ -660,30 +661,13 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		ctx,
 		r.destChain,
 		consts.ContractNameOffRamp,
-		consts.MethodNameOfframpGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
+		consts.MethodNameOffRampGetDynamicConfig,
 		&dynamicConfig,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 	}
 	resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, dynamicConfig.FeeQuoter)
-
-	// TODO: re-enable router discovery once the chainreader has been configured with
-	/*
-		// Router is in the offRamp chain config.
-		var chainConfig offRampDestChainConfig
-		err = r.getDestinationData(
-			ctx,
-			r.destChain,
-			consts.ContractNameOffRamp,
-			consts.MethodNameOffRampGetDestChainConfig,
-			&chainConfig,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("unable to lookup router (offramp dest chain config): %w", err)
-		}
-		resp = resp.Append(consts.ContractNameRouter, r.destChain, chainConfig.Router)
-	*/
 
 	return resp, nil
 }
@@ -717,17 +701,19 @@ func (r *ccipChainReader) DiscoverContracts(
 	myChains := maps.Keys(r.contractReaders)
 
 	// Read onRamps for FeeQuoter in DynamicConfig.
-	dynamicConfigs, err := r.getOnRampDynamicConfigs(ctx, myChains)
-	if err != nil {
-		r.lggr.Infow("unable to lookup source fee quoters, this is expected during initialization", "err", err)
+	{
+		dynamicConfigs, err := r.getOnRampDynamicConfigs(ctx, myChains)
+		if err != nil {
+			r.lggr.Infow("unable to lookup source fee quoters, this is expected during initialization", "err", err)
 
-		// ErrNoBindings is an allowable error.
-		if !errors.Is(err, contractreader.ErrNoBindings) {
-			return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
-		}
-	} else {
-		for chain, cfg := range dynamicConfigs {
-			resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
+			// ErrNoBindings is an allowable error.
+			if !errors.Is(err, contractreader.ErrNoBindings) {
+				return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
+			}
+		} else {
+			for chain, cfg := range dynamicConfigs {
+				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
+			}
 		}
 	}
 
@@ -809,6 +795,16 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 	return linkPriceUSD, nil
 }
 
+// feeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/FeeQuoter.sol#L946
+//
+//nolint:lll // It's a URL.
+type feeQuoterStaticConfig struct {
+	MaxFeeJuelsPerMsg  cciptypes.BigInt `json:"maxFeeJuelsPerMsg"`
+	LinkToken          []byte           `json:"linkToken"`
+	StalenessThreshold uint32           `json:"stalenessThreshold"`
+}
+
 // getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
 func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
 	var staticConfig feeQuoterStaticConfig
@@ -867,6 +863,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 //
 //nolint:lll // It's a URL.
 type sourceChainConfig struct {
+	Router    []byte // local router
 	IsEnabled bool
 	OnRamp    []byte
 	MinSeqNr  uint64
@@ -963,16 +960,6 @@ type offRampDestChainConfig struct {
 	Router           []byte `json:"router"`
 }
 
-// feeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
-// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/FeeQuoter.sol#L946
-//
-//nolint:lll // It's a URL.
-type feeQuoterStaticConfig struct {
-	MaxFeeJuelsPerMsg  cciptypes.BigInt `json:"maxFeeJuelsPerMsg"`
-	LinkToken          []byte           `json:"linkToken"`
-	StalenessThreshold uint32           `json:"stalenessThreshold"`
-}
-
 // getData returns data for a single reader.
 func (r *ccipChainReader) getDestinationData(
 	ctx context.Context,
@@ -1007,6 +994,7 @@ type onRampDynamicChainConfig struct {
 	AllowListAdmin   []byte `json:"allowListAdmin"`
 }
 
+//nolint:dupl // It's not quite duplicate code...
 func (r *ccipChainReader) getOnRampDynamicConfigs(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
@@ -1032,7 +1020,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
-				consts.MethodNameOnrampGetDynamicConfig, //nolint:staticcheck // TODO: use the new name.
+				consts.MethodNameOnRampGetDynamicConfig,
 				primitives.Unconfirmed,
 				map[string]any{},
 				&resp,
