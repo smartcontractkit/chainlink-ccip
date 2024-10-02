@@ -11,7 +11,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 )
 
@@ -56,9 +56,6 @@ func TestPlugin(t *testing.T) {
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	outcome = runner.MustRunRound(t, ctx)
-	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
-		return m.Header.SequenceNumber
-	})
+	sequenceNumbers := testhelpers.ExtractSequenceNumbers(outcome)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
-
 }
