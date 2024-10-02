@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -21,7 +20,6 @@ import (
 
 func Test_USDC_Transfer(t *testing.T) {
 	ctx := tests.Context(t)
-	lggr := logger.Test(t)
 
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
@@ -46,8 +44,23 @@ func Test_USDC_Transfer(t *testing.T) {
 		}),
 	}
 
-	intTest, runner := SetupSimpleTest(ctx, t, lggr, sourceChain, destChain)
+	events := []*readerpkg.MessageSentEvent{
+		newMessageSentEvent(0, 6, 1, []byte{1}),
+		newMessageSentEvent(0, 6, 2, []byte{2}),
+		newMessageSentEvent(0, 6, 3, []byte{3}),
+	}
+
+	attestation104 := map[string]string{
+		"0x0f43587da5355551d234a2ba24dde8edfe0e385346465d6d53653b6aa642992e": `{
+			"status": "complete",
+			"attestation": "0x720502893578a89a8a87982982ef781c18b193"
+		}`,
+	}
+
+	intTest := SetupSimpleTest(t, sourceChain, destChain)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	intTest.WithUSDC(randomEthAddress, attestation104, events)
+	runner := intTest.Start()
 	defer intTest.Close()
 
 	// Contract Discovery round.

@@ -53,9 +53,35 @@ type IntTest struct {
 	srcSelector cciptypes.ChainSelector
 	dstSelector cciptypes.ChainSelector
 
-	msgHasher  cciptypes.MessageHasher
-	ccipReader *inmem.InMemoryCCIPReader
-	server     *ConfigurableAttestationServer
+	msgHasher           cciptypes.MessageHasher
+	ccipReader          *inmem.InMemoryCCIPReader
+	server              *ConfigurableAttestationServer
+	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
+	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
+}
+
+func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
+	donID := uint32(1)
+
+	msgHasher := mocks.NewMessageHasher()
+	ccipReader := inmem.InMemoryCCIPReader{
+		Reports: []plugintypes2.CommitPluginReportWithMeta{},
+		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
+			srcSelector: {},
+		},
+		Dest: dstSelector,
+	}
+
+	return &IntTest{
+		t:                   t,
+		donID:               donID,
+		msgHasher:           msgHasher,
+		srcSelector:         srcSelector,
+		dstSelector:         dstSelector,
+		ccipReader:          &ccipReader,
+		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
+		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{},
+	}
 }
 
 func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNumber uint64, crTimestamp time.Time) {
@@ -92,87 +118,36 @@ func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNu
 	)
 }
 
-func SetupSimpleTest(
-	ctx context.Context,
-	t *testing.T,
-	lggr logger.Logger,
-	srcSelector, dstSelector cciptypes.ChainSelector,
-) (*IntTest, *testhelpers.OCR3Runner[[]byte]) {
-	donID := uint32(1)
-
-	msgHasher := mocks.NewMessageHasher()
-	ccipReader := inmem.InMemoryCCIPReader{
-		Reports: []plugintypes2.CommitPluginReportWithMeta{},
-		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
-			srcSelector: {},
-		},
-		Dest: dstSelector,
-	}
-
-	server := newConfigurableAttestationServer(map[string]string{
-		"0x0f43587da5355551d234a2ba24dde8edfe0e385346465d6d53653b6aa642992e": `{
-			"status": "complete",
-			"attestation": "0x720502893578a89a8a87982982ef781c18b193"
-		}`,
-	})
-
-	cfg := pluginconfig.ExecutePluginConfig{
-		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
-			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-			BatchGasLimit:             100000000,
-			TokenDataObservers: []pluginconfig.TokenDataObserverConfig{
-				{
-					Type:    "usdc-cctp",
-					Version: "1",
-					USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
-						Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
-							srcSelector: {
-								SourcePoolAddress:            randomEthAddress,
-								SourceMessageTransmitterAddr: randomEthAddress,
-							},
-						},
-						AttestationAPI:         server.server.URL,
-						AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
-						AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
+func (it *IntTest) WithUSDC(
+	sourcePoolAddress string,
+	attestations map[string]string,
+	events []*readerpkg.MessageSentEvent,
+) {
+	it.server = newConfigurableAttestationServer(attestations)
+	it.tokenObserverConfig = []pluginconfig.TokenDataObserverConfig{
+		{
+			Type:    "usdc-cctp",
+			Version: "1",
+			USDCCCTPObserverConfig: &pluginconfig.USDCCCTPObserverConfig{
+				Tokens: map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig{
+					it.srcSelector: {
+						SourcePoolAddress:            sourcePoolAddress,
+						SourceMessageTransmitterAddr: randomEthAddress,
 					},
 				},
-			},
-		},
-		DestChain: dstSelector,
-	}
-	chainConfigInfos := []reader.ChainConfigInfo{
-		{
-			ChainSelector: srcSelector,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
-			},
-		}, {
-			ChainSelector: dstSelector,
-			ChainConfig: reader.HomeChainConfigMapper{
-				FChain: 1,
-				Readers: []libocrtypes.PeerID{
-					{1}, {2}, {3},
-				},
-				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+				AttestationAPI:         it.server.server.URL,
+				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Second),
 			},
 		},
 	}
 
-	homeChain := setupHomeChainPoller(t, donID, lggr, chainConfigInfos)
-	err := homeChain.Start(ctx)
-	require.NoError(t, err, "failed to start home chain poller")
-
-	usdcEvents := []types.Sequence{
-		{Data: newMessageSentEvent(0, 6, 1, []byte{1})},
-		{Data: newMessageSentEvent(0, 6, 2, []byte{2})},
-		{Data: newMessageSentEvent(0, 6, 3, []byte{3})},
+	usdcEvents := make([]types.Sequence, len(events))
+	for i, e := range events {
+		usdcEvents[i] = types.Sequence{Data: e}
 	}
 
-	r := readermock.NewMockContractReaderFacade(t)
+	r := readermock.NewMockContractReaderFacade(it.t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,
@@ -182,29 +157,63 @@ func SetupSimpleTest(
 		mock.Anything,
 	).Return(usdcEvents, nil).Maybe()
 
-	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
-		lggr,
-		cfg.DestChain,
-		cfg.OffchainConfig.TokenDataObservers,
-		testhelpers.TokenDataEncoderInstance,
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			srcSelector: r,
-			dstSelector: r,
+	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+		it.srcSelector: r,
+		it.dstSelector: r,
+	}
+}
+
+func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
+	cfg := pluginconfig.ExecutePluginConfig{
+		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
+			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+			BatchGasLimit:             100000000,
 		},
+		DestChain: it.dstSelector,
+	}
+	chainConfigInfos := []reader.ChainConfigInfo{
+		{
+			ChainSelector: it.srcSelector,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+			},
+		}, {
+			ChainSelector: it.dstSelector,
+			ChainConfig: reader.HomeChainConfigMapper{
+				FChain: 1,
+				Readers: []libocrtypes.PeerID{
+					{1}, {2}, {3},
+				},
+				Config: mustEncodeChainConfig(chainconfig.ChainConfig{}),
+			},
+		},
+	}
+
+	homeChain := setupHomeChainPoller(it.t, it.donID, logger.Test(it.t), chainConfigInfos)
+	err := homeChain.Start(tests.Context(it.t))
+	require.NoError(it.t, err, "failed to start home chain poller")
+
+	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
+		logger.Test(it.t),
+		cfg.DestChain,
+		it.tokenObserverConfig,
+		testhelpers.TokenDataEncoderInstance,
+		it.tokenChainReader,
 	)
-	require.NoError(t, err)
+	require.NoError(it.t, err)
 
-	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
+	oracleIDToP2pID := getP2pIDs(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		newNode(donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
-		newNode(donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
-		newNode(donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
+		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
+		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
+		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
 	}
 
-	err = homeChain.Close()
-	if err != nil {
-		return nil, nil
-	}
+	require.NoError(it.t, homeChain.Close())
 
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], 0, len(nodesSetup))
 	for _, n := range nodesSetup {
@@ -216,19 +225,7 @@ func SetupSimpleTest(
 		nodeIDs = append(nodeIDs, n.node.ReportingCfg().OracleID)
 	}
 
-	it := &IntTest{
-		t:           t,
-		donID:       donID,
-		msgHasher:   msgHasher,
-		srcSelector: srcSelector,
-		dstSelector: dstSelector,
-		ccipReader:  &ccipReader,
-		server:      server,
-	}
-
-	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
-
-	return it, runner
+	return testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 }
 
 func newNode(
@@ -282,7 +279,7 @@ func makeMsgWithToken(
 	return msg
 }
 
-func GetP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
+func getP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
 	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
 	for _, id := range ids {
 		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}

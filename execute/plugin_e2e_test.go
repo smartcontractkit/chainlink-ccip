@@ -1,13 +1,12 @@
 package execute
 
 import (
-	"context"
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -16,8 +15,7 @@ import (
 )
 
 func TestPlugin(t *testing.T) {
-	ctx := context.Background()
-	lggr := logger.Test(t)
+	ctx := tests.Context(t)
 
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)
@@ -31,8 +29,9 @@ func TestPlugin(t *testing.T) {
 		makeMsg(105, srcSelector, dstSelector, false),
 	}
 
-	intTest, runner := SetupSimpleTest(ctx, t, lggr, srcSelector, dstSelector)
+	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	runner := intTest.Start()
 	defer intTest.Close()
 
 	// Contract Discovery round.
