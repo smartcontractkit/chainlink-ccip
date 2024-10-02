@@ -179,6 +179,64 @@ func Test_validateObservedOffRampMaxSeqNums(t *testing.T) {
 	}
 }
 
+func Test_validateRMNRemoteConfig(t *testing.T) {
+	tests := []struct {
+		name              string
+		observer          commontypes.OracleID
+		supportsDestChain bool
+		expectedError     string
+	}{
+		{
+			name:              "Supports dest chain",
+			observer:          1,
+			supportsDestChain: true,
+			expectedError:     "",
+		},
+		{
+			name:              "Does not support dest chain",
+			observer:          2,
+			supportsDestChain: false,
+			expectedError:     "oracle 2 does not support dest chain, but has observed a RMNRemoteConfig",
+		},
+		{
+			name:              "Zero observer ID supports dest chain",
+			observer:          0,
+			supportsDestChain: true,
+			expectedError:     "",
+		},
+		{
+			name:              "Zero observer ID does not support dest chain",
+			observer:          0,
+			supportsDestChain: false,
+			expectedError:     "oracle 0 does not support dest chain, but has observed a RMNRemoteConfig",
+		},
+		{
+			name:              "Large observer ID supports dest chain",
+			observer:          1,
+			supportsDestChain: true,
+			expectedError:     "",
+		},
+		{
+			name:              "Large observer ID does not support dest chain",
+			observer:          1,
+			supportsDestChain: false,
+			expectedError:     "oracle 1 does not support dest chain, but has observed a RMNRemoteConfig",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain)
+
+			if tt.expectedError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.expectedError)
+			}
+		})
+	}
+}
+
 func Test_validateFChain(t *testing.T) {
 	testCases := []struct {
 		name   string
