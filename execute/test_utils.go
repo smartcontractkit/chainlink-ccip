@@ -14,6 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
@@ -47,16 +48,17 @@ const (
 type IntTest struct {
 	t *testing.T
 
+	donID uint32
+
 	srcSelector cciptypes.ChainSelector
 	dstSelector cciptypes.ChainSelector
 
+	msgHasher  cciptypes.MessageHasher
 	ccipReader *inmem.InMemoryCCIPReader
 	server     *ConfigurableAttestationServer
 }
 
 func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNumber uint64, crTimestamp time.Time) {
-	msgHasher := mocks.NewMessageHasher()
-
 	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
 	reportData := exectypes.CommitData{
 		SourceChain: it.srcSelector,
@@ -67,7 +69,7 @@ func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNu
 		Messages: mapped,
 	}
 
-	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(it.t))
+	tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, logger.Test(it.t))
 	require.NoError(it.t, err, "failed to construct merkle tree")
 
 	it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
@@ -189,9 +191,9 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
+		newNode(donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
+		newNode(donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
+		newNode(donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -211,6 +213,8 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 
 	it := &IntTest{
 		t:           t,
+		donID:       donID,
+		msgHasher:   msgHasher,
 		srcSelector: srcSelector,
 		dstSelector: dstSelector,
 		ccipReader:  &ccipReader,
@@ -223,8 +227,6 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 }
 
 func newNode(
-	_ context.Context,
-	_ *testing.T,
 	donID plugintypes.DonID,
 	lggr logger.Logger,
 	cfg pluginconfig.ExecutePluginConfig,
@@ -254,7 +256,8 @@ func newNode(
 		homeChain,
 		tokenDataObserver,
 		evm.EstimateProvider{},
-		lggr)
+		lggr,
+	)
 
 	return nodeSetup{
 		node:        node1,
