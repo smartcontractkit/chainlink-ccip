@@ -28,8 +28,6 @@ import (
 )
 
 const maxQueryLength = 1024 * 1024 // 1MB
-// const maxReportTransmissionCheckAttempts = 5
-// const rmnEnabled = false
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -99,6 +97,8 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
+
+	offchainConfig.ApplyDefaults()
 
 	if err = offchainConfig.Validate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)

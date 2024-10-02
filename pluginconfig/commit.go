@@ -19,7 +19,13 @@ import (
 
 // EvmDefaultMaxMerkleTreeSize is the default number of max new messages to put in a merkle tree.
 // We use this default value when the config is not set for a specific chain.
-const EvmDefaultMaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
+const (
+	defaultRMNSignaturesTimeout               = 5 * time.Second
+	defaultNewMsgScanBatchSize                = 256
+	EvmDefaultMaxMerkleTreeSize               = merklemulti.MaxNumberTreeLeaves
+	defaultMaxReportTransmissionCheckAttempts = 5
+	defaultRMNEnabled                         = false
+)
 
 type FeeInfo struct {
 	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
@@ -107,6 +113,24 @@ type CommitOffchainConfig struct {
 	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
 	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
+}
+
+func (c *CommitOffchainConfig) ApplyDefaults() {
+	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
+		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
+	}
+
+	if c.NewMsgScanBatchSize == 0 {
+		c.NewMsgScanBatchSize = defaultNewMsgScanBatchSize
+	}
+
+	if c.MaxReportTransmissionCheckAttempts == 0 {
+		c.MaxReportTransmissionCheckAttempts = defaultMaxReportTransmissionCheckAttempts
+	}
+
+	if c.MaxMerkleTreeSize == 0 {
+		c.MaxMerkleTreeSize = EvmDefaultMaxMerkleTreeSize
+	}
 }
 
 func (c CommitOffchainConfig) Validate() error {
