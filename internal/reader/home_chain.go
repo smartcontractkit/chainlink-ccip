@@ -371,12 +371,14 @@ type OCR3Config struct {
 	OffchainConfig        []byte                  `json:"offchainConfig"`
 }
 
+// OCR3ConfigWithMeta
 // nolint: lll
 // https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
-
+// TODO: we might need to change it from OCR3ConfigWithMeta to VersionedConfig
+// If so, we'll create a new package so that we don't have conflict naming with RMNHome
 type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
-	ConfigCount  uint64     `json:"configCount"`
+	Version      uint32     `json:"version"`
 	ConfigDigest [32]byte   `json:"configDigest"`
 }
 

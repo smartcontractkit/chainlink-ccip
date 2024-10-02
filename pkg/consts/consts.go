@@ -87,8 +87,9 @@ const (
 	// Used by the home chain reader.
 	MethodNameGetCapability = "GetCapability"
 
-	// CCIPConfig.sol methods.
+	// CCIPHome.sol methods.
 	// Used by the home chain reader.
+	// TODO: change them to getConfig, getAllConfigs
 	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
 	MethodNameGetOCRConfig       = "GetOCRConfig"
 
