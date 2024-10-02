@@ -178,18 +178,21 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 			"donId":      donID,
 			"pluginType": pluginType,
 		},
-		mock.AnythingOfType("*[]reader.OCR3ConfigWithMeta"),
+		//mock.AnythingOfType("*[]reader.ActiveCandidate"),
+		mock.Anything,
 	).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(4).(*[]OCR3ConfigWithMeta)
-		*arg = append(*arg, OCR3ConfigWithMeta{
-			Version: 1,
-			Config: OCR3Config{
-				PluginType:     pluginType,
-				ChainSelector:  1,
-				FRoleDon:       1,
-				OfframpAddress: []byte("offramp"),
+		arg := args.Get(4).(*ActiveCandidate)
+		*arg = ActiveCandidate{
+			ActiveConfig: &OCR3ConfigWithMeta{
+				Version: 1,
+				Config: OCR3Config{
+					PluginType:     pluginType,
+					ChainSelector:  1,
+					FRoleDon:       1,
+					OfframpAddress: []byte("offramp"),
+				},
 			},
-		})
+		}
 	})
 	defer homeChainReader.AssertExpectations(t)
 

@@ -223,6 +223,8 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
+	var activeCandidate ActiveCandidate
+
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
 		r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetOCRConfig),
@@ -230,9 +232,16 @@ func (r *homeChainPoller) GetOCRConfigs(
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
-		}, &ocrConfigs)
+		}, &activeCandidate)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
+	}
+
+	if activeCandidate.ActiveConfig != nil {
+		ocrConfigs = append(ocrConfigs, *activeCandidate.ActiveConfig)
+	}
+	if activeCandidate.CandidateConfig != nil {
+		ocrConfigs = append(ocrConfigs, *activeCandidate.CandidateConfig)
 	}
 
 	return ocrConfigs, nil
@@ -380,6 +389,11 @@ type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
 	Version      uint32     `json:"version"`
 	ConfigDigest [32]byte   `json:"configDigest"`
+}
+
+type ActiveCandidate struct {
+	ActiveConfig    *OCR3ConfigWithMeta `json:"activeConfig"`
+	CandidateConfig *OCR3ConfigWithMeta `json:"candidate"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)

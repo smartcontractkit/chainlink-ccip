@@ -8,7 +8,7 @@ const (
 	ContractNameOnRamp                 = "OnRamp"
 	ContractNameFeeQuoter              = "FeeQuoter"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
-	ContractNameCCIPConfig             = "CCIPConfig"
+	ContractNameCCIPConfig             = "CCIPHome"
 	ContractNamePriceAggregator        = "AggregatorV3Interface"
 	ContractNameNonceManager           = "NonceManager"
 	ContractNameRMNHome                = "RMNHome"
