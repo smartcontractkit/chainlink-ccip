@@ -393,7 +393,7 @@ type OCR3ConfigWithMeta struct {
 
 type ActiveCandidate struct {
 	ActiveConfig    *OCR3ConfigWithMeta `json:"activeConfig"`
-	CandidateConfig *OCR3ConfigWithMeta `json:"candidate"`
+	CandidateConfig *OCR3ConfigWithMeta `json:"candidateConfig"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)
