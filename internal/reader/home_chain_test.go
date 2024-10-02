@@ -64,7 +64,7 @@ func Test_PollingWorking(t *testing.T) {
 	chainConfig := chainconfig.ChainConfig{}
 	encodedChainConfig, err := chainconfig.EncodeChainConfig(chainConfig)
 	require.NoError(t, err)
-	onChainConfigs := []ChainConfigInfo{
+	onChainConfigs := []ChainConfigArgs{
 		{
 			ChainSelector: chainA,
 			ChainConfig: HomeChainConfigMapper{
@@ -127,7 +127,7 @@ func Test_PollingWorking(t *testing.T) {
 		mock.Anything,
 	).Run(
 		func(args mock.Arguments) {
-			arg := args.Get(4).(*[]ChainConfigInfo)
+			arg := args.Get(4).(*[]ChainConfigArgs)
 			*arg = onChainConfigs
 		}).Return(nil)
 
