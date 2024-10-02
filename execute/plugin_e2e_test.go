@@ -30,8 +30,8 @@ func TestPlugin(t *testing.T) {
 		makeMsg(105, srcSelector, dstSelector, false),
 	}
 
-	runner, server := SetupSimpleTest(ctx, t, lggr, srcSelector, dstSelector, messages)
-	defer server.Close()
+	intTest, runner := SetupSimpleTest(ctx, t, lggr, srcSelector, dstSelector, messages)
+	defer intTest.Close()
 
 	// Contract Discovery round.
 	res, err := runner.RunRound(ctx)

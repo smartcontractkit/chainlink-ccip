@@ -44,13 +44,14 @@ const (
 	randomEthAddress = "0x00000000000000000000000000001234"
 )
 
-func SetupSimpleTest(
-	ctx context.Context,
-	t *testing.T,
-	lggr logger.Logger,
-	srcSelector, dstSelector cciptypes.ChainSelector,
-	messages []inmem.MessagesWithMetadata,
-) (*testhelpers.OCR3Runner[[]byte], *ConfigurableAttestationServer) {
+type IntTest struct {
+	t *testing.T
+
+	ccipReader inmem.InMemoryCCIPReader
+	server     *ConfigurableAttestationServer
+}
+
+func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector, messages []inmem.MessagesWithMetadata) (*IntTest, *testhelpers.OCR3Runner[[]byte]) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -195,9 +196,15 @@ func SetupSimpleTest(
 		nodeIDs = append(nodeIDs, n.node.ReportingCfg().OracleID)
 	}
 
+	it := &IntTest{
+		t:          t,
+		ccipReader: ccipReader,
+		server:     server,
+	}
+
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
 
-	return runner, server
+	return it, runner
 }
 
 func newNode(
@@ -405,4 +412,10 @@ func setupHomeChainPoller(
 	)
 
 	return homeChain
+}
+
+func (i *IntTest) Close() {
+	if i.server != nil {
+		i.server.Close()
+	}
 }

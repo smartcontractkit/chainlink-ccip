@@ -47,8 +47,8 @@ func Test_USDC_Transfer(t *testing.T) {
 		}),
 	}
 
-	runner, server := SetupSimpleTest(ctx, t, lggr, sourceChain, destChain, messages)
-	defer server.Close()
+	intTest, runner := SetupSimpleTest(ctx, t, lggr, sourceChain, destChain, messages)
+	defer intTest.Close()
 
 	// Contract Discovery round.
 	res, err := runner.RunRound(ctx)
@@ -90,7 +90,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	//Attestation data added to the USDC
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
 
-	server.AddResponse(
+	intTest.server.AddResponse(
 		"0x70ef528624085241badbff913575c0ab50241e7cb6db183a5614922ab0bcba5d",
 		`{
 			"status": "complete",
