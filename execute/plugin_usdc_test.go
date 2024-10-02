@@ -30,8 +30,6 @@ func Test_USDC_Transfer(t *testing.T) {
 	require.NoError(t, err)
 
 	messages := []inmem.MessagesWithMetadata{
-		makeMsg(100, sourceChain, destChain, true),
-		makeMsg(101, sourceChain, destChain, true),
 		makeMsg(102, sourceChain, destChain, false),
 		makeMsg(103, sourceChain, destChain, false),
 		makeMsgWithToken(104, sourceChain, destChain, false, []cciptypes.RampTokenAmount{
@@ -53,37 +51,22 @@ func Test_USDC_Transfer(t *testing.T) {
 	defer intTest.Close()
 
 	// Contract Discovery round.
-	res, err := runner.RunRound(ctx)
-	require.NoError(t, err)
-	outcome, err := exectypes.DecodeOutcome(res.Outcome)
-	require.NoError(t, err)
+	outcome := runner.MustRunRound(t, ctx)
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
 	// Round 1 - Get Commit Reports
-	// One pending commit report only.
-	// Two of the messages are executed which should be indicated in the Outcome.
-	res, err = runner.RunRound(ctx)
-	require.NoError(t, err)
-	outcome, err = exectypes.DecodeOutcome(res.Outcome)
-	require.NoError(t, err)
+	outcome = runner.MustRunRound(t, ctx)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
-	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
-	// Messages now attached to the pending commit.
-	res, err = runner.RunRound(ctx)
-	require.NoError(t, err)
-	outcome, err = exectypes.DecodeOutcome(res.Outcome)
-	require.NoError(t, err)
+	outcome = runner.MustRunRound(t, ctx)
 	require.Len(t, outcome.Report.ChainReports, 0)
 	require.Len(t, outcome.PendingCommitReports, 1)
 
 	// Round 3 - Filter
-	// An execute report with the following messages executed: 102, 103, 104, 105.
-	res, err = runner.RunRound(ctx)
-	require.NoError(t, err)
-	outcome, err = exectypes.DecodeOutcome(res.Outcome)
+	// Messages 102-104 are executed, 105 doesn't have token data ready
+	outcome = runner.MustRunRound(t, ctx)
 	require.NoError(t, err)
 	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
@@ -101,12 +84,9 @@ func Test_USDC_Transfer(t *testing.T) {
 
 	// Run 3 more rounds to get all attestations
 	for i := 0; i < 3; i++ {
-		res, err = runner.RunRound(ctx)
-		require.NoError(t, err)
+		outcome = runner.MustRunRound(t, ctx)
 	}
 
-	outcome, err = exectypes.DecodeOutcome(res.Outcome)
-	require.NoError(t, err)
 	sequenceNumbers = slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})

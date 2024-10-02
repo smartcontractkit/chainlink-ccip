@@ -8,11 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"testing"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 )
 
@@ -165,6 +168,14 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 		NotTransmitted: notTransmitted,
 		Outcome:        outcomes[0],
 	}, nil
+}
+
+func (r *OCR3Runner[RI]) MustRunRound(t *testing.T, ctx context.Context) exectypes.Outcome {
+	result, err := r.RunRound(ctx)
+	require.NoError(t, err)
+	outcome, err := exectypes.DecodeOutcome(result.Outcome)
+	require.NoError(t, err)
+	return outcome
 }
 
 func (r *OCR3Runner[RI]) selectLeader() ocr3types.ReportingPlugin[RI] {
