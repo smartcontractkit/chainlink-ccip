@@ -212,11 +212,11 @@ func TestProcessor_Query(t *testing.T) {
 				},
 			},
 			contractAddresses: contractAddrs,
-			cfg: pluginconfig.CommitPluginConfig{
+			cfg: pluginconfig.CommitOffchainConfig{
 				RMNEnabled:           true,
 				RMNSignaturesTimeout: time.Second,
-				DestChain:            dstChain,
 			},
+			destChain: dstChain,
 			rmnClient: func(t *testing.T) *rmnmocks.MockController { return rmnmocks.NewMockController(t) },
 			expQuery:  Query{},
 			expErr:    true,

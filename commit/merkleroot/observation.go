@@ -131,8 +131,8 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
-		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.cfg.DestChain)
-		rmnRemoteCfg := w.observer.ObserveRMNRemoteCfg(ctx, w.cfg.DestChain)
+		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.destChain)
+		rmnRemoteCfg := w.observer.ObserveRMNRemoteCfg(ctx, w.destChain)
 
 		return Observation{
 			OnRampMaxSeqNums:   onRampLatestSeqNums,

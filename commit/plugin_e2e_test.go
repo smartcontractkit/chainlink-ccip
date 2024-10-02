@@ -79,8 +79,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
 
-	cfg := pluginconfig.CommitPluginConfig{
-		DestChain:                          destChain,
+	cfg := pluginconfig.CommitOffchainConfig{
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
 	}
