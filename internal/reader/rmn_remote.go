@@ -8,19 +8,19 @@ import (
 
 type RMNRemote interface {
 	GetMinSigners() uint64
-	GetSignersInfo() []rmntypes.RMNRemoteSignerInfo
+	GetSignersInfo() []rmntypes.RemoteSignerInfo
 	GetRmnReportVersion() string
 	GetRmnRemoteContractAddress() string
 	GetRmnHomeConfigDigest() cciptypes.Bytes32
 }
 
 type RmnRemotePoller struct {
-	rmnRemoteConfig rmntypes.RMNRemoteConfig
+	rmnRemoteConfig rmntypes.RemoteConfig
 }
 
 func NewRMNRemotePoller() RMNRemote {
 	return &RmnRemotePoller{
-		rmnRemoteConfig: rmntypes.RMNRemoteConfig{},
+		rmnRemoteConfig: rmntypes.RemoteConfig{},
 	}
 }
 
@@ -28,7 +28,7 @@ func (r *RmnRemotePoller) GetMinSigners() uint64 {
 	panic("implement me")
 }
 
-func (r *RmnRemotePoller) GetSignersInfo() []rmntypes.RMNRemoteSignerInfo {
+func (r *RmnRemotePoller) GetSignersInfo() []rmntypes.RemoteSignerInfo {
 	panic("implement me")
 }
 
