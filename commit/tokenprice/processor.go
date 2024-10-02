@@ -21,7 +21,8 @@ import (
 type processor struct {
 	oracleID         commontypes.OracleID
 	lggr             logger.Logger
-	cfg              pluginconfig.CommitPluginConfig
+	offChainCfg      pluginconfig.CommitOffchainConfig
+	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader reader.PriceReader
 	homeChain        reader.HomeChain
@@ -32,7 +33,8 @@ type processor struct {
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	lggr logger.Logger,
-	cfg pluginconfig.CommitPluginConfig,
+	offChainCfg pluginconfig.CommitOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
 	tokenPriceReader reader.PriceReader,
 	homeChain reader.HomeChain,
@@ -41,7 +43,8 @@ func NewProcessor(
 	return &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
-		cfg:              cfg,
+		offChainCfg:      offChainCfg,
+		destChain:        destChain,
 		chainSupport:     chainSupport,
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
@@ -97,7 +100,7 @@ func (p *processor) Outcome(
 ) (Outcome, error) {
 	p.lggr.Infow("processing token price outcome")
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
-	if p.cfg.OffchainConfig.TokenPriceBatchWriteFrequency.Duration() == 0 {
+	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
 		return Outcome{}, nil
 	}

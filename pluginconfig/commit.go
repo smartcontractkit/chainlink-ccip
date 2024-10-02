@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -19,48 +20,6 @@ import (
 // EvmDefaultMaxMerkleTreeSize is the default number of max new messages to put in a merkle tree.
 // We use this default value when the config is not set for a specific chain.
 const EvmDefaultMaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
-
-type CommitPluginConfig struct {
-	// DestChain is the ccip destination chain configured for the commit plugin DON.
-	DestChain cciptypes.ChainSelector `json:"destChain"`
-
-	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
-	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
-
-	// The maximum number of times to check if the previous report has been transmitted
-	MaxReportTransmissionCheckAttempts uint
-
-	// OffchainConfig is the offchain config set for the commit DON.
-	OffchainConfig CommitOffchainConfig `json:"offchainConfig"`
-
-	// RMNEnabled is a flag to enable/disable RMN signature verification.
-	RMNEnabled bool `json:"rmnEnabled"`
-
-	// RMNSignaturesTimeout is the timeout for RMN signature verification.
-	// Typically set to `MaxQueryDuration - e`, where e some small duration.
-	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
-
-	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
-	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
-	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
-	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
-}
-
-func (c CommitPluginConfig) Validate() error {
-	if c.DestChain == cciptypes.ChainSelector(0) {
-		return fmt.Errorf("destChain not set")
-	}
-
-	if c.NewMsgScanBatchSize == 0 {
-		return fmt.Errorf("newMsgScanBatchSize not set")
-	}
-
-	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
-		return fmt.Errorf("rmnSignaturesTimeout not set")
-	}
-
-	return c.OffchainConfig.Validate()
-}
 
 type FeeInfo struct {
 	ExecDeviationPPB             cciptypes.BigInt `json:"execDeviationPPB"`
@@ -130,6 +89,24 @@ type CommitOffchainConfig struct {
 	// This will typically be an arbitrum testnet/mainnet chain depending on
 	// the deployment.
 	PriceFeedChainSelector cciptypes.ChainSelector `json:"tokenPriceChainSelector"`
+
+	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
+	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
+
+	// The maximum number of times to check if the previous report has been transmitted
+	MaxReportTransmissionCheckAttempts uint
+
+	// RMNSignaturesTimeout is the timeout for RMN signature verification.
+	// Typically set to `MaxQueryDuration - e`, where e some small duration.
+	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+
+	// RMNEnabled is a flag to enable/disable RMN signature verification.
+	RMNEnabled bool `json:"rmnEnabled"`
+
+	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
+	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
+	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
+	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
 }
 
 func (c CommitOffchainConfig) Validate() error {
@@ -151,6 +128,14 @@ func (c CommitOffchainConfig) Validate() error {
 		if err := tokenInfo.Validate(); err != nil {
 			return fmt.Errorf("invalid token info for token %s: %w", token, err)
 		}
+	}
+
+	if c.NewMsgScanBatchSize == 0 {
+		return fmt.Errorf("newMsgScanBatchSize not set")
+	}
+
+	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
+		return fmt.Errorf("rmnSignaturesTimeout not set")
 	}
 
 	return nil

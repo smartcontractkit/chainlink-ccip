@@ -40,7 +40,7 @@ func (w *Processor) getOutcome(
 ) (Outcome, State) {
 	nextState := previousOutcome.NextState()
 
-	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
+	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.destChain, aos)
 	if err != nil {
 		w.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
 		return Outcome{}, nextState
@@ -48,7 +48,7 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize), nextState
+		return reportRangesOutcome(q, w.lggr, consensusObservation, w.offchainCfg.MaxMerkleTreeSize), nextState
 	case BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
@@ -58,7 +58,7 @@ func (w *Processor) getOutcome(
 		return buildReport(q, w.lggr, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
 		return checkForReportTransmission(
-			w.lggr, w.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
+			w.lggr, w.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
 	default:
 		w.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
 		return Outcome{}, nextState

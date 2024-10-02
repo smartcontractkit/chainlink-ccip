@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/stretchr/testify/assert"
@@ -75,8 +76,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 		sourceChain2: 19, // no new msg, still on 19
 	}
 
-	cfg := pluginconfig.CommitPluginConfig{
-		DestChain:                          destChain,
+	cfg := pluginconfig.CommitOffchainConfig{
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
 	}
@@ -276,7 +276,7 @@ func setupNode(
 	nodeID commontypes.OracleID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	pluginCfg pluginconfig.CommitPluginConfig,
+	offchainCfg pluginconfig.CommitOffchainConfig,
 	chainCfg map[ccipocr3.ChainSelector]reader.ChainConfig,
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
@@ -371,7 +371,8 @@ func setupNode(
 		donID,
 		nodeID,
 		oracleIDToP2pID,
-		pluginCfg,
+		offchainCfg,
+		destChain,
 		ccipReader,
 		tokenPricesReader,
 		reportCodec,

@@ -11,7 +11,7 @@ import (
 )
 
 func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
-	if !w.cfg.RMNEnabled {
+	if !w.offchainCfg.RMNEnabled {
 		return Query{}, nil
 	}
 
@@ -20,12 +20,12 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, nil
 	}
 
-	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
+	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.destChain)
 	if err != nil {
 		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
 	}
 	dstChainInfo := &rmnpb.LaneDest{
-		DestChainSelector: uint64(w.cfg.DestChain),
+		DestChainSelector: uint64(w.destChain),
 		OfframpAddress:    offRampAddress,
 	}
 
@@ -48,7 +48,7 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		})
 	}
 
-	ctxQuery, cancel := context.WithTimeout(ctx, w.cfg.RMNSignaturesTimeout)
+	ctxQuery, cancel := context.WithTimeout(ctx, w.offchainCfg.RMNSignaturesTimeout)
 	defer cancel()
 
 	// Get signatures for the requested updates. The signatures might contain a subset of the requested updates.

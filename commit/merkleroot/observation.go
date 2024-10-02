@@ -52,7 +52,7 @@ func (w *Processor) Observation(
 // 1. If RMN is enabled, RMN signatures are required in the BuildingReport state but not expected in other states.
 // 2. If RMN signatures are provided, they are verified against the current RMN node config.
 func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Query) error {
-	if !w.cfg.RMNEnabled {
+	if !w.offchainCfg.RMNEnabled {
 		return nil
 	}
 
@@ -69,12 +69,12 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
 
-	ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))
+	ch, exists := chainsel.ChainBySelector(uint64(w.destChain))
 	if !exists {
-		return fmt.Errorf("failed to get chain by selector %d", w.cfg.DestChain)
+		return fmt.Errorf("failed to get chain by selector %d", w.destChain)
 	}
 
-	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
+	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.destChain)
 	if err != nil {
 		return fmt.Errorf("failed to get offramp contract address: %w", err)
 	}
@@ -115,7 +115,7 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
-		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.cfg.DestChain)
+		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.destChain)
 
 		return Observation{
 			OnRampMaxSeqNums:   onRampLatestSeqNums,

@@ -4,51 +4,50 @@ import (
 	"math/big"
 	"testing"
 
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 func TestCommitPluginConfigValidate(t *testing.T) {
 	testCases := []struct {
-		name   string
-		input  CommitPluginConfig
-		expErr bool
+		name      string
+		input     CommitOffchainConfig
+		destChain cciptypes.ChainSelector
+		expErr    bool
 	}{
 		{
 			name: "valid cfg",
-			input: CommitPluginConfig{
-				DestChain:           cciptypes.ChainSelector(1),
-				NewMsgScanBatchSize: 256,
-				OffchainConfig: CommitOffchainConfig{
-					RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-				},
+			input: CommitOffchainConfig{
+				NewMsgScanBatchSize:               256,
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 			},
-			expErr: false,
+			destChain: cciptypes.ChainSelector(1),
+			expErr:    false,
 		},
 		{
 			name: "dest chain is empty",
-			input: CommitPluginConfig{
+			input: CommitOffchainConfig{
 				NewMsgScanBatchSize: 256,
 			},
 			expErr: true,
 		},
 		{
 			name: "zero priced tokens",
-			input: CommitPluginConfig{
-				DestChain:           cciptypes.ChainSelector(1),
+			input: CommitOffchainConfig{
 				NewMsgScanBatchSize: 256,
 			},
-			expErr: true,
+			destChain: cciptypes.ChainSelector(1),
+			expErr:    true,
 		},
 		{
-			name: "empty batch scan size",
-			input: CommitPluginConfig{
-				DestChain: cciptypes.ChainSelector(1),
-			},
-			expErr: true,
+			name:      "empty batch scan size",
+			input:     CommitOffchainConfig{},
+			destChain: cciptypes.ChainSelector(1),
+			expErr:    true,
 		},
 	}
 
@@ -169,6 +168,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		TokenInfo                         map[types.Account]TokenInfo
 		TokenPriceChainSelector           cciptypes.ChainSelector
 		TokenDecimals                     map[types.Account]uint8
+		NewMsgScanBatchSize               uint32
 	}
 	//nolint:gosec
 	const remoteTokenAddress = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
@@ -191,6 +191,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 					},
 				},
 				TokenPriceChainSelector: 10,
+				NewMsgScanBatchSize:     256,
 			},
 			false,
 		},
@@ -200,6 +201,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
 				TokenInfo:                         map[types.Account]TokenInfo{},
+				NewMsgScanBatchSize:               256,
 			},
 			false,
 		},
@@ -215,6 +217,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						Decimals:          18,
 					},
 				},
+				NewMsgScanBatchSize: 256,
 			},
 			true,
 		},
@@ -230,6 +233,16 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						Decimals:          18,
 					},
 				},
+				NewMsgScanBatchSize: 256,
+			},
+			true,
+		},
+		{
+			"invalid, no new msg scan batch size",
+			fields{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
+				TokenInfo:                         map[types.Account]TokenInfo{},
 			},
 			true,
 		},
@@ -241,6 +254,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
 				TokenInfo:                         tt.fields.TokenInfo,
 				PriceFeedChainSelector:            tt.fields.TokenPriceChainSelector,
+				NewMsgScanBatchSize:               int(tt.fields.NewMsgScanBatchSize),
 			}
 			err := c.Validate()
 			if tt.wantErr {
