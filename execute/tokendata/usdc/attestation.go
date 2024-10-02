@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -56,8 +56,8 @@ type AttestationEncoder func(context.Context, cciptypes.Bytes, cciptypes.Bytes) 
 type AttestationClient interface {
 	Attestations(
 		ctx context.Context,
-		msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
-	) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error)
+		msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
+	) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error)
 }
 
 type sequentialAttestationClient struct {
@@ -88,12 +88,12 @@ func NewSequentialAttestationClient(
 
 func (s *sequentialAttestationClient) Attestations(
 	ctx context.Context,
-	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
-	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
+	msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
+) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
+	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
 
 	for chainSelector, hashes := range msgs {
-		outcome[chainSelector] = make(map[exectypes.MessageTokenID]AttestationStatus)
+		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
 
 		for tokenID, messageHash := range hashes {
 			s.lggr.Debugw(
@@ -127,12 +127,12 @@ type FakeAttestationClient struct {
 
 func (f FakeAttestationClient) Attestations(
 	_ context.Context,
-	msgs map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes,
-) (map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus, error) {
-	outcome := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus)
+	msgs map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes,
+) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
+	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
 
 	for chainSelector, hashes := range msgs {
-		outcome[chainSelector] = make(map[exectypes.MessageTokenID]AttestationStatus)
+		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
 
 		for tokenID, messageHash := range hashes {
 			outcome[chainSelector][tokenID] = f.Data[string(messageHash)]

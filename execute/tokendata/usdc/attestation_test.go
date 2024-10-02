@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -42,83 +43,83 @@ func Test_AttestationClient(t *testing.T) {
 		name     string
 		success  []string
 		pending  []string
-		input    map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes
-		expected map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus
+		input    map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes
+		expected map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus
 	}{
 		{
 			name:     "empty input",
-			input:    map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{},
-			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{},
+			input:    map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{},
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{},
 		},
 		{
 			name:    "single success",
 			success: []string{messageA.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
+			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 1): messageA.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
+					reader.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
 				},
 			},
 		},
 		{
 			name:    "single pending",
 			pending: []string{messageA.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
+			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 1): messageA.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(1, 1): ErrorAttestationStatus(ErrNotReady),
 				},
 			},
 		},
 		{
 			name:    "multiple success",
 			success: []string{messageA.keccak, messageB.keccak, messageC.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
+			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): messageA.hash,
-					exectypes.NewMessageTokenID(1, 2): messageB.hash,
+					reader.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 2): messageB.hash,
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): messageC.hash,
+					reader.NewMessageTokenID(2, 1): messageC.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
-					exectypes.NewMessageTokenID(1, 2): SuccessAttestationStatus(messageB.hash, mustDecode(messageB.keccak)),
+					reader.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
+					reader.NewMessageTokenID(1, 2): SuccessAttestationStatus(messageB.hash, mustDecode(messageB.keccak)),
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
+					reader.NewMessageTokenID(2, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
 				},
 			},
 		},
 		{
 			name:    "multiple failures - A, C not ready but B internal error",
 			pending: []string{messageA.keccak, messageC.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
+			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): messageA.hash,
-					exectypes.NewMessageTokenID(1, 2): messageB.hash,
+					reader.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 2): messageB.hash,
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): messageC.hash,
+					reader.NewMessageTokenID(2, 1): messageC.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): ErrorAttestationStatus(ErrNotReady),
-					exectypes.NewMessageTokenID(1, 2): ErrorAttestationStatus(ErrUnknownResponse),
+					reader.NewMessageTokenID(1, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(1, 2): ErrorAttestationStatus(ErrUnknownResponse),
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
 				},
 			},
 		},
@@ -126,26 +127,26 @@ func Test_AttestationClient(t *testing.T) {
 			name:    "mixed success and failure",
 			success: []string{messageA.keccak, messageC.keccak},
 			pending: []string{messageB.keccak},
-			input: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]cciptypes.Bytes{
+			input: map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): messageA.hash,
+					reader.NewMessageTokenID(1, 1): messageA.hash,
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): messageB.hash,
+					reader.NewMessageTokenID(2, 1): messageB.hash,
 				},
 				cciptypes.ChainSelector(3): {
-					exectypes.NewMessageTokenID(3, 1): messageC.hash,
+					reader.NewMessageTokenID(3, 1): messageC.hash,
 				},
 			},
-			expected: map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]AttestationStatus{
+			expected: map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus{
 				cciptypes.ChainSelector(1): {
-					exectypes.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
+					reader.NewMessageTokenID(1, 1): SuccessAttestationStatus(messageA.hash, mustDecode(messageA.keccak)),
 				},
 				cciptypes.ChainSelector(2): {
-					exectypes.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
+					reader.NewMessageTokenID(2, 1): ErrorAttestationStatus(ErrNotReady),
 				},
 				cciptypes.ChainSelector(3): {
-					exectypes.NewMessageTokenID(3, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
+					reader.NewMessageTokenID(3, 1): SuccessAttestationStatus(messageC.hash, mustDecode(messageC.keccak)),
 				},
 			},
 		},

@@ -7,6 +7,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -310,7 +311,7 @@ func mergeTokenObservations(
 ) (exectypes.TokenDataObservations, error) {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	//nolint:lll
-	validators := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
 	for _, ao := range aos {
@@ -325,7 +326,7 @@ func mergeTokenObservations(
 			}
 
 			if _, ok1 := validators[selector]; !ok1 {
-				validators[selector] = make(map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+				validators[selector] = make(map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 			}
 
 			initResultsAndValidators(selector, f, seqMap, results, validators)
@@ -357,7 +358,7 @@ func initResultsAndValidators(
 	f int,
 	seqMap map[cciptypes.SeqNum]exectypes.MessageTokenData,
 	results exectypes.TokenDataObservations,
-	validators map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
+	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
 ) {
 	for seqNr, msgTokenData := range seqMap {
 		if _, ok := results[selector][seqNr]; !ok {
@@ -365,7 +366,7 @@ func initResultsAndValidators(
 		}
 
 		for tokenIndex, tokenData := range msgTokenData.TokenData {
-			messageTokenID := exectypes.NewMessageTokenID(seqNr, tokenIndex)
+			messageTokenID := reader.NewMessageTokenID(seqNr, tokenIndex)
 			if _, ok := validators[selector][messageTokenID]; !ok {
 				validators[selector][messageTokenID] =
 					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)

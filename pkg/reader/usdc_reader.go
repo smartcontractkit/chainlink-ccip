@@ -11,7 +11,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -21,8 +20,8 @@ import (
 type USDCMessageReader interface {
 	MessageHashes(ctx context.Context,
 		source, dest cciptypes.ChainSelector,
-		tokens map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-	) (map[exectypes.MessageTokenID]cciptypes.Bytes, error)
+		tokens map[MessageTokenID]cciptypes.RampTokenAmount,
+	) (map[MessageTokenID]cciptypes.Bytes, error)
 }
 
 const (
@@ -106,8 +105,8 @@ func NewUSDCMessageReader(
 func (u usdcMessageReader) MessageHashes(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
-	tokens map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-) (map[exectypes.MessageTokenID]cciptypes.Bytes, error) {
+	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
+) (map[MessageTokenID]cciptypes.Bytes, error) {
 	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
 	eventIDs, err := u.recreateMessageTransmitterEvents(dest, tokens)
 	if err != nil {
@@ -150,7 +149,7 @@ func (u usdcMessageReader) MessageHashes(
 
 	// 3. This should be done by ChainReader - picking only events matching eventIDs.
 	// Right now ChainReader doesn't support filtering by specific data words
-	out := make(map[exectypes.MessageTokenID]cciptypes.Bytes)
+	out := make(map[MessageTokenID]cciptypes.Bytes)
 	for tokenID, messageID := range eventIDs {
 		messageHash, ok1 := messageSentEvents[messageID]
 		if !ok1 {
@@ -165,9 +164,9 @@ func (u usdcMessageReader) MessageHashes(
 
 func (u usdcMessageReader) recreateMessageTransmitterEvents(
 	destChainSelector cciptypes.ChainSelector,
-	tokens map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-) (map[exectypes.MessageTokenID]eventID, error) {
-	messageTransmitterEvents := make(map[exectypes.MessageTokenID]eventID)
+	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
+) (map[MessageTokenID]eventID, error) {
+	messageTransmitterEvents := make(map[MessageTokenID]eventID)
 
 	for id, token := range tokens {
 		sourceTokenPayload, err := NewSourceTokenDataPayloadFromBytes(token.ExtraData)
@@ -254,19 +253,19 @@ func (s SourceTokenDataPayload) ToBytes() cciptypes.Bytes {
 }
 
 type FakeUSDCMessageReader struct {
-	Messages map[exectypes.MessageTokenID]cciptypes.Bytes
+	Messages map[MessageTokenID]cciptypes.Bytes
 }
 
-func NewFakeUSDCMessageReader(messages map[exectypes.MessageTokenID]cciptypes.Bytes) FakeUSDCMessageReader {
+func NewFakeUSDCMessageReader(messages map[MessageTokenID]cciptypes.Bytes) FakeUSDCMessageReader {
 	return FakeUSDCMessageReader{Messages: messages}
 }
 
 func (f FakeUSDCMessageReader) MessageHashes(
 	_ context.Context,
 	_, _ cciptypes.ChainSelector,
-	tokens map[exectypes.MessageTokenID]cciptypes.RampTokenAmount,
-) (map[exectypes.MessageTokenID]cciptypes.Bytes, error) {
-	outcome := make(map[exectypes.MessageTokenID]cciptypes.Bytes)
+	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
+) (map[MessageTokenID]cciptypes.Bytes, error) {
+	outcome := make(map[MessageTokenID]cciptypes.Bytes)
 	for tokenID := range tokens {
 		outcome[tokenID] = f.Messages[tokenID]
 	}

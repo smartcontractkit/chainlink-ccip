@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
@@ -72,9 +73,9 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[exectypes.MessageTokenID]cciptypes.Bytes{
-					exectypes.NewMessageTokenID(10, 0): []byte("message10"),
-					exectypes.NewMessageTokenID(12, 0): []byte("message12"),
+				map[reader.MessageTokenID]cciptypes.Bytes{
+					reader.NewMessageTokenID(10, 0): []byte("message10"),
+					reader.NewMessageTokenID(12, 0): []byte("message12"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
@@ -103,10 +104,10 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[exectypes.MessageTokenID]cciptypes.Bytes{
-					exectypes.NewMessageTokenID(10, 1): []byte("message10_1"),
-					exectypes.NewMessageTokenID(11, 1): []byte("message11_1"),
-					exectypes.NewMessageTokenID(12, 2): []byte("message12_2"),
+				map[reader.MessageTokenID]cciptypes.Bytes{
+					reader.NewMessageTokenID(10, 1): []byte("message10_1"),
+					reader.NewMessageTokenID(11, 1): []byte("message11_1"),
+					reader.NewMessageTokenID(12, 2): []byte("message12_2"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
@@ -147,12 +148,12 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[exectypes.MessageTokenID]cciptypes.Bytes{
-					exectypes.NewMessageTokenID(10, 0): []byte("message10_0"),
-					exectypes.NewMessageTokenID(10, 1): []byte("message10_1"),
-					exectypes.NewMessageTokenID(10, 2): []byte("message10_2"),
-					exectypes.NewMessageTokenID(12, 0): []byte("message12_0"),
-					exectypes.NewMessageTokenID(12, 1): []byte("message12_1"),
+				map[reader.MessageTokenID]cciptypes.Bytes{
+					reader.NewMessageTokenID(10, 0): []byte("message10_0"),
+					reader.NewMessageTokenID(10, 1): []byte("message10_1"),
+					reader.NewMessageTokenID(10, 2): []byte("message10_2"),
+					reader.NewMessageTokenID(12, 0): []byte("message12_0"),
+					reader.NewMessageTokenID(12, 1): []byte("message12_1"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
@@ -188,9 +189,9 @@ func TestTokenDataObserver_Observe_USDCAndRegularTokens(t *testing.T) {
 				},
 			},
 			usdcReader: reader.NewFakeUSDCMessageReader(
-				map[exectypes.MessageTokenID]cciptypes.Bytes{
-					exectypes.NewMessageTokenID(10, 0): []byte("message10_0"),
-					exectypes.NewMessageTokenID(10, 1): []byte("message10_1"),
+				map[reader.MessageTokenID]cciptypes.Bytes{
+					reader.NewMessageTokenID(10, 0): []byte("message10_0"),
+					reader.NewMessageTokenID(10, 1): []byte("message10_1"),
 				},
 			),
 			attestationClient: usdc.FakeAttestationClient{
