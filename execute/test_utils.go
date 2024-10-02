@@ -202,7 +202,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	)
 	require.NoError(it.t, err)
 
-	oracleIDToP2pID := getP2pIDs(1, 2, 3)
+	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
 		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
 		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
@@ -279,14 +279,6 @@ func makeMsgWithToken(
 	msg := makeMsg(seqNum, src, dest, executed)
 	msg.Message.TokenAmounts = tokens
 	return msg
-}
-
-func getP2pIDs(ids ...int) map[commontypes.OracleID]libocrtypes.PeerID {
-	res := make(map[commontypes.OracleID]libocrtypes.PeerID)
-	for _, id := range ids {
-		res[commontypes.OracleID(id)] = libocrtypes.PeerID{byte(id)}
-	}
-	return res
 }
 
 func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
