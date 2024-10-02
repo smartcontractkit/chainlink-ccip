@@ -98,7 +98,8 @@ const (
 
 	// RMNRemote.sol methods
 	// Used by the rmn remote reader.
-	MethodNameGetVersionedConfig = "GetVersionedConfig"
+	MethodNameGetVersionedConfig    = "GetVersionedConfig"
+	MethodNameGetReportDigestHeader = "GetReportDigestHeader"
 )
 
 // Event Names

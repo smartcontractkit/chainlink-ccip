@@ -181,10 +181,11 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		config  ExecuteOffchainConfig
-		wantErr bool
-		errMsg  string
+		name        string
+		config      ExecuteOffchainConfig
+		usdcEnabled bool
+		wantErr     bool
+		errMsg      string
 	}{
 		{
 			name:   "valid config without token data observers",
@@ -197,8 +198,9 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Type:    "my-fancy-token",
 					Version: "1.0",
 				}),
-			wantErr: true,
-			errMsg:  "unknown token data observer type",
+			usdcEnabled: false,
+			wantErr:     true,
+			errMsg:      "unknown token data observer type",
 		},
 		{
 			name: "usdc type is set but struct is empty",
@@ -208,8 +210,9 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Version:                "1.0",
 					USDCCCTPObserverConfig: &USDCCCTPObserverConfig{},
 				}),
-			wantErr: true,
-			errMsg:  "AttestationAPI not set",
+			usdcEnabled: true,
+			wantErr:     true,
+			errMsg:      "AttestationAPI not set",
 		},
 		{
 			name: "usdc type is set but tokens are missing",
@@ -223,8 +226,9 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
 					},
 				}),
-			wantErr: true,
-			errMsg:  "Tokens not set",
+			usdcEnabled: true,
+			wantErr:     true,
+			errMsg:      "Tokens not set",
 		},
 		{
 			name: "the same observer can't bet set twice",
@@ -239,8 +243,9 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Version:                "1.0",
 					USDCCCTPObserverConfig: withUSDCConfig(),
 				}),
-			wantErr: true,
-			errMsg:  "duplicate token data observer type",
+			usdcEnabled: true,
+			wantErr:     true,
+			errMsg:      "duplicate token data observer type",
 		},
 		{
 			name: "valid config with multiple the same observers types but different versions",
@@ -256,6 +261,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					USDCCCTPObserverConfig: withUSDCConfig(),
 				},
 			),
+			usdcEnabled: true,
 		},
 		{
 			name: "valid config with single usdc observer",
@@ -265,6 +271,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					Version:                "1.0",
 					USDCCCTPObserverConfig: withUSDCConfig(),
 				}),
+			usdcEnabled: true,
 		},
 	}
 
@@ -277,6 +284,7 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+			require.Equal(t, tt.usdcEnabled, tt.config.IsUSDCEnabled())
 		})
 	}
 }

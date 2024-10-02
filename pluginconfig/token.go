@@ -50,29 +50,26 @@ type TokenDataObserverConfig struct {
 
 // WellFormed checks that the observer's config is syntactically correct - proper struct is initialized based on type
 func (t TokenDataObserverConfig) WellFormed() error {
-	switch t.Type {
-	case USDCCCTPHandlerType:
+	if t.IsUSDC() {
 		if t.USDCCCTPObserverConfig == nil {
 			return errors.New("USDCCCTPObserverConfig is empty")
 		}
-	default:
-		return errors.New("unknown token data observer type")
+		return nil
 	}
-	return nil
+	return errors.New("unknown token data observer type")
 }
 
 // Validate checks that the observer's config is semantically correct - fields are set correctly
 // depending on the config's type
 func (t TokenDataObserverConfig) Validate() error {
-	switch t.Type {
-	case USDCCCTPHandlerType:
-		if err := t.USDCCCTPObserverConfig.Validate(); err != nil {
-			return err
-		}
-	default:
-		return errors.New("unknown token data observer type " + t.Type)
+	if t.IsUSDC() {
+		return t.USDCCCTPObserverConfig.Validate()
 	}
-	return nil
+	return errors.New("unknown token data observer type " + t.Type)
+}
+
+func (t TokenDataObserverConfig) IsUSDC() bool {
+	return t.Type == USDCCCTPHandlerType
 }
 
 const USDCCCTPHandlerType = "usdc-cctp"

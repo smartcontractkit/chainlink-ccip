@@ -12,35 +12,47 @@ import (
 
 type NodeID uint32
 
-// RMNHomeConfig contains the configuration fetched from the RMNHome contract.
-type RMNHomeConfig struct {
-	Nodes                   []RMNHomeNodeInfo
+// HomeConfig contains the configuration fetched from the RMNHome contract.
+type HomeConfig struct {
+	Nodes                   []HomeNodeInfo
 	SourceChainMinObservers map[cciptypes.ChainSelector]uint64
 	ConfigDigest            cciptypes.Bytes32
 	OffchainConfig          cciptypes.Bytes // The raw offchain config
 }
 
-// RMNHomeNodeInfo contains information about a node from the RMNHome contract.
-type RMNHomeNodeInfo struct {
+// HomeNodeInfo contains information about a node from the RMNHome contract.
+type HomeNodeInfo struct {
 	ID                    NodeID                              // ID is the index of this node in the RMN config
 	PeerID                ragep2ptypes.PeerID                 // The peer ID of the node
 	SupportedSourceChains mapset.Set[cciptypes.ChainSelector] // Set of supported source chains by the node
 	OffchainPublicKey     *ed25519.PublicKey                  // The public key is used to verify observations
 }
 
-// RMNRemoteConfig contains the configuration fetched from the RMNRemote contract.
-type RMNRemoteConfig struct {
-	ContractAddress  cciptypes.Bytes
-	ConfigDigest     cciptypes.Bytes32
-	Signers          []RMNRemoteSignerInfo
-	MinSigners       uint64
-	ConfigVersion    uint32
-	RmnReportVersion string // e.g., "RMN_V1_6_ANY2EVM_REPORT"
+// RemoteConfig contains the configuration fetched from the RMNRemote contract.
+type RemoteConfig struct {
+	ContractAddress  cciptypes.Bytes    `json:"contractAddress"`
+	ConfigDigest     cciptypes.Bytes32  `json:"configDigest"`
+	Signers          []RemoteSignerInfo `json:"signers"`
+	MinSigners       uint64             `json:"minSigners"`
+	ConfigVersion    uint32             `json:"configVersion"`
+	RmnReportVersion cciptypes.Bytes32  `json:"rmnReportVersion"` // e.g., "RMN_V1_6_ANY2EVM_REPORT"
 }
 
-// RMNRemoteSignerInfo contains information about a signer from the RMNRemote contract.
-type RMNRemoteSignerInfo struct {
-	OnchainPublicKey      cciptypes.Bytes // The signer's onchain address, used to verify report signature
-	NodeIndex             uint64          // The index of the node in the RMN config
-	SignObservationPrefix string          // The prefix of the observation to sign
+func (r RemoteConfig) IsEmpty() bool {
+	return len(r.ContractAddress) == 0 &&
+		r.ConfigDigest == (cciptypes.Bytes32{}) &&
+		len(r.Signers) == 0 &&
+		r.MinSigners == 0 &&
+		r.ConfigVersion == 0 &&
+		r.RmnReportVersion == (cciptypes.Bytes32{})
+}
+
+// RemoteSignerInfo contains information about a signer from the RMNRemote contract.
+type RemoteSignerInfo struct {
+	// The signer's onchain address, used to verify report signature
+	OnchainPublicKey cciptypes.Bytes `json:"onchainPublicKey"`
+	// The index of the node in the RMN config
+	NodeIndex uint64 `json:"nodeIndex"`
+	// The prefix of the observation to sign
+	SignObservationPrefix string `json:"signObservationPrefix"`
 }

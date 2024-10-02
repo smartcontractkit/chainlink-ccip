@@ -20,7 +20,11 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, nil
 	}
 
-	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.destChain)
+	if prevOutcome.RMNRemoteCfg.IsEmpty() {
+		return Query{}, fmt.Errorf("RMN report config is empty")
+	}
+
+	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
 	if err != nil {
 		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
 	}
