@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +31,8 @@ func TestPlugin(t *testing.T) {
 		makeMsg(105, srcSelector, dstSelector, false),
 	}
 
-	intTest, runner := SetupSimpleTest(ctx, t, lggr, srcSelector, dstSelector, messages)
+	intTest, runner := SetupSimpleTest(ctx, t, lggr, srcSelector, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
 	defer intTest.Close()
 
 	// Contract Discovery round.

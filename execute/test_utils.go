@@ -47,46 +47,59 @@ const (
 type IntTest struct {
 	t *testing.T
 
-	ccipReader inmem.InMemoryCCIPReader
+	srcSelector cciptypes.ChainSelector
+	dstSelector cciptypes.ChainSelector
+
+	ccipReader *inmem.InMemoryCCIPReader
 	server     *ConfigurableAttestationServer
 }
 
-func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector, messages []inmem.MessagesWithMetadata) (*IntTest, *testhelpers.OCR3Runner[[]byte]) {
-	donID := uint32(1)
-
+func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNumber uint64, crTimestamp time.Time) {
 	msgHasher := mocks.NewMessageHasher()
 
 	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
 	reportData := exectypes.CommitData{
-		SourceChain:         srcSelector,
-		SequenceNumberRange: cciptypes.NewSeqNumRange(100, 105),
-		Messages:            mapped,
+		SourceChain: it.srcSelector,
+		SequenceNumberRange: cciptypes.NewSeqNumRange(
+			messages[0].Header.SequenceNumber,
+			messages[len(messages)-1].Header.SequenceNumber,
+		),
+		Messages: mapped,
 	}
 
-	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(t))
-	require.NoError(t, err, "failed to construct merkle tree")
+	tree, err := report.ConstructMerkleTree(context.Background(), msgHasher, reportData, logger.Test(it.t))
+	require.NoError(it.t, err, "failed to construct merkle tree")
 
-	// Initialize reader with some data
-	ccipReader := inmem.InMemoryCCIPReader{
-		Dest: dstSelector,
-		Reports: []plugintypes2.CommitPluginReportWithMeta{
-			{
-				Report: cciptypes.CommitPluginReport{
-					MerkleRoots: []cciptypes.MerkleRootChain{
-						{
-							ChainSel:     reportData.SourceChain,
-							SeqNumsRange: reportData.SequenceNumberRange,
-							MerkleRoot:   tree.Root(),
-						},
-					},
+	it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
+		Report: cciptypes.CommitPluginReport{
+			MerkleRoots: []cciptypes.MerkleRootChain{
+				{
+					ChainSel:     reportData.SourceChain,
+					SeqNumsRange: reportData.SequenceNumberRange,
+					MerkleRoot:   tree.Root(),
 				},
-				BlockNum:  1000,
-				Timestamp: time.Now().Add(-4 * time.Hour),
 			},
 		},
+		BlockNum:  crBlockNumber,
+		Timestamp: crTimestamp,
+	})
+
+	it.ccipReader.Messages[it.srcSelector] = append(
+		it.ccipReader.Messages[it.srcSelector],
+		messages...,
+	)
+}
+
+func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) (*IntTest, *testhelpers.OCR3Runner[[]byte]) {
+	donID := uint32(1)
+
+	msgHasher := mocks.NewMessageHasher()
+	ccipReader := inmem.InMemoryCCIPReader{
+		Reports: []plugintypes2.CommitPluginReportWithMeta{},
 		Messages: map[cciptypes.ChainSelector][]inmem.MessagesWithMetadata{
-			srcSelector: messages,
+			srcSelector: {},
 		},
+		Dest: dstSelector,
 	}
 
 	server := newConfigurableAttestationServer(map[string]string{
@@ -143,7 +156,7 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 	}
 
 	homeChain := setupHomeChainPoller(t, donID, lggr, chainConfigInfos)
-	err = homeChain.Start(ctx)
+	err := homeChain.Start(ctx)
 	require.NoError(t, err, "failed to start home chain poller")
 
 	usdcEvents := []types.Sequence{
@@ -176,9 +189,9 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 
 	oracleIDToP2pID := GetP2pIDs(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
-		newNode(ctx, t, donID, lggr, cfg, msgHasher, ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
+		newNode(ctx, t, donID, lggr, cfg, msgHasher, &ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
 	}
 
 	err = homeChain.Close()
@@ -197,9 +210,11 @@ func SetupSimpleTest(ctx context.Context, t *testing.T, lggr logger.Logger, srcS
 	}
 
 	it := &IntTest{
-		t:          t,
-		ccipReader: ccipReader,
-		server:     server,
+		t:           t,
+		srcSelector: srcSelector,
+		dstSelector: dstSelector,
+		ccipReader:  &ccipReader,
+		server:      server,
 	}
 
 	runner := testhelpers.NewOCR3Runner(nodes, nodeIDs, nil)
@@ -414,8 +429,8 @@ func setupHomeChainPoller(
 	return homeChain
 }
 
-func (i *IntTest) Close() {
-	if i.server != nil {
-		i.server.Close()
+func (it *IntTest) Close() {
+	if it.server != nil {
+		it.server.Close()
 	}
 }

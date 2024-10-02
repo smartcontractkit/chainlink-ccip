@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"strings"
 	"testing"
+	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -47,7 +48,8 @@ func Test_USDC_Transfer(t *testing.T) {
 		}),
 	}
 
-	intTest, runner := SetupSimpleTest(ctx, t, lggr, sourceChain, destChain, messages)
+	intTest, runner := SetupSimpleTest(ctx, t, lggr, sourceChain, destChain)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
 	defer intTest.Close()
 
 	// Contract Discovery round.
