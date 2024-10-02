@@ -1,4 +1,4 @@
-package execute_test
+package execute
 
 import (
 	"encoding/hex"
@@ -12,15 +12,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-)
-
-const (
-	randomEthAddress = "0x00000000000000000000000000001234"
 )
 
 func Test_USDC_Transfer(t *testing.T) {
@@ -52,7 +47,7 @@ func Test_USDC_Transfer(t *testing.T) {
 		}),
 	}
 
-	runner, server := execute.SetupSimpleTest(ctx, t, lggr, sourceChain, destChain, messages)
+	runner, server := SetupSimpleTest(ctx, t, lggr, sourceChain, destChain, messages)
 	defer server.Close()
 
 	// Contract Discovery round.
@@ -117,28 +112,4 @@ func Test_USDC_Transfer(t *testing.T) {
 	//Attestation data added to the both USDC messages
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[3])
-}
-
-func makeMsgWithToken(
-	seqNum cciptypes.SeqNum,
-	src, dest cciptypes.ChainSelector,
-	executed bool,
-	tokens []cciptypes.RampTokenAmount,
-) inmem.MessagesWithMetadata {
-	msg := makeMsg(seqNum, src, dest, executed)
-	msg.Message.TokenAmounts = tokens
-	return msg
-}
-
-func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool) inmem.MessagesWithMetadata {
-	return inmem.MessagesWithMetadata{
-		Message: cciptypes.Message{
-			Header: cciptypes.RampMessageHeader{
-				SourceChainSelector: src,
-				SequenceNumber:      seqNum,
-			},
-		},
-		Destination: dest,
-		Executed:    executed,
-	}
 }

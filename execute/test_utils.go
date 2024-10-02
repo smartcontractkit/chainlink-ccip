@@ -50,7 +50,7 @@ func SetupSimpleTest(
 	lggr logger.Logger,
 	srcSelector, dstSelector cciptypes.ChainSelector,
 	messages []inmem.MessagesWithMetadata,
-) (*testhelpers.OCR3Runner[[]byte], *configurableAttestationServer) {
+) (*testhelpers.OCR3Runner[[]byte], *ConfigurableAttestationServer) {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -268,13 +268,13 @@ func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
 	return encoded
 }
 
-type configurableAttestationServer struct {
+type ConfigurableAttestationServer struct {
 	responses map[string]string
 	server    *httptest.Server
 }
 
-func newConfigurableAttestationServer(responses map[string]string) *configurableAttestationServer {
-	c := &configurableAttestationServer{
+func newConfigurableAttestationServer(responses map[string]string) *ConfigurableAttestationServer {
+	c := &ConfigurableAttestationServer{
 		responses: responses,
 	}
 
@@ -294,11 +294,11 @@ func newConfigurableAttestationServer(responses map[string]string) *configurable
 	return c
 }
 
-func (c *configurableAttestationServer) AddResponse(url, response string) {
+func (c *ConfigurableAttestationServer) AddResponse(url, response string) {
 	c.responses[url] = response
 }
 
-func (c *configurableAttestationServer) Close() {
+func (c *ConfigurableAttestationServer) Close() {
 	c.server.Close()
 }
 
