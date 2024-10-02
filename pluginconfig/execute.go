@@ -89,6 +89,19 @@ func (e ExecuteOffchainConfig) Validate() error {
 	return nil
 }
 
+func (e ExecuteOffchainConfig) IsUSDCEnabled() bool {
+	for _, ob := range e.TokenDataObservers {
+		if ob.WellFormed() != nil {
+			continue
+		}
+		if ob.IsUSDC() {
+			return true
+		}
+	}
+	return false
+
+}
+
 // EncodeExecuteOffchainConfig encodes a ExecuteOffchainConfig into bytes using JSON.
 func EncodeExecuteOffchainConfig(e ExecuteOffchainConfig) ([]byte, error) {
 	return json.Marshal(e)
