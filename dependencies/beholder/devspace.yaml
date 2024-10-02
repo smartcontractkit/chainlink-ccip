@@ -36,6 +36,10 @@ pullSecrets:
     secret: regcred-beholder
 
 pipelines:
+  ci-e2e-test:
+    run: |-
+      run_dependency_pipelines prometheus grafana loki tempo redpanda
+      create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
   kind:
     run: |-
       run_dependency_pipelines prometheus grafana loki tempo redpanda
@@ -117,6 +121,21 @@ deployments:
               logs:
                 receivers: [otlp]
                 exporters: [debug, otlp]
+        ingress:
+          enabled: true
+          ingressClassName: "alb"
+          annotations:
+            alb.ingress.kubernetes.io/backend-protocol: HTTP
+            alb.ingress.kubernetes.io/certificate-arn: "${DEVSPACE_INGRESS_CERT_ARN}"
+            alb.ingress.kubernetes.io/group.name: "${DEVSPACE_NAMESPACE}"
+            alb.ingress.kubernetes.io/scheme: internal
+            alb.ingress.kubernetes.io/target-type: ip
+            external-dns.alpha.kubernetes.io/ttl: "120"
+          hosts:
+            - host: ${DEVSPACE_NAMESPACE}-opentelemetry-collector.${DEVSPACE_INGRESS_BASE_DOMAIN}
+              paths:
+                - path: /
+                  pathType: Prefix
 
   beholder-otel-collector-gateway:
     updateImageTags: false
