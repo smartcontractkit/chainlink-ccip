@@ -2,17 +2,11 @@ package commit
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
-
-func TestFlake(t *testing.T) {
-	n := time.Now().Unix()
-	assert.True(t, n%2 == 0, "this test should fail sometimes")
-}
 
 func Test_validateFChain(t *testing.T) {
 	testCases := []struct {

@@ -1,17 +1,11 @@
 name: "Flaky test detection"
 
-#on:
-#  # Allow manual triggering via the GitHub UI
-#  workflow_dispatch:
-#  # Run the workflow every 4 hours
-#  schedule:
-#    - cron: "0 */4 * * *"
-
 on:
-  pull_request:
-  push:
-    branches:
-      - 'main'
+  # Allow manual triggering via the GitHub UI
+  workflow_dispatch:
+  # Run the workflow every 4 hours
+  schedule:
+    - cron: "0 */4 * * *"
 
 jobs:
   flaky-test-detection:
