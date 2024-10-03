@@ -13,8 +13,8 @@ in
 mkShell' {
   nativeBuildInputs = [
     go
-    goreleaser
-
+    nur.repos.goreleaser.goreleaser-pro
+    
     curl
     nodejs
     nodePackages.pnpm

@@ -18,7 +18,41 @@
         "type": "github"
       }
     },
+    "goreleaser-nur": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1726594821,
+        "narHash": "sha256-ORImH+i+zOCMOdztNDqGDbyyFRC/FKmgbX8w50TNbQY=",
+        "owner": "goreleaser",
+        "repo": "nur",
+        "rev": "bd2ee272ddfffbda9377a472131728e83ce2332d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "goreleaser",
+        "repo": "nur",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1624561540,
+        "narHash": "sha256-izJ2PYZMGMsSkg+e7c9A1x3t/yOLT+qzUM6WQsc2tqo=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c6a049a3d32293b24c0f894a840872cf67fd7c11",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1726463316,
         "narHash": "sha256-gI9kkaH0ZjakJOKrdjaI/VbaMEo9qBbSUl93DnU7f4c=",
@@ -34,10 +68,27 @@
         "type": "github"
       }
     },
+    "nur": {
+      "locked": {
+        "lastModified": 1727912806,
+        "narHash": "sha256-LDOTTOGPaEP233gBrL8dnPGopc1lqcJFe0VB/+K/yWc=",
+        "owner": "nix-community",
+        "repo": "NUR",
+        "rev": "9d9bcd30fec126b08b49020b7af08bc1aad66210",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "NUR",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "goreleaser-nur": "goreleaser-nur",
+        "nixpkgs": "nixpkgs_2",
+        "nur": "nur"
       }
     },
     "systems": {
