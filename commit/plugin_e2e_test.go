@@ -79,8 +79,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 
 	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
 
-	cfg := pluginconfig.CommitPluginConfig{
-		DestChain:                          destChain,
+	cfg := pluginconfig.CommitOffchainConfig{
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
 	}
@@ -291,7 +290,7 @@ func setupNode(
 	nodeID commontypes.OracleID,
 	reportingCfg ocr3types.ReportingPluginConfig,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	pluginCfg pluginconfig.CommitPluginConfig,
+	offchainCfg pluginconfig.CommitOffchainConfig,
 	chainCfg map[ccipocr3.ChainSelector]reader.ChainConfig,
 	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
 	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
@@ -391,7 +390,8 @@ func setupNode(
 		donID,
 		nodeID,
 		oracleIDToP2pID,
-		pluginCfg,
+		offchainCfg,
+		destChain,
 		ccipReader,
 		tokenPricesReader,
 		reportCodec,
