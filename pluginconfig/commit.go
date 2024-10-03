@@ -137,7 +137,7 @@ func (c *CommitOffchainConfig) applyDefaults() {
 	}
 }
 
-func (c *CommitOffchainConfig) validate() error {
+func (c *CommitOffchainConfig) Validate() error {
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		return errors.New("remoteGasPriceBatchWriteFrequency not set")
 	}
@@ -179,7 +179,7 @@ func (c *CommitOffchainConfig) validate() error {
 
 func (c *CommitOffchainConfig) ApplyDefaultsAndValidate() error {
 	c.applyDefaults()
-	return c.validate()
+	return c.Validate()
 }
 
 // EncodeCommitOffchainConfig encodes a CommitOffchainConfig into bytes using JSON.

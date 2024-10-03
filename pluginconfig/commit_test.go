@@ -56,7 +56,7 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := tc.input.validate()
+			actual := tc.input.Validate()
 			if tc.expErr {
 				assert.Error(t, actual)
 				return
@@ -273,7 +273,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: uint(tt.fields.MaxReportTransmissionCheckAttempts),
 				MaxMerkleTreeSize:                  uint64(tt.fields.MaxMerkleTreeSize),
 			}
-			err := c.validate()
+			err := c.Validate()
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
