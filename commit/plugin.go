@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 )
 
 type MerkleRootObservation = plugincommon.AttributedObservation[merkleroot.Observation]
@@ -76,8 +77,8 @@ func NewPlugin(
 
 	if offchainCfg.MaxMerkleTreeSize == 0 {
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
-			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
-		offchainCfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
+			"default", merklemulti.MaxNumberTreeLeaves)
+		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(

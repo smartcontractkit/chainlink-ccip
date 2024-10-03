@@ -20,7 +20,7 @@ import (
 // We use this default value when the config is not set for a specific chain.
 const (
 	defaultRMNSignaturesTimeout               = 5 * time.Second
-	defaultNewMsgScanBatchSize                = 256
+	defaultNewMsgScanBatchSize                = merklemulti.MaxNumberTreeLeaves
 	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
 	defaultRMNEnabled                         = false
@@ -100,7 +100,7 @@ type CommitOffchainConfig struct {
 	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
 
 	// The maximum number of times to check if the previous report has been transmitted
-	MaxReportTransmissionCheckAttempts uint
+	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
 
 	// RMNSignaturesTimeout is the timeout for RMN signature verification.
 	// Typically set to `MaxQueryDuration - e`, where e some small duration.
@@ -115,7 +115,7 @@ type CommitOffchainConfig struct {
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
 }
 
-func (c *CommitOffchainConfig) ApplyDefaults() {
+func (c *CommitOffchainConfig) applyDefaults() {
 	if c.RMNEnabled && c.RMNSignaturesTimeout == 0 {
 		c.RMNSignaturesTimeout = defaultRMNSignaturesTimeout
 	}
@@ -137,7 +137,7 @@ func (c *CommitOffchainConfig) ApplyDefaults() {
 	}
 }
 
-func (c *CommitOffchainConfig) Validate() error {
+func (c *CommitOffchainConfig) validate() error {
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		return errors.New("remoteGasPriceBatchWriteFrequency not set")
 	}
@@ -178,8 +178,8 @@ func (c *CommitOffchainConfig) Validate() error {
 }
 
 func (c *CommitOffchainConfig) ApplyDefaultsAndValidate() error {
-	c.ApplyDefaults()
-	return c.Validate()
+	c.applyDefaults()
+	return c.validate()
 }
 
 // EncodeCommitOffchainConfig encodes a CommitOffchainConfig into bytes using JSON.

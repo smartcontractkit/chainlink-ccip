@@ -23,8 +23,10 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 		{
 			name: "valid cfg",
 			input: CommitOffchainConfig{
-				NewMsgScanBatchSize:               256,
-				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				NewMsgScanBatchSize:                256,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
 			},
 			destChain: cciptypes.ChainSelector(1),
 			expErr:    false,
@@ -54,7 +56,7 @@ func TestCommitPluginConfigValidate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := tc.input.Validate()
+			actual := tc.input.validate()
 			if tc.expErr {
 				assert.Error(t, actual)
 				return
@@ -164,12 +166,14 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 
 func TestCommitOffchainConfig_Validate(t *testing.T) {
 	type fields struct {
-		RemoteGasPriceBatchWriteFrequency commonconfig.Duration
-		TokenPriceBatchWriteFrequency     commonconfig.Duration
-		TokenInfo                         map[types.Account]TokenInfo
-		TokenPriceChainSelector           cciptypes.ChainSelector
-		TokenDecimals                     map[types.Account]uint8
-		NewMsgScanBatchSize               uint32
+		RemoteGasPriceBatchWriteFrequency  commonconfig.Duration
+		TokenPriceBatchWriteFrequency      commonconfig.Duration
+		TokenInfo                          map[types.Account]TokenInfo
+		TokenPriceChainSelector            cciptypes.ChainSelector
+		TokenDecimals                      map[types.Account]uint8
+		NewMsgScanBatchSize                uint32
+		MaxReportTransmissionCheckAttempts uint32
+		MaxMerkleTreeSize                  uint32
 	}
 	//nolint:gosec
 	const remoteTokenAddress = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
@@ -191,18 +195,22 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						Decimals:          18,
 					},
 				},
-				TokenPriceChainSelector: 10,
-				NewMsgScanBatchSize:     256,
+				TokenPriceChainSelector:            10,
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
 			},
 			false,
 		},
 		{
 			"valid, no token price sources",
 			fields{
-				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-				TokenInfo:                         map[types.Account]TokenInfo{},
-				NewMsgScanBatchSize:               256,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[types.Account]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
 			},
 			false,
 		},
@@ -218,7 +226,9 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						Decimals:          18,
 					},
 				},
-				NewMsgScanBatchSize: 256,
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
 			},
 			true,
 		},
@@ -234,16 +244,20 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 						Decimals:          18,
 					},
 				},
-				NewMsgScanBatchSize: 256,
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
 			},
 			true,
 		},
 		{
 			"invalid, no new msg scan batch size",
 			fields{
-				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				TokenInfo:                         map[types.Account]TokenInfo{},
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(1),
+				TokenInfo:                          map[types.Account]TokenInfo{},
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
 			},
 			true,
 		},
@@ -251,13 +265,15 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := CommitOffchainConfig{
-				RemoteGasPriceBatchWriteFrequency: tt.fields.RemoteGasPriceBatchWriteFrequency,
-				TokenPriceBatchWriteFrequency:     tt.fields.TokenPriceBatchWriteFrequency,
-				TokenInfo:                         tt.fields.TokenInfo,
-				PriceFeedChainSelector:            tt.fields.TokenPriceChainSelector,
-				NewMsgScanBatchSize:               int(tt.fields.NewMsgScanBatchSize),
+				RemoteGasPriceBatchWriteFrequency:  tt.fields.RemoteGasPriceBatchWriteFrequency,
+				TokenPriceBatchWriteFrequency:      tt.fields.TokenPriceBatchWriteFrequency,
+				TokenInfo:                          tt.fields.TokenInfo,
+				PriceFeedChainSelector:             tt.fields.TokenPriceChainSelector,
+				NewMsgScanBatchSize:                int(tt.fields.NewMsgScanBatchSize),
+				MaxReportTransmissionCheckAttempts: uint(tt.fields.MaxReportTransmissionCheckAttempts),
+				MaxMerkleTreeSize:                  uint64(tt.fields.MaxMerkleTreeSize),
 			}
-			err := c.Validate()
+			err := c.validate()
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -342,7 +358,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RMNSignaturesTimeout:               0,
 				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
-				MaxMerkleTreeSize:                  EvmDefaultMaxMerkleTreeSize,
+				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 			},
 		},
 		{
@@ -355,7 +372,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RMNSignaturesTimeout:               defaultRMNSignaturesTimeout,
 				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
-				MaxMerkleTreeSize:                  EvmDefaultMaxMerkleTreeSize,
+				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 			},
 		},
 		{
@@ -373,6 +391,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				NewMsgScanBatchSize:                500,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 			},
 		},
 		{
@@ -388,6 +407,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				NewMsgScanBatchSize:                300,
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
 				MaxMerkleTreeSize:                  500,
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 			},
 		},
 	}
@@ -395,7 +415,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := tt.input
-			config.ApplyDefaults()
+			config.applyDefaults()
 			assert.Equal(t, tt.expected, config)
 		})
 	}
