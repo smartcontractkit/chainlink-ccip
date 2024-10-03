@@ -223,7 +223,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
-	var activeCandidate ActiveCandidate
+	var activeCandidate GetAllConfigs
 
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
@@ -369,7 +369,7 @@ type ChainConfig struct {
 // https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
 
 type OCR3Node struct {
-	P2PId          [32]byte `json:"p2pId"`
+	P2pId          [32]byte `json:"p2pId"`
 	SignerKey      []byte   `json:"signerKey"`
 	TransmitterKey []byte   `json:"transmitterKey"`
 }
@@ -380,7 +380,7 @@ type OCR3Node struct {
 type OCR3Config struct {
 	PluginType            uint8                   `json:"pluginType"`
 	ChainSelector         cciptypes.ChainSelector `json:"chainSelector"`
-	FRoleDon              uint8                   `json:"FRoleDon"`
+	FRoleDON              uint8                   `json:"fRoleDON"`
 	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
 	OfframpAddress        []byte                  `json:"offrampAddress"`
 	RmnHomeAddress        []byte                  `json:"rmnHomeAddress"`
@@ -394,12 +394,12 @@ type OCR3Config struct {
 // TODO: we might need to change it from OCR3ConfigWithMeta to VersionedConfig
 // If so, we'll create a new package so that we don't have conflict naming with RMNHome
 type OCR3ConfigWithMeta struct {
-	Config       OCR3Config `json:"config"`
 	Version      uint32     `json:"version"`
 	ConfigDigest [32]byte   `json:"configDigest"`
+	Config       OCR3Config `json:"config"`
 }
 
-type ActiveCandidate struct {
+type GetAllConfigs struct {
 	ActiveConfig    OCR3ConfigWithMeta `json:"activeConfig"`
 	CandidateConfig OCR3ConfigWithMeta `json:"candidateConfig"`
 }

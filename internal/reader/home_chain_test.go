@@ -178,17 +178,17 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 			"donId":      donID,
 			"pluginType": pluginType,
 		},
-		//mock.AnythingOfType("*[]reader.ActiveCandidate"),
+		//mock.AnythingOfType("*[]reader.GetAllConfigs"),
 		mock.Anything,
 	).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(4).(*ActiveCandidate)
-		*arg = ActiveCandidate{
+		arg := args.Get(4).(*GetAllConfigs)
+		*arg = GetAllConfigs{
 			ActiveConfig: OCR3ConfigWithMeta{
 				Version: 1,
 				Config: OCR3Config{
 					PluginType:     pluginType,
 					ChainSelector:  1,
-					FRoleDon:       1,
+					FRoleDON:       1,
 					OfframpAddress: []byte("offramp"),
 				},
 			},
@@ -208,6 +208,6 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	require.Len(t, configs, 1)
 	require.Equal(t, uint8(1), configs[0].Config.PluginType)
 	require.Equal(t, cciptypes.ChainSelector(1), configs[0].Config.ChainSelector)
-	require.Equal(t, uint8(1), configs[0].Config.FRoleDon)
+	require.Equal(t, uint8(1), configs[0].Config.FRoleDON)
 	require.Equal(t, []byte("offramp"), configs[0].Config.OfframpAddress)
 }

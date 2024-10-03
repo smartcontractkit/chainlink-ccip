@@ -189,7 +189,7 @@ func setupHomeChainPoller(
 				params,
 				returnVal interface{},
 			) {
-				*returnVal.(*reader.ActiveCandidate) = reader.ActiveCandidate{}
+				*returnVal.(*reader.GetAllConfigs) = reader.GetAllConfigs{}
 			}).
 		Return(nil)
 
