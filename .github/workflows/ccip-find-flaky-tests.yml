@@ -1,0 +1,53 @@
+name: "Flaky test detection"
+
+#on:
+#  # Allow manual triggering via the GitHub UI
+#  workflow_dispatch:
+#  # Run the workflow on a schedule (every 4 hours using cron)
+#  schedule:
+#    # This example runs the workflow every 4 hours
+#    - cron: "0 */4 * * *"
+
+on:
+  pull_request:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  flaky-test-detection:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        go-version: ['1.22']
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      - name: Setup Go ${{ matrix.go-version }}
+        uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Display Go version
+        run: go version
+      - name: Run tests 100 times.
+        run: TEST_COUNT=100 make test
+      - name: Notify the team
+        if: failure()
+        run: |
+          # Set the issue title
+          ISSUE_TITLE="Your Issue Title"
+
+          # Search for issues with the same title
+          EXISTING_ISSUES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          "https://api.github.com/search/issues?q=is:issue+repo:${{ github.repository }}+in:title+${ISSUE_TITLE}" | jq '.total_count')
+
+          # Save whether an issue with this title exists
+          if [ "$EXISTING_ISSUES" -eq "0" ]; then
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/issues \
+              -d '{"title": "$ISSUE_TITLE", "body": "This issue was autimatically created because flaky tests were detected."}'
+          fi
