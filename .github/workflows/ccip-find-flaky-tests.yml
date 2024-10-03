@@ -1,18 +1,11 @@
 name: "Flaky test detection"
 
-#on:
-#  # Allow manual triggering via the GitHub UI
-#  workflow_dispatch:
-#  # Run the workflow on a schedule (every 4 hours using cron)
-#  schedule:
-#    # This example runs the workflow every 4 hours
-#    - cron: "0 */4 * * *"
-
 on:
-  pull_request:
-  push:
-    branches:
-      - 'main'
+  # Allow manual triggering via the GitHub UI
+  workflow_dispatch:
+  # Run the workflow every 4 hours
+  schedule:
+    - cron: "0 */4 * * *"
 
 jobs:
   flaky-test-detection:
@@ -31,8 +24,8 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Display Go version
         run: go version
-      - name: Run tests 30 times.
-        run: TEST_COUNT=30 make test
+      - name: Run tests 50 times.
+        run: TEST_COUNT=50 make test
       - name: Notify the team
         if: failure()
         run: |
