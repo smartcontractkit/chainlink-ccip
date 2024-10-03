@@ -411,7 +411,7 @@ profiles:
             command: |-
               image=${runtime.images.app}
               (
-                cd $CHAINLINK_CODE_DIR/ccip && \
+                cd $CHAINLINK_CODE_DIR/chainlink && \
                 nix develop -c \
                   bash -c "IMAGE=$image goreleaser \
                     release --nightly --split --clean --config .goreleaser.devspace.yaml"
@@ -652,7 +652,7 @@ profiles:
             command: |-
               image=${runtime.images.app}
               (
-                cd $CHAINLINK_CODE_DIR/ccip && \
+                cd $CHAINLINK_CODE_DIR/chainlink && \
                 nix develop -c \
                   bash -c "IMAGE=$image goreleaser \
                     release --nightly --split --clean --config .goreleaser.devspace.yaml"
