@@ -2,6 +2,8 @@ package discoverytypes
 
 import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 // Outcome isn't needed for this processor.
@@ -18,10 +20,7 @@ type Observation struct {
 	//SourceChains     []ccipocr3.ChainSelector
 	FChain map[cciptypes.ChainSelector]int
 	// See reader.ContractAddresses for more info on this data structure.
-	Addresses map[string]map[cciptypes.ChainSelector][]byte
-
-	// TODO: fix circular dependency /w token reader
-	//Addresses  reader.ContractAddresses
+	Addresses reader.ContractAddresses
 
 	// TODO: some sort of request flag to avoid including this every time.
 	// Request bool
