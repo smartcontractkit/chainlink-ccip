@@ -178,8 +178,8 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 			"donId":      donID,
 			"pluginType": pluginType,
 		},
-		//mock.AnythingOfType("*[]reader.GetAllConfigs"),
-		mock.Anything,
+		mock.AnythingOfType("*reader.GetAllConfigs"),
+		//mock.Anything,
 	).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(4).(*GetAllConfigs)
 		*arg = GetAllConfigs{
