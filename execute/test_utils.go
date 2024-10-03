@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -461,8 +462,8 @@ func setupHomeChainPoller(
 	return homeChain
 }
 
-func extractSequenceNumbers(outcome exectypes.Outcome) []cciptypes.SeqNum {
-	sequenceNumbers := slicelib.Map(outcome.Report.ChainReports[0].Messages, func(m cciptypes.Message) cciptypes.SeqNum {
+func extractSequenceNumbers(messages []cciptypes.Message) []cciptypes.SeqNum {
+	sequenceNumbers := slicelib.Map(messages, func(m cciptypes.Message) cciptypes.SeqNum {
 		return m.Header.SequenceNumber
 	})
 	return sequenceNumbers
