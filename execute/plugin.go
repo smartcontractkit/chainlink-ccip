@@ -632,14 +632,6 @@ func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
 }
 
 func (p *Plugin) Close() error {
-	timeout := 10 * time.Second // todo: cfg
-	ctx, cf := context.WithTimeout(context.Background(), timeout)
-	defer cf()
-
-	if err := p.ccipReader.Close(ctx); err != nil {
-		return fmt.Errorf("close ccip reader: %w", err)
-	}
-
 	return nil
 }
 

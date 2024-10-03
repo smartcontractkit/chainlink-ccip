@@ -143,10 +143,6 @@ func (r InMemoryCCIPReader) DiscoverContracts(
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) Close(ctx context.Context) error {
-	return nil
-}
-
 // Sync can be used to perform frequent syncing operations inside the reader implementation.
 // Returns a bool indicating whether something was updated.
 func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) error {

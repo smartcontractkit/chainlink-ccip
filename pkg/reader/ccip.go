@@ -471,7 +471,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		//TODO: Use batching in the future
+		// TODO: Use batching in the future
 		var nativeTokenAddress ocr3types.Account
 		err := reader.ExtendedGetLatestValue(
 			ctx,
@@ -541,10 +541,10 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			continue
 		}
 		feeUpdates[chain] = update
-		//feeUpdates[chain] = chainfee.ChainFeeUpdate{
+		// feeUpdates[chain] = chainfee.ChainFeeUpdate{
 		//	Timestamp: update.Timestamp,
 		//	ChainFee:  chainfee.FromPackedFee(update.Value.Int),
-		//}
+		// }
 	}
 
 	return feeUpdates
@@ -696,10 +696,6 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	}
 
 	return errors.Join(errs...)
-}
-
-func (r *ccipChainReader) Close(ctx context.Context) error {
-	return nil
 }
 
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {

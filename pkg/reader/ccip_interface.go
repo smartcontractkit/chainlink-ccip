@@ -141,7 +141,4 @@ type CCIPReader interface {
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
-
-	// Close closes any open resources.
-	Close(ctx context.Context) error
 }
