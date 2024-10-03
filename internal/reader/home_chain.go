@@ -85,7 +85,7 @@ func NewHomeChainConfigPoller(
 	}
 }
 
-func (r *homeChainPoller) Start(ctx context.Context) error {
+func (r *homeChainPoller) Start(_ context.Context) error {
 	r.lggr.Infow("Start Polling ChainConfig")
 	return r.sync.StartOnce(r.Name(), func() error {
 		r.wg.Add(1)
@@ -237,11 +237,19 @@ func (r *homeChainPoller) GetOCRConfigs(
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
 
-	if activeCandidate.ActiveConfig != nil {
-		ocrConfigs = append(ocrConfigs, *activeCandidate.ActiveConfig)
+	r.lggr.Infow(
+		"GetOCRConfigs",
+		"activeConfig", activeCandidate.ActiveConfig,
+		"candidateConfig", activeCandidate.CandidateConfig,
+	)
+
+	// Not empty
+	if activeCandidate.ActiveConfig.Version != 0 {
+		ocrConfigs = append(ocrConfigs, activeCandidate.ActiveConfig)
 	}
-	if activeCandidate.CandidateConfig != nil {
-		ocrConfigs = append(ocrConfigs, *activeCandidate.CandidateConfig)
+	// Not empty
+	if activeCandidate.CandidateConfig.Version != 0 {
+		ocrConfigs = append(ocrConfigs, activeCandidate.CandidateConfig)
 	}
 
 	return ocrConfigs, nil
@@ -392,8 +400,8 @@ type OCR3ConfigWithMeta struct {
 }
 
 type ActiveCandidate struct {
-	ActiveConfig    *OCR3ConfigWithMeta `json:"activeConfig"`
-	CandidateConfig *OCR3ConfigWithMeta `json:"candidateConfig"`
+	ActiveConfig    OCR3ConfigWithMeta `json:"activeConfig"`
+	CandidateConfig OCR3ConfigWithMeta `json:"candidateConfig"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)

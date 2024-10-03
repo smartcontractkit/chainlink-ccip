@@ -183,7 +183,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	).Return(nil).Run(func(args mock.Arguments) {
 		arg := args.Get(4).(*ActiveCandidate)
 		*arg = ActiveCandidate{
-			ActiveConfig: &OCR3ConfigWithMeta{
+			ActiveConfig: OCR3ConfigWithMeta{
 				Version: 1,
 				Config: OCR3Config{
 					PluginType:     pluginType,
