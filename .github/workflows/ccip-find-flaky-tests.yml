@@ -41,10 +41,8 @@ jobs:
           # Search for issues with the same title
           EXISTING_ISSUES=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" "https://api.github.com/search/issues?q=is:issue+repo:${{ github.repository }}+in:title+${ISSUE_TITLE}" | jq '.total_count')
 
-          echo "Existing issues: $EXISTING_ISSUES"
-
           # Save whether an issue with this title exists
-          if [ "$EXISTING_ISSUES" -eq "0" ]; then
+          if [ -z "$EXISTING_ISSUES" ] || [ "$EXISTING_ISSUES" -eq "0" ]; then
             curl -X POST \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
