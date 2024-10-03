@@ -3,6 +3,7 @@ package pluginconfig
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
@@ -324,6 +325,136 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Equal(t, c, decoded)
+		})
+	}
+}
+
+func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    CommitOffchainConfig
+		expected CommitOffchainConfig
+	}{
+		{
+			name:  "Empty config",
+			input: CommitOffchainConfig{},
+			expected: CommitOffchainConfig{
+				RMNSignaturesTimeout:               0,
+				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
+				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
+				MaxMerkleTreeSize:                  EvmDefaultMaxMerkleTreeSize,
+			},
+		},
+		{
+			name: "RMN enabled without timeout",
+			input: CommitOffchainConfig{
+				RMNEnabled: true,
+			},
+			expected: CommitOffchainConfig{
+				RMNEnabled:                         true,
+				RMNSignaturesTimeout:               defaultRMNSignaturesTimeout,
+				NewMsgScanBatchSize:                defaultNewMsgScanBatchSize,
+				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
+				MaxMerkleTreeSize:                  EvmDefaultMaxMerkleTreeSize,
+			},
+		},
+		{
+			name: "Custom values",
+			input: CommitOffchainConfig{
+				RMNEnabled:                         true,
+				RMNSignaturesTimeout:               5 * time.Minute,
+				NewMsgScanBatchSize:                500,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+			},
+			expected: CommitOffchainConfig{
+				RMNEnabled:                         true,
+				RMNSignaturesTimeout:               5 * time.Minute,
+				NewMsgScanBatchSize:                500,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+			},
+		},
+		{
+			name: "Partial custom values",
+			input: CommitOffchainConfig{
+				RMNEnabled:          true,
+				NewMsgScanBatchSize: 300,
+				MaxMerkleTreeSize:   500,
+			},
+			expected: CommitOffchainConfig{
+				RMNEnabled:                         true,
+				RMNSignaturesTimeout:               defaultRMNSignaturesTimeout,
+				NewMsgScanBatchSize:                300,
+				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
+				MaxMerkleTreeSize:                  500,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := tt.input
+			config.ApplyDefaults()
+			assert.Equal(t, tt.expected, config)
+		})
+	}
+}
+
+func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         CommitOffchainConfig
+		expectedError string
+	}{
+		{
+			name:  "Empty config applies defaults and validates successfully",
+			input: CommitOffchainConfig{},
+		},
+		{
+			name: "Config with some values set applies remaining defaults and validates successfully",
+			input: CommitOffchainConfig{
+				NewMsgScanBatchSize: 100,
+				RMNEnabled:          true,
+			},
+		},
+		{
+			name: "Config with all valid values doesn't change and validates successfully",
+			input: CommitOffchainConfig{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(2 * time.Minute),
+				RMNSignaturesTimeout:               10 * time.Second,
+				NewMsgScanBatchSize:                100,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				RMNEnabled:                         true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := tt.input
+			err := config.ApplyDefaultsAndValidate()
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+			} else {
+				require.NoError(t, err)
+
+				// Check that defaults were applied
+				assert.NotZero(t, config.RemoteGasPriceBatchWriteFrequency.Duration())
+				assert.NotZero(t, config.NewMsgScanBatchSize)
+				assert.NotZero(t, config.MaxReportTransmissionCheckAttempts)
+				assert.NotZero(t, config.MaxMerkleTreeSize)
+
+				// Check specific defaults
+				if !tt.input.RMNEnabled {
+					assert.Zero(t, config.RMNSignaturesTimeout)
+				} else {
+					assert.NotZero(t, config.RMNSignaturesTimeout)
+				}
+			}
 		})
 	}
 }

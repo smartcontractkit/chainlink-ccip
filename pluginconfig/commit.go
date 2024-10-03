@@ -17,14 +17,14 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
-// EvmDefaultMaxMerkleTreeSize is the default number of max new messages to put in a merkle tree.
 // We use this default value when the config is not set for a specific chain.
 const (
 	defaultRMNSignaturesTimeout               = 5 * time.Second
 	defaultNewMsgScanBatchSize                = 256
-	EvmDefaultMaxMerkleTreeSize               = merklemulti.MaxNumberTreeLeaves
+	defaultEvmDefaultMaxMerkleTreeSize        = merklemulti.MaxNumberTreeLeaves
 	defaultMaxReportTransmissionCheckAttempts = 5
 	defaultRMNEnabled                         = false
+	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 )
 
 type FeeInfo struct {
@@ -129,11 +129,15 @@ func (c *CommitOffchainConfig) ApplyDefaults() {
 	}
 
 	if c.MaxMerkleTreeSize == 0 {
-		c.MaxMerkleTreeSize = EvmDefaultMaxMerkleTreeSize
+		c.MaxMerkleTreeSize = defaultEvmDefaultMaxMerkleTreeSize
+	}
+
+	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
+		c.RemoteGasPriceBatchWriteFrequency = *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency)
 	}
 }
 
-func (c CommitOffchainConfig) Validate() error {
+func (c *CommitOffchainConfig) Validate() error {
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		return errors.New("remoteGasPriceBatchWriteFrequency not set")
 	}
@@ -162,7 +166,20 @@ func (c CommitOffchainConfig) Validate() error {
 		return fmt.Errorf("rmnSignaturesTimeout not set")
 	}
 
+	if c.MaxReportTransmissionCheckAttempts == 0 {
+		return fmt.Errorf("maxReportTransmissionCheckAttempts not set")
+	}
+
+	if c.MaxMerkleTreeSize == 0 {
+		return fmt.Errorf("maxMerkleTreeSize not set")
+	}
+
 	return nil
+}
+
+func (c *CommitOffchainConfig) ApplyDefaultsAndValidate() error {
+	c.ApplyDefaults()
+	return c.Validate()
 }
 
 // EncodeCommitOffchainConfig encodes a CommitOffchainConfig into bytes using JSON.
