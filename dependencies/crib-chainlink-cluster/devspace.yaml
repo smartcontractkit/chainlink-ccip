@@ -348,9 +348,8 @@ profiles:
               (
                 cd $CHAINLINK_CODE_DIR/chainlink && \
                 nix develop -c \
-                  bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
-                    release --snapshot --clean --config .goreleaser.devspace.yaml" && \
-                docker push $image
+                  bash -c "IMAGE=$image goreleaser \
+                    release --nightly --split --clean --config .goreleaser.devspace.yaml"
               )
       deployments:
         app:
@@ -414,9 +413,8 @@ profiles:
               (
                 cd $CHAINLINK_CODE_DIR/ccip && \
                 nix develop -c \
-                  bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
-                    release --snapshot --clean --config .goreleaser.devspace.yaml" && \
-                docker push $image
+                  bash -c "IMAGE=$image goreleaser \
+                    release --nightly --split --clean --config .goreleaser.devspace.yaml"
               )
       deployments:
         app:
@@ -656,9 +654,8 @@ profiles:
               (
                 cd $CHAINLINK_CODE_DIR/ccip && \
                 nix develop -c \
-                  bash -c "MACOS_SDK_DIR=$(pwd)/tools/bin/MacOSX12.3.sdk IMAGE=$image ./tools/bin/goreleaser_wrapper \
-                    release --snapshot --clean --config .goreleaser.devspace.yaml" && \
-                docker push $image
+                  bash -c "IMAGE=$image goreleaser \
+                    release --nightly --split --clean --config .goreleaser.devspace.yaml"
               )
   - name: local-charts
     merge:
