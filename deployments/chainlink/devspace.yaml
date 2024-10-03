@@ -53,7 +53,8 @@ pipelines:
 
   ccip-don:
     run: |-
-      run_dependency_pipelines crib-chainlink-cluster
+      run_dependency_pipelines crib-chainlink-cluster geth mockserver
+      run_pipelines ingress-check
 
   ccip-scripts:
     run: |-
@@ -266,7 +267,7 @@ profiles:
           - local-charts
   - name: ccip-eks-bix-ship
     parents:
-      - profile: ccip-no-geth
+      - profile: ccip
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
