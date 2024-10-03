@@ -244,11 +244,11 @@ func (r *homeChainPoller) GetOCRConfigs(
 	)
 
 	// Not empty
-	if allConfigs.ActiveConfig.Version != 0 {
+	if allConfigs.ActiveConfig.ConfigDigest != [32]byte{} {
 		ocrConfigs = append(ocrConfigs, allConfigs.ActiveConfig)
 	}
 	// Not empty
-	if allConfigs.CandidateConfig.Version != 0 {
+	if allConfigs.CandidateConfig.ConfigDigest != [32]byte{} {
 		ocrConfigs = append(ocrConfigs, allConfigs.CandidateConfig)
 	}
 
