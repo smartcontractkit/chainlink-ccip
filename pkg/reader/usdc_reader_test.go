@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"testing"
 
-	sel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	sel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -172,8 +172,8 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 		validChain:  validReader,
 	}
 
-	tokens := map[exectypes.MessageTokenID]cciptypes.RampTokenAmount{
-		exectypes.NewMessageTokenID(1, 1): {
+	tokens := map[MessageTokenID]cciptypes.RampTokenAmount{
+		NewMessageTokenID(1, 1): {
 			ExtraData: NewSourceTokenDataPayload(11, validChainCCTP).ToBytes(),
 		},
 	}
@@ -185,14 +185,14 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 		name           string
 		sourceSelector cciptypes.ChainSelector
 		destSelector   cciptypes.ChainSelector
-		expectedMsgIDs []exectypes.MessageTokenID
+		expectedMsgIDs []MessageTokenID
 		errorMessage   string
 	}{
 		{
 			name:           "should return empty dataset when chain doesn't have events",
 			sourceSelector: emptyChain,
 			destSelector:   faultyChain,
-			expectedMsgIDs: []exectypes.MessageTokenID{},
+			expectedMsgIDs: []MessageTokenID{},
 		},
 		{
 			name:           "should return error when chain reader errors",
@@ -216,7 +216,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 			name:           "valid chain return events but nothing is matched",
 			sourceSelector: validChain,
 			destSelector:   emptyChain,
-			expectedMsgIDs: []exectypes.MessageTokenID{},
+			expectedMsgIDs: []MessageTokenID{},
 		},
 	}
 
