@@ -48,9 +48,10 @@ jobs:
           git checkout ${{ github.base_ref }}
           { time TEST_COUNT=1 COVERAGE_FILE=coverage.out make test; } 2> test-results.txt
           real_time=$(cat test-results.txt | grep real | awk '{print $2}')
+          echo "tests_duration_target=$real_time" >> $GITHUB_ENV
           total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
           echo "coverage_target=$total" >> $GITHUB_ENV
-          echo "tests_duration_target=$real_time" >> $GITHUB_ENV
+          echo "Tests duration: $real_time"
       - name: Remove previous coverage comments
         uses: actions/github-script@v6
         if: github.event_name == 'pull_request'
