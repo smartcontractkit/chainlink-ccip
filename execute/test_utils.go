@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/mock"
@@ -160,12 +161,9 @@ func (it *IntTest) WithUSDC(
 }
 
 func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
-	cfg := pluginconfig.ExecutePluginConfig{
-		OffchainConfig: pluginconfig.ExecuteOffchainConfig{
-			MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
-			BatchGasLimit:             100000000,
-		},
-		DestChain: it.dstSelector,
+	cfg := pluginconfig.ExecuteOffchainConfig{
+		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
+		BatchGasLimit:             100000000,
 	}
 	chainConfigInfos := []reader.ChainConfigInfo{
 		{
@@ -195,7 +193,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		logger.Test(it.t),
-		cfg.DestChain,
+		it.dstSelector,
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
 		it.tokenChainReader,
@@ -204,9 +202,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
-		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
-		newNode(it.donID, logger.Test(it.t), cfg, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
+		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
+		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
+		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -233,7 +231,8 @@ func (it *IntTest) Close() {
 func newNode(
 	donID plugintypes.DonID,
 	lggr logger.Logger,
-	cfg pluginconfig.ExecutePluginConfig,
+	cfg pluginconfig.ExecuteOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	msgHasher cciptypes.MessageHasher,
 	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
@@ -253,6 +252,7 @@ func newNode(
 		donID,
 		rCfg,
 		cfg,
+		destChain,
 		oracleIDToP2pID,
 		ccipReader,
 		reportCodec,
