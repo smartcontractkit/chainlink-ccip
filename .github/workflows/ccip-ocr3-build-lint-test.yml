@@ -81,6 +81,8 @@ jobs:
           script: |
             const coverage = process.env.coverage;
             const coverage_target = process.env.coverage_target;
+            const tests_duration = process.env.tests_duration;
+            const tests_duration_target = process.env.tests_duration_target;
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
