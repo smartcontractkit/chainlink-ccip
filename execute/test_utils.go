@@ -202,9 +202,42 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 1, 1),
-		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 2, 1),
-		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, oracleIDToP2pID, 3, 1),
+		newNode(
+			it.donID,
+			logger.Test(it.t),
+			cfg,
+			it.dstSelector,
+			it.msgHasher,
+			it.ccipReader,
+			homeChain,
+			tkObs,
+			oracleIDToP2pID,
+			1,
+			1),
+		newNode(
+			it.donID,
+			logger.Test(it.t),
+			cfg,
+			it.dstSelector,
+			it.msgHasher,
+			it.ccipReader,
+			homeChain,
+			tkObs,
+			oracleIDToP2pID,
+			2,
+			1),
+		newNode(
+			it.donID,
+			logger.Test(it.t),
+			cfg,
+			it.dstSelector,
+			it.msgHasher,
+			it.ccipReader,
+			homeChain,
+			tkObs,
+			oracleIDToP2pID,
+			3,
+			1),
 	}
 
 	require.NoError(it.t, homeChain.Close())
