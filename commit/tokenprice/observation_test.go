@@ -78,7 +78,8 @@ func Test_Observation(t *testing.T) {
 					chainSupport:     chainSupport,
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
-					cfg:              defaultCfg,
+					offChainCfg:      defaultCfg,
+					destChain:        destChainSel,
 					fRoleDON:         f,
 				}
 			},
@@ -104,7 +105,8 @@ func Test_Observation(t *testing.T) {
 					chainSupport:     chainSupport,
 					tokenPriceReader: tokenPriceReader,
 					homeChain:        homeChain,
-					cfg:              defaultCfg,
+					destChain:        destChainSel,
+					offChainCfg:      defaultCfg,
 					fRoleDON:         f,
 				}
 			},
@@ -132,20 +134,17 @@ func Test_Observation(t *testing.T) {
 	}
 }
 
-var defaultCfg = pluginconfig.CommitPluginConfig{
-	DestChain: destChainSel,
-	OffchainConfig: pluginconfig.CommitOffchainConfig{
-		TokenInfo: map[types.Account]pluginconfig.TokenInfo{
-			tokenA: {
-				Decimals:          18,
-				AggregatorAddress: "0x1111111111111111111111Ff18C45Df59775Fbb2",
-				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
-			},
-			tokenB: {
-				Decimals:          18,
-				AggregatorAddress: "0x2222222222222222222222Ff18C45Df59775Fbb2",
-				DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)}},
+var defaultCfg = pluginconfig.CommitOffchainConfig{
+	TokenInfo: map[types.Account]pluginconfig.TokenInfo{
+		tokenA: {
+			Decimals:          18,
+			AggregatorAddress: "0x1111111111111111111111Ff18C45Df59775Fbb2",
+			DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
 		},
-		PriceFeedChainSelector: feedChainSel,
+		tokenB: {
+			Decimals:          18,
+			AggregatorAddress: "0x2222222222222222222222Ff18C45Df59775Fbb2",
+			DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)}},
 	},
+	PriceFeedChainSelector: feedChainSel,
 }

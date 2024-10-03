@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/crypto/sha3"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type MessageTokenData struct {
@@ -132,20 +133,4 @@ func TokenDataHash(td TokenData) [32]byte {
 
 func (td TokenData) IsReady() bool {
 	return td.Ready
-}
-
-// MessageTokenID is a unique identifier for a message token data (per chain selector). It's a composite key of
-// the message sequence number and the token index within the message. It's used to easier identify token data for
-// messages without having to deal with nested maps.
-type MessageTokenID struct {
-	SeqNr cciptypes.SeqNum
-	Index int
-}
-
-func NewMessageTokenID(seqNr cciptypes.SeqNum, index int) MessageTokenID {
-	return MessageTokenID{SeqNr: seqNr, Index: index}
-}
-
-func (mti MessageTokenID) String() string {
-	return fmt.Sprintf("%d_%d", mti.SeqNr, mti.Index)
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	internaltypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -141,6 +142,13 @@ func (r InMemoryCCIPReader) DiscoverContracts(
 	ctx context.Context, allChains []cciptypes.ChainSelector,
 ) (reader.ContractAddresses, error) {
 	return nil, nil
+}
+
+func (r InMemoryCCIPReader) GetRMNRemoteConfig(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+) (rmntypes.RemoteConfig, error) {
+	return rmntypes.RemoteConfig{}, nil
 }
 
 func (r InMemoryCCIPReader) Close(ctx context.Context) error {

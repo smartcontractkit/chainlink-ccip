@@ -205,19 +205,19 @@ func (_c *MockRMNRemote_GetRmnReportVersion_Call) RunAndReturn(run func() string
 }
 
 // GetSignersInfo provides a mock function with given fields:
-func (_m *MockRMNRemote) GetSignersInfo() []types.RMNRemoteSignerInfo {
+func (_m *MockRMNRemote) GetSignersInfo() []types.RemoteSignerInfo {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetSignersInfo")
 	}
 
-	var r0 []types.RMNRemoteSignerInfo
-	if rf, ok := ret.Get(0).(func() []types.RMNRemoteSignerInfo); ok {
+	var r0 []types.RemoteSignerInfo
+	if rf, ok := ret.Get(0).(func() []types.RemoteSignerInfo); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]types.RMNRemoteSignerInfo)
+			r0 = ret.Get(0).([]types.RemoteSignerInfo)
 		}
 	}
 
@@ -241,12 +241,12 @@ func (_c *MockRMNRemote_GetSignersInfo_Call) Run(run func()) *MockRMNRemote_GetS
 	return _c
 }
 
-func (_c *MockRMNRemote_GetSignersInfo_Call) Return(_a0 []types.RMNRemoteSignerInfo) *MockRMNRemote_GetSignersInfo_Call {
+func (_c *MockRMNRemote_GetSignersInfo_Call) Return(_a0 []types.RemoteSignerInfo) *MockRMNRemote_GetSignersInfo_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRMNRemote_GetSignersInfo_Call) RunAndReturn(run func() []types.RMNRemoteSignerInfo) *MockRMNRemote_GetSignersInfo_Call {
+func (_c *MockRMNRemote_GetSignersInfo_Call) RunAndReturn(run func() []types.RemoteSignerInfo) *MockRMNRemote_GetSignersInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

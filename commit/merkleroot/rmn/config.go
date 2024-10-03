@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -33,7 +34,8 @@ type RMNNodeInfo struct {
 	IsSigner                  bool
 	SignReportsAddress        cciptypes.Bytes
 	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
-	SignObservationPrefix     string             // e.g. "chainlink ccip 1.6 rmn observation"
+	// TODO: clarify this field
+	SignObservationPrefix string // e.g. "chainlink ccip 1.6 rmn observation"
 }
 
 type NodeID uint32

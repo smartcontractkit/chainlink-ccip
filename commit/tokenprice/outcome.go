@@ -26,16 +26,16 @@ func (p *processor) getConsensusObservation(
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
 	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
 
-	fDestChain, exists := fChains[p.cfg.DestChain]
+	fDestChain, exists := fChains[p.destChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.cfg.DestChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
 
-	fFeedChain, exists := fChains[p.cfg.OffchainConfig.PriceFeedChainSelector]
+	fFeedChain, exists := fChains[p.offChainCfg.PriceFeedChainSelector]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for f for FeedChain: %d", p.cfg.OffchainConfig.PriceFeedChainSelector)
+			fmt.Errorf("no consensus value for f for FeedChain: %d", p.offChainCfg.PriceFeedChainSelector)
 	}
 
 	feedPricesConsensus := consensus.GetConsensusMapAggregator(
@@ -77,7 +77,7 @@ func (p *processor) selectTokensForUpdate(
 	obs ConsensusObservation,
 ) []cciptypes.TokenPrice {
 	var tokenPrices []cciptypes.TokenPrice
-	cfg := p.cfg.OffchainConfig
+	cfg := p.offChainCfg
 	tokenInfo := cfg.TokenInfo
 
 	for token, feedPrice := range obs.FeedTokenPrices {
