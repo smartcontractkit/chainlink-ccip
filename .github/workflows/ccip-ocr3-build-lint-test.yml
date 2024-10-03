@@ -32,6 +32,7 @@ jobs:
         run: make lint
       - name: Run tests
         run: |
+          go get ./...
           { time TEST_COUNT=1 COVERAGE_FILE=coverage.out make test; } 2> test-results.txt
           real_time=$(cat test-results.txt | grep real | awk '{print $2}')
           echo "Tests duration: $real_time"
@@ -46,7 +47,6 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}
           git checkout ${{ github.base_ref }}
-          go clean -testcache
           { time TEST_COUNT=1 COVERAGE_FILE=coverage_target.out make test; } 2> test-results.txt
           real_time=$(cat test-results.txt | grep real | awk '{print $2}')
           echo "tests_duration_target=$real_time" >> $GITHUB_ENV
