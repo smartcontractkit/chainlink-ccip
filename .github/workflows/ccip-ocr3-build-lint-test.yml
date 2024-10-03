@@ -31,18 +31,23 @@ jobs:
       - name: Run linter
         run: make lint
       - name: Run tests
-        run: TEST_COUNT=1 COVERAGE_FILE=coverage.out make test
+        run: |
+          { time TEST_COUNT=1 COVERAGE_FILE=coverage.out make test; } 2> test-results.txt
+          real_time=$(cat test-results.txt | grep real | awk '{print $2}')
+          echo "tests_duration=$real_time" >> $GITHUB_ENV
       - name: Generate coverage report
         if: github.event_name == 'pull_request'
         run: |
           total=$(go tool cover -func=coverage.out | grep total | awk '{print $3}')
           echo "coverage=$total" >> $GITHUB_ENV
-      - name: Coverage on target branch
+      - name: Coverage and duration on target branch
         if: github.event_name == 'pull_request'
         run: |
           git fetch origin ${{ github.base_ref }}
           git checkout ${{ github.base_ref }}
-          TEST_COUNT=1 COVERAGE_FILE=coverage_target.out make test
+          { time TEST_COUNT=1 COVERAGE_FILE=coverage.out make test; } 2> test-results.txt
+          real_time=$(cat test-results.txt | grep real | awk '{print $2}')
+          echo "tests_duration_target=$real_time" >> $GITHUB_ENV
           total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
           echo "coverage_target=$total" >> $GITHUB_ENV
       - name: Remove previous coverage comments
@@ -79,5 +84,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `| Metric | \`${{ github.head_ref }}\` | \`${{ github.base_ref }}\` |\n|--|--|--|\n| **Coverage** | ${coverage} | ${coverage_target} |`
+              body: `| Metric       | \`${{ github.head_ref }}\` | \`${{ github.base_ref }}\` | \n|--------------|--|--|\n| **Coverage** | ${coverage} | ${coverage_target} |\n| **Tests Duration** | ${tests_duration} | ${tests_duration_target} |`
             });
