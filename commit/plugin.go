@@ -12,6 +12,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
@@ -33,7 +35,7 @@ type Plugin struct {
 	donID               plugintypes.DonID
 	oracleID            commontypes.OracleID
 	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
-	cfg                 pluginconfig.CommitPluginConfig
+	offchainCfg         pluginconfig.CommitOffchainConfig
 	ccipReader          readerpkg.CCIPReader
 	tokenPricesReader   reader.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
@@ -57,7 +59,8 @@ func NewPlugin(
 	donID plugintypes.DonID,
 	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg pluginconfig.CommitPluginConfig,
+	offchainCfg pluginconfig.CommitOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	ccipReader readerpkg.CCIPReader,
 	tokenPricesReader reader.PriceReader,
 	reportCodec cciptypes.CommitPluginCodec,
@@ -72,10 +75,10 @@ func NewPlugin(
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
-	if cfg.MaxMerkleTreeSize == 0 {
+	if offchainCfg.MaxMerkleTreeSize == 0 {
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
-			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
-		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
+			"default", merklemulti.MaxNumberTreeLeaves)
+		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
@@ -83,13 +86,14 @@ func NewPlugin(
 		homeChain,
 		oracleIDToP2pID,
 		oracleID,
-		cfg.DestChain,
+		destChain,
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
 		oracleID,
 		lggr,
-		cfg,
+		offchainCfg,
+		destChain,
 		homeChain,
 		ccipReader,
 		msgHasher,
@@ -104,7 +108,8 @@ func NewPlugin(
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		oracleID,
 		lggr,
-		cfg,
+		offchainCfg,
+		destChain,
 		chainSupport,
 		tokenPricesReader,
 		homeChain,
@@ -115,17 +120,17 @@ func NewPlugin(
 		lggr,
 		&ccipReader,
 		homeChain,
-		cfg.DestChain,
+		destChain,
 		reportingCfg.F,
 		oracleIDToP2pID,
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
 		lggr,
-		cfg.DestChain,
+		destChain,
 		homeChain,
 		ccipReader,
-		cfg.OffchainConfig,
+		offchainCfg,
 		chainSupport,
 		reportingCfg.F,
 	)
@@ -135,7 +140,7 @@ func NewPlugin(
 		oracleID:            oracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
 		lggr:                lggr,
-		cfg:                 cfg,
+		offchainCfg:         offchainCfg,
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,

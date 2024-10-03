@@ -11,23 +11,49 @@ import (
 )
 
 // Test_fChainConsensus is a legacy test that was replaced by GetConsensusMap, now it's a regression test.
+
 func Test_fChainConsensus(t *testing.T) {
 	lggr := logger.Test(t)
-	f := 3
-	fChainValues := map[cciptypes.ChainSelector][]int{
-		cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},
-		cciptypes.ChainSelector(2): {5, 5, 5, 3, 5},
-		cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least f times.
-		cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least f times, no consensus
+
+	testCases := []struct {
+		name           string
+		f              int
+		inputMap       map[cciptypes.ChainSelector][]int
+		expectedOutput map[cciptypes.ChainSelector]int
+	}{
+		{
+			name: "multiple chains with integer values",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]int{
+				cciptypes.ChainSelector(1): {5, 5, 5, 5, 5},
+				cciptypes.ChainSelector(2): {5, 5, 5, 3, 5},
+				cciptypes.ChainSelector(3): {5, 5},             // not enough observations, must be observed at least f times.
+				cciptypes.ChainSelector(4): {5, 3, 5, 3, 5, 3}, // both values appear at least f times, no consensus
+			},
+			expectedOutput: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 5,
+				cciptypes.ChainSelector(2): 5,
+			},
+		},
+		{
+			name: "single chain with integer values",
+			f:    3,
+			inputMap: map[cciptypes.ChainSelector][]int{
+				cciptypes.ChainSelector(1): {1, 1, 1, 2, 1, 3},
+			},
+			expectedOutput: map[cciptypes.ChainSelector]int{
+				cciptypes.ChainSelector(1): 1,
+			},
+		},
 	}
 
-	minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(f))
-	fChainFinal := GetConsensusMap(lggr, "fChain", fChainValues, minObs)
-
-	assert.Equal(t, map[cciptypes.ChainSelector]int{
-		cciptypes.ChainSelector(1): 5,
-		cciptypes.ChainSelector(2): 5,
-	}, fChainFinal)
+	for _, scenario := range testCases {
+		t.Run(scenario.name, func(t *testing.T) {
+			minObs := MakeConstantThreshold[cciptypes.ChainSelector](Threshold(scenario.f))
+			result := GetConsensusMap(lggr, "fChain", scenario.inputMap, minObs)
+			assert.Equal(t, scenario.expectedOutput, result)
+		})
+	}
 }
 
 func Test_GetConsensusMapMedianTimestamp(t *testing.T) {

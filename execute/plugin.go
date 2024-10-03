@@ -58,10 +58,6 @@ type Plugin struct {
 	contractsInitialized bool
 }
 
-func (p *Plugin) ReportingCfg() ocr3types.ReportingPluginConfig {
-	return p.reportingCfg
-}
-
 func NewPlugin(
 	donID plugintypes.DonID,
 	reportingCfg ocr3types.ReportingPluginConfig,

@@ -34,13 +34,13 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 		return []cciptypes.TokenPrice{}
 	}
 
-	if !supportedChains.Contains(p.cfg.OffchainConfig.PriceFeedChainSelector) {
+	if !supportedChains.Contains(p.offChainCfg.PriceFeedChainSelector) {
 		p.lggr.Debugw("oracle does not support token price observation")
 		return []cciptypes.TokenPrice{}
 
 	}
 
-	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
+	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
@@ -80,7 +80,7 @@ func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 		return map[types.Account]plugintypes.TimestampedBig{}
 	}
 
-	tokensToQuery := maps.Keys(p.cfg.OffchainConfig.TokenInfo)
+	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing fee quoter token updates")
