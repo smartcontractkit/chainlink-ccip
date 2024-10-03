@@ -138,6 +138,9 @@ func (c *CommitOffchainConfig) applyDefaults() {
 }
 
 func (c *CommitOffchainConfig) Validate() error {
+	// TODO: temporary workaround to ensure that the config is valid in chainlink
+	c.applyDefaults()
+
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		return errors.New("remoteGasPriceBatchWriteFrequency not set")
 	}
