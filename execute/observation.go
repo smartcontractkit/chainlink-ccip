@@ -33,13 +33,11 @@ func (p *Plugin) Observation(
 	var err error
 	var previousOutcome exectypes.Outcome
 
-	if outctx.PreviousOutcome != nil {
-		previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
-		}
-		p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
+	previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
+	if err != nil {
+		return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
+	p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
 
 	var discoveryObs dt.Observation
 	// discovery processor disabled by setting it to nil.
@@ -84,7 +82,10 @@ func (p *Plugin) Observation(
 // getCommitReportsObservations implements phase1 of the execute plugin state machine. It fetches commit reports from
 // the destination chain and determines which messages are ready to be executed. These are added to the provided
 // observation object.
-func (p *Plugin) getCommitReportsObservation(ctx context.Context, observation exectypes.Observation) (exectypes.Observation, error) {
+func (p *Plugin) getCommitReportsObservation(
+	ctx context.Context,
+	observation exectypes.Observation,
+) (exectypes.Observation, error) {
 	fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
 
 	// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
@@ -107,6 +108,19 @@ func (p *Plugin) getCommitReportsObservation(ctx context.Context, observation ex
 
 	// No observation for non-dest readers.
 	return observation, nil
+}
+
+// regroup converts the previous outcome to the observation format.
+// TODO: use same format for Observation and Outcome.
+func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
+	groupedCommits := make(exectypes.CommitObservations)
+	for _, report := range commitData {
+		if _, ok := groupedCommits[report.SourceChain]; !ok {
+			groupedCommits[report.SourceChain] = []exectypes.CommitData{}
+		}
+		groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
+	}
+	return groupedCommits
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -152,16 +166,6 @@ func (p *Plugin) getMessagesObservation(
 		}
 	}
 
-	// Regroup the commit reports back into the observation format.
-	// TODO: use same format for Observation and Outcome.
-	groupedCommits := make(exectypes.CommitObservations)
-	for _, report := range previousOutcome.PendingCommitReports {
-		if _, ok := groupedCommits[report.SourceChain]; !ok {
-			groupedCommits[report.SourceChain] = []exectypes.CommitData{}
-		}
-		groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
-	}
-
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
@@ -172,7 +176,7 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages %w", err)
 	}
 
-	observation.CommitReports = groupedCommits
+	observation.CommitReports = regroup(previousOutcome.PendingCommitReports)
 	observation.Messages = messages
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData

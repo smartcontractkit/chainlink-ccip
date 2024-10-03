@@ -110,6 +110,9 @@ func (o Outcome) Encode() ([]byte, error) {
 
 // DecodeOutcome decodes the outcome from JSON.
 func DecodeOutcome(b []byte) (Outcome, error) {
+	if len(b) == 0 {
+		return Outcome{}, nil
+	}
 	o := Outcome{}
 	err := json.Unmarshal(b, &o)
 	return o, err
