@@ -107,7 +107,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
 	for oracleID, node := range p.ocrConfig.Config.Nodes {
-		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pId
+		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
 	// Bind the RMNHome contract

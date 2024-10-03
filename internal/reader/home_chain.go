@@ -223,7 +223,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
-	var activeCandidate GetAllConfigs
+	var allConfigs GetAllConfigs
 
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
@@ -232,24 +232,24 @@ func (r *homeChainPoller) GetOCRConfigs(
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
-		}, &activeCandidate)
+		}, &allConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
 
 	r.lggr.Infow(
 		"GetOCRConfigs",
-		"activeConfig", activeCandidate.ActiveConfig,
-		"candidateConfig", activeCandidate.CandidateConfig,
+		"activeConfig", allConfigs.ActiveConfig,
+		"candidateConfig", allConfigs.CandidateConfig,
 	)
 
 	// Not empty
-	if activeCandidate.ActiveConfig.Version != 0 {
-		ocrConfigs = append(ocrConfigs, activeCandidate.ActiveConfig)
+	if allConfigs.ActiveConfig.Version != 0 {
+		ocrConfigs = append(ocrConfigs, allConfigs.ActiveConfig)
 	}
 	// Not empty
-	if activeCandidate.CandidateConfig.Version != 0 {
-		ocrConfigs = append(ocrConfigs, activeCandidate.CandidateConfig)
+	if allConfigs.CandidateConfig.Version != 0 {
+		ocrConfigs = append(ocrConfigs, allConfigs.CandidateConfig)
 	}
 
 	return ocrConfigs, nil
@@ -354,8 +354,8 @@ type ChainConfigInfo struct {
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
 
-// ChainConfig will live on the home chain and will be used to update chain configuration like FRoleDon value and supported
-// nodes dynamically.
+// ChainConfig will live on the home chain and will be used to update chain configuration
+// like FRoleDon value and supported nodes dynamically.
 type ChainConfig struct {
 	// FChain defines the FChain value for the chain. FChain is used while forming consensus based on the observations.
 	FChain int `json:"fChain"`
@@ -369,7 +369,7 @@ type ChainConfig struct {
 // https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
 
 type OCR3Node struct {
-	P2pId          [32]byte `json:"p2pId"`
+	P2pID          [32]byte `json:"p2pId"`
 	SignerKey      []byte   `json:"signerKey"`
 	TransmitterKey []byte   `json:"transmitterKey"`
 }
