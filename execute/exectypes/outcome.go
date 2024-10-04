@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"sort"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -103,13 +105,13 @@ func newSortedOutcome(
 // Encode encodes the outcome by first sorting the pending commit reports and the chain reports
 // and then JSON marshalling.
 // The encoding MUST be deterministic.
-func (o Outcome) Encode() ([]byte, error) {
+func (o Outcome) Encode() (ocr3types.Outcome, error) {
 	// We sort again here in case construction is not via the constructor.
 	return json.Marshal(newSortedOutcome(o.State, o.PendingCommitReports, o.Report))
 }
 
-// DecodeOutcome decodes the outcome from JSON.
-func DecodeOutcome(b []byte) (Outcome, error) {
+// DecodeOutcome decodes the outcome from JSON. An empty string is treated as an empty outcome.
+func DecodeOutcome(b ocr3types.Outcome) (Outcome, error) {
 	if len(b) == 0 {
 		return Outcome{}, nil
 	}
