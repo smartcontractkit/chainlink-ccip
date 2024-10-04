@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	rand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -122,9 +124,8 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		MaxReportTransmissionCheckAttempts uint32
 		MaxMerkleTreeSize                  uint32
 	}
-	//nolint:gosec
-	const remoteTokenAddress = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
-	const aggregatorAddress = "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2"
+	remoteTokenAddress := rand.RandomAddress()
+	aggregatorAddress := string(rand.RandomAddress())
 	tests := []struct {
 		name    string
 		fields  fields
@@ -236,13 +237,10 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
 		PriceSources                      map[types.Account]TokenInfo
 	}
-	//nolint:gosec
-	const (
-		remoteTokenAddress1 = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
-		remoteTokenAddress2 = "0x560fAB5e97758BaB75C1316873Ec4F98C11E57E4"
-		aggregatorAddress1  = "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2"
-		aggregatorAddress2  = "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb3"
-	)
+	remoteTokenAddress1 := rand.RandomAddress()
+	remoteTokenAddress2 := rand.RandomAddress()
+	aggregatorAddress1 := string(rand.RandomAddress())
+	aggregatorAddress2 := string(rand.RandomAddress())
 	tests := []struct {
 		name   string
 		fields fields
