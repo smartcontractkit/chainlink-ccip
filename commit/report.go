@@ -37,7 +37,8 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
-		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+		RMNSignatures:    outcome.MerkleRootOutcome.RMNReportSignatures,
+		RMNMinSignatures: outcome.MerkleRootOutcome.RMNRemoteCfg.MinSigners,
 	}
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
@@ -63,10 +64,10 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if p.offchainCfg.RMNEnabled &&
-		len(decodedReport.MerkleRoots) > 0 &&
-		len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
-		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
-			len(decodedReport.RMNSignatures), p.rmnConfig.Remote.MinSigners)
+		len(decodedReport.MerkleRoots) > 0 {
+		// len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
+		// p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
+		// len(decodedReport.RMNSignatures), p.rmnConfig.Remote.MinSigners)
 		return false, nil
 	}
 

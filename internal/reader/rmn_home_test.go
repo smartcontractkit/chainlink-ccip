@@ -247,7 +247,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 					expectedChainSelector := cciptypes.ChainSelector(uint64(i + 1))
 					minObs, exists := minObsMap[expectedChainSelector]
 					require.True(t, exists)
-					require.Equal(t, uint64(i+1), minObs)
+					require.Equal(t, i+1, minObs)
 				}
 			}
 		})

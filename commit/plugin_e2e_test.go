@@ -25,7 +25,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -400,7 +399,6 @@ func setupNode(
 		homeChainReader,
 		rmnHomeReader,
 		reportingCfg,
-		rmn.Config{},
 	)
 
 	return nodeSetup{

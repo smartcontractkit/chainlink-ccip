@@ -23,6 +23,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 )
 
 var (
@@ -53,6 +55,7 @@ type Controller interface {
 		ctx context.Context,
 		destChain *rmnpb.LaneDest,
 		requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
+		rmnRemoteCfg rmntypes.RemoteConfig,
 	) (*ReportSignatures, error)
 }
 
@@ -77,7 +80,8 @@ type controller struct {
 	// peerClient is the client used to communicate with the RMN nodes.
 	peerClient PeerClient
 
-	rmnCfg Config
+	// rmnHomeReader is used to read the RMN home contract configuration.
+	rmnHomeReader reader.RMNHome
 
 	// ed25519Verifier is used to verify the RMN offchain observation signatures.
 	ed25519Verifier ED25519Verifier
@@ -97,7 +101,7 @@ func NewController(
 	rmnCrypto cciptypes.RMNCrypto,
 	signObservationPrefix string,
 	peerClient PeerClient,
-	rmnConfig Config,
+	rmnHomeReader reader.RMNHome,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Controller {
@@ -106,7 +110,7 @@ func NewController(
 		rmnCrypto:                               rmnCrypto,
 		signObservationPrefix:                   signObservationPrefix,
 		peerClient:                              peerClient,
-		rmnCfg:                                  rmnConfig,
+		rmnHomeReader:                           rmnHomeReader,
 		ed25519Verifier:                         NewED25519Verifier(),
 		observationsInitialRequestTimerDuration: observationsInitialRequestTimerDuration,
 		reportsInitialRequestTimerDuration:      reportsInitialRequestTimerDuration,
@@ -117,6 +121,7 @@ func (c *controller) ComputeReportSignatures(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
+	rmnRemoteCfg rmntypes.RemoteConfig,
 ) (*ReportSignatures, error) {
 	// Group the lane update requests by their source chain and mark the RMN nodes that can sign each update
 	// based on whether it supports the source chain or not.
@@ -128,9 +133,14 @@ func (c *controller) ComputeReportSignatures(
 
 		updatesPerChain[updateReq.LaneSource.SourceChainSelector] = updateRequestWithMeta{
 			Data:     updateReq,
-			RmnNodes: mapset.NewSet[NodeID](),
+			RmnNodes: mapset.NewSet[rmntypes.NodeID](),
 		}
-		for _, node := range c.rmnCfg.Home.RmnNodes {
+		rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(rmnRemoteCfg.ConfigDigest)
+		if err != nil {
+			return nil, fmt.Errorf("get rmn nodes info: %w", err)
+		}
+
+		for _, node := range rmnNodes {
 			// If RMN node supports the chain add it to the list of RMN nodes that can sign the update.
 			if node.SupportedSourceChains.Contains(cciptypes.ChainSelector(updateReq.LaneSource.SourceChainSelector)) {
 				updatesPerChain[updateReq.LaneSource.SourceChainSelector].RmnNodes.Add(node.ID)
@@ -138,12 +148,19 @@ func (c *controller) ComputeReportSignatures(
 		}
 	}
 
+	minObserversMap, err := c.rmnHomeReader.GetMinObservers(rmnRemoteCfg.ConfigDigest)
+	if err != nil {
+		return nil, fmt.Errorf("get min observers: %w", err)
+	}
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
 	for chain, l := range updatesPerChain {
-		if l.RmnNodes.Cardinality() < c.rmnCfg.Remote.MinObservers {
+		if _, exists := minObserversMap[cciptypes.ChainSelector(chain)]; !exists {
+			return nil, fmt.Errorf("no min observers for chain %d", chain)
+		}
+		if l.RmnNodes.Cardinality() < minObserversMap[cciptypes.ChainSelector(chain)] {
 			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
 				"chain", chain,
-				"minObservers", c.rmnCfg.Remote.MinObservers,
+				"minObservers", minObserversMap[cciptypes.ChainSelector(chain)],
 				"nodes", l.RmnNodes.ToSlice(),
 			)
 			delete(updatesPerChain, chain)
@@ -155,7 +172,13 @@ func (c *controller) ComputeReportSignatures(
 	}
 
 	tStart := time.Now()
-	rmnSignedObservations, err := c.getRmnSignedObservations(ctx, destChain, updatesPerChain)
+	rmnSignedObservations, err := c.getRmnSignedObservations(
+		ctx,
+		destChain,
+		updatesPerChain,
+		rmnRemoteCfg.ConfigDigest,
+		minObserversMap)
+	// minObserversMap[cciptypes.ChainSelector(destChain.DestChainSelector)])
 	if err != nil {
 		return nil, fmt.Errorf("get rmn signed observations: %w", err)
 	}
@@ -166,7 +189,12 @@ func (c *controller) ComputeReportSignatures(
 	)
 
 	tStart = time.Now()
-	rmnReportSignatures, err := c.getRmnReportSignatures(ctx, destChain, rmnSignedObservations, updatesPerChain)
+	rmnReportSignatures, err := c.getRmnReportSignatures(
+		ctx,
+		destChain,
+		rmnSignedObservations,
+		updatesPerChain,
+		rmnRemoteCfg)
 	if err != nil {
 		return nil, fmt.Errorf("get rmn report signatures: %w", err)
 	}
@@ -184,17 +212,23 @@ func (c *controller) getRmnSignedObservations(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
 	updateRequestsPerChain map[uint64]updateRequestWithMeta,
+	configDigest cciptypes.Bytes32,
+	minObserversMap map[cciptypes.ChainSelector]int,
 ) ([]rmnSignedObservationWithMeta, error) {
-	requestedNodes := make(map[uint64]mapset.Set[NodeID])                   // sourceChain -> requested rmnNodeIDs
-	requestsPerNode := make(map[NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
+	requestedNodes := make(map[uint64]mapset.Set[rmntypes.NodeID])                   // sourceChain -> requested rmnNodeIDs
+	requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
 	// For each lane update request send an observation request to at most 'minObservers' number of rmn nodes.
 	// At this point we can safely assume that we have at least #minObservers supporting each source chain.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
-		requestedNodes[sourceChain] = mapset.NewSet[NodeID]()
+		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
+		minObservers, exist := minObserversMap[cciptypes.ChainSelector(sourceChain)]
+		if !exist {
+			return nil, fmt.Errorf("no min observers for chain %d", sourceChain)
+		}
 
 		for nodeID := range updateRequest.RmnNodes.Iter() {
-			if requestedNodes[sourceChain].Cardinality() >= c.rmnCfg.Remote.MinObservers {
+			if requestedNodes[sourceChain].Cardinality() >= minObservers {
 				break // We have enough initial observers for this source chain.
 			}
 
@@ -209,14 +243,14 @@ func (c *controller) getRmnSignedObservations(
 	requestIDs := c.sendObservationRequests(destChain, requestsPerNode)
 
 	signedObservations, err := c.listenForRmnObservationResponses(
-		ctx, destChain, requestIDs, updateRequestsPerChain, requestedNodes)
+		ctx, destChain, requestIDs, updateRequestsPerChain, requestedNodes, configDigest, minObserversMap)
 	if err != nil {
 		return nil, fmt.Errorf("listen for rmn observation responses: %w", err)
 	}
 
 	// Sanity check that we got enough signed observations for every source chain.
 	// In practice this should never happen, an error must have been received earlier.
-	if !gotSufficientObservationResponses(updateRequestsPerChain, signedObservations, c.rmnCfg.Remote.MinObservers) {
+	if !gotSufficientObservationResponses(updateRequestsPerChain, signedObservations, minObserversMap) {
 		return nil, fmt.Errorf("not enough signed observations after sanity check")
 	}
 
@@ -227,7 +261,7 @@ func (c *controller) getRmnSignedObservations(
 // If a specific request fails, it is logged and not included in the returned requestIDs mapping.
 func (c *controller) sendObservationRequests(
 	destChain *rmnpb.LaneDest,
-	requestsPerNode map[NodeID][]*rmnpb.FixedDestLaneUpdateRequest,
+	requestsPerNode map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest,
 ) (requestIDs mapset.Set[uint64]) {
 	requestIDs = mapset.NewSet[uint64]()
 
@@ -268,7 +302,9 @@ func (c *controller) listenForRmnObservationResponses(
 	destChain *rmnpb.LaneDest,
 	requestIDs mapset.Set[uint64],
 	lursPerChain map[uint64]updateRequestWithMeta,
-	requestedNodes map[uint64]mapset.Set[NodeID],
+	requestedNodes map[uint64]mapset.Set[rmntypes.NodeID],
+	configDigest cciptypes.Bytes32,
+	minObserversMap map[cciptypes.ChainSelector]int,
 ) ([]rmnSignedObservationWithMeta, error) {
 	c.lggr.Infow("listening for RMN observation responses", "requestIDs", requestIDs.String())
 
@@ -295,9 +331,8 @@ func (c *controller) listenForRmnObservationResponses(
 				resp.RMNNodeID,
 				lursPerChain,
 				destChain,
-				c.rmnCfg.Home.ConfigDigest,
+				configDigest,
 			)
-
 			if err != nil {
 				c.lggr.Warnw("skipping an invalid RMN observation response", "err", err)
 				initialObservationRequestTimer.Reset(0) // immediately schedule the additional requests
@@ -309,7 +344,7 @@ func (c *controller) listenForRmnObservationResponses(
 			}
 
 			allChainsHaveEnoughResponses := gotSufficientObservationResponses(
-				lursPerChain, rmnObservationResponses, c.rmnCfg.Remote.MinObservers)
+				lursPerChain, rmnObservationResponses, minObserversMap)
 			if allChainsHaveEnoughResponses {
 				c.lggr.Infof("all chains have enough observation responses with matching roots")
 				return rmnObservationResponses, nil
@@ -327,7 +362,7 @@ func (c *controller) listenForRmnObservationResponses(
 			timerExpired = true
 
 			c.lggr.Warn("sending additional RMN observation requests")
-			requestsPerNode := make(map[NodeID][]*rmnpb.FixedDestLaneUpdateRequest)
+			requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest)
 			for sourceChain, updateReq := range lursPerChain {
 				for _, nodeID := range randomShuffle(updateReq.RmnNodes.ToSlice()) {
 					if requestedNodes[sourceChain].Contains(nodeID) {
@@ -350,7 +385,7 @@ func (c *controller) listenForRmnObservationResponses(
 func gotSufficientObservationResponses(
 	updateRequests map[uint64]updateRequestWithMeta,
 	rmnObservationResponses []rmnSignedObservationWithMeta,
-	minObservers int,
+	minObserversMap map[cciptypes.ChainSelector]int,
 ) bool {
 	merkleRootsCount := make(map[uint64]map[cciptypes.Bytes32]int)
 	for _, signedObs := range rmnObservationResponses {
@@ -368,6 +403,10 @@ func gotSufficientObservationResponses(
 		if !ok || len(countsPerRoot) == 0 {
 			return false
 		}
+		minObservers, exists := minObserversMap[cciptypes.ChainSelector(sourceChain)]
+		if !exists {
+			return false
+		}
 
 		values := maps.Values(countsPerRoot)
 		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
@@ -382,7 +421,7 @@ func gotSufficientObservationResponses(
 // nolint:gocyclo // todo
 func (c *controller) validateSignedObservationResponse(
 	parsedResp *rmnpb.Response,
-	rmnNodeID NodeID,
+	rmnNodeID rmntypes.NodeID,
 	lurs map[uint64]updateRequestWithMeta,
 	destChain *rmnpb.LaneDest,
 	rmnHomeConfigDigest cciptypes.Bytes32,
@@ -392,7 +431,7 @@ func (c *controller) validateSignedObservationResponse(
 		return fmt.Errorf("got an unexpected type of response %T", parsedResp.Response)
 	}
 
-	rmnNode, exists := c.getRmnNodeByID(rmnNodeID)
+	rmnNode, exists := c.getHomeNodeByID(rmnHomeConfigDigest, rmnNodeID)
 	if !exists {
 		return fmt.Errorf("rmn node %d not found", rmnNodeID)
 	}
@@ -450,6 +489,7 @@ func (c *controller) getRmnReportSignatures(
 	destChain *rmnpb.LaneDest,
 	rmnSignedObservations []rmnSignedObservationWithMeta,
 	updatesPerChain map[uint64]updateRequestWithMeta,
+	rmnRemoteCfg rmntypes.RemoteConfig,
 ) (*ReportSignatures, error) {
 	// At this point we might have multiple signedObservations for different nodes but never for the same source chain
 	// from the same node.
@@ -495,12 +535,12 @@ func (c *controller) getRmnReportSignatures(
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               c.rmnCfg.Home.RmnReportVersion,
+		ReportVersion:               rmnRemoteCfg.RmnReportVersion.String(),
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(destChainInfo.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(destChain.DestChainSelector),
-		RmnRemoteContractAddress:    c.rmnCfg.Remote.ContractAddress,
+		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,
 		OfframpAddress:              destChain.OfframpAddress,
-		RmnHomeContractConfigDigest: c.rmnCfg.Home.ConfigDigest,
+		RmnHomeContractConfigDigest: rmnRemoteCfg.ConfigDigest,
 		LaneUpdates:                 laneUpdates,
 	}
 
@@ -512,19 +552,30 @@ func (c *controller) getRmnReportSignatures(
 	reportSigReq := &rmnpb.ReportSignatureRequest{
 		Context: &rmnpb.ReportContext{
 			EvmDestChainId:              chainInfo.EvmChainID,
-			RmnRemoteContractAddress:    c.rmnCfg.Remote.ContractAddress,
-			RmnHomeContractConfigDigest: c.rmnCfg.Home.ConfigDigest[:],
+			RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,
+			RmnHomeContractConfigDigest: rmnRemoteCfg.ConfigDigest[:],
 			LaneDest:                    destChain,
 		},
 		AttributedSignedObservations: transformAndSortObservations(rmnSignedObservations),
 	}
-
-	requestIDs, signersRequested, err := c.sendReportSignatureRequest(reportSigReq)
+	minSigners := rmnRemoteCfg.MinSigners
+	signers := rmnRemoteCfg.Signers
+	requestIDs, signersRequested, err := c.sendReportSignatureRequest(
+		reportSigReq,
+		signers,
+		int(minSigners))
 	if err != nil {
 		return nil, fmt.Errorf("send report signature request: %w", err)
 	}
 
-	ecdsaSignatures, err := c.listenForRmnReportSignatures(ctx, requestIDs, rmnReport, reportSigReq, signersRequested)
+	ecdsaSignatures, err := c.listenForRmnReportSignatures(
+		ctx,
+		requestIDs,
+		rmnReport,
+		reportSigReq,
+		signersRequested,
+		signers,
+		int(minSigners))
 	if err != nil {
 		return nil, fmt.Errorf("listen for rmn report signatures: %w", err)
 	}
@@ -597,19 +648,19 @@ func getMostVotedRootsFromObservations(
 
 // sendReportSignatureRequest sends the report signature request to #minSigners random RMN nodes.
 // If not enough requests were sent, it returns an error.
-func (c *controller) sendReportSignatureRequest(reportSigReq *rmnpb.ReportSignatureRequest) (
-	requestIDs mapset.Set[uint64], signersRequested mapset.Set[NodeID], err error) {
+func (c *controller) sendReportSignatureRequest(
+	reportSigReq *rmnpb.ReportSignatureRequest,
+	remoteSigners []rmntypes.RemoteSignerInfo,
+	minSigners int,
+) (
+	requestIDs mapset.Set[uint64], signersRequested mapset.Set[rmntypes.NodeID], err error) {
 	requestIDs = mapset.NewSet[uint64]()
-	signersRequested = mapset.NewSet[NodeID]()
+	signersRequested = mapset.NewSet[rmntypes.NodeID]()
 
 	// Send the report signature request to at least minSigners
-	for _, node := range randomShuffle(c.rmnCfg.Home.RmnNodes) {
-		if requestIDs.Cardinality() >= c.rmnCfg.Remote.MinSigners {
+	for _, node := range randomShuffle(remoteSigners) {
+		if requestIDs.Cardinality() >= minSigners {
 			break
-		}
-
-		if !node.IsSigner {
-			continue
 		}
 
 		req := &rmnpb.Request{
@@ -619,19 +670,19 @@ func (c *controller) sendReportSignatureRequest(reportSigReq *rmnpb.ReportSignat
 			},
 		}
 
-		c.lggr.Infow("sending report signature request", "node", node.ID, "requestID", req.RequestId)
+		c.lggr.Infow("sending report signature request", "node", node.NodeIndex, "requestID", req.RequestId)
 
-		err := c.marshalAndSend(req, node.ID)
+		err := c.marshalAndSend(req, rmntypes.NodeID(node.NodeIndex))
 		if err != nil {
-			c.lggr.Warnw("failed to send report signature request", "node", node.ID, "err", err)
+			c.lggr.Warnw("failed to send report signature request", "node", node.NodeIndex, "err", err)
 			continue
 		}
 
 		requestIDs.Add(req.RequestId)
-		signersRequested.Add(node.ID)
+		signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
 	}
 
-	if requestIDs.Cardinality() < c.rmnCfg.Remote.MinSigners {
+	if requestIDs.Cardinality() < minSigners {
 		return requestIDs, signersRequested, fmt.Errorf("not able to send to enough report signers")
 	}
 	return requestIDs, signersRequested, nil
@@ -650,7 +701,9 @@ func (c *controller) listenForRmnReportSignatures(
 	requestIDs mapset.Set[uint64],
 	rmnReport cciptypes.RMNReport,
 	reportSigReq *rmnpb.ReportSignatureRequest,
-	signersRequested mapset.Set[NodeID],
+	signersRequested mapset.Set[rmntypes.NodeID],
+	signers []rmntypes.RemoteSignerInfo,
+	minSigners int,
 ) ([]*rmnpb.EcdsaSignature, error) {
 	tReportsInitialRequest := time.NewTimer(c.reportsInitialRequestTimerDuration)
 	timerExpired := false
@@ -670,7 +723,7 @@ func (c *controller) listenForRmnReportSignatures(
 			}
 			finishedRequests.Add(responseTyp.RequestId)
 
-			reportSig, err := c.validateReportSigResponse(ctx, responseTyp, resp.RMNNodeID, rmnReport)
+			reportSig, err := c.validateReportSigResponse(ctx, responseTyp, resp.RMNNodeID, signers, rmnReport)
 			if err != nil {
 				c.lggr.Warnw("skipping an invalid RMN report signature response", "err", err)
 				tReportsInitialRequest.Reset(0) // schedule additional requests if any
@@ -679,7 +732,7 @@ func (c *controller) listenForRmnReportSignatures(
 				reportSigs = append(reportSigs, *reportSig)
 			}
 
-			if len(reportSigs) >= c.rmnCfg.Remote.MinSigners {
+			if len(reportSigs) >= minSigners {
 				c.lggr.Infof("got enough RMN report signatures")
 				return sortAndParseReportSigs(reportSigs), nil
 			}
@@ -696,8 +749,8 @@ func (c *controller) listenForRmnReportSignatures(
 
 			c.lggr.Warnw("sending additional RMN signature requests")
 
-			for _, node := range randomShuffle(c.rmnCfg.Home.RmnNodes) {
-				if !node.IsSigner || signersRequested.Contains(node.ID) {
+			for _, node := range randomShuffle(signers) {
+				if signersRequested.Contains(rmntypes.NodeID(node.NodeIndex)) {
 					continue
 				}
 				req := &rmnpb.Request{
@@ -707,13 +760,13 @@ func (c *controller) listenForRmnReportSignatures(
 					},
 				}
 
-				c.lggr.Infow("sending report signature request", "node", node.ID, "requestID", req.RequestId)
-				if err := c.marshalAndSend(req, node.ID); err != nil {
-					c.lggr.Errorw("failed to send report signature request", "node", node.ID, "err", err)
+				c.lggr.Infow("sending report signature request", "node", node.NodeIndex, "requestID", req.RequestId)
+				if err := c.marshalAndSend(req, rmntypes.NodeID(node.NodeIndex)); err != nil {
+					c.lggr.Errorw("failed to send report signature request", "node", node.NodeIndex, "err", err)
 					continue
 				}
 				requestIDs.Add(req.RequestId)
-				signersRequested.Add(node.ID)
+				signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
 			}
 		case <-ctx.Done():
 			return nil, ErrTimeout
@@ -738,10 +791,11 @@ func sortAndParseReportSigs(reportSigs []reportSigWithSignerAddress) []*rmnpb.Ec
 func (c *controller) validateReportSigResponse(
 	ctx context.Context,
 	responseTyp *rmnpb.Response,
-	nodeID NodeID,
+	nodeID rmntypes.NodeID,
+	signers []rmntypes.RemoteSignerInfo,
 	rmnReport cciptypes.RMNReport,
 ) (*reportSigWithSignerAddress, error) {
-	rmnNode, exists := c.getRmnNodeByID(nodeID)
+	signerNode, exists := c.getSignerNodeByID(signers, nodeID)
 	if !exists {
 		return nil, fmt.Errorf("rmn node %d not found", nodeID)
 	}
@@ -760,7 +814,7 @@ func (c *controller) validateReportSigResponse(
 		ctx,
 		[]cciptypes.RMNECDSASignature{*sig},
 		rmnReport,
-		[]cciptypes.Bytes{rmnNode.SignReportsAddress},
+		[]cciptypes.Bytes{signerNode.OnchainPublicKey},
 	)
 
 	if err != nil {
@@ -769,30 +823,48 @@ func (c *controller) validateReportSigResponse(
 
 	return &reportSigWithSignerAddress{
 		reportSig:     reportSig,
-		signerAddress: rmnNode.SignReportsAddress,
+		signerAddress: signerNode.OnchainPublicKey,
 	}, nil
 }
 
-func (c *controller) getRmnNodeByID(nodeID NodeID) (RMNNodeInfo, bool) {
-	for _, node := range c.rmnCfg.Home.RmnNodes {
+func (c *controller) getHomeNodeByID(
+	configDigest cciptypes.Bytes32,
+	nodeID rmntypes.NodeID) (rmntypes.HomeNodeInfo, bool) {
+	rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(configDigest)
+	if err != nil {
+		return rmntypes.HomeNodeInfo{}, false
+	}
+
+	for _, node := range rmnNodes {
 		if node.ID == nodeID {
 			return node, true
 		}
 	}
-	return RMNNodeInfo{}, false
+	return rmntypes.HomeNodeInfo{}, false
+}
+
+func (c *controller) getSignerNodeByID(
+	rmnNodes []rmntypes.RemoteSignerInfo,
+	nodeID rmntypes.NodeID) (rmntypes.RemoteSignerInfo, bool) {
+	for _, node := range rmnNodes {
+		if rmntypes.NodeID(node.NodeIndex) == nodeID {
+			return node, true
+		}
+	}
+	return rmntypes.RemoteSignerInfo{}, false
 }
 
 type updateRequestWithMeta struct {
 	Data     *rmnpb.FixedDestLaneUpdateRequest
-	RmnNodes mapset.Set[NodeID]
+	RmnNodes mapset.Set[rmntypes.NodeID]
 }
 
 type rmnSignedObservationWithMeta struct {
 	SignedObservation *rmnpb.SignedObservation
-	RMNNodeID         NodeID
+	RMNNodeID         rmntypes.NodeID
 }
 
-func (c *controller) marshalAndSend(req *rmnpb.Request, nodeID NodeID) error {
+func (c *controller) marshalAndSend(req *rmnpb.Request, nodeID rmntypes.NodeID) error {
 	reqBytes, err := proto.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("proto marshal RMN request: %w", err)

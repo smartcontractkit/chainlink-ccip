@@ -49,7 +49,6 @@ type Plugin struct {
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
-	rmnConfig           rmn.Config
 
 	// state
 	contractsInitialized bool
@@ -70,7 +69,6 @@ func NewPlugin(
 	homeChain reader.HomeChain,
 	rmnHomeReader reader.RMNHome,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	rmnConfig rmn.Config,
 ) *Plugin {
 	lggr = logger.Named(lggr, "CommitPlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
@@ -102,7 +100,6 @@ func NewPlugin(
 		chainSupport,
 		rmn.Controller(nil),      // todo
 		cciptypes.RMNCrypto(nil), // todo
-		rmnConfig,
 		rmnHomeReader,
 	)
 
@@ -153,7 +150,6 @@ func NewPlugin(
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
-		rmnConfig:           rmnConfig,
 	}
 }
 
