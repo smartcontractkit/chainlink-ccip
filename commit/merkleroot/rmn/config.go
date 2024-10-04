@@ -34,8 +34,6 @@ type RMNNodeInfo struct {
 	IsSigner                  bool
 	SignReportsAddress        cciptypes.Bytes
 	SignObservationsPublicKey *ed25519.PublicKey // offChainPublicKey
-	// TODO: clarify this field
-	SignObservationPrefix string // e.g. "chainlink ccip 1.6 rmn observation"
 }
 
 type NodeID uint32

@@ -14,12 +14,13 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
@@ -65,7 +66,6 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 				IsSigner:                  true,
 				SignReportsAddress:        cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
 				SignObservationsPublicKey: &publicKey,
-				SignObservationPrefix:     "chainlink ccip 1.6 rmn observation",
 			}
 		}
 

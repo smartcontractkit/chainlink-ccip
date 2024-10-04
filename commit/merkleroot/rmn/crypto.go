@@ -33,6 +33,7 @@ func (ED25519VerifierImpl) Verify(publicKey ed25519.PublicKey, message, sig []by
 //	e.g. ed25519.sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
 func verifyObservationSignature(
 	rmnNode RMNNodeInfo,
+	signedObservationPrefix string,
 	signedObs *rmnpb.SignedObservation,
 	verifier ED25519Verifier,
 ) error {
@@ -42,7 +43,7 @@ func verifyObservationSignature(
 	}
 
 	observationBytesSha256 := sha256.Sum256(observationBytes)
-	msg := append([]byte(rmnNode.SignObservationPrefix), observationBytesSha256[:]...)
+	msg := append([]byte(signedObservationPrefix), observationBytesSha256[:]...)
 	msgSha256 := sha256.Sum256(msg)
 
 	isValid := verifier.Verify(*rmnNode.SignObservationsPublicKey, msgSha256[:], signedObs.Signature)
