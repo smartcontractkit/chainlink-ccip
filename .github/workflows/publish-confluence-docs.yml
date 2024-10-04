@@ -15,7 +15,7 @@ jobs:
 
       # TODO: step to lint markdowns under docs/confluence before publishing
 
-      - uses: smartcontractkit/.github/actions/md-confluence-sync@v0.0.1
+      - uses: smartcontractkit/.github/actions/md-confluence-sync@ef7717407a45c59833fe792d6d767bc21d6d1def #v0.0.1
         with:
           files: "docs/confluence/**"
           user: ${{ secrets.CONFLUENCE_USER }}
