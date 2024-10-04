@@ -166,11 +166,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	mockReader := readerpkg_mock.NewMockCCIPReader(t)
-	mockReader.On("Close", mock.Anything).Return(nil)
-
-	lggr := logger.Test(t)
-	p := &Plugin{lggr: lggr, ccipReader: mockReader}
+	p := &Plugin{}
 	require.NoError(t, p.Close())
 }
 

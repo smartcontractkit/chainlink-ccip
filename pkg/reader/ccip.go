@@ -757,10 +757,6 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	return errors.Join(errs...)
 }
 
-func (r *ccipChainReader) Close(ctx context.Context) error {
-	return nil
-}
-
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	bindings := r.contractReaders[chain].GetBindings(contractName)
 	if len(bindings) != 1 {
