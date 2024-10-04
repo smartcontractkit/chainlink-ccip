@@ -5,19 +5,21 @@ import (
 	"time"
 
 	sel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 func Test_USDC_Transfer(t *testing.T) {
 	ctx := tests.Context(t)
-	randomEthAddress := "0x00000000000000000000000000001234"
+	randomEthAddress := string(rand.RandomAddress())
 
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
