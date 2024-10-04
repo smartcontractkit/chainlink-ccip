@@ -37,8 +37,7 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
-		RMNSignatures:    outcome.MerkleRootOutcome.RMNReportSignatures,
-		RMNMinSignatures: outcome.MerkleRootOutcome.RMNRemoteCfg.MinSigners,
+		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
 	}
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
@@ -63,6 +62,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
+	// TODO: think about how to handle this
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 {
 		// len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
