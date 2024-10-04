@@ -1,0 +1,33 @@
+name: Publish confluence docs
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/confluence/**"
+  workflow_dispatch:
+
+jobs:
+  publish-confluence-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: step to lint markdowns under docs/confluence before publishing
+
+      - uses: smartcontractkit/.github/actions/md-confluence-sync@v0.0.1
+        with:
+          files: "docs/confluence/**"
+          user: ${{ secrets.CONFLUENCE_USER }}
+          token: ${{ secrets.CONFLUENCE_TOKEN }}
+          space: CRIB
+          parent: "Test md-confluence sync" # TODO: adjust once stable
+          base_url: https://smartcontract-it.atlassian.net/wiki/
+          dry-run: true # TODO: switch to false once stable
+          # grafana inputs (optional)
+          metrics-job-name: publish-confluence-docs
+          gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
+          gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
+          gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+
+      # TODO: delete pages that are not in the repo
