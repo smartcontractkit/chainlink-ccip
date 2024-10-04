@@ -39,7 +39,8 @@ const maxReportSizeBytes = 250_000
 type Plugin struct {
 	donID        plugintypes.DonID
 	reportingCfg ocr3types.ReportingPluginConfig
-	cfg          pluginconfig.ExecutePluginConfig
+	offchainCfg  pluginconfig.ExecuteOffchainConfig
+	destChain    cciptypes.ChainSelector
 
 	// providers
 	ccipReader  readerpkg.CCIPReader
@@ -61,7 +62,8 @@ type Plugin struct {
 func NewPlugin(
 	donID plugintypes.DonID,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	cfg pluginconfig.ExecutePluginConfig,
+	offchainCfg pluginconfig.ExecuteOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader readerpkg.CCIPReader,
 	reportCodec cciptypes.ExecutePluginCodec,
@@ -78,7 +80,8 @@ func NewPlugin(
 	return &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
-		cfg:               cfg,
+		offchainCfg:       offchainCfg,
+		destChain:         destChain,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		ccipReader:        ccipReader,
 		reportCodec:       reportCodec,
@@ -93,7 +96,7 @@ func NewPlugin(
 			lggr,
 			&ccipReader,
 			homeChain,
-			cfg.DestChain,
+			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
 		),
@@ -205,7 +208,7 @@ func (p *Plugin) Observation(
 	p.lggr.Debugw("Execute plugin performing observation", "state", state)
 	switch state {
 	case exectypes.GetCommitReports:
-		fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
+		fetchFrom := time.Now().Add(-p.offchainCfg.MessageVisibilityInterval.Duration()).UTC()
 
 		// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
 		//          a valid execution report.
@@ -214,7 +217,7 @@ func (p *Plugin) Observation(
 			return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 		}
 		if supportsDest {
-			groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, fetchFrom, p.lggr)
+			groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, p.lggr)
 			if err != nil {
 				return types.Observation{}, err
 			}
@@ -299,7 +302,7 @@ func (p *Plugin) Observation(
 			}
 
 			for _, msg := range commitReport.Messages {
-				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
+				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.destChain))
 				nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
 			}
 		}
@@ -309,7 +312,7 @@ func (p *Plugin) Observation(
 		for srcChain, addrSet := range nonceRequestArgs {
 			// TODO: check if srcSelector is supported.
 			addrs := maps.Keys(addrSet)
-			nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.cfg.DestChain, addrs)
+			nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.destChain, addrs)
 			if err != nil {
 				return types.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
 			}
@@ -438,7 +441,7 @@ func (p *Plugin) Outcome(
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
 	}
 
-	observation, err := getConsensusObservation(p.lggr, decodedAos, p.cfg.DestChain, p.reportingCfg.F, fChain)
+	observation, err := getConsensusObservation(p.lggr, decodedAos, p.destChain, p.reportingCfg.F, fChain)
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
 	}
@@ -497,9 +500,9 @@ func (p *Plugin) Outcome(
 			p.reportCodec,
 			p.estimateProvider,
 			observation.Nonces,
-			p.cfg.DestChain,
+			p.destChain,
 			uint64(maxReportSizeBytes),
-			p.cfg.OffchainConfig.BatchGasLimit,
+			p.offchainCfg.BatchGasLimit,
 		)
 		outcomeReports, commitReports, err := selectReport(
 			p.lggr,
@@ -650,7 +653,7 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return chains.Contains(p.cfg.DestChain), nil
+	return chains.Contains(p.destChain), nil
 }
 
 // Interface compatibility checks.
