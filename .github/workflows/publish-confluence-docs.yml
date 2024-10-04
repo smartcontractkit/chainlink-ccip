@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - "docs/confluence/**"
+    workflow_dispatch:  
 
 jobs:
   publish-confluence-docs:
