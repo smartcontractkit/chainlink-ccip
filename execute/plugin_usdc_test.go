@@ -4,12 +4,11 @@ import (
 	"testing"
 	"time"
 
-	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
+	sel "github.com/smartcontractkit/chain-selectors"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
@@ -81,7 +80,8 @@ func Test_USDC_Transfer(t *testing.T) {
 	// Messages 102-104 are executed, 105 doesn't have token data ready
 	outcome = runner.MustRunRound(ctx, t)
 	require.NoError(t, err)
-	sequenceNumbers := extractSequenceNumbers(outcome)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104})
 	//Attestation data added to the USDC
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
@@ -98,7 +98,8 @@ func Test_USDC_Transfer(t *testing.T) {
 		outcome = runner.MustRunRound(ctx, t)
 	}
 
-	sequenceNumbers = extractSequenceNumbers(outcome)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 	//Attestation data added to the both USDC messages
 	require.NotEmpty(t, outcome.Report.ChainReports[0].OffchainTokenData[2])
