@@ -29,9 +29,6 @@ jobs:
       - name: Notify the team by commenting on latest commit
         if: failure()
         run: |
-          COMMIT_SHA=$(git rev-parse HEAD)
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/commits/$COMMIT_SHA/comments \
-            -d '{"body":"@smartcontractkit/ccip-offchain flaky tests were detected, please check."}'
+          response=$(curl -X POST -H 'Content-type: application/json' \
+            --data '{"text": "Flaky tests detected in chainlink-ccip repository.", "channel": "#ccip-pod-offchain"}' \
+              ${{ secrets.SLACK_WEBHOOK_URL }})
