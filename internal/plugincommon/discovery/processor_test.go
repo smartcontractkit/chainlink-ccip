@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	mock_home_chain "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
@@ -239,9 +238,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 			source1: []byte("feeQuoter1"),
 			source2: []byte("feeQuoter2"),
 		},
-		consts.ContractNameRouter: map[cciptypes.ChainSelector][]byte{
-			dest: []byte("dest_router"),
-		},
+		consts.ContractNameRouter: {},
 	}
 	mockReader.
 		EXPECT().
@@ -271,10 +268,6 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 			consts.ContractNameFeeQuoter: {
 				source1: expectedContracts[consts.ContractNameFeeQuoter][source1],
 				source2: expectedContracts[consts.ContractNameFeeQuoter][source2],
-			},
-			consts.ContractNameRouter: {
-				source1: expectedContracts[consts.ContractNameRouter][dest],
-				source2: expectedContracts[consts.ContractNameRouter][dest],
 			},
 		},
 	}
@@ -325,8 +318,10 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
+		consts.ContractNameRouter: {
+			dest: []byte("router"),
+		},
 		consts.ContractNameFeeQuoter: {}, // no consensus
-		consts.ContractNameRouter:    {}, // no consensus
 	}
 	mockReader.
 		EXPECT().
@@ -346,10 +341,6 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 	fChainObs := discoverytypes.Observation{
 		FChain: expectedFChain,
 		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
-			consts.ContractNameRouter: {
-				source1: []byte("router"),
-				source2: []byte("router"),
-			},
 			consts.ContractNameFeeQuoter: {
 				source1: []byte("fee_quoter_1"),
 				source2: []byte("fee_quoter_2"),
@@ -365,6 +356,9 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 			},
 			consts.ContractNameRMNRemote: {
 				dest: expectedRMNRemote,
+			},
+			consts.ContractNameRouter: {
+				dest: []byte("router"),
 			},
 		},
 	}
@@ -674,71 +668,4 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), fmt.Sprintf("oracle %d is not allowed to observe chain %s", ao.OracleID, cdp.dest))
-}
-
-func Test_getRouterConsensus(t *testing.T) {
-	tests := []struct {
-		name        string
-		routerAddrs map[cciptypes.ChainSelector][][]byte
-		want        []byte
-		err         string
-	}{
-		{
-			name: "no inputs",
-			err:  "no consensus on router",
-		},
-		{
-			name: "total agreement",
-			routerAddrs: map[cciptypes.ChainSelector][][]byte{
-				1: {{1, 2, 3}, {1, 2, 3}},
-				2: {{1, 2, 3}, {1, 2, 3}},
-				3: {{1, 2, 3}, {1, 2, 3}},
-			},
-			want: []byte{1, 2, 3},
-		},
-		{
-			name: "threshold 2 not reached",
-			routerAddrs: map[cciptypes.ChainSelector][][]byte{
-				1: {{1, 2, 3}},
-				2: {{1, 2, 3}},
-				3: {{1, 2, 3}},
-			},
-			err: "no consensus on router, routerAddrs",
-		},
-		{
-			name: "3 way tie",
-			routerAddrs: map[cciptypes.ChainSelector][][]byte{
-				1: {{1, 1, 1}, {1, 1, 1}},
-				2: {{2, 2, 2}, {2, 2, 2}},
-				3: {{3, 3, 3}, {3, 3, 3}},
-			},
-			err: "no consensus on router, there is a tie multiple routers were seen 1 times",
-		},
-		{
-			name: "majority",
-			routerAddrs: map[cciptypes.ChainSelector][][]byte{
-				1: {{1, 1, 1}, {1, 1, 1}},
-				2: {{2, 2, 2}, {2, 2, 2}},
-				3: {{1, 1, 1}, {1, 1, 1}},
-			},
-			want: []byte{1, 1, 1},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			lggr := logger.Test(t)
-
-			thresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](2)
-			got, err := getOnRampDestRouterConsensus(lggr, tt.routerAddrs, thresh)
-			if tt.err != "" {
-				assert.ErrorContains(t, err, tt.err)
-				return
-			}
-
-			require.NoError(t, err)
-			assert.Equalf(t, tt.want, got, "getOnRampDestRouterConsensus(...)")
-		})
-	}
 }

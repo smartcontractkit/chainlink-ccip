@@ -183,54 +183,6 @@ func aggregateObservations(
 	return obs
 }
 
-// getOnRampDestRouterConsensus figures out a single dest router address from the multiple observed addresses from
-// multiple offramp source chain configurations. This happens in two phases:
-//  1. get consensus on the router address for each offRamp source chain config according the threshold (2*fChain+1).
-//  2. with consensus across the source chains, select whichever address was observed the most times.
-//     * if there is a tie, return an error.
-//
-// For a typical configuration, we expect all source chains to report the same destination router address.
-// See https://github.com/smartcontractkit/chainlink/blob/05c8b45da51340aa9575ac909486decc9c164792/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L105
-//
-//nolint:lll // it's a url
-func getOnRampDestRouterConsensus(
-	lggr logger.Logger,
-	routerAddrs map[cciptypes.ChainSelector][][]byte,
-	thresh consensus.MultiThreshold[cciptypes.ChainSelector],
-) ([]byte, error) {
-	routerConsensus := consensus.GetConsensusMap(
-		lggr,
-		"router",
-		routerAddrs,
-		thresh,
-	)
-	// All the routers in routerAddrs are "valid", but we can only choose one.
-	routerCounts := make(map[string]int)
-	for _, addr := range routerConsensus {
-		routerCounts[string(addr)]++
-	}
-	var tied bool
-	var maxCount int
-	var address []byte
-	for addr, count := range routerCounts {
-		if count > maxCount {
-			maxCount = count
-			tied = false
-			address = []byte(addr)
-		} else if count == maxCount {
-			tied = true
-		}
-	}
-	if tied {
-		return nil, fmt.Errorf("no consensus on router, there is a tie multiple routers were seen %d times: %v, %v",
-			maxCount, routerCounts, routerConsensus)
-	}
-	if maxCount == 0 {
-		return nil, fmt.Errorf("no consensus on router, routerAddrs: %v", routerAddrs)
-	}
-	return address, nil
-}
-
 // isZero returns true if data is nil or all zeros, otherwise returns false.
 func isZero(data []byte) bool {
 	for _, v := range data {
@@ -323,26 +275,21 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
 	// Router address consensus
-	contracts[consts.ContractNameRouter] = map[cciptypes.ChainSelector][]byte{}
-	routerAddr, err := getOnRampDestRouterConsensus(cdp.lggr, agg.routerAddrs, fChainThresh)
-	if err != nil {
-		cdp.lggr.Warnw("Unable to reach consensus on router address",
-			"RouterAddrs", agg.routerAddrs,
-			"fChainThresh", fChainThresh,
-			"err", err,
-		)
-	} else {
-		cdp.lggr.Infow("Determined consensus Router",
-			"RouterConsensus", routerAddr,
-			"RouterAddrs", agg.routerAddrs,
-			"fChainThresh", fChainThresh,
-		)
-		if len(routerAddr) == 0 {
-			cdp.lggr.Warnw("No consensus on router, routerConsensus map is empty")
-		} else {
-			contracts[consts.ContractNameRouter][cdp.dest] = routerAddr
-		}
+	routerConsensus := consensus.GetConsensusMap(
+		cdp.lggr,
+		"router",
+		agg.routerAddrs,
+		fChainThresh,
+	)
+	cdp.lggr.Infow("Determined consensus router",
+		"routerConsensus", routerConsensus,
+		"routerAddrs", agg.routerAddrs,
+		"fChainThresh", fChainThresh,
+	)
+	if len(routerConsensus) == 0 {
+		cdp.lggr.Warnw("No consensus on router, routerConsensus map is empty")
 	}
+	contracts[consts.ContractNameRouter] = routerConsensus
 
 	// call Sync to bind contracts.
 	if err := (*cdp.reader).Sync(ctx, contracts); err != nil {
