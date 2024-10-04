@@ -68,6 +68,8 @@ var (
 // GetHTTPClient returns a singleton instance of the httpClient for the given API URL.
 // It's critical to reuse existing clients because of the self-rate limiting mechanism. Being rate limited by
 // Circle comes with a long cool down period, so we should always self-rate limit before hitting the API rate limit.
+// IMPORTANT: In the loop world this might require major rework - e.g. making httpClient a loop plugin to
+// enforce the singleton pattern.
 func GetHTTPClient(
 	lggr logger.Logger,
 	api string,
