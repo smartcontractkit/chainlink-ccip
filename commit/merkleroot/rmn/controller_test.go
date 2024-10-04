@@ -52,7 +52,6 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ctx := tests.Context(t)
 		resChan := make(chan PeerResponse, 200)
 		peerClient := newMockPeerClient(resChan)
-		// signObservationPrefix := "chainlink ccip 1.6 rmn observation"
 
 		const numNodes = 4
 		rmnNodes := make([]RMNNodeInfo, numNodes)
