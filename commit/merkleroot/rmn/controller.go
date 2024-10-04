@@ -16,10 +16,11 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
@@ -67,6 +68,9 @@ type ReportSignatures struct {
 type controller struct {
 	lggr logger.Logger
 
+	// signObservationPrefix is the prefix used to sign the observation.
+	signObservationPrefix string
+
 	// rmnCrypto contains the chain-specific crypto functions required by the RMN controller to verify signatures.
 	rmnCrypto cciptypes.RMNCrypto
 
@@ -91,6 +95,7 @@ type controller struct {
 func NewController(
 	lggr logger.Logger,
 	rmnCrypto cciptypes.RMNCrypto,
+	signObservationPrefix string,
 	peerClient PeerClient,
 	rmnConfig Config,
 	observationsInitialRequestTimerDuration time.Duration,
@@ -99,6 +104,7 @@ func NewController(
 	return &controller{
 		lggr:                                    lggr,
 		rmnCrypto:                               rmnCrypto,
+		signObservationPrefix:                   signObservationPrefix,
 		peerClient:                              peerClient,
 		rmnCfg:                                  rmnConfig,
 		ed25519Verifier:                         NewED25519Verifier(),
@@ -433,7 +439,7 @@ func (c *controller) validateSignedObservationResponse(
 		}
 	}
 
-	if err := verifyObservationSignature(rmnNode, signedObs, c.ed25519Verifier); err != nil {
+	if err := verifyObservationSignature(rmnNode, c.signObservationPrefix, signedObs, c.ed25519Verifier); err != nil {
 		return fmt.Errorf("failed to verify observation signature: %w", err)
 	}
 	return nil

@@ -25,6 +25,7 @@ const (
 	defaultMaxReportTransmissionCheckAttempts = 5
 	defaultRMNEnabled                         = false
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
+	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 )
 
 type FeeInfo struct {
@@ -113,6 +114,9 @@ type CommitOffchainConfig struct {
 	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
 	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
 	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
+
+	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
+	SignObservationPrefix string `json:"signObservationPrefix"`
 }
 
 func (c *CommitOffchainConfig) applyDefaults() {
@@ -134,6 +138,10 @@ func (c *CommitOffchainConfig) applyDefaults() {
 
 	if c.RemoteGasPriceBatchWriteFrequency.Duration() == 0 {
 		c.RemoteGasPriceBatchWriteFrequency = *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency)
+	}
+
+	if c.SignObservationPrefix == "" {
+		c.SignObservationPrefix = defaultSignObservationPrefix
 	}
 }
 
@@ -172,6 +180,10 @@ func (c *CommitOffchainConfig) Validate() error {
 
 	if c.MaxMerkleTreeSize == 0 {
 		return fmt.Errorf("maxMerkleTreeSize not set")
+	}
+
+	if c.SignObservationPrefix == "" {
+		return fmt.Errorf("signObservationPrefix not set")
 	}
 
 	return nil
