@@ -116,18 +116,41 @@ func (c *compositeTokenDataObserver) Observe(
 	msgObservations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
 	tokenDataObservations := c.initTokenDataObservations(msgObservations)
+	// Terminate immediately if there are no observers
+	if len(c.observers) == 0 {
+		return tokenDataObservations, nil
+	}
+
+	resultsCh := make(chan exectypes.TokenDataObservations, len(c.observers))
+	defer close(resultsCh)
 
 	for _, ob := range c.observers {
-		tokenData, err := ob.Observe(ctx, msgObservations)
-		if err != nil {
-			c.lggr.Error("Error while observing token data", "error", err)
-			continue
-		}
-		tokenDataObservations, err = merge(tokenDataObservations, tokenData)
-		if err != nil {
-			return nil, err
+		go func(ob *TokenDataObserver) {
+			tokenData, err := (*ob).Observe(ctx, msgObservations)
+			// Best effort, if one observer fails we still want to process the rest of tokens
+			if err != nil {
+				c.lggr.Errorw("Error while observing token data", "error", err)
+				tokenData = exectypes.TokenDataObservations{}
+			}
+			resultsCh <- tokenData
+		}(&ob)
+	}
+
+	for i := 0; i < len(c.observers); i++ {
+		select {
+		case tokenData := <-resultsCh:
+			var err error
+			tokenDataObservations, err = merge(tokenDataObservations, tokenData)
+			if err != nil {
+				return nil, fmt.Errorf("merging token data together failed: %w", err)
+			}
+		case <-ctx.Done():
+			// Return whatever was processed so far when context is canceled
+			c.lggr.Errorw("Context cancelled while waiting for token observers", "error", ctx.Err())
+			return tokenDataObservations, nil
 		}
 	}
+
 	return tokenDataObservations, nil
 }
 
