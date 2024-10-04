@@ -559,16 +559,16 @@ func Test_CompositeTokenDataObserver_ParallelExecution(t *testing.T) {
 	}
 }
 
-func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) fakeObserver {
-	return fakeObserver{
+func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) *fakeObserver {
+	return &fakeObserver{
 		prefix:          prefix,
 		faulty:          true,
 		supportedTokens: supportedTokens,
 	}
 }
 
-func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) fakeObserver {
-	return fakeObserver{
+func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) *fakeObserver {
+	return &fakeObserver{
 		prefix:          prefix,
 		faulty:          false,
 		supportedTokens: supportedTokens,
@@ -582,12 +582,12 @@ type fakeObserver struct {
 	sleep           time.Duration
 }
 
-func (f fakeObserver) withDelay(sleep time.Duration) fakeObserver {
+func (f *fakeObserver) withDelay(sleep time.Duration) *fakeObserver {
 	f.sleep = sleep
 	return f
 }
 
-func (f fakeObserver) Observe(
+func (f *fakeObserver) Observe(
 	_ context.Context,
 	observations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
@@ -619,7 +619,7 @@ func (f fakeObserver) Observe(
 	return tokenObservations, nil
 }
 
-func (f fakeObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
+func (f *fakeObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
 	tokenAddr, ok := f.supportedTokens[sourceChain]
 	return ok && tokenAddr == msgToken.SourcePoolAddress.String()
 }
