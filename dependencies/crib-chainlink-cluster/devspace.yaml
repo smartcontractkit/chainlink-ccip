@@ -348,7 +348,7 @@ profiles:
               (
                 cd $CHAINLINK_CODE_DIR/chainlink && \
                 nix develop --impure -c \
-                  bash -c "IS_CRIB=true IMAGE=$image goreleaser \
+                  bash -c "IMAGE=$image goreleaser \
                     release --nightly --split --clean --config .goreleaser.devspace.yaml"
               )
       deployments:
@@ -413,7 +413,7 @@ profiles:
               (
                 cd $CHAINLINK_CODE_DIR/ccip && \
                 nix develop --impure -c \
-                  bash -c "IS_CRIB=true IMAGE=$image goreleaser \
+                  bash -c "IMAGE=$image goreleaser \
                     release --nightly --split --clean --config .goreleaser.devspace.yaml"
               )
       deployments:
@@ -654,7 +654,7 @@ profiles:
               (
                 cd $CHAINLINK_CODE_DIR/ccip && \
                 nix develop --impure -c \
-                  bash -c "IS_CRIB=true IMAGE=$image goreleaser \
+                  bash -c "IMAGE=$image goreleaser \
                     release --nightly --split --clean --config .goreleaser.devspace.yaml"
               )
   - name: local-charts

@@ -5,6 +5,7 @@ product="${1:-}"
 
 # List of required environment variables for CORE
 required_vars_common=(
+	"IS_CRIB"
 	"CHAINLINK_CODE_DIR"
 	"DEVSPACE_IMAGE"
 	"DEVSPACE_INGRESS_CIDRS"
