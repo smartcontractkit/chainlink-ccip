@@ -17,7 +17,7 @@ type Query struct {
 }
 
 type Observation struct {
-	MerkleRoots        []cciptypes.MerkleRootChain     `json:"merkleRoots"`
+	MerkleRoots        []cciptypes.MerkleRoot          `json:"merkleRoots"`
 	OnRampMaxSeqNums   []plugintypes.SeqNumChain       `json:"onRampMaxSeqNums"`
 	OffRampNextSeqNums []plugintypes.SeqNumChain       `json:"offRampNextSeqNums"`
 	RMNRemoteConfig    rmntypes.RemoteConfig           `json:"rmnRemoteConfig"`
@@ -35,7 +35,7 @@ func (o Observation) IsEmpty() bool {
 // MerkleAggregatedObservation is the aggregation of a list of observations
 type MerkleAggregatedObservation struct {
 	// A map from chain selectors to the list of merkle roots observed for each chain
-	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain
+	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.MerkleRoot
 
 	// A map from chain selectors to the list of OnRamp max sequence numbers observed for each chain
 	OnRampMaxSeqNums map[cciptypes.ChainSelector][]cciptypes.SeqNum
@@ -53,7 +53,7 @@ type MerkleAggregatedObservation struct {
 // aggregateObservations takes a list of observations and produces an MerkleAggregatedObservation
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) MerkleAggregatedObservation {
 	aggObs := MerkleAggregatedObservation{
-		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
+		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRoot),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		RMNRemoteConfigs:   make([]rmntypes.RemoteConfig, 0),
@@ -64,8 +64,8 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		obs := ao.Observation
 		// MerkleRoots
 		for _, merkleRoot := range obs.MerkleRoots {
-			aggObs.MerkleRoots[merkleRoot.ChainSel] =
-				append(aggObs.MerkleRoots[merkleRoot.ChainSel], merkleRoot)
+			aggObs.MerkleRoots[merkleRoot.SourceChainSelector] =
+				append(aggObs.MerkleRoots[merkleRoot.SourceChainSelector], merkleRoot)
 		}
 
 		// OnRampMaxSeqNums
@@ -98,7 +98,7 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 // ConsensusObservation holds the consensus values for all chains across all observations in a round
 type ConsensusObservation struct {
 	// A map from chain selectors to each chain's consensus merkle root
-	MerkleRoots map[cciptypes.ChainSelector]cciptypes.MerkleRootChain
+	MerkleRoots map[cciptypes.ChainSelector]cciptypes.MerkleRoot
 
 	// A map from chain selectors to each chain's consensus OnRamp max sequence number
 	OnRampMaxSeqNums map[cciptypes.ChainSelector]cciptypes.SeqNum
@@ -127,11 +127,14 @@ const (
 type Outcome struct {
 	OutcomeType                     OutcomeType                   `json:"outcomeType"`
 	RangesSelectedForReport         []plugintypes.ChainRange      `json:"rangesSelectedForReport"`
-	RootsToReport                   []cciptypes.MerkleRootChain   `json:"rootsToReport"`
+	RootsToReport                   []cciptypes.MerkleRoot        `json:"rootsToReport"`
 	OffRampNextSeqNums              []plugintypes.SeqNumChain     `json:"offRampNextSeqNums"`
 	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
 	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
-	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
+	//TODO: Calculate the bitmap
+	// This is a bitmap where ith bit represents how the v value should be for ith signature
+	//RmnRawVs                        *cciptypes.BigInt             `json:"rmnRawVs"`
+	RMNRemoteCfg rmntypes.RemoteConfig `json:"rmnRemoteCfg"`
 }
 
 // Sort all fields of the given Outcome
@@ -140,7 +143,7 @@ func (o *Outcome) Sort() {
 		return o.RangesSelectedForReport[i].ChainSel < o.RangesSelectedForReport[j].ChainSel
 	})
 	sort.Slice(o.RootsToReport, func(i, j int) bool {
-		return o.RootsToReport[i].ChainSel < o.RootsToReport[j].ChainSel
+		return o.RootsToReport[i].SourceChainSelector < o.RootsToReport[j].SourceChainSelector
 	})
 	sort.Slice(o.OffRampNextSeqNums, func(i, j int) bool {
 		return o.OffRampNextSeqNums[i].ChainSel < o.OffRampNextSeqNums[j].ChainSel

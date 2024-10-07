@@ -169,7 +169,7 @@ type Observer interface {
 	ObserveLatestOnRampSeqNums(ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain
 
 	// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
-	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
+	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRoot
 
 	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain
 	ObserveRMNRemoteCfg(ctx context.Context, dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig
@@ -278,7 +278,7 @@ func (o ObserverImpl) ObserveLatestOnRampSeqNums(
 func (o ObserverImpl) ObserveMerkleRoots(
 	ctx context.Context,
 	ranges []plugintypes.ChainRange,
-) []cciptypes.MerkleRootChain {
+) []cciptypes.MerkleRoot {
 
 	supportedChains, err := o.chainSupport.SupportedChains(o.nodeID)
 	if err != nil {
@@ -286,7 +286,7 @@ func (o ObserverImpl) ObserveMerkleRoots(
 		return nil
 	}
 
-	var roots []cciptypes.MerkleRootChain
+	var roots []cciptypes.MerkleRoot
 	rootsMu := &sync.Mutex{}
 	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
@@ -306,10 +306,18 @@ func (o ObserverImpl) ObserveMerkleRoots(
 					return
 				}
 
-				merkleRoot := cciptypes.MerkleRootChain{
-					ChainSel:     chainRange.ChainSel,
-					SeqNumsRange: chainRange.SeqNumRange,
-					MerkleRoot:   root,
+				onRampAddress, err := o.ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainRange.ChainSel)
+				if err != nil {
+					o.lggr.Warnw("discovering onRamp failed", "err", err)
+					return
+				}
+
+				merkleRoot := cciptypes.MerkleRoot{
+					SourceChainSelector: chainRange.ChainSel,
+					MinSeqNr:            chainRange.SeqNumRange.Start(),
+					MaxSeqNr:            chainRange.SeqNumRange.End(),
+					OnRampAddress:       onRampAddress,
+					MerkleRoot:          root,
 				}
 
 				rootsMu.Lock()

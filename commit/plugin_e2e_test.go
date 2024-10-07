@@ -107,7 +107,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 	outcomeReportGenerated := Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType: merkleroot.ReportGenerated,
-			RootsToReport: []ccipocr3.MerkleRootChain{
+			RootsToReport: []ccipocr3.MerkleRoot{
 				{
 					ChainSel:     sourceChain1,
 					SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
@@ -153,7 +153,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			expOutcome:  outcomeReportGenerated,
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
-					MerkleRoots: []ccipocr3.MerkleRootChain{
+					MerkleRoots: []ccipocr3.MerkleRoot{
 						{
 							ChainSel:     sourceChain1,
 							SeqNumsRange: ccipocr3.NewSeqNumRange(0xa, 0xa),

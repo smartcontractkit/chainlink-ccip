@@ -2,10 +2,10 @@ package merkleroot
 
 import (
 	"fmt"
+	mapset "github.com/deckarep/golang-set/v2"
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -148,7 +148,7 @@ func buildReport(
 		outcomeType = ReportEmpty
 	}
 
-	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
+	sort.Slice(roots, func(i, j int) bool { return roots[i].SourceChainSelector < roots[j].SourceChainSelector })
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
 	if q.RMNSignatures != nil { // TODO: should never be nil, error after e2e RMN integration.
@@ -159,20 +159,24 @@ func buildReport(
 		}
 		sigs = parsedSigs
 
-		signedRoots := mapset.NewSet[cciptypes.MerkleRootChain]()
+		//TODO: MerkleRoot is not comparable, not working
+		signedRoots := mapset.NewSet[cciptypes.MerkleRoot]()
+		//signedRoots := make(map[cciptypes.MerkleRoot]bool, len(q.RMNSignatures.LaneUpdates))
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
-			signedRoots.Add(cciptypes.MerkleRootChain{
-				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
-				SeqNumsRange: cciptypes.NewSeqNumRange(
-					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
-					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
-				),
-				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
+			srcSelector := cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector)
+			signedRoots.Add(cciptypes.MerkleRoot{
+				SourceChainSelector: srcSelector,
+				MinSeqNr:            cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
+				MaxSeqNr:            cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
+				//TODO: IMPORTANT check if we'll change protobuf to include onRamp and what needs to be done
+				//OnRampAddress: laneUpdate.OnRampAddress,
+				OnRampAddress: consensusObservation.MerkleRoots[srcSelector].OnRampAddress,
+				MerkleRoot:    cciptypes.Bytes32(laneUpdate.Root),
 			})
 		}
 
 		// Only report roots that are present in RMN signatures.
-		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
+		rootsToReport := make([]cciptypes.MerkleRoot, 0)
 		for _, root := range roots {
 			if signedRoots.Contains(root) {
 				rootsToReport = append(rootsToReport, root)

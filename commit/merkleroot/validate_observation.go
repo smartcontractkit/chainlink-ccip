@@ -59,7 +59,7 @@ func (w *Processor) ValidateObservation(
 }
 
 func validateObservedMerkleRoots(
-	merkleRoots []cciptypes.MerkleRootChain,
+	merkleRoots []cciptypes.MerkleRoot,
 	observer commontypes.OracleID,
 	observerSupportedChains mapset.Set[cciptypes.ChainSelector],
 ) error {
@@ -69,15 +69,15 @@ func validateObservedMerkleRoots(
 
 	seenChains := mapset.NewSet[cciptypes.ChainSelector]()
 	for _, root := range merkleRoots {
-		if !observerSupportedChains.Contains(root.ChainSel) {
+		if !observerSupportedChains.Contains(root.SourceChainSelector) {
 			return fmt.Errorf("found merkle root for chain %d, but this chain is not supported by Observer %d",
-				root.ChainSel, observer)
+				root.SourceChainSelector, observer)
 		}
 
-		if seenChains.Contains(root.ChainSel) {
-			return fmt.Errorf("duplicate merkle root for chain %d", root.ChainSel)
+		if seenChains.Contains(root.SourceChainSelector) {
+			return fmt.Errorf("duplicate merkle root for chain %d", root.SourceChainSelector)
 		}
-		seenChains.Add(root.ChainSel)
+		seenChains.Add(root.SourceChainSelector)
 	}
 
 	return nil
@@ -165,8 +165,8 @@ func ValidateMerkleRootsState(
 	reportChains := make([]cciptypes.ChainSelector, 0)
 	reportMinSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
 	for _, mr := range report.MerkleRoots {
-		reportChains = append(reportChains, mr.ChainSel)
-		reportMinSeqNums[mr.ChainSel] = mr.SeqNumsRange.Start()
+		reportChains = append(reportChains, mr.SourceChainSelector)
+		reportMinSeqNums[mr.SourceChainSelector] = mr.MinSeqNr
 	}
 
 	if len(reportChains) == 0 {

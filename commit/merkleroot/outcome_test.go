@@ -21,7 +21,7 @@ func Test_buildReport(t *testing.T) {
 		const rounds = 50
 
 		obs := ConsensusObservation{
-			MerkleRoots: map[cciptypes.ChainSelector]cciptypes.MerkleRootChain{
+			MerkleRoots: map[cciptypes.ChainSelector]cciptypes.MerkleRoot{
 				cciptypes.ChainSelector(1): {
 					ChainSel:     1,
 					SeqNumsRange: cciptypes.NewSeqNumRange(10, 20),

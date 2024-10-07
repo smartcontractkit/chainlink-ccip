@@ -124,19 +124,19 @@ func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) RunAndReturn(run func(co
 }
 
 // ObserveMerkleRoots provides a mock function with given fields: ctx, ranges
-func (_m *MockObserver) ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []ccipocr3.MerkleRootChain {
+func (_m *MockObserver) ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []ccipocr3.MerkleRoot {
 	ret := _m.Called(ctx, ranges)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ObserveMerkleRoots")
 	}
 
-	var r0 []ccipocr3.MerkleRootChain
-	if rf, ok := ret.Get(0).(func(context.Context, []plugintypes.ChainRange) []ccipocr3.MerkleRootChain); ok {
+	var r0 []ccipocr3.MerkleRoot
+	if rf, ok := ret.Get(0).(func(context.Context, []plugintypes.ChainRange) []ccipocr3.MerkleRoot); ok {
 		r0 = rf(ctx, ranges)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccipocr3.MerkleRootChain)
+			r0 = ret.Get(0).([]ccipocr3.MerkleRoot)
 		}
 	}
 
@@ -162,12 +162,12 @@ func (_c *MockObserver_ObserveMerkleRoots_Call) Run(run func(ctx context.Context
 	return _c
 }
 
-func (_c *MockObserver_ObserveMerkleRoots_Call) Return(_a0 []ccipocr3.MerkleRootChain) *MockObserver_ObserveMerkleRoots_Call {
+func (_c *MockObserver_ObserveMerkleRoots_Call) Return(_a0 []ccipocr3.MerkleRoot) *MockObserver_ObserveMerkleRoots_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockObserver_ObserveMerkleRoots_Call) RunAndReturn(run func(context.Context, []plugintypes.ChainRange) []ccipocr3.MerkleRootChain) *MockObserver_ObserveMerkleRoots_Call {
+func (_c *MockObserver_ObserveMerkleRoots_Call) RunAndReturn(run func(context.Context, []plugintypes.ChainRange) []ccipocr3.MerkleRoot) *MockObserver_ObserveMerkleRoots_Call {
 	_c.Call.Return(run)
 	return _c
 }
