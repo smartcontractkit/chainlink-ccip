@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -159,7 +158,7 @@ func buildReport(
 		}
 		sigs = parsedSigs
 
-		signedRoots := mapset.NewSet[cciptypes.MerkleRootChain]()
+		var signedRoots RootSet
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
 			srcSelector := cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector)
 			signedRoots.Add(cciptypes.MerkleRootChain{

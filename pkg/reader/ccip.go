@@ -164,7 +164,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.Report.MerkleRoots))
 		for _, mr := range ev.Report.MerkleRoots {
-			onRampAddress, err := r.GetContractAddress(consts.ContractNameOnRamp, cciptypes.ChainSelector(mr.SourceChainSelector))
+			onRampAddress, err := r.GetContractAddress(
+				consts.ContractNameOnRamp,
+				cciptypes.ChainSelector(mr.SourceChainSelector),
+			)
 			if err != nil {
 				return nil, fmt.Errorf("get onRamp address: %w", err)
 			}

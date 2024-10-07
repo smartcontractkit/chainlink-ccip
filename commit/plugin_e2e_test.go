@@ -109,9 +109,10 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 			OutcomeType: merkleroot.ReportGenerated,
 			RootsToReport: []ccipocr3.MerkleRootChain{
 				{
-					ChainSel:     sourceChain1,
-					SeqNumsRange: ccipocr3.SeqNumRange{0xa, 0xa},
-					MerkleRoot:   merkleRoot1,
+					ChainSel:      sourceChain1,
+					OnRampAddress: ccipocr3.Bytes{},
+					SeqNumsRange:  ccipocr3.SeqNumRange{0xa, 0xa},
+					MerkleRoot:    merkleRoot1,
 				},
 			},
 			OffRampNextSeqNums: []plugintypes.SeqNumChain{
@@ -155,9 +156,10 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{
 					MerkleRoots: []ccipocr3.MerkleRootChain{
 						{
-							ChainSel:     sourceChain1,
-							SeqNumsRange: ccipocr3.NewSeqNumRange(0xa, 0xa),
-							MerkleRoot:   merkleRoot1,
+							ChainSel:      sourceChain1,
+							SeqNumsRange:  ccipocr3.NewSeqNumRange(0xa, 0xa),
+							OnRampAddress: ccipocr3.Bytes{},
+							MerkleRoot:    merkleRoot1,
 						},
 					},
 					PriceUpdates:  ccipocr3.PriceUpdates{},
@@ -221,6 +223,9 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				n.ccipReader.EXPECT().
 					GetChainFeePriceUpdate(ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
+				n.ccipReader.EXPECT().
+					GetContractAddress(mock.Anything, mock.Anything).
+					Return(ccipocr3.Bytes{}, nil).Maybe()
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					assert.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))

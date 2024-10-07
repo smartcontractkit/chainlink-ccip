@@ -191,6 +191,7 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 					FRoleDON:       1,
 					OfframpAddress: []byte("offramp"),
 				},
+				ConfigDigest: [32]byte{1},
 			},
 		}
 	})

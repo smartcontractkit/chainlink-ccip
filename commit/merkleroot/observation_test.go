@@ -426,6 +426,10 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
 			}
 
+			reader.EXPECT().
+				GetContractAddress(mock.Anything, mock.Anything).
+				Return(cciptypes.Bytes{}, nil).Maybe()
+
 			chainSupport := common_mock.NewMockChainSupport(t)
 			if tc.supportedChainsFails {
 				chainSupport.On("SupportedChains", nodeID).Return(
