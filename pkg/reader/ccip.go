@@ -637,7 +637,10 @@ func (r *ccipChainReader) discoverDestinationContracts(
 	}
 	for chain, cfg := range sourceConfigs {
 		resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
-		resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+		// The local router is located in each source chain config. Add it once.
+		if len(resp[consts.ContractNameOnRamp][r.destChain]) == 0 {
+			resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+		}
 	}
 
 	// NonceManager and RMNRemote are in the offramp static config.
