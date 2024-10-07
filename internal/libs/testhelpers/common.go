@@ -40,9 +40,8 @@ func CreateRMNRemoteCfg() rmntypes.RemoteConfig {
 		ConfigDigest:    rand.RandomBytes32(),
 		Signers: []rmntypes.RemoteSignerInfo{
 			{
-				OnchainPublicKey:      rand.RandomBytes(20),
-				NodeIndex:             rand.RandomUint64(),
-				SignObservationPrefix: rand.RandomPrefix(),
+				OnchainPublicKey: rand.RandomBytes(20),
+				NodeIndex:        rand.RandomUint64(),
 			},
 		},
 		MinSigners:       rand.RandomUint64(),

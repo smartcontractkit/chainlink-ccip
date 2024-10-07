@@ -188,6 +188,7 @@ func buildReport(
 		RootsToReport:       roots,
 		OffRampNextSeqNums:  prevOutcome.OffRampNextSeqNums,
 		RMNReportSignatures: sigs,
+		RMNRemoteCfg:        prevOutcome.RMNRemoteCfg,
 	}
 
 	return outcome

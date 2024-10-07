@@ -22,7 +22,11 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 )
 
 var (
@@ -44,6 +48,10 @@ type testSetup struct {
 	rmnController  *controller
 	peerClient     *mockPeerClient
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
+	rmnHomeMock    *reader_mock.MockRMNHome
+	remoteRMNCfg   rmntypes.RemoteConfig
+	minObservers   int
+	rmnNodes       []rmntypes.HomeNodeInfo
 }
 
 func TestClient_ComputeReportSignatures(t *testing.T) {
@@ -52,38 +60,27 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ctx := tests.Context(t)
 		resChan := make(chan PeerResponse, 200)
 		peerClient := newMockPeerClient(resChan)
+		rmnHomeReaderMock := reader_mock.NewMockRMNHome(t)
 
 		const numNodes = 4
-		rmnNodes := make([]RMNNodeInfo, numNodes)
+		rmnNodes := make([]rmntypes.HomeNodeInfo, numNodes)
 		for i := 0; i < numNodes; i++ {
 			// deterministically create a public key by seeding with a 32char string.
 			publicKey, _, err := ed25519.GenerateKey(
 				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
 			require.NoError(t, err)
-			rmnNodes[i] = RMNNodeInfo{
-				ID:                        NodeID(i + 1),
-				SupportedSourceChains:     mapset.NewSet(chainS1, chainS2),
-				IsSigner:                  true,
-				SignReportsAddress:        cciptypes.Bytes{uint8(i + 1), 0, 0, 0},
-				SignObservationsPublicKey: &publicKey,
+			rmnNodes[i] = rmntypes.HomeNodeInfo{
+				ID:                    rmntypes.NodeID(i + 1),
+				PeerID:                ragep2ptypes.PeerID([32]byte{1, 2, 3}),
+				SupportedSourceChains: mapset.NewSet(chainS1, chainS2),
+				OffchainPublicKey:     &publicKey,
 			}
 		}
 
 		cl := &controller{
-			lggr:       lggr,
-			peerClient: peerClient,
-			rmnCfg: Config{
-				Home: RMNHomeConfig{
-					RmnNodes:         rmnNodes,
-					ConfigDigest:     cciptypes.Bytes32{0x1, 0x2, 0x3},
-					RmnReportVersion: "RMN_V1_6_ANY2EVM_REPORT",
-				},
-				Remote: RMNRemoteConfig{
-					ContractAddress: []byte{1, 2, 3},
-					MinObservers:    2,
-					MinSigners:      2,
-				},
-			},
+			lggr:                                    lggr,
+			peerClient:                              peerClient,
+			rmnHomeReader:                           rmnHomeReaderMock,
 			observationsInitialRequestTimerDuration: time.Minute,
 			reportsInitialRequestTimerDuration:      time.Minute,
 			ed25519Verifier:                         signatureVerifierAlwaysTrue{},
@@ -101,6 +98,32 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			},
 		}
 
+		rmnRemoteCfg := rmntypes.RemoteConfig{
+			ContractAddress: []byte{1, 2, 3},
+			ConfigDigest:    cciptypes.Bytes32{0x1, 0x2, 0x3},
+			MinSigners:      2,
+			Signers: []rmntypes.RemoteSignerInfo{
+				{
+					OnchainPublicKey: []byte{1, 2, 3},
+					NodeIndex:        1,
+				},
+				{
+					OnchainPublicKey: []byte{4, 5, 6},
+					NodeIndex:        2,
+				},
+				{
+					OnchainPublicKey: []byte{7, 8, 9},
+					NodeIndex:        3,
+				},
+				{
+					OnchainPublicKey: []byte{10, 11, 12},
+					NodeIndex:        4,
+				},
+			},
+			ConfigVersion:    1,
+			RmnReportVersion: cciptypes.Bytes32{0x1, 0x2, 0x3},
+		}
+
 		return testSetup{
 			name:           t.Name(),
 			t:              t,
@@ -109,6 +132,10 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			rmnController:  cl,
 			peerClient:     peerClient,
 			updateRequests: updateRequests,
+			rmnHomeMock:    rmnHomeReaderMock,
+			remoteRMNCfg:   rmnRemoteCfg,
+			minObservers:   2,
+			rmnNodes:       rmnNodes,
 		}
 	}
 
@@ -119,26 +146,35 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 	t.Run("empty lane update request", func(t *testing.T) {
 		ts := newTestSetup(t)
+
+		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
+
 		_, err := ts.rmnController.ComputeReportSignatures(
 			ts.ctx,
 			destChain,
 			[]*rmnpb.FixedDestLaneUpdateRequest{},
+			ts.remoteRMNCfg,
 		)
 		assert.Error(t, err, ErrNothingToDo)
 	})
 
 	t.Run("happy path no retries", func(t *testing.T) {
 		ts := newTestSetup(t)
+
+		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
+		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2, chainD1: 2}, nil)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.peerClient, ts.rmnController.rmnCfg.Remote.MinObservers)
+				ts.peerClient, ts.minObservers)
 
 			ts.nodesRespondToTheObservationRequests(
-				ts.peerClient, requestIDs, requestedChains, ts.rmnController.rmnCfg.Home.ConfigDigest, destChain)
+				ts.peerClient, requestIDs, requestedChains, ts.remoteRMNCfg.ConfigDigest, destChain)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.peerClient, ts.rmnController.rmnCfg.Remote.MinSigners,
-				ts.rmnController.rmnCfg.Remote.MinObservers)
+				t, ts.peerClient, int(ts.remoteRMNCfg.MinSigners),
+				ts.minObservers)
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
@@ -147,10 +183,11 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			ts.ctx,
 			destChain,
 			ts.updateRequests,
+			ts.remoteRMNCfg,
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnController.rmnCfg.Remote.MinSigners)
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.MinSigners))
 		// Make sure signature are in ascending signer address order
 		for i := 1; i < len(sigs.Signatures); i++ {
 			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
@@ -164,26 +201,30 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnController.observationsInitialRequestTimerDuration = time.Nanosecond
 		ts.rmnController.reportsInitialRequestTimerDuration = time.Nanosecond
 
+		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
+		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
+
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.peerClient, ts.rmnController.rmnCfg.Remote.MinObservers)
+				ts.peerClient, ts.minObservers)
 
 			// requests should be sent to at least two nodes
-			assert.GreaterOrEqual(t, len(requestIDs), ts.rmnController.rmnCfg.Remote.MinObservers)
-			assert.GreaterOrEqual(t, len(requestedChains), ts.rmnController.rmnCfg.Remote.MinObservers)
+			assert.GreaterOrEqual(t, len(requestIDs), ts.minObservers)
+			assert.GreaterOrEqual(t, len(requestedChains), ts.minObservers)
 
 			ts.nodesRespondToTheObservationRequests(
-				ts.peerClient, requestIDs, requestedChains, ts.rmnController.rmnCfg.Home.ConfigDigest, destChain)
+				ts.peerClient, requestIDs, requestedChains, ts.remoteRMNCfg.ConfigDigest, destChain)
 			time.Sleep(time.Millisecond)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.peerClient, len(ts.rmnController.rmnCfg.Home.RmnNodes), ts.rmnController.rmnCfg.Remote.MinObservers)
+				t, ts.peerClient, len(ts.remoteRMNCfg.Signers), ts.minObservers)
 			time.Sleep(time.Millisecond)
 
 			t.Logf("requestIDs: %v", requestIDs)
 
 			// requests should be sent to all nodes, since we hit the timer timeout
-			assert.Equal(t, len(requestIDs), len(ts.rmnController.rmnCfg.Home.RmnNodes))
+			assert.Equal(t, len(requestIDs), len(ts.remoteRMNCfg.Signers))
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
@@ -192,19 +233,20 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			ts.ctx,
 			destChain,
 			ts.updateRequests,
+			ts.remoteRMNCfg,
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, ts.rmnController.rmnCfg.Remote.MinSigners)
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.MinSigners))
 	})
 }
 
 func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockPeerClient,
 	minObservers int,
-) (map[NodeID]uint64, map[NodeID]mapset.Set[uint64]) {
-	requestIDs := make(map[NodeID]uint64)
-	requestedChains := make(map[NodeID]mapset.Set[uint64])
+) (map[rmntypes.NodeID]uint64, map[rmntypes.NodeID]mapset.Set[uint64]) {
+	requestIDs := make(map[rmntypes.NodeID]uint64)
+	requestedChains := make(map[rmntypes.NodeID]mapset.Set[uint64])
 
 	for {
 		time.Sleep(time.Millisecond)
@@ -246,8 +288,8 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 
 func (ts *testSetup) nodesRespondToTheObservationRequests(
 	rmnClient *mockPeerClient,
-	requestIDs map[NodeID]uint64,
-	requestedChains map[NodeID]mapset.Set[uint64],
+	requestIDs map[rmntypes.NodeID]uint64,
+	requestedChains map[rmntypes.NodeID]mapset.Set[uint64],
 	rmnHomeConfigDigest [32]byte,
 	destChain *rmnpb.LaneDest,
 ) {
@@ -301,8 +343,8 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 	rmnClient *mockPeerClient,
 	expectedResponses int,
 	minObservers int,
-) map[NodeID]uint64 {
-	requestIDs := make(map[NodeID]uint64)
+) map[rmntypes.NodeID]uint64 {
+	requestIDs := make(map[rmntypes.NodeID]uint64)
 	// plugin now has received the observation responses and should send
 	// the report requests to the nodes, wait for them to be received by the nodes
 	// should a total of minSigners requests each one containing the observation requests
@@ -356,7 +398,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 
 func (ts *testSetup) nodesRespondToTheSignatureRequests(
 	rmnClient *mockPeerClient,
-	requestIDs map[NodeID]uint64,
+	requestIDs map[rmntypes.NodeID]uint64,
 ) {
 	// now the plugin is waiting for rmn node responses for all this requests
 	for nodeID, reqID := range requestIDs {
@@ -383,7 +425,7 @@ func (ts *testSetup) nodesRespondToTheSignatureRequests(
 
 type mockPeerClient struct {
 	resChan          chan PeerResponse
-	receivedRequests map[NodeID][]*rmnpb.Request
+	receivedRequests map[rmntypes.NodeID][]*rmnpb.Request
 	mu               *sync.RWMutex
 }
 
@@ -394,8 +436,8 @@ func newMockPeerClient(resChan chan PeerResponse) *mockPeerClient {
 	}
 }
 
-func (m *mockPeerClient) getReceivedRequests() map[NodeID][]*rmnpb.Request {
-	cp := make(map[NodeID][]*rmnpb.Request)
+func (m *mockPeerClient) getReceivedRequests() map[rmntypes.NodeID][]*rmnpb.Request {
+	cp := make(map[rmntypes.NodeID][]*rmnpb.Request)
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	for k, v := range m.receivedRequests {
@@ -407,15 +449,15 @@ func (m *mockPeerClient) getReceivedRequests() map[NodeID][]*rmnpb.Request {
 func (m *mockPeerClient) resetReceivedRequests() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.receivedRequests = make(map[NodeID][]*rmnpb.Request)
+	m.receivedRequests = make(map[rmntypes.NodeID][]*rmnpb.Request)
 }
 
-func (m *mockPeerClient) Send(rmnNodeID NodeID, request []byte) error {
+func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.receivedRequests == nil {
-		m.receivedRequests = map[NodeID][]*rmnpb.Request{}
+		m.receivedRequests = map[rmntypes.NodeID][]*rmnpb.Request{}
 	}
 
 	if _, ok := m.receivedRequests[rmnNodeID]; !ok {

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 var (
@@ -103,8 +104,8 @@ func Test_verifyObservationSignature(t *testing.T) {
 				tc.signedObs.Observation.FixedDestLaneUpdates[0].Root, _ = hex.DecodeString(tc.rootStr)
 			}
 
-			rmnNode := RMNNodeInfo{
-				SignObservationsPublicKey: &offchainPK,
+			rmnNode := rmntypes.HomeNodeInfo{
+				OffchainPublicKey: &offchainPK,
 			}
 			signObservationPrefix1 := "chainlink ccip 1.6 rmn observation"
 
