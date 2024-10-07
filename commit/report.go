@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -12,6 +13,10 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+type ReportInfo struct {
+	MinSigners uint64 `json:"minSigners"`
+}
 
 func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	outcome, err := DecodeOutcome(outcomeBytes)
@@ -45,7 +50,18 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
-	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: nil}}, nil
+	// Prepare the info data
+	reportInfo := ReportInfo{
+		MinSigners: outcome.MerkleRootOutcome.RMNRemoteCfg.MinSigners,
+	}
+
+	// Serialize reportInfo to []byte
+	infoBytes, err := json.Marshal(reportInfo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal report info: %w", err)
+	}
+
+	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: infoBytes}}, nil
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(
@@ -62,12 +78,17 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	// TODO: think about how to handle this
+	var reportInfo ReportInfo
+	err = json.Unmarshal(r.Info, &reportInfo)
+	if err != nil {
+		return false, fmt.Errorf("failed to unmarshal report info: %w", err)
+	}
+
 	if p.offchainCfg.RMNEnabled &&
-		len(decodedReport.MerkleRoots) > 0 {
-		// len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
-		// p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
-		// len(decodedReport.RMNSignatures), p.rmnConfig.Remote.MinSigners)
+		len(decodedReport.MerkleRoots) > 0 &&
+		len(decodedReport.RMNSignatures) < int(reportInfo.MinSigners) {
+		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
+			len(decodedReport.RMNSignatures), reportInfo.MinSigners)
 		return false, nil
 	}
 
