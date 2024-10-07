@@ -418,6 +418,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
+	//srcRouters := []byte{0x7, 0x8}
 	//srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 
 	// Build expected addresses.
@@ -446,6 +447,15 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			mock.Anything,
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDynamicConfig,
+			primitives.Unconfirmed,
+			map[string]any{},
+			mock.Anything,
+		).Return(contractreader.ErrNoBindings)
+
+		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
+			mock.Anything,
+			consts.ContractNameOnRamp,
+			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
 			map[string]any{},
 			mock.Anything,
@@ -484,11 +494,16 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
-	require.Equal(t, 1, hook.Len())
+	require.Equal(t, 2, hook.Len())
 	assert.Contains(
 		t,
 		"unable to lookup source fee quoters, this is expected during initialization",
 		hook.All()[0].Message,
+	)
+	assert.Contains(
+		t,
+		"unable to lookup source routers, this is expected during initialization",
+		hook.All()[1].Message,
 	)
 }
 
@@ -503,6 +518,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	destFeeQuoter := []byte{0x5}
 	destRouter := []byte{0x6}
 	srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
+	srcRouters := [2][]byte{{0x9}, {0x10}}
 
 	// Build expected addresses.
 	var expectedContractAddresses ContractAddresses
@@ -513,6 +529,10 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	for i := range srcFeeQuoters {
 		expectedContractAddresses = expectedContractAddresses.Append(
 			consts.ContractNameFeeQuoter, sourceChain[i], srcFeeQuoters[i])
+	}
+	for i := range srcRouters {
+		expectedContractAddresses = expectedContractAddresses.Append(
+			consts.ContractNameRouter, sourceChain[i], srcRouters[i])
 	}
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameFeeQuoter, destChain, destFeeQuoter)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRMNRemote, destChain, destRMNRemote)
@@ -538,6 +558,18 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 			v := returnVal.(*onRampDynamicChainConfig)
 			v.FeeQuoter = srcFeeQuoters[i]
+		}))
+
+		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
+			mock.Anything,
+			consts.ContractNameOnRamp,
+			consts.MethodNameOnRampGetDestChainConfig,
+			primitives.Unconfirmed,
+			map[string]any{},
+			mock.Anything,
+		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+			v := returnVal.(*onRampDestChainConfig)
+			v.Router = srcRouters[i]
 		}))
 
 		// mock the call for sourceChain2

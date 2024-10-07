@@ -717,6 +717,23 @@ func (r *ccipChainReader) DiscoverContracts(
 		}
 	}
 
+	// Read onRamps for Router in DestChainConfig.
+	{
+		destChainConfig, err := r.getOnRampDestChainConfig(ctx, myChains)
+		if err != nil {
+			r.lggr.Infow("unable to lookup source routers, this is expected during initialization", "err", err)
+
+			// ErrNoBindings is an allowable error.
+			if !errors.Is(err, contractreader.ErrNoBindings) {
+				return nil, fmt.Errorf("unable to lookup source routers (onRamp dest chain config): %w", err)
+			}
+		} else {
+			for chain, cfg := range destChainConfig {
+				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
+			}
+		}
+	}
+
 	return resp, nil
 }
 
@@ -1021,6 +1038,61 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				ctx,
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDynamicConfig,
+				primitives.Unconfirmed,
+				map[string]any{},
+				&resp,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+			}
+			mu.Lock()
+			result[chainSel] = resp
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// See DestChainConfig in OnRamp.sol
+type onRampDestChainConfig struct {
+	SequenceNumber   uint64 `json:"sequenceNumber"`
+	AllowListEnabled bool   `json:"allowListEnabled"`
+	Router           []byte `json:"router"`
+}
+
+//nolint:dupl // It's not quite duplicate code...
+func (r *ccipChainReader) getOnRampDestChainConfig(
+	ctx context.Context,
+	srcChains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]onRampDestChainConfig, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, srcChains...); err != nil {
+		return nil, err
+	}
+
+	result := make(map[cciptypes.ChainSelector]onRampDestChainConfig)
+
+	mu := new(sync.Mutex)
+	eg := new(errgroup.Group)
+	for _, chainSel := range srcChains {
+		// no onramp for the destination chain
+		if chainSel == r.destChain {
+			continue
+		}
+
+		chainSel := chainSel
+		eg.Go(func() error {
+			// read onramp dynamic config
+			resp := onRampDestChainConfig{}
+			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
+				ctx,
+				consts.ContractNameOnRamp,
+				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{},
 				&resp,
