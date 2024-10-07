@@ -41,6 +41,9 @@ var (
 
 	// ErrInsufficientSignatureResponses is returned when we don't get enough report signatures.
 	ErrInsufficientSignatureResponses = errors.New("insufficient signature responses")
+
+	// ErrNotFound is returned when the RMN node is not found in the RMN home or the Remote contracts.
+	ErrNotFound = errors.New("rmn node not found")
 )
 
 // Controller contains the high-level functionality required by the plugin to interact with the RMN nodes.
@@ -178,7 +181,6 @@ func (c *controller) ComputeReportSignatures(
 		updatesPerChain,
 		rmnRemoteCfg.ConfigDigest,
 		minObserversMap)
-	// minObserversMap[cciptypes.ChainSelector(destChain.DestChainSelector)])
 	if err != nil {
 		return nil, fmt.Errorf("get rmn signed observations: %w", err)
 	}
@@ -250,7 +252,7 @@ func (c *controller) getRmnSignedObservations(
 
 	// Sanity check that we got enough signed observations for every source chain.
 	// In practice this should never happen, an error must have been received earlier.
-	if !gotSufficientObservationResponses(updateRequestsPerChain, signedObservations, minObserversMap) {
+	if !gotSufficientObservationResponses(c.lggr, updateRequestsPerChain, signedObservations, minObserversMap) {
 		return nil, fmt.Errorf("not enough signed observations after sanity check")
 	}
 
@@ -344,7 +346,10 @@ func (c *controller) listenForRmnObservationResponses(
 			}
 
 			allChainsHaveEnoughResponses := gotSufficientObservationResponses(
-				lursPerChain, rmnObservationResponses, minObserversMap)
+				c.lggr,
+				lursPerChain,
+				rmnObservationResponses,
+				minObserversMap)
 			if allChainsHaveEnoughResponses {
 				c.lggr.Infof("all chains have enough observation responses with matching roots")
 				return rmnObservationResponses, nil
@@ -383,6 +388,7 @@ func (c *controller) listenForRmnObservationResponses(
 // gotSufficientObservationResponses checks if we got enough observation responses for each source chain.
 // Enough meaning that we got at least #minObservers observing the same merkle root for a target chain.
 func gotSufficientObservationResponses(
+	lggr logger.Logger,
 	updateRequests map[uint64]updateRequestWithMeta,
 	rmnObservationResponses []rmnSignedObservationWithMeta,
 	minObserversMap map[cciptypes.ChainSelector]int,
@@ -405,6 +411,7 @@ func gotSufficientObservationResponses(
 		}
 		minObservers, exists := minObserversMap[cciptypes.ChainSelector(sourceChain)]
 		if !exists {
+			lggr.Errorw("no min observers for chain", "chain", sourceChain)
 			return false
 		}
 
@@ -431,8 +438,8 @@ func (c *controller) validateSignedObservationResponse(
 		return fmt.Errorf("got an unexpected type of response %T", parsedResp.Response)
 	}
 
-	rmnNode, exists := c.getHomeNodeByID(rmnHomeConfigDigest, rmnNodeID)
-	if !exists {
+	rmnNode, err := c.getHomeNodeByID(rmnHomeConfigDigest, rmnNodeID)
+	if err != nil {
 		return fmt.Errorf("rmn node %d not found", rmnNodeID)
 	}
 
@@ -558,12 +565,12 @@ func (c *controller) getRmnReportSignatures(
 		},
 		AttributedSignedObservations: transformAndSortObservations(rmnSignedObservations),
 	}
-	minSigners := rmnRemoteCfg.MinSigners
+	minSigners := int(rmnRemoteCfg.MinSigners)
 	signers := rmnRemoteCfg.Signers
 	requestIDs, signersRequested, err := c.sendReportSignatureRequest(
 		reportSigReq,
 		signers,
-		int(minSigners))
+		minSigners)
 	if err != nil {
 		return nil, fmt.Errorf("send report signature request: %w", err)
 	}
@@ -575,7 +582,7 @@ func (c *controller) getRmnReportSignatures(
 		reportSigReq,
 		signersRequested,
 		signers,
-		int(minSigners))
+		minSigners)
 	if err != nil {
 		return nil, fmt.Errorf("listen for rmn report signatures: %w", err)
 	}
@@ -750,7 +757,8 @@ func (c *controller) listenForRmnReportSignatures(
 			c.lggr.Warnw("sending additional RMN signature requests")
 
 			for _, node := range randomShuffle(signers) {
-				if signersRequested.Contains(rmntypes.NodeID(node.NodeIndex)) {
+				nodeIndex := node.NodeIndex
+				if signersRequested.Contains(rmntypes.NodeID(nodeIndex)) {
 					continue
 				}
 				req := &rmnpb.Request{
@@ -760,13 +768,13 @@ func (c *controller) listenForRmnReportSignatures(
 					},
 				}
 
-				c.lggr.Infow("sending report signature request", "node", node.NodeIndex, "requestID", req.RequestId)
-				if err := c.marshalAndSend(req, rmntypes.NodeID(node.NodeIndex)); err != nil {
-					c.lggr.Errorw("failed to send report signature request", "node", node.NodeIndex, "err", err)
+				c.lggr.Infow("sending report signature request", "node", nodeIndex, "requestID", req.RequestId)
+				if err := c.marshalAndSend(req, rmntypes.NodeID(nodeIndex)); err != nil {
+					c.lggr.Errorw("failed to send report signature request", "node", nodeIndex, "err", err)
 					continue
 				}
 				requestIDs.Add(req.RequestId)
-				signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
+				signersRequested.Add(rmntypes.NodeID(nodeIndex))
 			}
 		case <-ctx.Done():
 			return nil, ErrTimeout
@@ -795,8 +803,8 @@ func (c *controller) validateReportSigResponse(
 	signers []rmntypes.RemoteSignerInfo,
 	rmnReport cciptypes.RMNReport,
 ) (*reportSigWithSignerAddress, error) {
-	signerNode, exists := c.getSignerNodeByID(signers, nodeID)
-	if !exists {
+	signerNode, err := c.getSignerNodeByID(signers, nodeID)
+	if err != nil {
 		return nil, fmt.Errorf("rmn node %d not found", nodeID)
 	}
 
@@ -829,29 +837,34 @@ func (c *controller) validateReportSigResponse(
 
 func (c *controller) getHomeNodeByID(
 	configDigest cciptypes.Bytes32,
-	nodeID rmntypes.NodeID) (rmntypes.HomeNodeInfo, bool) {
+	nodeID rmntypes.NodeID) (rmntypes.HomeNodeInfo, error) {
 	rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(configDigest)
 	if err != nil {
-		return rmntypes.HomeNodeInfo{}, false
+		return rmntypes.HomeNodeInfo{}, err
 	}
-
 	for _, node := range rmnNodes {
 		if node.ID == nodeID {
-			return node, true
+			return node, nil
 		}
 	}
-	return rmntypes.HomeNodeInfo{}, false
+
+	return rmntypes.HomeNodeInfo{}, ErrNotFound
 }
 
 func (c *controller) getSignerNodeByID(
 	rmnNodes []rmntypes.RemoteSignerInfo,
-	nodeID rmntypes.NodeID) (rmntypes.RemoteSignerInfo, bool) {
+	nodeID rmntypes.NodeID) (rmntypes.RemoteSignerInfo, error) {
+
+	// Search for the node with the specified ID
 	for _, node := range rmnNodes {
 		if rmntypes.NodeID(node.NodeIndex) == nodeID {
-			return node, true
+			// Return the found node and nil error
+			return node, nil
 		}
 	}
-	return rmntypes.RemoteSignerInfo{}, false
+
+	// If the node was not found, return a "not found" error
+	return rmntypes.RemoteSignerInfo{}, ErrNotFound
 }
 
 type updateRequestWithMeta struct {

@@ -60,6 +60,10 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 
 	nextState := prevOutcome.NextState()
 
+	if nextState != BuildingReport && q.RMNSignatures == nil {
+		return nil
+	}
+
 	err := checkRMNRequirements(nextState, q, prevOutcome)
 	if err != nil {
 		return fmt.Errorf("failed to check RMN requirements: %w", err)
