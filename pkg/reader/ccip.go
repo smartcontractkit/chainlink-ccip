@@ -181,8 +181,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: cciptypes.UnknownEncodedAddress(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
-				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
+				TokenID: cciptypes.UnknownEncodedAddress(
+					typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
+				Price: cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
 

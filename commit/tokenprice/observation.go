@@ -62,7 +62,9 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	return tokenPricesUSD
 }
 
-func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
+func (p *processor) ObserveFeeQuoterTokenUpdates(
+	ctx context.Context,
+) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
 	if p.tokenPriceReader == nil {
 		p.lggr.Debugw("no token price reader available")
 		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}

@@ -125,7 +125,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 		SignObservationPrefix              string
 	}
 	remoteTokenAddress := rand.RandomAddress()
-	aggregatorAddress := cciptypes.UnknownEncodedAddress(rand.RandomAddress())
+	aggregatorAddress := rand.RandomAddress()
 	tests := []struct {
 		name    string
 		fields  fields
