@@ -771,6 +771,83 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 	return addressBytes, nil
 }
 
+// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
+// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
+// function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
+// the price of ETH not in ETH but in wei (1e-18 ETH).
+func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
+	// Ensure we can read from the destination chain.
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("failed to validate dest chain reader existence: %w", err)
+	}
+
+	// TODO: consider caching this value.
+	feeQuoterCfg, err := r.getDestFeeQuoterStaticConfig(ctx)
+	if err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("get destination fee quoter static config: %w", err)
+	}
+
+	linkPriceUSD, err := r.getFeeQuoterTokenPriceUSD(ctx, feeQuoterCfg.LinkToken)
+	if err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("get LINK price in USD: %w", err)
+	}
+
+	return linkPriceUSD, nil
+}
+
+// getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
+func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
+	var staticConfig feeQuoterStaticConfig
+	err := r.getDestinationData(
+		ctx,
+		r.destChain,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameFeeQuoterGetStaticConfig,
+		&staticConfig,
+	)
+
+	if err != nil {
+		return feeQuoterStaticConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
+	}
+
+	return staticConfig, nil
+}
+
+// getFeeQuoterTokenPriceUSD gets the token price in USD of the given token address from the FeeQuoter contract on the
+// destination chain.
+func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAddr []byte) (cciptypes.BigInt, error) {
+	if len(tokenAddr) == 0 {
+		return cciptypes.BigInt{}, fmt.Errorf("tokenAddr is empty")
+	}
+
+	reader, ok := r.contractReaders[r.destChain]
+	if !ok {
+		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
+	}
+
+	var price big.Int
+	err := reader.ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameFeeQuoterGetTokenPrices,
+		primitives.Unconfirmed,
+		map[string]any{
+			"token": tokenAddr,
+		},
+		&price,
+	)
+
+	if err != nil {
+		return cciptypes.BigInt{}, fmt.Errorf("failed to get LINK token price, addr: %v, err: %w", tokenAddr, err)
+	}
+
+	if price.Cmp(big.NewInt(0)) == 0 {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
+	}
+
+	return cciptypes.NewBigInt(&price), nil
+}
+
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L94
 //
@@ -870,6 +947,16 @@ type offRampDestChainConfig struct {
 	SequenceNumber   uint64 `json:"sequenceNumber"`
 	AllowListEnabled bool   `json:"allowListEnabled"`
 	Router           []byte `json:"router"`
+}
+
+// feeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
+// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/FeeQuoter.sol#L946
+//
+//nolint:lll // It's a URL.
+type feeQuoterStaticConfig struct {
+	MaxFeeJuelsPerMsg  cciptypes.BigInt `json:"maxFeeJuelsPerMsg"`
+	LinkToken          []byte           `json:"linkToken"`
+	StalenessThreshold uint32           `json:"stalenessThreshold"`
 }
 
 // getData returns data for a single reader.
