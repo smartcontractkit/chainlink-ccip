@@ -28,7 +28,7 @@ import (
 )
 
 func Test_Observation(t *testing.T) {
-	merkleRoots := []cciptypes.MerkleRoot{
+	merkleRoots := []cciptypes.MerkleRootChain{
 		{
 			ChainSel:     1,
 			SeqNumsRange: [2]cciptypes.SeqNum{5, 78},

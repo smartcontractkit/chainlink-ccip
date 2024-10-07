@@ -20,14 +20,14 @@ import (
 func Test_validateObservedMerkleRoots(t *testing.T) {
 	testCases := []struct {
 		name                    string
-		merkleRoots             []cciptypes.MerkleRoot
+		merkleRoots             []cciptypes.MerkleRootChain
 		observer                commontypes.OracleID
 		observerSupportedChains mapset.Set[cciptypes.ChainSelector]
 		expErr                  bool
 	}{
 		{
 			name: "Chain not supported",
-			merkleRoots: []cciptypes.MerkleRoot{
+			merkleRoots: []cciptypes.MerkleRootChain{
 				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
 				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
 			},
@@ -37,7 +37,7 @@ func Test_validateObservedMerkleRoots(t *testing.T) {
 		},
 		{
 			name: "Duplicate chains",
-			merkleRoots: []cciptypes.MerkleRoot{
+			merkleRoots: []cciptypes.MerkleRootChain{
 				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
 				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
 				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{3, 7}, MerkleRoot: [32]byte{1, 2, 3}},
@@ -48,7 +48,7 @@ func Test_validateObservedMerkleRoots(t *testing.T) {
 		},
 		{
 			name: "Valid offRampMaxSeqNums",
-			merkleRoots: []cciptypes.MerkleRoot{
+			merkleRoots: []cciptypes.MerkleRootChain{
 				{ChainSel: 1, SeqNumsRange: [2]cciptypes.SeqNum{10, 20}, MerkleRoot: [32]byte{1, 2, 3}},
 				{ChainSel: 2, SeqNumsRange: [2]cciptypes.SeqNum{24, 45}, MerkleRoot: [32]byte{1, 2, 3}},
 			},
@@ -333,7 +333,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
 			for _, snc := range tc.reportSeqNums {
-				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRoot{
+				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
 					ChainSel:     snc.ChainSel,
 					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
 				})

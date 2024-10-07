@@ -117,13 +117,13 @@ func groupByChainSelector(
 	commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 	for _, report := range reports {
 		for _, singleReport := range report.Report.MerkleRoots {
-			commitReportCache[singleReport.SourceChainSelector] = append(commitReportCache[singleReport.SourceChainSelector],
+			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
 				exectypes.CommitData{
-					SourceChain:         singleReport.SourceChainSelector,
+					SourceChain:         singleReport.ChainSel,
 					Timestamp:           report.Timestamp,
 					BlockNum:            report.BlockNum,
 					MerkleRoot:          singleReport.MerkleRoot,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(singleReport.MinSeqNr, singleReport.MaxSeqNr),
+					SequenceNumberRange: singleReport.SeqNumsRange,
 				})
 		}
 	}

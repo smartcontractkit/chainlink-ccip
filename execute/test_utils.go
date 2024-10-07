@@ -96,13 +96,11 @@ func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNu
 
 	it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
 		Report: cciptypes.CommitPluginReport{
-			MerkleRoots: []cciptypes.MerkleRoot{
+			MerkleRoots: []cciptypes.MerkleRootChain{
 				{
-					SourceChainSelector: reportData.SourceChain,
-					MinSeqNr:            reportData.SequenceNumberRange.Start(),
-					MaxSeqNr:            reportData.SequenceNumberRange.End(),
-					//OnRampAddress:
-					MerkleRoot: tree.Root(),
+					ChainSel:     reportData.SourceChain,
+					SeqNumsRange: reportData.SequenceNumberRange,
+					MerkleRoot:   tree.Root(),
 				},
 			},
 		},
