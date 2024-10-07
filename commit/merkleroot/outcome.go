@@ -161,8 +161,10 @@ func buildReport(
 
 		signedRoots := mapset.NewSet[cciptypes.MerkleRootChain]()
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
+			srcSelector := cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector)
 			signedRoots.Add(cciptypes.MerkleRootChain{
-				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
+				ChainSel:      srcSelector,
+				OnRampAddress: consensusObservation.MerkleRoots[srcSelector].OnRampAddress,
 				SeqNumsRange: cciptypes.NewSeqNumRange(
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
