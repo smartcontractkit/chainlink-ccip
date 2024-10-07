@@ -12,7 +12,8 @@ func (p *processor) Observation(
 	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
-) (Observation, error) { // Get the fee components for all available chains that we can read from
+) (Observation, error) {
+	// Get the fee components for all available chains that we can read from
 	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx)
 
 	availableChains := maps.Keys(feeComponents)
