@@ -23,7 +23,7 @@ jobs:
           python-version: 3.x
 
       - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
-      - uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # cache@v4.0.2
+      - uses: actions/cache@2cdf405574d6ef1f33a1d12acccd3ae82f47b3f2 # cache@v4.1.0
         with:
           key: mkdocs-material-${{ env.cache_id }}
           path: .cache
