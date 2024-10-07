@@ -10,13 +10,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	sel "github.com/smartcontractkit/chain-selectors"
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata/usdc"
@@ -431,7 +432,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 }
 
 func createToken(t *testing.T, nonce uint64, sourceDomain uint32, pool string) cciptypes.RampTokenAmount {
-	bytesPool, err := cciptypes.NewBytesFromString(pool)
+	bytesPool, err := cciptypes.NewUnknownAddressFromHex(pool)
 	require.NoError(t, err)
 
 	return cciptypes.RampTokenAmount{

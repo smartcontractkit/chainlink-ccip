@@ -14,8 +14,6 @@ import (
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -34,7 +32,7 @@ func Test_Observation(t *testing.T) {
 		cciptypes.NewTokenPrice(tokenA, bi100),
 		cciptypes.NewTokenPrice(tokenB, bi200),
 	}
-	feeQuoterTokenUpdates := map[types.Account]plugintypes.TimestampedBig{
+	feeQuoterTokenUpdates := map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 		tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
 		tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
 	}
@@ -55,11 +53,11 @@ func Test_Observation(t *testing.T) {
 				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 
 				tokenPriceReader := readermock.NewMockPriceReader(t)
-				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, []types.Account{tokenA, tokenB}).
+				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, []cciptypes.UnknownEncodedAddress{tokenA, tokenB}).
 					Return([]*big.Int{bi100, bi200}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
-					map[types.Account]plugintypes.TimestampedBig{
+					map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 						tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
 						tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
 					},
@@ -135,7 +133,7 @@ func Test_Observation(t *testing.T) {
 }
 
 var defaultCfg = pluginconfig.CommitOffchainConfig{
-	TokenInfo: map[types.Account]pluginconfig.TokenInfo{
+	TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
 		tokenA: {
 			Decimals:          18,
 			AggregatorAddress: "0x1111111111111111111111Ff18C45Df59775Fbb2",

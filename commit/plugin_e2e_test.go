@@ -16,7 +16,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -232,7 +231,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
 					Return(
-						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
+						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
 

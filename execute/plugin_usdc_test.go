@@ -23,7 +23,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	sourceChain := cciptypes.ChainSelector(sel.ETHEREUM_TESTNET_SEPOLIA.Selector)
 	destChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET_BASE_1.Selector)
 
-	addressBytes, err := cciptypes.NewBytesFromString(randomEthAddress)
+	addressBytes, err := cciptypes.NewUnknownAddressFromHex(randomEthAddress)
 	require.NoError(t, err)
 
 	messages := []inmem.MessagesWithMetadata{

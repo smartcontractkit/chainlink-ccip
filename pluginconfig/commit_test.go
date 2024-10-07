@@ -5,11 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	rand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -17,7 +16,7 @@ import (
 
 func TestArbitrumPriceSource_Validate(t *testing.T) {
 	type fields struct {
-		AggregatorAddress string
+		AggregatorAddress cciptypes.UnknownEncodedAddress
 		DeviationPPB      cciptypes.BigInt
 		Decimals          uint8
 	}
@@ -117,16 +116,16 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 	type fields struct {
 		RemoteGasPriceBatchWriteFrequency  commonconfig.Duration
 		TokenPriceBatchWriteFrequency      commonconfig.Duration
-		TokenInfo                          map[types.Account]TokenInfo
+		TokenInfo                          map[cciptypes.UnknownEncodedAddress]TokenInfo
 		TokenPriceChainSelector            cciptypes.ChainSelector
-		TokenDecimals                      map[types.Account]uint8
+		TokenDecimals                      map[cciptypes.UnknownEncodedAddress]uint8
 		NewMsgScanBatchSize                uint32
 		MaxReportTransmissionCheckAttempts uint32
 		MaxMerkleTreeSize                  uint32
 		SignObservationPrefix              string
 	}
 	remoteTokenAddress := rand.RandomAddress()
-	aggregatorAddress := string(rand.RandomAddress())
+	aggregatorAddress := cciptypes.UnknownEncodedAddress(rand.RandomAddress())
 	tests := []struct {
 		name    string
 		fields  fields
@@ -137,7 +136,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				TokenInfo: map[types.Account]TokenInfo{
+				TokenInfo: map[cciptypes.UnknownEncodedAddress]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
@@ -157,7 +156,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
-				TokenInfo:                          map[types.Account]TokenInfo{},
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
 				NewMsgScanBatchSize:                256,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
@@ -170,7 +169,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-				TokenInfo: map[types.Account]TokenInfo{
+				TokenInfo: map[cciptypes.UnknownEncodedAddress]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
@@ -189,7 +188,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				TokenInfo: map[types.Account]TokenInfo{
+				TokenInfo: map[cciptypes.UnknownEncodedAddress]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
@@ -208,7 +207,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(1),
-				TokenInfo:                          map[types.Account]TokenInfo{},
+				TokenInfo:                          map[cciptypes.UnknownEncodedAddress]TokenInfo{},
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				SignObservationPrefix:              defaultSignObservationPrefix,
@@ -220,7 +219,7 @@ func TestCommitOffchainConfig_Validate(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				TokenInfo: map[types.Account]TokenInfo{
+				TokenInfo: map[cciptypes.UnknownEncodedAddress]TokenInfo{
 					remoteTokenAddress: {
 						AggregatorAddress: aggregatorAddress,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
@@ -261,12 +260,12 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 	type fields struct {
 		RemoteGasPriceBatchWriteFrequency commonconfig.Duration
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
-		PriceSources                      map[types.Account]TokenInfo
+		PriceSources                      map[cciptypes.UnknownEncodedAddress]TokenInfo
 	}
 	remoteTokenAddress1 := rand.RandomAddress()
 	remoteTokenAddress2 := rand.RandomAddress()
-	aggregatorAddress1 := string(rand.RandomAddress())
-	aggregatorAddress2 := string(rand.RandomAddress())
+	aggregatorAddress1 := rand.RandomAddress()
+	aggregatorAddress2 := rand.RandomAddress()
 	tests := []struct {
 		name   string
 		fields fields
@@ -276,7 +275,7 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-				PriceSources: map[types.Account]TokenInfo{
+				PriceSources: map[cciptypes.UnknownEncodedAddress]TokenInfo{
 					remoteTokenAddress1: {
 						AggregatorAddress: aggregatorAddress1,
 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
@@ -293,7 +292,7 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 			fields{
 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-				PriceSources:                      map[types.Account]TokenInfo{},
+				PriceSources:                      map[cciptypes.UnknownEncodedAddress]TokenInfo{},
 			},
 		},
 	}

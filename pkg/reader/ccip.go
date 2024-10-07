@@ -98,7 +98,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	type TokenPriceUpdate struct {
-		SourceToken []byte
+		SourceToken cciptypes.UnknownAddress
 		UsdPerToken *big.Int
 	}
 
@@ -181,7 +181,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: ocr3types.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
+				TokenID: cciptypes.UnknownEncodedAddress(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}

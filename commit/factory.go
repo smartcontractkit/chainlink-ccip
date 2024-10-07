@@ -140,7 +140,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		var bcs []types.BoundContract
 		for _, info := range offchainConfig.TokenInfo {
 			bcs = append(bcs, types.BoundContract{
-				Address: info.AggregatorAddress,
+				Address: string(info.AggregatorAddress),
 				Name:    consts.ContractNamePriceAggregator,
 			})
 		}

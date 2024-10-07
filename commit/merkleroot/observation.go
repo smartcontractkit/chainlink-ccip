@@ -9,11 +9,12 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/sync/errgroup"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -85,7 +86,7 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("RMN remote config is not provided in the previous outcome")
 	}
 
-	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
+	signerAddresses := make([]cciptypes.UnknownAddress, 0, len(sigs))
 	for _, rmnNode := range rmnRemoteCfg.Signers {
 		signerAddresses = append(signerAddresses, rmnNode.OnchainPublicKey)
 	}

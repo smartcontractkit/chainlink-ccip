@@ -5,8 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
@@ -42,7 +40,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
-		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fFeedChain)),
+		consensus.MakeConstantThreshold[cciptypes.UnknownEncodedAddress](consensus.TwoFPlus1(fFeedChain)),
 		func(vals []cciptypes.TokenPrice) cciptypes.TokenPrice {
 			return consensus.Median(vals, consensus.TokenPriceComparator)
 		},
@@ -52,7 +50,7 @@ func (p *processor) getConsensusObservation(
 		p.lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
-		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fDestChain)),
+		consensus.MakeConstantThreshold[cciptypes.UnknownEncodedAddress](consensus.TwoFPlus1(fDestChain)),
 		// each key will have one object with the median for timestamps as timestamp value
 		// and the median prices as price value
 		consensus.TimestampedBigAggregator,
@@ -119,8 +117,8 @@ func (p *processor) selectTokensForUpdate(
 // aggregateObservations takes a list of observations and produces an AggregateObservation
 func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) AggregateObservation {
 	aggObs := AggregateObservation{
-		FeedTokenPrices:       make(map[types.Account][]cciptypes.TokenPrice),
-		FeeQuoterTokenUpdates: make(map[types.Account][]plugintypes.TimestampedBig),
+		FeedTokenPrices:       make(map[cciptypes.UnknownEncodedAddress][]cciptypes.TokenPrice),
+		FeeQuoterTokenUpdates: make(map[cciptypes.UnknownEncodedAddress][]plugintypes.TimestampedBig),
 		FChain:                make(map[cciptypes.ChainSelector][]int),
 		Timestamps:            []time.Time{},
 	}

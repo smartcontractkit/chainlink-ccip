@@ -8,10 +8,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -26,27 +24,27 @@ type PriceReader interface {
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetTokenFeedPricesUSD(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress) ([]*big.Int, error)
 
 	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
-		tokens []ocr2types.Account,
-	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
+		tokens []ccipocr3.UnknownEncodedAddress,
+	) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error)
 }
 
 type OnchainTokenPricesReader struct {
 	// Reader for the chain that will have the token prices on-chain
 	ContractReader   contractreader.ContractReaderFacade
-	TokenInfo        map[types.Account]pluginconfig.TokenInfo
-	FeeQuoterAddress types.Account
+	TokenInfo        map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
+	FeeQuoterAddress ccipocr3.UnknownEncodedAddress
 	// FeeQuoterEnabled Flag until we discover feeQuoter address and bind it correctly
 	feeQuoterEnabled bool
 }
 
 func NewOnchainTokenPricesReader(
 	contractReader contractreader.ContractReaderFacade,
-	tokenInfo map[types.Account]pluginconfig.TokenInfo,
+	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 ) *OnchainTokenPricesReader {
 	return &OnchainTokenPricesReader{
 		ContractReader: contractReader,
@@ -68,10 +66,10 @@ type LatestRoundData struct {
 
 func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
-	tokens []ocr2types.Account,
-) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
+	tokens []ccipocr3.UnknownEncodedAddress,
+) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error) {
 	if !pr.feeQuoterEnabled {
-		return make(map[ocr2types.Account]plugintypes.TimestampedBig), nil
+		return make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig), nil
 	}
 	var updates []plugintypes.TimestampedBig
 
@@ -92,7 +90,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 		return nil, fmt.Errorf("failed to get token prices: %w", err)
 	}
 
-	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
+	updateMap := make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == time.Unix(0, 0) {
@@ -105,7 +103,7 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 }
 
 func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
-	ctx context.Context, tokens []ocr2types.Account,
+	ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress,
 ) ([]*big.Int, error) {
 	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
@@ -114,7 +112,7 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		token := token
 		eg.Go(func() error {
 			boundContract := commontypes.BoundContract{
-				Address: pr.TokenInfo[token].AggregatorAddress,
+				Address: string(pr.TokenInfo[token].AggregatorAddress),
 				Name:    consts.ContractNamePriceAggregator,
 			}
 			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
@@ -146,7 +144,7 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 
 func (pr *OnchainTokenPricesReader) getFeedDecimals(
 	ctx context.Context,
-	token ocr2types.Account,
+	token ccipocr3.UnknownEncodedAddress,
 	boundContract commontypes.BoundContract,
 ) (uint8, error) {
 	var decimals uint8
@@ -166,7 +164,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(
 
 func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
-	token ocr2types.Account,
+	token ccipocr3.UnknownEncodedAddress,
 	boundContract commontypes.BoundContract,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData

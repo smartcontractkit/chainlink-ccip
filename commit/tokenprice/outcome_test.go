@@ -12,14 +12,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	"github.com/stretchr/testify/assert"
 )
 
 var ts = time.Now().UTC()
 
-var feedTokenPricesMap = map[types.Account]cciptypes.TokenPrice{
+var feedTokenPricesMap = map[cciptypes.UnknownEncodedAddress]cciptypes.TokenPrice{
 	tokenA: {TokenID: tokenA, Price: cbi100},
 	tokenB: {TokenID: tokenB, Price: cbi200},
 	tokenC: {TokenID: tokenC, Price: cbi100},
@@ -33,7 +31,7 @@ var feedTokenPrices = []cciptypes.TokenPrice{
 	feedTokenPricesMap[tokenD],
 }
 
-var feeQuoterUpdates = map[types.Account]plugintypes.TimestampedBig{
+var feeQuoterUpdates = map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
 	tokenA: {Timestamp: ts.Add(-2 * time.Minute), Value: cbi100},     // Update because of time
 	tokenB: {Timestamp: ts, Value: cbi100},                           // update because of deviation
 	tokenD: {Timestamp: ts, Value: feedTokenPricesMap[tokenD].Price}, // no update, same price and timestamp
@@ -51,7 +49,7 @@ var obs = Observation{
 
 var offChainCfg = pluginconfig.CommitOffchainConfig{
 	TokenPriceBatchWriteFrequency: *commonconfig.MustNewDuration(time.Minute),
-	TokenInfo: map[types.Account]pluginconfig.TokenInfo{
+	TokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
 		tokenA: {DeviationPPB: cbi(1)},
 		tokenB: {DeviationPPB: cbi(2)},
 		tokenC: {DeviationPPB: cbi(3)},
