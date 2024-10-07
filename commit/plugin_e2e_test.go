@@ -117,6 +117,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
 			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
+			RMNRemoteCfg:        rmnRemoteCfg,
 		},
 	}
 
