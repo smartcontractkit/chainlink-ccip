@@ -1,58 +1,260 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/smartcontractkit/crib/cli/utils"
+	"github.com/smartcontractkit/crib/cli/wrappers"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+// Allowed values for the "provider" flag
+var supportedProviders = []string{"aws", "kind"}
 
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new CRIB installation",
+	Args:  cobra.MaximumNArgs(1),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		if len(args) == 1 {
+			viper.Set("DEVSPACE_NAMESPACE", args[0])
+		}
+		logger.Debug("input params for PreRun", "config", viper.AllSettings())
+
+		userWasPrompted := false
+		if !viper.GetBool("CRIB_CI_ENV") {
+			// DEVSPACE_NAMESPACE and PROVIDER are the only parameters that can be set interactively so
+			// the CLI flow doesn't require an extra step
+			for key, defaultValue := range map[string]string{"DEVSPACE_NAMESPACE": "", "PROVIDER": "aws"} {
+				if viper.GetString(key) == "" {
+					userWasPrompted = true
+					userInput, err := utils.PromptForInput(key, defaultValue)
+					if err != nil {
+						logger.Error("failed to prompt for input", slog.Any("error", err))
+						os.Exit(1)
+					}
+					viper.Set(key, userInput)
+				}
+			}
+		}
+
+		if !slices.Contains(supportedProviders, viper.GetString("PROVIDER")) {
+			logger.Error("unsupported provider", "supportedProviders", supportedProviders)
+			os.Exit(1)
+		}
+
+		if !viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX") && !strings.HasPrefix(viper.GetString("DEVSPACE_NAMESPACE"), "crib-") {
+			logger.Error("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
+			os.Exit(1)
+		}
+
+		if userWasPrompted && viper.GetBool("WRITE_CONFIG") {
+			promptedKvs := map[string]string{
+				"DEVSPACE_NAMESPACE": viper.GetString("DEVSPACE_NAMESPACE"),
+				"PROVIDER":           viper.GetString("PROVIDER"),
+			}
+			if err := utils.WriteConfig(viper.ConfigFileUsed(), promptedKvs); err != nil {
+				logger.Error("failed to write config file", slog.Any("error", err))
+				os.Exit(1)
+			}
+			logger.Info("prompted configs written to .env file", "config_file", viper.ConfigFileUsed())
+
+			// reload configs from .env after writing to it
+			if err := viper.ReadInConfig(); err != nil {
+				logger.Error("failed to reload the .env config file", slog.Any("error", err))
+				os.Exit(1)
+			}
+		}
+
+		// making sure we've got everything loaded by viper, whilst not enforcing optional params
+		// TODO: think about a better way to tell mandatory from optional flags apart
+		optionalKeys := []string{"GRAFANA_TOKEN", "DASHBOARD_NAME"}
+		missingRequiredFlags := []string{}
+		for _, key := range viper.AllKeys() {
+			if (strings.HasPrefix(key, "KEYSTONE_") || slices.Contains(optionalKeys, key)) && viper.Get(key) == "" {
+				missingRequiredFlags = append(missingRequiredFlags, key)
+			}
+		}
+		if len(missingRequiredFlags) > 0 {
+			logger.Error("missing required flags", "flags", missingRequiredFlags)
+			os.Exit(1)
+		}
+	},
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("init called")
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
 
-		// TODO: call SetupAwsProfile when applicable
-		// e.g. utils.SetupAwsProfile("$HOME/.aws/config", viper.GetString("crib.awsProfileName"), viper.GetString("aws.accountId"), viper.GetString("aws.region"), viper.GetString("aws.ssoRoleName"), viper.GetString("aws.ssoStartUrl"))
+		if err := utils.SetupAwsProfile(
+			viper.GetString("AWS_CONFIG_FILE"),
+			viper.GetString("AWS_PROFILE"),
+			viper.GetString("AWS_ACCOUNT_ID"),
+			viper.GetString("AWS_REGION"),
+			viper.GetString("AWS_SSO_ROLE_NAME"),
+			viper.GetString("AWS_SSO_START_URL"),
+		); err != nil {
+			logger.Error("failed to setup AWS Profile for CRIB", slog.Any("error", err))
+			os.Exit(1)
+		}
 
-		// TODO: call SetupKubeConfig when applicable
-		// setupKubeConfigInput := &utils.SetupKubeConfigInput{
-		// 	EksClient:            eksClient,
-		// 	KubeconfigPath:       "./kubeconfig",
-		// 	EksClusterName:       viper.GetString("eks.clusterName"),
-		// 	EksAliasName:         viper.GetString("eks.clusterAlias"),
-		// 	CribNamespace:        "crib-someone",
-		// 	AwsProfile:           viper.GetString("crib.awsProfileName"),
-		// 	AwsRegion:            viper.GetString("aws.region"),
-		// 	ChangeDefaultContext: true,
-		// }
-		// if err := utils.SetupKubeConfig(setupKubeConfigInput); err != nil {
-		// 	log.Fatalf("Failed to setup kubeconfig: %v", err)
-		// }
+		logger.Info("AWS config modified",
+			"config_file", viper.GetString("AWS_CONFIG_FILE"),
+			"profile", viper.GetString("AWS_PROFILE"),
+		)
 
-		// TODO: call DockerLogin w/ ECR token when applicable
-		// dockerCli, err := utils.InitializeDockerCLI()
-		// ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient) // ecrAuthToken contains a list of authData
-		// utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL)
+		awsSdkConfig, err := config.LoadDefaultConfig(
+			context.TODO(),
+			config.WithSharedConfigFiles([]string{viper.GetString("AWS_CONFIG_FILE")}),
+			config.WithSharedConfigProfile(viper.GetString("AWS_PROFILE")),
+		)
+		if err != nil {
+			logger.Error("failed to load AWS config", slog.Any("error", err))
+			os.Exit(1)
+		}
 
-		// TODO: call HelmRegistryLogin w/ ECR token when applicable
-		// helmRegistryClient, err := utils.InitializeHelmRegistryClient(nil)
-		// ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient) // ecrAuthToken contains a list of authData
-		// utils.HelmRegistryLogin(helmRegistryClient, authData.Username, authData.Password, authData.RegistryURL)
+		stsClient := wrappers.NewSTSClientWrapper(awsSdkConfig)
+		if !utils.HasValidAwsSession(stsClient) {
+			logger.Warn("No valid AWS session found, attempting to login via AWS SSO")
+			if err := utils.AwsSsoLogin(viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE")); err != nil {
+				logger.Error("failed to aws sso login", slog.Any("error", err))
+				os.Exit(1)
+			}
+		} else {
+			logger.Info("AWS credentials working.")
+		}
+
+		if !utils.HasValidAwsSession(stsClient) {
+			logger.Error("AWS credentials still not detected. Exiting.")
+			os.Exit(1)
+		}
+
+		if err := utils.SetupKubeConfig(&utils.SetupKubeConfigInput{
+			EksClient:            wrappers.NewEKSClientWrapper(awsSdkConfig),
+			KubeconfigPath:       viper.GetString("KUBECONFIG"),
+			EksClusterName:       viper.GetString("CRIB_EKS_CLUSTER_NAME"),
+			EksAliasName:         viper.GetString("CRIB_EKS_ALIAS_NAME"),
+			CribNamespace:        viper.GetString("DEVSPACE_NAMESPACE"),
+			AwsProfile:           viper.GetString("AWS_PROFILE"),
+			AwsRegion:            viper.GetString("AWS_REGION"),
+			ChangeDefaultContext: true,
+		}); err != nil {
+			logger.Error("failed to setup kubeconfig", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		// TODO: test EKS access here, if not working recommend the user to connect to the vpn
+		logger.Info("EKS access working",
+			"kubeconfig", viper.GetString("KUBECONFIG"),
+			"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
+		)
+
+		// TODO: call HelmRegistryLogin and DockerLogin to a separate command, so devspace can refresh tokens when needed
+		if viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") && viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
+			logger.Info("CRIB initialization complete")
+			return
+		}
+
+		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
+		ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient)
+		if err != nil {
+			logger.Error("failed to get ECR auth token", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		for _, authData := range ecrAuthToken {
+			if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
+				dockerCli, err := utils.InitializeDockerCLI()
+				if err != nil {
+					logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+					os.Exit(1)
+				}
+				if _, err := utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL); err != nil && !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
+					logger.Error("failed to docker login", slog.Any("error", err))
+					os.Exit(1)
+				}
+				logger.Info("Docker login successful", "registry", authData.RegistryURL)
+			}
+
+			if !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
+				helmRegistryClient, err := utils.InitializeHelmRegistryClient(nil)
+				if err != nil {
+					logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
+					os.Exit(1)
+				}
+				if err := utils.HelmRegistryLogin(helmRegistryClient, authData.Username, authData.Password, authData.RegistryURL); err != nil {
+					logger.Error("failed to helm registry login", slog.Any("error", err))
+					os.Exit(1)
+				}
+				logger.Info("Helm registry login successful", "registry", authData.RegistryURL)
+			}
+		}
+
+		logger.Info("CRIB initialization complete")
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(initCmd)
 
-	// Here you will define your flags and configuration settings.
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Error("failed to determine user's home dir", slog.Any("error", err))
+	}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// AWS Flags
+	initCmd.Flags().String("aws-config-file", filepath.Join(userHomeDir, ".aws", "config"), "Path to AWS config")
+	initCmd.Flags().String("aws-profile", "", "AWS Profile name to setup")
+	initCmd.Flags().String("aws-account-id", "", "AWS Account ID for the profile")
+	initCmd.Flags().String("aws-region", "", "AWS Region")
+	initCmd.Flags().String("aws-sso-role-name", "", "AWS SSO Role Name")
+	initCmd.Flags().String("aws-sso-start-url", "", "AWS SSO Start URL")
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// K8S flags
+	initCmd.Flags().String("kubeconfig", filepath.Join(userHomeDir, ".kube", "config"), "Path to kube config file")
+	initCmd.Flags().String("crib-eks-cluster-name", "", "EKS cluster name to point kubeconfig at")
+	initCmd.Flags().String("crib-eks-alias-name", "", "EKS alias name (will be used as the name of the kube context)")
+
+	// devspace flags
+	initCmd.Flags().String("devspace-namespace", "", "CRIB K8S Namespace (to be used by devspace)")
+	initCmd.Flags().String("provider", "", fmt.Sprintf("Provider to initialize (should be one of: %v)", supportedProviders))
+
+	// flow control flags
+	initCmd.Flags().Bool("crib-ci-env", false, "Flag to indicate that this is a CI environment")
+	initCmd.Flags().Bool("crib-ignore-namespace-prefix", false, "Skips validating the crib- prefix in DEVSPACE_NAMESPACE")
+	initCmd.Flags().Bool("crib-skip-docker-ecr-login", false, "Skips logging into Docker ECR registry")
+	initCmd.Flags().Bool("crib-skip-helm-ecr-login", false, "Skips logging into Helm ECR registry")
+	initCmd.Flags().Bool("write-config", false, "Persists config acquired interactively back to .env passed via --config (WARNING: comments will be lost!)")
+
+	// bind to viper
+	viper.BindPFlag("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file"))
+	viper.BindPFlag("AWS_PROFILE", initCmd.Flags().Lookup("aws-profile-name"))
+	viper.BindPFlag("AWS_ACCOUNT_ID", initCmd.Flags().Lookup("aws-account-id"))
+	viper.BindPFlag("AWS_REGION", initCmd.Flags().Lookup("aws-region"))
+	viper.BindPFlag("AWS_SSO_ROLE_NAME", initCmd.Flags().Lookup("aws-sso-role-name"))
+	viper.BindPFlag("AWS_SSO_START_URL", initCmd.Flags().Lookup("aws-sso-start-url"))
+	viper.BindPFlag("KUBECONFIG", initCmd.Flags().Lookup("kubeconfig"))
+	viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("eks-cluster-name"))
+	viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("eks-alias-name"))
+	viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
+	viper.BindPFlag("CRIB_CI_ENV", initCmd.Flags().Lookup("crib-ci-env"))
+	viper.BindPFlag("CRIB_IGNORE_NAMESPACE_PREFIX", initCmd.Flags().Lookup("crib-ignore-namespace-prefix"))
+	viper.BindPFlag("CRIB_SKIP_DOCKER_ECR_LOGIN", initCmd.Flags().Lookup("crib-skip-docker-ecr-login"))
+	viper.BindPFlag("CRIB_SKIP_HELM_ECR_LOGIN", initCmd.Flags().Lookup("crib-skip-helm-ecr-login"))
+	viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
+	viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))
+
+	// set defaults
+	viper.SetDefault("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file").DefValue)
+	viper.SetDefault("KUBECONFIG", initCmd.Flags().Lookup("kubeconfig").DefValue)
+
+	// defaults that came from cribbit.sh
+	viper.SetDefault("CRIB_EKS_CLUSTER_NAME", "main-stage-cluster")
+	viper.SetDefault("CRIB_EKS_ALIAS_NAME", "main-stage-cluster-crib")
 }

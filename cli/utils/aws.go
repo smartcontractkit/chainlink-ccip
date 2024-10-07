@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	"gopkg.in/ini.v1"
 )
@@ -17,7 +20,12 @@ func SetupAwsProfile(configPath string, profileName string, accountId string, re
 	ini.PrettyFormat = false
 	ini.PrettyEqual = true
 
-	cfg, err := ini.Load(configPath)
+	configFile, err := os.OpenFile(configPath, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+
+	cfg, err := ini.Load(configFile)
 	if err != nil {
 		return err
 	}
@@ -78,4 +86,22 @@ func GetDecodedECRAuthorizationToken(ecrClient wrappers.ECRAPI) ([]*GetDecodedEC
 	}
 
 	return output, nil
+}
+
+// TODO: evaluate inspecting credentials expiry, so we can refresh the token beforehand
+func HasValidAwsSession(stsClient wrappers.STSAPI) bool {
+	_, err := stsClient.GetCallerIdentity(context.TODO(), &sts.GetCallerIdentityInput{})
+	return err == nil
+}
+
+func AwsSsoLogin(awsConfigFile string, awsProfile string) error {
+	cmd := exec.Command("aws", "sso", "login")
+	cmd.Env = []string{
+		"PATH=" + os.Getenv("PATH"),
+		"AWS_CONFIG_FILE=" + awsConfigFile,
+		"AWS_PROFILE=" + awsProfile,
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

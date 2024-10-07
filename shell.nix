@@ -65,5 +65,11 @@ mkShell' {
     echo -n "Building crib-cli... "
     (cd $repo_root/cli && go build -o ./dist/crib-cli .) && echo "Done." || echo "Failed to build crib-cli. Please post this error message to #project-crib." >&2
     export PATH=$PATH:$repo_root/cli/dist
+
+    # crib-cli init will make sure everything else is set up prior to running any devspace commands
+    crib-cli init --write-config || exit $?
+
+    # sourcing the .env file as the last step
+    export $(cat .env | grep -v ^# | xargs)
   '';
 }

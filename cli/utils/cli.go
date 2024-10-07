@@ -1,0 +1,167 @@
+package utils
+
+import (
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/go-git/go-git/v5"
+)
+
+func GetGitTopLevelDir(dir string) (string, error) {
+	// normalize the path
+	path, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		repo, err := git.PlainOpen(path)
+		if err == nil {
+			// Get the working directory of the repository
+			worktree, err := repo.Worktree()
+			if err != nil {
+				return "", fmt.Errorf("failed to get worktree for repo %s: %v", path, err)
+			}
+
+			return worktree.Filesystem.Root(), nil
+		}
+
+		parentDir := filepath.Dir(path)
+		if parentDir == path {
+			return "", git.ErrRepositoryNotExists
+		}
+
+		// Move up one directory level
+		path = parentDir
+	}
+}
+
+func ListFiles(dirPath string) ([]string, error) {
+	f, err := os.Open(dirPath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return f.Readdirnames(-1)
+}
+
+func PromptForInput(key string, defaultValue string) (string, error) {
+	userInput := ""
+	prompt := fmt.Sprintf("Please enter a value for %s: ", key)
+	if defaultValue != "" {
+		prompt = fmt.Sprintf("%s (default is '%s')", prompt, defaultValue)
+	}
+	fmt.Print(prompt)
+	_, err := fmt.Scanln(&userInput)
+	if userInput == "" {
+		return defaultValue, nil
+	}
+	return userInput, err
+}
+
+// PresentPrompt presents a prompt to the user with possible choices and waits for valid input
+func PresentPrompt(prompt string, choices []string) string {
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		// Display the prompt and valid choices
+		fmt.Printf("%s (%s): ", prompt, strings.Join(choices, "/"))
+
+		// Read the user's input
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading input. Please try again.")
+			continue
+		}
+
+		// Clean up the input (remove newline and extra spaces)
+		input = strings.TrimSpace(input)
+
+		// Check if the input is one of the valid choices
+		for _, choice := range choices {
+			if input == choice {
+				return input // Return valid input
+			}
+		}
+
+		// Inform the user that the input is invalid
+		fmt.Printf("Invalid choice. Please choose one of %v.\n", choices)
+	}
+}
+
+func CopyFile(srcPath string, dstPath string) error {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		return err
+	}
+
+	// Copy source to destination
+	_, err = io.Copy(dst, src)
+	return err
+}
+
+// WriteConfig writes the configuration settings to a file by searching and replacing the values of the keys in kv
+func WriteConfig(path string, kv map[string]string) error {
+	tempFile, err := os.CreateTemp(filepath.Dir(path), ".env.temp")
+	if err != nil {
+		return fmt.Errorf("error creating temporary file: %w", err)
+	}
+	defer tempFile.Close()
+
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("error opening .env file: %w", err)
+	}
+	defer file.Close()
+
+	linesToWrite := []string{}
+	updatedLines := map[string]string{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		for key, newValue := range kv {
+			if strings.HasPrefix(line, key) {
+				line = fmt.Sprintf("%s=%s", key, newValue)
+				updatedLines[key] = newValue
+				break
+			}
+		}
+		linesToWrite = append(linesToWrite, line)
+	}
+
+	cliMarker := "# Added by CRIB CLI"
+	if len(updatedLines) < len(kv) {
+		if !slices.Contains(linesToWrite, cliMarker) {
+			linesToWrite = append(linesToWrite, cliMarker)
+		}
+		for key, newValue := range kv {
+			if _, ok := updatedLines[key]; !ok {
+				linesToWrite = append(linesToWrite, fmt.Sprintf("%s=%s", key, newValue))
+			}
+		}
+	}
+
+	for _, line := range linesToWrite {
+		if _, err := tempFile.WriteString(line + "\n"); err != nil {
+			return fmt.Errorf("error writing to temporary file: %w", err)
+		}
+	}
+
+	// Move the temporary file to replace the original .env file
+	if err := os.Rename(tempFile.Name(), path); err != nil {
+		return fmt.Errorf("error moving temporary file to original file: %w", err)
+	}
+
+	return nil
+}
