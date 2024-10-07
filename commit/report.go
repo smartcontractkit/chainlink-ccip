@@ -38,6 +38,8 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+		//TODO: Calculate it for real
+		RmnRawVs: cciptypes.NewBigIntFromInt64(0),
 	}
 
 	encodedReport, err := p.reportCodec.Encode(context.Background(), rep)
