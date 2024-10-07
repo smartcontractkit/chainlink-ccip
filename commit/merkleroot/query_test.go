@@ -108,6 +108,7 @@ func TestProcessor_Query(t *testing.T) {
 								ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 50, MaxMsgNr: 51},
 							},
 						},
+						rmnRemoteCfg,
 					).
 					Return(expSigs1, nil)
 				return cl
@@ -137,7 +138,7 @@ func TestProcessor_Query(t *testing.T) {
 			rmnClient: func(t *testing.T) *rmnmocks.MockController {
 				cl := rmnmocks.NewMockController(t)
 				time.Sleep(time.Millisecond)
-				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
+				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, rmn.ErrTimeout) // <------------------------------------ timeout error
 				return cl
 			},
@@ -166,7 +167,7 @@ func TestProcessor_Query(t *testing.T) {
 			rmnClient: func(t *testing.T) *rmnmocks.MockController {
 				cl := rmnmocks.NewMockController(t)
 				time.Sleep(time.Millisecond)
-				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything).
+				cl.EXPECT().ComputeReportSignatures(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(expSigs1, fmt.Errorf("some error")) // <------------------------- some random error
 				return cl
 			},

@@ -80,9 +80,14 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("failed to convert signatures from protobuf: %w", err)
 	}
 
+	rmnRemoteCfg := prevOutcome.RMNRemoteCfg
+	if rmnRemoteCfg.IsEmpty() {
+		return fmt.Errorf("RMN remote config is not provided in the previous outcome")
+	}
+
 	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
-	for _, rmnNode := range w.rmnConfig.Home.RmnNodes {
-		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
+	for _, rmnNode := range rmnRemoteCfg.Signers {
+		signerAddresses = append(signerAddresses, rmnNode.OnchainPublicKey)
 	}
 
 	laneUpdates, err := rmn.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
@@ -91,12 +96,12 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               w.rmnConfig.Home.RmnReportVersion,
+		ReportVersion:               rmnRemoteCfg.RmnReportVersion.String(),
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
-		RmnRemoteContractAddress:    w.rmnConfig.Remote.ContractAddress,
+		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,
 		OfframpAddress:              offRampAddress,
-		RmnHomeContractConfigDigest: w.rmnConfig.Home.ConfigDigest,
+		RmnHomeContractConfigDigest: rmnRemoteCfg.ConfigDigest,
 		LaneUpdates:                 laneUpdates,
 	}
 
