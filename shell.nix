@@ -59,5 +59,10 @@ mkShell' {
 
     # install changesets (no nix package available atm)
     pnpm install
+
+    # build crib-cli and make it available in PATH
+    echo -n "Building crib-cli... "
+    (cd $repo_root/cli && go build -o ./dist/crib-cli .) && echo "Done." || echo "Failed to build crib-cli. Please post this error message to #project-crib." >&2
+    export PATH=$PATH:$repo_root/cli/dist
   '';
 }
