@@ -132,9 +132,8 @@ type Outcome struct {
 	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
 	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
 	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
-	//TODO: Calculate the bitmap
 	// This is a bitmap where ith bit represents how the v value should be for ith signature
-	RmnRawVs cciptypes.BigInt `json:"rmnRawVs"`
+	RMNRawVs cciptypes.BigInt `json:"rmnRawVs"`
 }
 
 // Sort all fields of the given Outcome

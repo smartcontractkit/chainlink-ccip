@@ -120,6 +120,8 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
 			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
+			// TODO: Calculate the bitmap
+			RMNRawVs: ccipocr3.NewBigIntFromInt64(0),
 		},
 	}
 

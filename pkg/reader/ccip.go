@@ -112,13 +112,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		GasPriceUpdates   []GasPriceUpdate
 	}
 
-	type CommitReportAccepted struct {
+	type CommitReportAcceptedEvent struct {
 		PriceUpdates PriceUpdates
 		MerkleRoots  []MerkleRoot
-	}
-
-	type CommitReportAcceptedEvent struct {
-		Report CommitReportAccepted
 	}
 	// ---------------------------------------------------
 
@@ -155,15 +151,17 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
-			r.lggr.Debugw("commit report too old, skipping", "report", ev.Report, "item", item,
+			r.lggr.Debugw("commit report too old, skipping", "report", ev, "item", item,
 				"destChain", dest,
 				"ts", ts,
 				"limit", limit)
 			continue
 		}
 
-		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.Report.MerkleRoots))
-		for _, mr := range ev.Report.MerkleRoots {
+		r.lggr.Debugw("processing commit report", "report", ev, "item", item)
+
+		merkleRoots := make([]cciptypes.MerkleRootChain, 0, len(ev.MerkleRoots))
+		for _, mr := range ev.MerkleRoots {
 			onRampAddress, err := r.GetContractAddress(
 				consts.ContractNameOnRamp,
 				cciptypes.ChainSelector(mr.SourceChainSelector),
@@ -187,14 +185,14 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			GasPriceUpdates:   make([]cciptypes.GasPriceChain, 0),
 		}
 
-		for _, tokenPriceUpdate := range ev.Report.PriceUpdates.TokenPriceUpdates {
+		for _, tokenPriceUpdate := range ev.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
 				TokenID: ocr3types.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
 				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
 
-		for _, gasPriceUpdate := range ev.Report.PriceUpdates.GasPriceUpdates {
+		for _, gasPriceUpdate := range ev.PriceUpdates.GasPriceUpdates {
 			priceUpdates.GasPriceUpdates = append(priceUpdates.GasPriceUpdates, cciptypes.GasPriceChain{
 				ChainSel: cciptypes.ChainSelector(gasPriceUpdate.DestChainSelector),
 				GasPrice: cciptypes.NewBigInt(gasPriceUpdate.UsdPerUnitGas),
@@ -215,6 +213,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			BlockNum:  blockNum,
 		})
 	}
+
+	r.lggr.Debugw("decoded commit reports", "reports", reports)
 
 	if len(reports) < limit {
 		return reports, nil
@@ -770,7 +770,12 @@ func (r *ccipChainReader) Close(ctx context.Context) error {
 }
 
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
-	bindings := r.contractReaders[chain].GetBindings(contractName)
+	extendedReader, ok := r.contractReaders[chain]
+	if !ok {
+		return nil, fmt.Errorf("contract reader not found for chain %d", chain)
+	}
+
+	bindings := extendedReader.GetBindings(contractName)
 	if len(bindings) != 1 {
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
 	}
