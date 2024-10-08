@@ -536,6 +536,62 @@ func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) RunAndReturn(run fu
 	return _c
 }
 
+// LinkPriceUSD provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) LinkPriceUSD(ctx context.Context) (ccipocr3.BigInt, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LinkPriceUSD")
+	}
+
+	var r0 ccipocr3.BigInt
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.BigInt, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.BigInt); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(ccipocr3.BigInt)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_LinkPriceUSD_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LinkPriceUSD'
+type MockCCIPReader_LinkPriceUSD_Call struct {
+	*mock.Call
+}
+
+// LinkPriceUSD is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockCCIPReader_Expecter) LinkPriceUSD(ctx interface{}) *MockCCIPReader_LinkPriceUSD_Call {
+	return &MockCCIPReader_LinkPriceUSD_Call{Call: _e.mock.On("LinkPriceUSD", ctx)}
+}
+
+func (_c *MockCCIPReader_LinkPriceUSD_Call) Run(run func(ctx context.Context)) *MockCCIPReader_LinkPriceUSD_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_LinkPriceUSD_Call) Return(_a0 ccipocr3.BigInt, _a1 error) *MockCCIPReader_LinkPriceUSD_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_LinkPriceUSD_Call) RunAndReturn(run func(context.Context) (ccipocr3.BigInt, error)) *MockCCIPReader_LinkPriceUSD_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MsgsBetweenSeqNums provides a mock function with given fields: ctx, chain, seqNumRange
 func (_m *MockCCIPReader) MsgsBetweenSeqNums(ctx context.Context, chain ccipocr3.ChainSelector, seqNumRange ccipocr3.SeqNumRange) ([]ccipocr3.Message, error) {
 	ret := _m.Called(ctx, chain, seqNumRange)
