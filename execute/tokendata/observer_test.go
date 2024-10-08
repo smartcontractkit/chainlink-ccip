@@ -423,6 +423,9 @@ func Test_CompositeTokenDataObserver_ParallelExecution(t *testing.T) {
 	lggr := logger.Test(t)
 
 	t.Cleanup(func() {
+		// Sync the logger state after timeouting underlying Go routines in the tests
+		// If the killed routine is woken up after the test is finished, it will try to log which cause zap logger
+		// to panic
 		_ = lggr.Sync()
 	})
 
