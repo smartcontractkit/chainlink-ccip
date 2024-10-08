@@ -7,9 +7,10 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
@@ -129,6 +130,7 @@ func (p *Plugin) getMessagesObservation(
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
 	messages := make(exectypes.MessageObservations)
+	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
 	if len(previousOutcome.PendingCommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
@@ -164,6 +166,12 @@ func (p *Plugin) getMessagesObservation(
 				}
 			}
 		}
+
+		var err error
+		messageTimestamps, err = getMessageTimestampMap(commitReportCache, messages)
+		if err != nil {
+			return exectypes.Observation{}, err
+		}
 	}
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
@@ -171,7 +179,7 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
-	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages)
+	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages, messageTimestamps)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages %w", err)
 	}
