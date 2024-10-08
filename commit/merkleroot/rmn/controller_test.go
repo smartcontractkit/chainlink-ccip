@@ -54,6 +54,162 @@ type testSetup struct {
 	rmnNodes       []rmntypes.HomeNodeInfo
 }
 
+func Test_selectRoots(t *testing.T) {
+
+	root1 := cciptypes.Bytes32{0, 0, 0, 1}
+	root2 := cciptypes.Bytes32{0, 0, 0, 2}
+
+	testCases := []struct {
+		name         string
+		observations []rmnSignedObservationWithMeta
+		minObservers map[cciptypes.ChainSelector]int
+		expErr       bool
+		expRoots     map[cciptypes.ChainSelector]cciptypes.Bytes32
+	}{
+		{
+			name: "happy path",
+			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+			},
+			minObservers: map[cciptypes.ChainSelector]int{chainS1: 1},
+			expRoots: map[cciptypes.ChainSelector]cciptypes.Bytes32{
+				chainS1: root1,
+			},
+		},
+		{
+			name: "observers not defined",
+			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+			},
+			minObservers: map[cciptypes.ChainSelector]int{}, // <-------
+			expErr:       true,
+		},
+		{
+			name: "more than one roots but one of them less than f",
+			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root2[:],
+								},
+							},
+						},
+					},
+				},
+			},
+			minObservers: map[cciptypes.ChainSelector]int{chainS1: 2},
+			expRoots: map[cciptypes.ChainSelector]cciptypes.Bytes32{
+				chainS1: root1,
+			},
+		},
+		{
+			name: "more than one valid roots",
+			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root2[:],
+								},
+							},
+						},
+					},
+				},
+			},
+			minObservers: map[cciptypes.ChainSelector]int{chainS1: 1},
+			expErr:       true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			roots, err := selectRoots(tc.observations, tc.minObservers)
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expRoots, roots)
+		})
+	}
+}
+
 func TestClient_ComputeReportSignatures(t *testing.T) {
 	newTestSetup := func(t *testing.T) testSetup {
 		lggr := logger.Test(t)
