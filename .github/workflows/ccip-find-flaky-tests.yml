@@ -1,11 +1,17 @@
 name: "Flaky test detection"
 
 on:
-  # Allow manual triggering via the GitHub UI
-  workflow_dispatch:
-  # Run the workflow every 4 hours
-  schedule:
-    - cron: "0 */4 * * *"
+  pull_request:
+  push:
+    branches:
+      - 'main'
+
+#on:
+#  # Allow manual triggering via the GitHub UI
+#  workflow_dispatch:
+#  # Run the workflow every 4 hours
+#  schedule:
+#    - cron: "0 */4 * * *"
 
 jobs:
   flaky-test-detection:
@@ -25,10 +31,12 @@ jobs:
       - name: Display Go version
         run: go version
       - name: Run tests 50 times.
-        run: TEST_COUNT=50 make test
+        run: |
+          TEST_COUNT=50 make test
+          exit 1
       - name: Notify the team by commenting on latest commit
         if: failure()
         run: |
           response=$(curl -X POST -H 'Content-type: application/json' \
-            --data '{"text": "Flaky tests detected in chainlink-ccip repository.", "channel": "#ccip-pod-offchain"}' \
+            --data '{"text": "This is a test - Flaky tests detected in chainlink-ccip repository.", "channel": "#ccip-pod-offchain"}' \
               ${{ secrets.SLACK_WEBHOOK_URL }})
