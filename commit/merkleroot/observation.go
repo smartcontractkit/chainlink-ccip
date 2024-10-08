@@ -60,7 +60,11 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 
 	nextState := prevOutcome.NextState()
 
-	if skipVerification, err := shouldSkipRMNVerification(nextState, q, prevOutcome); skipVerification || err != nil {
+	skipVerification, err := shouldSkipRMNVerification(nextState, q, prevOutcome)
+	if skipVerification {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 
