@@ -2,6 +2,7 @@ package merkleroot
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"sort"
@@ -60,13 +61,8 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 
 	nextState := prevOutcome.NextState()
 
-	if nextState != BuildingReport && q.RMNSignatures == nil {
-		return nil
-	}
-
-	err := checkRMNRequirements(nextState, q, prevOutcome)
-	if err != nil {
-		return fmt.Errorf("failed to check RMN requirements: %w", err)
+	if skipVerification, err := shouldSkipRMNVerification(nextState, q, prevOutcome); skipVerification || err != nil {
+		return err
 	}
 
 	ch, exists := chainsel.ChainBySelector(uint64(w.destChain))
@@ -115,24 +111,35 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	return nil
 }
 
-func checkRMNRequirements(nextState State, q Query, prevOutcome Outcome) error {
-	// If we are in the BuildingReport state, and we are not retrying RMN signatures in the next round, we expect RMN
-	// signatures to be provided by the leader.
+// shouldSkipRMNVerification checks whether RMN verification should be skipped based on the current state and query.
+func shouldSkipRMNVerification(nextState State, q Query, prevOutcome Outcome) (bool, error) {
+	// Skip verification if RMN signatures are not expected in the current state.
+	if nextState != BuildingReport && q.RMNSignatures == nil {
+		return true, nil
+	}
+
+	// Skip verification if we are retrying RMN signatures in the next round.
+	if nextState == BuildingReport && q.RetryRMNSignatures {
+		return true, nil
+	}
+
+	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
 	if nextState == BuildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+		return false, fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
 	}
 
-	// If we are in the BuildingReport state, RMN remote config is required to verify the RMN signatures.
+	// If in the BuildingReport state but RMN remote config is not available, return an error.
 	if nextState == BuildingReport && prevOutcome.RMNRemoteCfg.IsEmpty() {
-		return fmt.Errorf("RMN report config is not provided in the previous outcome")
+		return false, fmt.Errorf("RMN report config is not provided in the previous outcome")
 	}
 
-	// If we are not in the BuildingReport state, we do not expect RMN signatures to be provided.
+	// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
 	if nextState != BuildingReport && q.RMNSignatures != nil {
-		return fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
+		return false, fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
 	}
 
-	return nil
+	// Proceed with RMN verification.
+	return false, nil
 }
 
 func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
@@ -392,4 +399,16 @@ func (o ObserverImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
+}
+
+// signatureVerifierAlwaysTrue is a signature verifier that always returns true.
+type signatureVerifierAlwaysTrue struct{}
+
+func (a signatureVerifierAlwaysTrue) Verify(_ ed25519.PublicKey, _, _ []byte) bool {
+	return true
+}
+
+func (a signatureVerifierAlwaysTrue) VerifyReportSignatures(
+	_ context.Context, _ []cciptypes.RMNECDSASignature, _ cciptypes.RMNReport, _ []cciptypes.Bytes) error {
+	return nil
 }
