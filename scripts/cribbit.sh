@@ -19,9 +19,6 @@ set -euo pipefail
 # environment.
 #############################
 
-# Used by build scripts in CHAINLINK_CODE_DIR to configure a crib build environment
-export IS_CRIB=true
-
 # Get the root of the Git repository
 repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
 
