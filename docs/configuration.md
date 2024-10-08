@@ -120,7 +120,8 @@ all chains. For example the OffRamp is only available to nodes configured with
 an OffRamp reader role. See the [consensus documentation](consensus.md) for
 details about participant roles.
 
-TODO: more details about discovery and a link to the discovery processor.
+Contract discovery is managed by the [discovery processor](https://github.com/smartcontractkit/chainlink-ccip/tree/b99bec3d0692a2224aaa477a7aa297f0b48eaa58/internal/plugincommon/discovery),
+a shared component used by the commit and execute plugins.
 
 ```mermaid
 sequenceDiagram
@@ -130,8 +131,8 @@ OffRamp ->> DestReader: Get static configuration.
 OffRamp ->> DestReader: Get dynamic configuration.
 OffRamp ->> DestReader: Get source chain configuration.
 DestReader ->> DON: Share contract addresses.
-DON ->> SourceReader(s): Receive contract addresses.
 OnRamp ->> SourceReader(s): Get static configuration.
 OnRamp ->> SourceReader(s): Get dynamic configuration.
 OnRamp ->> SourceReader(s): Get source chain configuration.
+SourceReader(s) ->> DON: Share contract addresses.
 ```
