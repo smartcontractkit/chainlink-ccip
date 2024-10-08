@@ -21,6 +21,7 @@ func Test_CompositeTokenDataObserver_EmptyObservers(t *testing.T) {
 		100,
 		[]pluginconfig.TokenDataObserverConfig{},
 		nil,
+		nil,
 	)
 	require.NoError(t, err)
 

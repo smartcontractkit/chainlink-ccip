@@ -3,7 +3,6 @@ package commit
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -32,21 +33,21 @@ type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observati
 
 type Plugin struct {
 	donID               plugintypes.DonID
-	nodeID              commontypes.OracleID
-	oracleIDToP2pID     map[commontypes.OracleID]libocrtypes.PeerID
-	cfg                 pluginconfig.CommitPluginConfig
+	oracleID            commontypes.OracleID
+	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
+	offchainCfg         pluginconfig.CommitOffchainConfig
 	ccipReader          readerpkg.CCIPReader
 	tokenPricesReader   reader.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
+	rmnHomeReader       reader.RMNHome
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
-	rmnConfig           rmn.Config
 
 	// state
 	contractsInitialized bool
@@ -55,36 +56,42 @@ type Plugin struct {
 func NewPlugin(
 	_ context.Context,
 	donID plugintypes.DonID,
-	nodeID commontypes.OracleID,
+	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	cfg pluginconfig.CommitPluginConfig,
+	offchainCfg pluginconfig.CommitOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	ccipReader readerpkg.CCIPReader,
 	tokenPricesReader reader.PriceReader,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
+	rmnHomeReader reader.RMNHome,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	rmnConfig rmn.Config,
 ) *Plugin {
-	if cfg.MaxMerkleTreeSize == 0 {
+	lggr = logger.Named(lggr, "CommitPlugin")
+	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
+	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
+
+	if offchainCfg.MaxMerkleTreeSize == 0 {
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
-			"default", pluginconfig.EvmDefaultMaxMerkleTreeSize)
-		cfg.MaxMerkleTreeSize = pluginconfig.EvmDefaultMaxMerkleTreeSize
+			"default", merklemulti.MaxNumberTreeLeaves)
+		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
 		lggr,
 		homeChain,
 		oracleIDToP2pID,
-		nodeID,
-		cfg.DestChain,
+		oracleID,
+		destChain,
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
-		nodeID,
+		oracleID,
 		lggr,
-		cfg,
+		offchainCfg,
+		destChain,
 		homeChain,
 		ccipReader,
 		msgHasher,
@@ -92,13 +99,14 @@ func NewPlugin(
 		chainSupport,
 		rmn.Controller(nil),      // todo
 		cciptypes.RMNCrypto(nil), // todo
-		rmnConfig,
+		rmnHomeReader,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
-		nodeID,
+		oracleID,
 		lggr,
-		cfg,
+		offchainCfg,
+		destChain,
 		chainSupport,
 		tokenPricesReader,
 		homeChain,
@@ -109,28 +117,38 @@ func NewPlugin(
 		lggr,
 		&ccipReader,
 		homeChain,
-		cfg.DestChain,
+		destChain,
 		reportingCfg.F,
 		oracleIDToP2pID,
 	)
 
+	chainFeeProcessr := chainfee.NewProcessor(
+		lggr,
+		destChain,
+		homeChain,
+		ccipReader,
+		offchainCfg,
+		chainSupport,
+		reportingCfg.F,
+	)
+
 	return &Plugin{
 		donID:               donID,
-		nodeID:              nodeID,
-		oracleIDToP2pID:     oracleIDToP2pID,
+		oracleID:            oracleID,
+		oracleIDToP2PID:     oracleIDToP2pID,
 		lggr:                lggr,
-		cfg:                 cfg,
+		offchainCfg:         offchainCfg,
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
 		homeChain:           homeChain,
+		rmnHomeReader:       rmnHomeReader,
 		reportCodec:         reportCodec,
 		reportingCfg:        reportingCfg,
 		chainSupport:        chainSupport,
 		merkleRootProcessor: merkleRootProcessor,
 		tokenPriceProcessor: tokenPriceProcessor,
-		chainFeeProcessor:   chainfee.NewProcessor(),
+		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
-		rmnConfig:           rmnConfig,
 	}
 }
 
@@ -214,7 +232,7 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
-		p.lggr.Warnw("call to GetFChain failed", "err", err)
+		p.lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
@@ -322,14 +340,6 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	timeout := 10 * time.Second
-	ctx, cf := context.WithTimeout(context.Background(), timeout)
-	defer cf()
-
-	if err := p.ccipReader.Close(ctx); err != nil {
-		return fmt.Errorf("close ccip reader: %w", err)
-	}
-
 	return nil
 }
 

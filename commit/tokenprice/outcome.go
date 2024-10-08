@@ -26,16 +26,16 @@ func (p *processor) getConsensusObservation(
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
 	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
 
-	fDestChain, exists := fChains[p.cfg.DestChain]
+	fDestChain, exists := fChains[p.destChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.cfg.DestChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d", p.destChain)
 	}
 
-	fFeedChain, exists := fChains[p.cfg.OffchainConfig.PriceFeedChainSelector]
+	fFeedChain, exists := fChains[p.offChainCfg.PriceFeedChainSelector]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for f for FeedChain: %d", p.cfg.OffchainConfig.PriceFeedChainSelector)
+			fmt.Errorf("no consensus value for f for FeedChain: %d", p.offChainCfg.PriceFeedChainSelector)
 	}
 
 	feedPricesConsensus := consensus.GetConsensusMapAggregator(
@@ -53,7 +53,9 @@ func (p *processor) getConsensusObservation(
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
 		consensus.MakeConstantThreshold[types.Account](consensus.TwoFPlus1(fDestChain)),
-		feeQuoterAggregator,
+		// each key will have one object with the median for timestamps as timestamp value
+		// and the median prices as price value
+		consensus.TimestampedBigAggregator,
 	)
 
 	consensusObs := ConsensusObservation{
@@ -66,22 +68,6 @@ func (p *processor) getConsensusObservation(
 	return consensusObs, nil
 }
 
-// feeQuoterAggregator aggregates the fee quoter updates by taking the median of the prices and timestamps
-var feeQuoterAggregator = func(updates []plugintypes.TimestampedBig) plugintypes.TimestampedBig {
-	timestamps := make([]time.Time, len(updates))
-	prices := make([]cciptypes.BigInt, len(updates))
-	for i := range updates {
-		timestamps[i] = updates[i].Timestamp
-		prices[i] = updates[i].Value
-	}
-	medianPrice := consensus.Median(prices, consensus.BigIntComparator)
-	medianTimestamp := consensus.Median(timestamps, consensus.TimestampComparator)
-	return plugintypes.TimestampedBig{
-		Value:     medianPrice,
-		Timestamp: medianTimestamp,
-	}
-}
-
 // selectTokensForUpdate checks which tokens need to be updated based on the observed token prices and
 // the fee quoter updates
 // a token is selected for update if it meets one of 2 conditions:
@@ -91,7 +77,7 @@ func (p *processor) selectTokensForUpdate(
 	obs ConsensusObservation,
 ) []cciptypes.TokenPrice {
 	var tokenPrices []cciptypes.TokenPrice
-	cfg := p.cfg.OffchainConfig
+	cfg := p.offChainCfg
 	tokenInfo := cfg.TokenInfo
 
 	for token, feedPrice := range obs.FeedTokenPrices {

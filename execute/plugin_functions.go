@@ -7,7 +7,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -17,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -311,7 +311,7 @@ func mergeTokenObservations(
 ) (exectypes.TokenDataObservations, error) {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	//nolint:lll
-	validators := make(map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
 	for _, ao := range aos {
@@ -326,7 +326,7 @@ func mergeTokenObservations(
 			}
 
 			if _, ok1 := validators[selector]; !ok1 {
-				validators[selector] = make(map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
+				validators[selector] = make(map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 			}
 
 			initResultsAndValidators(selector, f, seqMap, results, validators)
@@ -358,7 +358,7 @@ func initResultsAndValidators(
 	f int,
 	seqMap map[cciptypes.SeqNum]exectypes.MessageTokenData,
 	results exectypes.TokenDataObservations,
-	validators map[cciptypes.ChainSelector]map[exectypes.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
+	validators map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData],
 ) {
 	for seqNr, msgTokenData := range seqMap {
 		if _, ok := results[selector][seqNr]; !ok {
@@ -366,7 +366,7 @@ func initResultsAndValidators(
 		}
 
 		for tokenIndex, tokenData := range msgTokenData.TokenData {
-			messageTokenID := exectypes.NewMessageTokenID(seqNr, tokenIndex)
+			messageTokenID := reader.NewMessageTokenID(seqNr, tokenIndex)
 			if _, ok := validators[selector][messageTokenID]; !ok {
 				validators[selector][messageTokenID] =
 					consensus.NewMinObservation[exectypes.TokenData](consensus.FPlus1(f), exectypes.TokenDataHash)
@@ -426,12 +426,35 @@ func mergeNonceObservations(
 	return results
 }
 
+// mergeCostlyMessages merges all costly message observations. A message is considered costly if it is observed by more
+// than `fChainDest` observers.
+func mergeCostlyMessages(
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChainDest int,
+) []cciptypes.Bytes32 {
+	costlyMessages := mapset.NewSet[cciptypes.Bytes32]()
+	counts := make(map[cciptypes.Bytes32]int)
+	for _, ao := range aos {
+		for _, costlyMessage := range ao.Observation.CostlyMessages {
+			counts[costlyMessage]++
+			if counts[costlyMessage] >= int(consensus.FPlus1(fChainDest)) {
+				costlyMessages.Add(costlyMessage)
+			}
+		}
+	}
+
+	if costlyMessages.Cardinality() == 0 {
+		return nil
+	}
+
+	return costlyMessages.ToSlice()
+}
+
 // getConsensusObservation merges all attributed observations into a single observation based on which values have
 // consensus among the observers.
 func getConsensusObservation(
 	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
-	oracleID commontypes.OracleID,
 	destChainSelector cciptypes.ChainSelector,
 	F int,
 	fChain map[cciptypes.ChainSelector]int,
@@ -440,48 +463,37 @@ func getConsensusObservation(
 		return exectypes.Observation{}, fmt.Errorf("below F threshold")
 	}
 
-	lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: decoded observations", oracleID),
-		"oracle", oracleID,
-		"aos", aos)
+	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)
 
 	mergedCommitObservations, err := mergeCommitObservations(aos, fChain)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to merge commit report observations: %w", err)
 	}
-	lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged commit observations", oracleID),
-		"oracle", oracleID,
-		"mergedCommitObservations", mergedCommitObservations)
+	lggr.Debugw("merged commit observations", "mergedCommitObservations", mergedCommitObservations)
 
 	mergedMessageObservations, err := mergeMessageObservations(aos, fChain)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to merge message observations: %w", err)
 	}
-	lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged message observations", oracleID),
-		"oracle", oracleID,
-		"mergedMessageObservations", mergedMessageObservations)
+	lggr.Debugw("merged message observations", "mergedMessageObservations", mergedMessageObservations)
 
 	mergedTokenObservations, err := mergeTokenObservations(aos, fChain)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to merge token data observations: %w", err)
 	}
-	lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged token data observations", oracleID),
-		"oracle", oracleID,
-		"mergedTokenObservations", mergedTokenObservations)
+	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
+
+	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
+	lggr.Debugw("merged costly messages", "mergedCostlyMessages", mergedCostlyMessages)
 
 	mergedNonceObservations :=
 		mergeNonceObservations(aos, fChain[destChainSelector])
-	lggr.Debugw(
-		fmt.Sprintf("[oracle %d] exec outcome: merged nonce observations", oracleID),
-		"oracle", oracleID,
-		"mergedNonceObservations", mergedNonceObservations)
+	lggr.Debugw("merged nonce observations", "mergedNonceObservations", mergedNonceObservations)
 
 	observation := exectypes.NewObservation(
 		mergedCommitObservations,
 		mergedMessageObservations,
+		mergedCostlyMessages,
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},

@@ -2,7 +2,7 @@ package merkleroot
 
 import (
 	"context"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -21,6 +21,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -53,29 +54,26 @@ func (w *Processor) Observation(
 // 1. If RMN is enabled, RMN signatures are required in the BuildingReport state but not expected in other states.
 // 2. If RMN signatures are provided, they are verified against the current RMN node config.
 func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Query) error {
-	if !w.cfg.RMNEnabled {
+	if !w.offchainCfg.RMNEnabled {
 		return nil
 	}
 
 	nextState := prevOutcome.NextState()
 
-	// If we are in the BuildingReport state, and we are not retrying RMN signatures in the next round, we expect RMN
-	// signatures to be provided by the leader.
-	if nextState == BuildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
-		return fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+	skipVerification, err := shouldSkipRMNVerification(nextState, q, prevOutcome)
+	if skipVerification {
+		return nil
+	}
+	if err != nil {
+		return err
 	}
 
-	// If we are not in the BuildingReport state, we do not expect RMN signatures to be provided.
-	if nextState != BuildingReport && q.RMNSignatures != nil {
-		return fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
-	}
-
-	ch, exists := chainsel.ChainBySelector(uint64(w.cfg.DestChain))
+	ch, exists := chainsel.ChainBySelector(uint64(w.destChain))
 	if !exists {
-		return fmt.Errorf("failed to get chain by selector %d", w.cfg.DestChain)
+		return fmt.Errorf("failed to get chain by selector %d", w.destChain)
 	}
 
-	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.cfg.DestChain)
+	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.destChain)
 	if err != nil {
 		return fmt.Errorf("failed to get offramp contract address: %w", err)
 	}
@@ -85,9 +83,14 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("failed to convert signatures from protobuf: %w", err)
 	}
 
+	rmnRemoteCfg := prevOutcome.RMNRemoteCfg
+	if rmnRemoteCfg.IsEmpty() {
+		return fmt.Errorf("RMN remote config is not provided in the previous outcome")
+	}
+
 	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
-	for _, rmnNode := range w.rmnConfig.Home.RmnNodes {
-		signerAddresses = append(signerAddresses, rmnNode.SignReportsAddress)
+	for _, rmnNode := range rmnRemoteCfg.Signers {
+		signerAddresses = append(signerAddresses, rmnNode.OnchainPublicKey)
 	}
 
 	laneUpdates, err := rmn.NewLaneUpdatesFromPB(q.RMNSignatures.LaneUpdates)
@@ -96,12 +99,12 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               w.rmnConfig.Home.RmnReportVersion,
+		ReportVersion:               rmnRemoteCfg.RmnReportVersion.String(),
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
-		RmnRemoteContractAddress:    w.rmnConfig.Remote.ContractAddress,
+		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,
 		OfframpAddress:              offRampAddress,
-		RmnHomeContractConfigDigest: w.rmnConfig.Home.ConfigDigest,
+		RmnHomeContractConfigDigest: rmnRemoteCfg.ConfigDigest,
 		LaneUpdates:                 laneUpdates,
 	}
 
@@ -111,16 +114,49 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	return nil
 }
 
+// shouldSkipRMNVerification checks whether RMN verification should be skipped based on the current state and query.
+func shouldSkipRMNVerification(nextState State, q Query, prevOutcome Outcome) (bool, error) {
+	// Skip verification if RMN signatures are not expected in the current state.
+	if nextState != BuildingReport && q.RMNSignatures == nil {
+		return true, nil
+	}
+
+	// Skip verification if we are retrying RMN signatures in the next round.
+	if nextState == BuildingReport && q.RetryRMNSignatures {
+		return true, nil
+	}
+
+	// If in the BuildingReport state and RMN signatures are required but not provided, return an error.
+	if nextState == BuildingReport && !q.RetryRMNSignatures && q.RMNSignatures == nil {
+		return false, fmt.Errorf("RMN signatures are required in the BuildingReport state but not provided by leader")
+	}
+
+	// If in the BuildingReport state but RMN remote config is not available, return an error.
+	if nextState == BuildingReport && prevOutcome.RMNRemoteCfg.IsEmpty() {
+		return false, fmt.Errorf("RMN report config is not provided in the previous outcome")
+	}
+
+	// If RMN signatures are unexpectedly provided in a non-BuildingReport state, return an error.
+	if nextState != BuildingReport && q.RMNSignatures != nil {
+		return false, fmt.Errorf("RMN signatures are provided but not expected in the %d state", nextState)
+	}
+
+	// Proceed with RMN verification.
+	return false, nil
+}
+
 func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome Outcome) (Observation, State) {
 	nextState := previousOutcome.NextState()
 	switch nextState {
 	case SelectingRangesForReport:
 		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
-		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.cfg.DestChain)
+		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.destChain)
+		rmnRemoteCfg := w.observer.ObserveRMNRemoteCfg(ctx, w.destChain)
 
 		return Observation{
 			OnRampMaxSeqNums:   onRampLatestSeqNums,
 			OffRampNextSeqNums: offRampNextSeqNums,
+			RMNRemoteConfig:    rmnRemoteCfg,
 			FChain:             w.observer.ObserveFChain(),
 		}, nextState
 	case BuildingReport:
@@ -153,6 +189,9 @@ type Observer interface {
 
 	// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
+
+	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain
+	ObserveRMNRemoteCfg(ctx context.Context, dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
@@ -320,9 +359,8 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 
 		msgHash, err := o.msgHasher.Hash(ctx, msg)
 		if err != nil {
-			msgID := hex.EncodeToString(msg.Header.MessageID[:])
-			o.lggr.Warnw("failed to hash message", "msg", msg, "msg_id", msgID, "err", err)
-			return cciptypes.Bytes32{}, fmt.Errorf("failed to hash message with id %s: %w", msgID, err)
+			o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+			return cciptypes.Bytes32{}, fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
 		}
 
 		hashes = append(hashes, msgHash)
@@ -335,9 +373,25 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	}
 
 	root := tree.Root()
-	o.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", hex.EncodeToString(root[:]))
+	o.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", cciptypes.Bytes32(root).String())
 
 	return root, nil
+}
+
+func (o ObserverImpl) ObserveRMNRemoteCfg(
+	ctx context.Context,
+	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
+	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
+	if err != nil {
+		if errors.Is(err, readerpkg.ErrContractReaderNotFound) {
+			// destination chain not supported
+			return rmntypes.RemoteConfig{}
+		}
+		// legitimate error
+		o.lggr.Errorw("call to GetRMNRemoteConfig failed", "err", err)
+		return rmntypes.RemoteConfig{}
+	}
+	return rmnRemoteCfg
 }
 
 func (o ObserverImpl) ObserveFChain() map[cciptypes.ChainSelector]int {

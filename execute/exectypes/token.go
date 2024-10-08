@@ -1,10 +1,12 @@
 package exectypes
 
 import (
+	"errors"
 	"fmt"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"golang.org/x/crypto/sha3"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type MessageTokenData struct {
@@ -38,6 +40,20 @@ func (mtd MessageTokenData) IsReady() bool {
 		}
 	}
 	return true
+}
+
+// Error returns combined errors from all the TokenData children.
+// If message IsReady it must return nil. Keep in mind that errors are not preserved when serializing
+// TokenDataObservations, so this method is only useful for internal processing. Observation fetched from
+// other nodes will return nil even if it's faulty.
+func (mtd MessageTokenData) Error() error {
+	err := make([]error, 0)
+	for _, td := range mtd.TokenData {
+		if td.Error != nil {
+			err = append(err, td.Error)
+		}
+	}
+	return errors.Join(err...)
 }
 
 func (mtd MessageTokenData) ToByteSlice() [][]byte {
@@ -117,20 +133,4 @@ func TokenDataHash(td TokenData) [32]byte {
 
 func (td TokenData) IsReady() bool {
 	return td.Ready
-}
-
-// MessageTokenID is a unique identifier for a message token data (per chain selector). It's a composite key of
-// the message sequence number and the token index within the message. It's used to easier identify token data for
-// messages without having to deal with nested maps.
-type MessageTokenID struct {
-	SeqNr cciptypes.SeqNum
-	Index int
-}
-
-func NewMessageTokenID(seqNr cciptypes.SeqNum, index int) MessageTokenID {
-	return MessageTokenID{SeqNr: seqNr, Index: index}
-}
-
-func (mti MessageTokenID) String() string {
-	return fmt.Sprintf("%d_%d", mti.SeqNr, mti.Index)
 }

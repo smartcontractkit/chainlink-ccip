@@ -5,19 +5,7 @@ import (
 	"errors"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
-
-// ExecutePluginConfig is configuration for the execute plugin
-// which includes the offchain configuration as well as other parameters
-// fetched from the OCR configuration.
-type ExecutePluginConfig struct {
-	// DestChain is the ccip destination chain configured for the execute DON.
-	DestChain cciptypes.ChainSelector `json:"destChain"`
-
-	// OffchainConfig is the offchain config set for the exec DON.
-	OffchainConfig ExecuteOffchainConfig `json:"offchainConfig"`
-}
 
 // ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
 // This is posted onchain as part of the OCR configuration process of the exec plugin.
@@ -87,6 +75,19 @@ func (e ExecuteOffchainConfig) Validate() error {
 		set[key] = struct{}{}
 	}
 	return nil
+}
+
+func (e ExecuteOffchainConfig) IsUSDCEnabled() bool {
+	for _, ob := range e.TokenDataObservers {
+		if ob.WellFormed() != nil {
+			continue
+		}
+		if ob.IsUSDC() {
+			return true
+		}
+	}
+	return false
+
 }
 
 // EncodeExecuteOffchainConfig encodes a ExecuteOffchainConfig into bytes using JSON.

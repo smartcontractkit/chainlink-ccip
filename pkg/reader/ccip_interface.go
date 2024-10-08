@@ -9,6 +9,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -21,6 +24,18 @@ var (
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
 type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
+
+func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
+	resp := ca
+	if resp == nil {
+		resp = make(ContractAddresses)
+	}
+	if resp[contract] == nil {
+		resp[contract] = make(map[cciptypes.ChainSelector][]byte)
+	}
+	resp[contract][chain] = address
+	return resp
+}
 
 func NewCCIPChainReader(
 	lggr logger.Logger,
@@ -103,17 +118,39 @@ type CCIPReader interface {
 		addresses []string,
 	) (map[string]uint64, error)
 
-	// GasPrices reads the provided chains gas prices.
-	GasPrices(ctx context.Context, chains []cciptypes.ChainSelector) ([]cciptypes.BigInt, error)
+	// GetAvailableChainsFeeComponents Reads all fee components for known chains (chains that have chain writer defined)
+	GetAvailableChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents
+
+	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
+	GetWrappedNativeTokenPriceUSD(
+		ctx context.Context,
+		selectors []cciptypes.ChainSelector,
+	) map[cciptypes.ChainSelector]cciptypes.BigInt
+
+	// GetChainFeePriceUpdate Gets latest chain fee price update for the provided chains.
+	GetChainFeePriceUpdate(
+		ctx context.Context,
+		selectors []cciptypes.ChainSelector,
+	) map[cciptypes.ChainSelector]plugintypes.TimestampedBig
+
+	GetRMNRemoteConfig(
+		ctx context.Context,
+		destChainSelector cciptypes.ChainSelector,
+	) (rmntypes.RemoteConfig, error)
 
 	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
 	// contract and source chain selector.
-	DiscoverContracts(ctx context.Context, destChain cciptypes.ChainSelector) (ContractAddresses, error)
+	// allChains is needed because there is currently no way to discover all source contracts. So we allow them
+	// to be passed in here. We'll attempt to fetch the source config from the offramp for each of them.
+	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
+
+	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
+	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
+	// function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
+	// the price of ETH not in ETH but in wei (1e-18 ETH).
+	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
 
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
-
-	// Close closes any open resources.
-	Close(ctx context.Context) error
 }

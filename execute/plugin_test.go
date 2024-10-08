@@ -29,7 +29,6 @@ import (
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -167,11 +166,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	mockReader := readerpkg_mock.NewMockCCIPReader(t)
-	mockReader.On("Close", mock.Anything).Return(nil)
-
-	lggr := logger.Test(t)
-	p := &Plugin{lggr: lggr, ccipReader: mockReader}
+	p := &Plugin{}
 	require.NoError(t, p.Close())
 }
 
@@ -230,7 +225,7 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 				},
 			},
 		},
-	}, nil, nil, dt.Observation{})
+	}, nil, nil, nil, dt.Observation{})
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -262,7 +257,9 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 			{MerkleRoot: root},
 		},
 	}
-	observation := exectypes.NewObservation(commitReports, nil, nil, nil, dt.Observation{})
+	observation := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{},
+	)
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
 	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
@@ -355,7 +352,9 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 	commitReports := map[cciptypes.ChainSelector][]exectypes.CommitData{
 		1: {},
 	}
-	observation, err := exectypes.NewObservation(commitReports, nil, nil, nil, dt.Observation{}).Encode()
+	observation, err := exectypes.NewObservation(
+		commitReports, nil, nil, nil, nil, dt.Observation{},
+	).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -388,7 +387,9 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 			},
 		},
 	}
-	observation, err := exectypes.NewObservation(nil, messages, nil, nil, dt.Observation{}).Encode()
+	observation, err := exectypes.NewObservation(
+		nil, messages, nil, nil, nil, dt.Observation{},
+	).Encode()
 	require.NoError(t, err)
 	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
@@ -492,7 +493,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         lggr,
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		homeChain:    mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
@@ -525,7 +526,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 	p := &Plugin{
 		donID:        donID,
 		lggr:         logger.Test(t),
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,
@@ -555,7 +556,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 	p := &Plugin{
 		donID:        donID,
 		lggr:         lggr,
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,

@@ -13,28 +13,34 @@ const (
 	ContractNameNonceManager           = "NonceManager"
 	ContractNameRMNHome                = "RMNHome"
 	ContractNameRMNRemote              = "RMNRemote"
+	ContractNameRouter                 = "Router"
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
 )
 
 // Method Names
 // TODO: these should be better organized, maybe separate packages.
 const (
-	// Offramp methods
+	// Router methods
+	MethodNameRouterGetWrappedNative = "GetWrappedNative"
+
+	// OffRamp methods
 	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
-	MethodNameOfframpGetDynamicConfig      = "OfframpGetDynamicConfig"
-	MethodNameOfframpGetStaticConfig       = "OfframpGetStaticConfig"
+	MethodNameOffRampGetDynamicConfig      = "OffRampGetDynamicConfig"
+	MethodNameOffRampGetStaticConfig       = "OffRampGetStaticConfig"
+	MethodNameOffRampGetDestChainConfig    = "OffRampGetDestChainConfig"
 	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                    = "IsBlessed"
 	MethodNameGetMerkleRoot                = "GetMerkleRoot"
 	MethodNameGetExecutionState            = "GetExecutionState"
 
-	// Onramp methods
-	MethodNameOnrampGetDynamicConfig        = "OnrampGetDynamicConfig"
-	MethodNameOnrampGetStaticConfig         = "OnrampGetStaticConfig"
+	// OnRamp methods
+	MethodNameOnRampGetDynamicConfig        = "OnRampGetDynamicConfig"
+	MethodNameOnRampGetStaticConfig         = "OnRampGetStaticConfig"
 	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
 
 	// FeeQuoter view/pure methods
 	MethodNameFeeQuoterGetTokenPrices       = "GetTokenPrices"
+	MethodNameGetFeePriceUpdate             = "GetDestinationChainGasPrice"
 	MethodNameFeeQuoterGetStaticConfig      = "GetStaticConfig"
 	MethodNameGetDestChainConfig            = "GetDestChainConfig"
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
@@ -51,6 +57,15 @@ const (
 	// NonceManager methods
 	MethodNameGetInboundNonce  = "GetInboundNonce"
 	MethodNameGetOutboundNonce = "GetOutboundNonce"
+
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOfframpGetDynamicConfig = "OfframpGetDynamicConfig"
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOfframpGetStaticConfig = "OfframpGetStaticConfig"
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOnrampGetDynamicConfig = "OnrampGetDynamicConfig"
+	// Deprecated: TODO: remove after chainlink is updated.
+	MethodNameOnrampGetStaticConfig = "OnrampGetStaticConfig"
 
 	/*
 		// On EVM:
@@ -80,6 +95,11 @@ const (
 	// RMNHome.sol methods
 	// Used by the rmn home reader.
 	MethodNameGetAllConfigs = "GetAllConfigs"
+
+	// RMNRemote.sol methods
+	// Used by the rmn remote reader.
+	MethodNameGetVersionedConfig    = "GetVersionedConfig"
+	MethodNameGetReportDigestHeader = "GetReportDigestHeader"
 )
 
 // Event Names

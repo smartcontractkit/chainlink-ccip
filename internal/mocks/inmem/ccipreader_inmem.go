@@ -4,11 +4,14 @@ import (
 	"context"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	internaltypes "github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
 type MessagesWithMetadata struct {
@@ -19,7 +22,7 @@ type MessagesWithMetadata struct {
 
 type InMemoryCCIPReader struct {
 	// Reports that may be returned.
-	Reports []plugintypes2.CommitPluginReportWithMeta
+	Reports []plugintypes.CommitPluginReportWithMeta
 
 	// Messages that may be returned.
 	Messages map[cciptypes.ChainSelector][]MessagesWithMetadata
@@ -41,8 +44,8 @@ func (r InMemoryCCIPReader) GetExpectedNextSequenceNumber(
 
 func (r InMemoryCCIPReader) CommitReportsGTETimestamp(
 	_ context.Context, _ cciptypes.ChainSelector, ts time.Time, limit int,
-) ([]plugintypes2.CommitPluginReportWithMeta, error) {
-	results := slicelib.Filter(r.Reports, func(report plugintypes2.CommitPluginReportWithMeta) bool {
+) ([]plugintypes.CommitPluginReportWithMeta, error) {
+	results := slicelib.Filter(r.Reports, func(report plugintypes.CommitPluginReportWithMeta) bool {
 		return report.Timestamp.After(ts) || report.Timestamp.Equal(ts)
 	})
 	if len(results) > limit {
@@ -116,20 +119,40 @@ func (r InMemoryCCIPReader) Nonces(
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GasPrices(
-	ctx context.Context, chains []cciptypes.ChainSelector,
-) ([]cciptypes.BigInt, error) {
+func (r InMemoryCCIPReader) GetAvailableChainsFeeComponents(
+	ctx context.Context,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	panic("implement me")
+}
+func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]cciptypes.BigInt {
+	return nil
+}
+
+func (r InMemoryCCIPReader) GetChainFeePriceUpdate(
+	ctx context.Context,
+	selectors []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]internaltypes.TimestampedBig {
+	return nil
 }
 
 func (r InMemoryCCIPReader) DiscoverContracts(
-	ctx context.Context, destChain cciptypes.ChainSelector,
+	ctx context.Context, allChains []cciptypes.ChainSelector,
 ) (reader.ContractAddresses, error) {
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) Close(ctx context.Context) error {
-	return nil
+func (r InMemoryCCIPReader) GetRMNRemoteConfig(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+) (rmntypes.RemoteConfig, error) {
+	return rmntypes.RemoteConfig{}, nil
+}
+
+func (r InMemoryCCIPReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
+	return cciptypes.BigInt{}, nil
 }
 
 // Sync can be used to perform frequent syncing operations inside the reader implementation.
