@@ -159,22 +159,37 @@ func buildReport(
 		}
 		sigs = parsedSigs
 
-		signedRoots := mapset.NewSet[cciptypes.MerkleRootChain]()
+		// TODO: we're doing this because we're going to add the OnRamp address
+		// to the MerkleRootChain struct and it makes the struct not usable anymore
+		// on the mapset.Set type.
+		type rootKey struct {
+			ChainSel     cciptypes.ChainSelector
+			SeqNumsRange cciptypes.SeqNumRange
+			MerkleRoot   cciptypes.Bytes32
+			// TODO: add OnRamp as a string?
+		}
+		signedRoots := mapset.NewSet[rootKey]()
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
-			signedRoots.Add(cciptypes.MerkleRootChain{
+			signedRoots.Add(rootKey{
 				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
 				),
 				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
+				// TODO: add OnRamp as a string?
 			})
 		}
 
 		// Only report roots that are present in RMN signatures.
 		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
 		for _, root := range roots {
-			if signedRoots.Contains(root) {
+			if signedRoots.Contains(rootKey{
+				ChainSel:     root.ChainSel,
+				SeqNumsRange: root.SeqNumsRange,
+				MerkleRoot:   root.MerkleRoot,
+				// TODO: add OnRamp as a string?
+			}) {
 				rootsToReport = append(rootsToReport, root)
 			} else {
 				lggr.Warnw("skipping merkle root not signed by RMN", "root", root)
