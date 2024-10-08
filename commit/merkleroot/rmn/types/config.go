@@ -15,7 +15,7 @@ type NodeID uint32
 // HomeConfig contains the configuration fetched from the RMNHome contract.
 type HomeConfig struct {
 	Nodes                   []HomeNodeInfo
-	SourceChainMinObservers map[cciptypes.ChainSelector]uint64
+	SourceChainMinObservers map[cciptypes.ChainSelector]int
 	ConfigDigest            cciptypes.Bytes32
 	OffchainConfig          cciptypes.Bytes // The raw offchain config
 }
@@ -53,6 +53,4 @@ type RemoteSignerInfo struct {
 	OnchainPublicKey cciptypes.Bytes `json:"onchainPublicKey"`
 	// The index of the node in the RMN config
 	NodeIndex uint64 `json:"nodeIndex"`
-	// The prefix of the observation to sign
-	SignObservationPrefix string `json:"signObservationPrefix"`
 }

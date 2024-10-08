@@ -151,8 +151,8 @@ func (r InMemoryCCIPReader) GetRMNRemoteConfig(
 	return rmntypes.RemoteConfig{}, nil
 }
 
-func (r InMemoryCCIPReader) Close(ctx context.Context) error {
-	return nil
+func (r InMemoryCCIPReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
+	return cciptypes.BigInt{}, nil
 }
 
 // Sync can be used to perform frequent syncing operations inside the reader implementation.

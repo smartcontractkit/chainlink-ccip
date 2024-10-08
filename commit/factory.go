@@ -14,12 +14,10 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -28,9 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const maxReportTransmissionCheckAttempts = 5
 const maxQueryLength = 1024 * 1024 // 1MB
-const rmnEnabled = false
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -101,7 +97,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
 
-	if err = offchainConfig.Validate(); err != nil {
+	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}
 
@@ -112,7 +108,7 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 
 	// Bind the RMNHome contract
 	var rmnHomeReader reader.RMNHome
-	if rmnEnabled {
+	if offchainConfig.RMNEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
 		rmnCr, ok := p.contractReaders[p.homeChainSelector]
 		if !ok {
@@ -175,13 +171,8 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.donID,
 			config.OracleID,
 			oracleIDToP2PID,
-			pluginconfig.CommitPluginConfig{
-				DestChain:                          p.ocrConfig.Config.ChainSelector,
-				NewMsgScanBatchSize:                merklemulti.MaxNumberTreeLeaves,
-				MaxReportTransmissionCheckAttempts: maxReportTransmissionCheckAttempts,
-				OffchainConfig:                     offchainConfig,
-				RMNEnabled:                         rmnEnabled,
-			},
+			offchainConfig,
+			p.ocrConfig.Config.ChainSelector,
 			ccipReader,
 			onChainTokenPricesReader,
 			p.commitCodec,
@@ -190,7 +181,6 @@ func (p *PluginFactory) NewReportingPlugin(config ocr3types.ReportingPluginConfi
 			p.homeChainReader,
 			rmnHomeReader,
 			config,
-			rmn.Config{}, // todo
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{

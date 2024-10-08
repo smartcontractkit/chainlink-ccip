@@ -2,6 +2,7 @@ package merkleroot
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -18,124 +19,148 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-func Test_Observation(t *testing.T) {
-	merkleRoots := []cciptypes.MerkleRootChain{
-		{
-			ChainSel:     1,
-			SeqNumsRange: [2]cciptypes.SeqNum{5, 78},
-			MerkleRoot:   [32]byte{1},
-		},
-	}
-	offRampNextSeqNums := []plugintypes.SeqNumChain{
-		{ChainSel: 456, SeqNum: 9987},
-	}
-	onRampLatestSeqNums := []plugintypes.SeqNumChain{
-		{ChainSel: 456, SeqNum: 9990},
-	}
-	fChain := map[cciptypes.ChainSelector]int{
-		872: 3,
+func TestObservation(t *testing.T) {
+	mockObserver := merkleroot.NewMockObserver(t)
+	mockCCIPReader := readerpkg_mock.NewMockCCIPReader(t)
+	chainSupport := common_mock.NewMockChainSupport(t)
+
+	destChain := cciptypes.ChainSelector(909606746561742123)
+
+	offchainAddress := []byte(rand.RandomAddress())
+
+	p := &Processor{
+		lggr:         logger.Test(t),
+		observer:     mockObserver,
+		rmnCrypto:    signatureVerifierAlwaysTrue{},
+		ccipReader:   mockCCIPReader,
+		destChain:    destChain,
+		offchainCfg:  pluginconfig.CommitOffchainConfig{RMNEnabled: true},
+		chainSupport: chainSupport,
 	}
 
-	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
+	ctx := context.Background()
 
 	testCases := []struct {
-		name            string
-		previousOutcome Outcome
-		getObserver     func(t *testing.T) *merkleroot.MockObserver
-		expObs          Observation
+		name        string
+		prevOutcome Outcome
+		query       Query
+		setupMocks  func()
+		expectedObs Observation
+		expectedErr string
 	}{
 		{
-			name: "SelectingRangesForReport observation",
-			previousOutcome: Outcome{
+			name: "SelectingRangesForReport",
+			prevOutcome: Outcome{
 				OutcomeType: ReportTransmitted,
 			},
-			getObserver: func(t *testing.T) *merkleroot.MockObserver {
-				observer := merkleroot.NewMockObserver(t)
-				observer.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Once().Return(offRampNextSeqNums)
-				observer.EXPECT().ObserveLatestOnRampSeqNums(mock.Anything, mock.Anything).Return(onRampLatestSeqNums)
-				observer.EXPECT().ObserveFChain().Once().Return(fChain)
-				observer.EXPECT().ObserveRMNRemoteCfg(mock.Anything, mock.Anything).Once().Return(rmnRemoteCfg)
-				return observer
+			query: Query{},
+			setupMocks: func() {
+				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything).Return(
+					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
+				mockObserver.On("ObserveLatestOnRampSeqNums", mock.Anything, destChain).Return(
+					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
+				mockObserver.On("ObserveRMNRemoteCfg", mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
+				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
-			expObs: Observation{
-				OnRampMaxSeqNums:   onRampLatestSeqNums,
-				OffRampNextSeqNums: offRampNextSeqNums,
-				RMNRemoteConfig:    rmnRemoteCfg,
-				FChain:             fChain,
+			expectedObs: Observation{
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
+				OnRampMaxSeqNums:   []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}},
+				RMNRemoteConfig:    rmntypes.RemoteConfig{},
+				FChain:             map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
 		{
-			name: "BuildingReport observation",
-			previousOutcome: Outcome{
+			name: "BuildingReport",
+			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
-					{
-						ChainSel:    1,
-						SeqNumRange: cciptypes.SeqNumRange{5, 78},
-					},
+					{ChainSel: destChain, SeqNumRange: cciptypes.SeqNumRange{5, 10}},
 				},
+				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
-			getObserver: func(t *testing.T) *merkleroot.MockObserver {
-				observer := merkleroot.NewMockObserver(t)
-				observer.EXPECT().ObserveMerkleRoots(mock.Anything, []plugintypes.ChainRange{
+			query: Query{
+				RMNSignatures: &rmn.ReportSignatures{},
+			},
+			setupMocks: func() {
+				mockObserver.On("ObserveMerkleRoots", mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
 					{
-						ChainSel:    1,
-						SeqNumRange: cciptypes.SeqNumRange{5, 78},
-					},
-				}).Once().Return(merkleRoots)
-				observer.EXPECT().ObserveFChain().Once().Return(fChain)
-				return observer
+						ChainSel:     1,
+						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
+						MerkleRoot:   [32]byte{1},
+					}})
+				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
+				mockCCIPReader.On("GetContractAddress", mock.Anything, mock.Anything).Return(offchainAddress, nil)
 			},
-			expObs: Observation{
-				MerkleRoots: merkleRoots,
-				FChain:      fChain,
+			expectedObs: Observation{
+				MerkleRoots: []cciptypes.MerkleRootChain{
+					{
+						ChainSel:     1,
+						SeqNumsRange: [2]cciptypes.SeqNum{5, 10},
+						MerkleRoot:   [32]byte{1}},
+				},
+				FChain: map[cciptypes.ChainSelector]int{1: 3},
 			},
 		},
 		{
-			name: "WaitingForReportTransmission observation",
-			previousOutcome: Outcome{
-				OutcomeType: ReportInFlight,
+			name: "WaitingForReportTransmission",
+			prevOutcome: Outcome{
+				OutcomeType:  ReportInFlight,
+				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
-			getObserver: func(t *testing.T) *merkleroot.MockObserver {
-				observer := merkleroot.NewMockObserver(t)
-				observer.EXPECT().ObserveOffRampNextSeqNums(mock.Anything).Once().Return(offRampNextSeqNums)
-				observer.EXPECT().ObserveFChain().Once().Return(fChain)
-				return observer
+			query: Query{},
+			setupMocks: func() {
+				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything).Return(
+					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 20}}).Once()
+				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
 			},
-			expObs: Observation{
-				OffRampNextSeqNums: offRampNextSeqNums,
-				FChain:             fChain,
+			expectedObs: Observation{
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 20}},
+				FChain:             map[cciptypes.ChainSelector]int{1: 3},
 			},
+		},
+		{
+			name: "BuildingReport with RetryRMNSignatures",
+			prevOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+			},
+			query: Query{
+				RetryRMNSignatures: true,
+			},
+			setupMocks: func() {
+				// No mocks needed for this case
+			},
+			expectedObs: Observation{},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := tests.Context(t)
-			observer := tc.getObserver(t)
-			defer observer.AssertExpectations(t)
+			tc.setupMocks()
 
-			p := Processor{
-				lggr:     logger.Test(t),
-				observer: observer,
+			obs, err := p.Observation(ctx, tc.prevOutcome, tc.query)
+
+			if tc.expectedErr != "" {
+				assert.EqualError(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedObs, obs)
 			}
 
-			actualObs, err := p.Observation(
-				ctx,
-				tc.previousOutcome,
-				Query{},
-			)
-			require.NoError(t, err)
-			assert.Equal(t, tc.expObs, actualObs)
+			mockObserver.AssertExpectations(t)
+			mockCCIPReader.AssertExpectations(t)
 		})
 	}
 }
@@ -582,4 +607,16 @@ func NewBadMessageHasher() *BadMessageHasher {
 // Always returns an error
 func (m *BadMessageHasher) Hash(ctx context.Context, msg cciptypes.Message) (cciptypes.Bytes32, error) {
 	return cciptypes.Bytes32{}, fmt.Errorf("failed to hash")
+}
+
+// signatureVerifierAlwaysTrue is a signature verifier that always returns true.
+type signatureVerifierAlwaysTrue struct{}
+
+func (a signatureVerifierAlwaysTrue) Verify(_ ed25519.PublicKey, _, _ []byte) bool {
+	return true
+}
+
+func (a signatureVerifierAlwaysTrue) VerifyReportSignatures(
+	_ context.Context, _ []cciptypes.RMNECDSASignature, _ cciptypes.RMNReport, _ []cciptypes.Bytes) error {
+	return nil
 }
