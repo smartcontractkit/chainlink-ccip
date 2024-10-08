@@ -420,6 +420,12 @@ func Test_CompositeTokenDataObserver_ParallelExecution(t *testing.T) {
 	usdcTokenSourcePool := internal.RandBytes().String()
 	randomTokenSourcePool := internal.RandBytes().String()
 
+	lggr := logger.Test(t)
+
+	t.Cleanup(func() {
+		_ = lggr.Sync()
+	})
+
 	tt := []struct {
 		name               string
 		observers          []tokendata.TokenDataObserver
@@ -549,7 +555,7 @@ func Test_CompositeTokenDataObserver_ParallelExecution(t *testing.T) {
 				defer cancel()
 			}
 
-			composite := tokendata.NewCompositeObservers(logger.Test(t), tc.observers...)
+			composite := tokendata.NewCompositeObservers(lggr, tc.observers...)
 
 			tkData, err := composite.Observe(ctx, tc.messageObservation)
 			require.NoError(t, err)
@@ -557,6 +563,7 @@ func Test_CompositeTokenDataObserver_ParallelExecution(t *testing.T) {
 			require.Equal(t, tc.expectedTokenData, tkData)
 		})
 	}
+
 }
 
 func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) *fakeObserver {
