@@ -189,6 +189,8 @@ func buildReport(
 		RootsToReport:       roots,
 		OffRampNextSeqNums:  prevOutcome.OffRampNextSeqNums,
 		RMNReportSignatures: sigs,
+		// TODO: Calculate it for real
+		RmnRawVs: cciptypes.NewBigIntFromInt64(0),
 	}
 
 	return outcome

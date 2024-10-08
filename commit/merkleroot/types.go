@@ -134,7 +134,7 @@ type Outcome struct {
 	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
 	//TODO: Calculate the bitmap
 	// This is a bitmap where ith bit represents how the v value should be for ith signature
-	RmnRawVs *cciptypes.BigInt `json:"rmnRawVs"`
+	RmnRawVs cciptypes.BigInt `json:"rmnRawVs"`
 }
 
 // Sort all fields of the given Outcome
