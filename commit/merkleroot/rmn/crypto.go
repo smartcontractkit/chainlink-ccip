@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
 // ED25519Verifier is an interface for verifying ED25519 signatures.
@@ -32,7 +33,8 @@ func (ED25519VerifierImpl) Verify(publicKey ed25519.PublicKey, message, sig []by
 //
 //	e.g. ed25519.sign(sha256("chainlink ccip 1.6 rmn observation"|sha256(observation)))
 func verifyObservationSignature(
-	rmnNode RMNNodeInfo,
+	rmnNode rmntypes.HomeNodeInfo,
+	signedObservationPrefix string,
 	signedObs *rmnpb.SignedObservation,
 	verifier ED25519Verifier,
 ) error {
@@ -42,10 +44,10 @@ func verifyObservationSignature(
 	}
 
 	observationBytesSha256 := sha256.Sum256(observationBytes)
-	msg := append([]byte(rmnNode.SignObservationPrefix), observationBytesSha256[:]...)
+	msg := append([]byte(signedObservationPrefix), observationBytesSha256[:]...)
 	msgSha256 := sha256.Sum256(msg)
 
-	isValid := verifier.Verify(*rmnNode.SignObservationsPublicKey, msgSha256[:], signedObs.Signature)
+	isValid := verifier.Verify(*rmnNode.OffchainPublicKey, msgSha256[:], signedObs.Signature)
 	if !isValid {
 		return fmt.Errorf("observation signature does not match node %d public key", rmnNode.ID)
 	}

@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	rand "github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -111,124 +113,149 @@ func TestArbitrumPriceSource_Validate(t *testing.T) {
 	}
 }
 
-// func TestCommitOffchainConfig_Validate(t *testing.T) {
-// 	type fields struct {
-// 		RemoteGasPriceBatchWriteFrequency  commonconfig.Duration
-// 		TokenPriceBatchWriteFrequency      commonconfig.Duration
-// 		TokenInfo                          map[types.Account]TokenInfo
-// 		TokenPriceChainSelector            cciptypes.ChainSelector
-// 		TokenDecimals                      map[types.Account]uint8
-// 		NewMsgScanBatchSize                uint32
-// 		MaxReportTransmissionCheckAttempts uint32
-// 		MaxMerkleTreeSize                  uint32
-// 	}
-// 	//nolint:gosec
-// 	const remoteTokenAddress = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
-// 	const aggregatorAddress = "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2"
-// 	tests := []struct {
-// 		name    string
-// 		fields  fields
-// 		wantErr bool
-// 	}{
-// 		{
-// 			"valid, with token price sources",
-// 			fields{
-// 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-// 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-// 				TokenInfo: map[types.Account]TokenInfo{
-// 					remoteTokenAddress: {
-// 						AggregatorAddress: aggregatorAddress,
-// 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
-// 						Decimals:          18,
-// 					},
-// 				},
-// 				TokenPriceChainSelector:            10,
-// 				NewMsgScanBatchSize:                256,
-// 				MaxReportTransmissionCheckAttempts: 10,
-// 				MaxMerkleTreeSize:                  1000,
-// 			},
-// 			false,
-// 		},
-// 		{
-// 			"valid, no token price sources",
-// 			fields{
-// 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
-// 				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
-// 				TokenInfo:                          map[types.Account]TokenInfo{},
-// 				NewMsgScanBatchSize:                256,
-// 				MaxReportTransmissionCheckAttempts: 10,
-// 				MaxMerkleTreeSize:                  1000,
-// 			},
-// 			false,
-// 		},
-// 		{
-// 			"invalid, token price sources with no frequency",
-// 			fields{
-// 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-// 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
-// 				TokenInfo: map[types.Account]TokenInfo{
-// 					remoteTokenAddress: {
-// 						AggregatorAddress: aggregatorAddress,
-// 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
-// 						Decimals:          18,
-// 					},
-// 				},
-// 				NewMsgScanBatchSize:                256,
-// 				MaxReportTransmissionCheckAttempts: 10,
-// 				MaxMerkleTreeSize:                  1000,
-// 			},
-// 			true,
-// 		},
-// 		{
-// 			"invalid, price sources with no chain selector",
-// 			fields{
-// 				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
-// 				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
-// 				TokenInfo: map[types.Account]TokenInfo{
-// 					remoteTokenAddress: {
-// 						AggregatorAddress: aggregatorAddress,
-// 						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
-// 						Decimals:          18,
-// 					},
-// 				},
-// 				NewMsgScanBatchSize:                256,
-// 				MaxReportTransmissionCheckAttempts: 10,
-// 				MaxMerkleTreeSize:                  1000,
-// 			},
-// 			true,
-// 		},
-// 		{
-// 			"invalid, no new msg scan batch size",
-// 			fields{
-// 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
-// 				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(1),
-// 				TokenInfo:                          map[types.Account]TokenInfo{},
-// 				MaxReportTransmissionCheckAttempts: 10,
-// 				MaxMerkleTreeSize:                  1000,
-// 			},
-// 			true,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			c := CommitOffchainConfig{
-// 				RemoteGasPriceBatchWriteFrequency:  tt.fields.RemoteGasPriceBatchWriteFrequency,
-// 				TokenPriceBatchWriteFrequency:      tt.fields.TokenPriceBatchWriteFrequency,
-// 				TokenInfo:                          tt.fields.TokenInfo,
-// 				PriceFeedChainSelector:             tt.fields.TokenPriceChainSelector,
-// 				NewMsgScanBatchSize:                int(tt.fields.NewMsgScanBatchSize),
-// 				MaxReportTransmissionCheckAttempts: uint(tt.fields.MaxReportTransmissionCheckAttempts),
-// 				MaxMerkleTreeSize:                  uint64(tt.fields.MaxMerkleTreeSize),
-// 			}
-// 			err := c.Validate()
-// 			if tt.wantErr {
-// 				require.Error(t, err)
-// 			} else {
-// 				require.NoError(t, err)
-// 			}
-// 		})
-// 	}
-// }
+func TestCommitOffchainConfig_Validate(t *testing.T) {
+	type fields struct {
+		RemoteGasPriceBatchWriteFrequency  commonconfig.Duration
+		TokenPriceBatchWriteFrequency      commonconfig.Duration
+		TokenInfo                          map[types.Account]TokenInfo
+		TokenPriceChainSelector            cciptypes.ChainSelector
+		TokenDecimals                      map[types.Account]uint8
+		NewMsgScanBatchSize                uint32
+		MaxReportTransmissionCheckAttempts uint32
+		MaxMerkleTreeSize                  uint32
+		SignObservationPrefix              string
+	}
+	remoteTokenAddress := rand.RandomAddress()
+	aggregatorAddress := string(rand.RandomAddress())
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{
+			"valid, with token price sources",
+			fields{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
+				TokenInfo: map[types.Account]TokenInfo{
+					remoteTokenAddress: {
+						AggregatorAddress: aggregatorAddress,
+						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
+					},
+				},
+				TokenPriceChainSelector:            10,
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+			},
+			false,
+		},
+		{
+			"valid, no token price sources",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(0),
+				TokenInfo:                          map[types.Account]TokenInfo{},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+			},
+			false,
+		},
+		{
+			"invalid, token price sources with no frequency",
+			fields{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(0),
+				TokenInfo: map[types.Account]TokenInfo{
+					remoteTokenAddress: {
+						AggregatorAddress: aggregatorAddress,
+						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
+					},
+				},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+			},
+			true,
+		},
+		{
+			"invalid, price sources with no chain selector",
+			fields{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
+				TokenInfo: map[types.Account]TokenInfo{
+					remoteTokenAddress: {
+						AggregatorAddress: aggregatorAddress,
+						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
+					},
+				},
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+			},
+			true,
+		},
+		{
+			"invalid, no new msg scan batch size",
+			fields{
+				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:      *commonconfig.MustNewDuration(1),
+				TokenInfo:                          map[types.Account]TokenInfo{},
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+				SignObservationPrefix:              defaultSignObservationPrefix,
+			},
+			true,
+		},
+		{
+			"invalid, missing SignObservationPrefix",
+			fields{
+				RemoteGasPriceBatchWriteFrequency: *commonconfig.MustNewDuration(1),
+				TokenPriceBatchWriteFrequency:     *commonconfig.MustNewDuration(1),
+				TokenInfo: map[types.Account]TokenInfo{
+					remoteTokenAddress: {
+						AggregatorAddress: aggregatorAddress,
+						DeviationPPB:      cciptypes.BigInt{Int: big.NewInt(1)},
+						Decimals:          18,
+					},
+				},
+				TokenPriceChainSelector:            10,
+				NewMsgScanBatchSize:                256,
+				MaxReportTransmissionCheckAttempts: 10,
+				MaxMerkleTreeSize:                  1000,
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := CommitOffchainConfig{
+				RemoteGasPriceBatchWriteFrequency:  tt.fields.RemoteGasPriceBatchWriteFrequency,
+				TokenPriceBatchWriteFrequency:      tt.fields.TokenPriceBatchWriteFrequency,
+				TokenInfo:                          tt.fields.TokenInfo,
+				PriceFeedChainSelector:             tt.fields.TokenPriceChainSelector,
+				NewMsgScanBatchSize:                int(tt.fields.NewMsgScanBatchSize),
+				MaxReportTransmissionCheckAttempts: uint(tt.fields.MaxReportTransmissionCheckAttempts),
+				MaxMerkleTreeSize:                  uint64(tt.fields.MaxMerkleTreeSize),
+				SignObservationPrefix:              tt.fields.SignObservationPrefix,
+			}
+			err := c.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
 
 func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 	type fields struct {
@@ -236,13 +263,10 @@ func TestCommitOffchainConfig_EncodeDecode(t *testing.T) {
 		TokenPriceBatchWriteFrequency     commonconfig.Duration
 		PriceSources                      map[types.Account]TokenInfo
 	}
-	//nolint:gosec
-	const (
-		remoteTokenAddress1 = "0x260fAB5e97758BaB75C1216873Ec4F88C11E57E3"
-		remoteTokenAddress2 = "0x560fAB5e97758BaB75C1316873Ec4F98C11E57E4"
-		aggregatorAddress1  = "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb2"
-		aggregatorAddress2  = "0x2e03388D351BF87CF2409EFf18C45Df59775Fbb3"
-	)
+	remoteTokenAddress1 := rand.RandomAddress()
+	remoteTokenAddress2 := rand.RandomAddress()
+	aggregatorAddress1 := string(rand.RandomAddress())
+	aggregatorAddress2 := string(rand.RandomAddress())
 	tests := []struct {
 		name   string
 		fields fields
@@ -307,6 +331,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
+				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
 		},
 		{
@@ -321,6 +346,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
+				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
 		},
 		{
@@ -339,6 +365,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
+				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
 		},
 		{
@@ -355,6 +382,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: defaultMaxReportTransmissionCheckAttempts,
 				MaxMerkleTreeSize:                  500,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
+				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
 		},
 	}
@@ -394,6 +422,7 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				RMNEnabled:                         true,
+				SignObservationPrefix:              defaultSignObservationPrefix,
 			},
 		},
 	}
@@ -414,6 +443,7 @@ func TestCommitOffchainConfig_ApplyDefaultsAndValidate(t *testing.T) {
 				assert.NotZero(t, config.NewMsgScanBatchSize)
 				assert.NotZero(t, config.MaxReportTransmissionCheckAttempts)
 				assert.NotZero(t, config.MaxMerkleTreeSize)
+				assert.NotZero(t, config.SignObservationPrefix)
 
 				// Check specific defaults
 				if !tt.input.RMNEnabled {

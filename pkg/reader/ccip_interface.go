@@ -144,10 +144,13 @@ type CCIPReader interface {
 	// to be passed in here. We'll attempt to fetch the source config from the offramp for each of them.
 	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
 
+	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
+	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this
+	// function returning the price of LINK not in USD, but in a small denomination of USD, similar to returning
+	// the price of ETH not in ETH but in wei (1e-18 ETH).
+	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
+
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
-
-	// Close closes any open resources.
-	Close(ctx context.Context) error
 }

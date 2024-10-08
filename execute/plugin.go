@@ -3,11 +3,9 @@ package execute
 import (
 	"context"
 	"fmt"
-	"sort"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -21,10 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
-	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -39,7 +34,8 @@ const maxReportSizeBytes = 250_000
 type Plugin struct {
 	donID        plugintypes.DonID
 	reportingCfg ocr3types.ReportingPluginConfig
-	cfg          pluginconfig.ExecutePluginConfig
+	offchainCfg  pluginconfig.ExecuteOffchainConfig
+	destChain    cciptypes.ChainSelector
 
 	// providers
 	ccipReader  readerpkg.CCIPReader
@@ -61,7 +57,8 @@ type Plugin struct {
 func NewPlugin(
 	donID plugintypes.DonID,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	cfg pluginconfig.ExecutePluginConfig,
+	offchainCfg pluginconfig.ExecuteOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader readerpkg.CCIPReader,
 	reportCodec cciptypes.ExecutePluginCodec,
@@ -78,7 +75,8 @@ func NewPlugin(
 	return &Plugin{
 		donID:             donID,
 		reportingCfg:      reportingCfg,
-		cfg:               cfg,
+		offchainCfg:       offchainCfg,
+		destChain:         destChain,
 		oracleIDToP2pID:   oracleIDToP2pID,
 		ccipReader:        ccipReader,
 		reportCodec:       reportCodec,
@@ -93,7 +91,7 @@ func NewPlugin(
 			lggr,
 			&ccipReader,
 			homeChain,
-			cfg.DestChain,
+			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
 		),
@@ -160,166 +158,6 @@ func getPendingExecutedReports(
 		"groupedCommits", groupedCommits, "count", len(groupedCommits))
 
 	return groupedCommits, nil
-}
-
-// Observation collects data across two phases which happen in separate rounds.
-// These phases happen continuously so that except for the first round, every
-// subsequent round can have a new execution report.
-//
-// Phase 1: Gather commit reports from the destination chain and determine
-// which messages are required to build a valid execution report.
-//
-// Phase 2: Gather messages from the source chains and build the execution
-// report.
-// nolint:gocyclo // todo
-func (p *Plugin) Observation(
-	ctx context.Context, outctx ocr3types.OutcomeContext, _ types.Query,
-) (types.Observation, error) {
-	var err error
-	var previousOutcome exectypes.Outcome
-
-	if outctx.PreviousOutcome != nil {
-		previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("unable to decode previous outcome: %w", err)
-		}
-		p.lggr.Infow("decoded previous outcome", "previousOutcome", previousOutcome)
-	}
-
-	var discoveryObs dt.Observation
-	// discovery processor disabled by setting it to nil.
-	if p.discovery != nil {
-		discoveryObs, err = p.discovery.Observation(ctx, dt.Outcome{}, dt.Query{})
-		if err != nil {
-			p.lggr.Errorw("failed to discover contracts", "err", err)
-		}
-
-		if !p.contractsInitialized {
-			p.lggr.Infow("contracts not initialized, only making discovery observations",
-				"discoveryObs", discoveryObs)
-			return exectypes.Observation{Contracts: discoveryObs}.Encode()
-		}
-	}
-
-	state := previousOutcome.State.Next()
-	p.lggr.Debugw("Execute plugin performing observation", "state", state)
-	switch state {
-	case exectypes.GetCommitReports:
-		fetchFrom := time.Now().Add(-p.cfg.OffchainConfig.MessageVisibilityInterval.Duration()).UTC()
-
-		// Phase 1: Gather commit reports from the destination chain and determine which messages are required to build
-		//          a valid execution report.
-		supportsDest, err := p.supportsDestChain()
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
-		}
-		if supportsDest {
-			groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.cfg.DestChain, fetchFrom, p.lggr)
-			if err != nil {
-				return types.Observation{}, err
-			}
-
-			// TODO: truncate grouped to a maximum observation size?
-			return exectypes.NewObservation(groupedCommits, nil, nil, nil, nil, discoveryObs).Encode()
-		}
-
-		// No observation for non-dest readers.
-		return types.Observation{}, nil
-	case exectypes.GetMessages:
-		// Phase 2: Gather messages from the source chains and build the execution report.
-		messages := make(exectypes.MessageObservations)
-		if len(previousOutcome.PendingCommitReports) == 0 {
-			p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
-			// No reports to execute.
-			// This is expected after a cold start.
-		} else {
-			commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-			for _, report := range previousOutcome.PendingCommitReports {
-				commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
-			}
-
-			for srcChain, reports := range commitReportCache {
-				if len(reports) == 0 {
-					continue
-				}
-
-				ranges, err := computeRanges(reports)
-				if err != nil {
-					return types.Observation{}, err
-				}
-
-				// Read messages for each range.
-				for _, seqRange := range ranges {
-					// TODO: check if srcChain is supported.
-					msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqRange)
-					if err != nil {
-						return nil, err
-					}
-					for _, msg := range msgs {
-						if _, ok := messages[srcChain]; !ok {
-							messages[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-						}
-						messages[srcChain][msg.Header.SequenceNumber] = msg
-					}
-				}
-			}
-		}
-
-		// Regroup the commit reports back into the observation format.
-		// TODO: use same format for Observation and Outcome.
-		groupedCommits := make(exectypes.CommitObservations)
-		for _, report := range previousOutcome.PendingCommitReports {
-			if _, ok := groupedCommits[report.SourceChain]; !ok {
-				groupedCommits[report.SourceChain] = []exectypes.CommitData{}
-			}
-			groupedCommits[report.SourceChain] = append(groupedCommits[report.SourceChain], report)
-		}
-
-		tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
-		if err1 != nil {
-			return types.Observation{}, fmt.Errorf("unable to process token data %w", err1)
-		}
-
-		costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages)
-		if err != nil {
-			return types.Observation{}, fmt.Errorf("unable to observe costly messages %w", err)
-		}
-
-		return exectypes.NewObservation(
-			groupedCommits, messages, costlyMessages, tkData, nil, discoveryObs).Encode()
-
-	case exectypes.Filter:
-		// Phase 3: observe nonce for each unique source/sender pair.
-		nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
-
-		// Collect unique senders.
-		for _, commitReport := range previousOutcome.PendingCommitReports {
-			if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
-				nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
-			}
-
-			for _, msg := range commitReport.Messages {
-				sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.cfg.DestChain))
-				nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
-			}
-		}
-
-		// Read args from chain.
-		nonceObservations := make(exectypes.NonceObservations)
-		for srcChain, addrSet := range nonceRequestArgs {
-			// TODO: check if srcSelector is supported.
-			addrs := maps.Keys(addrSet)
-			nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.cfg.DestChain, addrs)
-			if err != nil {
-				return types.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
-			}
-			nonceObservations[srcChain] = nonces
-		}
-
-		return exectypes.NewObservation(nil, nil, nil, nil, nonceObservations, discoveryObs).Encode()
-	default:
-		return types.Observation{}, fmt.Errorf("unknown state")
-	}
 }
 
 func (p *Plugin) ValidateObservation(
@@ -391,146 +229,6 @@ func selectReport(
 		"numReports", len(execReports),
 		"numPendingReports", len(stillPendingReports))
 	return execReports, stillPendingReports, err
-}
-
-// Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
-// formed report that will be encoded for final transmission in the reporting phase.
-// nolint:gocyclo // todo
-func (p *Plugin) Outcome(
-	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
-) (ocr3types.Outcome, error) {
-	p.lggr.Debugw("Execute plugin performing outcome",
-		"outctx", outctx,
-		"query", query,
-		"attributedObservations", aos)
-	var previousOutcome exectypes.Outcome
-	if outctx.PreviousOutcome != nil {
-		var err error
-		previousOutcome, err = exectypes.DecodeOutcome(outctx.PreviousOutcome)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
-		}
-	}
-
-	decodedAos, err := decodeAttributedObservations(aos)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode observations: %w", err)
-	}
-
-	// discovery processor disabled by setting it to nil.
-	if p.discovery != nil {
-		discoveryAos := make([]plugincommon.AttributedObservation[dt.Observation], len(decodedAos))
-		for i := range decodedAos {
-			discoveryAos[i] = plugincommon.AttributedObservation[dt.Observation]{
-				OracleID:    decodedAos[i].OracleID,
-				Observation: decodedAos[i].Observation.Contracts,
-			}
-		}
-		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
-		if err != nil {
-			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
-		}
-		p.contractsInitialized = true
-	}
-
-	fChain, err := p.homeChain.GetFChain()
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
-	}
-
-	observation, err := getConsensusObservation(p.lggr, decodedAos, p.cfg.DestChain, p.reportingCfg.F, fChain)
-	if err != nil {
-		return ocr3types.Outcome{}, fmt.Errorf("unable to get consensus observation: %w", err)
-	}
-
-	var outcome exectypes.Outcome
-	state := previousOutcome.State.Next()
-	switch state {
-	case exectypes.GetCommitReports:
-		// flatten commit reports and sort by timestamp.
-		var commitReports []exectypes.CommitData
-		for _, report := range observation.CommitReports {
-			commitReports = append(commitReports, report...)
-		}
-		sort.Slice(commitReports, func(i, j int) bool {
-			return commitReports[i].Timestamp.Before(commitReports[j].Timestamp)
-		})
-
-		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
-	case exectypes.GetMessages:
-		commitReports := previousOutcome.PendingCommitReports
-		costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
-		for _, msgID := range observation.CostlyMessages {
-			costlyMessagesSet.Add(msgID)
-		}
-
-		// add messages to their commitReports.
-		for i, report := range commitReports {
-			report.Messages = nil
-			report.CostlyMessages = nil
-			for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
-				if msg, ok := observation.Messages[report.SourceChain][j]; ok {
-					report.Messages = append(report.Messages, msg)
-					if costlyMessagesSet.Contains(msg.Header.MessageID) {
-						report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
-					}
-				}
-
-				if tokenData, ok := observation.TokenData[report.SourceChain][j]; ok {
-					report.MessageTokenData = append(report.MessageTokenData, tokenData)
-				}
-			}
-			commitReports[i].Messages = report.Messages
-			commitReports[i].MessageTokenData = report.MessageTokenData
-			commitReports[i].CostlyMessages = report.CostlyMessages
-		}
-
-		outcome = exectypes.NewOutcome(state, commitReports, cciptypes.ExecutePluginReport{})
-	case exectypes.Filter:
-		commitReports := previousOutcome.PendingCommitReports
-
-		// TODO: this function should be pure, a context should not be needed.
-		builder := report.NewBuilder(
-			context.Background(),
-			p.lggr,
-			p.msgHasher,
-			p.reportCodec,
-			p.estimateProvider,
-			observation.Nonces,
-			p.cfg.DestChain,
-			uint64(maxReportSizeBytes),
-			p.cfg.OffchainConfig.BatchGasLimit,
-		)
-		outcomeReports, commitReports, err := selectReport(
-			p.lggr,
-			commitReports,
-			builder)
-		if err != nil {
-			return ocr3types.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
-		}
-
-		execReport := cciptypes.ExecutePluginReport{
-			ChainReports: outcomeReports,
-		}
-
-		outcome = exectypes.NewOutcome(state, commitReports, execReport)
-	default:
-		panic("unknown state")
-	}
-
-	if outcome.IsEmpty() {
-		p.lggr.Warnw(
-			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
-			"execPluginState", state)
-		if p.contractsInitialized {
-			return exectypes.Outcome{State: exectypes.Initialized}.Encode()
-		}
-		return nil, nil
-	}
-
-	p.lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
-
-	return outcome.Encode()
 }
 
 func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
@@ -628,14 +326,6 @@ func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
 }
 
 func (p *Plugin) Close() error {
-	timeout := 10 * time.Second // todo: cfg
-	ctx, cf := context.WithTimeout(context.Background(), timeout)
-	defer cf()
-
-	if err := p.ccipReader.Close(ctx); err != nil {
-		return fmt.Errorf("close ccip reader: %w", err)
-	}
-
 	return nil
 }
 
@@ -658,7 +348,7 @@ func (p *Plugin) supportsDestChain() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error getting supported chains: %w", err)
 	}
-	return chains.Contains(p.cfg.DestChain), nil
+	return chains.Contains(p.destChain), nil
 }
 
 // Interface compatibility checks.

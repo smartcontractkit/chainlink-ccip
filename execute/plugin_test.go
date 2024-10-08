@@ -29,7 +29,6 @@ import (
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -167,11 +166,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	mockReader := readerpkg_mock.NewMockCCIPReader(t)
-	mockReader.On("Close", mock.Anything).Return(nil)
-
-	lggr := logger.Test(t)
-	p := &Plugin{lggr: lggr, ccipReader: mockReader}
+	p := &Plugin{}
 	require.NoError(t, p.Close())
 }
 
@@ -498,7 +493,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 
 	p := &Plugin{
 		lggr:         lggr,
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		homeChain:    mockHomeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
@@ -531,7 +526,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 	p := &Plugin{
 		donID:        donID,
 		lggr:         logger.Test(t),
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,
@@ -561,7 +556,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 	p := &Plugin{
 		donID:        donID,
 		lggr:         lggr,
-		cfg:          pluginconfig.ExecutePluginConfig{DestChain: 1},
+		destChain:    1,
 		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,

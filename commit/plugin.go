@@ -3,7 +3,6 @@ package commit
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -49,7 +48,6 @@ type Plugin struct {
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
-	rmnConfig           rmn.Config
 
 	// state
 	contractsInitialized bool
@@ -70,7 +68,6 @@ func NewPlugin(
 	homeChain reader.HomeChain,
 	rmnHomeReader reader.RMNHome,
 	reportingCfg ocr3types.ReportingPluginConfig,
-	rmnConfig rmn.Config,
 ) *Plugin {
 	lggr = logger.Named(lggr, "CommitPlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
@@ -102,7 +99,6 @@ func NewPlugin(
 		chainSupport,
 		rmn.Controller(nil),      // todo
 		cciptypes.RMNCrypto(nil), // todo
-		rmnConfig,
 		rmnHomeReader,
 	)
 
@@ -153,7 +149,6 @@ func NewPlugin(
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
-		rmnConfig:           rmnConfig,
 	}
 }
 
@@ -345,14 +340,6 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	timeout := 10 * time.Second
-	ctx, cf := context.WithTimeout(context.Background(), timeout)
-	defer cf()
-
-	if err := p.ccipReader.Close(ctx); err != nil {
-		return fmt.Errorf("close ccip reader: %w", err)
-	}
-
 	return nil
 }
 

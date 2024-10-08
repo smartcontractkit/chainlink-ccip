@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -12,6 +13,22 @@ import (
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
+
+// ReportInfo is the info data that will be sent with the along with the report
+// It will be used to determine if the report should be accepted or not
+type ReportInfo struct {
+	// MinSigners is the minimum number of RMN signatures required for the report to be accepted
+	MinSigners uint64 `json:"minSigners"`
+}
+
+func (ri ReportInfo) Encode() ([]byte, error) {
+	return json.Marshal(ri)
+}
+
+// decode should be used to decode the report info
+func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
+	return json.Unmarshal(encodedReportInfo, ri)
+}
 
 func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
 	outcome, err := DecodeOutcome(outcomeBytes)
@@ -45,7 +62,18 @@ func (p *Plugin) Reports(seqNr uint64, outcomeBytes ocr3types.Outcome) ([]ocr3ty
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
-	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: nil}}, nil
+	// Prepare the info data
+	reportInfo := ReportInfo{
+		MinSigners: outcome.MerkleRootOutcome.RMNRemoteCfg.MinSigners,
+	}
+
+	// Serialize reportInfo to []byte
+	infoBytes, err := reportInfo.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("encode report info: %w", err)
+	}
+
+	return []ocr3types.ReportWithInfo[[]byte]{{Report: encodedReport, Info: infoBytes}}, nil
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(
@@ -62,11 +90,16 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
+	var reportInfo ReportInfo
+	if err := reportInfo.Decode(r.Info); err != nil {
+		return false, fmt.Errorf("decode report info: %w", err)
+	}
+
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
-		len(decodedReport.RMNSignatures) < p.rmnConfig.Remote.MinSigners {
+		len(decodedReport.RMNSignatures) < int(reportInfo.MinSigners) {
 		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
-			len(decodedReport.RMNSignatures), p.rmnConfig.Remote.MinSigners)
+			len(decodedReport.RMNSignatures), reportInfo.MinSigners)
 		return false, nil
 	}
 

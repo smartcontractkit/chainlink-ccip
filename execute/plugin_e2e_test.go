@@ -4,8 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -54,6 +55,7 @@ func TestPlugin(t *testing.T) {
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	outcome = runner.MustRunRound(ctx, t)
-	sequenceNumbers := extractSequenceNumbers(outcome)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
