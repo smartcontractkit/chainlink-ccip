@@ -175,9 +175,8 @@ func buildReport(
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
 				),
 				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
-				// NOTE: this hex encoding is just for the sake of giving the onramp address
-				// a value in this key struct.
-				OnRampAddress: hex.EncodeToString(laneUpdate.LaneSource.OnrampAddress),
+				// NOTE: convert address into a comparable value for mapset.
+				OnRampAddress: string(laneUpdate.LaneSource.OnrampAddress),
 			})
 		}
 
@@ -188,9 +187,8 @@ func buildReport(
 				ChainSel:     root.ChainSel,
 				SeqNumsRange: root.SeqNumsRange,
 				MerkleRoot:   root.MerkleRoot,
-				// NOTE: this hex encoding is just for the sake of giving the onramp address
-				// a value in this key struct.
-				OnRampAddress: hex.EncodeToString(root.OnRampAddress),
+				// NOTE: convert address into a comparable value for mapset.
+				OnRampAddress: string(root.OnRampAddress),
 			}) {
 				rootsToReport = append(rootsToReport, root)
 			} else {
