@@ -53,7 +53,7 @@ func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 	require.NoError(t, configPoller.Close())
 }
 
-func TestRMNHomePoller_HealthReport(t *testing.T) {
+func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
