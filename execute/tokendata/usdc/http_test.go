@@ -323,6 +323,12 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 }
 
 func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
+	lggr := logger.Test(t)
+
+	t.Cleanup(func() {
+		_ = lggr.Sync()
+	})
+
 	testCases := []struct {
 		name         string
 		requests     uint64
@@ -373,7 +379,7 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			attestationURI, err := url.ParseRequestURI(ts.URL)
 			require.NoError(t, err)
 
-			client, err := newHTTPClient(logger.Test(t), attestationURI.String(), tc.rateConfig, longTimeout)
+			client, err := newHTTPClient(lggr, attestationURI.String(), tc.rateConfig, longTimeout)
 			require.NoError(t, err)
 
 			ctx := context.Background()
