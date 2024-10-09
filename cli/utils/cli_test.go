@@ -196,3 +196,59 @@ func TestPromptForInput(t *testing.T) {
 		})
 	}
 }
+func TestPresentPrompt(t *testing.T) {
+	testCases := []struct {
+		name      string
+		prompt    string
+		choices   []string
+		userInput string
+		expected  string
+	}{
+		{
+			name:      "ValidChoice",
+			prompt:    "Choose an option",
+			choices:   []string{"option1", "option2", "option3"},
+			userInput: "option2\n",
+			expected:  "option2",
+		},
+		{
+			name:      "InvalidThenValidChoice",
+			prompt:    "Choose an option",
+			choices:   []string{"option1", "option2", "option3"},
+			userInput: "invalid\noption3\n",
+			expected:  "option3",
+		},
+		{
+			name:      "WhitespaceInput",
+			prompt:    "Choose an option",
+			choices:   []string{"option1", "option2", "option3"},
+			userInput: "  option1  \n",
+			expected:  "option1",
+		},
+		{
+			name:      "EmptyInputThenValidChoice",
+			prompt:    "Choose an option",
+			choices:   []string{"option1", "option2", "option3"},
+			userInput: "\noption1\n",
+			expected:  "option1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Mock stdin
+			oldStdin := os.Stdin
+			defer func() { os.Stdin = oldStdin }()
+			r, w, _ := os.Pipe()
+			os.Stdin = r
+
+			// Write user input to the pipe
+			_, err := w.WriteString(tc.userInput)
+			require.NoError(t, err)
+			w.Close()
+
+			result := PresentPrompt(tc.prompt, tc.choices)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
