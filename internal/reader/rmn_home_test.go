@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 	require.NoError(t, configPoller.Close())
 }
 
-func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
+func TestRMNHomePoller_HealthReport(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -77,30 +78,61 @@ func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			// Create a mock ContractReaderFacade
 			homeChainReader := readermock.NewMockContractReaderFacade(t)
 
-			// Create the rmnHomePoller
+			// Create a variable to track if GetLatestValue was called
+			var getLatestValueCalled bool
+			var mu sync.Mutex
+
+			homeChainReader.On("GetLatestValue",
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+			).Run(func(args mock.Arguments) {
+				result := args.Get(4).(*[]VersionedConfigWithDigest)
+				*result = []VersionedConfigWithDigest{
+					{
+						ConfigDigest: [32]byte{1},
+						VersionedConfig: VersionedConfig{
+							Version: 1,
+							Config: Config{
+								Nodes:        []Node{},
+								SourceChains: []SourceChain{},
+							},
+						},
+					},
+				}
+				mu.Lock()
+				getLatestValueCalled = true
+				mu.Unlock()
+			}).Return(nil)
+
 			poller := NewRMNHomePoller(
 				homeChainReader,
 				rmnHomeBoundContract,
 				logger.Test(t),
-				time.Second,
+				10*time.Millisecond,
 			).(*rmnHomePoller)
 
-			err := poller.Start(context.Background())
-			require.NoError(t, err)
+			require.NoError(t, poller.Start(context.Background()))
 
-			// Set the failedPolls
+			// Wait for the initial fetch to complete
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return getLatestValueCalled
+			}, 5*time.Second, 10*time.Millisecond, "GetLatestValue was not called within the expected timeframe")
+
+			poller.mutex.Lock()
 			poller.failedPolls = tt.failedPolls
+			poller.mutex.Unlock()
 
-			// Call HealthReport
 			report := poller.HealthReport()
 
-			// Check the results
 			require.Len(t, report, 1)
-			err = report[poller.Name()]
+			err := report[poller.Name()]
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -108,6 +140,9 @@ func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+
+			require.NoError(t, poller.Close())
+			homeChainReader.AssertExpectations(t)
 		})
 	}
 }
