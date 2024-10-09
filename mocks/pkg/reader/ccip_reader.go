@@ -35,52 +35,6 @@ func (_m *MockCCIPReader) EXPECT() *MockCCIPReader_Expecter {
 	return &MockCCIPReader_Expecter{mock: &_m.Mock}
 }
 
-// Close provides a mock function with given fields: ctx
-func (_m *MockCCIPReader) Close(ctx context.Context) error {
-	ret := _m.Called(ctx)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Close")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
-		r0 = rf(ctx)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// MockCCIPReader_Close_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Close'
-type MockCCIPReader_Close_Call struct {
-	*mock.Call
-}
-
-// Close is a helper method to define mock.On call
-//   - ctx context.Context
-func (_e *MockCCIPReader_Expecter) Close(ctx interface{}) *MockCCIPReader_Close_Call {
-	return &MockCCIPReader_Close_Call{Call: _e.mock.On("Close", ctx)}
-}
-
-func (_c *MockCCIPReader_Close_Call) Run(run func(ctx context.Context)) *MockCCIPReader_Close_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
-	})
-	return _c
-}
-
-func (_c *MockCCIPReader_Close_Call) Return(_a0 error) *MockCCIPReader_Close_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockCCIPReader_Close_Call) RunAndReturn(run func(context.Context) error) *MockCCIPReader_Close_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // CommitReportsGTETimestamp provides a mock function with given fields: ctx, dest, ts, limit
 func (_m *MockCCIPReader) CommitReportsGTETimestamp(ctx context.Context, dest ccipocr3.ChainSelector, ts time.Time, limit int) ([]plugintypes.CommitPluginReportWithMeta, error) {
 	ret := _m.Called(ctx, dest, ts, limit)
@@ -578,6 +532,62 @@ func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) Return(_a0 map[ccip
 }
 
 func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.BigInt) *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// LinkPriceUSD provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) LinkPriceUSD(ctx context.Context) (ccipocr3.BigInt, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LinkPriceUSD")
+	}
+
+	var r0 ccipocr3.BigInt
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.BigInt, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.BigInt); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(ccipocr3.BigInt)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_LinkPriceUSD_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LinkPriceUSD'
+type MockCCIPReader_LinkPriceUSD_Call struct {
+	*mock.Call
+}
+
+// LinkPriceUSD is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockCCIPReader_Expecter) LinkPriceUSD(ctx interface{}) *MockCCIPReader_LinkPriceUSD_Call {
+	return &MockCCIPReader_LinkPriceUSD_Call{Call: _e.mock.On("LinkPriceUSD", ctx)}
+}
+
+func (_c *MockCCIPReader_LinkPriceUSD_Call) Run(run func(ctx context.Context)) *MockCCIPReader_LinkPriceUSD_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_LinkPriceUSD_Call) Return(_a0 ccipocr3.BigInt, _a1 error) *MockCCIPReader_LinkPriceUSD_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_LinkPriceUSD_Call) RunAndReturn(run func(context.Context) (ccipocr3.BigInt, error)) *MockCCIPReader_LinkPriceUSD_Call {
 	_c.Call.Return(run)
 	return _c
 }

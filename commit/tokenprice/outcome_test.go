@@ -63,12 +63,10 @@ var offChainCfg = pluginconfig.CommitOffchainConfig{
 func TestGetConsensusObservation(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr: lggr,
-		cfg: pluginconfig.CommitPluginConfig{
-			DestChain:      destChainSel,
-			OffchainConfig: offChainCfg,
-		},
-		fRoleDON: 1,
+		lggr:        lggr,
+		destChain:   destChainSel,
+		offChainCfg: offChainCfg,
+		fRoleDON:    1,
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 and fail feedChain 2f+1
@@ -112,12 +110,10 @@ func TestGetConsensusObservation(t *testing.T) {
 func TestSelectTokensForUpdate(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr: lggr,
-		cfg: pluginconfig.CommitPluginConfig{
-			DestChain:      destChainSel,
-			OffchainConfig: offChainCfg,
-		},
-		fRoleDON: 1,
+		lggr:        lggr,
+		destChain:   destChainSel,
+		offChainCfg: offChainCfg,
+		fRoleDON:    1,
 	}
 
 	conObs := ConsensusObservation{
@@ -141,12 +137,10 @@ func TestSelectTokensForUpdate(t *testing.T) {
 func TestOutcome(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr: lggr,
-		cfg: pluginconfig.CommitPluginConfig{
-			DestChain:      destChainSel,
-			OffchainConfig: offChainCfg,
-		},
-		fRoleDON: 1,
+		lggr:        lggr,
+		destChain:   destChainSel,
+		offChainCfg: offChainCfg,
+		fRoleDON:    1,
 	}
 
 	outcome, err := p.Outcome(Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{

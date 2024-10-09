@@ -132,6 +132,8 @@ type Outcome struct {
 	ReportTransmissionCheckAttempts uint                          `json:"reportTransmissionCheckAttempts"`
 	RMNReportSignatures             []cciptypes.RMNECDSASignature `json:"rmnReportSignatures"`
 	RMNRemoteCfg                    rmntypes.RemoteConfig         `json:"rmnRemoteCfg"`
+	// This is a bitmap where ith bit represents how the v value should be for ith signature
+	RMNRawVs cciptypes.BigInt `json:"rmnRawVs"`
 }
 
 // Sort all fields of the given Outcome
@@ -173,3 +175,23 @@ const (
 	BuildingReport
 	WaitingForReportTransmission
 )
+
+type RootSet struct {
+	roots []cciptypes.MerkleRootChain
+}
+
+// Add a MerkleRoot to the set (if it's not already in the set)
+func (s *RootSet) Add(root cciptypes.MerkleRootChain) {
+	if !s.Contains(root) {
+		s.roots = append(s.roots, root)
+	}
+}
+
+func (s *RootSet) Contains(root cciptypes.MerkleRootChain) bool {
+	for _, r := range s.roots {
+		if r.Equals(root) {
+			return true
+		}
+	}
+	return false
+}

@@ -7,13 +7,14 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
@@ -102,8 +103,8 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
-	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
-		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
+	for oracleID, node := range p.ocrConfig.Config.Nodes {
+		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
 	// map types to the facade.
@@ -134,10 +135,8 @@ func (p PluginFactory) NewReportingPlugin(
 	return NewPlugin(
 			p.donID,
 			config,
-			pluginconfig.ExecutePluginConfig{
-				DestChain:      p.ocrConfig.Config.ChainSelector,
-				OffchainConfig: offchainConfig,
-			},
+			offchainConfig,
+			p.ocrConfig.Config.ChainSelector,
 			oracleIDToP2PID,
 			ccipReader,
 			p.execCodec,

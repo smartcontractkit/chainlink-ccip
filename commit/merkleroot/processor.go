@@ -20,7 +20,8 @@ import (
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
 	oracleID      commontypes.OracleID
-	cfg           pluginconfig.CommitPluginConfig
+	offchainCfg   pluginconfig.CommitOffchainConfig
+	destChain     cciptypes.ChainSelector
 	lggr          logger.Logger
 	observer      Observer
 	ccipReader    readerpkg.CCIPReader
@@ -28,7 +29,6 @@ type Processor struct {
 	chainSupport  plugincommon.ChainSupport
 	rmnClient     rmn.Controller
 	rmnCrypto     cciptypes.RMNCrypto
-	rmnConfig     rmn.Config
 	rmnHomeReader reader.RMNHome
 }
 
@@ -36,7 +36,8 @@ type Processor struct {
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	lggr logger.Logger,
-	cfg pluginconfig.CommitPluginConfig,
+	offchainCfg pluginconfig.CommitOffchainConfig,
+	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
 	ccipReader readerpkg.CCIPReader,
 	msgHasher cciptypes.MessageHasher,
@@ -44,7 +45,6 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	rmnClient rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
-	rmnConfig rmn.Config,
 	rmnHomeReader reader.RMNHome,
 ) *Processor {
 	observer := ObserverImpl{
@@ -57,7 +57,8 @@ func NewProcessor(
 	}
 	return &Processor{
 		oracleID:      oracleID,
-		cfg:           cfg,
+		offchainCfg:   offchainCfg,
+		destChain:     destChain,
 		lggr:          lggr,
 		observer:      observer,
 		ccipReader:    ccipReader,
@@ -65,7 +66,6 @@ func NewProcessor(
 		chainSupport:  chainSupport,
 		rmnClient:     rmnClient,
 		rmnCrypto:     rmnCrypto,
-		rmnConfig:     rmnConfig,
 		rmnHomeReader: rmnHomeReader,
 	}
 }

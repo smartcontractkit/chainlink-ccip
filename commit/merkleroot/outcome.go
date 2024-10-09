@@ -1,13 +1,14 @@
 package merkleroot
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -41,7 +42,7 @@ func (w *Processor) getOutcome(
 ) (Outcome, State) {
 	nextState := previousOutcome.NextState()
 
-	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.cfg.DestChain, aos)
+	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.destChain, aos)
 	if err != nil {
 		w.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
 		return Outcome{}, nextState
@@ -49,7 +50,7 @@ func (w *Processor) getOutcome(
 
 	switch nextState {
 	case SelectingRangesForReport:
-		return reportRangesOutcome(q, w.lggr, consensusObservation, w.cfg.MaxMerkleTreeSize, w.cfg.DestChain), nextState
+		return reportRangesOutcome(q, w.lggr, consensusObservation, w.offchainCfg.MaxMerkleTreeSize, w.destChain), nextState
 	case BuildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
@@ -59,7 +60,7 @@ func (w *Processor) getOutcome(
 		return buildReport(q, w.lggr, consensusObservation, previousOutcome), nextState
 	case WaitingForReportTransmission:
 		return checkForReportTransmission(
-			w.lggr, w.cfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
+			w.lggr, w.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
 	default:
 		w.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
 		return Outcome{}, nextState
@@ -159,22 +160,38 @@ func buildReport(
 		}
 		sigs = parsedSigs
 
-		signedRoots := mapset.NewSet[cciptypes.MerkleRootChain]()
+		type rootKey struct {
+			ChainSel      cciptypes.ChainSelector
+			SeqNumsRange  cciptypes.SeqNumRange
+			MerkleRoot    cciptypes.Bytes32
+			OnRampAddress string
+		}
+		signedRoots := mapset.NewSet[rootKey]()
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
-			signedRoots.Add(cciptypes.MerkleRootChain{
+			signedRoots.Add(rootKey{
 				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
 				),
 				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
+				// NOTE: this hex encoding is just for the sake of giving the onramp address
+				// a value in this key struct.
+				OnRampAddress: hex.EncodeToString(laneUpdate.LaneSource.OnrampAddress),
 			})
 		}
 
 		// Only report roots that are present in RMN signatures.
 		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
 		for _, root := range roots {
-			if signedRoots.Contains(root) {
+			if signedRoots.Contains(rootKey{
+				ChainSel:     root.ChainSel,
+				SeqNumsRange: root.SeqNumsRange,
+				MerkleRoot:   root.MerkleRoot,
+				// NOTE: this hex encoding is just for the sake of giving the onramp address
+				// a value in this key struct.
+				OnRampAddress: hex.EncodeToString(root.OnRampAddress),
+			}) {
 				rootsToReport = append(rootsToReport, root)
 			} else {
 				lggr.Warnw("skipping merkle root not signed by RMN", "root", root)
@@ -188,6 +205,9 @@ func buildReport(
 		RootsToReport:       roots,
 		OffRampNextSeqNums:  prevOutcome.OffRampNextSeqNums,
 		RMNReportSignatures: sigs,
+		// TODO: Calculate it for real
+		RMNRawVs:     cciptypes.NewBigIntFromInt64(0),
+		RMNRemoteCfg: prevOutcome.RMNRemoteCfg,
 	}
 
 	return outcome
@@ -246,7 +266,7 @@ func getConsensusObservation(
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
-	// consensus on the fChain map uses the role DON F value
+	// consensus on the fChain map uses the role DON f value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fRoleDON))
 	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)

@@ -1,9 +1,11 @@
 package reader
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -799,4 +801,144 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 		returnVal interface{}) {
 		mapper(returnVal)
 	}
+}
+
+func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
+	destCR := reader_mocks.NewMockContractReaderFacade(t)
+	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().GetLatestValue(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Run(func(
+		ctx context.Context,
+		readIdentifier string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params interface{},
+		returnVal interface{},
+	) {
+		cfg := returnVal.(*feeQuoterStaticConfig)
+		cfg.MaxFeeJuelsPerMsg = cciptypes.NewBigIntFromInt64(10)
+		cfg.LinkToken = []byte{0x3, 0x4}
+		cfg.StalenessThreshold = 12
+	}).Return(nil)
+
+	offrampAddress := []byte{0x3}
+	feeQuoterAddress := []byte{0x4}
+	ccipReader := newCCIPChainReaderInternal(
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			chainC: destCR,
+		}, nil, chainC, offrampAddress,
+	)
+
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
+		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
+			Address: typeconv.AddressBytesToString(feeQuoterAddress, 111_111)}}))
+
+	ctx := context.Background()
+	cfg, err := ccipReader.getDestFeeQuoterStaticConfig(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, cciptypes.NewBigIntFromInt64(10), cfg.MaxFeeJuelsPerMsg)
+	assert.Equal(t, []byte{0x3, 0x4}, cfg.LinkToken)
+	assert.Equal(t, uint32(12), cfg.StalenessThreshold)
+}
+
+func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
+	tokenAddr := []byte{0x3, 0x4}
+	destCR := reader_mocks.NewMockContractReaderFacade(t)
+	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().GetLatestValue(
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Run(func(
+		ctx context.Context,
+		readIdentifier string,
+		confidenceLevel primitives.ConfidenceLevel,
+		params interface{},
+		returnVal interface{},
+	) {
+		givenTokenAddr := params.(map[string]any)["token"].([]byte)
+		if bytes.Equal(tokenAddr, givenTokenAddr) {
+			price := returnVal.(*big.Int)
+			price.SetInt64(145)
+		}
+	}).Return(nil)
+
+	offrampAddress := []byte{0x3}
+	feeQuoterAddress := []byte{0x4}
+	ccipReader := newCCIPChainReaderInternal(
+		logger.Test(t),
+		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			chainC: destCR,
+		}, nil, chainC, offrampAddress,
+	)
+
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
+		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
+			Address: typeconv.AddressBytesToString(feeQuoterAddress, 111_111)}}))
+
+	ctx := context.Background()
+	price, err := ccipReader.getFeeQuoterTokenPriceUSD(ctx, []byte{0x3, 0x4})
+	assert.NoError(t, err)
+	assert.Equal(t, cciptypes.NewBigIntFromInt64(145), price)
+}
+
+func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
+	tokenAddr := []byte{0x3, 0x4}
+	destCR := reader_mocks.NewMockExtended(t)
+	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+
+	destCR.EXPECT().ExtendedGetLatestValue(
+		mock.Anything,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameFeeQuoterGetStaticConfig,
+		primitives.Unconfirmed,
+		map[string]any{},
+		mock.Anything,
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+		cfg := returnVal.(*feeQuoterStaticConfig)
+		cfg.MaxFeeJuelsPerMsg = cciptypes.NewBigIntFromInt64(10)
+		cfg.LinkToken = []byte{0x3, 0x4}
+		cfg.StalenessThreshold = 12
+	}))
+
+	// mock the call to get the fee quoter
+	destCR.EXPECT().ExtendedGetLatestValue(
+		mock.Anything,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameFeeQuoterGetTokenPrices,
+		primitives.Unconfirmed,
+		map[string]interface{}{"token": tokenAddr},
+		mock.Anything,
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+		price := returnVal.(*big.Int)
+		price.SetInt64(145)
+	}))
+
+	offrampAddress := []byte{0x3}
+	feeQuoterAddress := []byte{0x4}
+	contractReaders := make(map[cciptypes.ChainSelector]contractreader.Extended)
+	contractReaders[chainC] = destCR
+	ccipReader := ccipChainReader{
+		logger.Test(t),
+		contractReaders,
+		nil,
+		chainC,
+		string(offrampAddress),
+	}
+
+	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
+		context.Background(), []types.BoundContract{{Name: "FeeQuoter",
+			Address: typeconv.AddressBytesToString(feeQuoterAddress, 111_111)}}))
+
+	ctx := context.Background()
+	price, err := ccipReader.LinkPriceUSD(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, cciptypes.NewBigIntFromInt64(145), price)
 }

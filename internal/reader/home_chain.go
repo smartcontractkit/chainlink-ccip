@@ -85,7 +85,7 @@ func NewHomeChainConfigPoller(
 	}
 }
 
-func (r *homeChainPoller) Start(ctx context.Context) error {
+func (r *homeChainPoller) Start(_ context.Context) error {
 	r.lggr.Infow("Start Polling ChainConfig")
 	return r.sync.StartOnce(r.Name(), func() error {
 		r.wg.Add(1)
@@ -223,6 +223,8 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
 	var ocrConfigs []OCR3ConfigWithMeta
+	var allConfigs GetAllConfigs
+
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
 		r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetOCRConfig),
@@ -230,9 +232,24 @@ func (r *homeChainPoller) GetOCRConfigs(
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
-		}, &ocrConfigs)
+		}, &allConfigs)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
+	}
+
+	r.lggr.Infow(
+		"GetOCRConfigs",
+		"activeConfig", allConfigs.ActiveConfig,
+		"candidateConfig", allConfigs.CandidateConfig,
+	)
+
+	// Not empty
+	if allConfigs.ActiveConfig.ConfigDigest != [32]byte{} {
+		ocrConfigs = append(ocrConfigs, allConfigs.ActiveConfig)
+	}
+	// Not empty
+	if allConfigs.CandidateConfig.ConfigDigest != [32]byte{} {
+		ocrConfigs = append(ocrConfigs, allConfigs.CandidateConfig)
 	}
 
 	return ocrConfigs, nil
@@ -337,8 +354,8 @@ type ChainConfigInfo struct {
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
 }
 
-// ChainConfig will live on the home chain and will be used to update chain configuration like F value and supported
-// nodes dynamically.
+// ChainConfig will live on the home chain and will be used to update chain configuration
+// like FRoleDon value and supported nodes dynamically.
 type ChainConfig struct {
 	// FChain defines the FChain value for the chain. FChain is used while forming consensus based on the observations.
 	FChain int `json:"fChain"`
@@ -348,25 +365,43 @@ type ChainConfig struct {
 	Config chainconfig.ChainConfig `json:"config"`
 }
 
-// OCR3Config mirrors CCIPConfig.sol's OCR3Config struct
+// nolint: lll
+// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+
+type OCR3Node struct {
+	P2pID          [32]byte `json:"p2pId"`
+	SignerKey      []byte   `json:"signerKey"`
+	TransmitterKey []byte   `json:"transmitterKey"`
+}
+
+// nolint: lll
+// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+
 type OCR3Config struct {
 	PluginType            uint8                   `json:"pluginType"`
 	ChainSelector         cciptypes.ChainSelector `json:"chainSelector"`
-	F                     uint8                   `json:"F"`
+	FRoleDON              uint8                   `json:"fRoleDON"`
 	OffchainConfigVersion uint64                  `json:"offchainConfigVersion"`
 	OfframpAddress        []byte                  `json:"offrampAddress"`
 	RmnHomeAddress        []byte                  `json:"rmnHomeAddress"`
-	P2PIds                [][32]byte              `json:"p2pIds"`
-	Signers               [][]byte                `json:"signers"`
-	Transmitters          [][]byte                `json:"transmitters"`
+	Nodes                 []OCR3Node              `json:"nodes"`
 	OffchainConfig        []byte                  `json:"offchainConfig"`
 }
 
-// OCR3ConfigWithmeta mirrors CCIPConfig.sol's OCR3ConfigWithMeta struct
+// OCR3ConfigWithMeta
+// nolint: lll
+// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+// TODO: we might need to change it from OCR3ConfigWithMeta to VersionedConfig
+// If so, we'll create a new package so that we don't have conflict naming with RMNHome
 type OCR3ConfigWithMeta struct {
-	Config       OCR3Config `json:"config"`
-	ConfigCount  uint64     `json:"configCount"`
+	Version      uint32     `json:"version"`
 	ConfigDigest [32]byte   `json:"configDigest"`
+	Config       OCR3Config `json:"config"`
+}
+
+type GetAllConfigs struct {
+	ActiveConfig    OCR3ConfigWithMeta `json:"activeConfig"`
+	CandidateConfig OCR3ConfigWithMeta `json:"candidateConfig"`
 }
 
 var _ HomeChain = (*homeChainPoller)(nil)

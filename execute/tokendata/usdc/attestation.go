@@ -70,7 +70,7 @@ func NewSequentialAttestationClient(
 	lggr logger.Logger,
 	config pluginconfig.USDCCCTPObserverConfig,
 ) (AttestationClient, error) {
-	client, err := NewHTTPClient(
+	client, err := GetHTTPClient(
 		lggr,
 		config.AttestationAPI,
 		config.AttestationAPIInterval.Duration(),
