@@ -19,6 +19,8 @@ type OCR3ConfigWithMeta = reader_internal.OCR3ConfigWithMeta
 
 type OCR3Config = reader_internal.OCR3Config
 
+type OCR3Node = reader_internal.OCR3Node
+
 func NewHomeChainReader(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,

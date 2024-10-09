@@ -325,10 +325,21 @@ func (o ObserverImpl) ObserveMerkleRoots(
 					return
 				}
 
+				onRampAddress, err := o.ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainRange.ChainSel)
+				if err != nil {
+					o.lggr.Warnw(
+						fmt.Sprintf("getting onramp contract address failed for selector %d", chainRange.ChainSel),
+						"err", err,
+						"chainSelector", chainRange.ChainSel,
+					)
+					return
+				}
+
 				merkleRoot := cciptypes.MerkleRootChain{
-					ChainSel:     chainRange.ChainSel,
-					SeqNumsRange: chainRange.SeqNumRange,
-					MerkleRoot:   root,
+					ChainSel:      chainRange.ChainSel,
+					SeqNumsRange:  chainRange.SeqNumRange,
+					OnRampAddress: onRampAddress,
+					MerkleRoot:    root,
 				}
 
 				rootsMu.Lock()

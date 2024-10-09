@@ -443,7 +443,7 @@ func setupHomeChainPoller(
 				params,
 				returnVal interface{},
 			) {
-				*returnVal.(*[]reader.OCR3ConfigWithMeta) = []reader.OCR3ConfigWithMeta{{}}
+				*returnVal.(*reader.ActiveAndCandidate) = reader.ActiveAndCandidate{}
 			}).
 		Return(nil)
 
