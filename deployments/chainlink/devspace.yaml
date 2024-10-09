@@ -103,6 +103,12 @@ profiles:
   - name: core
     patches:
       - op: add
+        path: vars
+        value:
+          CHAINLINK_REPO_DIR:
+            source: env
+            default: "${CHAINLINK_CODE_DIR}/chainlink"
+      - op: add
         path: dependencies
         value:
           crib-chainlink-cluster:

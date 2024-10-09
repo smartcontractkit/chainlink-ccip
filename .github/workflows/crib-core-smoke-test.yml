@@ -9,6 +9,7 @@ on:
       # Include common changes
       - "*"
       - "dependencies/crib-chainlink-cluster/**"
+      - "imports/**"
       - "scripts/**"
       # Include crib core changes
       - "deployments/chainlink/**"
