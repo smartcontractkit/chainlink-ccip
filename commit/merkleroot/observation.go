@@ -327,7 +327,10 @@ func (o ObserverImpl) ObserveMerkleRoots(
 
 				onRampAddress, err := o.ccipReader.GetContractAddress(consts.ContractNameOnRamp, chainRange.ChainSel)
 				if err != nil {
-					o.lggr.Warnw("discovering onRamp failed", "err", err)
+					o.lggr.Warnw(
+						fmt.Sprintf("getting onramp contract address failed for selector %d", chainRange.ChainSel),
+						"err", err,
+					)
 					return
 				}
 

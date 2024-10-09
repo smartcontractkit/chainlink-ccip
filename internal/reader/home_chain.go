@@ -222,8 +222,10 @@ func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) ([]OCR3ConfigWithMeta, error) {
-	var ocrConfigs []OCR3ConfigWithMeta
-	var allConfigs GetAllConfigs
+	var (
+		ocrConfigs []OCR3ConfigWithMeta
+		allConfigs GetAllConfigs
+	)
 
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
@@ -243,11 +245,10 @@ func (r *homeChainPoller) GetOCRConfigs(
 		"candidateConfig", allConfigs.CandidateConfig,
 	)
 
-	// Not empty
 	if allConfigs.ActiveConfig.ConfigDigest != [32]byte{} {
 		ocrConfigs = append(ocrConfigs, allConfigs.ActiveConfig)
 	}
-	// Not empty
+
 	if allConfigs.CandidateConfig.ConfigDigest != [32]byte{} {
 		ocrConfigs = append(ocrConfigs, allConfigs.CandidateConfig)
 	}
