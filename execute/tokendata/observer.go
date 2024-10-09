@@ -80,6 +80,7 @@ func createUSDCTokenObserver(
 	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (TokenDataObserver, error) {
 	usdcReader, err := reader.NewUSDCMessageReader(
+		lggr,
 		cctpConfig.Tokens,
 		readers,
 	)

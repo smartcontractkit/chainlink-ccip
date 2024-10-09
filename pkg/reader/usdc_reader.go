@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -45,6 +47,7 @@ var CCTPDestDomains = map[uint64]uint32{
 }
 
 type usdcMessageReader struct {
+	lggr            logger.Logger
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
 	cctpDestDomain  map[uint64]uint32
 	boundContracts  map[cciptypes.ChainSelector]types.BoundContract
@@ -72,6 +75,7 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 }
 
 func NewUSDCMessageReader(
+	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (USDCMessageReader, error) {
@@ -96,6 +100,7 @@ func NewUSDCMessageReader(
 	}
 
 	return usdcMessageReader{
+		lggr:            lggr,
 		contractReaders: contractReaders,
 		cctpDestDomain:  CCTPDestDomains,
 		boundContracts:  boundContracts,
@@ -120,14 +125,29 @@ func (u usdcMessageReader) MessageHashes(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
+	eventIDsFilter := make([]query.Expression, len(eventIDs))
+	for _, id := range eventIDs {
+		eventIDsFilter = append(
+			eventIDsFilter,
+			query.Comparator(consts.EventFilterCCIPMessageSent,
+				primitives.ValueComparator{
+					Value:    id,
+					Operator: primitives.Eq,
+				}),
+		)
+	}
+
 	iter, err := u.contractReaders[source].QueryKey(
 		ctx,
 		cr,
 		query.KeyFilter{
 			Key:         consts.EventNameCCTPMessageSent,
-			Expressions: []query.Expression{},
+			Expressions: eventIDsFilter,
 		},
-		query.NewLimitAndSort(query.Limit{}, query.NewSortBySequence(query.Asc)),
+		query.NewLimitAndSort(
+			query.Limit{Count: uint64(len(eventIDsFilter))},
+			query.NewSortBySequence(query.Asc),
+		),
 		&MessageSentEvent{},
 	)
 	if err != nil {
@@ -147,13 +167,17 @@ func (u usdcMessageReader) MessageHashes(
 		messageSentEvents[e] = event.Arg0
 	}
 
-	// 3. This should be done by ChainReader - picking only events matching eventIDs.
-	// Right now ChainReader doesn't support filtering by specific data words
+	// 3. Remapping database events to the proper MessageTokenID
 	out := make(map[MessageTokenID]cciptypes.Bytes)
 	for tokenID, messageID := range eventIDs {
 		messageHash, ok1 := messageSentEvents[messageID]
 		if !ok1 {
 			// Token not available in the source chain
+			u.lggr.Debugw("Message not found in the source chain",
+				"seqNr", tokenID.SeqNr,
+				"tokenIndex", tokenID.Index,
+				"chainSelector", source,
+			)
 			continue
 		}
 		out[tokenID] = messageHash
