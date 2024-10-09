@@ -1,7 +1,6 @@
 package merkleroot
 
 import (
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"time"
