@@ -73,3 +73,59 @@ func TestGetGitTopLevelDir(t *testing.T) {
 		})
 	}
 }
+func TestListFiles(t *testing.T) {
+	// Create a temporary directory for testing
+	tempDir := t.TempDir()
+
+	// Create some files in the temporary directory
+	// Initialize files in a slice and create them in a loop
+	files := []string{"file1.txt", "file2.txt", "file3.txt"}
+	for _, file := range files {
+		_, err := os.Create(filepath.Join(tempDir, file))
+		require.NoError(t, err)
+	}
+	os.Mkdir(filepath.Join(tempDir, "subdir"), 0750)
+
+	testCases := []struct {
+		name        string
+		dir         string
+		expected    []string
+		expectedErr error
+	}{
+		{
+			name:        "ValidDirectory",
+			dir:         tempDir,
+			expected:    []string{"file1.txt", "file2.txt", "file3.txt", "subdir"},
+			expectedErr: nil,
+		},
+		{
+			name:        "NonExistentDirectory",
+			dir:         filepath.Join(tempDir, "nonexistent"),
+			expected:    nil,
+			expectedErr: &os.PathError{},
+		},
+		{
+			name:        "EmptyDirectory",
+			dir:         filepath.Join(tempDir, "empty"),
+			expected:    []string{},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.name == "EmptyDirectory" {
+				require.NoError(t, os.Mkdir(tc.dir, 0750))
+			}
+
+			files, err := ListFiles(tc.dir)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.IsType(t, tc.expectedErr, err)
+			} else {
+				assert.NoError(t, err)
+				assert.ElementsMatch(t, tc.expected, files)
+			}
+		})
+	}
+}
