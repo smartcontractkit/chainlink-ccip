@@ -19,6 +19,12 @@ import (
 )
 
 func Test_AttestationClient(t *testing.T) {
+	lggr := logger.Test(t)
+
+	t.Cleanup(func() {
+		_ = lggr.Sync()
+	})
+
 	type example struct {
 		hash   []byte
 		keccak string
@@ -157,7 +163,7 @@ func Test_AttestationClient(t *testing.T) {
 			server := httptest.NewServer(createHandler(t, tc.success, tc.pending))
 			defer server.Close()
 
-			client, err := NewSequentialAttestationClient(logger.Test(t), pluginconfig.USDCCCTPObserverConfig{
+			client, err := NewSequentialAttestationClient(lggr, pluginconfig.USDCCCTPObserverConfig{
 				AttestationAPI:         server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
 				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Minute),
