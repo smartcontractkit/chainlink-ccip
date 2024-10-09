@@ -165,6 +165,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 					},
 					PriceUpdates:  ccipocr3.PriceUpdates{},
 					RMNSignatures: []ccipocr3.RMNECDSASignature{},
+					RMNRawVs:      ccipocr3.NewBigIntFromInt64(0),
 				},
 			},
 		},
