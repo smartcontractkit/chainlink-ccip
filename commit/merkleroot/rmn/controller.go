@@ -513,18 +513,26 @@ func (c *controller) getRmnReportSignatures(
 	// At this point it is also possible that the signed observations contain
 	// different roots for the same source chain and interval.
 
-	rootsPerChain := getMostVotedRootsFromObservations(rmnSignedObservations)
+	minObservers, err := c.rmnHomeReader.GetMinObservers(rmnRemoteCfg.ConfigDigest)
+	if err != nil {
+		return nil, fmt.Errorf("get min observers: %w", err)
+	}
+
+	rootsPerChain, err := selectRoots(rmnSignedObservations, minObservers)
+	if err != nil {
+		return nil, fmt.Errorf("get most voted roots from observations: %w", err)
+	}
 
 	fixedDestLaneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0)
 	for sourceChain, updateReq := range updatesPerChain {
-		mostVotedRoot, ok := rootsPerChain[cciptypes.ChainSelector(sourceChain)]
+		selectedRoot, ok := rootsPerChain[cciptypes.ChainSelector(sourceChain)]
 		if !ok {
 			return nil, fmt.Errorf("no most voted root for source chain %d", sourceChain)
 		}
 		fixedDestLaneUpdates = append(fixedDestLaneUpdates, &rmnpb.FixedDestLaneUpdate{
 			LaneSource:     updateReq.Data.LaneSource,
 			ClosedInterval: updateReq.Data.ClosedInterval,
-			Root:           mostVotedRoot[:],
+			Root:           selectedRoot[:],
 		})
 	}
 	sort.Slice(fixedDestLaneUpdates, func(i, j int) bool {
@@ -624,9 +632,12 @@ func transformAndSortObservations(
 	return attrSigObservations
 }
 
-// getMostVotedRootsFromObservations returns the most voted roots for each source chain.
-func getMostVotedRootsFromObservations(
-	observations []rmnSignedObservationWithMeta) map[cciptypes.ChainSelector]cciptypes.Bytes32 {
+// selectsRoots selects the roots from the signed observations.
+// If there are more than one valid roots based on the provided minObservers it returns an error.
+func selectRoots(
+	observations []rmnSignedObservationWithMeta,
+	minObservers map[cciptypes.ChainSelector]int,
+) (map[cciptypes.ChainSelector]cciptypes.Bytes32, error) {
 	votesPerRoot := make(map[cciptypes.ChainSelector]map[cciptypes.Bytes32]int)
 	for _, so := range observations {
 		for _, lu := range so.SignedObservation.Observation.FixedDestLaneUpdates {
@@ -637,20 +648,34 @@ func getMostVotedRootsFromObservations(
 		}
 	}
 
-	mostVotedRoots := make(map[cciptypes.ChainSelector]cciptypes.Bytes32)
+	selectedRoots := make(map[cciptypes.ChainSelector]cciptypes.Bytes32)
 	for chain, votes := range votesPerRoot {
-		var mostVotedRoot cciptypes.Bytes32
-		maxVotes := 0
-		for root, vote := range votes {
-			if vote > maxVotes {
-				mostVotedRoot = root
-				maxVotes = vote
-			}
+		minObserversForChain, exists := minObservers[chain]
+		if !exists {
+			return nil, fmt.Errorf("no min observers for chain %d", chain)
 		}
-		mostVotedRoots[chain] = mostVotedRoot
+
+		var selectedRoot cciptypes.Bytes32
+
+		for root, vote := range votes {
+			if vote < minObserversForChain {
+				continue
+			}
+
+			if !selectedRoot.IsEmpty() {
+				return nil, fmt.Errorf("more than one valid root for chain %d", chain)
+			}
+
+			selectedRoot = root
+		}
+
+		if selectedRoot.IsEmpty() {
+			return nil, fmt.Errorf("no valid root for chain %d", chain)
+		}
+		selectedRoots[chain] = selectedRoot
 	}
 
-	return mostVotedRoots
+	return selectedRoots, nil
 }
 
 // sendReportSignatureRequest sends the report signature request to #minSigners random RMN nodes.
