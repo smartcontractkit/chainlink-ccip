@@ -24,6 +24,10 @@ dependencies:
 pipelines:
   deploy:
     run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        ensure_pull_secrets --all
+      fi
+
       run_dependency_pipelines postgres
 
       create_deployments job-distributor
@@ -35,7 +39,7 @@ deployments:
       releaseName: "job-distributor"
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/job-distributor
-        version: "0.1.5"
+        version: "0.2.6"
       values:
         envVars:
           ENVIRONMENT: development
@@ -70,3 +74,28 @@ deployments:
             # AWS ALB private CIDRs and optionally other custom CIDRs.
             # Example format: 10.0.0.0/16,192.168.0.1/24
             customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+profiles:
+  - name: local-charts
+    merge:
+      deployments:
+        job-distributor:
+          helm:
+            chart:
+              name: job-distributor
+              path: ${CHAINLINK_CODE_DIR}/job-distributor/charts/job-distributor
+              version: null
+  - name: kind
+    activation:
+      - vars:
+          PROVIDER: "kind"
+    merge:
+      pullSecrets:
+        regcred-prod-ecr:
+          registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+          secret: regcred-prod-ecr
+      deployments:
+        job-distributor:
+          helm:
+            values:
+              imagePullSecrets:
+                - name: regcred-prod-ecr
