@@ -112,6 +112,10 @@ func (u usdcMessageReader) MessageHashes(
 	source, dest cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[MessageTokenID]cciptypes.Bytes, error) {
+	if len(tokens) == 0 {
+		return map[MessageTokenID]cciptypes.Bytes{}, nil
+	}
+
 	// 1. Extract 3rd word from the MessageSent(bytes) - it's going to be our identifier
 	eventIDs, err := u.recreateMessageTransmitterEvents(dest, tokens)
 	if err != nil {
@@ -125,10 +129,10 @@ func (u usdcMessageReader) MessageHashes(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
-	queryFilter := make([]query.Expression, 0, len(eventIDs)+1)
+	eventFilter := make([]query.Expression, 0, len(eventIDs))
 	for _, id := range eventIDs {
-		queryFilter = append(
-			queryFilter,
+		eventFilter = append(
+			eventFilter,
 			query.Comparator(consts.EventFilterCCIPMessageSent,
 				primitives.ValueComparator{
 					Value:    id,
@@ -136,14 +140,18 @@ func (u usdcMessageReader) MessageHashes(
 				}),
 		)
 	}
-	queryFilter = append(queryFilter, query.Confidence(primitives.Finalized))
+
+	filter := []query.Expression{
+		query.Or(eventFilter...),
+		query.Confidence(primitives.Finalized),
+	}
 
 	iter, err := u.contractReaders[source].QueryKey(
 		ctx,
 		cr,
 		query.KeyFilter{
 			Key:         consts.EventNameCCTPMessageSent,
-			Expressions: queryFilter,
+			Expressions: filter,
 		},
 		query.NewLimitAndSort(
 			query.Limit{Count: uint64(len(eventIDs))},
