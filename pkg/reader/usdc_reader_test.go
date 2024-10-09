@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/exp/maps"
@@ -98,7 +99,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				readers[k] = v
 			}
 
-			r, err := NewUSDCMessageReader(tc.tokensConfig, readers)
+			r, err := NewUSDCMessageReader(logger.Test(t), tc.tokensConfig, readers)
 			if tc.errorMessage != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tc.errorMessage)
@@ -178,7 +179,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 		},
 	}
 
-	usdcReader, err := NewUSDCMessageReader(tokensConfigs, contactReaders)
+	usdcReader, err := NewUSDCMessageReader(logger.Test(t), tokensConfigs, contactReaders)
 	require.NoError(t, err)
 
 	tt := []struct {

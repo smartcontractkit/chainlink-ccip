@@ -117,6 +117,11 @@ const (
 	EventAttributeDestChain      = "destChain"
 )
 
+// Dedicated filters
+const (
+	CCTPMessageSentValue = "CCTPMessageSentValue"
+)
+
 // Mirrors of Internal.sol's OCRPluginType
 const (
 	PluginTypeCommit  uint8 = 0

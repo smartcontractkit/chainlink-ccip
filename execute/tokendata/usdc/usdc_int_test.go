@@ -202,6 +202,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 	sepoliaReader := mockReader(t, sepoliaTransmitter, sepolia)
 
 	usdcReader, err := readerpkg.NewUSDCMessageReader(
+		logger.Test(t),
 		config,
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			fujiChain:    fujiReader,
