@@ -7,15 +7,13 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
 type processor struct {
@@ -121,7 +119,7 @@ func (p *processor) Outcome(
 }
 
 func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
-	tokensWithPrice := mapset.NewSet[types.Account]()
+	tokensWithPrice := mapset.NewSet[cciptypes.UnknownEncodedAddress]()
 	for _, t := range tokenPrices {
 		if tokensWithPrice.Contains(t.TokenID) {
 			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)
