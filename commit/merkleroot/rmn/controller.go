@@ -669,6 +669,9 @@ func selectRoots(
 			selectedRoot = root
 		}
 
+		if selectedRoot.IsEmpty() {
+			return nil, fmt.Errorf("no valid root for chain %d", chain)
+		}
 		selectedRoots[chain] = selectedRoot
 	}
 

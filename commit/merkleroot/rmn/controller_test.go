@@ -88,6 +88,25 @@ func Test_selectRoots(t *testing.T) {
 			},
 		},
 		{
+			name: "zero valid roots",
+			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+			},
+			minObservers: map[cciptypes.ChainSelector]int{chainS1: 2}, // <-----
+			expErr:       true,
+		},
+		{
 			name: "observers not defined",
 			observations: []rmnSignedObservationWithMeta{
 				{
