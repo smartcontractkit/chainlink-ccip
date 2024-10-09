@@ -125,10 +125,10 @@ func (u usdcMessageReader) MessageHashes(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
-	eventIDsFilter := make([]query.Expression, len(eventIDs))
+	queryFilter := make([]query.Expression, len(eventIDs)+1)
 	for _, id := range eventIDs {
-		eventIDsFilter = append(
-			eventIDsFilter,
+		queryFilter = append(
+			queryFilter,
 			query.Comparator(consts.EventFilterCCIPMessageSent,
 				primitives.ValueComparator{
 					Value:    id,
@@ -136,16 +136,17 @@ func (u usdcMessageReader) MessageHashes(
 				}),
 		)
 	}
+	queryFilter = append(queryFilter, query.Confidence(primitives.Finalized))
 
 	iter, err := u.contractReaders[source].QueryKey(
 		ctx,
 		cr,
 		query.KeyFilter{
 			Key:         consts.EventNameCCTPMessageSent,
-			Expressions: eventIDsFilter,
+			Expressions: queryFilter,
 		},
 		query.NewLimitAndSort(
-			query.Limit{Count: uint64(len(eventIDsFilter))},
+			query.Limit{Count: uint64(len(eventIDs))},
 			query.NewSortBySequence(query.Asc),
 		),
 		&MessageSentEvent{},
