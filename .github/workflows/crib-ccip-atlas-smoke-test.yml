@@ -10,6 +10,7 @@ on:
       - "*"
       - "dependencies/crib-chainlink-cluster/**"
       - "dependencies/crib-ccip-scripts/**"
+      - "imports/**"
       - "dependencies/atlas/**"
       - "scripts/**"
       # Include crib ccip changes
