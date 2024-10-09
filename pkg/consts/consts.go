@@ -119,7 +119,7 @@ const (
 
 // Dedicated filters
 const (
-	EventFilterCCIPMessageSent = "MessageSentIDBytes"
+	CCTPMessageSentValue = "CCTPMessageSentValue"
 )
 
 // Mirrors of Internal.sol's OCRPluginType
