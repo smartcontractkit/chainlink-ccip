@@ -349,7 +349,7 @@ type HomeChainConfigMapper struct {
 // ChainConfigInfo This is a 1-1 mapping between the config that we get from the contract to make
 // se/deserializing easier
 type ChainConfigInfo struct {
-	// nolint:lll // don't split up the long url
+	//nolint:lll // don't split up the long url
 	// Calling function https://github.com/smartcontractkit/ccip/blob/330c5e98f624cfb10108c92fe1e00ced6d345a99/contracts/src/v0.8/ccip/capability/CCIPConfig.sol#L140
 	ChainSelector cciptypes.ChainSelector `json:"chainSelector"`
 	ChainConfig   HomeChainConfigMapper   `json:"chainConfig"`
@@ -366,18 +366,18 @@ type ChainConfig struct {
 	Config chainconfig.ChainConfig `json:"config"`
 }
 
-// nolint: lll
-// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
-
+// See https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+//
+//nolint:lll
 type OCR3Node struct {
 	P2pID          [32]byte `json:"p2pId"`
 	SignerKey      []byte   `json:"signerKey"`
 	TransmitterKey []byte   `json:"transmitterKey"`
 }
 
-// nolint: lll
-// https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
-
+// See https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
+//
+//nolint:lll
 type OCR3Config struct {
 	PluginType            uint8                   `json:"pluginType"`
 	ChainSelector         cciptypes.ChainSelector `json:"chainSelector"`
@@ -390,10 +390,11 @@ type OCR3Config struct {
 }
 
 // OCR3ConfigWithMeta
-// nolint: lll
 // https://github.com/smartcontractkit/chainlink/blob/e964798a974f3246ee1da011feffe33509b358df/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L105-L131
 // TODO: we might need to change it from OCR3ConfigWithMeta to VersionedConfig
 // If so, we'll create a new package so that we don't have conflict naming with RMNHome
+//
+//nolint:lll
 type OCR3ConfigWithMeta struct {
 	Version      uint32     `json:"version"`
 	ConfigDigest [32]byte   `json:"configDigest"`
