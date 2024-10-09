@@ -3,8 +3,11 @@ package exectypes
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
 
@@ -19,15 +22,25 @@ type CostlyMessageObserver interface {
 	) ([]cciptypes.Bytes32, error)
 }
 
-func NewCostlyMessageObserver() CostlyMessageObserver {
+func NewCostlyMessageObserver(
+	lggr logger.Logger,
+	ccipReader readerpkg.CCIPReader,
+	RelativeBoostPerWaitHour float64,
+) CostlyMessageObserver {
 	return &CcipCostlyMessageObserver{
-		// TODO: Implement fee and exec cost calculators
-		feeCalculator:      &NoOpMessageFeeE18USDCalculator{},
+		lggr: lggr,
+		feeCalculator: &CcipMessageFeeE18USDCalculator{
+			lggr:                     lggr,
+			ccipReader:               ccipReader,
+			RelativeBoostPerWaitHour: RelativeBoostPerWaitHour,
+		},
+		// TODO: Implement exec cost calculator
 		execCostCalculator: &NoOpMessageExecCostE18USDCalculator{},
 	}
 }
 
 type CcipCostlyMessageObserver struct {
+	lggr               logger.Logger
 	feeCalculator      MessageFeeE18USDCalculator
 	execCostCalculator MessageExecCostE18USDCalculator
 }
@@ -68,6 +81,7 @@ func (o *CcipCostlyMessageObserver) Observe(
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
 		if fee.Cmp(execCost.Int) < 0 {
+			o.lggr.Infow("message is too costly to execute", "messageID", msg.Header.MessageID)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		}
 	}
@@ -133,3 +147,64 @@ func (n *NoOpMessageExecCostE18USDCalculator) MessageExecCostE18USD(
 }
 
 var _ MessageExecCostE18USDCalculator = &NoOpMessageExecCostE18USDCalculator{}
+
+// CcipMessageFeeE18USDCalculator calculates the fees (paid at source) of a set of messages in e-18 USDs.
+type CcipMessageFeeE18USDCalculator struct {
+	lggr logger.Logger
+
+	ccipReader readerpkg.CCIPReader
+
+	// RelativeBoostPerWaitHour indicates how much to increase (artificially) the fee paid on the source chain per hour
+	// of wait time, such that eventually the fee paid is greater than the execution cost, and we’ll execute it.
+	// For example: if set to 0.5, that means the fee paid is increased by 50% every hour the message has been waiting.
+	RelativeBoostPerWaitHour float64 `json:"relativeBoostPerWaitHour"`
+}
+
+var _ MessageFeeE18USDCalculator = &CcipMessageFeeE18USDCalculator{}
+
+// MessageFeeE18USD Returns a map from message ID to the message's fee in e-18 USDs. For example, if the message's
+// fee is 12USD, this function return this message's fee as 12 * 1e18. You can think of this function returning the
+// fee not in USD, but in a small denomination of USD, analogous to returning the cost in wei instead of ETH
+// (1 wei = 1e-18 ETH).
+func (c *CcipMessageFeeE18USDCalculator) MessageFeeE18USD(
+	ctx context.Context,
+	messages []cciptypes.Message,
+	messageTimeStamps map[cciptypes.Bytes32]time.Time,
+) (map[cciptypes.Bytes32]cciptypes.BigInt, error) {
+	linkPriceUSD, err := c.ccipReader.LinkPriceUSD(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get LINK price in USD: %w", err)
+	}
+
+	messageFees := make(map[cciptypes.Bytes32]cciptypes.BigInt)
+	for _, msg := range messages {
+		feeE18USD := big.NewInt(0).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int)
+		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
+		if !ok {
+			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
+			// message will not be executed (as it will be considered too costly).
+			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
+		} else {
+			feeE18USD = waitBoostedFee(time.Since(timestamp), feeE18USD, c.RelativeBoostPerWaitHour)
+		}
+
+		messageFees[msg.Header.MessageID] = cciptypes.NewBigInt(feeE18USD)
+	}
+
+	return messageFees, nil
+}
+
+// waitBoostedFee boosts the given fee according to the time passed since the msg was sent.
+// RelativeBoostPerWaitHour is used to normalize the time diff,
+// it makes our loss taking "smooth" and gives us time to react without a hard deadline.
+// At the same time, messages that are slightly underpaid will start going through after waiting for a little bit.
+//
+// wait_boosted_fee(m) = (1 + (now - m.send_time).hours * RELATIVE_BOOST_PER_WAIT_HOUR) * fee(m)
+func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHour float64) *big.Int {
+	k := 1.0 + waitTime.Hours()*relativeBoostPerWaitHour
+
+	boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(fee))
+	res, _ := boostedFee.Int(nil)
+
+	return res
+}

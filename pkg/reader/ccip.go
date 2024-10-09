@@ -805,6 +805,14 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 		return cciptypes.BigInt{}, fmt.Errorf("get LINK price in USD: %w", err)
 	}
 
+	if linkPriceUSD.Int == nil {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK price is nil")
+	}
+
+	if linkPriceUSD.Int.Cmp(big.NewInt(0)) == 0 {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK price is 0")
+	}
+
 	return linkPriceUSD, nil
 }
 

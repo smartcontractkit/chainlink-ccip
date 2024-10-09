@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -132,6 +133,12 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
 
+	costlyMessageObserver := exectypes.NewCostlyMessageObserver(
+		p.lggr,
+		ccipReader,
+		offchainConfig.RelativeBoostPerWaitHour,
+	)
+
 	return NewPlugin(
 			p.donID,
 			config,
@@ -145,6 +152,7 @@ func (p PluginFactory) NewReportingPlugin(
 			tokenDataObserver,
 			p.estimateProvider,
 			p.lggr,
+			costlyMessageObserver,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

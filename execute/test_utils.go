@@ -282,6 +282,12 @@ func newNode(
 		OracleID: commontypes.OracleID(id),
 	}
 
+	costlyMessageObserver := exectypes.NewCostlyMessageObserver(
+		lggr,
+		ccipReader,
+		cfg.RelativeBoostPerWaitHour,
+	)
+
 	node1 := NewPlugin(
 		donID,
 		rCfg,
@@ -295,6 +301,7 @@ func newNode(
 		tokenDataObserver,
 		evm.EstimateProvider{},
 		lggr,
+		costlyMessageObserver,
 	)
 
 	return nodeSetup{
@@ -383,6 +390,7 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 				SourceChainSelector: src,
 				SequenceNumber:      seqNum,
 			},
+			FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
 		},
 		Destination: dest,
 		Executed:    executed,

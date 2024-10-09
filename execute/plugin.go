@@ -67,6 +67,7 @@ func NewPlugin(
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
+	costlyMessageObserver exectypes.CostlyMessageObserver,
 ) *Plugin {
 	lggr = logger.Named(lggr, "ExecutePlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
@@ -85,7 +86,7 @@ func NewPlugin(
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
 		lggr:                  lggr,
-		costlyMessageObserver: exectypes.NewCostlyMessageObserver(),
+		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			lggr,
 			&ccipReader,
