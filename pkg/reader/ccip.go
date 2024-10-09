@@ -167,7 +167,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				cciptypes.ChainSelector(mr.SourceChainSelector),
 			)
 			if err != nil {
-				return nil, fmt.Errorf("get onRamp address: %w", err)
+				return nil, fmt.Errorf("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
 			}
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
 				ChainSel:      cciptypes.ChainSelector(mr.SourceChainSelector),

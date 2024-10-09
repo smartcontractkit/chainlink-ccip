@@ -443,7 +443,7 @@ func setupHomeChainPoller(
 				params,
 				returnVal interface{},
 			) {
-				*returnVal.(*reader.GetAllConfigs) = reader.GetAllConfigs{}
+				*returnVal.(*reader.ActiveAndCandidate) = reader.ActiveAndCandidate{}
 			}).
 		Return(nil)
 

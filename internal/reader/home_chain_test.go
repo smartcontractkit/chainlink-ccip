@@ -180,8 +180,8 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 		},
 		mock.AnythingOfType("*reader.GetAllConfigs"),
 	).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(4).(*GetAllConfigs)
-		*arg = GetAllConfigs{
+		arg := args.Get(4).(*ActiveAndCandidate)
+		*arg = ActiveAndCandidate{
 			ActiveConfig: OCR3ConfigWithMeta{
 				Version: 1,
 				Config: OCR3Config{

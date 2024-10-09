@@ -330,6 +330,7 @@ func (o ObserverImpl) ObserveMerkleRoots(
 					o.lggr.Warnw(
 						fmt.Sprintf("getting onramp contract address failed for selector %d", chainRange.ChainSel),
 						"err", err,
+						"chainSelector", chainRange.ChainSel,
 					)
 					return
 				}

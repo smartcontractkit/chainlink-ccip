@@ -224,7 +224,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 ) ([]OCR3ConfigWithMeta, error) {
 	var (
 		ocrConfigs []OCR3ConfigWithMeta
-		allConfigs GetAllConfigs
+		allConfigs ActiveAndCandidate
 	)
 
 	err := r.homeChainReader.GetLatestValue(
@@ -400,7 +400,7 @@ type OCR3ConfigWithMeta struct {
 	Config       OCR3Config `json:"config"`
 }
 
-type GetAllConfigs struct {
+type ActiveAndCandidate struct {
 	ActiveConfig    OCR3ConfigWithMeta `json:"activeConfig"`
 	CandidateConfig OCR3ConfigWithMeta `json:"candidateConfig"`
 }
