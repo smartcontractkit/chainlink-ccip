@@ -125,7 +125,7 @@ func (u usdcMessageReader) MessageHashes(
 		return nil, fmt.Errorf("no contract bound for chain %d", source)
 	}
 
-	queryFilter := make([]query.Expression, len(eventIDs)+1)
+	queryFilter := make([]query.Expression, 0, len(eventIDs)+1)
 	for _, id := range eventIDs {
 		queryFilter = append(
 			queryFilter,
