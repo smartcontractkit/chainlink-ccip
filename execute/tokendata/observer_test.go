@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -413,16 +415,170 @@ func Test_CompositeTokenDataObserver_Failures(t *testing.T) {
 	}
 }
 
-func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) tokendata.TokenDataObserver {
-	return fakeObserver{
+func Test_CompositeTokenDataObserver_ParallelExecution(t *testing.T) {
+	linkTokenSourcePool := internal.RandBytes().String()
+	usdcTokenSourcePool := internal.RandBytes().String()
+	randomTokenSourcePool := internal.RandBytes().String()
+
+	lggr := logger.Test(t)
+
+	t.Cleanup(func() {
+		// Sync the logger state after timeouting underlying Go routines in the tests
+		// If the killed routine is woken up after the test is finished, it will try to log which cause zap logger
+		// to panic
+		_ = lggr.Sync()
+	})
+
+	tt := []struct {
+		name               string
+		observers          []tokendata.TokenDataObserver
+		messageObservation exectypes.MessageObservations
+		expectedTokenData  exectypes.TokenDataObservations
+		timeout            time.Duration
+	}{
+		{
+			name: "multiple valid observers",
+			observers: []tokendata.TokenDataObserver{
+				fake("LINK", map[cciptypes.ChainSelector]string{
+					1: linkTokenSourcePool,
+				}).withDelay(100 * time.Millisecond),
+				fake("USDC", map[cciptypes.ChainSelector]string{
+					1: usdcTokenSourcePool,
+				}).withDelay(200 * time.Millisecond),
+				fake("TOKEN", map[cciptypes.ChainSelector]string{
+					1: randomTokenSourcePool,
+				}).withDelay(300 * time.Millisecond),
+			},
+			messageObservation: exectypes.MessageObservations{
+				1: {
+					11: internal.MessageWithTokens(t, usdcTokenSourcePool, randomTokenSourcePool),
+					12: internal.MessageWithTokens(t, internal.RandBytes().String()),
+					13: internal.MessageWithTokens(t, linkTokenSourcePool),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("USDC_11_0")),
+						exectypes.NewSuccessTokenData([]byte("TOKEN_11_1")),
+					),
+					12: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+					13: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("LINK_13_0")),
+					),
+				},
+			},
+		},
+		{
+			name: "faulty observer doesn't impact observation if there are no matching tokens",
+			observers: []tokendata.TokenDataObserver{
+				fake("LINK", map[cciptypes.ChainSelector]string{
+					1: linkTokenSourcePool,
+				}).withDelay(100 * time.Millisecond),
+				faulty("USDC", map[cciptypes.ChainSelector]string{
+					1: usdcTokenSourcePool,
+				}).withDelay(200 * time.Millisecond),
+			},
+			messageObservation: exectypes.MessageObservations{
+				1: {
+					11: internal.MessageWithTokens(t, linkTokenSourcePool),
+					12: internal.MessageWithTokens(t, internal.RandBytes().String()),
+					13: internal.MessageWithTokens(t),
+				},
+			},
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("LINK_11_0")),
+					),
+					12: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+					13: exectypes.NewMessageTokenData(),
+				},
+			},
+		},
+		{
+			name: "timeouting observer doesn't impact observation for other tokens",
+			observers: []tokendata.TokenDataObserver{
+				fake("LINK", map[cciptypes.ChainSelector]string{
+					1: linkTokenSourcePool,
+				}).withDelay(100 * time.Millisecond),
+				fake("USDC", map[cciptypes.ChainSelector]string{
+					1: usdcTokenSourcePool,
+				}).withDelay(200 * time.Millisecond),
+				fake("TOKEN", map[cciptypes.ChainSelector]string{
+					1: randomTokenSourcePool,
+				}).withDelay(1 * time.Minute),
+			},
+			messageObservation: exectypes.MessageObservations{
+				1: {
+					11: internal.MessageWithTokens(t, linkTokenSourcePool),
+					12: internal.MessageWithTokens(t, internal.RandBytes().String()),
+					13: internal.MessageWithTokens(t),
+					14: internal.MessageWithTokens(t, usdcTokenSourcePool),
+					15: internal.MessageWithTokens(t, randomTokenSourcePool, linkTokenSourcePool),
+					16: internal.MessageWithTokens(t, randomTokenSourcePool),
+				},
+			},
+			timeout: 500 * time.Millisecond,
+			expectedTokenData: exectypes.TokenDataObservations{
+				1: {
+					11: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("LINK_11_0")),
+					),
+					12: exectypes.NewMessageTokenData(
+						exectypes.NewNoopTokenData(),
+					),
+					13: exectypes.NewMessageTokenData(),
+					14: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("USDC_14_0")),
+					),
+					// These messages will be filtered out by the plugin
+					15: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: false, Supported: true},
+						exectypes.NewSuccessTokenData([]byte("LINK_15_1")),
+					),
+					16: exectypes.NewMessageTokenData(
+						exectypes.TokenData{Ready: false, Supported: true},
+					),
+				},
+			},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tests.Context(t)
+			if tc.timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tc.timeout)
+				defer cancel()
+			}
+
+			composite := tokendata.NewCompositeObservers(lggr, tc.observers...)
+
+			tkData, err := composite.Observe(ctx, tc.messageObservation)
+			require.NoError(t, err)
+
+			require.Equal(t, tc.expectedTokenData, tkData)
+		})
+	}
+
+}
+
+func faulty(prefix string, supportedTokens map[cciptypes.ChainSelector]string) *fakeObserver {
+	return &fakeObserver{
 		prefix:          prefix,
 		faulty:          true,
 		supportedTokens: supportedTokens,
 	}
 }
 
-func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) tokendata.TokenDataObserver {
-	return fakeObserver{
+func fake(prefix string, supportedTokens map[cciptypes.ChainSelector]string) *fakeObserver {
+	return &fakeObserver{
 		prefix:          prefix,
 		faulty:          false,
 		supportedTokens: supportedTokens,
@@ -433,12 +589,22 @@ type fakeObserver struct {
 	faulty          bool
 	prefix          string
 	supportedTokens map[cciptypes.ChainSelector]string
+	sleep           time.Duration
 }
 
-func (f fakeObserver) Observe(
+func (f *fakeObserver) withDelay(sleep time.Duration) *fakeObserver {
+	f.sleep = sleep
+	return f
+}
+
+func (f *fakeObserver) Observe(
 	_ context.Context,
 	observations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	if f.sleep > 0 {
+		time.Sleep(f.sleep)
+	}
+
 	if f.faulty {
 		return nil, fmt.Errorf("error")
 	}
@@ -463,7 +629,7 @@ func (f fakeObserver) Observe(
 	return tokenObservations, nil
 }
 
-func (f fakeObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
+func (f *fakeObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
 	tokenAddr, ok := f.supportedTokens[sourceChain]
 	return ok && tokenAddr == msgToken.SourcePoolAddress.String()
 }
