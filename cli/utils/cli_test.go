@@ -129,3 +129,70 @@ func TestListFiles(t *testing.T) {
 		})
 	}
 }
+func TestPromptForInput(t *testing.T) {
+	testCases := []struct {
+		name         string
+		key          string
+		defaultValue string
+		userInput    string
+		expected     string
+		expectedErr  error
+	}{
+		{
+			name:         "UserProvidesInput",
+			key:          "username",
+			defaultValue: "defaultUser",
+			userInput:    "testUser\n",
+			expected:     "testUser",
+			expectedErr:  nil,
+		},
+		{
+			name:         "UserProvidesNoInput",
+			key:          "username",
+			defaultValue: "defaultUser",
+			userInput:    "\n",
+			expected:     "defaultUser",
+			expectedErr:  nil,
+		},
+		{
+			name:         "UserProvidesInputWithoutDefault",
+			key:          "username",
+			defaultValue: "",
+			userInput:    "testUser\n",
+			expected:     "testUser",
+			expectedErr:  nil,
+		},
+		{
+			name:         "UserProvidesNoInputWithoutDefault",
+			key:          "username",
+			defaultValue: "",
+			userInput:    "\n",
+			expected:     "",
+			expectedErr:  nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Mock stdin
+			oldStdin := os.Stdin
+			defer func() { os.Stdin = oldStdin }()
+			r, w, _ := os.Pipe()
+			os.Stdin = r
+
+			// Write user input to the pipe
+			_, err := w.WriteString(tc.userInput)
+			require.NoError(t, err)
+			w.Close()
+
+			result, err := PromptForInput(tc.key, tc.defaultValue)
+			assert.Equal(t, tc.expected, result)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
