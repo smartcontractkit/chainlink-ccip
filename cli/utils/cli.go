@@ -13,6 +13,10 @@ import (
 )
 
 func GetGitTopLevelDir(dir string) (string, error) {
+	if stat, err := os.Stat(dir); os.IsNotExist(err) || !stat.IsDir() {
+		return "", git.ErrRepositoryNotExists
+	}
+
 	// normalize the path
 	path, err := filepath.Abs(dir)
 	if err != nil {
