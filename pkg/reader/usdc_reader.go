@@ -181,8 +181,8 @@ func (u usdcMessageReader) MessageHashes(
 	for tokenID, messageID := range eventIDs {
 		messageHash, ok1 := messageSentEvents[messageID]
 		if !ok1 {
-			// Token not available in the source chain
-			u.lggr.Debugw("Message not found in the source chain",
+			// Token not available in the source chain, it should never happen at this stage
+			u.lggr.Warnw("Message not found in the source chain",
 				"seqNr", tokenID.SeqNr,
 				"tokenIndex", tokenID.Index,
 				"chainSelector", source,
