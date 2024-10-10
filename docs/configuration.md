@@ -36,6 +36,108 @@ addresses.
 **Data structure references**:
 
 * [CCIPConfig](https://github.com/smartcontractkit/chainlink/blob/1b41e69cca2f4622d367ef18733c36fcae433505/contracts/src/v0.8/ccip/capability/libraries/CCIPConfigTypes.sol)
+```
+  /// @notice OCR3 configuration.
+  struct OCR3Config {
+    Internal.OCRPluginType pluginType; // ────────╮ The plugin that the configuration is for.
+    uint64 chainSelector; //                      | The (remote) chain that the configuration is for.
+    uint8 F; //                                   | The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ─────────────╯ The version of the offchain configuration.
+    bytes offrampAddress; // The remote chain offramp address.
+    // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
+    // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
+    // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
+    bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
+    bytes[] signers; // The onchain signing keys of nodes in the don.
+    bytes[] transmitters; // The onchain transmitter keys of nodes in the don.
+    bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
+  }
+}
+```
+* [offchainConfig](https://github.com/smartcontractkit/chainlink/blob/200fb4504b6b96c92979fe42148530f784098cc2/core/capabilities/ccip/oraclecreator/plugin.go#L526) has two components:
+  * [commitOffchainConfig](https://github.com/smartcontractkit/chainlink-ccip/blob/ae3e8f4935a0bb3efe86c456b410a612be56bfec/pluginconfig/commit.go#L77)
+  * [execOffchainConfig](https://github.com/smartcontractkit/chainlink-ccip/blob/ae3e8f4935a0bb3efe86c456b410a612be56bfec/pluginconfig/execute.go#L14)
+```
+// CommitOffchainConfig is the OCR offchainConfig for the commit plugin.
+// This is posted onchain as part of the OCR configuration process of the commit plugin.
+// Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
+// method on the ReportingPluginFactory interface.
+type CommitOffchainConfig struct {
+	// RemoteGasPriceBatchWriteFrequency is the frequency at which the commit plugin
+	// should write gas prices to the remote chain.
+	//TODO: Rename to something with ChainFee
+	RemoteGasPriceBatchWriteFrequency commonconfig.Duration `json:"remoteGasPriceBatchWriteFrequency"`
+
+	FeeInfo map[cciptypes.ChainSelector]FeeInfo `json:"feeInfo"`
+
+	// TokenPriceBatchWriteFrequency is the frequency at which the commit plugin should
+	// write token prices to the remote chain.
+	// If set to zero, no prices will be written (i.e keystone feeds would be active).
+	TokenPriceBatchWriteFrequency commonconfig.Duration `json:"tokenPriceBatchWriteFrequency"`
+
+	// TokenInfo is a map of Arbitrum price sources for each token.
+	// Note that the token address is that on the remote chain.
+	TokenInfo map[types.Account]TokenInfo `json:"tokenInfo"`
+
+	// PriceFeedChainSelector is the chain selector for the chain on which
+	// the token prices are read from.
+	// This will typically be an arbitrum testnet/mainnet chain depending on
+	// the deployment.
+	PriceFeedChainSelector cciptypes.ChainSelector `json:"tokenPriceChainSelector"`
+
+	// NewMsgScanBatchSize is the number of max new messages to scan, typically set to 256.
+	NewMsgScanBatchSize int `json:"newMsgScanBatchSize"`
+
+	// The maximum number of times to check if the previous report has been transmitted
+	MaxReportTransmissionCheckAttempts uint `json:"maxReportTransmissionCheckAttempts"`
+
+	// RMNSignaturesTimeout is the timeout for RMN signature verification.
+	// Typically set to `MaxQueryDuration - e`, where e some small duration.
+	RMNSignaturesTimeout time.Duration `json:"rmnSignaturesTimeout"`
+
+	// RMNEnabled is a flag to enable/disable RMN signature verification.
+	RMNEnabled bool `json:"rmnEnabled"`
+
+	// MaxMerkleTreeSize is the maximum size of a merkle tree to create prior to calculating the merkle root.
+	// If for example in the next round we have 1000 pending messages and a max tree size of 256, only 256 seq nums
+	// will be in the report. If a value is not set we fallback to EvmDefaultMaxMerkleTreeSize.
+	MaxMerkleTreeSize uint64 `json:"maxTreeSize"`
+
+	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
+	SignObservationPrefix string `json:"signObservationPrefix"`
+}
+
+// ExecuteOffchainConfig is the OCR offchainConfig for the exec plugin.
+// This is posted onchain as part of the OCR configuration process of the exec plugin.
+// Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
+// method on the ReportingPluginFactory interface.
+type ExecuteOffchainConfig struct {
+	// BatchGasLimit is the maximum sum of user callback gas we permit in one execution report.
+	// EVM only.
+	BatchGasLimit uint64 `json:"batchGasLimit"`
+
+	// RelativeBoostPerWaitHour indicates how much to increase (artificially) the fee paid on the source chain per hour
+	// of wait time, such that eventually the fee paid is greater than the execution cost, and we’ll execute it.
+	// For example: if set to 0.5, that means the fee paid is increased by 50% every hour the message has been waiting.
+	RelativeBoostPerWaitHour float64 `json:"relativeBoostPerWaitHour"`
+
+	// InflightCacheExpiry indicates how long we keep a report in the plugin cache before we expire it.
+	// The caching prevents us from issuing another report while one is already in flight.
+	InflightCacheExpiry commonconfig.Duration `json:"inflightCacheExpiry"`
+
+	// RootSnoozeTime is the interval at which we check roots for executable messages.
+	RootSnoozeTime commonconfig.Duration `json:"rootSnoozeTime"`
+
+	// MessageVisibilityInterval is the time interval for which the messages are visible by the plugin.
+	MessageVisibilityInterval commonconfig.Duration `json:"messageVisibilityInterval"`
+
+	// BatchingStrategyID is the strategy to use for batching messages.
+	BatchingStrategyID uint32 `json:"batchingStrategyID"`
+
+	// TokenDataObservers registers different strategies for processing token data.
+	TokenDataObservers []TokenDataObserverConfig `json:"tokenDataObservers"`
+}
+```
 
 ### OffRamp
 
