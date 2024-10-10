@@ -20,7 +20,7 @@ func SetupAwsProfile(configPath string, profileName string, accountId string, re
 	ini.PrettyFormat = false
 	ini.PrettyEqual = true
 
-	configFile, err := os.OpenFile(configPath, os.O_RDWR|os.O_CREATE, 0600)
+	configFile, err := os.OpenFile(configPath, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
 	}

@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
-
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -68,7 +67,7 @@ func SetupKubeConfig(input *SetupKubeConfigInput) error {
 
 	newConfig.Clusters[eksClusterArn] = &clientcmdapi.Cluster{
 		Server:                   eksClusterEndpoint,
-		CertificateAuthorityData: []byte(decodedEksClusterCAData),
+		CertificateAuthorityData: decodedEksClusterCAData,
 	}
 
 	// clientcmdapi.ExecConfig based on current state of aws eks update-kubeconfig

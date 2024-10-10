@@ -73,6 +73,7 @@ func InMemIniWithAwsProfiles(awsProfiles []AwsProfile) (*ini.File, error) {
 // keys and values only, as direct equality doesn't work well when
 // working with temporary files
 func AssertEqualIniSections(t *testing.T, a *ini.Section, b *ini.Section) {
+	t.Helper()
 
 	// strictly comparing ini.File, ini.Section or ini.Key instances
 	// fails because each of them carry a pointer to its respective parent
@@ -86,7 +87,9 @@ func AssertEqualIniSections(t *testing.T, a *ini.Section, b *ini.Section) {
 }
 
 func TestSetupAwsProfileNonExisting(t *testing.T) {
-	mockedAwsConfig := MockAwsConfigFile([]byte(""), 0666)
+	t.Parallel()
+
+	mockedAwsConfig := MockAwsConfigFile([]byte(""), 0o666)
 	defer os.Remove(mockedAwsConfig.Name())
 
 	require.NoError(t, SetupAwsProfile(mockedAwsConfig.Name(), "test-profile", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"))
@@ -123,6 +126,8 @@ func TestSetupAwsProfileNonExisting(t *testing.T) {
 }
 
 func TestSetupAwsProfileExistsButDiverges(t *testing.T) {
+	t.Parallel()
+
 	mockedAwsConfig := MockAwsConfigFile([]byte(`[default]
 region = us-west-2
 output = text
@@ -137,7 +142,7 @@ output = json
 sso_start_url = https://some.outdated.url
 sso_region = us-east-1
 sso_account_id = 123
-sso_role_name = outdated-role`), 0666)
+sso_role_name = outdated-role`), 0o666)
 	defer os.Remove(mockedAwsConfig.Name())
 
 	require.NoError(t, SetupAwsProfile(mockedAwsConfig.Name(), "test-profile", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"))
@@ -194,6 +199,8 @@ sso_role_name = outdated-role`), 0666)
 }
 
 func TestGetDecodedECRAuthorizationTokenSingle(t *testing.T) {
+	t.Parallel()
+
 	authToken := base64.StdEncoding.EncodeToString([]byte("user:password"))
 	proxyEndpoint := "https://012345678910.dkr.ecr.us-east-1.amazonaws.com"
 	mockEcrClient := wrappermocks.NewECRAPI(t)
@@ -217,6 +224,8 @@ func TestGetDecodedECRAuthorizationTokenSingle(t *testing.T) {
 }
 
 func TestGetDecodedECRAuthorizationTokenMultiple(t *testing.T) {
+	t.Parallel()
+
 	authToken1 := base64.StdEncoding.EncodeToString([]byte("user:password"))
 	proxyEndpoint1 := "https://012345678910.dkr.ecr.us-east-1.amazonaws.com"
 	authToken2 := base64.StdEncoding.EncodeToString([]byte("anotheruser:anotherpassword"))
@@ -244,6 +253,8 @@ func TestGetDecodedECRAuthorizationTokenMultiple(t *testing.T) {
 }
 
 func TestGetDecodedECRAuthorizationTokenErrors(t *testing.T) {
+	t.Parallel()
+
 	type errorTestCases struct {
 		description   string
 		mockEcrClient wrappers.ECRAPI
@@ -291,6 +302,8 @@ func TestGetDecodedECRAuthorizationTokenErrors(t *testing.T) {
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := GetDecodedECRAuthorizationToken(scenario.mockEcrClient)
 			assert.ErrorContains(t, err, scenario.wantError)
 			assert.Nil(t, got)

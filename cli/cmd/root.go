@@ -13,8 +13,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
-var logger *slog.Logger
+var (
+	cfgFile string
+	logger  *slog.Logger
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -40,12 +42,15 @@ func Execute() {
 	}
 }
 
+//nolint:gochecknoinits
 func init() {
 	cobra.OnInitialize(ensureRunningInAProductDir, initConfig, initLogger)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".env", "config file")
 	rootCmd.PersistentFlags().StringP("log-level", "", "info", "Log level (debug, info, warn, error)")
-	viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))
+
+	// Bind the viper flag to the cobra flag (we can safely ignore the error here)
+	_ = viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))
 	viper.SetDefault("log_level", "info")
 }
 

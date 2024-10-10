@@ -12,6 +12,8 @@ import (
 )
 
 func TestHelmRegistryLogin(t *testing.T) {
+	t.Parallel()
+
 	type testCases struct {
 		description            string
 		mockHelmRegistryClient wrappers.HelmRegistryAPI
@@ -52,6 +54,8 @@ func TestHelmRegistryLogin(t *testing.T) {
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
+			t.Parallel()
+
 			err := HelmRegistryLogin(scenario.mockHelmRegistryClient, scenario.username, scenario.password, scenario.serverAddress)
 			if scenario.wantError == "" {
 				require.NoError(t, err)

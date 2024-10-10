@@ -11,6 +11,8 @@ import (
 )
 
 func TestGetGitTopLevelDir(t *testing.T) {
+	t.Parallel()
+
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
@@ -21,7 +23,7 @@ func TestGetGitTopLevelDir(t *testing.T) {
 
 	// Create a subdirectory within the git repository
 	subDir := filepath.Join(gitRepoInTempDir, "subdir", "subsubdir")
-	err = os.MkdirAll(subDir, 0755)
+	err = os.MkdirAll(subDir, 0o755)
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -58,8 +60,10 @@ func TestGetGitTopLevelDir(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tc.name == "DirectoryWithoutGitRepository" {
-				require.NoError(t, os.Mkdir(tc.dir, 0750))
+				require.NoError(t, os.Mkdir(tc.dir, 0o750))
 			}
 
 			topLevelDir, err := GetGitTopLevelDir(tc.dir)
@@ -73,7 +77,10 @@ func TestGetGitTopLevelDir(t *testing.T) {
 		})
 	}
 }
+
 func TestListFiles(t *testing.T) {
+	t.Parallel()
+
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
@@ -84,7 +91,7 @@ func TestListFiles(t *testing.T) {
 		_, err := os.Create(filepath.Join(tempDir, file))
 		require.NoError(t, err)
 	}
-	os.Mkdir(filepath.Join(tempDir, "subdir"), 0750)
+	require.NoError(t, os.Mkdir(filepath.Join(tempDir, "subdir"), 0o750))
 
 	testCases := []struct {
 		name        string
@@ -114,8 +121,10 @@ func TestListFiles(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			if tc.name == "EmptyDirectory" {
-				require.NoError(t, os.Mkdir(tc.dir, 0750))
+				require.NoError(t, os.Mkdir(tc.dir, 0o750))
 			}
 
 			files, err := ListFiles(tc.dir)
@@ -129,7 +138,10 @@ func TestListFiles(t *testing.T) {
 		})
 	}
 }
+
 func TestPromptForInput(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name         string
 		key          string
@@ -174,6 +186,8 @@ func TestPromptForInput(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Mock stdin
 			oldStdin := os.Stdin
 			defer func() { os.Stdin = oldStdin }()
@@ -196,7 +210,10 @@ func TestPromptForInput(t *testing.T) {
 		})
 	}
 }
+
 func TestPresentPrompt(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name      string
 		prompt    string
@@ -236,6 +253,8 @@ func TestPresentPrompt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Mock stdin
 			oldStdin := os.Stdin
 			defer func() { os.Stdin = oldStdin }()

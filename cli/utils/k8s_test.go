@@ -41,6 +41,8 @@ func MockKubeConfigFile(content []byte, perm fs.FileMode) *os.File {
 // TODO: use golang reflect to compare the entire object and recurse into subtypes whilst ignoring
 // fields such as LocationOfOrigin (which varies when dealing with tmpfiles)
 func AssertEqualKubeConfigs(t *testing.T, want *clientcmdapi.Config, got *clientcmdapi.Config) {
+	t.Helper()
+
 	assert.Len(t, got.Clusters, len(want.Clusters))
 	for name, wantCluster := range want.Clusters {
 		gotCluster := got.Clusters[name]
@@ -73,6 +75,8 @@ func AssertEqualKubeConfigs(t *testing.T, want *clientcmdapi.Config, got *client
 }
 
 func TestSetupKubeConfigNonExisting(t *testing.T) {
+	t.Parallel()
+
 	nonExistingKubeConfig := filepath.Join(t.TempDir(), "non-existing")
 
 	// mocking return of eks.DescribeCluster
@@ -113,7 +117,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			eksClusterArn: &clientcmdapi.AuthInfo{
+			eksClusterArn: {
 				Exec: &clientcmdapi.ExecConfig{
 					Command: "aws",
 					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
@@ -126,13 +130,13 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 			},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			eksClusterArn: &clientcmdapi.Cluster{
+			eksClusterArn: {
 				Server:                   eksClusterEndpoint,
 				CertificateAuthorityData: []byte("cadata"),
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			eksClusterAlias: &clientcmdapi.Context{
+			eksClusterAlias: {
 				Cluster:  eksClusterArn,
 				AuthInfo: eksClusterArn,
 			},
@@ -143,6 +147,8 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 }
 
 func TestSetupKubeConfigExistsButDiverges(t *testing.T) {
+	t.Parallel()
+
 	mockedKubeConfig := MockKubeConfigFile([]byte(`apiVersion: v1
 clusters:
 - cluster:
@@ -183,7 +189,7 @@ users:
       - wrong-eks-cluster
       command: aws
       env: null
-      provideClusterInfo: false`), 0666)
+      provideClusterInfo: false`), 0o666)
 	defer os.Remove(mockedKubeConfig.Name())
 
 	// mocking return of eks.DescribeCluster
@@ -223,7 +229,7 @@ users:
 
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			eksClusterArn: &clientcmdapi.AuthInfo{
+			eksClusterArn: {
 				Exec: &clientcmdapi.ExecConfig{
 					Command: "aws",
 					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
@@ -234,27 +240,27 @@ users:
 					InteractiveMode: "IfAvailable",
 				},
 			},
-			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": &clientcmdapi.AuthInfo{
+			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": {
 				ClientCertificate: "path/to/some/client/cert",
 				ClientKey:         "path/to/some/client/key",
 			},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			eksClusterArn: &clientcmdapi.Cluster{
+			eksClusterArn: {
 				Server:                   eksClusterEndpoint,
 				CertificateAuthorityData: []byte("cadata"),
 			},
-			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": &clientcmdapi.Cluster{
+			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": {
 				Server:                   "https://unrelated.endpoint",
 				CertificateAuthorityData: []byte("something"),
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			eksClusterAlias: &clientcmdapi.Context{
+			eksClusterAlias: {
 				Cluster:  eksClusterArn,
 				AuthInfo: eksClusterArn,
 			},
-			"context-we-should-not-touch": &clientcmdapi.Context{
+			"context-we-should-not-touch": {
 				Cluster:  "arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch",
 				AuthInfo: "arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch",
 			},
@@ -263,7 +269,10 @@ users:
 	}
 	AssertEqualKubeConfigs(t, want, got)
 }
+
 func TestCheckEksAccess(t *testing.T) {
+	t.Parallel()
+
 	// mocking a successful call to CoreV1().Namespaces().List()
 	mockedCoreV1NamespacesWorking := wrappermocks.NewNamespaceInterface(t)
 	mockedCoreV1NamespacesWorking.EXPECT().
@@ -310,6 +319,8 @@ func TestCheckEksAccess(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := CheckEksAccess(tt.corev1)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
