@@ -516,7 +516,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	destNonceMgr := []byte{0x3}
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
-	destRouter := []byte{0x6}
+	destRouter := [2][]byte{{0x6}, {0xFF}} // We should never see 0xFF in the result.
 	srcFeeQuoters := [2][]byte{{0x7}, {0x8}}
 	srcRouters := [2][]byte{{0x9}, {0x10}}
 
@@ -537,7 +537,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameFeeQuoter, destChain, destFeeQuoter)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRMNRemote, destChain, destRMNRemote)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameNonceManager, destChain, destNonceMgr)
-	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter)
+	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter[0])
 
 	mockReaders := make(map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
 
@@ -583,7 +583,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 			v := returnVal.(*sourceChainConfig)
 			v.OnRamp = onramps[i]
-			v.Router = destRouter
+			v.Router = destRouter[i]
 			v.IsEnabled = true
 		}))
 	}

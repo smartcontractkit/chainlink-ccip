@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -635,11 +636,17 @@ func (r *ccipChainReader) discoverDestinationContracts(
 	if err != nil {
 		return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 	}
-	for chain, cfg := range sourceConfigs {
-		resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
-		// The local router is located in each source chain config. Add it once.
-		if len(resp[consts.ContractNameOnRamp][r.destChain]) == 0 {
-			resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+	{
+		// Iterate in chain selector order so that the router config is deterministic.
+		keys := maps.Keys(sourceConfigs)
+		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		for _, chain := range keys {
+			cfg := sourceConfigs[chain]
+			resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
+			// The local router is located in each source chain config. Add it once.
+			if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
+				resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+			}
 		}
 	}
 
@@ -706,13 +713,11 @@ func (r *ccipChainReader) DiscoverContracts(
 	// Read onRamps for FeeQuoter in DynamicConfig.
 	{
 		dynamicConfigs, err := r.getOnRampDynamicConfigs(ctx, myChains)
-		if err != nil {
-			r.lggr.Infow("unable to lookup source fee quoters, this is expected during initialization", "err", err)
-
+		if errors.Is(err, contractreader.ErrNoBindings) {
 			// ErrNoBindings is an allowable error.
-			if !errors.Is(err, contractreader.ErrNoBindings) {
-				return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
-			}
+			r.lggr.Infow("unable to lookup source fee quoters, this is expected during initialization", "err", err)
+		} else if err != nil {
+			return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
 		} else {
 			for chain, cfg := range dynamicConfigs {
 				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
@@ -723,13 +728,11 @@ func (r *ccipChainReader) DiscoverContracts(
 	// Read onRamps for Router in DestChainConfig.
 	{
 		destChainConfig, err := r.getOnRampDestChainConfig(ctx, myChains)
-		if err != nil {
-			r.lggr.Infow("unable to lookup source routers, this is expected during initialization", "err", err)
-
+		if errors.Is(err, contractreader.ErrNoBindings) {
 			// ErrNoBindings is an allowable error.
-			if !errors.Is(err, contractreader.ErrNoBindings) {
-				return nil, fmt.Errorf("unable to lookup source routers (onRamp dest chain config): %w", err)
-			}
+			r.lggr.Infow("unable to lookup source routers, this is expected during initialization", "err", err)
+		} else if err != nil {
+			return nil, fmt.Errorf("unable to lookup source routers (onRamp dest chain config): %w", err)
 		} else {
 			for chain, cfg := range destChainConfig {
 				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
