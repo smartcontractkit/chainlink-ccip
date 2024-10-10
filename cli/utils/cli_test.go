@@ -107,13 +107,13 @@ func TestListFiles(t *testing.T) {
 		},
 		{
 			name:        "NonExistentDirectory",
-			dir:         filepath.Join(tempDir, "nonexistent"),
+			dir:         filepath.Join(t.TempDir(), "nonexistent"),
 			expected:    nil,
 			expectedErr: &os.PathError{},
 		},
 		{
 			name:        "EmptyDirectory",
-			dir:         filepath.Join(tempDir, "empty"),
+			dir:         filepath.Join(t.TempDir(), "empty"),
 			expected:    []string{},
 			expectedErr: nil,
 		},
@@ -139,9 +139,8 @@ func TestListFiles(t *testing.T) {
 	}
 }
 
+// nolint: paralleltest,nolintlint
 func TestPromptForInput(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name         string
 		key          string
@@ -186,8 +185,6 @@ func TestPromptForInput(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Mock stdin
 			oldStdin := os.Stdin
 			defer func() { os.Stdin = oldStdin }()
