@@ -273,7 +273,9 @@ func getConsensusObservation(
 	_, exists := fChains[destChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v, fChainsConsensus: %+v",
+				destChain, aggObs.FChain, fChains,
+			)
 	}
 
 	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs

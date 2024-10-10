@@ -25,7 +25,7 @@ func (p *processor) getConsensusObservation(
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
 	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
-
+	p.lggr.Debugw("aggregateObservations and fChain", "aggObs", aggObs, "fChains", fChains)
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
 		return ConsensusObservation{},
