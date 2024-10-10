@@ -40,7 +40,8 @@ jobs:
       - name: Coverage on target branch
         if: github.event_name == 'pull_request'
         run: |
-          git fetch origin ${{ github.base_ref }}
+          #git fetch origin ${{ github.base_ref }}
+          git fetch origin BCF-2887-context-propagation 
           git checkout ${{ github.base_ref }}
           TEST_COUNT=1 COVERAGE_FILE=coverage_target.out make test
           total=$(go tool cover -func=coverage_target.out | grep total | awk '{print $3}')
