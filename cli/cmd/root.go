@@ -69,7 +69,7 @@ func ensureRunningInAProductDir() {
 		os.Exit(1)
 	}
 
-	relPath, err := filepath.Rel(repoRoot, dir)
+	relPath, err := filepath.Rel(dir, repoRoot)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to get relative path: %v\n", err)
 		os.Exit(1)
