@@ -230,7 +230,7 @@ a shared component used by the commit and execute plugins.
 ```mermaid
 sequenceDiagram
 note over DestReader: The offRamps are configured during initialization.
-note over DestReader: 2. Fetch onRamp, destNonceManager, destFeeQuoter, and destRouter
+note over DestReader: 1. Fetch onRamp, destNonceManager, destFeeQuoter, and destRouter
 DestReader ->>+ OffRamp: getStaticConfiguration()
 OffRamp ->>- DestReader: offRamp.StaticConfig
 DestReader ->>+ OffRamp: getDynamicConfig()
@@ -238,18 +238,18 @@ OffRamp ->>- DestReader: offRamp.DynamicConfig
 DestReader ->>+ OffRamp: getSourceChainConfig(allChains)
 OffRamp ->>- DestReader: []offRamp.SourceChainConfig
 
-note over DestReader: 3. Share and agree on addresses.
+note over DestReader: 2. Share and agree on addresses.
 DestReader ->>+ DON: Share contract addresses.
 
-note over SourceReader(s): 4. With the onRamp now configured, fetch sourceFeeQuoter, and sourceRouter's
-SourceReader ->>+ OnRamp: getStaticConfiguration()
-OnRamp ->>- SourceReader: onRamp.StaticConfig
-SourceReader ->>+ OnRamp: getDynamicConfig()
-OnRamp ->>- SourceReader: onRamp.DynamicConfig
-SourceReader ->>+ OnRamp: getSourceChainConfig(allChains)
-OnRamp ->>- SourceReader: []onRamp.SourceChainConfig
+note over SourceReader(s): 3. With the onRamp now configured, fetch sourceFeeQuoter, and sourceRouter's
+SourceReader(s) ->>+ OnRamp: getStaticConfiguration()
+OnRamp ->>- SourceReader(s): onRamp.StaticConfig
+SourceReader(s) ->>+ OnRamp: getDynamicConfig()
+OnRamp ->>- SourceReader(s): onRamp.DynamicConfig
+SourceReader(s) ->>+ OnRamp: getSourceChainConfig(allChains)
+OnRamp ->>- SourceReader(s): []onRamp.SourceChainConfig
 
-note over SourceReader(s): 5. Share and agree on addresses.
+note over SourceReader(s): 4. Share and agree on addresses.
 SourceReader(s) ->> DON: Share contract addresses.
 ```
 
