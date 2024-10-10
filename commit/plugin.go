@@ -278,6 +278,7 @@ func (p *Plugin) Outcome(
 			p.lggr.Errorw("failed to decode observation", "err", err)
 			continue
 		}
+		p.lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
 		merkleObservations = append(merkleObservations,
 			MerkleRootObservation{
 				OracleID:    ao.Observer,
