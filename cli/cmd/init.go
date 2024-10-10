@@ -165,15 +165,20 @@ var initCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if err := utils.CheckEksAccess(kubeClientset.CoreV1()); err != nil {
-			logger.Error("EKS access not working. Make sure you're connected to the VPN and try again.")
-			os.Exit(1)
-		}
+		switch viper.GetString("PROVIDER") {
+		case "kind":
+			logger.Info("Skipped k8s access check for provider Kind (make sure you run ./cribbit.sh crib-local for now, kind support for the CLI coming soon)")
+		case "aws":
+			if err := utils.CheckK8sAccess(kubeClientset.CoreV1()); err != nil {
+				logger.Error("EKS access not working. Make sure you're connected to the VPN and try again.", slog.Any("error", err))
+				os.Exit(1)
+			}
 
-		logger.Info("EKS access working",
-			"kubeconfig", viper.GetString("KUBECONFIG"),
-			"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
-		)
+			logger.Info("EKS access working",
+				"kubeconfig", viper.GetString("KUBECONFIG"),
+				"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
+			)
+		}
 
 		if viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") && viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
 			logger.Info("CRIB initialization complete")

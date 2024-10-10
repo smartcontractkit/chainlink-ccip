@@ -102,7 +102,7 @@ func SetupKubeConfig(input *SetupKubeConfigInput) error {
 	return clientcmd.ModifyConfig(pathOptions, *newConfig, true)
 }
 
-func CheckEksAccess(kubeCoreV1Client corev1.CoreV1Interface) error {
+func CheckK8sAccess(kubeCoreV1Client corev1.CoreV1Interface) error {
 	_, err := kubeCoreV1Client.Namespaces().List(context.TODO(), metav1.ListOptions{})
 	return err
 }

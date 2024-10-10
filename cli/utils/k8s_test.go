@@ -270,7 +270,7 @@ users:
 	AssertEqualKubeConfigs(t, want, got)
 }
 
-func TestCheckEksAccess(t *testing.T) {
+func TestCheckK8sAccess(t *testing.T) {
 	t.Parallel()
 
 	// mocking a successful call to CoreV1().Namespaces().List()
@@ -321,7 +321,7 @@ func TestCheckEksAccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := CheckEksAccess(tt.corev1)
+			err := CheckK8sAccess(tt.corev1)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
 			} else {
