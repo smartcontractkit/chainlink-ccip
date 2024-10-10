@@ -4,17 +4,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var ts = time.Now().UTC()
@@ -135,6 +136,7 @@ func TestSelectTokensForUpdate(t *testing.T) {
 
 // Test Plugin Outcome method returns the correct token prices
 func TestOutcome(t *testing.T) {
+	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 	p := &processor{
 		lggr:        lggr,
@@ -143,7 +145,7 @@ func TestOutcome(t *testing.T) {
 		fRoleDON:    1,
 	}
 
-	outcome, err := p.Outcome(Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{
+	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{
 		{OracleID: 1, Observation: obs},
 		{OracleID: 2, Observation: obs},
 		{OracleID: 3, Observation: obs},

@@ -7,9 +7,10 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
@@ -21,7 +22,7 @@ import (
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
 func (p *Plugin) Outcome(
-	outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
+	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	p.lggr.Debugw("Execute plugin performing outcome",
 		"outctx", outctx,
@@ -48,7 +49,7 @@ func (p *Plugin) Outcome(
 			}
 		}
 		discoveryAos := slicelib.Map(decodedAos, mapper)
-		_, err = p.discovery.Outcome(dt.Outcome{}, dt.Query{}, discoveryAos)
+		_, err = p.discovery.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryAos)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
 		}
@@ -73,7 +74,7 @@ func (p *Plugin) Outcome(
 	case exectypes.GetMessages:
 		outcome = p.getMessagesOutcome(observation, previousOutcome)
 	case exectypes.Filter:
-		outcome, err = p.getFilterOutcome(observation, previousOutcome)
+		outcome, err = p.getFilterOutcome(ctx, observation, previousOutcome)
 	default:
 		panic("unknown state")
 	}
@@ -152,14 +153,13 @@ func (p *Plugin) getMessagesOutcome(
 }
 
 func (p *Plugin) getFilterOutcome(
+	ctx context.Context,
 	observation exectypes.Observation,
 	previousOutcome exectypes.Outcome,
 ) (exectypes.Outcome, error) {
 	commitReports := previousOutcome.PendingCommitReports
 
-	// TODO: this function should be pure, a context should not be needed.
 	builder := report.NewBuilder(
-		context.Background(),
 		p.lggr,
 		p.msgHasher,
 		p.reportCodec,
@@ -170,6 +170,7 @@ func (p *Plugin) getFilterOutcome(
 		p.offchainCfg.BatchGasLimit,
 	)
 	outcomeReports, commitReports, err := selectReport(
+		ctx,
 		p.lggr,
 		commitReports,
 		builder)

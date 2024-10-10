@@ -272,7 +272,8 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		{Observation: obs},
 	}
 
-	outcome, err := cdp.Outcome(discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
+	ctx := tests.Context(t)
+	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
 }
@@ -354,7 +355,8 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		{Observation: fChainObs},
 	}
 
-	outcome, err := cdp.Outcome(discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
+	ctx := tests.Context(t)
+	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
 }
@@ -436,7 +438,8 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		{Observation: fChainObs},
 	}
 
-	outcome, err := cdp.Outcome(discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
+	ctx := tests.Context(t)
+	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.NoError(t, err)
 	assert.Empty(t, outcome)
 }
@@ -512,7 +515,8 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		{Observation: obs},
 	}
 
-	outcome, err := cdp.Outcome(discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
+	ctx := tests.Context(t)
+	outcome, err := cdp.Outcome(ctx, discoverytypes.Outcome{}, discoverytypes.Query{}, aos)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, syncErr)
 	assert.Empty(t, outcome)

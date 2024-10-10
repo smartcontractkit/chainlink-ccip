@@ -38,6 +38,7 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 }
 
 func NewCCIPChainReader(
+	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
@@ -45,6 +46,7 @@ func NewCCIPChainReader(
 	offrampAddress []byte,
 ) CCIPReader {
 	return newCCIPChainReaderInternal(
+		ctx,
 		lggr,
 		contractReaders,
 		contractWriters,
@@ -55,13 +57,14 @@ func NewCCIPChainReader(
 
 // NewCCIPReaderWithExtendedContractReaders can be used when you want to directly provide contractreader.Extended
 func NewCCIPReaderWithExtendedContractReaders(
+	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) CCIPReader {
-	cr := newCCIPChainReaderInternal(lggr, nil, contractWriters, destChain, offrampAddress)
+	cr := newCCIPChainReaderInternal(ctx, lggr, nil, contractWriters, destChain, offrampAddress)
 	for ch, extendedCr := range contractReaders {
 		cr.WithExtendedContractReader(ch, extendedCr)
 	}

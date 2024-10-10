@@ -20,6 +20,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -178,15 +179,22 @@ func TestPlugin_Query(t *testing.T) {
 }
 
 func TestPlugin_ObservationQuorum(t *testing.T) {
-	p := &Plugin{}
-	got, err := p.ObservationQuorum(ocr3types.OutcomeContext{}, nil)
+	ctx := tests.Context(t)
+	p := &Plugin{
+		reportingCfg: ocr3types.ReportingPluginConfig{F: 1},
+	}
+	got, err := p.ObservationQuorum(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+		{Observation: []byte{}},
+		{Observation: []byte{}},
+	})
 	require.NoError(t, err)
-	assert.Equal(t, ocr3types.QuorumFPlusOne, got)
+	assert.Equal(t, true, got)
 }
 
 func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
+	ctx := tests.Context(t)
 	p := &Plugin{}
-	err := p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte("not a valid observation"),
 	})
 	require.Error(t, err)
@@ -194,8 +202,9 @@ func TestPlugin_ValidateObservation_NonDecodable(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
+	ctx := tests.Context(t)
 	p := &Plugin{}
-	err := p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+	err := p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: []byte(`{"oracleID": "0xdeadbeef"}`),
 	})
 	require.Error(t, err)
@@ -203,6 +212,7 @@ func TestPlugin_ValidateObservation_SupportedChainsError(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
+	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -228,7 +238,7 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 	}, nil, nil, nil, dt.Observation{})
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
-	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
 	})
 	require.Error(t, err)
@@ -236,6 +246,7 @@ func TestPlugin_ValidateObservation_IneligibleObserver(t *testing.T) {
 }
 
 func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
+	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 
 	mockHomeChain := reader_mock.NewMockHomeChain(t)
@@ -262,7 +273,7 @@ func TestPlugin_ValidateObservation_ValidateObservedSeqNum_Error(t *testing.T) {
 	)
 	encoded, err := observation.Encode()
 	require.NoError(t, err)
-	err = p.ValidateObservation(ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
+	err = p.ValidateObservation(ctx, ocr3types.OutcomeContext{}, types.Query{}, types.AttributedObservation{
 		Observation: encoded,
 	})
 	require.Error(t, err)
@@ -296,8 +307,9 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
+	ctx := tests.Context(t)
 	p := &Plugin{lggr: logger.Test(t)}
-	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
+	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{
 			{
 				Observation: []byte("not a valid observation"),
@@ -309,6 +321,7 @@ func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {
+	ctx := tests.Context(t)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.EXPECT().GetFChain().Return(nil, nil)
 	p := &Plugin{
@@ -318,13 +331,14 @@ func TestPlugin_Outcome_BelowF(t *testing.T) {
 		},
 		lggr: logger.Test(t),
 	}
-	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil,
+	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "below F threshold")
 }
 
 func TestPlugin_Outcome_HomeChainError(t *testing.T) {
+	ctx := tests.Context(t)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetFChain", mock.Anything).Return(nil, fmt.Errorf("test error"))
 
@@ -332,12 +346,13 @@ func TestPlugin_Outcome_HomeChainError(t *testing.T) {
 		homeChain: homeChain,
 		lggr:      logger.Test(t),
 	}
-	_, err := p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
+	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to get FChain: test error")
 }
 
 func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
+	ctx := tests.Context(t)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
@@ -356,7 +371,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 		commitReports, nil, nil, nil, nil, dt.Observation{},
 	).Encode()
 	require.NoError(t, err)
-	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
 			Observation: observation,
 		},
@@ -366,6 +381,7 @@ func TestPlugin_Outcome_CommitReportsMergeError(t *testing.T) {
 }
 
 func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
+	ctx := tests.Context(t)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	fChainMap := map[cciptypes.ChainSelector]int{
 		10: 20,
@@ -391,7 +407,7 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 		nil, messages, nil, nil, nil, dt.Observation{},
 	).Encode()
 	require.NoError(t, err)
-	_, err = p.Outcome(ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
+	_, err = p.Outcome(ctx, ocr3types.OutcomeContext{}, nil, []types.AttributedObservation{
 		{
 			Observation: observation,
 		},
@@ -401,13 +417,15 @@ func TestPlugin_Outcome_MessagesMergeError(t *testing.T) {
 }
 
 func TestPlugin_Reports_UnableToParse(t *testing.T) {
+	ctx := tests.Context(t)
 	p := &Plugin{}
-	_, err := p.Reports(0, ocr3types.Outcome("not a valid observation"))
+	_, err := p.Reports(ctx, 0, ocr3types.Outcome("not a valid observation"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to decode outcome")
 }
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
+	ctx := tests.Context(t)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
@@ -415,7 +433,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	report, err := exectypes.NewOutcome(exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}).Encode()
 	require.NoError(t, err)
 
-	_, err = p.Reports(0, report)
+	_, err = p.Reports(ctx, 0, report)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unable to encode report: test error")
 }

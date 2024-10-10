@@ -178,18 +178,21 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 			"donId":      donID,
 			"pluginType": pluginType,
 		},
-		mock.AnythingOfType("*[]reader.OCR3ConfigWithMeta"),
+		mock.AnythingOfType("*reader.ActiveAndCandidate"),
 	).Return(nil).Run(func(args mock.Arguments) {
-		arg := args.Get(4).(*[]OCR3ConfigWithMeta)
-		*arg = append(*arg, OCR3ConfigWithMeta{
-			ConfigCount: 1,
-			Config: OCR3Config{
-				PluginType:     pluginType,
-				ChainSelector:  1,
-				F:              1,
-				OfframpAddress: []byte("offramp"),
+		arg := args.Get(4).(*ActiveAndCandidate)
+		*arg = ActiveAndCandidate{
+			ActiveConfig: OCR3ConfigWithMeta{
+				Version: 1,
+				Config: OCR3Config{
+					PluginType:     pluginType,
+					ChainSelector:  1,
+					FRoleDON:       1,
+					OfframpAddress: []byte("offramp"),
+				},
+				ConfigDigest: [32]byte{1},
 			},
-		})
+		}
 	})
 	defer homeChainReader.AssertExpectations(t)
 
@@ -205,6 +208,6 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	require.Len(t, configs, 1)
 	require.Equal(t, uint8(1), configs[0].Config.PluginType)
 	require.Equal(t, cciptypes.ChainSelector(1), configs[0].Config.ChainSelector)
-	require.Equal(t, uint8(1), configs[0].Config.F)
+	require.Equal(t, uint8(1), configs[0].Config.FRoleDON)
 	require.Equal(t, []byte("offramp"), configs[0].Config.OfframpAddress)
 }
