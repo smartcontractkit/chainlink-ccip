@@ -8,6 +8,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/smartcontractkit/crib/cli/wrappers"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -99,4 +101,9 @@ func SetupKubeConfig(input *SetupKubeConfigInput) error {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = input.KubeconfigPath
 	return clientcmd.ModifyConfig(pathOptions, *newConfig, true)
+}
+
+func CheckEksAccess(kubeCoreV1Client corev1.CoreV1Interface) error {
+	_, err := kubeCoreV1Client.Namespaces().List(context.TODO(), metav1.ListOptions{})
+	return err
 }

@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Allowed values for the "provider" flag
@@ -148,14 +150,31 @@ var initCmd = &cobra.Command{
 			logger.Error("failed to setup kubeconfig", slog.Any("error", err))
 			os.Exit(1)
 		}
+		logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 
-		// TODO: test EKS access here, if not working recommend the user to connect to the vpn
+		// Test if cluster is reachable by attempting the equivalent of a kubectl get ns
+		kubeconfig, err := clientcmd.BuildConfigFromFlags("", viper.GetString("KUBECONFIG"))
+		if err != nil {
+			logger.Error("failed to initialize kubeconfig", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		kubeClientset, err := kubernetes.NewForConfig(kubeconfig)
+		if err != nil {
+			logger.Error("failed to initialize kube clientset", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		if err := utils.CheckEksAccess(kubeClientset.CoreV1()); err != nil {
+			logger.Error("EKS access not working. Make sure you're connected to the VPN and try again.")
+			os.Exit(1)
+		}
+
 		logger.Info("EKS access working",
 			"kubeconfig", viper.GetString("KUBECONFIG"),
 			"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
 		)
 
-		// TODO: call HelmRegistryLogin and DockerLogin to a separate command, so devspace can refresh tokens when needed
 		if viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") && viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
 			logger.Info("CRIB initialization complete")
 			return

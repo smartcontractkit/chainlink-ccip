@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -14,6 +15,9 @@ import (
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -258,4 +262,61 @@ users:
 		CurrentContext: eksClusterAlias,
 	}
 	AssertEqualKubeConfigs(t, want, got)
+}
+func TestCheckEksAccess(t *testing.T) {
+	// mocking a successful call to CoreV1().Namespaces().List()
+	mockedCoreV1NamespacesWorking := wrappermocks.NewNamespaceInterface(t)
+	mockedCoreV1NamespacesWorking.EXPECT().
+		List(
+			context.TODO(), metav1.ListOptions{},
+		).Return(
+		&v1.NamespaceList{
+			Items: []v1.Namespace{
+				{ObjectMeta: metav1.ObjectMeta{Name: "some"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "namespaces"}},
+			},
+		}, nil)
+
+	mockedCoreV1ClientWorking := wrappermocks.NewCoreV1Interface(t)
+	mockedCoreV1ClientWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesWorking)
+
+	// mocking a failed call to CoreV1().Namespaces().List()
+	mockedCoreV1NamespacesNotWorking := wrappermocks.NewNamespaceInterface(t)
+	mockedCoreV1NamespacesNotWorking.EXPECT().
+		List(
+			context.TODO(), metav1.ListOptions{},
+		).Return(nil, fmt.Errorf("some error"))
+
+	mockedCoreV1ClientNotWorking := wrappermocks.NewCoreV1Interface(t)
+	mockedCoreV1ClientNotWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesNotWorking)
+
+	testCases := []struct {
+		name        string
+		corev1      corev1.CoreV1Interface
+		listErr     error
+		expectedErr string
+	}{
+		{
+			name:        "Success",
+			corev1:      mockedCoreV1ClientWorking,
+			expectedErr: "",
+		},
+		{
+			name:        "Error",
+			corev1:      mockedCoreV1ClientNotWorking,
+			expectedErr: "some error",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckEksAccess(tt.corev1)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
 }
