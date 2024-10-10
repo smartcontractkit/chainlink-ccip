@@ -28,9 +28,9 @@ two new terms:
 ## Configuration
 
 Because OCR is a permissioned network, roles are assigned during configuration.
-The plugin's must ensure observations for each chain are only made by the
+The plugins must ensure observations for each chain are only made by the
 designated nodes.
 
 Each role also has its own value for `FChain`. This value determines the number
-of nodes which must be assigned the role and the threshold of observations
-required.
+of nodes we should configure as `3 * FChain + 1` along with the strict
+strict observation threshold as `2 * FChain + 1`.

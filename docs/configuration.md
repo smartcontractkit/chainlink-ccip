@@ -35,29 +35,29 @@ addresses.
 
 **Data structure references**:
 
-* [CCIPConfig](https://github.com/smartcontractkit/chainlink/blob/1b41e69cca2f4622d367ef18733c36fcae433505/contracts/src/v0.8/ccip/capability/libraries/CCIPConfigTypes.sol)
-```
+* [CCIPConfig](https://github.com/smartcontractkit/chainlink/blob/ad555baa323ef32c3c00882aaec134e44226e79d/contracts/src/v0.8/ccip/capability/CCIPHome.sol#L112-L125)
+```solidity
   /// @notice OCR3 configuration.
+  /// Note that FRoleDON >= fChain, since FRoleDON represents the role DON, and fChain represents sub-committees.
+  /// FRoleDON values are typically identical across multiple OCR3 configs since the chains pertain to one role DON,
+  /// but FRoleDON values can change across OCR3 configs to indicate role DON splits.
   struct OCR3Config {
-    Internal.OCRPluginType pluginType; // ────────╮ The plugin that the configuration is for.
-    uint64 chainSelector; //                      | The (remote) chain that the configuration is for.
-    uint8 F; //                                   | The "big F" parameter for the role DON.
-    uint64 offchainConfigVersion; // ─────────────╯ The version of the offchain configuration.
+    Internal.OCRPluginType pluginType; // ─╮ The plugin that the configuration is for.
+    uint64 chainSelector; //               │ The (remote) chain that the configuration is for.
+    uint8 FRoleDON; //                     │ The "big F" parameter for the role DON.
+    uint64 offchainConfigVersion; // ──────╯ The version of the exec offchain configuration.
     bytes offrampAddress; // The remote chain offramp address.
-    // len(p2pIds) == len(signers) == len(transmitters) == 3 * F + 1
-    // NOTE: indexes matter here! The p2p ID at index i corresponds to the signer at index i and the transmitter at index i.
-    // This is crucial in order to build the oracle ID <-> peer ID mapping offchain.
-    bytes32[] p2pIds; // The P2P IDs of the oracles that are part of the role DON.
-    bytes[] signers; // The onchain signing keys of nodes in the don.
-    bytes[] transmitters; // The onchain transmitter keys of nodes in the don.
-    bytes offchainConfig; // The offchain configuration for the OCR3 protocol. Protobuf encoded.
+    bytes rmnHomeAddress; // The home chain RMN home address.
+    OCR3Node[] nodes; // Keys & IDs of nodes part of the role DON
+    bytes offchainConfig; // The offchain configuration for the OCR3 plugin. Protobuf encoded.
   }
-}
 ```
+
 * [offchainConfig](https://github.com/smartcontractkit/chainlink/blob/200fb4504b6b96c92979fe42148530f784098cc2/core/capabilities/ccip/oraclecreator/plugin.go#L526) has two components:
   * [commitOffchainConfig](https://github.com/smartcontractkit/chainlink-ccip/blob/ae3e8f4935a0bb3efe86c456b410a612be56bfec/pluginconfig/commit.go#L77)
   * [execOffchainConfig](https://github.com/smartcontractkit/chainlink-ccip/blob/ae3e8f4935a0bb3efe86c456b410a612be56bfec/pluginconfig/execute.go#L14)
-```
+
+```golang
 // CommitOffchainConfig is the OCR offchainConfig for the commit plugin.
 // This is posted onchain as part of the OCR configuration process of the commit plugin.
 // Every plugin is provided this configuration in its encoded form in the NewReportingPlugin
@@ -147,7 +147,8 @@ contains many different bits of configuration needed to configure the plugins.
 **Data structure references**:
 
 * [OffRamp structs](https://github.com/smartcontractkit/chainlink/blob/1b41e69cca2f4622d367ef18733c36fcae433505/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L89)
-```
+
+```solidity
   struct StaticConfig {
     uint64 chainSelector; // ───╮  Destination chainSelector
     IRMNV2 rmn; // ─────────────╯  RMN Verification Contract
@@ -182,7 +183,8 @@ used by the plugins to discover source chain FeeQuoter and Router addresses.
 **Data structure references**:
 
 * [OnRamp structs](https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/onRamp/OnRamp.sol)
-```
+
+```solidity
   /// @dev Struct that contains the static configuration
   /// RMN depends on this struct, if changing, please notify the RMN maintainers.
   // solhint-disable-next-line gas-struct-packing
@@ -227,11 +229,7 @@ a shared component used by the commit and execute plugins.
 
 ```mermaid
 sequenceDiagram
-note over HomeChainReader: 1. Home Chain and OffRamp's are configured during initialization.
-JobSpec ->> HomeChainReader: Initialize DestReader with HomeChain and OffRamp addresses.
-HomeChainReader ->>+ HomeChain: getAllChainConfigs(), getOCRConfig()
-HomeChain ->>- DestReader: []ChainConfigInfo, []OCR3ConfigWithMeta
-
+note over DestReader: The offRamps are configured during initialization.
 note over DestReader: 2. Fetch onRamp, destNonceManager, destFeeQuoter, and destRouter
 DestReader ->>+ OffRamp: getStaticConfiguration()
 OffRamp ->>- DestReader: offRamp.StaticConfig
