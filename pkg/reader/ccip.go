@@ -907,14 +907,13 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 				return fmt.Errorf("failed to get source chain config: %w", err)
 			}
 
-			// This may happen due to some sort of regression in the codec that unmarshals
-			// chain data -> go struct.
 			if len(resp.OnRamp) == 0 {
-				return fmt.Errorf(
-					"onRamp misconfigured/didn't unmarshal for chain %d: %x",
-					chainSel,
-					resp.OnRamp,
-				)
+				// This indicates that the source chain config is NOT set for this
+				// chain selector.
+				// This can happen if a node is set up to read from a chain that has
+				// not yet been configured in the offramp.
+				r.lggr.Debugw("source chain config not found", "chain", chainSel)
+				return nil
 			}
 
 			if !resp.IsEnabled {
