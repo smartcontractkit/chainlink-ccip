@@ -242,12 +242,12 @@ note over DestReader: 2. Share and agree on addresses.
 DestReader ->>+ DON: Share contract addresses.
 
 note over SourceReader(s): 3. With the onRamp now configured, fetch sourceFeeQuoter, and sourceRouter's
-SourceReader(s) ->>+ OnRamp: getStaticConfiguration()
-OnRamp -->>- SourceReader(s): onRamp.StaticConfig
-SourceReader(s) ->>+ OnRamp: getDynamicConfig()
-OnRamp -->>- SourceReader(s): onRamp.DynamicConfig
-SourceReader(s) ->>+ OnRamp: getSourceChainConfig(allChains)
-OnRamp -->>- SourceReader(s): []onRamp.SourceChainConfig
+SourceReader(s) ->>+ OnRamp(s): getStaticConfiguration()
+OnRamp(s) -->>- SourceReader(s): onRamp.StaticConfig
+SourceReader(s) ->>+ OnRamp(s): getDynamicConfig()
+OnRamp(s) -->>- SourceReader(s): onRamp.DynamicConfig
+SourceReader(s) ->>+ OnRamp(s): getSourceChainConfig(allChains)
+OnRamp(s) -->>- SourceReader(s): []onRamp.SourceChainConfig
 
 note over SourceReader(s): 4. Share and agree on addresses.
 SourceReader(s) ->> DON: Share contract addresses.
