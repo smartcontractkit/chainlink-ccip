@@ -68,26 +68,26 @@ func NewPlugin(
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
+	costlyMessageObserver exectypes.CostlyMessageObserver,
 ) *Plugin {
 	lggr = logger.Named(lggr, "ExecutePlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	return &Plugin{
-		donID:             donID,
-		reportingCfg:      reportingCfg,
-		offchainCfg:       offchainCfg,
-		destChain:         destChain,
-		oracleIDToP2pID:   oracleIDToP2pID,
-		ccipReader:        ccipReader,
-		reportCodec:       reportCodec,
-		msgHasher:         msgHasher,
-		homeChain:         homeChain,
-		tokenDataObserver: tokenDataObserver,
-		estimateProvider:  estimateProvider,
-		lggr:              lggr,
-		// TODO: implement
-		costlyMessageObserver: &exectypes.NoOpCostlyMessageObserver{},
+		donID:                 donID,
+		reportingCfg:          reportingCfg,
+		offchainCfg:           offchainCfg,
+		destChain:             destChain,
+		oracleIDToP2pID:       oracleIDToP2pID,
+		ccipReader:            ccipReader,
+		reportCodec:           reportCodec,
+		msgHasher:             msgHasher,
+		homeChain:             homeChain,
+		tokenDataObserver:     tokenDataObserver,
+		estimateProvider:      estimateProvider,
+		lggr:                  lggr,
+		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			lggr,
 			&ccipReader,
