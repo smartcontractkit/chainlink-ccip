@@ -1,0 +1,43 @@
+run:
+  timeout: 15m
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - copyloopvar
+    - decorder
+    - dogsled
+    - durationcheck
+    - errcheck
+    - errname
+    - gci
+    - gochecknoinits
+    - gofmt
+    - gofumpt
+    - goimports
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - grouper
+    - importas
+    - ineffassign
+    - makezero
+    - misspell
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - staticcheck
+    - tenv
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unused
+    - wastedassign
+    - whitespace
+    - prealloc
