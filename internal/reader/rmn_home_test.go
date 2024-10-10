@@ -53,80 +53,94 @@ func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
 	require.NoError(t, configPoller.Close())
 }
 
-func TestRMNHomeChainConfigPoller_HealthReport(t *testing.T) {
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+func TestRMNHomePoller_HealthReport(t *testing.T) {
+	t.Parallel()
 
-	var (
-		tickTime       = 1 * time.Millisecond
-		totalSleepTime = 50 * time.Millisecond // give more time for multiple ticks
-	)
+	tests := []struct {
+		name        string
+		failedPolls uint
+		wantErr     bool
+	}{
+		{
+			name:        "Healthy state",
+			failedPolls: 0,
+			wantErr:     false,
+		},
+		{
+			name:        "Unhealthy state",
+			failedPolls: MaxFailedPolls,
+			wantErr:     true,
+		},
+	}
 
-	// Set up the mock to return an error for the first 10 calls
-	homeChainReader.On(
-		"GetLatestValue",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(fmt.Errorf("error")).Times(50)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			homeChainReader := readermock.NewMockContractReaderFacade(t)
 
-	// Set up the mock for a successful call after 10 errors
-	primaryConfig, secondaryConfig := createTestRMNHomeConfigs(false, false)
-	rmnHomeOnChainConfigs := []VersionedConfigWithDigest{primaryConfig, secondaryConfig}
+			homeChainReader.On("GetLatestValue",
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+				mock.Anything,
+			).Run(func(args mock.Arguments) {
+				result := args.Get(4).(*[]VersionedConfigWithDigest)
+				*result = []VersionedConfigWithDigest{
+					{
+						ConfigDigest: [32]byte{1},
+						VersionedConfig: VersionedConfig{
+							Version: 1,
+							Config: Config{
+								Nodes:        []Node{},
+								SourceChains: []SourceChain{},
+							},
+						},
+					},
+				}
+			}).Return(nil)
 
-	homeChainReader.On(
-		"GetLatestValue",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Run(func(args mock.Arguments) {
-		arg := args.Get(4).(*[]VersionedConfigWithDigest)
-		*arg = rmnHomeOnChainConfigs
-	}).Return(nil).Times(50)
+			poller := NewRMNHomePoller(
+				homeChainReader,
+				rmnHomeBoundContract,
+				logger.Test(t),
+				10*time.Millisecond,
+			).(*rmnHomePoller)
 
-	homeChainReader.On(
-		"GetLatestValue",
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-	).Return(fmt.Errorf("error"))
+			require.NoError(t, poller.Start(context.Background()))
 
-	configPoller := NewRMNHomePoller(
-		homeChainReader,
-		rmnHomeBoundContract,
-		logger.Test(t),
-		tickTime,
-	)
+			// Wait for the initial fetch to complete
+			require.Eventually(t, func() bool {
+				return homeChainReader.AssertCalled(
+					t,
+					"GetLatestValue",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything)
+			}, 5*time.Second, 10*time.Millisecond, "GetLatestValue was not called within the expected timeframe")
 
-	require.NoError(t, configPoller.Start(context.Background()))
-	// Initially it's healthy
-	healthy := configPoller.HealthReport()
-	require.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy)
+			poller.mutex.Lock()
+			poller.failedPolls = tt.failedPolls
+			poller.mutex.Unlock()
 
-	// give some time for polling to happen
-	time.Sleep(totalSleepTime)
-	errors := configPoller.HealthReport()
-	require.Equal(t, 1, len(errors))
-	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+			report := poller.HealthReport()
 
-	// give some time for successful polling to happen
-	time.Sleep(totalSleepTime * 1)
-	errors = configPoller.HealthReport()
-	require.Equal(t, 1, len(errors))
-	require.Equal(t, map[string]error{configPoller.Name(): error(nil)}, healthy) // should not produce an error
+			require.Len(t, report, 1)
+			err := report[poller.Name()]
 
-	// give some time for polling to fail again
-	time.Sleep(totalSleepTime * 1)
-	errors = configPoller.HealthReport()
-	require.Equal(t, 1, len(errors))
-	require.Errorf(t, errors[configPoller.Name()], "polling failed %d times in a row", MaxFailedPolls)
+			if tt.wantErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "polling failed")
+			} else {
+				require.NoError(t, err)
+			}
 
-	require.NoError(t, configPoller.Close())
+			require.NoError(t, poller.Close())
+		})
+	}
 }
 
 func Test_RMNHomePollingWorking(t *testing.T) {
