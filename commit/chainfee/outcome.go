@@ -1,6 +1,7 @@
 package chainfee
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -15,6 +16,7 @@ import (
 )
 
 func (p *processor) Outcome(
+	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],

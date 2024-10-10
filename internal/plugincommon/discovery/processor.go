@@ -185,7 +185,7 @@ func aggregateObservations(
 // Outcome comes to consensus on the contract addresses and updates the chainreader. It doesn't actually
 // return an Outcome.
 func (cdp *ContractDiscoveryProcessor) Outcome(
-	_ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
+	ctx context.Context, _ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
 	// come to consensus on the onramp addresses and update the chainreader.
@@ -288,7 +288,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
 	// call Sync to bind contracts.
-	if err := (*cdp.reader).Sync(context.Background(), contracts); err != nil {
+	if err := (*cdp.reader).Sync(ctx, contracts); err != nil {
 		return dt.Outcome{}, fmt.Errorf("unable to sync contracts: %w", err)
 	}
 

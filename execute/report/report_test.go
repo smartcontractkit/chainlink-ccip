@@ -748,7 +748,6 @@ func Test_Builder_Build(t *testing.T) {
 			foundError := false
 
 			builder := NewBuilder(
-				ctx,
 				lggr,
 				hasher,
 				codec,
@@ -761,7 +760,7 @@ func Test_Builder_Build(t *testing.T) {
 
 			var updatedMessages []exectypes.CommitData
 			for _, report := range tt.args.reports {
-				updatedMessage, err := builder.Add(report)
+				updatedMessage, err := builder.Add(ctx, report)
 				if err != nil && tt.wantErr != "" {
 					if strings.Contains(err.Error(), tt.wantErr) {
 						foundError = true
@@ -941,7 +940,6 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			}
 
 			b := &execReportBuilder{
-				ctx:                context.Background(),
 				lggr:               lggr,
 				encoder:            resolvedEncoder,
 				estimateProvider:   tt.fields.estimateProvider,

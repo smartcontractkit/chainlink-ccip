@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
@@ -75,6 +76,7 @@ func (m MessageSentEvent) unpackID() (eventID, error) {
 }
 
 func NewUSDCMessageReader(
+	ctx context.Context,
 	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
@@ -87,7 +89,7 @@ func NewUSDCMessageReader(
 		}
 
 		contract, err := bindFacadeReaderContract(
-			context.Background(),
+			ctx,
 			contractReaders,
 			chainSelector,
 			consts.ContractNameCCTPMessageTransmitter,

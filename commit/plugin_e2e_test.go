@@ -394,7 +394,6 @@ func setupNode(
 		Return(rmnReportCfg, nil).Maybe()
 
 	p := NewPlugin(
-		ctx,
 		donID,
 		nodeID,
 		oracleIDToP2pID,

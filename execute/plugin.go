@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/libocr/quorumhelper"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -161,7 +162,7 @@ func getPendingExecutedReports(
 }
 
 func (p *Plugin) ValidateObservation(
-	outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
+	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation,
 ) error {
 	decodedObservation, err := exectypes.DecodeObservation(ao.Observation)
 	if err != nil {
@@ -185,9 +186,12 @@ func (p *Plugin) ValidateObservation(
 	return nil
 }
 
-func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.Query) (ocr3types.Quorum, error) {
+func (p *Plugin) ObservationQuorum(
+	_ context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
+) (bool, error) {
 	// TODO: should we use f+1 (or less) instead of 2f+1 because it is not needed for security?
-	return ocr3types.QuorumFPlusOne, nil
+	return quorumhelper.ObservationCountReachesObservationQuorum(
+		quorumhelper.QuorumFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
 // selectReport takes a list of reports in execution order and selects the first reports that fit within the
@@ -196,6 +200,7 @@ func (p *Plugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.
 // If there is not enough space in the final report, it may be partially executed by searching for a subset of messages
 // which can fit in the final report.
 func selectReport(
+	ctx context.Context,
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
@@ -212,7 +217,7 @@ func selectReport(
 		}
 
 		var err error
-		commitReports[i], err = builder.Add(report)
+		commitReports[i], err = builder.Add(ctx, report)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
 		}
@@ -231,7 +236,9 @@ func selectReport(
 	return execReports, stillPendingReports, err
 }
 
-func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[[]byte], error) {
+func (p *Plugin) Reports(
+	ctx context.Context, seqNr uint64, outcome ocr3types.Outcome,
+) ([]ocr3types.ReportPlus[[]byte], error) {
 	if outcome == nil {
 		p.lggr.Warn("no outcome, skipping report generation")
 		return nil, nil
@@ -242,16 +249,17 @@ func (p *Plugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.R
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	// TODO: this function should be pure, a context should not be needed.
-	encoded, err := p.reportCodec.Encode(context.Background(), decodedOutcome.Report)
+	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
-	report := []ocr3types.ReportWithInfo[[]byte]{{
-		Report: encoded,
-		Info:   nil,
-	}}
+	report := []ocr3types.ReportPlus[[]byte]{
+		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+			Report: encoded,
+			Info:   nil,
+		}},
+	}
 
 	return report, nil
 }

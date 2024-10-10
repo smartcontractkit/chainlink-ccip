@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/smartcontractkit/libocr/quorumhelper"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -54,7 +55,6 @@ type Plugin struct {
 }
 
 func NewPlugin(
-	_ context.Context,
 	donID plugintypes.DonID,
 	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -176,9 +176,12 @@ func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (ty
 	return q.Encode()
 }
 
-func (p *Plugin) ObservationQuorum(_ ocr3types.OutcomeContext, _ types.Query) (ocr3types.Quorum, error) {
+func (p *Plugin) ObservationQuorum(
+	ctx context.Context, _ ocr3types.OutcomeContext, _ types.Query, aos []types.AttributedObservation,
+) (bool, error) {
 	// Across all chains we require at least 2F+1 observations.
-	return ocr3types.QuorumTwoFPlusOne, nil
+	return quorumhelper.ObservationCountReachesObservationQuorum(
+		quorumhelper.QuorumTwoFPlusOne, p.reportingCfg.N, p.reportingCfg.F, aos), nil
 }
 
 func (p *Plugin) Observation(
@@ -243,7 +246,7 @@ func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
 // - builds a report
 // - checks for the transmission of a previous report
 func (p *Plugin) Outcome(
-	outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
+	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
 	p.lggr.Debugw("Commit plugin performing outcome",
 		"outctx", outCtx,
@@ -298,7 +301,7 @@ func (p *Plugin) Outcome(
 
 	if p.discoveryProcessor != nil {
 		p.lggr.Infow("Processing discovery observations", "discoveryObservations", discoveryObservations)
-		_, err = p.discoveryProcessor.Outcome(dt.Outcome{}, dt.Query{}, discoveryObservations)
+		_, err = p.discoveryProcessor.Outcome(ctx, dt.Outcome{}, dt.Query{}, discoveryObservations)
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
 		}
@@ -306,6 +309,7 @@ func (p *Plugin) Outcome(
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
+		ctx,
 		prevOutcome.MerkleRootOutcome,
 		decodedQ.MerkleRootQuery,
 		merkleObservations,
@@ -315,6 +319,7 @@ func (p *Plugin) Outcome(
 	}
 
 	tokenPriceOutcome, err := p.tokenPriceProcessor.Outcome(
+		ctx,
 		prevOutcome.TokenPriceOutcome,
 		decodedQ.TokenPriceQuery,
 		tokensObservations,
@@ -324,6 +329,7 @@ func (p *Plugin) Outcome(
 	}
 
 	chainFeeOutcome, err := p.chainFeeProcessor.Outcome(
+		ctx,
 		prevOutcome.ChainFeeOutcome,
 		decodedQ.ChainFeeQuery,
 		feeObservations,

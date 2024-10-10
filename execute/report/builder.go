@@ -15,12 +15,11 @@ import (
 var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
-	Add(report exectypes.CommitData) (exectypes.CommitData, error)
+	Add(ctx context.Context, report exectypes.CommitData) (exectypes.CommitData, error)
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
 func NewBuilder(
-	ctx context.Context,
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
@@ -31,7 +30,6 @@ func NewBuilder(
 	maxGas uint64,
 ) ExecReportBuilder {
 	return &execReportBuilder{
-		ctx:  ctx,
 		lggr: logger,
 
 		encoder:          encoder,
@@ -60,7 +58,6 @@ func (vm validationMetadata) accumulate(other validationMetadata) validationMeta
 }
 
 type execReportBuilder struct {
-	ctx  context.Context // TODO: remove context from builder so that it can be pure?
 	lggr logger.Logger
 
 	// Providers
@@ -84,9 +81,10 @@ type execReportBuilder struct {
 }
 
 func (b *execReportBuilder) Add(
+	ctx context.Context,
 	commitReport exectypes.CommitData,
 ) (exectypes.CommitData, error) {
-	execReport, updatedReport, err := b.buildSingleChainReport(b.ctx, commitReport)
+	execReport, updatedReport, err := b.buildSingleChainReport(ctx, commitReport)
 
 	// No messages fit into the report, move to next report
 	if errors.Is(err, ErrEmptyReport) {

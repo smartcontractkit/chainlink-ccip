@@ -48,6 +48,7 @@ type compositeTokenDataObserver struct {
 // Therefore, we don't re-run any validation and only match configs to the proper TokenDataObserver implementation.
 // This constructor that should be used by the plugin.
 func NewConfigBasedCompositeObservers(
+	ctx context.Context,
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	config []pluginconfig.TokenDataObserverConfig,
@@ -60,7 +61,7 @@ func NewConfigBasedCompositeObservers(
 		// e.g. observers[i] := config.CreateTokenDataObserver()
 		switch {
 		case c.USDCCCTPObserverConfig != nil:
-			observer, err := createUSDCTokenObserver(lggr, destChainSelector, *c.USDCCCTPObserverConfig, encoder, readers)
+			observer, err := createUSDCTokenObserver(ctx, lggr, destChainSelector, *c.USDCCCTPObserverConfig, encoder, readers)
 			if err != nil {
 				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
@@ -73,6 +74,7 @@ func NewConfigBasedCompositeObservers(
 }
 
 func createUSDCTokenObserver(
+	ctx context.Context,
 	lggr logger.Logger,
 	destChainSelector cciptypes.ChainSelector,
 	cctpConfig pluginconfig.USDCCCTPObserverConfig,
@@ -80,6 +82,7 @@ func createUSDCTokenObserver(
 	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 ) (TokenDataObserver, error) {
 	usdcReader, err := reader.NewUSDCMessageReader(
+		ctx,
 		lggr,
 		cctpConfig.Tokens,
 		readers,
