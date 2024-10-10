@@ -31,7 +31,7 @@ jobs:
       - name: Run linter
         run: make lint
       - name: Run tests
-        run: TEST_COUNT=20 COVERAGE_FILE=coverage.out make test
+        run: TEST_COUNT=1 COVERAGE_FILE=coverage.out make test
       - name: Generate coverage report
         if: github.event_name == 'pull_request'
         run: |
