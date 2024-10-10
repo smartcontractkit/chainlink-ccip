@@ -136,3 +136,17 @@ OnRamp ->> SourceReader(s): Get dynamic configuration.
 OnRamp ->> SourceReader(s): Get source chain configuration.
 SourceReader(s) ->> DON: Share contract addresses.
 ```
+
+### Address Sources
+
+The following addresses are discovered in a deterministic way:
+* OffRamp - located in the home chain config.
+* OnRamp - located in the offRamp's SourceChainConfig.
+* NonceManager - located in the onRamp/offRamp StaticConfig.
+* FeeQuoter - located in the onRamp/offRamp DynamicConfig.
+* Router - it's complicated.
+
+#### Special notes about router discovery
+
+During a new chain deployment, a test router is deployed. In this case there
+is no deterministic router, because they are both valid in their own way.
