@@ -28,6 +28,7 @@ mkShell' {
     golangci-lint
     github-cli
     jq
+    gomplate
 
     kind
 

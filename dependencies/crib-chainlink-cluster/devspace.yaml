@@ -642,7 +642,7 @@ profiles:
       - op: replace
         path: deployments.ccip-scripts.helm.values.enabled
         value: false
-  - name: ccip-v16
+  - name: ccip-v2
     merge:
       images:
         app:

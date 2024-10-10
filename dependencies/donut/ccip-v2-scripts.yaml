@@ -1,0 +1,31 @@
+version: v2beta1
+name: ccip-v2-deploy-scripts
+
+vars:
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  CHAINLINK_CODE_DIR:
+    source: env
+
+pipelines:
+  # ccip v2 scripts wrapper to generate nodes toml overrides
+  generate-nodes-toml: |-
+    # go run main.go cobra_cmd_here --output=${DEVSPACE_TMPDIR}/node_overrides.toml
+
+    # todo: this is the placeholder to invoke @Ani scripts
+    # from https://github.com/smartcontractkit/chainlink/tree/develop/integration-tests/deployment/devenv
+    echo "running deploy scripts"
+
+    mockedOverrides="
+    [Capabilities]
+    [Capabilities.ExternalRegistry]
+    Address = '0xF650B4cE1a32649902D03e2f5329E285d8f94579'
+    NetworkID = '1337'
+    ChainID = '1337'
+    "
+    NODE_TOML_OVERRIDES=$mockedOverrides \
+    gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts.overrides.yaml > ${DEVSPACE_TMPDIR}/ccip-v2-node-overrides.yaml
+
+    echo "generated nodes toml overrides"
+    cat ${DEVSPACE_TMPDIR}/ccip-v2-node-overrides.yaml

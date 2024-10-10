@@ -2,6 +2,8 @@
 
 > collection of components from the donops team
 
+Provides a fully configured DON Cluster. Relies on the chainlink-cluster production chart. 
+
 ## development
 
 - reference component directly (only for testing)

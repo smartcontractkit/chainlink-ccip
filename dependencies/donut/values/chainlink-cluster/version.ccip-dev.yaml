@@ -1,0 +1,6 @@
+---
+common:
+  image:
+    repository: 795953128386.dkr.ecr.us-west-2.amazonaws.com/ccip
+    tag: develop
+    pullPolicy: IfNotPresent

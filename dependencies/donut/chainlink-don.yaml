@@ -20,6 +20,18 @@ vars:
   LOCAL_VALUES_DIR:
     source: env
     default: ./values
+  # Required for deploying ingress on AWS based setup
+  INGRESS_CERT_ARN:
+    source: env
+    default: ""
+  # Infrastructure Provider, either kind or aws
+  PROVIDER:
+    source: env
+    default: ""
+  # Version of CCIP tooling
+  CCIP_TOOLING_VERSION:
+    source: env
+    default: ""
   # don
   DON_TYPE:
     source: env
@@ -39,10 +51,34 @@ vars:
     default: "true"
 
 pipelines:
-  chainlink-don:
+  deploy:
     run: |-
-      # temp
-      create_deployments --all
+      if [[ "$PROVIDER" == "kind" ]]; then
+       ensure_pull_secrets --all
+      fi
+
+      # Deploy DBs
+      for i in $(seq 0 $((DON_BOOT_NODE_COUNT-1)))
+      do
+        create_deployments "chainlink-don-db-bt-$i"
+      done
+      for i in $(seq 0 $((DON_NODE_COUNT-1)))
+      do
+        create_deployments "chainlink-don-db-$i"
+      done
+
+      if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
+        run_dependency_pipelines job-distributor
+        # run ccip-v2 scripts to generate capability contract address
+        run_dependency_pipelines ccip-v2-scripts --pipeline generate-nodes-toml
+        create_deployments chainlink-don --from-file="${DEVSPACE_TMPDIR}/ccip-v2-node-overrides.yaml"
+      else
+        create_deployments chainlink-don
+      fi
+
+      if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
+        # todo: run ccip-v2 scripts deploy on chain contracts (tokens, lanes, token pools, price registry, router)
+      fi
 
 deployments:
   chainlink-don:
@@ -76,6 +112,7 @@ profiles:
       $(
         DON_NODE_COUNT=${DON_NODE_COUNT} \
         DON_BOOT_NODE_COUNT=${DON_BOOT_NODE_COUNT} \
+        PROVIDER=${PROVIDER} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.base.yaml
       )
@@ -102,6 +139,16 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ethereum-sepolia.yaml
+  - name: network-geth-chain-1337
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.geth-chain-1337.yaml
+  - name: network-geth-chain-2337
+    patches:
+      - op: add
+        path: deployments.chainlink-don.helm.valuesFiles
+        value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.geth-chain-2337.yaml
   - name: network-besu-chain-alpha
     patches:
       - op: add
@@ -134,3 +181,40 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/overrides.yaml
+  - name: crib-staging
+    activation:
+      - vars:
+          PROVIDER: "aws"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        INGRESS_CERT_ARN=${INGRESS_CERT_ARN} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging.yaml
+      )
+  - name: crib-kind
+    activation:
+      - vars:
+          PROVIDER: "kind"
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-kind.yaml
+      )
+  - name: ccip-v2-scripts
+    activation:
+      - vars:
+          CCIP_TOOLING_VERSION: "v2"
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          ccip-v2-scripts:
+            path: ${DEPENDENCIES_DIR}/donut/ccip-v2-scripts.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          job-distributor:
+            path: ${DEPENDENCIES_DIR}/job-distributor
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}

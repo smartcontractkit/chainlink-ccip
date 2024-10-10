@@ -1,0 +1,15 @@
+---
+common:
+  chainlink:
+    v2Config:
+      01-network-geth-chain-1337.toml: |
+        [[EVM]]
+        ChainID = "1337"
+        MinContractPayment = '0'
+        AutoCreateKey = true
+        FinalityDepth = 1
+
+        [[EVM.Nodes]]
+        Name = 'node-1337'
+        HTTPURL = "http://geth-1337:8544"
+        WSURL = "ws://geth-1337:8546"

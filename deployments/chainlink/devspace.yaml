@@ -60,13 +60,11 @@ pipelines:
     run: |-
       run_dependency_pipelines crib-ccip-scripts
 
-  ccip-v16:
+  ccip-v2:
     run: |-
       run_dependency_pipelines geth
-      # Deploy job-distributor
-      run_dependency_pipelines job-distributor
-      # Deploy CCIP enabled DON
-      run_dependency_pipelines crib-chainlink-cluster
+      # Deploy CCIP enabled fully configured DON
+      run_dependency_pipelines donut-cluster
       run_pipelines ingress-check
 
   kind-dependencies:
@@ -292,8 +290,29 @@ profiles:
         value:
           - ccip-kind-bix-ship
           - kind
-  - name: ccip-v16
+  - name: ccip-v2
     patches:
+      - op: add
+        path: vars
+        value:
+          DON_TYPE:
+            source: env
+            default: ccip
+          DON_NODE_COUNT:
+            source: env
+            default: 4
+          DON_BOOT_NODE_COUNT:
+            source: env
+            default: 1
+          DON_VERSION:
+            source: env
+            default: ccip-dev
+          CCIP_TOOLING_VERSION:
+            source: env
+            default: v2
+          INGRESS_CERT_ARN:
+            source: env
+            default: ${DEVSPACE_INGRESS_CERT_ARN}
       - op: add
         path: dependencies
         value:
@@ -303,16 +322,13 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - ccip
-          job-distributor:
-            path: ${DEPENDENCIES_DIR}/job-distributor
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
-          crib-chainlink-cluster:
-            path: ${DEPENDENCIES_DIR}/crib-chainlink-cluster
+          donut-cluster:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
-              - ccip-v16
+              - network-geth-chain-1337
+              - network-geth-chain-2337
   - name: kind-dependencies
     patches:
       - op: add
@@ -496,9 +512,9 @@ commands:
     command: devspace run-pipeline ccip-atlas-ui -p ccip-atlas-ui
     description: Run the CCIP pipeline with Atlas and UI.
     appendArgs: true
-  ccip-v16:
-    command: devspace run-pipeline ccip-v16 -p ccip-v16
-    description: Run the ccip v1.6 pipeline.
+  ccip-v2:
+    command: devspace run-pipeline ccip-v2 -p ccip-v2
+    description: Run the ccip v2 pipeline.
     appendArgs: true
   beholder:
     command: devspace run-pipeline beholder -p beholder

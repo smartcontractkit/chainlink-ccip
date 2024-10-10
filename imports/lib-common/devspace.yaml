@@ -24,3 +24,6 @@ pipelines:
   purge:
     run: |-
       kubectl delete ns ${DEVSPACE_NAMESPACE}
+  ingress-check:
+    run: |-
+      ./${SCRIPTS_DIR}/ingress_check.sh

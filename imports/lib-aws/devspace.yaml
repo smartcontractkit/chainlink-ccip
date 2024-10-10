@@ -48,7 +48,3 @@ commands:
   man:
     command: ${SCRIPTS_DIR}/man.sh $1
     description: Display man pages
-pipelines:
-  ingress-check:
-    run: |-
-      ./${SCRIPTS_DIR}/ingress_check.sh

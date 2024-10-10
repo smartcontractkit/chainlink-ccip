@@ -108,6 +108,12 @@ deployments:
             # AWS ALB private CIDRs and optionally other custom CIDRs.
             # Example format: 10.0.0.0/16,192.168.0.1/24
             customCidrs: ${DEVSPACE_INGRESS_CIDRS}
+        networkPolicy:
+          extraIngressSelectors:
+            # whitelist chainlink-don deployment from donut dependency
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: chainlink-don
 
 profiles:
   - name: local-charts
@@ -125,9 +131,6 @@ profiles:
         geth:
           helm:
             values:
-              statefulSet:
-                # Set to true to use StatefulSet instead of Deployment.
-                enabled: true
               networkPolicy:
                 # Allow additional services to access geth
                 extraIngressSelectors:
@@ -137,6 +140,9 @@ profiles:
                   - podSelector:
                       matchLabels:
                         app: ccip-scripts-deployer
+                  - podSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: chainlink-don
               chains:
                 - networkId: 1337
                   customEVMConfigToml: |
@@ -150,7 +156,21 @@ profiles:
                     PriceMax = '200 gwei'
                     LimitDefault = 6000000
                     FeeCapDefault = '200 gwei'
+  - name: aws
+    activation:
+      - vars:
+          PROVIDER: "aws"
+    merge:
+      deployments:
+        geth:
+          helm:
+            values:
+              statefulSet:
+                enabled: true
   - name: kind
+    activation:
+      - vars:
+          PROVIDER: "kind"
     merge:
       deployments:
         geth:
