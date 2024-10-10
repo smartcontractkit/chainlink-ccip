@@ -227,15 +227,31 @@ a shared component used by the commit and execute plugins.
 
 ```mermaid
 sequenceDiagram
-JobSpec ->> DestReader: Get HomeChain and OffRamp addresses.
-HomeChain ->> DestReader: Get configuration.
-OffRamp ->> DestReader: Get static configuration.
-OffRamp ->> DestReader: Get dynamic configuration.
-OffRamp ->> DestReader: Get source chain configuration.
-DestReader ->> DON: Share contract addresses.
-OnRamp ->> SourceReader(s): Get static configuration.
-OnRamp ->> SourceReader(s): Get dynamic configuration.
-OnRamp ->> SourceReader(s): Get source chain configuration.
+note over HomeChainReader: 1. Home Chain and OffRamp's are configured during initialization.
+JobSpec ->> HomeChainReader: Initialize DestReader with HomeChain and OffRamp addresses.
+HomeChainReader ->>+ HomeChain: getAllChainConfigs(), getOCRConfig()
+HomeChain ->>- DestReader: []ChainConfigInfo, []OCR3ConfigWithMeta
+
+note over DestReader: 2. Fetch onRamp, destNonceManager, destFeeQuoter, and destRouter
+DestReader ->>+ OffRamp: getStaticConfiguration()
+OffRamp ->>- DestReader: offRamp.StaticConfig
+DestReader ->>+ OffRamp: getDynamicConfig()
+OffRamp ->>- DestReader: offRamp.DynamicConfig
+DestReader ->>+ OffRamp: getSourceChainConfig(allChains)
+OffRamp ->>- DestReader: []offRamp.SourceChainConfig
+
+note over DestReader: 3. Share and agree on addresses.
+DestReader ->>+ DON: Share contract addresses.
+
+note over SourceReader(s): 4. With the onRamp now configured, fetch sourceFeeQuoter, and sourceRouter's
+SourceReader ->>+ OnRamp: getStaticConfiguration()
+OnRamp ->>- SourceReader: onRamp.StaticConfig
+SourceReader ->>+ OnRamp: getDynamicConfig()
+OnRamp ->>- SourceReader: onRamp.DynamicConfig
+SourceReader ->>+ OnRamp: getSourceChainConfig(allChains)
+OnRamp ->>- SourceReader: []onRamp.SourceChainConfig
+
+note over SourceReader(s): 5. Share and agree on addresses.
 SourceReader(s) ->> DON: Share contract addresses.
 ```
 
