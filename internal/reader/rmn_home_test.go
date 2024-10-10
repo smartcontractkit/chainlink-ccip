@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"sync"
 	"testing"
 	"time"
 
@@ -80,10 +79,6 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 			t.Parallel()
 			homeChainReader := readermock.NewMockContractReaderFacade(t)
 
-			// Create a variable to track if GetLatestValue was called
-			var getLatestValueCalled bool
-			var mu sync.Mutex
-
 			homeChainReader.On("GetLatestValue",
 				mock.Anything,
 				mock.Anything,
@@ -104,9 +99,6 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 						},
 					},
 				}
-				mu.Lock()
-				getLatestValueCalled = true
-				mu.Unlock()
 			}).Return(nil)
 
 			poller := NewRMNHomePoller(
@@ -120,9 +112,14 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 
 			// Wait for the initial fetch to complete
 			require.Eventually(t, func() bool {
-				mu.Lock()
-				defer mu.Unlock()
-				return getLatestValueCalled
+				return homeChainReader.AssertCalled(
+					t,
+					"GetLatestValue",
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything,
+					mock.Anything)
 			}, 5*time.Second, 10*time.Millisecond, "GetLatestValue was not called within the expected timeframe")
 
 			poller.mutex.Lock()
@@ -142,7 +139,6 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 			}
 
 			require.NoError(t, poller.Close())
-			homeChainReader.AssertExpectations(t)
 		})
 	}
 }
