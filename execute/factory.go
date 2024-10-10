@@ -91,7 +91,7 @@ func NewPluginFactory(
 }
 
 func (p PluginFactory) NewReportingPlugin(
-	config ocr3types.ReportingPluginConfig,
+	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
 	if err != nil {
@@ -103,8 +103,8 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	var oracleIDToP2PID = make(map[commontypes.OracleID]ragep2ptypes.PeerID)
-	for oracleID, p2pID := range p.ocrConfig.Config.P2PIds {
-		oracleIDToP2PID[commontypes.OracleID(oracleID)] = p2pID
+	for oracleID, node := range p.ocrConfig.Config.Nodes {
+		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
 	// map types to the facade.
@@ -114,6 +114,7 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	ccipReader := readerpkg.NewCCIPChainReader(
+		ctx,
 		p.lggr,
 		readers,
 		p.chainWriters,
@@ -122,6 +123,7 @@ func (p PluginFactory) NewReportingPlugin(
 	)
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
+		ctx,
 		p.lggr,
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,

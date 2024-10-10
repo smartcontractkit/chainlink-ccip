@@ -1,13 +1,14 @@
 package merkleroot
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -23,6 +24,7 @@ import (
 // - builds a report
 // - checks for the transmission of a previous report
 func (w *Processor) Outcome(
+	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
@@ -159,14 +161,11 @@ func buildReport(
 		}
 		sigs = parsedSigs
 
-		// TODO: we're doing this because we're going to add the OnRamp address
-		// to the MerkleRootChain struct and it makes the struct not usable anymore
-		// on the mapset.Set type.
 		type rootKey struct {
-			ChainSel     cciptypes.ChainSelector
-			SeqNumsRange cciptypes.SeqNumRange
-			MerkleRoot   cciptypes.Bytes32
-			// TODO: add OnRamp as a string?
+			ChainSel      cciptypes.ChainSelector
+			SeqNumsRange  cciptypes.SeqNumRange
+			MerkleRoot    cciptypes.Bytes32
+			OnRampAddress string
 		}
 		signedRoots := mapset.NewSet[rootKey]()
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
@@ -177,7 +176,8 @@ func buildReport(
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MaxMsgNr),
 				),
 				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
-				// TODO: add OnRamp as a string?
+				// NOTE: convert address into a comparable value for mapset.
+				OnRampAddress: string(laneUpdate.LaneSource.OnrampAddress),
 			})
 		}
 
@@ -188,7 +188,8 @@ func buildReport(
 				ChainSel:     root.ChainSel,
 				SeqNumsRange: root.SeqNumsRange,
 				MerkleRoot:   root.MerkleRoot,
-				// TODO: add OnRamp as a string?
+				// NOTE: convert address into a comparable value for mapset.
+				OnRampAddress: string(root.OnRampAddress),
 			}) {
 				rootsToReport = append(rootsToReport, root)
 			} else {
@@ -203,7 +204,9 @@ func buildReport(
 		RootsToReport:       roots,
 		OffRampNextSeqNums:  prevOutcome.OffRampNextSeqNums,
 		RMNReportSignatures: sigs,
-		RMNRemoteCfg:        prevOutcome.RMNRemoteCfg,
+		// TODO: Calculate it for real
+		RMNRawVs:     cciptypes.NewBigIntFromInt64(0),
+		RMNRemoteCfg: prevOutcome.RMNRemoteCfg,
 	}
 
 	return outcome

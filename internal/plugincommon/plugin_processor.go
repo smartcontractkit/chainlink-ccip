@@ -36,9 +36,9 @@ type AttributedObservation[ObservationType any] struct {
 // Notice all interface functions are using prevOutcome instead of outCtx.
 // We're interested in the prevOutcome, and it makes it easier to have all decoding on the top level (OCR plugin),
 // otherwise there might be cyclic dependencies or just complicating the code more.
-type PluginProcessor[QueryType any, ObservationType any, OutcomeType any] interface {
-	Query(ctx context.Context, prevOutcome OutcomeType) (QueryType, error)
-	Observation(ctx context.Context, prevOutcome OutcomeType, query QueryType) (ObservationType, error)
-	ValidateObservation(prevOutcome OutcomeType, query QueryType, ao AttributedObservation[ObservationType]) error
-	Outcome(prevOutcome OutcomeType, query QueryType, aos []AttributedObservation[ObservationType]) (OutcomeType, error)
+type PluginProcessor[Query any, Observation any, Outcome any] interface {
+	Query(ctx context.Context, prev Outcome) (Query, error)
+	Observation(ctx context.Context, prev Outcome, query Query) (Observation, error)
+	ValidateObservation(prev Outcome, query Query, ao AttributedObservation[Observation]) error
+	Outcome(ctx context.Context, prev Outcome, query Query, aos []AttributedObservation[Observation]) (Outcome, error)
 }

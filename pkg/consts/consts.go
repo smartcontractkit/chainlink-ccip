@@ -8,7 +8,7 @@ const (
 	ContractNameOnRamp                 = "OnRamp"
 	ContractNameFeeQuoter              = "FeeQuoter"
 	ContractNameCapabilitiesRegistry   = "CapabilitiesRegistry"
-	ContractNameCCIPConfig             = "CCIPConfig"
+	ContractNameCCIPConfig             = "CCIPHome"
 	ContractNamePriceAggregator        = "AggregatorV3Interface"
 	ContractNameNonceManager           = "NonceManager"
 	ContractNameRMNHome                = "RMNHome"
@@ -87,8 +87,9 @@ const (
 	// Used by the home chain reader.
 	MethodNameGetCapability = "GetCapability"
 
-	// CCIPConfig.sol methods.
+	// CCIPHome.sol methods.
 	// Used by the home chain reader.
+	// TODO: change them to getConfig, getAllConfigs
 	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
 	MethodNameGetOCRConfig       = "GetOCRConfig"
 
@@ -115,6 +116,11 @@ const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
 	EventAttributeDestChain      = "destChain"
+)
+
+// Dedicated filters
+const (
+	CCTPMessageSentValue = "CCTPMessageSentValue"
 )
 
 // Mirrors of Internal.sol's OCRPluginType

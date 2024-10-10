@@ -62,6 +62,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 
 	offrampAddress := []byte{0x3}
 	ccipReader := newCCIPChainReaderInternal(
+		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainA: sourceCRs[chainA],
@@ -828,6 +829,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	feeQuoterAddress := []byte{0x4}
 	ccipReader := newCCIPChainReaderInternal(
+		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
@@ -873,6 +875,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	offrampAddress := []byte{0x3}
 	feeQuoterAddress := []byte{0x4}
 	ccipReader := newCCIPChainReaderInternal(
+		tests.Context(t),
 		logger.Test(t),
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
