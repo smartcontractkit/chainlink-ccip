@@ -57,7 +57,3 @@ nav:
   - Home: index.md
   - Getting Started:
       - Deploying CRIB Locally with Kind: Kind.md
-      - CI Integration: CI.md
-  - Logging: Logging.md
-  - Monitoring: Monitoring.md
-  - FAQ: Faq.md
