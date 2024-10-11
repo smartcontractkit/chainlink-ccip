@@ -995,6 +995,8 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
 	}
 
+	r.lggr.Debugw("got source chain configs", "configs", resp)
+
 	// Populate the map.
 	for i := range resp.selectors {
 		chainSel := resp.selectors[i]
