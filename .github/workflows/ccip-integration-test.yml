@@ -31,7 +31,8 @@ jobs:
         with:
           repository: smartcontractkit/chainlink
           # TODO: switch back to develop
-          ref: BCF-2887-context-propagation
+          #ref: develop
+          ref: will/ccip-contract-reader-config
           path: chainlink
       - name: Get the correct commit SHA via GitHub API
         id: get_sha
