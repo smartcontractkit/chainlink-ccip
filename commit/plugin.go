@@ -85,7 +85,7 @@ func NewPlugin(
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			if err := rmnHomeReader.Start(ctx); err != nil {
-				rmnReaderErr = fmt.Errorf("failed to start RMNHome reader: %w", err)
+				lggr.Errorw("Failed to start RMNHome reader", "err", err)
 			}
 		} else {
 			lggr.Errorw("Failed to initialize RMNHome reader", "err", err)
