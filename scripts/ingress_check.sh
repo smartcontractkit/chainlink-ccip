@@ -26,25 +26,28 @@ check_hostname_resolution() {
 	local ns_timeout=$2
 	local interval=$3
 
-	local start_time=$(date +%s)
-	while true; do
-		dig "$hostname" +short >/dev/null 2>&1
+	local start_time
+	start_time=$(date +%s)
 
-		if [ $? -eq 0 ]; then
+	while true; do
+		if dig "$hostname" +short >/dev/null 2>&1; then
 			echo "DNS lookup successful for $hostname"
 			return 0
 		fi
 
-		local current_time=$(date +%s)
-		local elapsed_time=$((current_time - start_time))
-		if [ $elapsed_time -ge $ns_timeout ]; then
+		local current_time
+		current_time=$(date +%s)
+
+		local elapsed_time
+		elapsed_time=$((current_time - start_time))
+		if [ $elapsed_time -ge "$ns_timeout" ]; then
 			echo "Error: DNS lookup failed after $ns_timeout seconds for $hostname."
 			return 1
 		fi
 
 		# Wait for the specified interval before trying again
 		echo "DNS lookup for $hostname failed, retrying in $interval seconds..."
-		sleep $interval
+		sleep "$interval"
 	done
 }
 
@@ -113,8 +116,7 @@ for INGRESS_NAME in "${ingresses[@]}"; do
 			# Check resolution for each hostname
 			if [[ ${CRIB_CI_ENV:-false} != "true" ]]; then
 				for hostname in $ingress_hosts; do
-					check_hostname_resolution "$hostname" $sleep_duration_propagate $sleep_duration_retry
-					if [ $? -ne 0 ]; then
+					if ! check_hostname_resolution "$hostname" $sleep_duration_propagate $sleep_duration_retry; then
 						echo "Error: DNS lookup failed for $hostname after $sleep_duration_propagate seconds."
 						exit 1
 					fi
