@@ -47,6 +47,9 @@ var initCmd = &cobra.Command{
 					viper.Set(key, userInput)
 				}
 			}
+		} else {
+			// CI environment, PROVIDER is always "aws"
+			viper.Set("PROVIDER", "aws")
 		}
 
 		if !slices.Contains(supportedProviders, viper.GetString("PROVIDER")) {
