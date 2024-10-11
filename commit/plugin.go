@@ -89,6 +89,7 @@ func NewPlugin(
 
 	merkleRootProcessor := merkleroot.NewProcessor(
 		oracleID,
+		oracleIDToP2pID,
 		lggr,
 		offchainCfg,
 		destChain,
@@ -99,7 +100,6 @@ func NewPlugin(
 		chainSupport,
 		rmn.Controller(nil),      // todo
 		cciptypes.RMNCrypto(nil), // todo
-		oracleIDToP2pID,
 		rmnHomeReader,
 	)
 

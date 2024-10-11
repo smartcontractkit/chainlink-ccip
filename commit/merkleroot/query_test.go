@@ -243,6 +243,7 @@ func TestProcessor_Query(t *testing.T) {
 				lggr:          logger.Test(t),
 			}
 
+			w.rmnControllerInitialized = true // skip rmn controller initialization
 			q, err := w.Query(ctx, tc.prevOutcome)
 			if tc.expErr {
 				require.Error(t, err)

@@ -60,7 +60,7 @@ func (w *Processor) Observation(
 }
 
 func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Outcome) error {
-	if w.offchainCfg.RMNEnabled {
+	if !w.offchainCfg.RMNEnabled {
 		return nil
 	}
 
