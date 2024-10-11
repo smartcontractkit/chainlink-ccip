@@ -259,11 +259,11 @@ profiles:
                       level: "debug"
                   pipelines:
                     traces:
-                      receivers: [ otlp ]
-                      exporters: [ debug, kafka ]
+                      receivers: [otlp]
+                      exporters: [debug, kafka]
                     metrics:
-                      receivers: [ otlp ]
-                      exporters: [ debug, kafka ]
+                      receivers: [otlp]
+                      exporters: [debug, kafka]
                     logs:
-                      receivers: [ otlp ]
-                      exporters: [ debug, kafka ]
+                      receivers: [otlp]
+                      exporters: [debug, kafka]
