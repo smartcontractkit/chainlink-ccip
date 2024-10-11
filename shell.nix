@@ -70,6 +70,6 @@ mkShell' {
     crib init --write-config || exit $?
 
     # sourcing the .env file as the last step
-    export $(cat .env | grep -v ^# | xargs)
+    [ -f ".env" ] && export $(cat .env | grep -v ^# | xargs)
   '';
 }
