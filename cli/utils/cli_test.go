@@ -3,6 +3,7 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-git/go-git/v5"
@@ -265,6 +266,124 @@ func TestPresentPrompt(t *testing.T) {
 
 			result := PresentPrompt(tc.prompt, tc.choices)
 			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+func TestWriteConfig(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		initialLines  []string
+		kv            map[string]string
+		expectedLines []string
+		expectedErr   error
+	}{
+		{
+			name: "UpdateExistingKeys",
+			initialLines: []string{
+				"KEY1=oldvalue1",
+				"KEY2=oldvalue2",
+			},
+			kv: map[string]string{
+				"KEY1": "newvalue1",
+				"KEY2": "newvalue2",
+			},
+			expectedLines: []string{
+				"KEY1=newvalue1",
+				"KEY2=newvalue2",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "AddNewKeys",
+			initialLines: []string{
+				"KEY1=oldvalue1",
+			},
+			kv: map[string]string{
+				"KEY2": "newvalue2",
+				"KEY3": "newvalue3",
+			},
+			expectedLines: []string{
+				"KEY1=oldvalue1",
+				"# Added by CRIB CLI",
+				"KEY2=newvalue2",
+				"KEY3=newvalue3",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "MixedUpdateAndAddKeys",
+			initialLines: []string{
+				"KEY1=oldvalue1",
+				"KEY2=oldvalue2",
+			},
+			kv: map[string]string{
+				"KEY2": "newvalue2",
+				"KEY3": "newvalue3",
+			},
+			expectedLines: []string{
+				"KEY1=oldvalue1",
+				"KEY2=newvalue2",
+				"# Added by CRIB CLI",
+				"KEY3=newvalue3",
+			},
+			expectedErr: nil,
+		},
+		{
+			name:         "EmptyFile",
+			initialLines: []string{},
+			kv: map[string]string{
+				"KEY1": "newvalue1",
+			},
+			expectedLines: []string{
+				"# Added by CRIB CLI",
+				"KEY1=newvalue1",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "NoChanges",
+			initialLines: []string{
+				"KEY1=oldvalue1",
+			},
+			kv: map[string]string{},
+			expectedLines: []string{
+				"KEY1=oldvalue1",
+			},
+			expectedErr: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Create a temporary file for testing
+			tempFile, err := os.CreateTemp("", "test.env")
+			require.NoError(t, err)
+			defer os.Remove(tempFile.Name())
+
+			// Write initial lines to the temporary file
+			for _, line := range tc.initialLines {
+				_, err := tempFile.WriteString(line + "\n")
+				require.NoError(t, err)
+			}
+			tempFile.Close()
+
+			err = WriteConfig(tempFile.Name(), tc.kv)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+
+				// Read the file and check the contents
+				content, err := os.ReadFile(tempFile.Name())
+				require.NoError(t, err)
+				lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+				assert.Equal(t, tc.expectedLines, lines)
+			}
 		})
 	}
 }
