@@ -140,6 +140,11 @@ func (c *controller) ComputeReportSignatures(
 ) (*ReportSignatures, error) {
 	rmnNodeInfo := make(map[rmntypes.NodeID]rmntypes.HomeNodeInfo)
 
+	rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(rmnRemoteCfg.ConfigDigest)
+	if err != nil {
+		return nil, fmt.Errorf("get rmn nodes info: %w", err)
+	}
+
 	// Group the lane update requests by their source chain and mark the RMN nodes that can sign each update
 	// based on whether it supports the source chain or not.
 	updatesPerChain := make(map[uint64]updateRequestWithMeta)
@@ -151,10 +156,6 @@ func (c *controller) ComputeReportSignatures(
 		updatesPerChain[updateReq.LaneSource.SourceChainSelector] = updateRequestWithMeta{
 			Data:     updateReq,
 			RmnNodes: mapset.NewSet[rmntypes.NodeID](),
-		}
-		rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(rmnRemoteCfg.ConfigDigest)
-		if err != nil {
-			return nil, fmt.Errorf("get rmn nodes info: %w", err)
 		}
 
 		for _, node := range rmnNodes {
