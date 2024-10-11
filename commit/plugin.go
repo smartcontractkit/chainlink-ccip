@@ -99,6 +99,7 @@ func NewPlugin(
 		chainSupport,
 		rmn.Controller(nil),      // todo
 		cciptypes.RMNCrypto(nil), // todo
+		oracleIDToP2pID,
 		rmnHomeReader,
 	)
 

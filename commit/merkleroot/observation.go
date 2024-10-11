@@ -83,8 +83,9 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 	for _, node := range rmnNodesInfo {
 		peerIDs = append(peerIDs, node.PeerID.String())
 	}
-
-	// todo: probably we also need to append OCR peer IDs
+	for _, p2pID := range w.oracleIDToP2pID {
+		peerIDs = append(peerIDs, p2pID.String())
+	}
 
 	if err := w.rmnController.InitConnection(
 		ctx,

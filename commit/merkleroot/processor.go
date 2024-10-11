@@ -3,6 +3,7 @@ package merkleroot
 import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
@@ -20,6 +21,7 @@ import (
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
 	oracleID                 commontypes.OracleID
+	oracleIDToP2pID          map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg              pluginconfig.CommitOffchainConfig
 	destChain                cciptypes.ChainSelector
 	lggr                     logger.Logger
@@ -36,6 +38,7 @@ type Processor struct {
 // NewProcessor creates a new Processor
 func NewProcessor(
 	oracleID commontypes.OracleID,
+	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	lggr logger.Logger,
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
@@ -57,17 +60,18 @@ func NewProcessor(
 		msgHasher,
 	}
 	return &Processor{
-		oracleID:      oracleID,
-		offchainCfg:   offchainCfg,
-		destChain:     destChain,
-		lggr:          lggr,
-		observer:      observer,
-		ccipReader:    ccipReader,
-		reportingCfg:  reportingCfg,
-		chainSupport:  chainSupport,
-		rmnController: rmnController,
-		rmnCrypto:     rmnCrypto,
-		rmnHomeReader: rmnHomeReader,
+		oracleID:        oracleID,
+		oracleIDToP2pID: oracleIDToP2pID,
+		offchainCfg:     offchainCfg,
+		destChain:       destChain,
+		lggr:            lggr,
+		observer:        observer,
+		ccipReader:      ccipReader,
+		reportingCfg:    reportingCfg,
+		chainSupport:    chainSupport,
+		rmnController:   rmnController,
+		rmnCrypto:       rmnCrypto,
+		rmnHomeReader:   rmnHomeReader,
 	}
 }
 
