@@ -197,7 +197,7 @@ func (r *peerClient) Recv() <-chan PeerResponse {
 	return r.respChan
 }
 
-// writePrefix writes the prefix to the rightmost 2 bytes of the hash.
+// writePrefix writes the prefix to the first 2 bytes of the hash.
 func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cciptypes.Bytes32 {
 	var prefixBytes [2]byte
 	binary.BigEndian.PutUint16(prefixBytes[:], uint16(prefix))
