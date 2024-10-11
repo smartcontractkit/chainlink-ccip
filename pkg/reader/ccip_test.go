@@ -762,7 +762,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	sourceChain2 := cciptypes.ChainSelector(3)
 	destExtended := reader_mocks.NewMockExtended(t)
 
-	// mock the call for sourceChain1 - successful
+	// mock the call for source chain configs
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
