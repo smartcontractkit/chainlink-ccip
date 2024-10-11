@@ -638,17 +638,16 @@ func (r *ccipChainReader) discoverOffRampContracts(
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
-		{
-			// Iterate in sourceChain selector order so that the router config is deterministic.
-			keys := maps.Keys(sourceConfigs)
-			sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-			for _, sourceChain := range keys {
-				cfg := sourceConfigs[sourceChain]
-				resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
-				// The local router is located in each source sourceChain config. Add it once.
-				if len(resp[consts.ContractNameRouter][chain]) == 0 {
-					resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
-				}
+
+		// Iterate results in sourceChain selector order so that the router config is deterministic.
+		keys := maps.Keys(sourceConfigs)
+		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+		for _, sourceChain := range keys {
+			cfg := sourceConfigs[sourceChain]
+			resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
+			// The local router is located in each source sourceChain config. Add it once.
+			if len(resp[consts.ContractNameRouter][chain]) == 0 {
+				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
 			}
 		}
 	}
@@ -696,7 +695,7 @@ func (r *ccipChainReader) DiscoverContracts(
 	var resp ContractAddresses
 
 	// Discover destination contracts if the dest chain is supported.
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err == nil {
 		resp, err = r.discoverOffRampContracts(ctx, r.destChain)
 		if err != nil {
 			return nil, fmt.Errorf("discover destination contracts: %w", err)
@@ -974,11 +973,12 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
 	type selectorsAndConfigs struct {
-		selectors          []uint64
-		sourceChainConfigs []sourceChainConfig
+		Selectors          []uint64            `mapstructure:"F0"`
+		SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
 	}
 
 	var resp selectorsAndConfigs
+	//var resp map[string]any
 	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -991,16 +991,16 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
 	}
 
-	if len(resp.sourceChainConfigs) != len(resp.selectors) {
+	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
 		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
 	}
 
 	r.lggr.Debugw("got source chain configs", "configs", resp)
 
 	// Populate the map.
-	for i := range resp.selectors {
-		chainSel := resp.selectors[i]
-		cfg := resp.sourceChainConfigs[i]
+	for i := range resp.Selectors {
+		chainSel := cciptypes.ChainSelector(resp.Selectors[i])
+		cfg := resp.SourceChainConfigs[i]
 
 		enabled, err := cfg.check()
 		if err != nil {
@@ -1012,7 +1012,7 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 			continue
 		}
 
-		configs[cciptypes.ChainSelector(resp.selectors[i])] = resp.sourceChainConfigs[i]
+		configs[chainSel] = cfg
 	}
 
 	return configs, nil
