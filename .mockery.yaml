@@ -22,6 +22,9 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
             Controller:
+            PeerGroup:
+            PeerGroupFactory:
+            Stream:
     github.com/smartcontractkit/chainlink-ccip/pkg/reader:
         interfaces:
             CCIPReader:

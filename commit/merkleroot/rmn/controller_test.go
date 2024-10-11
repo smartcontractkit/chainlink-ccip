@@ -325,6 +325,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
+		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
+
 		_, err := ts.rmnController.ComputeReportSignatures(
 			ts.ctx,
 			destChain,

@@ -53,18 +53,18 @@ type PeerResponse struct {
 
 type peerClient struct {
 	lggr                        logger.Logger
-	peerGroupFactory            networking.PeerGroupFactory
+	peerGroupFactory            PeerGroupFactory
 	respChan                    chan PeerResponse
-	peerGroup                   networking.PeerGroup // nil initially, until InitConnection is called
+	peerGroup                   PeerGroup // nil initially, until InitConnection is called
 	genericEndpointConfigDigest cciptypes.Bytes32
-	rageP2PStreams              map[rmntypes.NodeID]networking.Stream
+	rageP2PStreams              map[rmntypes.NodeID]Stream
 	bootstrappers               []commontypes.BootstrapperLocator
 	mu                          *sync.RWMutex
 }
 
 func NewPeerClient(
 	lggr logger.Logger,
-	peerGroupFactory networking.PeerGroupFactory,
+	peerGroupFactory PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
 ) PeerClient {
 	return &peerClient{
@@ -72,7 +72,7 @@ func NewPeerClient(
 		peerGroupFactory:            peerGroupFactory,
 		respChan:                    make(chan PeerResponse),
 		peerGroup:                   nil,
-		rageP2PStreams:              make(map[rmntypes.NodeID]networking.Stream),
+		rageP2PStreams:              make(map[rmntypes.NodeID]Stream),
 		genericEndpointConfigDigest: cciptypes.Bytes32{},
 		bootstrappers:               bootstrappers,
 		mu:                          &sync.RWMutex{},
@@ -137,7 +137,7 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 	return nil
 }
 
-func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (networking.Stream, error) {
+func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (Stream, error) {
 	r.mu.RLock()
 	stream, ok := r.rageP2PStreams[rmnNode.ID]
 	r.mu.RUnlock()
@@ -179,7 +179,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (ne
 	return stream, nil
 }
 
-func (r *peerClient) listenToStream(rmnNodeID rmntypes.NodeID, stream networking.Stream) {
+func (r *peerClient) listenToStream(rmnNodeID rmntypes.NodeID, stream Stream) {
 	for msg := range stream.ReceiveMessages() {
 		r.respChan <- PeerResponse{
 			RMNNodeID: rmnNodeID,
@@ -202,4 +202,18 @@ func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cc
 	hCopy[1] = prefixBytes[1]
 
 	return hCopy
+}
+
+// Redeclare interfaces for mocking purposes.
+
+type PeerGroupFactory interface {
+	networking.PeerGroupFactory
+}
+
+type PeerGroup interface {
+	networking.PeerGroup
+}
+
+type Stream interface {
+	networking.Stream
 }
