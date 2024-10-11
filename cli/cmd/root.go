@@ -47,11 +47,15 @@ func init() {
 	cobra.OnInitialize(ensureRunningInAProductDir, initConfig, initLogger)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".env", "config file")
-	rootCmd.PersistentFlags().StringP("log-level", "", "info", "Log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().Bool("crib-ci-env", false, "Flag to indicate that this is a CI environment")
 
 	// Bind the viper flag to the cobra flag (we can safely ignore the error here)
 	_ = viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))
-	viper.SetDefault("log_level", "info")
+	_ = viper.BindPFlag("CRIB_CI_ENV", rootCmd.PersistentFlags().Lookup("crib-ci-env"))
+
+	viper.SetDefault("log_level", rootCmd.PersistentFlags().Lookup("log-level").DefValue)
+	viper.SetDefault("CRIB_CI_ENV", rootCmd.PersistentFlags().Lookup("crib-ci-env").DefValue)
 }
 
 func ensureRunningInAProductDir() {
@@ -148,6 +152,14 @@ func initLogger() {
 		fmt.Fprintf(os.Stderr, "Invalid log level %s", requestedLogLevel)
 		os.Exit(1)
 	}
-	logger = slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: slogLevel}))
+	logger = slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{
+		Level: slogLevel,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.TimeKey && !viper.GetBool("CRIB_CI_ENV") {
+				return slog.Attr{}
+			}
+			return a
+		},
+	}))
 	logger.Debug("Debug mode enabled")
 }
