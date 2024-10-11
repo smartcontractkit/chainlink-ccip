@@ -65,7 +65,7 @@ jobs:
       - name: Deploy and validate CRIB Environment for Core
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@fa63a0fb95039c4d89fec6a9a78b53c0cacf5457 # crib-deploy-environment@2.0.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@a4058228b4b9b6e30bb0e2b883e3b4f0cd447970 # crib-deploy-environment@2.1.0
         with:
           api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
