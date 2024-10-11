@@ -443,6 +443,17 @@ profiles:
             path: ${DEPENDENCIES_DIR}/beholder
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: beholder-ci-e2e-test
+    parents:
+      - profile: beholder
+    patches:
+      - op: replace
+        path: dependencies.beholder.profiles
+        value:
+          - ci-e2e-test
+      - op: add
+        path: dependencies.beholder.pipeline
+        value: ci-e2e-test
   - name: beholder-kind
     parents:
       - profile: beholder
@@ -519,6 +530,10 @@ commands:
   beholder:
     command: devspace run-pipeline beholder -p beholder
     description: Run the Beholder pipeline.
+    appendArgs: true
+  beholder-ci-e2e-test:
+    command: devspace run-pipeline beholder -p beholder-ci-e2e-test
+    description: Run the Beholder pipeline for CI E2E test.
     appendArgs: true
   beholder-kind:
     command: devspace run-pipeline beholder -p beholder-kind

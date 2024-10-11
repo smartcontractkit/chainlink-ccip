@@ -23,10 +23,32 @@ namespace=${DEVSPACE_NAMESPACE}
 # Function to check if a hostname can be resolved
 check_hostname_resolution() {
 	local hostname="$1"
-	if ! dig +short "$hostname" >/dev/null; then
-		echo "Error: Hostname '$hostname' could not be resolved."
-		exit 1
-	fi
+	local ns_timeout=$2
+	local interval=$3
+
+	local start_time
+	start_time=$(date +%s)
+
+	while true; do
+		if dig "$hostname" +short >/dev/null 2>&1; then
+			echo "DNS lookup successful for $hostname"
+			return 0
+		fi
+
+		local current_time
+		current_time=$(date +%s)
+
+		local elapsed_time
+		elapsed_time=$((current_time - start_time))
+		if [ $elapsed_time -ge "$ns_timeout" ]; then
+			echo "Error: DNS lookup failed after $ns_timeout seconds for $hostname."
+			return 1
+		fi
+
+		# Wait for the specified interval before trying again
+		echo "DNS lookup for $hostname failed, retrying in $interval seconds..."
+		sleep "$interval"
+	done
 }
 
 # Get all ingress names in the current namespace
@@ -73,13 +95,6 @@ for INGRESS_NAME in "${ingresses[@]}"; do
 				exit 1
 			fi
 
-			# If the ingress class is alb, wait for DNS propagation
-			if [[ ${INGRESS_CLASS} == "alb" ]]; then
-				echo "Sleeping for ${sleep_duration_propagate} seconds to allow DNS records to propagate... (Use CTRL+C to safely skip this step.)"
-				sleep $sleep_duration_propagate
-				echo "...done. NOTE: If you have an issue with the DNS records, try to reset your local and/or VPN DNS cache."
-			fi
-
 			if [[ ${INGRESS_CLASS} == "nginx" ]]; then
 				echo "Configuring hosts file for namespace..."
 
@@ -101,7 +116,10 @@ for INGRESS_NAME in "${ingresses[@]}"; do
 			# Check resolution for each hostname
 			if [[ ${CRIB_CI_ENV:-false} != "true" ]]; then
 				for hostname in $ingress_hosts; do
-					check_hostname_resolution "$hostname"
+					if ! check_hostname_resolution "$hostname" $sleep_duration_propagate $sleep_duration_retry; then
+						echo "Error: DNS lookup failed for $hostname after $sleep_duration_propagate seconds."
+						exit 1
+					fi
 				done
 			fi
 
