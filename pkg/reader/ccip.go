@@ -619,21 +619,13 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}, nil
 }
 
-// getAllChains returns a slice containing all chains that are known to the offramp.
-func (r *ccipChainReader) getAllChains(
+// discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
+func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
-) ([]cciptypes.ChainSelector, error) {
-
-	return nil, nil
-}
-
-func (r *ccipChainReader) discoverDestinationContracts(
-	ctx context.Context,
-	allChains []cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
 	// Exit without an error if we cannot read the destination.
-	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
 		return nil, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
@@ -642,20 +634,20 @@ func (r *ccipChainReader) discoverDestinationContracts(
 
 	// OnRamps are in the offRamp SourceChainConfig.
 	{
-		sourceConfigs, err := r.getOffRampSourceChainsConfig(ctx, r.destChain)
+		sourceConfigs, err := r.getAllOffRampSourceChainsConfig(ctx, chain)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get SourceChainsConfig: %w", err)
 		}
 		{
-			// Iterate in chain selector order so that the router config is deterministic.
+			// Iterate in sourceChain selector order so that the router config is deterministic.
 			keys := maps.Keys(sourceConfigs)
 			sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
-			for _, chain := range keys {
-				cfg := sourceConfigs[chain]
-				resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
-				// The local router is located in each source chain config. Add it once.
-				if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
-					resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+			for _, sourceChain := range keys {
+				cfg := sourceConfigs[sourceChain]
+				resp = resp.Append(consts.ContractNameOnRamp, sourceChain, cfg.OnRamp)
+				// The local router is located in each source sourceChain config. Add it once.
+				if len(resp[consts.ContractNameRouter][chain]) == 0 {
+					resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
 				}
 			}
 		}
@@ -666,7 +658,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		var staticConfig offRampStaticChainConfig
 		err := r.getDestinationData(
 			ctx,
-			r.destChain,
+			chain,
 			consts.ContractNameOffRamp,
 			consts.MethodNameOffRampGetStaticConfig,
 			&staticConfig,
@@ -674,8 +666,8 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup nonce manager (offramp static config): %w", err)
 		}
-		resp = resp.Append(consts.ContractNameNonceManager, r.destChain, staticConfig.NonceManager)
-		resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.Rmn)
+		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfig.NonceManager)
+		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.Rmn)
 	}
 
 	// FeeQuoter from the offRamp dynamic config.
@@ -683,7 +675,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		var dynamicConfig offRampDynamicChainConfig
 		err := r.getDestinationData(
 			ctx,
-			r.destChain,
+			chain,
 			consts.ContractNameOffRamp,
 			consts.MethodNameOffRampGetDynamicConfig,
 			&dynamicConfig,
@@ -691,7 +683,7 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		if err != nil {
 			return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 		}
-		resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, dynamicConfig.FeeQuoter)
+		resp = resp.Append(consts.ContractNameFeeQuoter, chain, dynamicConfig.FeeQuoter)
 	}
 
 	return resp, nil
@@ -704,13 +696,8 @@ func (r *ccipChainReader) DiscoverContracts(
 	var resp ContractAddresses
 
 	// Discover destination contracts if the dest chain is supported.
-	if errValidate := validateExtendedReaderExistence(r.contractReaders, r.destChain); errValidate != nil {
-		allChains, err := r.getAllChains(ctx, r.destChain)
-		if err != nil {
-			return nil, fmt.Errorf("get all chains: %w", err)
-		}
-
-		resp, err = r.discoverDestinationContracts(ctx, allChains)
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		resp, err = r.discoverOffRampContracts(ctx, r.destChain)
 		if err != nil {
 			return nil, fmt.Errorf("discover destination contracts: %w", err)
 		}
@@ -905,6 +892,18 @@ type sourceChainConfig struct {
 	MinSeqNr  uint64
 }
 
+func (scc sourceChainConfig) check() (bool /* enabled */, error) {
+	// This may happen due to some sort of regression in the codec that unmarshals
+	// chain data -> go struct.
+	if len(scc.OnRamp) == 0 {
+		return false, fmt.Errorf(
+			"onRamp misconfigured/didn't unmarshal: %x",
+			scc.OnRamp,
+		)
+	}
+	return scc.IsEnabled, nil
+}
+
 // getOffRampSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source
 // chain.
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
@@ -914,79 +913,107 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	}
 
 	res := make(map[cciptypes.ChainSelector]sourceChainConfig)
+	mu := new(sync.Mutex)
+
+	eg := new(errgroup.Group)
+	for _, chainSel := range chains {
+		if chainSel == r.destChain {
+			continue
+		}
+
+		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
+		chainSel := chainSel
+		eg.Go(func() error {
+			resp := sourceChainConfig{}
+			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+				ctx,
+				consts.ContractNameOffRamp,
+				consts.MethodNameGetSourceChainConfig,
+				primitives.Unconfirmed,
+				map[string]any{
+					"sourceChainSelector": chainSel,
+				},
+				&resp,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to get source chain config: %w", err)
+			}
+
+			enabled, err := resp.check()
+			if err != nil {
+				return fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
+			}
+			if !enabled {
+				// We don't want to process disabled chains prematurely.
+				r.lggr.Debugw("source chain is disabled", "chain", chainSel)
+				return nil
+			}
+
+			mu.Lock()
+			res[chainSel] = resp
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for the provided chain.
+func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
+	ctx context.Context,
+	chain cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, chain); err != nil {
+		return nil, fmt.Errorf("validate extended reader existence: %w", err)
+	}
+
+	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
 	type selectorsAndConfigs struct {
 		selectors          []uint64
 		sourceChainConfigs []sourceChainConfig
 	}
 
-	resp := sourceChainConfig{}
-	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+	var resp selectorsAndConfigs
+	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
 		consts.MethodNameOffRampGetAllSourceChainConfigs,
 		primitives.Unconfirmed,
-		map[string]any{
-			"sourceChainSelector": chainSel,
-		},
+		map[string]any{},
 		&resp,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
+	}
 
-	return res, nil
-	/*
-		mu := new(sync.Mutex)
+	if len(resp.sourceChainConfigs) != len(resp.selectors) {
+		return nil, fmt.Errorf("selectors and source chain configs length mismatch: %v", resp)
+	}
 
-		eg := new(errgroup.Group)
-		for _, chainSel := range chains {
-			if chainSel == r.destChain {
-				continue
-			}
+	// Populate the map.
+	for i := range resp.selectors {
+		chainSel := resp.selectors[i]
+		cfg := resp.sourceChainConfigs[i]
 
-			// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
-			chainSel := chainSel
-			eg.Go(func() error {
-				resp := sourceChainConfig{}
-				err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
-					ctx,
-					consts.ContractNameOffRamp,
-					consts.MethodNameGetSourceChainConfig,
-					primitives.Unconfirmed,
-					map[string]any{
-						"sourceChainSelector": chainSel,
-					},
-					&resp,
-				)
-				if err != nil {
-					return fmt.Errorf("failed to get source chain config: %w", err)
-				}
-
-				// This may happen due to some sort of regression in the codec that unmarshals
-				// chain data -> go struct.
-				if len(resp.OnRamp) == 0 {
-					return fmt.Errorf(
-						"onRamp misconfigured/didn't unmarshal for chain %d: %x",
-						chainSel,
-						resp.OnRamp,
-					)
-				}
-
-				if !resp.IsEnabled {
-					// We don't want to process disabled chains prematurely.
-					r.lggr.Debugw("source chain is disabled", "chain", chainSel)
-					return nil
-				}
-
-				mu.Lock()
-				res[chainSel] = resp
-				mu.Unlock()
-				return nil
-			})
+		enabled, err := cfg.check()
+		if err != nil {
+			return nil, fmt.Errorf("source chain config check for chain %d failed: %w", chainSel, err)
+		}
+		if !enabled {
+			// We don't want to process disabled chains prematurely.
+			r.lggr.Debugw("source chain is disabled", "chain", chainSel)
+			continue
 		}
 
-		if err := eg.Wait(); err != nil {
-			return nil, err
-		}
-	*/
+		configs[cciptypes.ChainSelector(resp.selectors[i])] = resp.sourceChainConfigs[i]
+	}
+
+	return configs, nil
 }
 
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
