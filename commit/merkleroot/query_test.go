@@ -236,11 +236,11 @@ func TestProcessor_Query(t *testing.T) {
 			}
 
 			w := Processor{
-				offchainCfg: tc.cfg,
-				destChain:   tc.destChain,
-				ccipReader:  ccipReader,
-				rmnClient:   tc.rmnClient(t),
-				lggr:        logger.Test(t),
+				offchainCfg:   tc.cfg,
+				destChain:     tc.destChain,
+				ccipReader:    ccipReader,
+				rmnController: tc.rmnClient(t),
+				lggr:          logger.Test(t),
 			}
 
 			q, err := w.Query(ctx, tc.prevOutcome)

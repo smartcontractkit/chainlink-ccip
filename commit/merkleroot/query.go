@@ -57,7 +57,7 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 
 	// Get signatures for the requested updates. The signatures might contain a subset of the requested updates.
 	// While building the report the plugin should exclude source chain updates without signatures.
-	sigs, err := w.rmnClient.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
+	sigs, err := w.rmnController.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
 	if err != nil {
 		if errors.Is(err, rmn.ErrTimeout) {
 			w.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",

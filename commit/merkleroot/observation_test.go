@@ -42,13 +42,14 @@ func TestObservation(t *testing.T) {
 	offchainAddress := []byte(rand.RandomAddress())
 
 	p := &Processor{
-		lggr:         logger.Test(t),
-		observer:     mockObserver,
-		rmnCrypto:    signatureVerifierAlwaysTrue{},
-		ccipReader:   mockCCIPReader,
-		destChain:    destChain,
-		offchainCfg:  pluginconfig.CommitOffchainConfig{RMNEnabled: true},
-		chainSupport: chainSupport,
+		lggr:                     logger.Test(t),
+		observer:                 mockObserver,
+		rmnCrypto:                signatureVerifierAlwaysTrue{},
+		ccipReader:               mockCCIPReader,
+		destChain:                destChain,
+		offchainCfg:              pluginconfig.CommitOffchainConfig{RMNEnabled: true},
+		rmnControllerInitialized: true, // skip the initialization part in this test
+		chainSupport:             chainSupport,
 	}
 
 	ctx := context.Background()

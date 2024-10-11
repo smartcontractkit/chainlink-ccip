@@ -5,8 +5,11 @@ package rmn
 import (
 	context "context"
 
-	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	ccipocr3 "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+
 	mock "github.com/stretchr/testify/mock"
+
+	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 
 	rmnpb "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 
@@ -83,6 +86,55 @@ func (_c *MockController_ComputeReportSignatures_Call) Return(_a0 *rmn.ReportSig
 }
 
 func (_c *MockController_ComputeReportSignatures_Call) RunAndReturn(run func(context.Context, *rmnpb.LaneDest, []*rmnpb.FixedDestLaneUpdateRequest, types.RemoteConfig) (*rmn.ReportSignatures, error)) *MockController_ComputeReportSignatures_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// InitConnection provides a mock function with given fields: ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs
+func (_m *MockController) InitConnection(ctx context.Context, commitConfigDigest ccipocr3.Bytes32, rmnHomeConfigDigest ccipocr3.Bytes32, peerIDs []string) error {
+	ret := _m.Called(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InitConnection")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.Bytes32, ccipocr3.Bytes32, []string) error); ok {
+		r0 = rf(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockController_InitConnection_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InitConnection'
+type MockController_InitConnection_Call struct {
+	*mock.Call
+}
+
+// InitConnection is a helper method to define mock.On call
+//   - ctx context.Context
+//   - commitConfigDigest ccipocr3.Bytes32
+//   - rmnHomeConfigDigest ccipocr3.Bytes32
+//   - peerIDs []string
+func (_e *MockController_Expecter) InitConnection(ctx interface{}, commitConfigDigest interface{}, rmnHomeConfigDigest interface{}, peerIDs interface{}) *MockController_InitConnection_Call {
+	return &MockController_InitConnection_Call{Call: _e.mock.On("InitConnection", ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)}
+}
+
+func (_c *MockController_InitConnection_Call) Run(run func(ctx context.Context, commitConfigDigest ccipocr3.Bytes32, rmnHomeConfigDigest ccipocr3.Bytes32, peerIDs []string)) *MockController_InitConnection_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.Bytes32), args[2].(ccipocr3.Bytes32), args[3].([]string))
+	})
+	return _c
+}
+
+func (_c *MockController_InitConnection_Call) Return(_a0 error) *MockController_InitConnection_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockController_InitConnection_Call) RunAndReturn(run func(context.Context, ccipocr3.Bytes32, ccipocr3.Bytes32, []string) error) *MockController_InitConnection_Call {
 	_c.Call.Return(run)
 	return _c
 }

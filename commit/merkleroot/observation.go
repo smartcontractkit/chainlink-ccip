@@ -44,6 +44,12 @@ func (w *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
+	if w.offchainCfg.RMNEnabled {
+		if err := w.initializeRMNController(ctx, prevOutcome); err != nil {
+			return Observation{}, fmt.Errorf("initialize RMN controller: %w", err)
+		}
+	}
+
 	if err := w.verifyQuery(ctx, prevOutcome, q); err != nil {
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
@@ -53,6 +59,42 @@ func (w *Processor) Observation(
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
+}
+
+func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Outcome) error {
+	if w.rmnControllerInitialized {
+		return nil
+	}
+
+	if prevOutcome.RMNRemoteCfg.IsEmpty() {
+		w.lggr.Debugw("RMN remote config is empty, skipping RMN controller initialization in this round")
+		return nil
+	}
+	w.lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
+
+	rmnNodesInfo, err := w.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)
+	if err != nil {
+		return fmt.Errorf("failed to get RMN nodes info: %w", err)
+	}
+
+	peerIDs := make([]string, 0, len(rmnNodesInfo))
+	for _, node := range rmnNodesInfo {
+		peerIDs = append(peerIDs, node.PeerID.String())
+	}
+
+	// todo: probably we also need to append OCR peer IDs
+
+	if err := w.rmnController.InitConnection(
+		ctx,
+		cciptypes.Bytes32(w.reportingCfg.ConfigDigest),
+		prevOutcome.RMNRemoteCfg.ConfigDigest,
+		peerIDs,
+	); err != nil {
+		return fmt.Errorf("failed to init connection to RMN: %w", err)
+	}
+	w.rmnControllerInitialized = true
+
+	return nil
 }
 
 // verifyQuery verifies the query based to the following rules.

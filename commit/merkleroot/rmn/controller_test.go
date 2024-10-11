@@ -627,7 +627,15 @@ func (m *mockPeerClient) resetReceivedRequests() {
 	m.receivedRequests = make(map[rmntypes.NodeID][]*rmnpb.Request)
 }
 
-func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
+func (m *mockPeerClient) InitConnection(_ context.Context, _ cciptypes.Bytes32, _ cciptypes.Bytes32, _ []string) error {
+	return nil
+}
+
+func (m *mockPeerClient) Close() error {
+	return nil
+}
+
+func (m *mockPeerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -635,8 +643,8 @@ func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
 		m.receivedRequests = map[rmntypes.NodeID][]*rmnpb.Request{}
 	}
 
-	if _, ok := m.receivedRequests[rmnNodeID]; !ok {
-		m.receivedRequests[rmnNodeID] = []*rmnpb.Request{}
+	if _, ok := m.receivedRequests[rmnNode.ID]; !ok {
+		m.receivedRequests[rmnNode.ID] = []*rmnpb.Request{}
 	}
 
 	req := &rmnpb.Request{}
@@ -645,7 +653,7 @@ func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
 		return err
 	}
 
-	m.receivedRequests[rmnNodeID] = append(m.receivedRequests[rmnNodeID], req)
+	m.receivedRequests[rmnNode.ID] = append(m.receivedRequests[rmnNode.ID], req)
 	return nil
 }
 
