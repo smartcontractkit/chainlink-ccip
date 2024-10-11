@@ -20,19 +20,19 @@ import (
 // It's setup to use RMN to query which messages to include in the merkle root and ensures
 // the newly built merkle roots are the same as RMN roots.
 type Processor struct {
-	oracleID                 commontypes.OracleID
-	oracleIDToP2pID          map[commontypes.OracleID]libocrtypes.PeerID
-	offchainCfg              pluginconfig.CommitOffchainConfig
-	destChain                cciptypes.ChainSelector
-	lggr                     logger.Logger
-	observer                 Observer
-	ccipReader               readerpkg.CCIPReader
-	reportingCfg             ocr3types.ReportingPluginConfig
-	chainSupport             plugincommon.ChainSupport
-	rmnController            rmn.Controller
-	rmnControllerInitialized bool
-	rmnCrypto                cciptypes.RMNCrypto
-	rmnHomeReader            reader.RMNHome
+	oracleID               commontypes.OracleID
+	oracleIDToP2pID        map[commontypes.OracleID]libocrtypes.PeerID
+	offchainCfg            pluginconfig.CommitOffchainConfig
+	destChain              cciptypes.ChainSelector
+	lggr                   logger.Logger
+	observer               Observer
+	ccipReader             readerpkg.CCIPReader
+	reportingCfg           ocr3types.ReportingPluginConfig
+	chainSupport           plugincommon.ChainSupport
+	rmnController          rmn.Controller
+	rmnControllerCfgDigest cciptypes.Bytes32
+	rmnCrypto              cciptypes.RMNCrypto
+	rmnHomeReader          reader.RMNHome
 }
 
 // NewProcessor creates a new Processor

@@ -68,12 +68,14 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 		return nil
 	}
 
-	if w.rmnControllerInitialized {
+	if prevOutcome.RMNRemoteCfg.IsEmpty() {
+		w.lggr.Debug("RMN remote config is empty, skipping RMN controller initialization in this round")
 		return nil
 	}
 
-	if prevOutcome.RMNRemoteCfg.IsEmpty() {
-		w.lggr.Debugw("RMN remote config is empty, skipping RMN controller initialization in this round")
+	if prevOutcome.RMNRemoteCfg.ConfigDigest == w.rmnControllerCfgDigest {
+		w.lggr.Debugw("RMN controller already initialized with the same config digest",
+			"configDigest", w.rmnControllerCfgDigest)
 		return nil
 	}
 
@@ -100,7 +102,8 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 	); err != nil {
 		return fmt.Errorf("failed to init connection to RMN: %w", err)
 	}
-	w.rmnControllerInitialized = true
+
+	w.rmnControllerCfgDigest = prevOutcome.RMNRemoteCfg.ConfigDigest
 
 	return nil
 }

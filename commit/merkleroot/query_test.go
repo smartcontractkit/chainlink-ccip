@@ -243,7 +243,8 @@ func TestProcessor_Query(t *testing.T) {
 				lggr:          logger.Test(t),
 			}
 
-			w.rmnControllerInitialized = true // skip rmn controller initialization
+			w.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller init
+
 			q, err := w.Query(ctx, tc.prevOutcome)
 			if tc.expErr {
 				require.Error(t, err)

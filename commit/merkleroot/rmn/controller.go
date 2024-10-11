@@ -54,7 +54,7 @@ type Controller interface {
 		ctx context.Context,
 		commitConfigDigest cciptypes.Bytes32,
 		rmnHomeConfigDigest cciptypes.Bytes32,
-		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
+		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs (oracles required for peer discovery)
 	) error
 
 	// Close closes the connection to the generic peer group endpoint and all the underlying streams.

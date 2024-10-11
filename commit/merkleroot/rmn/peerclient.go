@@ -20,7 +20,7 @@ import (
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
-var ErrNoConn = fmt.Errorf("no connection, please call InitConnection before further interraction")
+var ErrNoConn = fmt.Errorf("no connection, please call InitConnection before further interaction")
 
 // PeerClient performs low-level communication with RMN peers.
 type PeerClient interface {
@@ -30,7 +30,7 @@ type PeerClient interface {
 		ctx context.Context,
 		commitConfigDigest cciptypes.Bytes32,
 		rmnHomeConfigDigest cciptypes.Bytes32,
-		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
+		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs (oracles required for peer discovery)
 	) error
 
 	Close() error
@@ -84,6 +84,10 @@ func (r *peerClient) InitConnection(
 	commitConfigDigest, rmnHomeConfigDigest cciptypes.Bytes32,
 	peerIDs []string,
 ) error {
+	if err := r.Close(); err != nil {
+		return fmt.Errorf("close existing peer group: %w", err)
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -108,6 +112,10 @@ func (r *peerClient) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if r.peerGroup == nil {
+		return nil
+	}
+
 	// individual streams are closed by the peer group
 	if err := r.peerGroup.Close(); err != nil {
 		return fmt.Errorf("close peer group: %w", err)
@@ -117,11 +125,10 @@ func (r *peerClient) Close() error {
 }
 
 func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
-	r.mu.RLock()
-	peerGroupNotInitialized := r.peerGroup == nil
-	r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if peerGroupNotInitialized {
+	if r.peerGroup == nil {
 		return ErrNoConn
 	}
 
@@ -130,9 +137,7 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 		return fmt.Errorf("get or create rage p2p stream: %w", err)
 	}
 
-	r.mu.Lock()
 	stream.SendMessage(request)
-	r.mu.Unlock()
 
 	return nil
 }
@@ -150,7 +155,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 
 	// todo: versioning for stream names e.g. for 'v1_7'
 	streamName := fmt.Sprintf("ccip-rmn/v1_6/%x", r.genericEndpointConfigDigest)
-	r.lggr.Info("Creating new stream", "streamName", streamName)
+	r.lggr.Infow("Creating new stream", "streamName", streamName)
 
 	var err error
 	stream, err = r.peerGroup.NewStream(

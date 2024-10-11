@@ -45,14 +45,13 @@ func TestObservation(t *testing.T) {
 	offchainAddress := []byte(rand.RandomAddress())
 
 	p := &Processor{
-		lggr:                     logger.Test(t),
-		observer:                 mockObserver,
-		rmnCrypto:                signatureVerifierAlwaysTrue{},
-		ccipReader:               mockCCIPReader,
-		destChain:                destChain,
-		offchainCfg:              pluginconfig.CommitOffchainConfig{RMNEnabled: true},
-		rmnControllerInitialized: true, // skip the initialization part in this test
-		chainSupport:             chainSupport,
+		lggr:         logger.Test(t),
+		observer:     mockObserver,
+		rmnCrypto:    signatureVerifierAlwaysTrue{},
+		ccipReader:   mockCCIPReader,
+		destChain:    destChain,
+		offchainCfg:  pluginconfig.CommitOffchainConfig{RMNEnabled: true},
+		chainSupport: chainSupport,
 	}
 
 	ctx := context.Background()
@@ -154,6 +153,7 @@ func TestObservation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
+			p.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller setup
 			obs, err := p.Observation(ctx, tc.prevOutcome, tc.query)
 
 			if tc.expectedErr != "" {
@@ -606,11 +606,11 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 	assert.NoError(t, err, "rmn is not enabled")
 
 	p.offchainCfg.RMNEnabled = true
-	p.rmnControllerInitialized = true
+	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
 	err = p.initializeRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "rmn enabled but controller already initialized")
 
-	p.rmnControllerInitialized = false
+	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
 	err = p.initializeRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "previous outcome does not contain remote config digest")
 
@@ -635,7 +635,7 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 
 	err = p.initializeRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
 	assert.NoError(t, err, "rmn controller initialized")
-	assert.True(t, p.rmnControllerInitialized)
+	assert.Equal(t, cfg.ConfigDigest, p.rmnControllerCfgDigest)
 }
 
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
