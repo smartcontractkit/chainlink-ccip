@@ -57,6 +57,9 @@ type Controller interface {
 		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
 	) error
 
+	// Close closes the connection to the generic peer group endpoint and all the underlying streams.
+	Close() error
+
 	// ComputeReportSignatures computes and returns the signatures for the provided lane updates.
 	// The returned ReportSignatures might contain a subset of the requested lane updates if some of them were not
 	// able to get signed by the RMN nodes.
@@ -231,6 +234,10 @@ func (c *controller) InitConnection(
 	peerIDs []string,
 ) error {
 	return c.peerClient.InitConnection(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)
+}
+
+func (c *controller) Close() error {
+	return c.peerClient.Close()
 }
 
 // getRmnSignedObservations guarantees to return at least #minObservers signed observations for each source chain.

@@ -59,6 +59,10 @@ func (w *Processor) Observation(
 	return observation, nil
 }
 
+// initializeRMNController initializes the RMN controller iff:
+// 1. RMN is enabled.
+// 2. RMN controller is not already initialized.
+// 3. RMN remote config is available from previous outcome.
 func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Outcome) error {
 	if !w.offchainCfg.RMNEnabled {
 		return nil
@@ -72,6 +76,7 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 		w.lggr.Debugw("RMN remote config is empty, skipping RMN controller initialization in this round")
 		return nil
 	}
+
 	w.lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
 
 	rmnNodesInfo, err := w.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)

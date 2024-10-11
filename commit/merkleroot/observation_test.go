@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -26,7 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
+	rmn_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -589,6 +592,50 @@ func Test_computeMerkleRoot(t *testing.T) {
 			assert.Equal(t, tc.expMerkleRoot, rootString)
 		})
 	}
+}
+
+func Test_Processor_initializeRMNController(t *testing.T) {
+	ctx := tests.Context(t)
+
+	p := &Processor{
+		lggr:        logger.Test(t),
+		offchainCfg: pluginconfig.CommitOffchainConfig{RMNEnabled: false},
+	}
+
+	err := p.initializeRMNController(ctx, Outcome{})
+	assert.NoError(t, err, "rmn is not enabled")
+
+	p.offchainCfg.RMNEnabled = true
+	p.rmnControllerInitialized = true
+	err = p.initializeRMNController(ctx, Outcome{})
+	assert.NoError(t, err, "rmn enabled but controller already initialized")
+
+	p.rmnControllerInitialized = false
+	err = p.initializeRMNController(ctx, Outcome{})
+	assert.NoError(t, err, "previous outcome does not contain remote config digest")
+
+	rmnHomeReader := reader.NewMockRMNHome(t)
+	rmnController := rmn_mock.NewMockController(t)
+	p.rmnHomeReader = rmnHomeReader
+	p.rmnController = rmnController
+
+	cfg := testhelpers.CreateRMNRemoteCfg()
+	rmnNodes := []rmntypes.HomeNodeInfo{
+		{ID: 1, PeerID: types.PeerID{1, 2, 3}},
+		{ID: 10, PeerID: types.PeerID{1, 2, 31}},
+	}
+	rmnHomeReader.EXPECT().GetRMNNodesInfo(cfg.ConfigDigest).Return(rmnNodes, nil)
+
+	rmnController.EXPECT().InitConnection(
+		ctx,
+		cciptypes.Bytes32(p.reportingCfg.ConfigDigest),
+		cfg.ConfigDigest,
+		[]string{rmnNodes[0].PeerID.String(), rmnNodes[1].PeerID.String()},
+	).Return(nil)
+
+	err = p.initializeRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
+	assert.NoError(t, err, "rmn controller initialized")
+	assert.True(t, p.rmnControllerInitialized)
 }
 
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
