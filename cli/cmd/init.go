@@ -97,22 +97,24 @@ var initCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
 
-		if err := utils.SetupAwsProfile(
-			viper.GetString("AWS_CONFIG_FILE"),
-			viper.GetString("AWS_PROFILE"),
-			viper.GetString("AWS_ACCOUNT_ID"),
-			viper.GetString("AWS_REGION"),
-			viper.GetString("AWS_SSO_ROLE_NAME"),
-			viper.GetString("AWS_SSO_START_URL"),
-		); err != nil {
-			logger.Error("failed to setup AWS Profile for CRIB", slog.Any("error", err))
-			os.Exit(1)
-		}
+		if !viper.GetBool("CRIB_CI_ENV") {
+			if err := utils.SetupAwsProfile(
+				viper.GetString("AWS_CONFIG_FILE"),
+				viper.GetString("AWS_PROFILE"),
+				viper.GetString("AWS_ACCOUNT_ID"),
+				viper.GetString("AWS_REGION"),
+				viper.GetString("AWS_SSO_ROLE_NAME"),
+				viper.GetString("AWS_SSO_START_URL"),
+			); err != nil {
+				logger.Error("failed to setup AWS Profile for CRIB", slog.Any("error", err))
+				os.Exit(1)
+			}
 
-		logger.Info("AWS config modified",
-			"config_file", viper.GetString("AWS_CONFIG_FILE"),
-			"profile", viper.GetString("AWS_PROFILE"),
-		)
+			logger.Info("AWS config modified",
+				"config_file", viper.GetString("AWS_CONFIG_FILE"),
+				"profile", viper.GetString("AWS_PROFILE"),
+			)
+		}
 
 		awsSdkConfig, err := config.LoadDefaultConfig(
 			context.TODO(),
@@ -126,7 +128,12 @@ var initCmd = &cobra.Command{
 
 		stsClient := wrappers.NewSTSClientWrapper(awsSdkConfig)
 		if !utils.HasValidAwsSession(stsClient) {
-			logger.Warn("No valid AWS session found, attempting to login via AWS SSO")
+			msg := "No valid AWS session found."
+			if viper.GetBool("CRIB_CI_ENV") {
+				logger.Error(msg)
+				os.Exit(1)
+			}
+			logger.Warn(fmt.Sprintf("%s Attempting to login via AWS SSO", msg))
 			if err := utils.AwsSsoLogin(viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE")); err != nil {
 				logger.Error("failed to aws sso login", slog.Any("error", err))
 				os.Exit(1)
@@ -135,25 +142,27 @@ var initCmd = &cobra.Command{
 			logger.Info("AWS credentials working.")
 		}
 
-		if !utils.HasValidAwsSession(stsClient) {
+		if !viper.GetBool("CRIB_CI_ENV") && !utils.HasValidAwsSession(stsClient) {
 			logger.Error("AWS credentials still not detected. Exiting.")
 			os.Exit(1)
 		}
 
-		if err := utils.SetupKubeConfig(&utils.SetupKubeConfigInput{
-			EksClient:            wrappers.NewEKSClientWrapper(awsSdkConfig),
-			KubeconfigPath:       viper.GetString("KUBECONFIG"),
-			EksClusterName:       viper.GetString("CRIB_EKS_CLUSTER_NAME"),
-			EksAliasName:         viper.GetString("CRIB_EKS_ALIAS_NAME"),
-			CribNamespace:        viper.GetString("DEVSPACE_NAMESPACE"),
-			AwsProfile:           viper.GetString("AWS_PROFILE"),
-			AwsRegion:            viper.GetString("AWS_REGION"),
-			ChangeDefaultContext: true,
-		}); err != nil {
-			logger.Error("failed to setup kubeconfig", slog.Any("error", err))
-			os.Exit(1)
+		if !viper.GetBool("CRIB_CI_ENV") {
+			if err := utils.SetupKubeConfig(&utils.SetupKubeConfigInput{
+				EksClient:            wrappers.NewEKSClientWrapper(awsSdkConfig),
+				KubeconfigPath:       viper.GetString("KUBECONFIG"),
+				EksClusterName:       viper.GetString("CRIB_EKS_CLUSTER_NAME"),
+				EksAliasName:         viper.GetString("CRIB_EKS_ALIAS_NAME"),
+				CribNamespace:        viper.GetString("DEVSPACE_NAMESPACE"),
+				AwsProfile:           viper.GetString("AWS_PROFILE"),
+				AwsRegion:            viper.GetString("AWS_REGION"),
+				ChangeDefaultContext: true,
+			}); err != nil {
+				logger.Error("failed to setup kubeconfig", slog.Any("error", err))
+				os.Exit(1)
+			}
+			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 		}
-		logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 
 		// Test if cluster is reachable by attempting the equivalent of a kubectl get ns
 		kubeconfig, err := clientcmd.BuildConfigFromFlags("", viper.GetString("KUBECONFIG"))
@@ -173,7 +182,11 @@ var initCmd = &cobra.Command{
 			logger.Info("Skipped k8s access check for provider Kind (make sure you run ./cribbit.sh crib-local for now, kind support for the CLI coming soon)")
 		case "aws":
 			if err := utils.CheckK8sAccess(kubeClientset.CoreV1()); err != nil {
-				logger.Error("EKS access not working. Make sure you're connected to the VPN and try again.", slog.Any("error", err))
+				msg := "EKS access not working."
+				if !viper.GetBool("CRIB_CI_ENV") {
+					msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
+				}
+				logger.Error(msg, slog.Any("error", err))
 				os.Exit(1)
 			}
 
