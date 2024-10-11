@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -77,6 +78,18 @@ func NewPlugin(
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
 			"default", merklemulti.MaxNumberTreeLeaves)
 		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
+	}
+
+	if offchainCfg.RMNEnabled {
+		if err := rmnHomeReader.Ready(); err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := rmnHomeReader.Start(ctx); err != nil {
+				rmnReaderErr = fmt.Errorf("failed to start RMNHome reader: %w", err)
+			}
+		} else {
+			lggr.Errorw("Failed to initialize RMNHome reader", "err", err)
+		}
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
@@ -346,6 +359,22 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
+	var errs []error
+
+	if p.offchainCfg.RMNEnabled {
+		if p.rmnHomeReader != nil {
+			if err := p.rmnHomeReader.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to close RMNHome reader: %w", err))
+				p.lggr.Errorw("Failed to close RMNHome reader", "err", err)
+			}
+		} else {
+			p.lggr.Warn("RMNHome reader was nil during Close")
+		}
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("errors during Close: %v", errs)
+	}
 	return nil
 }
 
