@@ -91,7 +91,7 @@ const (
 	// CCIPHome.sol methods.
 	// Used by the home chain reader.
 	// TODO: change them to getConfig, getAllConfigs
-	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
+	MethodNameGetAllChainConfigs = "GetAllSourceChainConfigs"
 	MethodNameGetOCRConfig       = "GetOCRConfig"
 
 	// RMNHome.sol methods
