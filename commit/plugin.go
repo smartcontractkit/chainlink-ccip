@@ -3,7 +3,6 @@ package commit
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -78,18 +77,6 @@ func NewPlugin(
 		lggr.Warnw("MaxMerkleTreeSize not set, using default value which is for EVM",
 			"default", merklemulti.MaxNumberTreeLeaves)
 		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
-	}
-
-	if offchainCfg.RMNEnabled {
-		if err := rmnHomeReader.Ready(); err == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := rmnHomeReader.Start(ctx); err != nil {
-				lggr.Errorw("Failed to start RMNHome reader", "err", err)
-			}
-		} else {
-			lggr.Errorw("Failed to initialize RMNHome reader", "err", err)
-		}
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(

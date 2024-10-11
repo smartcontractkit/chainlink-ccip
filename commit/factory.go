@@ -130,6 +130,15 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.lggr,
 			100*time.Millisecond,
 		)
+
+		if err := rmnHomeReader.Ready(); err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := rmnHomeReader.Start(ctx); err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome reader: %w", err)
+		}
 	}
 
 	var onChainTokenPricesReader reader.PriceReader
