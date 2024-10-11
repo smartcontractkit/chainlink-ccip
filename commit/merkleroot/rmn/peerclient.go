@@ -117,7 +117,11 @@ func (r *peerClient) Close() error {
 }
 
 func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
-	if r.peerGroup == nil {
+	r.mu.RLock()
+	peerGroupNotInitialized := r.peerGroup == nil
+	r.mu.RUnlock()
+
+	if peerGroupNotInitialized {
 		return ErrNoConn
 	}
 
