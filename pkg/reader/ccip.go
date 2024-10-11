@@ -961,6 +961,12 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	return res, nil
 }
 
+// selectorsAndConfigs wraps the return values from getAllSourceChainConfigs.
+type selectorsAndConfigs struct {
+	Selectors          []uint64            `mapstructure:"F0"`
+	SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
+}
+
 // getAllOffRampSourceChainsConfig get all enabled source chain configs from the offRamp for the provided chain.
 func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	ctx context.Context,
@@ -971,11 +977,6 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	}
 
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
-
-	type selectorsAndConfigs struct {
-		Selectors          []uint64            `mapstructure:"F0"`
-		SourceChainConfigs []sourceChainConfig `mapstructure:"F1"`
-	}
 
 	var resp selectorsAndConfigs
 	//var resp map[string]any
