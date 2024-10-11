@@ -311,6 +311,7 @@ func TestGetDecodedECRAuthorizationTokenErrors(t *testing.T) {
 		})
 	}
 }
+
 func TestHasValidAwsSession(t *testing.T) {
 	t.Parallel()
 

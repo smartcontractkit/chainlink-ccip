@@ -269,6 +269,7 @@ func TestPresentPrompt(t *testing.T) {
 		})
 	}
 }
+
 func TestWriteConfig(t *testing.T) {
 	t.Parallel()
 
