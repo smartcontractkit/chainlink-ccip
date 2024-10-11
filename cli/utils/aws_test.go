@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -307,6 +308,49 @@ func TestGetDecodedECRAuthorizationTokenErrors(t *testing.T) {
 			got, err := GetDecodedECRAuthorizationToken(scenario.mockEcrClient)
 			assert.ErrorContains(t, err, scenario.wantError)
 			assert.Nil(t, got)
+		})
+	}
+}
+func TestHasValidAwsSession(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		description   string
+		mockStsClient wrappers.STSAPI
+		expectedValid bool
+	}
+
+	mockStsClientValidSession := wrappermocks.NewSTSAPI(t)
+	mockStsClientValidSession.EXPECT().
+		GetCallerIdentity(
+			context.TODO(), &sts.GetCallerIdentityInput{},
+		).Return(&sts.GetCallerIdentityOutput{}, nil)
+
+	mockStsClientInvalidSession := wrappermocks.NewSTSAPI(t)
+	mockStsClientInvalidSession.EXPECT().
+		GetCallerIdentity(
+			context.TODO(), &sts.GetCallerIdentityInput{},
+		).Return(nil, fmt.Errorf("some error"))
+
+	testCases := []testCase{
+		{
+			description:   "valid session",
+			mockStsClient: mockStsClientValidSession,
+			expectedValid: true,
+		},
+		{
+			description:   "invalid session",
+			mockStsClient: mockStsClientInvalidSession,
+			expectedValid: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			valid := HasValidAwsSession(tc.mockStsClient)
+			assert.Equal(t, tc.expectedValid, valid)
 		})
 	}
 }
