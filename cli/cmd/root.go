@@ -100,6 +100,12 @@ func initConfig() {
 		viper.SetConfigFile(".env")
 	}
 
+	if viper.GetBool("CRIB_CI_ENV") {
+		fmt.Fprintln(os.Stdout, "Running in CI, reading values from the environment")
+		viper.AutomaticEnv()
+		return
+	}
+
 	err := viper.ReadInConfig()
 	if err == nil {
 		fmt.Fprintln(os.Stdout, "Using config file:", viper.ConfigFileUsed())
