@@ -48,6 +48,15 @@ var (
 
 // Controller contains the high-level functionality required by the plugin to interact with the RMN nodes.
 type Controller interface {
+	// InitConnection initializes the connection to the generic peer group endpoint and must be called before
+	// further Controller interaction. If called twice it overwrites the previous connection.
+	InitConnection(
+		ctx context.Context,
+		commitConfigDigest cciptypes.Bytes32,
+		rmnHomeConfigDigest cciptypes.Bytes32,
+		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
+	) error
+
 	// ComputeReportSignatures computes and returns the signatures for the provided lane updates.
 	// The returned ReportSignatures might contain a subset of the requested lane updates if some of them were not
 	// able to get signed by the RMN nodes.
@@ -60,15 +69,6 @@ type Controller interface {
 		requestedUpdates []*rmnpb.FixedDestLaneUpdateRequest,
 		rmnRemoteCfg rmntypes.RemoteConfig,
 	) (*ReportSignatures, error)
-
-	// InitConnection initializes the connection to the generic peer endpoint and must be called before
-	// further PeerClient interaction. If called twice it overwrites the previous connection.
-	InitConnection(
-		ctx context.Context,
-		commitConfigDigest cciptypes.Bytes32,
-		rmnHomeConfigDigest cciptypes.Bytes32,
-		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs
-	) error
 }
 
 type ReportSignatures struct {

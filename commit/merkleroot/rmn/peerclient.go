@@ -20,6 +20,8 @@ import (
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 )
 
+var ErrNoConn = fmt.Errorf("no connection, please call InitConnection before further interraction")
+
 // PeerClient performs low-level communication with RMN peers.
 type PeerClient interface {
 	// InitConnection initializes the connection to the peer group endpoint and must be called before
@@ -33,7 +35,10 @@ type PeerClient interface {
 
 	Close() error
 
+	// Send will send a message to the target RMN node.
+	// If Send is called before InitConnection, it returns an ErrNoConn.
 	Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error
+
 	// Recv returns a channel which can be used to listen on for
 	// responses by all RMN nodes. This is expected to be monitored
 	// by the plugin in order to get RMN responses.
@@ -50,7 +55,7 @@ type peerClient struct {
 	lggr                        logger.Logger
 	peerGroupFactory            networking.PeerGroupFactory
 	respChan                    chan PeerResponse
-	peerGroup                   networking.PeerGroup // might be nil initially
+	peerGroup                   networking.PeerGroup // nil initially, until InitConnection is called
 	genericEndpointConfigDigest cciptypes.Bytes32
 	rageP2PStreams              map[rmntypes.NodeID]networking.Stream
 	bootstrappers               []commontypes.BootstrapperLocator
@@ -112,6 +117,10 @@ func (r *peerClient) Close() error {
 }
 
 func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
+	if r.peerGroup == nil {
+		return ErrNoConn
+	}
+
 	stream, err := r.getOrCreateRageP2PStream(rmnNode)
 	if err != nil {
 		return fmt.Errorf("get or create rage p2p stream: %w", err)
