@@ -24,14 +24,15 @@ const (
 	MethodNameRouterGetWrappedNative = "GetWrappedNative"
 
 	// OffRamp methods
-	MethodNameGetSourceChainConfig         = "GetSourceChainConfig"
-	MethodNameOffRampGetDynamicConfig      = "OffRampGetDynamicConfig"
-	MethodNameOffRampGetStaticConfig       = "OffRampGetStaticConfig"
-	MethodNameOffRampGetDestChainConfig    = "OffRampGetDestChainConfig"
-	MethodNameGetLatestPriceSequenceNumber = "GetLatestPriceSequenceNumber"
-	MethodNameIsBlessed                    = "IsBlessed"
-	MethodNameGetMerkleRoot                = "GetMerkleRoot"
-	MethodNameGetExecutionState            = "GetExecutionState"
+	MethodNameGetSourceChainConfig            = "GetSourceChainConfig"
+	MethodNameOffRampGetAllSourceChainConfigs = "OffRampGetAllSourceChainConfigs"
+	MethodNameOffRampGetDynamicConfig         = "OffRampGetDynamicConfig"
+	MethodNameOffRampGetStaticConfig          = "OffRampGetStaticConfig"
+	MethodNameOffRampGetDestChainConfig       = "OffRampGetDestChainConfig"
+	MethodNameGetLatestPriceSequenceNumber    = "GetLatestPriceSequenceNumber"
+	MethodNameIsBlessed                       = "IsBlessed"
+	MethodNameGetMerkleRoot                   = "GetMerkleRoot"
+	MethodNameGetExecutionState               = "GetExecutionState"
 
 	// OnRamp methods
 	MethodNameOnRampGetDynamicConfig        = "OnRampGetDynamicConfig"
@@ -91,7 +92,7 @@ const (
 	// CCIPHome.sol methods.
 	// Used by the home chain reader.
 	// TODO: change them to getConfig, getAllConfigs
-	MethodNameGetAllChainConfigs = "GetAllSourceChainConfigs"
+	MethodNameGetAllChainConfigs = "GetAllChainConfigs"
 	MethodNameGetOCRConfig       = "GetOCRConfig"
 
 	// RMNHome.sol methods
