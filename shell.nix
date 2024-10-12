@@ -13,7 +13,6 @@ in
 mkShell' {
   nativeBuildInputs = [
     go
-    goreleaser
 
     curl
     nodejs
@@ -53,6 +52,9 @@ mkShell' {
     alias kgp="kubectl get pod"
     alias kge="kubectl get events --sort-by=.metadata.creationTimestamp"
     alias kexec="kubectl exec -it"
+
+    # Used by build scripts in CHAINLINK_CODE_DIR to configure a crib build environment
+    export IS_CRIB=true
 
     # Find the root of the git repository
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
