@@ -18,6 +18,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -64,6 +65,8 @@ type PluginFactory struct {
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
+	rmnPeerClient     rmn.PeerClient
+	rmnCrypto         cciptypes.RMNCrypto
 }
 
 func NewPluginFactory(
@@ -76,6 +79,8 @@ func NewPluginFactory(
 	homeChainSelector cciptypes.ChainSelector,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	rmnPeerClient rmn.PeerClient,
+	rmnCrypto cciptypes.RMNCrypto,
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:              lggr,
@@ -87,6 +92,8 @@ func NewPluginFactory(
 		homeChainSelector: homeChainSelector,
 		contractReaders:   contractReaders,
 		chainWriters:      chainWriters,
+		rmnPeerClient:     rmnPeerClient,
+		rmnCrypto:         rmnCrypto,
 	}
 }
 
@@ -130,6 +137,13 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.lggr,
 			100*time.Millisecond,
 		)
+
+		if err := rmnHomeReader.Ready(); err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to initialize RMNHome reader: %w", err)
+		}
+		if err := rmnHomeReader.Start(ctx); err != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome reader: %w", err)
+		}
 	}
 
 	var onChainTokenPricesReader reader.PriceReader
@@ -180,6 +194,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			p.lggr,
 			p.homeChainReader,
 			rmnHomeReader,
+			p.rmnCrypto,
+			p.rmnPeerClient,
 			config,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleCommit",

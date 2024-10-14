@@ -30,9 +30,7 @@ jobs:
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           repository: smartcontractkit/chainlink
-          # TODO: switch back to develop
-          #ref: develop
-          ref: will/ccip-contract-reader-config
+          ref: develop
           path: chainlink
       - name: Get the correct commit SHA via GitHub API
         id: get_sha
