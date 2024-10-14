@@ -18,7 +18,7 @@ before:
 
 # See https://goreleaser.com/customization/build/
 builds:
-  - binary: crib-cli
+  - binary: crib
     env:
       - CGO_ENABLED=0
     main: ./cmd

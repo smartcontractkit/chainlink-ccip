@@ -15,6 +15,8 @@ import (
 )
 
 func TestDockerLogin(t *testing.T) {
+	t.Parallel()
+
 	type testCases struct {
 		description   string
 		mockDockerCli wrappers.DockerCLI
@@ -63,6 +65,8 @@ func TestDockerLogin(t *testing.T) {
 		},
 	} {
 		t.Run(scenario.description, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := DockerLogin(scenario.mockDockerCli, scenario.username, scenario.password, scenario.serverAddress)
 			if scenario.wantError == "" {
 				require.NoError(t, err)

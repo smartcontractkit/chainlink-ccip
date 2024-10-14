@@ -63,9 +63,15 @@ mkShell' {
     # install changesets (no nix package available atm)
     pnpm install
 
-    # build crib-cli and make it available in PATH
-    echo -n "Building crib-cli... "
-    (cd $repo_root/cli && go build -o ./dist/crib-cli .) && echo "Done." || echo "Failed to build crib-cli. Please post this error message to #project-crib." >&2
+    # build crib CLI and make it available in PATH
+    echo -n "Building crib CLI... "
+    (cd $repo_root/cli && go build -o ./dist/crib .) && echo "Done." || { echo "Failed to build crib CLI. Please post this error message to #project-crib." >&2; exit 1; }
     export PATH=$PATH:$repo_root/cli/dist
+
+    # crib init will make sure everything else is set up prior to running any devspace commands
+    crib init --write-config || exit $?
+
+    # sourcing the .env file as the last step
+    [ -f ".env" ] && export $(cat .env | grep -v ^# | xargs)
   '';
 }

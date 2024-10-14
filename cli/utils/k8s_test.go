@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -14,6 +15,9 @@ import (
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -37,6 +41,8 @@ func MockKubeConfigFile(content []byte, perm fs.FileMode) *os.File {
 // TODO: use golang reflect to compare the entire object and recurse into subtypes whilst ignoring
 // fields such as LocationOfOrigin (which varies when dealing with tmpfiles)
 func AssertEqualKubeConfigs(t *testing.T, want *clientcmdapi.Config, got *clientcmdapi.Config) {
+	t.Helper()
+
 	assert.Len(t, got.Clusters, len(want.Clusters))
 	for name, wantCluster := range want.Clusters {
 		gotCluster := got.Clusters[name]
@@ -69,6 +75,8 @@ func AssertEqualKubeConfigs(t *testing.T, want *clientcmdapi.Config, got *client
 }
 
 func TestSetupKubeConfigNonExisting(t *testing.T) {
+	t.Parallel()
+
 	nonExistingKubeConfig := filepath.Join(t.TempDir(), "non-existing")
 
 	// mocking return of eks.DescribeCluster
@@ -109,7 +117,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			eksClusterArn: &clientcmdapi.AuthInfo{
+			eksClusterArn: {
 				Exec: &clientcmdapi.ExecConfig{
 					Command: "aws",
 					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
@@ -122,13 +130,13 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 			},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			eksClusterArn: &clientcmdapi.Cluster{
+			eksClusterArn: {
 				Server:                   eksClusterEndpoint,
 				CertificateAuthorityData: []byte("cadata"),
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			eksClusterAlias: &clientcmdapi.Context{
+			eksClusterAlias: {
 				Cluster:  eksClusterArn,
 				AuthInfo: eksClusterArn,
 			},
@@ -139,6 +147,8 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 }
 
 func TestSetupKubeConfigExistsButDiverges(t *testing.T) {
+	t.Parallel()
+
 	mockedKubeConfig := MockKubeConfigFile([]byte(`apiVersion: v1
 clusters:
 - cluster:
@@ -179,7 +189,7 @@ users:
       - wrong-eks-cluster
       command: aws
       env: null
-      provideClusterInfo: false`), 0666)
+      provideClusterInfo: false`), 0o666)
 	defer os.Remove(mockedKubeConfig.Name())
 
 	// mocking return of eks.DescribeCluster
@@ -219,7 +229,7 @@ users:
 
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			eksClusterArn: &clientcmdapi.AuthInfo{
+			eksClusterArn: {
 				Exec: &clientcmdapi.ExecConfig{
 					Command: "aws",
 					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
@@ -230,27 +240,27 @@ users:
 					InteractiveMode: "IfAvailable",
 				},
 			},
-			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": &clientcmdapi.AuthInfo{
+			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": {
 				ClientCertificate: "path/to/some/client/cert",
 				ClientKey:         "path/to/some/client/key",
 			},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			eksClusterArn: &clientcmdapi.Cluster{
+			eksClusterArn: {
 				Server:                   eksClusterEndpoint,
 				CertificateAuthorityData: []byte("cadata"),
 			},
-			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": &clientcmdapi.Cluster{
+			"arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch": {
 				Server:                   "https://unrelated.endpoint",
 				CertificateAuthorityData: []byte("something"),
 			},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
-			eksClusterAlias: &clientcmdapi.Context{
+			eksClusterAlias: {
 				Cluster:  eksClusterArn,
 				AuthInfo: eksClusterArn,
 			},
-			"context-we-should-not-touch": &clientcmdapi.Context{
+			"context-we-should-not-touch": {
 				Cluster:  "arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch",
 				AuthInfo: "arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch",
 			},
@@ -258,4 +268,66 @@ users:
 		CurrentContext: eksClusterAlias,
 	}
 	AssertEqualKubeConfigs(t, want, got)
+}
+
+func TestCheckK8sAccess(t *testing.T) {
+	t.Parallel()
+
+	// mocking a successful call to CoreV1().Namespaces().List()
+	mockedCoreV1NamespacesWorking := wrappermocks.NewNamespaceInterface(t)
+	mockedCoreV1NamespacesWorking.EXPECT().
+		List(
+			context.TODO(), metav1.ListOptions{},
+		).Return(
+		&v1.NamespaceList{
+			Items: []v1.Namespace{
+				{ObjectMeta: metav1.ObjectMeta{Name: "some"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "namespaces"}},
+			},
+		}, nil)
+
+	mockedCoreV1ClientWorking := wrappermocks.NewCoreV1Interface(t)
+	mockedCoreV1ClientWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesWorking)
+
+	// mocking a failed call to CoreV1().Namespaces().List()
+	mockedCoreV1NamespacesNotWorking := wrappermocks.NewNamespaceInterface(t)
+	mockedCoreV1NamespacesNotWorking.EXPECT().
+		List(
+			context.TODO(), metav1.ListOptions{},
+		).Return(nil, fmt.Errorf("some error"))
+
+	mockedCoreV1ClientNotWorking := wrappermocks.NewCoreV1Interface(t)
+	mockedCoreV1ClientNotWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesNotWorking)
+
+	testCases := []struct {
+		name        string
+		corev1      corev1.CoreV1Interface
+		listErr     error
+		expectedErr string
+	}{
+		{
+			name:        "Success",
+			corev1:      mockedCoreV1ClientWorking,
+			expectedErr: "",
+		},
+		{
+			name:        "Error",
+			corev1:      mockedCoreV1ClientNotWorking,
+			expectedErr: "some error",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := CheckK8sAccess(tt.corev1)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
 }
