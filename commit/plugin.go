@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -359,10 +360,7 @@ func (p *Plugin) Close() error {
 		}
 	}
 
-	if len(errs) > 0 {
-		return fmt.Errorf("errors during Close: %v", errs)
-	}
-	return nil
+	return errors.Join(errs...)
 }
 
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
