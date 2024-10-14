@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -346,7 +347,20 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	return nil
+	var errs []error
+
+	if p.offchainCfg.RMNEnabled {
+		if p.rmnHomeReader != nil {
+			if err := p.rmnHomeReader.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to close RMNHome reader: %w", err))
+				p.lggr.Errorw("Failed to close RMNHome reader", "err", err)
+			}
+		} else {
+			p.lggr.Warn("RMNHome reader was nil during Close")
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
