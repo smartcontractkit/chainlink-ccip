@@ -406,6 +406,8 @@ func setupNode(
 		lggr,
 		homeChainReader,
 		rmnHomeReader,
+		nil,
+		nil,
 		reportingCfg,
 	)
 

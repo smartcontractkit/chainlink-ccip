@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -68,6 +69,8 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 	rmnHomeReader reader.RMNHome,
+	rmnCrypto cciptypes.RMNCrypto,
+	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	lggr = logger.Named(lggr, "CommitPlugin")
@@ -88,8 +91,19 @@ func NewPlugin(
 		destChain,
 	)
 
+	rmnController := rmn.NewController(
+		lggr,
+		rmnCrypto,
+		offchainCfg.SignObservationPrefix,
+		rmnPeerClient,
+		rmnHomeReader,
+		2*time.Second, /* observationsInitialRequestTimerDuration */
+		2*time.Second, /* observationsRequestTimerDuration */
+	)
+
 	merkleRootProcessor := merkleroot.NewProcessor(
 		oracleID,
+		oracleIDToP2pID,
 		lggr,
 		offchainCfg,
 		destChain,
@@ -98,8 +112,8 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		rmn.Controller(nil),      // todo
-		cciptypes.RMNCrypto(nil), // todo
+		rmnController,
+		rmnCrypto,
 		rmnHomeReader,
 	)
 
