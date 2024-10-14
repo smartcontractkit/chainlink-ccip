@@ -236,12 +236,14 @@ func TestProcessor_Query(t *testing.T) {
 			}
 
 			w := Processor{
-				offchainCfg: tc.cfg,
-				destChain:   tc.destChain,
-				ccipReader:  ccipReader,
-				rmnClient:   tc.rmnClient(t),
-				lggr:        logger.Test(t),
+				offchainCfg:   tc.cfg,
+				destChain:     tc.destChain,
+				ccipReader:    ccipReader,
+				rmnController: tc.rmnClient(t),
+				lggr:          logger.Test(t),
 			}
+
+			w.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller init
 
 			q, err := w.Query(ctx, tc.prevOutcome)
 			if tc.expErr {

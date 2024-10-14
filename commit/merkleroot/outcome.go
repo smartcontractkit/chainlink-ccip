@@ -9,6 +9,7 @@ import (
 	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -273,7 +274,9 @@ func getConsensusObservation(
 	_, exists := fChains[destChain]
 	if !exists {
 		return ConsensusObservation{},
-			fmt.Errorf("no consensus value for fDestChain, destChain: %d", destChain)
+			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v, fChainsConsensus: %+v",
+				destChain, aggObs.FChain, fChains,
+			)
 	}
 
 	// convert aggObs.RMNRemoteConfigs to a map of RMNRemoteConfigs
