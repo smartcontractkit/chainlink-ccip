@@ -3,6 +3,7 @@ package tokenprice
 import (
 	"context"
 	"errors"
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"math/big"
 	"testing"
 	"time"
@@ -54,11 +55,11 @@ func Test_Observation(t *testing.T) {
 				)
 				chainSupport.EXPECT().SupportsDestChain(mock.Anything).Return(true, nil)
 
-				tokenPriceReader := readermock.NewMockPriceReader(t)
-				tokenPriceReader.EXPECT().GetTokenFeedPricesUSD(mock.Anything, []types.Account{tokenA, tokenB}).
+				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
+				tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, []types.Account{tokenA, tokenB}).
 					Return([]*big.Int{bi100, bi200}, nil)
 
-				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything).Return(
+				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
 					map[types.Account]plugintypes.TimestampedBig{
 						tokenA: plugintypes.NewTimestampedBig(bi100.Int64(), timestamp),
 						tokenB: plugintypes.NewTimestampedBig(bi200.Int64(), timestamp),
@@ -97,7 +98,7 @@ func Test_Observation(t *testing.T) {
 				homeChain.EXPECT().GetFChain().Return(nil, errors.New("failed to get FChain"))
 
 				chainSupport := common_mock.NewMockChainSupport(t)
-				tokenPriceReader := readermock.NewMockPriceReader(t)
+				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
 
 				return &processor{
 					oracleID:         1,

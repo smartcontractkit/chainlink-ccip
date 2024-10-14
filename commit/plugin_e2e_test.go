@@ -238,7 +238,7 @@ func TestPlugin_E2E_AllNodesAgree(t *testing.T) {
 						Maybe()
 				}
 				n.priceReader.EXPECT().
-					GetFeeQuoterTokenUpdates(ctx, mock.Anything).
+					GetFeeQuoterTokenUpdates(ctx, mock.Anything, mock.Anything).
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
 					).
@@ -285,7 +285,7 @@ func normalizeOutcome(o Outcome) Outcome {
 type nodeSetup struct {
 	node        *Plugin
 	ccipReader  *readerpkg_mock.MockCCIPReader
-	priceReader *reader_mock.MockPriceReader
+	priceReader *readerpkg_mock.MockPriceReader
 	reportCodec *mocks.CommitPluginJSONReportCodec
 	msgHasher   *mocks.MessageHasher
 }
@@ -305,7 +305,7 @@ func setupNode(
 	rmnReportCfg rmntypes.RemoteConfig,
 ) nodeSetup {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
-	tokenPricesReader := reader_mock.NewMockPriceReader(t)
+	tokenPricesReader := readerpkg_mock.NewMockPriceReader(t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)

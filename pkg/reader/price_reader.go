@@ -3,6 +3,8 @@ package reader
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"math/big"
 	"time"
 
@@ -21,21 +23,23 @@ import (
 )
 
 type PriceReader interface {
-	// GetTokenFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18.
+	// GetFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18.
 	//	1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
 
-	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
+	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the specified chain
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
 		tokens []ocr2types.Account,
+		chain ccipocr3.ChainSelector,
 	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
 }
 
 type priceReader struct {
+	lggr logger.Logger
 	// Reader for the feed chain. This can be Nil if node doesn't support feed chain.
 	feedChainReader contractreader.ContractReaderFacade
 	tokenInfo       map[types.Account]pluginconfig.TokenInfo
@@ -43,11 +47,13 @@ type priceReader struct {
 }
 
 func NewPriceReader(
+	lggr logger.Logger,
 	feedChainReader contractreader.ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
 ) PriceReader {
 	return &priceReader{
+		lggr:            lggr,
 		feedChainReader: feedChainReader,
 		tokenInfo:       tokenInfo,
 		ccipReader:      ccipReader,
@@ -69,15 +75,19 @@ type LatestRoundData struct {
 func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
+	chain ccipocr3.ChainSelector,
 ) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
-	return nil, nil
-	var updates []plugintypes.TimestampedBig
+	updates := make([]plugintypes.TimestampedBig, len(tokens))
+	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
 
-	feeQuoterAddress := ""
-	//pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter)
+	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
+	if err != nil {
+		pr.lggr.Debugf("failed to get fee quoter address for chain %d: %v", chain, err)
+		return updateMap, nil
+	}
 
 	boundContract := commontypes.BoundContract{
-		Address: feeQuoterAddress,
+		Address: string(feeQuoterAddress),
 		Name:    consts.ContractNameFeeQuoter,
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
@@ -93,7 +103,6 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return nil, fmt.Errorf("failed to get token prices: %w", err)
 	}
 
-	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == time.Unix(0, 0) {
@@ -105,14 +114,14 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	return updateMap, nil
 }
 
-func (pr *priceReader) GetTokenFeedPricesUSD(
+func (pr *priceReader) GetFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
-	if pr.feedChainReader == nil {
-		//TODO: Log debug that it's not supporting feed chain
-		return nil, nil
-	}
 	prices := make([]*big.Int, len(tokens))
+	if pr.feedChainReader == nil {
+		pr.lggr.Debugf("node does not support feed chain")
+		return prices, nil
+	}
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
 		idx := idx

@@ -178,6 +178,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
+		p.lggr,
 		tokenPricesCr,
 		offchainConfig.TokenInfo,
 		ccipReader,

@@ -44,9 +44,9 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
-	tokenPrices, err := p.tokenPriceReader.GetTokenFeedPricesUSD(ctx, tokensToQuery)
+	tokenPrices, err := p.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
-		p.lggr.Errorw("call to GetTokenFeedPricesUSD failed", "err", err)
+		p.lggr.Errorw("call to GetFeedPricesUSD failed", "err", err)
 		return []cciptypes.TokenPrice{}
 	}
 
@@ -84,7 +84,7 @@ func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing fee quoter token updates")
-	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery)
+	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, p.destChain)
 	if err != nil {
 		p.lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
 		return map[types.Account]plugintypes.TimestampedBig{}
