@@ -2,7 +2,9 @@ package commit
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -67,6 +69,8 @@ func NewPlugin(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 	rmnHomeReader reader.RMNHome,
+	rmnCrypto cciptypes.RMNCrypto,
+	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	lggr = logger.Named(lggr, "CommitPlugin")
@@ -87,8 +91,19 @@ func NewPlugin(
 		destChain,
 	)
 
+	rmnController := rmn.NewController(
+		lggr,
+		rmnCrypto,
+		offchainCfg.SignObservationPrefix,
+		rmnPeerClient,
+		rmnHomeReader,
+		2*time.Second, /* observationsInitialRequestTimerDuration */
+		2*time.Second, /* observationsRequestTimerDuration */
+	)
+
 	merkleRootProcessor := merkleroot.NewProcessor(
 		oracleID,
+		oracleIDToP2pID,
 		lggr,
 		offchainCfg,
 		destChain,
@@ -97,8 +112,8 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		rmn.Controller(nil),      // todo
-		cciptypes.RMNCrypto(nil), // todo
+		rmnController,
+		rmnCrypto,
 		rmnHomeReader,
 	)
 
@@ -363,7 +378,20 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	return nil
+	var errs []error
+
+	if p.offchainCfg.RMNEnabled {
+		if p.rmnHomeReader != nil {
+			if err := p.rmnHomeReader.Close(); err != nil {
+				errs = append(errs, fmt.Errorf("failed to close RMNHome reader: %w", err))
+				p.lggr.Errorw("Failed to close RMNHome reader", "err", err)
+			}
+		} else {
+			p.lggr.Warn("RMNHome reader was nil during Close")
+		}
+	}
+
+	return errors.Join(errs...)
 }
 
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {

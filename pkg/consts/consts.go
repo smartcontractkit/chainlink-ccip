@@ -36,6 +36,7 @@ const (
 	// OnRamp methods
 	MethodNameOnRampGetDynamicConfig        = "OnRampGetDynamicConfig"
 	MethodNameOnRampGetStaticConfig         = "OnRampGetStaticConfig"
+	MethodNameOnRampGetDestChainConfig      = "OnRampGetDestChainConfig"
 	MethodNameGetExpectedNextSequenceNumber = "GetExpectedNextSequenceNumber"
 
 	// FeeQuoter view/pure methods

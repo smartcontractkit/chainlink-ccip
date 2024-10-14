@@ -44,6 +44,10 @@ func (w *Processor) Observation(
 	prevOutcome Outcome,
 	q Query,
 ) (Observation, error) {
+	if err := w.initializeRMNController(ctx, prevOutcome); err != nil {
+		return Observation{}, fmt.Errorf("initialize RMN controller: %w", err)
+	}
+
 	if err := w.verifyQuery(ctx, prevOutcome, q); err != nil {
 		return Observation{}, fmt.Errorf("verify query: %w", err)
 	}
@@ -53,6 +57,55 @@ func (w *Processor) Observation(
 	w.lggr.Infow("Sending MerkleRootObs",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
 	return observation, nil
+}
+
+// initializeRMNController initializes the RMN controller iff:
+// 1. RMN is enabled.
+// 2. RMN controller is not already initialized with the same cfg digest.
+// 3. RMN remote config is available from previous outcome.
+func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Outcome) error {
+	if !w.offchainCfg.RMNEnabled {
+		return nil
+	}
+
+	if prevOutcome.RMNRemoteCfg.IsEmpty() {
+		w.lggr.Debug("RMN remote config is empty, skipping RMN controller initialization in this round")
+		return nil
+	}
+
+	if prevOutcome.RMNRemoteCfg.ConfigDigest == w.rmnControllerCfgDigest {
+		w.lggr.Debugw("RMN controller already initialized with the same config digest",
+			"configDigest", w.rmnControllerCfgDigest)
+		return nil
+	}
+
+	w.lggr.Infow("Initializing RMN controller", "rmnRemoteCfg", prevOutcome.RMNRemoteCfg)
+
+	rmnNodesInfo, err := w.rmnHomeReader.GetRMNNodesInfo(prevOutcome.RMNRemoteCfg.ConfigDigest)
+	if err != nil {
+		return fmt.Errorf("failed to get RMN nodes info: %w", err)
+	}
+
+	peerIDs := make([]string, 0, len(rmnNodesInfo))
+	for _, node := range rmnNodesInfo {
+		peerIDs = append(peerIDs, node.PeerID.String())
+	}
+	for _, p2pID := range w.oracleIDToP2pID {
+		peerIDs = append(peerIDs, p2pID.String())
+	}
+
+	if err := w.rmnController.InitConnection(
+		ctx,
+		cciptypes.Bytes32(w.reportingCfg.ConfigDigest),
+		prevOutcome.RMNRemoteCfg.ConfigDigest,
+		peerIDs,
+	); err != nil {
+		return fmt.Errorf("failed to init connection to RMN: %w", err)
+	}
+
+	w.rmnControllerCfgDigest = prevOutcome.RMNRemoteCfg.ConfigDigest
+
+	return nil
 }
 
 // verifyQuery verifies the query based to the following rules.
