@@ -552,10 +552,6 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			continue
 		}
 		feeUpdates[chain] = update
-		//feeUpdates[chain] = chainfee.ChainFeeUpdate{
-		//	Timestamp: update.Timestamp,
-		//	ChainFee:  chainfee.FromPackedFee(update.Value.Int),
-		//}
 	}
 
 	return feeUpdates
@@ -859,6 +855,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	}
 
 	var price big.Int
+	//TODO: This is calling wrong method, use getTokenPrice without the `s` in the end
 	err := reader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameFeeQuoter,

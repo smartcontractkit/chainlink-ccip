@@ -40,7 +40,7 @@ type Plugin struct {
 	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg         pluginconfig.CommitOffchainConfig
 	ccipReader          readerpkg.CCIPReader
-	tokenPricesReader   reader.PriceReader
+	tokenPricesReader   readerpkg.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
@@ -63,7 +63,7 @@ func NewPlugin(
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	ccipReader readerpkg.CCIPReader,
-	tokenPricesReader reader.PriceReader,
+	tokenPricesReader readerpkg.PriceReader,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,

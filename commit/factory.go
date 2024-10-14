@@ -146,27 +146,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		}
 	}
 
-	var onChainTokenPricesReader reader.PriceReader
-	// The node supports the chain that the token prices are on.
-	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
-	if ok {
-		// Bind all token aggregate contracts
-		var bcs []types.BoundContract
-		for _, info := range offchainConfig.TokenInfo {
-			bcs = append(bcs, types.BoundContract{
-				Address: info.AggregatorAddress,
-				Name:    consts.ContractNamePriceAggregator,
-			})
-		}
-		if err1 := tokenPricesCr.Bind(ctx, bcs); err1 != nil {
-			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
-		}
-		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
-			tokenPricesCr,
-			offchainConfig.TokenInfo,
-		)
-	}
-
 	// map types to the facade.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
@@ -181,6 +160,29 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		p.ocrConfig.Config.ChainSelector,
 		p.ocrConfig.Config.OfframpAddress,
 	)
+
+	// The node supports the chain that the token prices are on.
+	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
+	if ok {
+		// Bind all token aggregate contracts
+		var bcs []types.BoundContract
+		for _, info := range offchainConfig.TokenInfo {
+			bcs = append(bcs, types.BoundContract{
+				Address: info.AggregatorAddress,
+				Name:    consts.ContractNamePriceAggregator,
+			})
+		}
+		if err1 := tokenPricesCr.Bind(ctx, bcs); err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
+		}
+	}
+
+	onChainTokenPricesReader := readerpkg.NewPriceReader(
+		tokenPricesCr,
+		offchainConfig.TokenInfo,
+		ccipReader,
+	)
+
 	return NewPlugin(
 			p.donID,
 			config.OracleID,

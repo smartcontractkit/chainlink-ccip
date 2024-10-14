@@ -3,6 +3,7 @@ package tokenprice
 import (
 	"context"
 	"fmt"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -24,7 +25,7 @@ type processor struct {
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
-	tokenPriceReader reader.PriceReader
+	tokenPriceReader reader2.PriceReader
 	homeChain        reader.HomeChain
 	fRoleDON         int
 }
@@ -36,7 +37,7 @@ func NewProcessor(
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
-	tokenPriceReader reader.PriceReader,
+	tokenPriceReader reader2.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
 ) *processor {

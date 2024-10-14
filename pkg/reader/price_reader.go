@@ -35,22 +35,22 @@ type PriceReader interface {
 	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
 }
 
-type OnchainTokenPricesReader struct {
-	// Reader for the chain that will have the token prices on-chain
-	ContractReader   contractreader.ContractReaderFacade
-	TokenInfo        map[types.Account]pluginconfig.TokenInfo
-	FeeQuoterAddress types.Account
-	// FeeQuoterEnabled Flag until we discover feeQuoter address and bind it correctly
-	feeQuoterEnabled bool
+type priceReader struct {
+	// Reader for the feed chain. This can be Nil if node doesn't support feed chain.
+	feedChainReader contractreader.ContractReaderFacade
+	tokenInfo       map[types.Account]pluginconfig.TokenInfo
+	ccipReader      CCIPReader
 }
 
-func NewOnchainTokenPricesReader(
-	contractReader contractreader.ContractReaderFacade,
+func NewPriceReader(
+	feedChainReader contractreader.ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
-) *OnchainTokenPricesReader {
-	return &OnchainTokenPricesReader{
-		ContractReader: contractReader,
-		TokenInfo:      tokenInfo,
+	ccipReader CCIPReader,
+) PriceReader {
+	return &priceReader{
+		feedChainReader: feedChainReader,
+		tokenInfo:       tokenInfo,
+		ccipReader:      ccipReader,
 	}
 }
 
@@ -66,23 +66,24 @@ type LatestRoundData struct {
 	AnsweredInRound *big.Int
 }
 
-func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
+func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
 ) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
-	if !pr.feeQuoterEnabled {
-		return make(map[ocr2types.Account]plugintypes.TimestampedBig), nil
-	}
+	return nil, nil
 	var updates []plugintypes.TimestampedBig
 
+	feeQuoterAddress := ""
+	//pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter)
+
 	boundContract := commontypes.BoundContract{
-		Address: string(pr.FeeQuoterAddress),
+		Address: feeQuoterAddress,
 		Name:    consts.ContractNameFeeQuoter,
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
 	if err :=
-		pr.ContractReader.GetLatestValue(
+		pr.feedChainReader.GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
@@ -104,9 +105,13 @@ func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
 	return updateMap, nil
 }
 
-func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
+func (pr *priceReader) GetTokenFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
+	if pr.feedChainReader == nil {
+		//TODO: Log debug that it's not supporting feed chain
+		return nil, nil
+	}
 	prices := make([]*big.Int, len(tokens))
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
@@ -114,14 +119,14 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 		token := token
 		eg.Go(func() error {
 			boundContract := commontypes.BoundContract{
-				Address: pr.TokenInfo[token].AggregatorAddress,
+				Address: pr.tokenInfo[token].AggregatorAddress,
 				Name:    consts.ContractNamePriceAggregator,
 			}
 			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
 			if err != nil {
 				return fmt.Errorf("failed to get token price for %s: %w", token, err)
 			}
-			tokenInfo, ok := pr.TokenInfo[token]
+			tokenInfo, ok := pr.tokenInfo[token]
 			if !ok {
 				return fmt.Errorf("failed to get tokenInfo for %s: %w", token, err)
 			}
@@ -144,14 +149,14 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getFeedDecimals(
+func (pr *priceReader) getFeedDecimals(
 	ctx context.Context,
 	token ocr2types.Account,
 	boundContract commontypes.BoundContract,
 ) (uint8, error) {
 	var decimals uint8
 	if err :=
-		pr.ContractReader.GetLatestValue(
+		pr.feedChainReader.GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
@@ -164,7 +169,7 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(
 	return decimals, nil
 }
 
-func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
+func (pr *priceReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
 	token ocr2types.Account,
 	boundContract commontypes.BoundContract,
@@ -172,7 +177,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 	var latestRoundData LatestRoundData
 	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 	if err :=
-		pr.ContractReader.GetLatestValue(
+		pr.feedChainReader.GetLatestValue(
 			ctx,
 			identifier,
 			primitives.Unconfirmed,
@@ -207,5 +212,5 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
-// Ensure OnchainTokenPricesReader implements PriceReader
-var _ PriceReader = (*OnchainTokenPricesReader)(nil)
+// Ensure priceReader implements PriceReader
+var _ PriceReader = (*priceReader)(nil)
