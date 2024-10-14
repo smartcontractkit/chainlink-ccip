@@ -217,9 +217,18 @@ func (p *Plugin) Observation(
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
 		if !p.contractsInitialized {
+			obs := Observation{DiscoveryObs: discoveryObs}
+			encoded, err := obs.Encode()
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode observation: %w, observation: %+v", err, obs)
+			}
+
 			p.lggr.Infow("contracts not initialized, only making discovery observations",
 				"discoveryObs", discoveryObs)
-			return Observation{DiscoveryObs: discoveryObs}.Encode()
+			p.lggr.Debugw("Commit plugin making observation",
+				"encodedObservation", encoded,
+				"observation", obs)
+			return encoded, nil
 		}
 	}
 
@@ -243,7 +252,14 @@ func (p *Plugin) Observation(
 		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
-	return obs.Encode()
+	encoded, err := obs.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode observation: %w, observation: %+v", err, obs)
+	}
+
+	p.lggr.Debugw("Commit plugin making observation",
+		"encodedObservation", encoded, "observation", obs)
+	return encoded, nil
 }
 
 func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
@@ -286,6 +302,7 @@ func (p *Plugin) Outcome(
 			p.lggr.Errorw("failed to decode observation", "err", err)
 			continue
 		}
+		p.lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
 		merkleObservations = append(merkleObservations,
 			MerkleRootObservation{
 				OracleID:    ao.Observer,
