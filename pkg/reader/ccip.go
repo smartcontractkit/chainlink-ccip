@@ -588,18 +588,23 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote config: %w", err)
 	}
 
-	var dh cciptypes.Bytes32
+	type ret struct {
+		DigestHeader cciptypes.Bytes32
+	}
+	var retVal ret
+
 	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
 		consts.MethodNameGetReportDigestHeader,
 		primitives.Unconfirmed,
 		map[string]any{},
-		&dh,
+		&retVal,
 	)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
 	}
+	r.lggr.Infow("got RMNRemote report digest header", "digest", retVal.DigestHeader)
 
 	signers := make([]rmntypes.RemoteSignerInfo, 0, len(vc.Config.Signers))
 	for _, signer := range vc.Config.Signers {
@@ -615,7 +620,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		Signers:          signers,
 		MinSigners:       vc.Config.MinSigners,
 		ConfigVersion:    vc.Version,
-		RmnReportVersion: dh,
+		RmnReportVersion: retVal.DigestHeader,
 	}, nil
 }
 
@@ -663,7 +668,8 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager (offramp static config): %w", err)
 	}
 	resp = resp.Append(consts.ContractNameNonceManager, r.destChain, staticConfig.NonceManager)
-	resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.Rmn)
+	resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.RmnRemote)
+	r.lggr.Infow("appending RMN remote contract address", "address", staticConfig.RmnRemote)
 
 	// FeeQuoter from the offRamp dynamic config.
 	var dynamicConfig offRampDynamicChainConfig
@@ -962,7 +968,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 //nolint:lll // It's a URL.
 type offRampStaticChainConfig struct {
 	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	Rmn                []byte                  `json:"rmn"`
+	RmnRemote          []byte                  `json:"rmnRemote"`
 	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
 	NonceManager       []byte                  `json:"nonceManager"`
 }
