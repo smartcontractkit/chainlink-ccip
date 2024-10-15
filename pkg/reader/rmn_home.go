@@ -7,11 +7,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type RMNHome = reader_internal.RMNHome
+
+type HomeNodeInfo = rmntypes.HomeNodeInfo
 
 func NewRMNHomePoller(
 	contractReader contractreader.ContractReaderFacade,
