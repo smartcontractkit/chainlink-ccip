@@ -281,7 +281,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
+				ObserverNodesBitmap: big.NewInt(7), // 111 in binary
 			},
 			nodeIndex:      1,
 			totalNodes:     3,
@@ -293,7 +293,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(5)), // 101 in binary
+				ObserverNodesBitmap: big.NewInt(5), // 101 in binary
 			},
 			nodeIndex:      1,
 			totalNodes:     3,
@@ -305,7 +305,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
+				ObserverNodesBitmap: big.NewInt(7), // 111 in binary
 			},
 			nodeIndex:      3,
 			totalNodes:     3,
@@ -317,7 +317,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(7)), // 111 in binary
+				ObserverNodesBitmap: big.NewInt(7), // 111 in binary
 			},
 			nodeIndex:      -1,
 			totalNodes:     3,
@@ -329,7 +329,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(8)), // 1000 in binary
+				ObserverNodesBitmap: big.NewInt(8), // 1000 in binary
 			},
 			nodeIndex:      0,
 			totalNodes:     3,
@@ -341,7 +341,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
+				ObserverNodesBitmap: big.NewInt(1),
 			},
 			nodeIndex:      0,
 			totalNodes:     0,
@@ -353,7 +353,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        3,
-				ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(1)),
+				ObserverNodesBitmap: big.NewInt(1),
 			},
 			nodeIndex:      0,
 			totalNodes:     257,
@@ -365,7 +365,7 @@ func TestIsNodeObserver(t *testing.T) {
 			sourceChain: SourceChain{
 				ChainSelector:       cciptypes.ChainSelector(1),
 				MinObservers:        1,
-				ObserverNodesBitmap: cciptypes.NewBigInt(new(big.Int).SetBit(big.NewInt(0), 255, 1)), // Only the 256th bit is set
+				ObserverNodesBitmap: new(big.Int).SetBit(big.NewInt(0), 255, 1), // Only the 256th bit is set
 			},
 			nodeIndex:      255,
 			totalNodes:     256,
@@ -405,7 +405,7 @@ func createTestRMNHomeConfigs(
 					{
 						ChainSelector:       cciptypes.ChainSelector(id),
 						MinObservers:        uint64(id),
-						ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(int64(id))),
+						ObserverNodesBitmap: big.NewInt(int64(id)),
 					},
 				},
 				OffchainConfig: cciptypes.Bytes{30 * id},
