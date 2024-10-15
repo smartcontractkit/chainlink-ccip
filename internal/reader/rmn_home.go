@@ -121,12 +121,7 @@ func (r *rmnHomePoller) poll() {
 }
 
 func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
-	type retTyp struct {
-		ActiveConfig    *VersionedConfig `json:"activeConfig"`
-		CandidateConfig *VersionedConfig `json:"candidateConfig"`
-	}
-	retVal := retTyp{}
-
+	retVal := GetAllConfigsResponse{}
 	err := r.contractReader.GetLatestValue(
 		ctx,
 		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetAllConfigs),
@@ -142,7 +137,7 @@ func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 	r.setRMNHomeState(
 		retVal.ActiveConfig.ConfigDigest,
 		retVal.CandidateConfig.ConfigDigest,
-		convertOnChainConfigToRMNHomeChainConfig(r.lggr, *retVal.ActiveConfig, *retVal.CandidateConfig),
+		convertOnChainConfigToRMNHomeChainConfig(r.lggr, retVal.ActiveConfig, retVal.CandidateConfig),
 	)
 
 	return nil
@@ -240,9 +235,10 @@ func convertOnChainConfigToRMNHomeChainConfig(
 	primaryConfig VersionedConfig,
 	secondaryConfig VersionedConfig,
 ) map[cciptypes.Bytes32]rmntypes.HomeConfig {
-	versionedConfigWithDigests := []VersionedConfig{
-		primaryConfig,
-		secondaryConfig,
+
+	versionedConfigWithDigests := []VersionedConfig{primaryConfig}
+	if !secondaryConfig.ConfigDigest.IsEmpty() {
+		versionedConfigWithDigests = append(versionedConfigWithDigests, secondaryConfig)
 	}
 
 	if len(versionedConfigWithDigests) == 0 {
@@ -322,6 +318,12 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 
 	// Check if the result equals the mask
 	return result.Cmp(mask) == 0, nil
+}
+
+// GetAllConfigsResponse mirrors RMNHome.sol's getAllConfigs() RMNHome's return value.
+type GetAllConfigsResponse struct {
+	ActiveConfig    VersionedConfig `json:"activeConfig"`
+	CandidateConfig VersionedConfig `json:"candidateConfig"`
 }
 
 // VersionedConfig mirrors RMNHome.sol's VersionedConfig struct

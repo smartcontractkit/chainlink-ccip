@@ -86,17 +86,13 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 				mock.Anything,
 				mock.Anything,
 			).Run(func(args mock.Arguments) {
-				result := args.Get(4).(*[]VersionedConfigWithDigest)
-				*result = []VersionedConfigWithDigest{
-					{
-						ConfigDigest: [32]byte{1},
-						VersionedConfig: VersionedConfig{
-							Version: 1,
-							Config: Config{
-								Nodes:        []Node{},
-								SourceChains: []SourceChain{},
-							},
-						},
+				result := args.Get(4).(*GetAllConfigsResponse)
+				*result = GetAllConfigsResponse{
+					ActiveConfig: VersionedConfig{
+						ConfigDigest:  [32]byte{1},
+						Version:       1,
+						StaticConfig:  StaticConfig{Nodes: []Node{}},
+						DynamicConfig: DynamicConfig{SourceChains: []SourceChain{}},
 					},
 				}
 			}).Return(nil)
@@ -179,7 +175,10 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			primaryConfig, secondaryConfig := createTestRMNHomeConfigs(tt.primaryEmpty, tt.secondaryEmpty)
-			rmnHomeOnChainConfigs := []VersionedConfigWithDigest{primaryConfig, secondaryConfig}
+			rmnHomeOnChainConfigs := GetAllConfigsResponse{
+				primaryConfig,
+				secondaryConfig,
+			}
 
 			homeChainReader := readermock.NewMockContractReaderFacade(t)
 			homeChainReader.On(
@@ -191,7 +190,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 				mock.Anything,
 			).Run(
 				func(args mock.Arguments) {
-					arg := args.Get(4).(*[]VersionedConfigWithDigest)
+					arg := args.Get(4).(*GetAllConfigsResponse)
 					*arg = rmnHomeOnChainConfigs
 				}).Return(nil)
 
@@ -223,7 +222,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 			}
 			require.GreaterOrEqual(t, callCount, tt.expectedCallCount)
 
-			for i, config := range rmnHomeOnChainConfigs {
+			for i, config := range []VersionedConfig{primaryConfig, secondaryConfig} {
 				isEmpty := (i == 0 && tt.primaryEmpty) || (i == 1 && tt.secondaryEmpty)
 
 				rmnNodes, err := configPoller.GetRMNNodesInfo(config.ConfigDigest)
@@ -393,31 +392,32 @@ func TestIsNodeObserver(t *testing.T) {
 
 func createTestRMNHomeConfigs(
 	primaryEmpty bool,
-	secondaryEmpty bool) (primary, secondary VersionedConfigWithDigest) {
-	createConfig := func(id byte, isEmpty bool) VersionedConfigWithDigest {
+	secondaryEmpty bool) (primary, secondary VersionedConfig) {
+	createConfig := func(id byte, isEmpty bool) VersionedConfig {
 		if isEmpty {
-			return VersionedConfigWithDigest{}
+			return VersionedConfig{}
 		}
-		return VersionedConfigWithDigest{
+		return VersionedConfig{
 			ConfigDigest: cciptypes.Bytes32{id},
-			VersionedConfig: VersionedConfig{
-				Version: uint32(id),
-				Config: Config{
-					Nodes: []Node{
-						{
-							PeerID:            cciptypes.Bytes32{10 * id},
-							OffchainPublicKey: cciptypes.Bytes32{20 * id},
-						},
+			Version:      uint32(id),
+			DynamicConfig: DynamicConfig{
+				SourceChains: []SourceChain{
+					{
+						ChainSelector:       cciptypes.ChainSelector(id),
+						MinObservers:        uint64(id),
+						ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(int64(id))),
 					},
-					SourceChains: []SourceChain{
-						{
-							ChainSelector:       cciptypes.ChainSelector(uint64(id)),
-							MinObservers:        uint64(id),
-							ObserverNodesBitmap: cciptypes.NewBigInt(big.NewInt(int64(id))),
-						},
-					},
-					OffchainConfig: cciptypes.Bytes{30 * id},
 				},
+				OffchainConfig: cciptypes.Bytes{30 * id},
+			},
+			StaticConfig: StaticConfig{
+				Nodes: []Node{
+					{
+						PeerID:            cciptypes.Bytes32{10 * id},
+						OffchainPublicKey: cciptypes.Bytes32{20 * id},
+					},
+				},
+				OffchainConfig: cciptypes.Bytes{30 * id},
 			},
 		}
 	}
