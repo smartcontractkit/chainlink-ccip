@@ -34,7 +34,6 @@ func randomAddress() string {
 
 // mustMakeBytes parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
 // random byte array.
-// nolint:unparam // surly this will be useful at some point...
 func mustMakeBytes(byteStr string) cciptypes.Bytes32 {
 	if byteStr == "" {
 		var randomBytes cciptypes.Bytes32
