@@ -221,23 +221,21 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
-				// Check overrides
-				offRampNextKeys := maps.Keys(params.offRampNextSeqNum)
-				offRampNextValues := maps.Values(params.offRampNextSeqNum)
-				if tc.offRampNextSeqNumDefaultOverrideKeys != nil {
-					offRampNextKeys = tc.offRampNextSeqNumDefaultOverrideKeys
-				}
-				if tc.offRampNextSeqNumDefaultOverrideValues != nil {
-					offRampNextValues = tc.offRampNextSeqNumDefaultOverrideValues
-				}
-
 				prepareCcipReaderMock(params.ctx,
 					n.ccipReader,
-					t,
-					offRampNextKeys,
-					offRampNextValues,
+					false, // mockEmptySeqNr
 					tc.enableDiscovery,
 				)
+
+				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
+					require.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
+					n.ccipReader.EXPECT().NextSeqNum(params.ctx, tc.offRampNextSeqNumDefaultOverrideKeys).Unset()
+					n.ccipReader.EXPECT().
+						NextSeqNum(params.ctx, tc.offRampNextSeqNumDefaultOverrideKeys).
+						Return(tc.offRampNextSeqNumDefaultOverrideValues, nil).
+						Maybe()
+				}
+
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
@@ -397,9 +395,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				prepareCcipReaderMock(
 					params.ctx,
 					n.ccipReader,
-					t,
-					[]ccipocr3.ChainSelector{},
-					[]ccipocr3.SeqNum{},
+					true, // mockEmptySeqNr
 					false,
 				)
 				tc.mockPriceReader(n.priceReader)
@@ -437,9 +433,7 @@ func normalizeOutcome(o Outcome) Outcome {
 func prepareCcipReaderMock(
 	ctx context.Context,
 	ccipReader *readerpkg_mock.MockCCIPReader,
-	t *testing.T,
-	offRampNextSeqNumKeys []ccipocr3.ChainSelector,
-	offRampNextSeqNumValues []ccipocr3.SeqNum,
+	mockEmptySeqNrs bool,
 	enableDiscovery bool,
 ) {
 	ccipReader.EXPECT().
@@ -455,15 +449,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{}, nil).Maybe()
 
-	//nolint:gosimple // need to check for nil here
-	if offRampNextSeqNumKeys != nil && len(offRampNextSeqNumKeys) > 0 {
-		assert.Equal(t, len(offRampNextSeqNumKeys), len(offRampNextSeqNumValues))
-		ccipReader.EXPECT().NextSeqNum(ctx, offRampNextSeqNumKeys).Unset()
-		ccipReader.EXPECT().
-			NextSeqNum(ctx, offRampNextSeqNumKeys).
-			Return(offRampNextSeqNumValues, nil).
-			Maybe()
-	} else {
+	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Return([]ccipocr3.SeqNum{}, nil).
 			Maybe()
@@ -472,7 +458,6 @@ func prepareCcipReaderMock(
 	if enableDiscovery {
 		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
 		ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
-		ccipReader.EXPECT().NextSeqNum(ctx, offRampNextSeqNumKeys).Unset()
 	}
 }
 
