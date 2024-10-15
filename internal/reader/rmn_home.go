@@ -121,23 +121,35 @@ func (r *rmnHomePoller) poll() {
 }
 
 func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
-	retVal := GetAllConfigsResponse{}
+	var activeAndCandidateConfigs GetAllConfigsResponse
 	err := r.contractReader.GetLatestValue(
 		ctx,
 		r.rmnHomeBoundContract.ReadIdentifier(consts.MethodNameGetAllConfigs),
 		primitives.Unconfirmed,
 		map[string]interface{}{},
-		&retVal,
+		&activeAndCandidateConfigs,
 	)
 	if err != nil {
 		return fmt.Errorf("error fetching RMNHomeConfig: %w", err)
 	}
-	r.lggr.Infof("Fetched RMNHomeConfigs: %v", retVal)
+	r.lggr.Infow("Fetched RMNHomeConfigs",
+		"activeConfig", activeAndCandidateConfigs.ActiveConfig.ConfigDigest,
+		"candidateConfig", activeAndCandidateConfigs.CandidateConfig.ConfigDigest,
+	)
+
+	if activeAndCandidateConfigs.ActiveConfig.ConfigDigest.IsEmpty() &&
+		activeAndCandidateConfigs.CandidateConfig.ConfigDigest.IsEmpty() {
+		return fmt.Errorf("both active and candidate config digests are empty")
+	}
 
 	r.setRMNHomeState(
-		retVal.ActiveConfig.ConfigDigest,
-		retVal.CandidateConfig.ConfigDigest,
-		convertOnChainConfigToRMNHomeChainConfig(r.lggr, retVal.ActiveConfig, retVal.CandidateConfig),
+		activeAndCandidateConfigs.ActiveConfig.ConfigDigest,
+		activeAndCandidateConfigs.CandidateConfig.ConfigDigest,
+		convertOnChainConfigToRMNHomeChainConfig(
+			r.lggr,
+			activeAndCandidateConfigs.ActiveConfig,
+			activeAndCandidateConfigs.CandidateConfig,
+		),
 	)
 
 	return nil
@@ -235,21 +247,19 @@ func convertOnChainConfigToRMNHomeChainConfig(
 	primaryConfig VersionedConfig,
 	secondaryConfig VersionedConfig,
 ) map[cciptypes.Bytes32]rmntypes.HomeConfig {
+	if primaryConfig.ConfigDigest.IsEmpty() && secondaryConfig.ConfigDigest.IsEmpty() {
+		lggr.Warnw("no on chain RMNHomeConfigs found, both digests are empty")
+		return map[cciptypes.Bytes32]rmntypes.HomeConfig{}
+	}
 
 	versionedConfigWithDigests := []VersionedConfig{primaryConfig}
 	if !secondaryConfig.ConfigDigest.IsEmpty() {
 		versionedConfigWithDigests = append(versionedConfigWithDigests, secondaryConfig)
 	}
 
-	if len(versionedConfigWithDigests) == 0 {
-		lggr.Warnw("no on chain RMNHomeConfigs found")
-		return map[cciptypes.Bytes32]rmntypes.HomeConfig{}
-	}
-
 	rmnHomeConfigs := make(map[cciptypes.Bytes32]rmntypes.HomeConfig)
 	for _, versionedConfig := range versionedConfigWithDigests {
 		err := validate(versionedConfig)
-
 		if err != nil {
 			lggr.Warnw("invalid on chain RMNHomeConfig", "err", err)
 			continue
@@ -320,7 +330,7 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 	return result.Cmp(mask) == 0, nil
 }
 
-// GetAllConfigsResponse mirrors RMNHome.sol's getAllConfigs() RMNHome's return value.
+// GetAllConfigsResponse mirrors RMNHome.sol's getAllConfigs() return value.
 type GetAllConfigsResponse struct {
 	ActiveConfig    VersionedConfig `json:"activeConfig"`
 	CandidateConfig VersionedConfig `json:"candidateConfig"`

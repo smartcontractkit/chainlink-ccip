@@ -104,8 +104,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode commit offchain config: %w", err)
 	}
 
-	offchainConfig.RMNEnabled = true
-
 	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate commit offchain config: %w", err)
 	}
@@ -137,13 +135,12 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			rmnCr,
 			rmnHomeBoundContract,
 			p.lggr,
-			time.Second,
+			5*time.Second,
 		)
 
 		if err := rmnHomeReader.Start(ctx); err != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome reader: %w", err)
 		}
-		p.lggr.Info("RMNHome reader started")
 	}
 
 	var onChainTokenPricesReader reader.PriceReader

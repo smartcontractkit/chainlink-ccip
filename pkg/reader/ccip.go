@@ -591,7 +591,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	type ret struct {
 		DigestHeader cciptypes.Bytes32
 	}
-	var retVal ret
+	var header ret
 
 	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 		ctx,
@@ -599,12 +599,12 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		consts.MethodNameGetReportDigestHeader,
 		primitives.Unconfirmed,
 		map[string]any{},
-		&retVal,
+		&header,
 	)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
 	}
-	r.lggr.Infow("got RMNRemote report digest header", "digest", retVal.DigestHeader)
+	r.lggr.Infow("got RMNRemote report digest header", "digest", header.DigestHeader)
 
 	signers := make([]rmntypes.RemoteSignerInfo, 0, len(vc.Config.Signers))
 	for _, signer := range vc.Config.Signers {
@@ -620,7 +620,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		Signers:          signers,
 		MinSigners:       vc.Config.MinSigners,
 		ConfigVersion:    vc.Version,
-		RmnReportVersion: retVal.DigestHeader,
+		RmnReportVersion: header.DigestHeader,
 	}, nil
 }
 
