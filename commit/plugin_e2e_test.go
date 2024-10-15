@@ -104,7 +104,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceChain1, SeqNum: 10},
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
-			RMNRemoteCfg: params.RmnReportCfg,
+			RMNRemoteCfg: params.rmnReportCfg,
 		},
 	}
 
@@ -126,7 +126,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
 			// TODO: Calculate the bitmap
 			RMNRawVs:     ccipocr3.NewBigIntFromInt64(0),
-			RMNRemoteCfg: params.RmnReportCfg,
+			RMNRemoteCfg: params.rmnReportCfg,
 		},
 	}
 
@@ -215,16 +215,15 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				params.NodeID = oracleIDs[i]
-				params.EnableDiscovery = tc.enableDiscovery
-				n := setupNode(params)
+				params.enableDiscovery = tc.enableDiscovery
+				n := setupNode(params, oracleIDs[i])
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
 				// Check overrides
-				offRampNextKeys := maps.Keys(params.OffRampNextSeqNum)
-				offRampNextValues := maps.Values(params.OffRampNextSeqNum)
+				offRampNextKeys := maps.Keys(params.offRampNextSeqNum)
+				offRampNextValues := maps.Values(params.offRampNextSeqNum)
 				if tc.offRampNextSeqNumDefaultOverrideKeys != nil {
 					offRampNextKeys = tc.offRampNextSeqNumDefaultOverrideKeys
 				}
@@ -232,7 +231,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 					offRampNextValues = tc.offRampNextSeqNumDefaultOverrideValues
 				}
 
-				prepareCcipReaderMock(params.Ctx,
+				prepareCcipReaderMock(params.ctx,
 					n.ccipReader,
 					t,
 					offRampNextKeys,
@@ -240,13 +239,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 					tc.enableDiscovery,
 				)
 				n.priceReader.EXPECT().
-					GetFeeQuoterTokenUpdates(params.Ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
 				n.priceReader.EXPECT().
-					GetFeedPricesUSD(params.Ctx, mock.Anything).
+					GetFeedPricesUSD(params.ctx, mock.Anything).
 					Return([]*big.Int{}, nil).
 					Maybe()
 			}
@@ -254,7 +253,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
-			res, err := runner.RunRound(params.Ctx)
+			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
 			decodedOutcome, err := DecodeOutcome(res.Outcome)
@@ -263,7 +262,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
-				decoded, err := reportCodec.Decode(params.Ctx, res.Transmitted[i].Report)
+				decoded, err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expTransmittedReports[i], decoded)
 			}
@@ -274,7 +273,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 	params := defaultNodeParams(t)
 
-	tokensToQuery := maps.Keys(params.OffchainCfg.TokenInfo)
+	tokensToQuery := maps.Keys(params.offchainCfg.TokenInfo)
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	orderedTokenPrices := make([]ccipocr3.TokenPrice, 0, len(tokensToQuery))
 	for _, token := range tokensToQuery {
@@ -287,7 +286,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		OutcomeType:             merkleroot.ReportIntervalsSelected,
 		RangesSelectedForReport: []plugintypes.ChainRange{},
 		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
-		RMNRemoteCfg:            params.RmnReportCfg,
+		RMNRemoteCfg:            params.rmnReportCfg,
 	}
 
 	testCases := []struct {
@@ -304,12 +303,12 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.Ctx, []ocr2types.Account{ArbAddr, EthAddr}).
+					GetFeedPricesUSD(params.ctx, []ocr2types.Account{ArbAddr, EthAddr}).
 					Return([]*big.Int{ArbPrice, EthPrice}, nil).
 					Maybe()
 
 				m.EXPECT().
-					GetFeeQuoterTokenUpdates(params.Ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
 					).
@@ -328,13 +327,13 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.Ctx, []ocr2types.Account{ArbAddr, EthAddr}).
+					GetFeedPricesUSD(params.ctx, []ocr2types.Account{ArbAddr, EthAddr}).
 					Return([]*big.Int{ArbPrice, EthPrice}, nil).
 					Maybe()
 
 				// Arb is fresh, will not be updated
 				m.EXPECT().
-					GetFeeQuoterTokenUpdates(params.Ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{
 							ArbAddr: {Value: ccipocr3.NewBigInt(ArbPrice), Timestamp: time.Now()},
@@ -354,12 +353,12 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.Ctx, []ocr2types.Account{ArbAddr, EthAddr}).
+					GetFeedPricesUSD(params.ctx, []ocr2types.Account{ArbAddr, EthAddr}).
 					Return([]*big.Int{ArbPrice, EthPrice}, nil).
 					Maybe()
 
 				m.EXPECT().
-					GetFeeQuoterTokenUpdates(params.Ctx, mock.Anything, mock.Anything).
+					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{
 							// Arb is fresh, will not be updated
@@ -368,7 +367,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 							EthAddr: {
 								Value: ccipocr3.NewBigInt(EthPrice),
 								Timestamp: time.Now().
-									Add(-params.OffchainCfg.TokenPriceBatchWriteFrequency.Duration() * 2),
+									Add(-params.offchainCfg.TokenPriceBatchWriteFrequency.Duration() * 2),
 							},
 						}, nil,
 					).
@@ -389,15 +388,14 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				params.NodeID = oracleIDs[i]
-				n := setupNode(params)
+				n := setupNode(params, oracleIDs[i])
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
 
 				prepareCcipReaderMock(
-					params.Ctx,
+					params.ctx,
 					n.ccipReader,
 					t,
 					[]ccipocr3.ChainSelector{},
@@ -410,7 +408,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
 			assert.NoError(t, err)
 			runner := testhelpers.NewOCR3Runner(nodes, oracleIDs, encodedPrevOutcome)
-			res, err := runner.RunRound(params.Ctx)
+			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
 			decodedOutcome, err := DecodeOutcome(res.Outcome)
@@ -419,7 +417,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
-				decoded, err := reportCodec.Decode(params.Ctx, res.Transmitted[i].Report)
+				decoded, err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expTransmittedReports[i], decoded)
 			}
@@ -457,7 +455,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{}, nil).Maybe()
 
-	//nolint we need to check if offRampNextSeqNumKeys is nil
+	//nolint:gosimple // need to check for nil here
 	if offRampNextSeqNumKeys != nil && len(offRampNextSeqNumKeys) > 0 {
 		assert.Equal(t, len(offRampNextSeqNumKeys), len(offRampNextSeqNumValues))
 		ccipReader.EXPECT().NextSeqNum(ctx, offRampNextSeqNumKeys).Unset()
@@ -488,33 +486,32 @@ type nodeSetup struct {
 
 // Define a struct to hold the parameters
 type SetupNodeParams struct {
-	Ctx               context.Context
-	T                 *testing.T
-	Lggr              logger.Logger
-	DonID             plugintypes.DonID
-	NodeID            commontypes.OracleID
-	ReportingCfg      ocr3types.ReportingPluginConfig
-	OracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
-	OffchainCfg       pluginconfig.CommitOffchainConfig
-	ChainCfg          map[ccipocr3.ChainSelector]reader.ChainConfig
-	OffRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum
-	OnRampLastSeqNum  map[ccipocr3.ChainSelector]ccipocr3.SeqNum
-	RmnReportCfg      rmntypes.RemoteConfig
-	EnableDiscovery   bool
+	ctx               context.Context
+	t                 *testing.T
+	lggr              logger.Logger
+	donID             plugintypes.DonID
+	reportingCfg      ocr3types.ReportingPluginConfig
+	oracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
+	offchainCfg       pluginconfig.CommitOffchainConfig
+	chainCfg          map[ccipocr3.ChainSelector]reader.ChainConfig
+	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum
+	onRampLastSeqNum  map[ccipocr3.ChainSelector]ccipocr3.SeqNum
+	rmnReportCfg      rmntypes.RemoteConfig
+	enableDiscovery   bool
 }
 
-// nolint cyclomatic complexity 14 of func `setupNode` is high (> 13)
-func setupNode(params SetupNodeParams) nodeSetup {
-	ccipReader := readerpkg_mock.NewMockCCIPReader(params.T)
-	tokenPricesReader := readerpkg_mock.NewMockPriceReader(params.T)
+//nolint:gocyclo // todo
+func setupNode(params SetupNodeParams, nodeID commontypes.OracleID) nodeSetup {
+	ccipReader := readerpkg_mock.NewMockCCIPReader(params.t)
+	tokenPricesReader := readerpkg_mock.NewMockPriceReader(params.t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
-	homeChainReader := reader_mock.NewMockHomeChain(params.T)
-	rmnHomeReader := reader_mock.NewMockRMNHome(params.T)
+	homeChainReader := reader_mock.NewMockHomeChain(params.t)
+	rmnHomeReader := reader_mock.NewMockRMNHome(params.t)
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
-	for chainSel, cfg := range params.ChainCfg {
+	for chainSel, cfg := range params.chainCfg {
 		fChain[chainSel] = cfg.FChain
 
 		for _, peerID := range cfg.SupportedNodes.ToSlice() {
@@ -527,7 +524,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
 	homeChainReader.EXPECT().
-		GetOCRConfigs(mock.Anything, params.DonID, consts.PluginTypeCommit).
+		GetOCRConfigs(mock.Anything, params.donID, consts.PluginTypeCommit).
 		Return([]reader.OCR3ConfigWithMeta{{}}, nil).Maybe()
 
 	for peerID, supportedChains := range supportedChainsForPeer {
@@ -536,14 +533,14 @@ func setupNode(params SetupNodeParams) nodeSetup {
 
 	knownCCIPChains := mapset.NewSet[ccipocr3.ChainSelector]()
 
-	for chainSel, cfg := range params.ChainCfg {
+	for chainSel, cfg := range params.chainCfg {
 		homeChainReader.EXPECT().GetChainConfig(chainSel).Return(cfg, nil).Maybe()
 		knownCCIPChains.Add(chainSel)
 	}
 	homeChainReader.EXPECT().GetKnownCCIPChains().Return(knownCCIPChains, nil).Maybe()
 
 	sourceChains := make([]ccipocr3.ChainSelector, 0)
-	for chainSel := range params.OffRampNextSeqNum {
+	for chainSel := range params.offRampNextSeqNum {
 		sourceChains = append(sourceChains, chainSel)
 	}
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
@@ -551,12 +548,12 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	offRampNextSeqNums := make([]ccipocr3.SeqNum, 0)
 	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
 	for _, sourceChain := range sourceChains {
-		offRampNextSeqNum, ok := params.OffRampNextSeqNum[sourceChain]
-		assert.True(params.T, ok)
+		offRampNextSeqNum, ok := params.offRampNextSeqNum[sourceChain]
+		assert.True(params.t, ok)
 		offRampNextSeqNums = append(offRampNextSeqNums, offRampNextSeqNum)
 
 		newMsgs := make([]ccipocr3.Message, 0)
-		numNewMsgs := (params.OnRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
+		numNewMsgs := (params.onRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
 		for i := uint64(0); i < uint64(numNewMsgs); i++ {
 			messageID := sha256.Sum256([]byte(fmt.Sprintf("%d", uint64(offRampNextSeqNum)+i)))
 			newMsgs = append(newMsgs, ccipocr3.Message{
@@ -567,7 +564,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 			})
 		}
 
-		ccipReader.EXPECT().MsgsBetweenSeqNums(params.Ctx, sourceChain,
+		ccipReader.EXPECT().MsgsBetweenSeqNums(params.ctx, sourceChain,
 			ccipocr3.NewSeqNumRange(offRampNextSeqNum, offRampNextSeqNum)).
 			Return(newMsgs, nil).Maybe()
 
@@ -578,41 +575,41 @@ func setupNode(params SetupNodeParams) nodeSetup {
 
 	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
 	for _, chainSel := range chainsWithNewMsgs {
-		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, params.OffRampNextSeqNum[chainSel])
+		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, params.offRampNextSeqNum[chainSel])
 	}
 	if len(chainsWithNewMsgs) > 0 {
-		ccipReader.EXPECT().NextSeqNum(params.Ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
+		ccipReader.EXPECT().NextSeqNum(params.ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
 	}
-	ccipReader.EXPECT().NextSeqNum(params.Ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
+	ccipReader.EXPECT().NextSeqNum(params.ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
 	for _, ch := range sourceChains {
 		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
-			params.Ctx, ch, destChain).Return(params.OffRampNextSeqNum[ch]+1, nil).Maybe()
+			params.ctx, ch, destChain).Return(params.offRampNextSeqNum[ch]+1, nil).Maybe()
 	}
 
 	ccipReader.EXPECT().
-		GetRMNRemoteConfig(params.Ctx, mock.Anything).
-		Return(params.RmnReportCfg, nil).Maybe()
+		GetRMNRemoteConfig(params.ctx, mock.Anything).
+		Return(params.rmnReportCfg, nil).Maybe()
 
 	p := NewPlugin(
-		params.DonID,
-		params.NodeID,
-		params.OracleIDToP2pID,
-		params.OffchainCfg,
+		params.donID,
+		nodeID,
+		params.oracleIDToP2pID,
+		params.offchainCfg,
 		destChain,
 		ccipReader,
 		tokenPricesReader,
 		reportCodec,
 		msgHasher,
-		params.Lggr,
+		params.lggr,
 		homeChainReader,
 		rmnHomeReader,
 		nil,
 		nil,
-		params.ReportingCfg,
+		params.reportingCfg,
 	)
 
-	if !params.EnableDiscovery {
+	if !params.enableDiscovery {
 		p.discoveryProcessor = nil
 	}
 	return nodeSetup{
@@ -674,19 +671,18 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
 
 	params := SetupNodeParams{
-		Ctx:               ctx,
-		T:                 t,
-		Lggr:              lggr,
-		DonID:             donID,
-		NodeID:            0,
-		ReportingCfg:      reportingCfg,
-		OracleIDToP2pID:   oracleIDToPeerID,
-		OffchainCfg:       cfg,
-		ChainCfg:          homeChainConfig,
-		OffRampNextSeqNum: offRampNextSeqNum,
-		OnRampLastSeqNum:  onRampLastSeqNum,
-		RmnReportCfg:      rmnRemoteCfg,
-		EnableDiscovery:   false,
+		ctx:               ctx,
+		t:                 t,
+		lggr:              lggr,
+		donID:             donID,
+		reportingCfg:      reportingCfg,
+		oracleIDToP2pID:   oracleIDToPeerID,
+		offchainCfg:       cfg,
+		chainCfg:          homeChainConfig,
+		offRampNextSeqNum: offRampNextSeqNum,
+		onRampLastSeqNum:  onRampLastSeqNum,
+		rmnReportCfg:      rmnRemoteCfg,
+		enableDiscovery:   false,
 	}
 
 	return params
