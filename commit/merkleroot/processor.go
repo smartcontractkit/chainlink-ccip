@@ -81,7 +81,7 @@ func NewProcessor(
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}
 
 func (p *Processor) Close() error {
-	if p.offchainCfg.RMNEnabled {
+	if !p.offchainCfg.RMNEnabled {
 		return nil
 	}
 
