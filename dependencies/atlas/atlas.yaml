@@ -35,6 +35,11 @@ vars:
     source: env
     default: http://geth-2337:8544
 
+pullSecrets:
+  regcred-atlas:
+    registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-atlas
+
 pipelines:
   atlas:
     run: |-
@@ -43,6 +48,7 @@ pipelines:
 
   atlas-infra:
     run: |-
+      ensure_pull_secrets --all
       create_deployments atlas-infra
 
   atlas-network-1:
@@ -71,7 +77,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
-        version: "0.0.4"
+        version: "0.1.0"
       valuesFiles:
         - ${MONITORING_NETWORK_1_VALUES_PATH}
       values:
@@ -100,7 +106,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-infra
-        version: "0.1.1"
+        version: "0.2.0"
       values:
         postgres-migration:
           envVars:
@@ -131,3 +137,199 @@ profiles:
               name: network-2
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
               version: null
+  - name: kind
+    merge:
+      deployments:
+        atlas-infra:
+          helm:
+            values:
+              atlas-postgraphile:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                topologySpreadConstraints: []
+                image:
+                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  pullPolicy: IfNotPresent
+              atlas-setup:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                image:
+                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  pullPolicy: IfNotPresent
+                initContainers:
+                  - name: wait-for-services
+                    image: "804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-setup:9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    command: ["/bin/sh", "-c"]
+                    args:
+                      - -c
+                      - |
+                        /bin/sh /scripts/wait_for_endpoint.sh
+                    volumeMounts:
+                      - name: script-volume
+                        mountPath: /scripts
+                    securityContext:
+                      capabilities:
+                        drop:
+                          - ALL
+                      runAsUser: 999
+                      runAsGroup: 999
+                      runAsNonRoot: true
+                    envFrom:
+                      - secretRef:
+                          name: kafka-urls
+                      - secretRef:
+                          name: schema-registry-url
+
+        atlas-network-1:
+          helm:
+            values:
+              atlas-evm-ccip-exporter:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                image:
+                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  pullPolicy: IfNotPresent
+              atlas-evm-ccip:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                image:
+                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  pullPolicy: IfNotPresent
+              atlas-core:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                dataCoverage:
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-blocks:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-events:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-events-retry:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-logs:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-logs-retry:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-receipts:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-receipts-retry:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-txn-rdd-filter:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-logs-abi-decoder:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+
+        atlas-network-2:
+          helm:
+            values:
+              atlas-evm-ccip-exporter:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                image:
+                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  pullPolicy: IfNotPresent
+              atlas-evm-ccip:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                image:
+                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  pullPolicy: IfNotPresent
+              atlas-core:
+                imagePullSecrets:
+                  - name: regcred-atlas
+                dataCoverage:
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-blocks:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-events:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-events-retry:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-logs:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-logs-retry:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-receipts:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-receipts-retry:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-txn-rdd-filter:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent
+                evm-logs-abi-decoder:
+                  imagePullSecrets:
+                    - name: regcred-atlas
+                  image:
+                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    pullPolicy: IfNotPresent

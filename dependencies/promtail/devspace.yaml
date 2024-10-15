@@ -16,6 +16,8 @@ deployments:
       values:
         config:
           enabled: true
+        rbac:
+          create: false
 
 profiles:
   - name: default
