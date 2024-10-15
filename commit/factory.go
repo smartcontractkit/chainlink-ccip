@@ -137,7 +137,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			rmnCr,
 			rmnHomeBoundContract,
 			p.lggr,
-			100*time.Millisecond,
+			time.Second,
 		)
 
 		if err := rmnHomeReader.Start(ctx); err != nil {
