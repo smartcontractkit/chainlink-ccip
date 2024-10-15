@@ -11,7 +11,6 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-// nolint:revive,govet
 func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,

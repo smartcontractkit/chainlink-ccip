@@ -120,7 +120,7 @@ func (p *USDCCCTPObserverConfig) setDefaults() {
 	}
 }
 
-// nolint:lll // CCTP link
+//nolint:lll // CCTP link
 type USDCCCTPTokenConfig struct {
 	// SourcePoolAddress is the address of the USDC token pool on the source chain that support USDC token transfers
 	SourcePoolAddress string `json:"sourceTokenAddress"`
