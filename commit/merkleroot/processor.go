@@ -90,7 +90,7 @@ func (p *Processor) Close() error {
 	// close rmn controller
 	if p.rmnController != nil {
 		if err := p.rmnController.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close RMN controller: %w", err))
+			errs = append(errs, fmt.Errorf("close RMN controller: %w", err))
 			p.lggr.Errorw("Failed to close RMN controller", "err", err)
 		}
 	}
@@ -98,7 +98,7 @@ func (p *Processor) Close() error {
 	// close rmn home reader
 	if p.rmnHomeReader != nil {
 		if err := p.rmnHomeReader.Close(); err != nil {
-			errs = append(errs, fmt.Errorf("failed to close RMNHome reader: %w", err))
+			errs = append(errs, fmt.Errorf("close RMNHome reader: %w", err))
 			p.lggr.Errorw("Failed to close RMNHome reader", "err", err)
 		}
 	}
