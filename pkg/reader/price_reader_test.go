@@ -150,7 +150,6 @@ func TestPriceService_calculateUsdPer1e18TokenAmount(t *testing.T) {
 	}
 }
 
-// nolint unparam
 func createMockReader(
 	t *testing.T,
 	mockPrices map[ocr2types.Account]*big.Int,

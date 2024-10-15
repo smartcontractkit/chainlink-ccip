@@ -472,8 +472,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	selectors []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]cciptypes.BigInt {
 	// 1. Call chain's router to get native token address https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/Router.sol#L189:L191
-	// nolint:lll
 	// 2. Call chain's FeeQuoter to get native tokens price  https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L229-L229
+	//
+	//nolint:lll
 	prices := make(map[cciptypes.ChainSelector]cciptypes.BigInt)
 	for _, chain := range selectors {
 		reader, ok := r.contractReaders[chain]
@@ -529,8 +530,9 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 
 // GetChainFeePriceUpdate Read from Destination chain FeeQuoter latest fee updates for the provided chains.
 // It unpacks the packed fee into the ChainFeeUSDPrices struct.
-// nolint:lll
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L263-L263
+//
+//nolint:lll
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
@@ -584,18 +586,23 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote config: %w", err)
 	}
 
-	var dh cciptypes.Bytes32
+	type ret struct {
+		DigestHeader cciptypes.Bytes32
+	}
+	var header ret
+
 	err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
 		consts.MethodNameGetReportDigestHeader,
 		primitives.Unconfirmed,
 		map[string]any{},
-		&dh,
+		&header,
 	)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote report digest header: %w", err)
 	}
+	r.lggr.Infow("got RMNRemote report digest header", "digest", header.DigestHeader)
 
 	signers := make([]rmntypes.RemoteSignerInfo, 0, len(vc.Config.Signers))
 	for _, signer := range vc.Config.Signers {
@@ -611,7 +618,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		Signers:          signers,
 		MinSigners:       vc.Config.MinSigners,
 		ConfigVersion:    vc.Version,
-		RmnReportVersion: dh,
+		RmnReportVersion: header.DigestHeader,
 	}, nil
 }
 
@@ -659,7 +666,8 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		return nil, fmt.Errorf("unable to lookup nonce manager (offramp static config): %w", err)
 	}
 	resp = resp.Append(consts.ContractNameNonceManager, r.destChain, staticConfig.NonceManager)
-	resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.Rmn)
+	resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.RmnRemote)
+	r.lggr.Infow("appending RMN remote contract address", "address", staticConfig.RmnRemote)
 
 	// FeeQuoter from the offRamp dynamic config.
 	var dynamicConfig offRampDynamicChainConfig
@@ -958,7 +966,7 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 //nolint:lll // It's a URL.
 type offRampStaticChainConfig struct {
 	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	Rmn                []byte                  `json:"rmn"`
+	RmnRemote          []byte                  `json:"rmnRemote"`
 	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
 	NonceManager       []byte                  `json:"nonceManager"`
 }
@@ -1118,8 +1126,6 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 
 // signer is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L42-L45
-//
-//nolint:lll // It's a URL.
 type signer struct {
 	OnchainPublicKey []byte `json:"onchainPublicKey"`
 	NodeIndex        uint64 `json:"nodeIndex"`
@@ -1127,8 +1133,6 @@ type signer struct {
 
 // config is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L49-L53
-//
-//nolint:lll // It's a URL.
 type config struct {
 	RMNHomeContractConfigDigest []byte   `json:"rmnHomeContractConfigDigest"`
 	Signers                     []signer `json:"signers"`
@@ -1137,8 +1141,6 @@ type config struct {
 
 // versionnedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L167-L169
-//
-//nolint:lll // It's a URL.
 type versionedConfig struct {
 	Version uint32 `json:"version"`
 	Config  config `json:"config"`

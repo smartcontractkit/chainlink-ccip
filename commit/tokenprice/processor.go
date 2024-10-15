@@ -30,7 +30,6 @@ type processor struct {
 	fRoleDON         int
 }
 
-// nolint: revive
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	lggr logger.Logger,
@@ -40,7 +39,7 @@ func NewProcessor(
 	tokenPriceReader reader2.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
-) *processor {
+) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
