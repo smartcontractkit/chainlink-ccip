@@ -48,3 +48,7 @@ func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}
+
+func (p *processor) Close() error {
+	return nil
+}

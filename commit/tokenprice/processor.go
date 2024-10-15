@@ -121,6 +121,10 @@ func (p *processor) Outcome(
 	}, nil
 }
 
+func (p *processor) Close() error {
+	return nil
+}
+
 func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 	tokensWithPrice := mapset.NewSet[types.Account]()
 	for _, t := range tokenPrices {
