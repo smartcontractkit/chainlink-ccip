@@ -17,6 +17,8 @@ type RMNHome = reader_internal.RMNHome
 
 type HomeNodeInfo = rmntypes.HomeNodeInfo
 
+type NodeID = rmntypes.NodeID
+
 func NewRMNHomePoller(
 	contractReader contractreader.ContractReaderFacade,
 	rmnHomeBoundContract types.BoundContract,
