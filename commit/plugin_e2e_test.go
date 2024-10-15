@@ -4,13 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
-	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"golang.org/x/exp/maps"
 	"math/big"
 	"sort"
 	"testing"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -24,12 +23,14 @@ import (
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -249,8 +250,22 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
-					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum, rmnRemoteCfg, tc.enableDiscovery)
+				params := SetupNodeParams{
+					Ctx:               ctx,
+					T:                 t,
+					Lggr:              lggr,
+					DonID:             donID,
+					NodeID:            oracleIDs[i],
+					ReportingCfg:      reportingCfg,
+					OracleIDToP2pID:   oracleIDToPeerID,
+					OffchainCfg:       cfg,
+					ChainCfg:          homeChainConfig,
+					OffRampNextSeqNum: offRampNextSeqNum,
+					OnRampLastSeqNum:  onRampLastSeqNum,
+					RmnReportCfg:      rmnRemoteCfg,
+					EnableDiscovery:   tc.enableDiscovery,
+				}
+				n := setupNode(params)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
@@ -457,8 +472,22 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				n := setupNode(ctx, t, lggr, donID, oracleIDs[i], reportingCfg, oracleIDToPeerID,
-					cfg, homeChainConfig, offRampNextSeqNum, onRampLastSeqNum, rmnRemoteCfg, false)
+				params := SetupNodeParams{
+					Ctx:               ctx,
+					T:                 t,
+					Lggr:              lggr,
+					DonID:             donID,
+					NodeID:            oracleIDs[i],
+					ReportingCfg:      reportingCfg,
+					OracleIDToP2pID:   oracleIDToPeerID,
+					OffchainCfg:       cfg,
+					ChainCfg:          homeChainConfig,
+					OffRampNextSeqNum: offRampNextSeqNum,
+					OnRampLastSeqNum:  onRampLastSeqNum,
+					RmnReportCfg:      rmnRemoteCfg,
+					EnableDiscovery:   false,
+				}
+				n := setupNode(params)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
@@ -525,6 +554,7 @@ func prepareCcipReaderMock(
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{}, nil).Maybe()
 
+	//nolint we need to check if offRampNextSeqNumKeys is nil
 	if offRampNextSeqNumKeys != nil && len(offRampNextSeqNumKeys) > 0 {
 		assert.Equal(t, len(offRampNextSeqNumKeys), len(offRampNextSeqNumValues))
 		ccipReader.EXPECT().NextSeqNum(ctx, offRampNextSeqNumKeys).Unset()
@@ -553,31 +583,35 @@ type nodeSetup struct {
 	msgHasher   *mocks.MessageHasher
 }
 
-func setupNode(
-	ctx context.Context,
-	t *testing.T,
-	lggr logger.Logger,
-	donID plugintypes.DonID,
-	nodeID commontypes.OracleID,
-	reportingCfg ocr3types.ReportingPluginConfig,
-	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	offchainCfg pluginconfig.CommitOffchainConfig,
-	chainCfg map[ccipocr3.ChainSelector]reader.ChainConfig,
-	offRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
-	onRampLastSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum,
-	rmnReportCfg rmntypes.RemoteConfig,
-	enableDiscovery bool,
-) nodeSetup {
-	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
-	tokenPricesReader := readerpkg_mock.NewMockPriceReader(t)
+// Define a struct to hold the parameters
+type SetupNodeParams struct {
+	Ctx               context.Context
+	T                 *testing.T
+	Lggr              logger.Logger
+	DonID             plugintypes.DonID
+	NodeID            commontypes.OracleID
+	ReportingCfg      ocr3types.ReportingPluginConfig
+	OracleIDToP2pID   map[commontypes.OracleID]libocrtypes.PeerID
+	OffchainCfg       pluginconfig.CommitOffchainConfig
+	ChainCfg          map[ccipocr3.ChainSelector]reader.ChainConfig
+	OffRampNextSeqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum
+	OnRampLastSeqNum  map[ccipocr3.ChainSelector]ccipocr3.SeqNum
+	RmnReportCfg      rmntypes.RemoteConfig
+	EnableDiscovery   bool
+}
+
+// Modify the function to accept an instance of the struct
+func setupNode(params SetupNodeParams) nodeSetup {
+	ccipReader := readerpkg_mock.NewMockCCIPReader(params.T)
+	tokenPricesReader := readerpkg_mock.NewMockPriceReader(params.T)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
-	homeChainReader := reader_mock.NewMockHomeChain(t)
-	rmnHomeReader := reader_mock.NewMockRMNHome(t)
+	homeChainReader := reader_mock.NewMockHomeChain(params.T)
+	rmnHomeReader := reader_mock.NewMockRMNHome(params.T)
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
-	for chainSel, cfg := range chainCfg {
+	for chainSel, cfg := range params.ChainCfg {
 		fChain[chainSel] = cfg.FChain
 
 		for _, peerID := range cfg.SupportedNodes.ToSlice() {
@@ -590,7 +624,7 @@ func setupNode(
 
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
 	homeChainReader.EXPECT().
-		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeCommit).
+		GetOCRConfigs(mock.Anything, params.DonID, consts.PluginTypeCommit).
 		Return([]reader.OCR3ConfigWithMeta{{}}, nil).Maybe()
 
 	for peerID, supportedChains := range supportedChainsForPeer {
@@ -599,14 +633,14 @@ func setupNode(
 
 	knownCCIPChains := mapset.NewSet[ccipocr3.ChainSelector]()
 
-	for chainSel, cfg := range chainCfg {
+	for chainSel, cfg := range params.ChainCfg {
 		homeChainReader.EXPECT().GetChainConfig(chainSel).Return(cfg, nil).Maybe()
 		knownCCIPChains.Add(chainSel)
 	}
 	homeChainReader.EXPECT().GetKnownCCIPChains().Return(knownCCIPChains, nil).Maybe()
 
 	sourceChains := make([]ccipocr3.ChainSelector, 0)
-	for chainSel := range offRampNextSeqNum {
+	for chainSel := range params.OffRampNextSeqNum {
 		sourceChains = append(sourceChains, chainSel)
 	}
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
@@ -614,12 +648,12 @@ func setupNode(
 	offRampNextSeqNums := make([]ccipocr3.SeqNum, 0)
 	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
 	for _, sourceChain := range sourceChains {
-		offRampNextSeqNum, ok := offRampNextSeqNum[sourceChain]
-		assert.True(t, ok)
+		offRampNextSeqNum, ok := params.OffRampNextSeqNum[sourceChain]
+		assert.True(params.T, ok)
 		offRampNextSeqNums = append(offRampNextSeqNums, offRampNextSeqNum)
 
 		newMsgs := make([]ccipocr3.Message, 0)
-		numNewMsgs := (onRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
+		numNewMsgs := (params.OnRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
 		for i := uint64(0); i < uint64(numNewMsgs); i++ {
 			messageID := sha256.Sum256([]byte(fmt.Sprintf("%d", uint64(offRampNextSeqNum)+i)))
 			newMsgs = append(newMsgs, ccipocr3.Message{
@@ -630,7 +664,7 @@ func setupNode(
 			})
 		}
 
-		ccipReader.EXPECT().MsgsBetweenSeqNums(ctx, sourceChain,
+		ccipReader.EXPECT().MsgsBetweenSeqNums(params.Ctx, sourceChain,
 			ccipocr3.NewSeqNumRange(offRampNextSeqNum, offRampNextSeqNum)).
 			Return(newMsgs, nil).Maybe()
 
@@ -641,41 +675,41 @@ func setupNode(
 
 	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
 	for _, chainSel := range chainsWithNewMsgs {
-		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, offRampNextSeqNum[chainSel])
+		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, params.OffRampNextSeqNum[chainSel])
 	}
 	if len(chainsWithNewMsgs) > 0 {
-		ccipReader.EXPECT().NextSeqNum(ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
+		ccipReader.EXPECT().NextSeqNum(params.Ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
 	}
-	ccipReader.EXPECT().NextSeqNum(ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
+	ccipReader.EXPECT().NextSeqNum(params.Ctx, sourceChains).Return(offRampNextSeqNums, nil).Maybe()
 
 	for _, ch := range sourceChains {
 		ccipReader.EXPECT().GetExpectedNextSequenceNumber(
-			ctx, ch, destChain).Return(offRampNextSeqNum[ch]+1, nil).Maybe()
+			params.Ctx, ch, destChain).Return(params.OffRampNextSeqNum[ch]+1, nil).Maybe()
 	}
 
 	ccipReader.EXPECT().
-		GetRMNRemoteConfig(ctx, mock.Anything).
-		Return(rmnReportCfg, nil).Maybe()
+		GetRMNRemoteConfig(params.Ctx, mock.Anything).
+		Return(params.RmnReportCfg, nil).Maybe()
 
 	p := NewPlugin(
-		donID,
-		nodeID,
-		oracleIDToP2pID,
-		offchainCfg,
+		params.DonID,
+		params.NodeID,
+		params.OracleIDToP2pID,
+		params.OffchainCfg,
 		destChain,
 		ccipReader,
 		tokenPricesReader,
 		reportCodec,
 		msgHasher,
-		lggr,
+		params.Lggr,
 		homeChainReader,
 		rmnHomeReader,
 		nil,
 		nil,
-		reportingCfg,
+		params.ReportingCfg,
 	)
 
-	if !enableDiscovery {
+	if !params.EnableDiscovery {
 		p.discoveryProcessor = nil
 	}
 	return nodeSetup{

@@ -3,7 +3,6 @@ package tokenprice
 import (
 	"context"
 	"fmt"
-	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
