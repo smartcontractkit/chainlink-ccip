@@ -43,10 +43,12 @@ func (p *processor) Outcome(
 	// We need to report a packed GasPrice
 	// The packed GasPrice is a 224-bit integer with the following format:
 	// (dataAvFeePriceUSD) << 112 | (executionFeePriceUSD)
-	// nolint:lll
+	//
 	// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
 	// In next loop we calculate the price in USD for the data availability and execution fees.
 	// And getGasPricesToUpdate will select and calculate the **packed** gas price to update based.
+	//
+	//nolint:lll
 	for chain, feeComp := range consensusObs.FeeComponents {
 		// The price, in USD with 18 decimals, per 1e18 of the smallest token denomination.
 		// 1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30

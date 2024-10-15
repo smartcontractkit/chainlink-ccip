@@ -391,7 +391,7 @@ func addDestinationContractAssertions(
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offRampStaticChainConfig)
 		v.NonceManager = destNonceMgr
-		v.Rmn = destRMNRemote
+		v.RmnRemote = destRMNRemote
 	}))
 	// mock the call to get the fee quoter
 	extended.EXPECT().ExtendedGetLatestValue(
@@ -494,16 +494,22 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
-	require.Equal(t, 2, hook.Len())
+	require.Equal(t, 3, hook.Len())
+
 	assert.Contains(
 		t,
-		"unable to lookup source fee quoters, this is expected during initialization",
+		"appending RMN remote contract address",
 		hook.All()[0].Message,
 	)
 	assert.Contains(
 		t,
-		"unable to lookup source routers, this is expected during initialization",
+		"unable to lookup source fee quoters, this is expected during initialization",
 		hook.All()[1].Message,
+	)
+	assert.Contains(
+		t,
+		"unable to lookup source routers, this is expected during initialization",
+		hook.All()[2].Message,
 	)
 }
 
@@ -641,7 +647,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		v := returnVal.(*offRampStaticChainConfig)
 		v.NonceManager = destNonceMgr
-		v.Rmn = destRMNRemote
+		v.RmnRemote = destRMNRemote
 	}))
 	// mock the call to get the fee quoter
 	destExtended.EXPECT().ExtendedGetLatestValue(

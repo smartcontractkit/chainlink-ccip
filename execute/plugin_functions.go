@@ -133,7 +133,8 @@ func groupByChainSelector(
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
-// nolint:gocyclo // todo
+//
+//nolint:gocyclo // todo
 func filterOutExecutedMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ([]exectypes.CommitData, error) {
@@ -311,7 +312,6 @@ func mergeTokenObservations(
 	fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.TokenDataObservations, error) {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
-	//nolint:lll
 	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
