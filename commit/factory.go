@@ -144,7 +144,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// map types to the facade.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
 	for chain, cr := range p.contractReaders {
 		readers[chain] = cr
 	}
