@@ -338,7 +338,8 @@ func (c *controller) sendObservationRequests(
 // listenForRmnObservationResponses listens for the RMN observation responses.
 // It waits for the responses until all the requests are finished or until the context is done.
 // It is responsible for sending additional observation requests if the initial requests timeout.
-// nolint:gocyclo // todo
+//
+//nolint:gocyclo // todo
 func (c *controller) listenForRmnObservationResponses(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
@@ -466,7 +467,7 @@ func gotSufficientObservationResponses(
 	return true
 }
 
-// nolint:gocyclo // todo
+//nolint:gocyclo // todo
 func (c *controller) validateSignedObservationResponse(
 	parsedResp *rmnpb.Response,
 	rmnNodeID rmntypes.NodeID,
@@ -778,7 +779,7 @@ type reportSigWithSignerAddress struct {
 	signerAddress cciptypes.Bytes
 }
 
-// nolint:gocyclo // todo
+//nolint:gocyclo // todo
 func (c *controller) listenForRmnReportSignatures(
 	ctx context.Context,
 	requestIDs mapset.Set[uint64],
