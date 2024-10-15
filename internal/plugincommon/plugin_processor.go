@@ -41,4 +41,5 @@ type PluginProcessor[Query any, Observation any, Outcome any] interface {
 	Observation(ctx context.Context, prev Outcome, query Query) (Observation, error)
 	ValidateObservation(prev Outcome, query Query, ao AttributedObservation[Observation]) error
 	Outcome(ctx context.Context, prev Outcome, query Query, aos []AttributedObservation[Observation]) (Outcome, error)
+	Close() error
 }
