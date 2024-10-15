@@ -4,27 +4,22 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_AttestationClient(t *testing.T) {
-	lggr := logger.Test(t)
-
-	t.Cleanup(func() {
-		_ = lggr.Sync()
-	})
-
 	type example struct {
 		hash   []byte
 		keccak string
@@ -44,6 +39,10 @@ func Test_AttestationClient(t *testing.T) {
 		hash:   []byte{0xC},
 		keccak: "0x4de0e96b0a8886e42a2c35b57df8a9d58a93b5bff655bc37a30e2ab8e29dc066",
 	}
+
+	handler := newMockHandler(t)
+	server := httptest.NewServer(handler)
+	defer server.Close()
 
 	tt := []struct {
 		name     string
@@ -160,13 +159,12 @@ func Test_AttestationClient(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(createHandler(t, tc.success, tc.pending))
-			defer server.Close()
+			handler.updateURIs(tc.success, tc.pending)
 
-			client, err := NewSequentialAttestationClient(lggr, pluginconfig.USDCCCTPObserverConfig{
+			client, err := NewSequentialAttestationClient(mocks.NullLogger, pluginconfig.USDCCCTPObserverConfig{
 				AttestationAPI:         server.URL,
 				AttestationAPIInterval: commonconfig.MustNewDuration(1 * time.Millisecond),
-				AttestationAPITimeout:  commonconfig.MustNewDuration(1 * time.Minute),
+				AttestationAPITimeout:  commonconfig.MustNewDuration(5 * time.Second),
 			})
 			require.NoError(t, err)
 			attestations, err := client.Attestations(tests.Context(t), tc.input)
@@ -176,35 +174,56 @@ func Test_AttestationClient(t *testing.T) {
 	}
 }
 
-func groupedByURI(hashes []string) map[string]string {
-	out := make(map[string]string)
-	for _, hash := range hashes {
-		out["/v1/attestations/"+hash] = hash
-	}
-	return out
+type mockHandler struct {
+	t *testing.T
+
+	success map[string]string
+	pending map[string]string
+	mu      sync.RWMutex
 }
 
-func writeJSONResponse(t *testing.T, w http.ResponseWriter, status, attestation string) {
+func newMockHandler(t *testing.T) *mockHandler {
+	return &mockHandler{
+		t:  t,
+		mu: sync.RWMutex{},
+	}
+}
+
+func (h *mockHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	if hash, ok := h.success[r.URL.String()]; ok {
+		h.writeJSONResponse(w, "complete", hash)
+	} else if hash1, ok1 := h.pending[r.URL.String()]; ok1 {
+		h.writeJSONResponse(w, "pending_confirmations", hash1)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (h *mockHandler) updateURIs(success, pending []string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	h.success = h.groupedByURI(success)
+	h.pending = h.groupedByURI(pending)
+}
+
+func (h *mockHandler) writeJSONResponse(w http.ResponseWriter, status, attestation string) {
 	response := fmt.Sprintf(`
 	{
 			"status": "%s",
 			"attestation": "%s"
 	}`, status, attestation)
 	_, err := w.Write([]byte(response))
-	require.NoError(t, err)
+	require.NoError(h.t, err)
 }
 
-func createHandler(t *testing.T, success []string, pending []string) http.HandlerFunc {
-	successURIs := groupedByURI(success)
-	pendingURIs := groupedByURI(pending)
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		if hash, ok := successURIs[r.URL.String()]; ok {
-			writeJSONResponse(t, w, "complete", hash)
-		} else if hash1, ok1 := pendingURIs[r.URL.String()]; ok1 {
-			writeJSONResponse(t, w, "pending_confirmations", hash1)
-		} else {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+func (h *mockHandler) groupedByURI(hashes []string) map[string]string {
+	out := make(map[string]string)
+	for _, hash := range hashes {
+		out["/v1/attestations/"+hash] = hash
 	}
+	return out
 }
