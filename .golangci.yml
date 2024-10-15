@@ -9,18 +9,19 @@ linters:
     - errorlint
     - exhaustive
     - exportloopref
-    - gofmt
-    - gocyclo
     - goconst
+    - gocyclo
+    - gofmt
     - goimports
-    - gosimple
     - gosec
+    - gosimple
     - govet
     - ineffassign
     - lll
     - misspell
     - nakedret
     - noctx
+    - nolintlint
     - revive
     - rowserrcheck
     - sqlclosecheck

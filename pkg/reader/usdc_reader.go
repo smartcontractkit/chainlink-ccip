@@ -216,7 +216,7 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 			return nil, fmt.Errorf("destination domain not found for chain %d", destChainSelector)
 		}
 
-		// nolint:lll
+		//nolint:lll
 		// USDC message payload:
 		// uint32 _msgVersion,
 		// uint32 _msgSourceDomain,

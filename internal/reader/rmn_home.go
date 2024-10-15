@@ -333,7 +333,7 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 
 // VersionedConfigWithDigest mirrors RMNHome.sol's VersionedConfigWithDigest struct
 type VersionedConfigWithDigest struct {
-	// nolint:lll // don't split up the long url
+	//nolint:lll // don't split up the long url
 	// https://github.com/smartcontractkit/ccip/blob/e6e26ad31eef625faf68806a2b4f0549bc89b15c/contracts/src/v0.8/ccip/RMNRemote.sol#L34
 	ConfigDigest    cciptypes.Bytes32 `json:"configDigest"`
 	VersionedConfig VersionedConfig   `json:"versionedConfig"`
