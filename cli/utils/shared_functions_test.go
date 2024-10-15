@@ -5,6 +5,8 @@ import (
 )
 
 func TestIsCustomImage(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name              string
 		devspaceNamespace string
@@ -45,6 +47,8 @@ func TestIsCustomImage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := IsCustomImage(tt.devspaceNamespace, tt.devspaceImage)
 			if result != tt.expected {
 				t.Errorf("IsCustomImage(%s, %s) = %v; want %v", tt.devspaceNamespace, tt.devspaceImage, result, tt.expected)
