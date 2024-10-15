@@ -126,8 +126,10 @@ commands:
 
 hooks:
   - name: "pre-image-build-hook"
-    command: ${SCRIPTS_DIR}/before_build_checks.sh
+    command: crib devspace before-build-checks
     events: ["before:build:app"]
+  - command: crib devspace refresh-ecr-credentials
+    events: ["before:build:*"]
   - command: ${SCRIPTS_DIR}/before_deploy_checks.sh
     events: ["before:deploy:app"]
   - command: ./${SCRIPTS_DIR}/manage_namespace.sh

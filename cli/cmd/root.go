@@ -27,10 +27,18 @@ var rootCmd = &cobra.Command{
 CRIB is tooling that enables CLL developers to quickly spin up ephemeral development 
 and/or testing environments that closely mimic a product’s staging environment with 
 all the required Chainlink dependencies.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		isChildOfDevspaceCmd := false
+		if cmd.Parent() != nil && cmd.Parent().Name() == "devspace" {
+			isChildOfDevspaceCmd = true
+		}
 
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+		if !isChildOfDevspaceCmd {
+			ensureRunningInAProductDir()
+		}
+		initConfig(isChildOfDevspaceCmd)
+		initLogger()
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -44,8 +52,6 @@ func Execute() {
 
 //nolint:gochecknoinits
 func init() {
-	cobra.OnInitialize(ensureRunningInAProductDir, initConfig, initLogger)
-
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".env", "config file")
 	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().Bool("crib-ci-env", false, "Flag to indicate that this is a CI environment")
@@ -91,7 +97,7 @@ func ensureRunningInAProductDir() {
 }
 
 // initConfig reads in a config file or initializes a new one from an example
-func initConfig() {
+func initConfig(isChildOfDevspaceCmd bool) {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
@@ -103,6 +109,10 @@ func initConfig() {
 	viper.AutomaticEnv()
 	if viper.GetBool("CRIB_CI_ENV") {
 		fmt.Fprintln(os.Stdout, "Running in CI, reading values from the environment")
+		return
+	}
+	if isChildOfDevspaceCmd {
+		fmt.Fprintln(os.Stdout, "Running devspace command, reading values from the environment")
 		return
 	}
 
