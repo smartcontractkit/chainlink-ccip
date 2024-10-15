@@ -126,9 +126,11 @@ commands:
 
 hooks:
   - name: "pre-image-build-hook"
-    command: crib devspace before-build-checks
+    command: crib
+    args: ["devspace", "before-build-checks"]
     events: ["before:build:app"]
-  - command: crib devspace refresh-ecr-credentials
+  - command: crib
+    args: ["devspace", "refresh-ecr-credentials", "--docker"]
     events: ["before:build:*"]
   - command: ${SCRIPTS_DIR}/before_deploy_checks.sh
     events: ["before:deploy:app"]

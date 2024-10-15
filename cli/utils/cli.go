@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/smartcontractkit/crib/cli/wrappers"
 )
 
 func GetGitTopLevelDir(dir string) (string, error) {
@@ -165,6 +168,56 @@ func WriteConfig(path string, kv map[string]string) error {
 	// Move the temporary file to replace the original .env file
 	if err := os.Rename(tempFile.Name(), path); err != nil {
 		return fmt.Errorf("error moving temporary file to original file: %w", err)
+	}
+
+	return nil
+}
+
+func ExtractHostFromUrl(input string) (string, error) {
+	parsedUrl, err := url.Parse(input)
+	if err != nil {
+		return "", err
+	}
+	return parsedUrl.Host, nil
+}
+
+func RefreshRegistriesECRCredentials(ecrClient *wrappers.ECRClient, dockerCli *wrappers.DockerCLI, helmRegistryClient *wrappers.HelmRegistryAPI, chainlinkHelmRegistryUri string) error {
+	if dockerCli == nil && helmRegistryClient == nil {
+		return nil
+	}
+
+	ecrAuthToken, err := GetDecodedECRAuthorizationToken(ecrClient)
+	if err != nil || len(ecrAuthToken) == 0 {
+		return fmt.Errorf("failed to get ECR auth token: %w", err)
+	}
+	if len(ecrAuthToken) > 1 {
+		slog.Warn("got multiple ECR auth tokens back from ecr.GetAuthorizationToken. Only the first one will be used")
+	}
+
+	if *dockerCli != nil {
+		dockerRegistryHost, err := ExtractHostFromUrl(ecrAuthToken[0].RegistryURL)
+		if err != nil {
+			return fmt.Errorf("failed to extract host from docker registry url: %w", err)
+		}
+		if _, err := DockerLogin(*dockerCli, ecrAuthToken[0].Username, ecrAuthToken[0].Password, dockerRegistryHost); err != nil {
+			return fmt.Errorf("failed to docker login: %w", err)
+		}
+		slog.Info("Docker login successful", "registry", dockerRegistryHost)
+	} else {
+		slog.Info("Skipping Docker ECR login")
+	}
+
+	if *helmRegistryClient != nil {
+		helmRegistryHost, err := ExtractHostFromUrl(chainlinkHelmRegistryUri)
+		if err != nil {
+			return fmt.Errorf("failed to extract host from CHAINLINK_HELM_REGISTRY_URI: %w", err)
+		}
+		if err := HelmRegistryLogin(*helmRegistryClient, ecrAuthToken[0].Username, ecrAuthToken[0].Password, helmRegistryHost); err != nil {
+			return fmt.Errorf("failed to helm registry login: %w", err)
+		}
+		slog.Info("Helm registry login successful", "registry", helmRegistryHost)
+	} else {
+		slog.Info("Skipping Helm registry ECR login")
 	}
 
 	return nil

@@ -71,37 +71,32 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		logger.Info("refreshing ECR credentials for docker and helm registry")
-		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
-		ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient)
-		if err != nil {
-			logger.Error("failed to get ECR auth token", slog.Any("error", err))
-			os.Exit(1)
-		}
+		var dockerCli wrappers.DockerCLI
+		var helmRegistryClient wrappers.HelmRegistryAPI
 
-		for _, authData := range ecrAuthToken {
-			dockerCli, err := utils.InitializeDockerCLI()
+		if viper.GetBool("docker") {
+			logger.Info("refreshing ECR credentials for docker")
+			dockerCli, err = utils.InitializeDockerCLI()
 			if err != nil {
 				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
 				os.Exit(1)
 			}
-			if _, err := utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL); err != nil {
-				logger.Error("failed to docker login", slog.Any("error", err))
-				os.Exit(1)
-			}
-			logger.Info("Docker login successful", "registry", authData.RegistryURL)
-
-			helmRegistryClient, err := utils.InitializeHelmRegistryClient(nil)
+		}
+		if viper.GetBool("helm") {
+			logger.Info("refreshing ECR credentials for helm registry")
+			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
 			if err != nil {
 				logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
 				os.Exit(1)
 			}
-			if err := utils.HelmRegistryLogin(helmRegistryClient, authData.Username, authData.Password, authData.RegistryURL); err != nil {
-				logger.Error("failed to helm registry login", slog.Any("error", err))
-				os.Exit(1)
-			}
-			logger.Info("Helm registry login successful", "registry", authData.RegistryURL)
 		}
+
+		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
+		if err := utils.RefreshRegistriesECRCredentials(ecrClient, &dockerCli, &helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI")); err != nil {
+			logger.Error("failed to refresh ECR credentials", slog.Any("error", err))
+			os.Exit(1)
+		}
+
 		logger.Info("ECR credentials refreshed")
 	},
 }
@@ -112,4 +107,10 @@ func init() {
 
 	devspaceCmd.AddCommand(beforeBuildChecksCmd)
 	devspaceCmd.AddCommand(refreshEcrCredentialsCmd)
+
+	refreshEcrCredentialsCmd.Flags().Bool("docker", false, "Refresh docker ECR credentials")
+	refreshEcrCredentialsCmd.Flags().Bool("helm", false, "Refresh helm ECR credentials")
+	refreshEcrCredentialsCmd.MarkFlagsOneRequired("docker", "helm")
+
+	_ = viper.BindPFlags(refreshEcrCredentialsCmd.Flags())
 }

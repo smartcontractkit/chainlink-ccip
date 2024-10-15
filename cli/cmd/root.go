@@ -177,5 +177,6 @@ func initLogger() {
 			return a
 		},
 	}))
+	slog.SetDefault(logger)
 	logger.Debug("Debug mode enabled")
 }

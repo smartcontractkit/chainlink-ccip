@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -388,3 +389,61 @@ func TestWriteConfig(t *testing.T) {
 		})
 	}
 }
+func TestExtractHostFromUrl(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		input       string
+		expected    string
+		expectedErr error
+	}{
+		{
+			name:        "ValidURLWithHost",
+			input:       "https://example.com/path",
+			expected:    "example.com",
+			expectedErr: nil,
+		},
+		{
+			name:        "ValidURLWithPort",
+			input:       "https://example.com:8080/path",
+			expected:    "example.com:8080",
+			expectedErr: nil,
+		},
+		{
+			name:        "ValidURLWithoutPath",
+			input:       "https://example.com",
+			expected:    "example.com",
+			expectedErr: nil,
+		},
+		{
+			name:        "InvalidURL",
+			input:       "://invalid-url",
+			expected:    "",
+			expectedErr: &url.Error{},
+		},
+		{
+			name:        "EmptyURL",
+			input:       "",
+			expected:    "",
+			expectedErr: &url.Error{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := ExtractHostFromUrl(tc.input)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.IsType(t, tc.expectedErr, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, result)
+			}
+		})
+	}
+}
+
+// TODO: TestRefreshRegistriesECRCredentials

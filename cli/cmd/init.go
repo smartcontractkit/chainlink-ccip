@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -197,50 +196,27 @@ var initCmd = &cobra.Command{
 			)
 		}
 
-		if viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") && viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
-			logger.Info("CRIB initialization complete")
-			return
-		}
+		var dockerCli wrappers.DockerCLI
+		var helmRegistryClient wrappers.HelmRegistryAPI
 
-		parsedHelmRegistryURI, err := url.Parse(viper.GetString("CHAINLINK_HELM_REGISTRY_URI"))
-		if err != nil {
-			logger.Error("failed to parse CHAINLINK_HELM_REGISTRY_URI", slog.Any("error", err))
-			os.Exit(1)
+		if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
+			dockerCli, err = utils.InitializeDockerCLI()
+			if err != nil {
+				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+				os.Exit(1)
+			}
 		}
-
+		if !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
+			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
+			if err != nil {
+				logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
+				os.Exit(1)
+			}
+		}
 		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
-		ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient)
-		if err != nil {
-			logger.Error("failed to get ECR auth token", slog.Any("error", err))
+		if err := utils.RefreshRegistriesECRCredentials(ecrClient, &dockerCli, &helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI")); err != nil {
+			logger.Error("failed to refresh ECR credentials", slog.Any("error", err))
 			os.Exit(1)
-		}
-
-		for _, authData := range ecrAuthToken {
-			if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-				dockerCli, err := utils.InitializeDockerCLI()
-				if err != nil {
-					logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
-					os.Exit(1)
-				}
-				if _, err := utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL); err != nil && !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-					logger.Error("failed to docker login", slog.Any("error", err))
-					os.Exit(1)
-				}
-				logger.Info("Docker login successful", "registry", authData.RegistryURL)
-			}
-
-			if !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
-				helmRegistryClient, err := utils.InitializeHelmRegistryClient(nil)
-				if err != nil {
-					logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
-					os.Exit(1)
-				}
-				if err := utils.HelmRegistryLogin(helmRegistryClient, authData.Username, authData.Password, parsedHelmRegistryURI.Host); err != nil {
-					logger.Error("failed to helm registry login", slog.Any("error", err))
-					os.Exit(1)
-				}
-				logger.Info("Helm registry login successful", "registry", parsedHelmRegistryURI.Host)
-			}
 		}
 
 		logger.Info("CRIB initialization complete")
