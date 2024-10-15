@@ -107,11 +107,13 @@ pipelines:
       kubectl wait --for=condition=ready pod -l "app=app" --timeout=2m
 
 pullSecrets:
-  regcred-don:
+  regcred-stage-ecr:
     registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
-    secret: regcred-don
-    serviceAccounts:
-      - default
+    secret: regcred-stage-ecr
+  # To support pre-built images from develop branch
+  regcred-sdlc-ecr:
+    registry: 795953128386.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-sdlc-ecr
 
 commands:
   workload:
