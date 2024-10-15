@@ -673,7 +673,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			return nil, fmt.Errorf("unable to lookup nonce manager (offramp static config): %w", err)
 		}
 		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfig.NonceManager)
-		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.Rmn)
+		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.RmnRemote)
 		r.lggr.Infow("appending RMN remote contract address", "address", staticConfig.RmnRemote)
 	}
 
