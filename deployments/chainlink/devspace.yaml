@@ -88,6 +88,12 @@ pipelines:
       run_pipelines ccip
       run_dependency_pipelines atlas
 
+  ccip-atlas-kind:
+    run: |-
+      run_pipelines kind-dependencies
+      run_pipelines ccip
+      run_dependency_pipelines atlas
+
   ccip-atlas-ui:
     run: |-
       run_pipelines ccip-atlas
@@ -420,12 +426,20 @@ profiles:
     parents:
       - profile: ccip
       - profile: atlas
+  - name: ccip-atlas-kind
+    parents:
+      - profile: ccip-kind
+      - profile: atlas
     patches:
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
         value:
           - ccip
           - ccip-ui-ingress
+      - op: add
+        path: dependencies.atlas.profiles
+        value:
+          - kind
       - op: add
         path: dependencies
         value:
@@ -498,6 +512,10 @@ commands:
   ccip-kind:
     command: devspace run-pipeline ccip-kind -p ccip-kind
     description: Run the Core pipeline for Kind.
+    appendArgs: true
+  ccip-atlas-kind:
+    command: devspace run-pipeline ccip-atlas-kind -p ccip-atlas-kind
+    description: Run the Atlas pipeline for Kind.
     appendArgs: true
   ccip-local-charts:
     command: devspace run-pipeline ccip -p ccip-local
