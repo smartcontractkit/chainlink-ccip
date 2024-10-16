@@ -60,8 +60,8 @@ var (
 	oracleIDs = []commontypes.OracleID{1, 2, 3}
 	peerIDs   = []libocrtypes.PeerID{{1}, {2}, {3}}
 
-	ArbPrice = big.NewInt(1).Mul(big.NewInt(5), big.NewInt(1e18))
-	EthPrice = big.NewInt(1).Mul(big.NewInt(7), big.NewInt(1e18))
+	ArbPrice = new(big.Int).Mul(big.NewInt(5), big.NewInt(1e18))
+	EthPrice = new(big.Int).Mul(big.NewInt(7), big.NewInt(1e18))
 
 	// a map to ease working with tests
 	tokenPriceMap = map[ocr2types.Account]ccipocr3.TokenPrice{
