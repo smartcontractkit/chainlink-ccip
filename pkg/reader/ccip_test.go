@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -458,7 +459,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
-			map[string]any{},
+			map[string]any{
+				"destChainSelector": selector,
+			},
 			mock.Anything,
 		).Return(contractreader.ErrNoBindings)
 
@@ -572,7 +575,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
-			map[string]any{},
+			map[string]any{
+				"destChainSelector": selector,
+			},
 			mock.Anything,
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 			v := returnVal.(*onRampDestChainConfig)
@@ -897,7 +902,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		givenTokenAddr := params.(map[string]any)["token"].([]byte)
 		if bytes.Equal(tokenAddr, givenTokenAddr) {
 			price := returnVal.(*plugintypes.TimestampedUnixBig)
-			price.Value = cciptypes.NewBigIntFromInt64(145)
+			price.Value = big.NewInt(145)
 		}
 	}).Return(nil)
 
@@ -950,7 +955,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 		price := returnVal.(*plugintypes.TimestampedUnixBig)
-		price.Value = cciptypes.NewBigIntFromInt64(145)
+		price.Value = big.NewInt(145)
 	}))
 
 	offrampAddress := []byte{0x3}

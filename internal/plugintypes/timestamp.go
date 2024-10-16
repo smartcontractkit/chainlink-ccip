@@ -17,8 +17,8 @@ type TimestampedBig struct {
 //
 //nolint:lll //url
 type TimestampedUnixBig struct {
-	Timestamp uint32           `json:"timestamp"`
-	Value     cciptypes.BigInt `json:"value"`
+	Timestamp uint32   `json:"timestamp"`
+	Value     *big.Int `json:"value"`
 }
 
 func NewTimestampedBig(value int64, timestamp time.Time) TimestampedBig {
@@ -30,7 +30,7 @@ func NewTimestampedBig(value int64, timestamp time.Time) TimestampedBig {
 
 func TimeStampedBigFromUnix(input TimestampedUnixBig) TimestampedBig {
 	return TimestampedBig{
-		Value:     input.Value,
+		Value:     cciptypes.NewBigInt(input.Value),
 		Timestamp: time.Unix(int64(input.Timestamp), 0),
 	}
 }

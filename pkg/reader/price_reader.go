@@ -120,7 +120,11 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 
 	for i, token := range tokens {
 		// token not available on fee quoter
-		if updates[i].Timestamp == 0 || updates[i].Value.IsEmpty() {
+		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
+			pr.lggr.Debugw("empty fee quoter update found",
+				"chain", chain,
+				"token", token,
+			)
 			continue
 		}
 		updateMap[token] = plugintypes.TimeStampedBigFromUnix(updates[i])

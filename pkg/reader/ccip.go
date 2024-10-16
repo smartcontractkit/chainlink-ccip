@@ -522,7 +522,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			r.lggr.Errorw("native token price is nil", "chain", chain)
 			continue
 		}
-		prices[chain] = update.Value
+		prices[chain] = cciptypes.NewBigInt(update.Value)
 	}
 	return prices
 }
@@ -552,7 +552,8 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			r.lggr.Warnw("failed to get chain fee price update", "chain", chain, "err", err)
 			continue
 		}
-		if update.Timestamp == 0 || update.Value.IsEmpty() {
+		if update.Timestamp == 0 || update.Value == nil || update.Value.Cmp(big.NewInt(0)) == 0 {
+			r.lggr.Debugw("chain fee price update is empty", "chain", chain)
 			continue
 		}
 		feeUpdates[chain] = plugintypes.TimeStampedBigFromUnix(update)
@@ -888,7 +889,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("failed to get LINK token price, addr: %v, err: %w", tokenAddr, err)
 	}
 
-	price := timestampedPrice.Value.Int
+	price := timestampedPrice.Value
 
 	if price.Cmp(big.NewInt(0)) == 0 {
 		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
@@ -1059,7 +1060,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDynamicConfig,
 				primitives.Unconfirmed,
-				nil,
+				map[string]any{},
 				&resp,
 			)
 			if err != nil {
