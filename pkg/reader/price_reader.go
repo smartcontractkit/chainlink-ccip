@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -78,7 +77,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	tokens []ocr2types.Account,
 	chain ccipocr3.ChainSelector,
 ) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
-	updates := make([]plugintypes.TimestampedBig, len(tokens))
+	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
 	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
 
 	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
@@ -121,10 +120,10 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 
 	for i, token := range tokens {
 		// token not available on fee quoter
-		if updates[i].Timestamp == time.Unix(0, 0) {
+		if updates[i].Timestamp == 0 {
 			continue
 		}
-		updateMap[token] = updates[i]
+		updateMap[token] = plugintypes.TimeStampedBigFromUnix(updates[i])
 	}
 
 	return updateMap, nil

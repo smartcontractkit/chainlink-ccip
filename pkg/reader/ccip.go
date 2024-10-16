@@ -502,27 +502,27 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		var price *big.Int
+		var update *plugintypes.TimestampedBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameFeeQuoter,
-			consts.MethodNameFeeQuoterGetTokenPrices,
+			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
 			map[string]any{
 				"token": nativeTokenAddress,
 			},
-			&price,
+			&update,
 		)
 		if err != nil {
 			r.lggr.Errorw("failed to get native token price", "chain", chain, "err", err)
 			continue
 		}
 
-		if price == nil {
+		if update == nil {
 			r.lggr.Errorw("native token price is nil", "chain", chain)
 			continue
 		}
-		prices[chain] = cciptypes.NewBigInt(price)
+		prices[chain] = update.Value
 	}
 	return prices
 }
