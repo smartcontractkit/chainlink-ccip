@@ -29,7 +29,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
 	rmn_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -614,7 +613,7 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 	err = p.initializeRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "previous outcome does not contain remote config digest")
 
-	rmnHomeReader := reader.NewMockRMNHome(t)
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
 	rmnController := rmn_mock.NewMockController(t)
 	p.rmnHomeReader = rmnHomeReader
 	p.rmnController = rmnController
