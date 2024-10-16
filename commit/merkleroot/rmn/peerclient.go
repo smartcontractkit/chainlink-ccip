@@ -15,9 +15,9 @@ import (
 	"github.com/smartcontractkit/libocr/ragep2p"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var ErrNoConn = fmt.Errorf("no connection, please call InitConnection before further interaction")

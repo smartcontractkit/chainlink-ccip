@@ -9,11 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
