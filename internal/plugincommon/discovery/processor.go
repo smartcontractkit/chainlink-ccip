@@ -298,3 +298,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 
 	return dt.Outcome{}, nil
 }
+
+func (cdp *ContractDiscoveryProcessor) Close() error {
+	return nil
+}
