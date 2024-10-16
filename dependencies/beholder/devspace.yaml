@@ -84,7 +84,7 @@ deployments:
         repo: https://charts.devspace.sh
       values:
         containers:
-          - image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:014083bba4a7a47de8658bceb1428e6df1781161
+          - image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:197d0d889bb2ffdea2ab5bb387ca9e94a071663d
             env:
               - name: OTEL_COLLECTOR_GRPC_ENDPOINT
                 value: "beholder-otel-collector-agent:4317"
@@ -96,8 +96,12 @@ deployments:
                 value: "${METRICS_ENABLED}"
               - name: METRICS_GAUGE_ATTRIBUTES_COUNT
                 value: "${METRICS_GAUGE_ATTRIBUTES_COUNT}"
+              - name: METRICS_GAUGE_ATTRIBUTES_POOL_COUNT
+                value: "${METRICS_GAUGE_ATTRIBUTES_POOL_COUNT}"
               - name: METRICS_BYTES_PER_ATTRIBUTE
                 value: "${METRICS_BYTES_PER_ATTRIBUTE}"
+              - name: OTEL_GO_X_CARDINALITY_LIMIT
+                value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
               - name: TRACES_ENABLED
                 value: "${TRACES_ENABLED}"
               - name: TRACES_TRACE_DEPTH
@@ -365,8 +369,12 @@ profiles:
             default: "true"
           METRICS_GAUGE_ATTRIBUTES_COUNT:
             default: "5"
+          METRICS_GAUGE_ATTRIBUTES_POOL_COUNT:
+            default: "20"
           METRICS_BYTES_PER_ATTRIBUTE:
             default: "15"
+          OTEL_GO_X_CARDINALITY_LIMIT:
+            default: "50"
           TRACES_ENABLED:
             default: "true"
           TRACES_TRACE_DEPTH:
