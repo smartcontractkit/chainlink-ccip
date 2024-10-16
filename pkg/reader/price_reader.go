@@ -82,7 +82,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 
 	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
 	if err != nil {
-		pr.lggr.Debugf("failed to get fee quoter address for chain %d: %v", chain, err)
+		pr.lggr.Debugw("failed to get fee quoter address.", "chain", chain, "err", err)
 		return updateMap, nil
 	}
 
