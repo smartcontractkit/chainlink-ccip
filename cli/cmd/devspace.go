@@ -71,6 +71,13 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		stsClient := wrappers.NewSTSClientWrapper(awsSdkConfig)
+		if err := utils.EnsureValidAwsSession(stsClient, viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE"), !viper.GetBool("CRIB_CI_ENV")); err != nil {
+			logger.Error("failed to get a valid AWS session", slog.Any("error", err))
+			os.Exit(1)
+		}
+		logger.Info("AWS credentials working.")
+
 		var dockerCli wrappers.DockerCLI
 		var helmRegistryClient wrappers.HelmRegistryAPI
 

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -205,20 +206,15 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 		output.ECRGetAuthorizationTokenError = err
 		return output
 	}
-	switch {
-	case len(ecrAuthToken) == 0:
+
+	if len(ecrAuthToken) == 0 {
 		output.ECRGetAuthorizationTokenError = fmt.Errorf("no authorization data returned")
-		return output
-	case len(ecrAuthToken) > 1:
-		// TODO: how to warn the user?
-		output.ECRGetAuthorizationTokenError = fmt.Errorf("got multiple ECR auth tokens back from ecr.GetAuthorizationToken. Only the first one will be used")
 		return output
 	}
 
-	// TODO: how about this?
-	// if len(ecrAuthToken) > 1 {
-	// 	slog.Warn("got multiple ECR auth tokens back from ecr.GetAuthorizationToken. Only the first one will be used")
-	// }
+	if len(ecrAuthToken) > 1 {
+		slog.Warn("got multiple ECR auth tokens back from ecr.GetAuthorizationToken. Only the first one will be used")
+	}
 
 	if dockerCli != nil {
 		dockerRegistryLoginAttempt := RegistryLoginAttempt{RegistryType: "docker"}

@@ -3,7 +3,9 @@ package utils
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -104,4 +106,22 @@ func AwsSsoLogin(awsConfigFile string, awsProfile string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func EnsureValidAwsSession(stsClient wrappers.STSAPI, awsConfigFile string, awsProfile string, shouldTryAwsSso bool) error {
+	if HasValidAwsSession(stsClient) {
+		return nil
+	}
+
+	msg := "No valid AWS session found."
+	if !shouldTryAwsSso {
+		return errors.New(msg)
+	}
+
+	slog.Warn(fmt.Sprintf("%s Attempting to login via AWS SSO", msg))
+	if err := AwsSsoLogin(awsConfigFile, awsProfile); err != nil {
+		return fmt.Errorf("failed to aws sso login, %v", err)
+	}
+
+	return nil
 }

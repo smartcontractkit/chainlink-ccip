@@ -127,20 +127,11 @@ var initCmd = &cobra.Command{
 		}
 
 		stsClient := wrappers.NewSTSClientWrapper(awsSdkConfig)
-		if !utils.HasValidAwsSession(stsClient) {
-			msg := "No valid AWS session found."
-			if viper.GetBool("CRIB_CI_ENV") {
-				logger.Error(msg)
-				os.Exit(1)
-			}
-			logger.Warn(fmt.Sprintf("%s Attempting to login via AWS SSO", msg))
-			if err := utils.AwsSsoLogin(viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE")); err != nil {
-				logger.Error("failed to aws sso login", slog.Any("error", err))
-				os.Exit(1)
-			}
-		} else {
-			logger.Info("AWS credentials working.")
+		if err := utils.EnsureValidAwsSession(stsClient, viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE"), !viper.GetBool("CRIB_CI_ENV")); err != nil {
+			logger.Error("failed to get a valid AWS session", slog.Any("error", err))
+			os.Exit(1)
 		}
+		logger.Info("AWS credentials working.")
 
 		if !viper.GetBool("CRIB_CI_ENV") && !utils.HasValidAwsSession(stsClient) {
 			logger.Error("AWS credentials still not detected. Exiting.")
