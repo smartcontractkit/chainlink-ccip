@@ -87,6 +87,17 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return updateMap, nil
 	}
 
+	byteTokens := make([][]byte, len(tokens))
+	for _, token := range tokens {
+		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
+		if err != nil {
+			pr.lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
+			continue
+		}
+
+		byteTokens = append(byteTokens, byteToken)
+	}
+
 	boundContract := commontypes.BoundContract{
 		Address: typeconv.AddressBytesToString(feeQuoterAddress[:], uint64(chain)),
 		Name:    consts.ContractNameFeeQuoter,
@@ -98,7 +109,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
-			tokens,
+			byteTokens,
 			&updates,
 		); err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
