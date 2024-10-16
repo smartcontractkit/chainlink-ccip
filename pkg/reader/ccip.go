@@ -13,9 +13,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -24,7 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -484,7 +483,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 
 		//TODO: Use batching in the future
-		var nativeTokenAddress ocr3types.Account
+		var nativeTokenAddress cciptypes.Bytes
 		err := reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameRouter,
@@ -498,32 +497,32 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		if nativeTokenAddress == "" {
+		if nativeTokenAddress.String() == "0x" {
 			r.lggr.Errorw("native token address is empty", "chain", chain)
 			continue
 		}
 
-		var price *big.Int
+		var update *plugintypes.TimestampedUnixBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameFeeQuoter,
-			consts.MethodNameFeeQuoterGetTokenPrices,
+			consts.MethodNameFeeQuoterGetTokenPrice,
 			primitives.Unconfirmed,
 			map[string]any{
 				"token": nativeTokenAddress,
 			},
-			&price,
+			&update,
 		)
 		if err != nil {
 			r.lggr.Errorw("failed to get native token price", "chain", chain, "err", err)
 			continue
 		}
 
-		if price == nil {
+		if update == nil {
 			r.lggr.Errorw("native token price is nil", "chain", chain)
 			continue
 		}
-		prices[chain] = cciptypes.NewBigInt(price)
+		prices[chain] = cciptypes.NewBigInt(update.Value)
 	}
 	return prices
 }
@@ -536,7 +535,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
-		update := plugintypes.TimestampedBig{}
+		update := plugintypes.TimestampedUnixBig{}
 		// Read from dest chain
 		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 			ctx,
@@ -553,11 +552,11 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			r.lggr.Warnw("failed to get chain fee price update", "chain", chain, "err", err)
 			continue
 		}
-		feeUpdates[chain] = update
-		//feeUpdates[chain] = chainfee.ChainFeeUpdate{
-		//	Timestamp: update.Timestamp,
-		//	ChainFee:  chainfee.FromPackedFee(update.Value.Int),
-		//}
+		if update.Timestamp == 0 || update.Value == nil || update.Value.Cmp(big.NewInt(0)) == 0 {
+			r.lggr.Debugw("chain fee price update is empty", "chain", chain)
+			continue
+		}
+		feeUpdates[chain] = plugintypes.TimeStampedBigFromUnix(update)
 	}
 
 	return feeUpdates
@@ -874,7 +873,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
 
-	var timestampedPrice plugintypes.TimestampedBig
+	var timestampedPrice plugintypes.TimestampedUnixBig
 	err := reader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameFeeQuoter,
@@ -890,7 +889,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("failed to get LINK token price, addr: %v, err: %w", tokenAddr, err)
 	}
 
-	price := timestampedPrice.Value.Int
+	price := timestampedPrice.Value
 
 	if price.Cmp(big.NewInt(0)) == 0 {
 		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
@@ -1034,7 +1033,6 @@ type onRampDynamicChainConfig struct {
 	AllowListAdmin   []byte `json:"allowListAdmin"`
 }
 
-//nolint:dupl // It's not quite duplicate code...
 func (r *ccipChainReader) getOnRampDynamicConfigs(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
@@ -1089,7 +1087,6 @@ type onRampDestChainConfig struct {
 	Router           []byte `json:"router"`
 }
 
-//nolint:dupl // It's not quite duplicate code...
 func (r *ccipChainReader) getOnRampDestChainConfig(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
@@ -1117,7 +1114,9 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
-				map[string]any{},
+				map[string]any{
+					"destChainSelector": chainSel,
+				},
 				&resp,
 			)
 			if err != nil {
