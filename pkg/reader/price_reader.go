@@ -119,7 +119,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 ) ([]*big.Int, error) {
 	prices := make([]*big.Int, len(tokens))
 	if pr.feedChainReader == nil {
-		pr.lggr.Debugf("node does not support feed chain")
+		pr.lggr.Debug("node does not support feed chain")
 		return prices, nil
 	}
 	eg := new(errgroup.Group)

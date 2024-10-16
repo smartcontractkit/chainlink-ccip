@@ -13,9 +13,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-
 	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -24,7 +21,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
@@ -869,7 +868,6 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	if !ok {
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
-
 
 	var timestampedPrice plugintypes.TimestampedBig
 	err := reader.ExtendedGetLatestValue(

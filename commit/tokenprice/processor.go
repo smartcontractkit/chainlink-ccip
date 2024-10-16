@@ -15,7 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -25,7 +25,7 @@ type processor struct {
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
-	tokenPriceReader reader2.PriceReader
+	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
 	fRoleDON         int
 }
@@ -36,7 +36,7 @@ func NewProcessor(
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
-	tokenPriceReader reader2.PriceReader,
+	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {

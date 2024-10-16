@@ -49,43 +49,43 @@ const (
 	destChain         = ccipocr3.ChainSelector(1)
 	sourceChain1      = ccipocr3.ChainSelector(2)
 	sourceChain2      = ccipocr3.ChainSelector(3)
-	ArbAddr           = ocr2types.Account("0xa100000000000000000000000000000000000000")
-	ArbAggregatorAddr = ocr2types.Account("0xa2000000000000000000000000000000000000000")
+	arbAddr           = ocr2types.Account("0xa100000000000000000000000000000000000000")
+	arbAggregatorAddr = ocr2types.Account("0xa2000000000000000000000000000000000000000")
 
-	EthAddr           = ocr2types.Account("0xe100000000000000000000000000000000000000")
-	EthAggregatorAddr = ocr2types.Account("0xe200000000000000000000000000000000000000")
+	ethAddr           = ocr2types.Account("0xe100000000000000000000000000000000000000")
+	ethAggregatorAddr = ocr2types.Account("0xe200000000000000000000000000000000000000")
 )
 
 var (
 	oracleIDs = []commontypes.OracleID{1, 2, 3}
 	peerIDs   = []libocrtypes.PeerID{{1}, {2}, {3}}
 
-	ArbPrice = new(big.Int).Mul(big.NewInt(5), big.NewInt(1e18))
-	EthPrice = new(big.Int).Mul(big.NewInt(7), big.NewInt(1e18))
+	arbPrice = new(big.Int).Mul(big.NewInt(5), big.NewInt(1e18))
+	ethPrice = new(big.Int).Mul(big.NewInt(7), big.NewInt(1e18))
 
 	// a map to ease working with tests
 	tokenPriceMap = map[ocr2types.Account]ccipocr3.TokenPrice{
-		ArbAddr: {
-			TokenID: ArbAddr,
-			Price:   ccipocr3.NewBigInt(ArbPrice),
+		arbAddr: {
+			TokenID: arbAddr,
+			Price:   ccipocr3.NewBigInt(arbPrice),
 		},
-		EthAddr: {
-			TokenID: EthAddr,
-			Price:   ccipocr3.NewBigInt(EthPrice),
+		ethAddr: {
+			TokenID: ethAddr,
+			Price:   ccipocr3.NewBigInt(ethPrice),
 		},
 	}
 
-	Decimals18 = uint8(18)
+	decimals18 = uint8(18)
 
-	ArbInfo = pluginconfig.TokenInfo{
-		AggregatorAddress: string(ArbAggregatorAddr),
+	arbInfo = pluginconfig.TokenInfo{
+		AggregatorAddress: string(arbAggregatorAddr),
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
-		Decimals:          Decimals18,
+		Decimals:          decimals18,
 	}
-	EthInfo = pluginconfig.TokenInfo{
-		AggregatorAddress: string(EthAggregatorAddr),
+	ethInfo = pluginconfig.TokenInfo{
+		AggregatorAddress: string(ethAggregatorAddr),
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
-		Decimals:          Decimals18,
+		Decimals:          decimals18,
 	}
 )
 
@@ -301,8 +301,8 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ocr2types.Account{ArbAddr, EthAddr}).
-					Return([]*big.Int{ArbPrice, EthPrice}, nil).
+					GetFeedPricesUSD(params.ctx, []ocr2types.Account{arbAddr, ethAddr}).
+					Return([]*big.Int{arbPrice, ethPrice}, nil).
 					Maybe()
 
 				m.EXPECT().
@@ -325,8 +325,8 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ocr2types.Account{ArbAddr, EthAddr}).
-					Return([]*big.Int{ArbPrice, EthPrice}, nil).
+					GetFeedPricesUSD(params.ctx, []ocr2types.Account{arbAddr, ethAddr}).
+					Return([]*big.Int{arbPrice, ethPrice}, nil).
 					Maybe()
 
 				// Arb is fresh, will not be updated
@@ -334,8 +334,8 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{
-							ArbAddr: {Value: ccipocr3.NewBigInt(ArbPrice), Timestamp: time.Now()},
-							EthAddr: {Value: ccipocr3.NewBigInt(EthPrice), Timestamp: time.Now()},
+							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
+							ethAddr: {Value: ccipocr3.NewBigInt(ethPrice), Timestamp: time.Now()},
 						}, nil,
 					).
 					Maybe()
@@ -351,8 +351,8 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ocr2types.Account{ArbAddr, EthAddr}).
-					Return([]*big.Int{ArbPrice, EthPrice}, nil).
+					GetFeedPricesUSD(params.ctx, []ocr2types.Account{arbAddr, ethAddr}).
+					Return([]*big.Int{arbPrice, ethPrice}, nil).
 					Maybe()
 
 				m.EXPECT().
@@ -360,10 +360,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					Return(
 						map[ocr2types.Account]plugintypes.TimestampedBig{
 							// Arb is fresh, will not be updated
-							ArbAddr: {Value: ccipocr3.NewBigInt(ArbPrice), Timestamp: time.Now()},
+							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
 							// Eth is stale, should update
-							EthAddr: {
-								Value: ccipocr3.NewBigInt(EthPrice),
+							ethAddr: {
+								Value: ccipocr3.NewBigInt(ethPrice),
 								Timestamp: time.Now().
 									Add(-params.offchainCfg.TokenPriceBatchWriteFrequency.Duration() * 2),
 							},
@@ -375,7 +375,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: []ccipocr3.TokenPrice{
-						tokenPriceMap[EthAddr],
+						tokenPriceMap[ethAddr],
 					},
 				},
 			},
@@ -492,8 +492,7 @@ func setupNode(params SetupNodeParams, nodeID commontypes.OracleID) nodeSetup {
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(params.t)
-	rmnHomeReader := reader_mock.NewMockRMNHome(params.t)
-
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(params.t)
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
@@ -648,8 +647,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		MaxReportTransmissionCheckAttempts: 2,
 		TokenPriceBatchWriteFrequency:      writeFrequency,
 		TokenInfo: map[ocr2types.Account]pluginconfig.TokenInfo{
-			ArbAddr: ArbInfo,
-			EthAddr: EthInfo,
+			arbAddr: arbInfo,
+			ethAddr: ethInfo,
 		},
 		PriceFeedChainSelector: sourceChain1,
 	}

@@ -46,7 +46,8 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
 	tokenPrices, err := p.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
-		p.lggr.Errorw("call to GetFeedPricesUSD failed", "err", err)
+		p.lggr.Errorw("call to GetFeedPricesUSD failed",
+			"err", err)
 		return []cciptypes.TokenPrice{}
 	}
 
