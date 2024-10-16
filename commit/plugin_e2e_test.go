@@ -309,7 +309,7 @@ func setupNode(
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(t)
-	rmnHomeReader := reader_mock.NewMockRMNHome(t)
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
 
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])

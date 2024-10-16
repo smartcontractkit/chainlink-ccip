@@ -22,6 +22,51 @@ func (_m *MockPluginProcessor[Query, Observation, Outcome]) EXPECT() *MockPlugin
 	return &MockPluginProcessor_Expecter[Query, Observation, Outcome]{mock: &_m.Mock}
 }
 
+// Close provides a mock function with given fields:
+func (_m *MockPluginProcessor[Query, Observation, Outcome]) Close() error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Close")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockPluginProcessor_Close_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Close'
+type MockPluginProcessor_Close_Call[Query interface{}, Observation interface{}, Outcome interface{}] struct {
+	*mock.Call
+}
+
+// Close is a helper method to define mock.On call
+func (_e *MockPluginProcessor_Expecter[Query, Observation, Outcome]) Close() *MockPluginProcessor_Close_Call[Query, Observation, Outcome] {
+	return &MockPluginProcessor_Close_Call[Query, Observation, Outcome]{Call: _e.mock.On("Close")}
+}
+
+func (_c *MockPluginProcessor_Close_Call[Query, Observation, Outcome]) Run(run func()) *MockPluginProcessor_Close_Call[Query, Observation, Outcome] {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockPluginProcessor_Close_Call[Query, Observation, Outcome]) Return(_a0 error) *MockPluginProcessor_Close_Call[Query, Observation, Outcome] {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockPluginProcessor_Close_Call[Query, Observation, Outcome]) RunAndReturn(run func() error) *MockPluginProcessor_Close_Call[Query, Observation, Outcome] {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Observation provides a mock function with given fields: ctx, prev, query
 func (_m *MockPluginProcessor[Query, Observation, Outcome]) Observation(ctx context.Context, prev Outcome, query Query) (Observation, error) {
 	ret := _m.Called(ctx, prev, query)

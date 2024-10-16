@@ -2,8 +2,8 @@ package commit
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -13,6 +13,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
@@ -44,7 +45,7 @@ type Plugin struct {
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
-	rmnHomeReader       reader.RMNHome
+	rmnHomeReader       readerpkg.RMNHome
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
@@ -68,7 +69,7 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
@@ -378,20 +379,12 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	var errs []error
-
-	if p.offchainCfg.RMNEnabled {
-		if p.rmnHomeReader != nil {
-			if err := p.rmnHomeReader.Close(); err != nil {
-				errs = append(errs, fmt.Errorf("failed to close RMNHome reader: %w", err))
-				p.lggr.Errorw("Failed to close RMNHome reader", "err", err)
-			}
-		} else {
-			p.lggr.Warn("RMNHome reader was nil during Close")
-		}
-	}
-
-	return errors.Join(errs...)
+	return services.CloseAll([]io.Closer{
+		p.merkleRootProcessor,
+		p.tokenPriceProcessor,
+		p.chainFeeProcessor,
+		p.discoveryProcessor,
+	}...)
 }
 
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
