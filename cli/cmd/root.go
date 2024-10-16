@@ -54,14 +54,25 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".env", "config file")
 	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().Bool("crib-ci-env", false, "Flag to indicate that this is a CI environment")
 
-	// Bind the viper flag to the cobra flag (we can safely ignore the error here)
+	// flow control flags
+	rootCmd.PersistentFlags().Bool("crib-ci-env", false, "Flag to indicate that this is a CI environment")
+	rootCmd.PersistentFlags().Bool("crib-ignore-namespace-prefix", false, "Skips validating the crib- prefix in DEVSPACE_NAMESPACE")
+	rootCmd.PersistentFlags().Bool("crib-skip-docker-ecr-login", false, "Skips logging into Docker ECR registry")
+	rootCmd.PersistentFlags().Bool("crib-skip-helm-ecr-login", false, "Skips logging into Helm ECR registry")
+
+	// Bind the viper flag to the cobra flag (we can safely ignore the errors here)
 	_ = viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))
 	_ = viper.BindPFlag("CRIB_CI_ENV", rootCmd.PersistentFlags().Lookup("crib-ci-env"))
+	_ = viper.BindPFlag("CRIB_IGNORE_NAMESPACE_PREFIX", rootCmd.Flags().Lookup("crib-ignore-namespace-prefix"))
+	_ = viper.BindPFlag("CRIB_SKIP_DOCKER_ECR_LOGIN", rootCmd.Flags().Lookup("crib-skip-docker-ecr-login"))
+	_ = viper.BindPFlag("CRIB_SKIP_HELM_ECR_LOGIN", rootCmd.Flags().Lookup("crib-skip-helm-ecr-login"))
 
 	viper.SetDefault("log_level", rootCmd.PersistentFlags().Lookup("log-level").DefValue)
 	viper.SetDefault("CRIB_CI_ENV", rootCmd.PersistentFlags().Lookup("crib-ci-env").DefValue)
+	viper.SetDefault("CRIB_IGNORE_NAMESPACE_PREFIX", rootCmd.PersistentFlags().Lookup("crib-ignore-namespace-prefix").DefValue)
+	viper.SetDefault("CRIB_SKIP_DOCKER_ECR_LOGIN", rootCmd.PersistentFlags().Lookup("crib-skip-docker-ecr-login").DefValue)
+	viper.SetDefault("CRIB_SKIP_HELM_ECR_LOGIN", rootCmd.PersistentFlags().Lookup("crib-skip-helm-ecr-login").DefValue)
 }
 
 func ensureRunningInAProductDir() {

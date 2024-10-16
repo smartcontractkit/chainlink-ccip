@@ -257,9 +257,6 @@ func init() {
 	initCmd.Flags().String("provider", "", fmt.Sprintf("Provider to initialize (should be one of: %v)", supportedProviders))
 
 	// flow control flags
-	initCmd.Flags().Bool("crib-ignore-namespace-prefix", false, "Skips validating the crib- prefix in DEVSPACE_NAMESPACE")
-	initCmd.Flags().Bool("crib-skip-docker-ecr-login", false, "Skips logging into Docker ECR registry")
-	initCmd.Flags().Bool("crib-skip-helm-ecr-login", false, "Skips logging into Helm ECR registry")
 	initCmd.Flags().Bool("write-config", false, "Persists config acquired interactively back to .env passed via --config (WARNING: comments will be lost!)")
 
 	// bind to viper (we can safely ignore the errors here, as the flags are guaranteed to exist)
@@ -273,9 +270,6 @@ func init() {
 	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("eks-cluster-name"))
 	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("eks-alias-name"))
 	_ = viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
-	_ = viper.BindPFlag("CRIB_IGNORE_NAMESPACE_PREFIX", initCmd.Flags().Lookup("crib-ignore-namespace-prefix"))
-	_ = viper.BindPFlag("CRIB_SKIP_DOCKER_ECR_LOGIN", initCmd.Flags().Lookup("crib-skip-docker-ecr-login"))
-	_ = viper.BindPFlag("CRIB_SKIP_HELM_ECR_LOGIN", initCmd.Flags().Lookup("crib-skip-helm-ecr-login"))
 	_ = viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
 	_ = viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))
 
