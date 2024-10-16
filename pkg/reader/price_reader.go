@@ -111,7 +111,9 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
-			byteTokens,
+			map[string]any{
+				"tokens": byteTokens,
+			},
 			&updates,
 		); err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
