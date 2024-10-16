@@ -24,7 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 )
 
 var (
@@ -96,7 +96,7 @@ type controller struct {
 	peerClient PeerClient
 
 	// rmnHomeReader is used to read the RMN home contract configuration.
-	rmnHomeReader reader.RMNHome
+	rmnHomeReader readerpkg.RMNHome
 
 	// ed25519Verifier is used to verify the RMN offchain observation signatures.
 	ed25519Verifier ED25519Verifier
@@ -116,7 +116,7 @@ func NewController(
 	rmnCrypto cciptypes.RMNCrypto,
 	signObservationPrefix string,
 	peerClient PeerClient,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Controller {

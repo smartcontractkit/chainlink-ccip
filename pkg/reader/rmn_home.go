@@ -25,7 +25,12 @@ import (
 
 const (
 	rmnMaxSizeCommittee = 256 // bitmap is 256 bits making the max committee size 256
+	MaxFailedPolls      = uint(10)
 )
+
+type HomeNodeInfo = rmntypes.HomeNodeInfo
+
+type NodeID = rmntypes.NodeID
 
 type RMNHome interface {
 	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
@@ -320,7 +325,7 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 
 	maxValidBitmap := new(big.Int).Lsh(big.NewInt(1), uint(totalNodes))
 	maxValidBitmap.Sub(maxValidBitmap, big.NewInt(1))
-	if sourceChain.ObserverNodesBitmap.Int.Cmp(maxValidBitmap) > 0 {
+	if sourceChain.ObserverNodesBitmap.Cmp(maxValidBitmap) > 0 {
 		return false, fmt.Errorf("invalid observer nodes bitmap")
 	}
 
@@ -328,7 +333,7 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 	mask := new(big.Int).Lsh(big.NewInt(1), uint(nodeIndex))
 
 	// Perform the bitwise AND operation
-	result := new(big.Int).And(sourceChain.ObserverNodesBitmap.Int, mask)
+	result := new(big.Int).And(sourceChain.ObserverNodesBitmap, mask)
 
 	// Check if the result equals the mask
 	return result.Cmp(mask) == 0, nil
@@ -369,7 +374,7 @@ type Node struct {
 type SourceChain struct {
 	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
 	MinObservers        uint64                  `json:"minObservers"`
-	ObserverNodesBitmap cciptypes.BigInt        `json:"observerNodesBitmap"`
+	ObserverNodesBitmap *big.Int                `json:"observerNodesBitmap"`
 }
 
 var _ RMNHome = (*rmnHomePoller)(nil)

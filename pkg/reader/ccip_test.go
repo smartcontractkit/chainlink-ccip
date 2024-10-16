@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"testing"
 	"time"
 
@@ -19,6 +18,8 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
@@ -895,8 +896,8 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	) {
 		givenTokenAddr := params.(map[string]any)["token"].([]byte)
 		if bytes.Equal(tokenAddr, givenTokenAddr) {
-			price := returnVal.(*big.Int)
-			price.SetInt64(145)
+			price := returnVal.(*plugintypes.TimestampedBig)
+			price.Value = cciptypes.NewBigIntFromInt64(145)
 		}
 	}).Return(nil)
 
@@ -943,13 +944,13 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	destCR.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetTokenPrices,
+		consts.MethodNameFeeQuoterGetTokenPrice,
 		primitives.Unconfirmed,
 		map[string]interface{}{"token": tokenAddr},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		price := returnVal.(*big.Int)
-		price.SetInt64(145)
+		price := returnVal.(*plugintypes.TimestampedBig)
+		price.Value = cciptypes.NewBigIntFromInt64(145)
 	}))
 
 	offrampAddress := []byte{0x3}

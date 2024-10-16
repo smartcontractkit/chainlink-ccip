@@ -1,6 +1,9 @@
 package merkleroot
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -32,7 +35,7 @@ type Processor struct {
 	rmnController          rmn.Controller
 	rmnControllerCfgDigest cciptypes.Bytes32
 	rmnCrypto              cciptypes.RMNCrypto
-	rmnHomeReader          reader.RMNHome
+	rmnHomeReader          readerpkg.RMNHome
 }
 
 // NewProcessor creates a new Processor
@@ -49,7 +52,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	rmnController rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,
@@ -76,3 +79,29 @@ func NewProcessor(
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &Processor{}
+
+func (p *Processor) Close() error {
+	if !p.offchainCfg.RMNEnabled {
+		return nil
+	}
+
+	errs := make([]error, 0)
+
+	// close rmn controller
+	if p.rmnController != nil {
+		if err := p.rmnController.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close RMN controller: %w", err))
+			p.lggr.Errorw("Failed to close RMN controller", "err", err)
+		}
+	}
+
+	// close rmn home reader
+	if p.rmnHomeReader != nil {
+		if err := p.rmnHomeReader.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close RMNHome reader: %w", err))
+			p.lggr.Errorw("Failed to close RMNHome reader", "err", err)
+		}
+	}
+
+	return errors.Join(errs...)
+}
