@@ -3,7 +3,6 @@ package reader
 import (
 	"context"
 	"fmt"
-	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"math/big"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -87,7 +87,9 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return updateMap, nil
 	}
 
-	byteTokens := make([][]byte, len(tokens))
+	pr.lggr.Infow("getting fee quoter token updates", "tokens", tokens, "chain", chain)
+
+	byteTokens := make([][]byte, 0, len(tokens))
 	for _, token := range tokens {
 		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
 		if err != nil {
