@@ -81,21 +81,26 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 		var dockerCli wrappers.DockerCLI
 		var helmRegistryClient wrappers.HelmRegistryAPI
 
-		if viper.GetBool("docker") {
+		if viper.GetBool("docker") && !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
 			logger.Info("refreshing ECR credentials for docker")
 			dockerCli, err = utils.InitializeDockerCLI()
 			if err != nil {
 				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
 				os.Exit(1)
 			}
+		} else {
+			logger.Info("Skipping Docker ECR login")
 		}
-		if viper.GetBool("helm") {
+
+		if viper.GetBool("helm") && !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
 			logger.Info("refreshing ECR credentials for helm registry")
 			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
 			if err != nil {
 				logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
 				os.Exit(1)
 			}
+		} else {
+			logger.Info("Skipping Helm Registry ECR login")
 		}
 
 		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
