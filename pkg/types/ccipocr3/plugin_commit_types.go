@@ -22,6 +22,7 @@ type CommitPluginReport struct {
 
 	// RMNSignatures are the ECDSA signatures from the RMN signing nodes on the RMNReport structure.
 	// For more details see the contract here: https://github.com/smartcontractkit/chainlink/blob/7ba0f37134a618375542079ff1805fe2224d7916/contracts/src/v0.8/ccip/interfaces/IRMNV2.sol#L8-L12
+	//nolint:lll // it's a url
 	RMNSignatures []RMNECDSASignature `json:"rmnSignatures"`
 
 	// RMNRawVs is a 256-bit bitmap. A bit is set if the v value of the signature is 28,
@@ -39,6 +40,8 @@ func (r CommitPluginReport) IsEmpty() bool {
 }
 
 // MerkleRootChain Mirroring https://github.com/smartcontractkit/chainlink/blob/cd5c78959575f593b27fd83d8766086d0c678487/contracts/src/v0.8/ccip/libraries/Internal.sol#L356-L362
+//
+//nolint:lll // it's a url
 type MerkleRootChain struct {
 	ChainSel      ChainSelector `json:"chain"`
 	OnRampAddress Bytes         `json:"onRampAddress"`
