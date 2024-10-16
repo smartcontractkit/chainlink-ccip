@@ -143,15 +143,10 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 }
 
 func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (Stream, error) {
-	r.mu.RLock()
 	stream, ok := r.rageP2PStreams[rmnNode.ID]
-	r.mu.RUnlock()
 	if ok {
 		return stream, nil
 	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
 
 	// todo: versioning for stream names e.g. for 'v1_7'
 	streamName := fmt.Sprintf("ccip-rmn/v1_6/%x", r.genericEndpointConfigDigest)
