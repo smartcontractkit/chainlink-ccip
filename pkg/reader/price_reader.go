@@ -2,8 +2,8 @@ package reader
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"math/big"
 	"time"
 
@@ -88,7 +88,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	}
 
 	boundContract := commontypes.BoundContract{
-		Address: "0x" + hex.EncodeToString(feeQuoterAddress),
+		Address: typeconv.AddressBytesToString(feeQuoterAddress[:], uint64(chain)),
 		Name:    consts.ContractNameFeeQuoter,
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
