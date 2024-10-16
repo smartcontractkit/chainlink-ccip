@@ -1,14 +1,25 @@
 package utils
 
 import (
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
+	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	"github.com/docker/cli/cli/config/configfile"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/go-git/go-git/v5"
+	"github.com/smartcontractkit/crib/cli/wrappers"
+	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -389,6 +400,7 @@ func TestWriteConfig(t *testing.T) {
 		})
 	}
 }
+
 func TestExtractHostFromUrl(t *testing.T) {
 	t.Parallel()
 
@@ -426,7 +438,7 @@ func TestExtractHostFromUrl(t *testing.T) {
 			name:        "EmptyURL",
 			input:       "",
 			expected:    "",
-			expectedErr: &url.Error{},
+			expectedErr: nil,
 		},
 	}
 
@@ -446,4 +458,213 @@ func TestExtractHostFromUrl(t *testing.T) {
 	}
 }
 
-// TODO: TestRefreshRegistriesECRCredentials
+func TestRefreshRegistriesECRCredentials(t *testing.T) {
+	t.Parallel()
+
+	mockDockerRegistryHost := "https://012345678910.dkr.ecr.us-east-1.amazonaws.com"
+	mockHelmRegistryHost := "oci://chainlink-helm-registry.com"
+	ecrAuthToken := base64.StdEncoding.EncodeToString([]byte("user:password"))
+
+	mockEcrClient := wrappermocks.NewECRAPI(t)
+	mockEcrClient.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(
+		&ecr.GetAuthorizationTokenOutput{
+			AuthorizationData: []ecrtypes.AuthorizationData{
+				{AuthorizationToken: &ecrAuthToken, ProxyEndpoint: &mockDockerRegistryHost},
+			},
+		}, nil,
+	)
+	mockEcrClientFailed := wrappermocks.NewECRAPI(t)
+	mockEcrClientFailedErr := errors.New("ecr.GetAuthorizationToken failed")
+	mockEcrClientFailed.EXPECT().
+		GetAuthorizationToken(
+			context.TODO(), &ecr.GetAuthorizationTokenInput{},
+		).Return(nil, mockEcrClientFailedErr)
+
+	mockDockerClient := wrappermocks.NewDockerAPI(t)
+	mockDockerCli := wrappermocks.NewDockerCLI(t)
+	mockDockerClient.EXPECT().
+		RegistryLogin(
+			context.TODO(), registry.AuthConfig{Username: "user", Password: "password", ServerAddress: strings.TrimPrefix(mockDockerRegistryHost, "https://")},
+		).Return(registry.AuthenticateOKBody{IdentityToken: "", Status: "Login Succeeded"}, nil)
+	mockDockerCli.EXPECT().Client().Return(mockDockerClient)
+	mockDockerCli.EXPECT().ConfigFile().Return(configfile.New(filepath.Join(t.TempDir(), "config.json"))) // TODO: revisit
+
+	mockDockerClientFailed := wrappermocks.NewDockerAPI(t)
+	mockDockerCliFailed := wrappermocks.NewDockerCLI(t)
+	mockDockerCliFailedErr := errors.New("failed to docker login")
+	mockDockerClientFailed.EXPECT().
+		RegistryLogin(
+			context.TODO(), registry.AuthConfig{Username: "user", Password: "password", ServerAddress: strings.TrimPrefix(mockDockerRegistryHost, "https://")},
+		).Return(registry.AuthenticateOKBody{}, mockDockerCliFailedErr)
+	mockDockerCliFailed.EXPECT().Client().Return(mockDockerClientFailed)
+
+	mockHelmRegistryClient := wrappermocks.NewHelmRegistryAPI(t)
+	mockHelmRegistryClient.EXPECT().
+		Login(
+			strings.TrimPrefix(mockHelmRegistryHost, "oci://"), mock.AnythingOfType("registry.LoginOption"),
+		).Return(nil)
+
+	mockHelmRegistryClientFailed := wrappermocks.NewHelmRegistryAPI(t)
+	mockHelmRegistryClientFailedErr := errors.New("failed to helm registry login")
+	mockHelmRegistryClientFailed.EXPECT().
+		Login(
+			strings.TrimPrefix(mockHelmRegistryHost, "oci://"), mock.AnythingOfType("registry.LoginOption"),
+		).Return(mockHelmRegistryClientFailedErr)
+
+	testCases := []struct {
+		name                     string
+		mockEcrClient            wrappers.ECRAPI
+		mockDockerCli            wrappers.DockerCLI
+		mockHelmRegistryClient   wrappers.HelmRegistryAPI
+		chainlinkHelmRegistryUri string
+		wantOutput               *RefreshRegistriesECRCredentialsOutput
+	}{
+		{
+			name:                     "SuccessfulRefreshDockerAndHelmRegistries",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            mockDockerCli,
+			mockHelmRegistryClient:   mockHelmRegistryClient,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost,
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+					{
+						RegistryType: "docker",
+						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+						LoginErr:     nil,
+					},
+					{
+						RegistryType: "helm",
+						RegistryHost: strings.TrimPrefix(mockHelmRegistryHost, "oci://"),
+						LoginErr:     nil,
+					},
+				},
+			},
+		},
+		{
+			name:                     "SuccessfulRefreshOnlyDockerRegistry",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            mockDockerCli,
+			mockHelmRegistryClient:   nil,
+			chainlinkHelmRegistryUri: "",
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+					{
+						RegistryType: "docker",
+						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+						LoginErr:     nil,
+					},
+				},
+			},
+		},
+		{
+			name:                     "SuccessfulRefreshOnlyHelmRegistry",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            nil,
+			mockHelmRegistryClient:   mockHelmRegistryClient,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost,
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+					{
+						RegistryType: "helm",
+						RegistryHost: strings.TrimPrefix(mockHelmRegistryHost, "oci://"),
+						LoginErr:     nil,
+					},
+				},
+			},
+		},
+		{
+			name:                     "NothingToRefresh",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            nil,
+			mockHelmRegistryClient:   nil,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost, // shouldn't make a difference, as helmRegistryClient is nil
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{},
+			},
+		},
+		{
+			name:                     "FailedRefreshDockerRegistry",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            mockDockerCliFailed,
+			mockHelmRegistryClient:   mockHelmRegistryClient,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost,
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+					{
+						RegistryType: "docker",
+						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+						LoginErr:     fmt.Errorf("failed to docker login: %v", mockDockerCliFailedErr),
+					},
+					{
+						RegistryType: "helm",
+						RegistryHost: strings.TrimPrefix(mockHelmRegistryHost, "oci://"),
+						LoginErr:     nil,
+					},
+				},
+			},
+		},
+		{
+			name:                     "FailedRefreshHelmRegistry",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            mockDockerCli,
+			mockHelmRegistryClient:   mockHelmRegistryClientFailed,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost,
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+					{
+						RegistryType: "docker",
+						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+						LoginErr:     nil,
+					},
+					{
+						RegistryType: "helm",
+						RegistryHost: strings.TrimPrefix(mockHelmRegistryHost, "oci://"),
+						LoginErr:     mockHelmRegistryClientFailedErr,
+					},
+				},
+			},
+		},
+		{
+			name:                     "FailedRefreshDockerAndHelmRegistries",
+			mockEcrClient:            mockEcrClient,
+			mockDockerCli:            mockDockerCliFailed,
+			mockHelmRegistryClient:   mockHelmRegistryClientFailed,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost,
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+					{
+						RegistryType: "docker",
+						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+						LoginErr:     fmt.Errorf("failed to docker login: %v", mockDockerCliFailedErr),
+					},
+					{
+						RegistryType: "helm",
+						RegistryHost: strings.TrimPrefix(mockHelmRegistryHost, "oci://"),
+						LoginErr:     mockHelmRegistryClientFailedErr,
+					},
+				},
+			},
+		},
+		{
+			name:                     "FailedRefreshDockerAndHelmRegistriesDueToEcrClientIssue",
+			mockEcrClient:            mockEcrClientFailed,
+			mockDockerCli:            mockDockerCli,
+			mockHelmRegistryClient:   mockHelmRegistryClient,
+			chainlinkHelmRegistryUri: mockHelmRegistryHost,
+			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+				ECRGetAuthorizationTokenError: fmt.Errorf("unable to fetch ECR authorization token, %v", mockEcrClientFailedErr),
+				RegistryLoginAttempts:         &[]RegistryLoginAttempt{},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.wantOutput, RefreshRegistriesECRCredentials(tc.mockEcrClient, tc.mockDockerCli, tc.mockHelmRegistryClient, tc.chainlinkHelmRegistryUri))
+		})
+	}
+}

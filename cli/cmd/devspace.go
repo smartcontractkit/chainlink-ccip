@@ -92,9 +92,19 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 		}
 
 		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
-		if err := utils.RefreshRegistriesECRCredentials(ecrClient, &dockerCli, &helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI")); err != nil {
-			logger.Error("failed to refresh ECR credentials", slog.Any("error", err))
+		refreshRegistriesOutput := utils.RefreshRegistriesECRCredentials(ecrClient, dockerCli, helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI"))
+		if refreshRegistriesOutput.ECRGetAuthorizationTokenError != nil {
+			logger.Error("failed to refresh ECR credentials", slog.Any("error", refreshRegistriesOutput.ECRGetAuthorizationTokenError))
 			os.Exit(1)
+		}
+
+		for _, attempt := range *refreshRegistriesOutput.RegistryLoginAttempts {
+			if attempt.LoginErr != nil {
+				logger.Error("failed to refresh ECR credentials for registry", slog.String("registry_type", attempt.RegistryType), slog.String("registry_host", attempt.RegistryHost), slog.Any("error", attempt.LoginErr))
+				os.Exit(1)
+			} else {
+				logger.Info("Registry login successful", slog.String("registry_type", attempt.RegistryType), slog.String("registry_host", attempt.RegistryHost))
+			}
 		}
 
 		logger.Info("ECR credentials refreshed")
