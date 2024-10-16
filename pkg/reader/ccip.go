@@ -1060,7 +1060,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDynamicConfig,
 				primitives.Unconfirmed,
-				map[string]any{},
+				nil,
 				&resp,
 			)
 			if err != nil {
@@ -1115,7 +1115,9 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
-				map[string]any{},
+				map[string]any{
+					"destChainSelector": chainSel,
+				},
 				&resp,
 			)
 			if err != nil {
