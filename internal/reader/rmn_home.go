@@ -314,6 +314,10 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 	}
 
 	// Validate the bitmap
+	if sourceChain.ObserverNodesBitmap.Int == nil {
+		return false, fmt.Errorf("observer nodes bitmap is nil")
+	}
+
 	maxValidBitmap := new(big.Int).Lsh(big.NewInt(1), uint(totalNodes))
 	maxValidBitmap.Sub(maxValidBitmap, big.NewInt(1))
 	if sourceChain.ObserverNodesBitmap.Int.Cmp(maxValidBitmap) > 0 {
