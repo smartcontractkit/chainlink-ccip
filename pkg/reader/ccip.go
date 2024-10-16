@@ -1032,7 +1032,6 @@ type onRampDynamicChainConfig struct {
 	AllowListAdmin   []byte `json:"allowListAdmin"`
 }
 
-//nolint:dupl // It's not quite duplicate code...
 func (r *ccipChainReader) getOnRampDynamicConfigs(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
@@ -1087,7 +1086,6 @@ type onRampDestChainConfig struct {
 	Router           []byte `json:"router"`
 }
 
-//nolint:dupl // It's not quite duplicate code...
 func (r *ccipChainReader) getOnRampDestChainConfig(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
