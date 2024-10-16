@@ -819,6 +819,14 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 		return cciptypes.BigInt{}, fmt.Errorf("get LINK price in USD: %w", err)
 	}
 
+	if linkPriceUSD.Int == nil {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK price is nil")
+	}
+
+	if linkPriceUSD.Int.Cmp(big.NewInt(0)) == 0 {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK price is 0")
+	}
+
 	return linkPriceUSD, nil
 }
 
@@ -862,28 +870,30 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
 
-	var price big.Int
-	//TODO: This is calling wrong method, use getTokenPrice without the `s` in the end
+
+	var timestampedPrice plugintypes.TimestampedBig
 	err := reader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetTokenPrices,
+		consts.MethodNameFeeQuoterGetTokenPrice,
 		primitives.Unconfirmed,
 		map[string]any{
 			"token": tokenAddr,
 		},
-		&price,
+		&timestampedPrice,
 	)
 
 	if err != nil {
 		return cciptypes.BigInt{}, fmt.Errorf("failed to get LINK token price, addr: %v, err: %w", tokenAddr, err)
 	}
 
+	price := timestampedPrice.Value.Int
+
 	if price.Cmp(big.NewInt(0)) == 0 {
 		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
 	}
 
-	return cciptypes.NewBigInt(&price), nil
+	return cciptypes.NewBigInt(price), nil
 }
 
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.

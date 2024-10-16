@@ -494,6 +494,7 @@ func setupNode(params SetupNodeParams, nodeID commontypes.OracleID) nodeSetup {
 	homeChainReader := reader_mock.NewMockHomeChain(params.t)
 	rmnHomeReader := reader_mock.NewMockRMNHome(params.t)
 
+
 	fChain := map[ccipocr3.ChainSelector]int{}
 	supportedChainsForPeer := make(map[libocrtypes.PeerID]mapset.Set[ccipocr3.ChainSelector])
 	for chainSel, cfg := range params.chainCfg {
