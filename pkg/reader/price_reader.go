@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
@@ -87,7 +88,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	}
 
 	boundContract := commontypes.BoundContract{
-		Address: string(feeQuoterAddress),
+		Address: "0x" + hex.EncodeToString(feeQuoterAddress),
 		Name:    consts.ContractNameFeeQuoter,
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
@@ -100,7 +101,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			tokens,
 			&updates,
 		); err != nil {
-		return nil, fmt.Errorf("failed to get token prices: %w", err)
+		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
 	}
 
 	for i, token := range tokens {
@@ -133,11 +134,11 @@ func (pr *priceReader) GetFeedPricesUSD(
 			}
 			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
 			if err != nil {
-				return fmt.Errorf("failed to get token price for %s: %w", token, err)
+				return fmt.Errorf("token price for %s: %w", token, err)
 			}
 			tokenInfo, ok := pr.tokenInfo[token]
 			if !ok {
-				return fmt.Errorf("failed to get tokenInfo for %s: %w", token, err)
+				return fmt.Errorf("get tokenInfo for %s: %w", token, err)
 			}
 
 			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, tokenInfo.Decimals)
