@@ -9,6 +9,10 @@ data:
     server:
       http_listen_port: 3100
 
+    compactor:
+      retention_enabled: true
+      delete_request_store: filesystem
+
     common:
       ring:
         instance_addr: 127.0.0.1
@@ -34,3 +38,4 @@ data:
     limits_config:
       ingestion_rate_mb: 5 # Limit ingestion rate to prevent overload
       ingestion_burst_size_mb: 10 # Burst size allows temporary exceedance
+      retention_period: 7d

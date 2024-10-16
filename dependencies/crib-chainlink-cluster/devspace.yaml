@@ -306,16 +306,6 @@ deployments:
                         name: app-node5
                         port:
                           number: 6688
-            # TODO: Move this Ingress to the component
-            - host: ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
-              http:
-                paths:
-                  - path: /
-                    backend:
-                      service:
-                        name: grafana
-                        port:
-                          number: 80
         networkPolicyDefault:
           ingress:
             allowCustomCidrs: true
