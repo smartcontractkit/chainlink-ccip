@@ -3,6 +3,7 @@ package tokenprice
 import (
 	"context"
 	"sort"
+	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
@@ -12,6 +13,35 @@ import (
 
 	"golang.org/x/exp/maps"
 )
+
+func (p *processor) Observation(
+	ctx context.Context,
+	prevOutcome Outcome,
+	query Query,
+) (Observation, error) {
+
+	fChain := p.ObserveFChain()
+	if len(fChain) == 0 {
+		return Observation{}, nil
+	}
+
+	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
+	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
+	ts := time.Now().UTC()
+	p.lggr.Infow(
+		"observed token prices",
+		"feed prices", feedTokenPrices,
+		"fee quoter updates", feeQuoterUpdates,
+		"timestamp", ts,
+	)
+
+	return Observation{
+		FeedTokenPrices:       feedTokenPrices,
+		FeeQuoterTokenUpdates: feeQuoterUpdates,
+		FChain:                fChain,
+		Timestamp:             ts,
+	}, nil
+}
 
 func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()

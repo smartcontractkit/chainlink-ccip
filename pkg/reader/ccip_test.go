@@ -896,7 +896,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	) {
 		givenTokenAddr := params.(map[string]any)["token"].([]byte)
 		if bytes.Equal(tokenAddr, givenTokenAddr) {
-			price := returnVal.(*plugintypes.TimestampedBig)
+			price := returnVal.(*plugintypes.TimestampedUnixBig)
 			price.Value = cciptypes.NewBigIntFromInt64(145)
 		}
 	}).Return(nil)
@@ -949,7 +949,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		map[string]interface{}{"token": tokenAddr},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		price := returnVal.(*plugintypes.TimestampedBig)
+		price := returnVal.(*plugintypes.TimestampedUnixBig)
 		price.Value = cciptypes.NewBigIntFromInt64(145)
 	}))
 

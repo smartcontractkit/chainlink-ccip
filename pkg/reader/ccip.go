@@ -483,7 +483,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 		}
 
 		//TODO: Use batching in the future
-		var nativeTokenAddress ocr3types.Account
+		var nativeTokenAddress cciptypes.Bytes
 		err := reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameRouter,
@@ -497,12 +497,12 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		if nativeTokenAddress == "" {
+		if nativeTokenAddress.String() == "0x" {
 			r.lggr.Errorw("native token address is empty", "chain", chain)
 			continue
 		}
 
-		var update *plugintypes.TimestampedBig
+		var update *plugintypes.TimestampedUnixBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
 			consts.ContractNameFeeQuoter,
@@ -535,7 +535,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors []cciptypes.ChainSelector) map[cciptypes.ChainSelector]plugintypes.TimestampedBig {
 	feeUpdates := make(map[cciptypes.ChainSelector]plugintypes.TimestampedBig, len(selectors))
 	for _, chain := range selectors {
-		update := plugintypes.TimestampedBig{}
+		update := plugintypes.TimestampedUnixBig{}
 		// Read from dest chain
 		err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 			ctx,
@@ -552,7 +552,10 @@ func (r *ccipChainReader) GetChainFeePriceUpdate(ctx context.Context, selectors 
 			r.lggr.Warnw("failed to get chain fee price update", "chain", chain, "err", err)
 			continue
 		}
-		feeUpdates[chain] = update
+		if update.Timestamp == 0 || update.Value.IsEmpty() {
+			continue
+		}
+		feeUpdates[chain] = plugintypes.TimeStampedBigFromUnix(update)
 	}
 
 	return feeUpdates
@@ -869,7 +872,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
 
-	var timestampedPrice plugintypes.TimestampedBig
+	var timestampedPrice plugintypes.TimestampedUnixBig
 	err := reader.ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameFeeQuoter,

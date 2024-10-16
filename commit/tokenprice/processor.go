@@ -3,7 +3,6 @@ package tokenprice
 import (
 	"context"
 	"fmt"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -54,35 +53,6 @@ func NewProcessor(
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
-}
-
-func (p *processor) Observation(
-	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
-) (Observation, error) {
-
-	fChain := p.ObserveFChain()
-	if len(fChain) == 0 {
-		return Observation{}, nil
-	}
-
-	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
-	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
-	ts := time.Now().UTC()
-	p.lggr.Infow(
-		"observed token prices",
-		"feed prices", feedTokenPrices,
-		"fee quoter updates", feeQuoterUpdates,
-		"timestamp", ts,
-	)
-
-	return Observation{
-		FeedTokenPrices:       feedTokenPrices,
-		FeeQuoterTokenUpdates: feeQuoterUpdates,
-		FChain:                fChain,
-		Timestamp:             ts,
-	}, nil
 }
 
 func (p *processor) ValidateObservation(
