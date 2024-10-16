@@ -355,6 +355,7 @@ func TestHasValidAwsSession(t *testing.T) {
 		})
 	}
 }
+
 func TestEnsureValidAwsSession(t *testing.T) {
 	t.Parallel()
 
