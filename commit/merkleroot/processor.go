@@ -32,7 +32,7 @@ type Processor struct {
 	rmnController          rmn.Controller
 	rmnControllerCfgDigest cciptypes.Bytes32
 	rmnCrypto              cciptypes.RMNCrypto
-	rmnHomeReader          reader.RMNHome
+	rmnHomeReader          readerpkg.RMNHome
 }
 
 // NewProcessor creates a new Processor
@@ -49,7 +49,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	rmnController rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,

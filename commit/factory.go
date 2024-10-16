@@ -114,7 +114,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// Bind the RMNHome contract
-	var rmnHomeReader reader.RMNHome
+	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
 		rmnCr, ok := p.contractReaders[p.homeChainSelector]
@@ -131,7 +131,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err1 := rmnCr.Bind(ctx, []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
 		}
-		rmnHomeReader = reader.NewRMNHomePoller(
+		rmnHomeReader = readerpkg.NewRMNHomePoller(
 			rmnCr,
 			rmnHomeBoundContract,
 			p.lggr,
