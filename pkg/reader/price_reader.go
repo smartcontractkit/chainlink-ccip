@@ -86,7 +86,11 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		return updateMap, nil
 	}
 
-	pr.lggr.Infow("getting fee quoter token updates", "tokens", tokens, "chain", chain)
+	pr.lggr.Infow("getting fee quoter token updates",
+		"tokens", tokens,
+		"chain", chain,
+		"feeQuoterAddress", feeQuoterAddress,
+	)
 
 	byteTokens := make([][]byte, 0, len(tokens))
 	for _, token := range tokens {
