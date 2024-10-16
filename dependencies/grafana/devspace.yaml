@@ -23,6 +23,14 @@ deployments:
           runAsGroup: 999
           fsGroup: 999
 
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          labels: {}
+          path: /
+          pathType: Prefix
+          hosts:
+            - ${DEVSPACE_NAMESPACE}-grafana.${DEVSPACE_INGRESS_BASE_DOMAIN}
 profiles:
   - name: add-beholder-config
     patches:
