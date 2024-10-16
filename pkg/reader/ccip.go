@@ -1026,24 +1026,28 @@ func (r *ccipChainReader) getDestinationData(
 	)
 }
 
-// See DynamicChainConfig in OnRamp.sol
-type onRampDynamicChainConfig struct {
-	FeeQuoter        []byte `json:"feeQuoter"`
-	MessageValidator []byte `json:"messageValidator"`
-	FeeAggregator    []byte `json:"feeAggregator"`
-	AllowListAdmin   []byte `json:"allowListAdmin"`
+// See the DynamicConfig struct in OnRamp.sol
+type onRampDynamicConfig struct {
+	FeeQuoter []byte `json:"feeQuoter"`
+	// TODO: we don't really care about these, can we get rid of them?
+	MessageInterceptor []byte `json:"messageInterceptor"`
+	FeeAggregator      []byte `json:"feeAggregator"`
+	AllowListAdmin     []byte `json:"allowListAdmin"`
 }
 
-//nolint:dupl // It's not quite duplicate code...
+type getDynamicConfigResponse struct {
+	DynamicConfig onRampDynamicConfig `json:"dynamicConfig"`
+}
+
 func (r *ccipChainReader) getOnRampDynamicConfigs(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]onRampDynamicChainConfig, error) {
+) (map[cciptypes.ChainSelector]onRampDynamicConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, srcChains...); err != nil {
 		return nil, err
 	}
 
-	result := make(map[cciptypes.ChainSelector]onRampDynamicChainConfig)
+	result := make(map[cciptypes.ChainSelector]onRampDynamicConfig)
 
 	mu := new(sync.Mutex)
 	eg := new(errgroup.Group)
@@ -1055,8 +1059,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 
 		chainSel := chainSel
 		eg.Go(func() error {
-			// read onramp dynamic config
-			resp := onRampDynamicChainConfig{}
+			var resp getDynamicConfigResponse
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
@@ -1069,7 +1072,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
 			}
 			mu.Lock()
-			result[chainSel] = resp
+			result[chainSel] = resp.DynamicConfig
 			mu.Unlock()
 
 			return nil
@@ -1089,7 +1092,6 @@ type onRampDestChainConfig struct {
 	Router           []byte `json:"router"`
 }
 
-//nolint:dupl // It's not quite duplicate code...
 func (r *ccipChainReader) getOnRampDestChainConfig(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
@@ -1117,11 +1119,13 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
-				map[string]any{},
+				map[string]any{
+					"destChainSelector": uint64(r.destChain),
+				},
 				&resp,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+				return fmt.Errorf("failed to get onramp dest chain config: %w", err)
 			}
 			mu.Lock()
 			result[chainSel] = resp

@@ -458,7 +458,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
-			map[string]any{},
+			map[string]any{
+				"destChainSelector": uint64(destChain),
+			},
 			mock.Anything,
 		).Return(contractreader.ErrNoBindings)
 
@@ -563,8 +565,8 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			map[string]any{},
 			mock.Anything,
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*onRampDynamicChainConfig)
-			v.FeeQuoter = srcFeeQuoters[i]
+			v := returnVal.(*getDynamicConfigResponse)
+			v.DynamicConfig.FeeQuoter = srcFeeQuoters[i]
 		}))
 
 		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
@@ -572,7 +574,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
-			map[string]any{},
+			map[string]any{
+				"destChainSelector": uint64(destChain),
+			},
 			mock.Anything,
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 			v := returnVal.(*onRampDestChainConfig)
