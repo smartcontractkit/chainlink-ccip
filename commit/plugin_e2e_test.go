@@ -453,7 +453,7 @@ func prepareCcipReaderMock(
 	}
 
 	if enableDiscovery {
-		ccipReader.EXPECT().DiscoverContracts(mock.Anything, mock.Anything).Return(nil, nil)
+		ccipReader.EXPECT().DiscoverContracts(mock.Anything).Return(nil, nil)
 		ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 	}
 }

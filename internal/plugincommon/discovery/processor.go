@@ -66,7 +66,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 	}
 
 	// TODO: discover the full list of source chain selectors and pass it into DiscoverContracts.
-	contracts, err := (*cdp.reader).DiscoverContracts(ctx, nil)
+	contracts, err := (*cdp.reader).DiscoverContracts(ctx)
 	if err != nil {
 		return dt.Observation{}, fmt.Errorf("unable to discover contracts: %w", err)
 	}

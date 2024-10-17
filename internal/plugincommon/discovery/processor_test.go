@@ -62,10 +62,9 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 			source: expectedRouter,
 		},
 	}
-	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, emptySelectors).
+		DiscoverContracts(mock.Anything).
 		Return(expectedContracts, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -139,10 +138,9 @@ func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing
 		dest:   1,
 		source: 2,
 	}
-	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, emptySelectors).
+		DiscoverContracts(mock.Anything).
 		Return(nil, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -179,10 +177,9 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 		source: 2,
 	}
 	discoveryErr := fmt.Errorf("discovery error")
-	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, emptySelectors).
+		DiscoverContracts(mock.Anything).
 		Return(nil, discoveryErr)
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
