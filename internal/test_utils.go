@@ -4,8 +4,9 @@ import (
 	"crypto/rand"
 	"testing"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/require"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func MessageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message {
