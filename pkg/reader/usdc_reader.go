@@ -90,6 +90,7 @@ func NewUSDCMessageReader(
 
 		contract, err := bindFacadeReaderContract(
 			ctx,
+			lggr,
 			contractReaders,
 			chainSelector,
 			consts.ContractNameCCTPMessageTransmitter,
