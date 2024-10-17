@@ -1,6 +1,6 @@
 package gas
 
-import "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+import "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 type EstimateProvider interface {
 	CalculateMerkleTreeGas(numRequests int) uint64
