@@ -35,7 +35,7 @@ type RemoteConfig struct {
 	Signers          []RemoteSignerInfo `json:"signers"`
 	MinSigners       uint64             `json:"minSigners"`
 	ConfigVersion    uint32             `json:"configVersion"`
-	RmnReportVersion cciptypes.Bytes32  `json:"rmnReportVersion"` // e.g., "RMN_V1_6_ANY2EVM_REPORT"
+	RmnReportVersion cciptypes.Bytes32  `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
 }
 
 func (r RemoteConfig) IsEmpty() bool {
