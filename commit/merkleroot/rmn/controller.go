@@ -145,6 +145,9 @@ func (c *controller) ComputeReportSignatures(
 		return nil, fmt.Errorf("get rmn nodes info: %w", err)
 	}
 
+	c.lggr.Infow("got RMN nodes info", "nodes", rmnNodes)
+	c.lggr.Infow("requested updates", "updates", updateRequests)
+
 	// Group the lane update requests by their source chain and mark the RMN nodes that can sign each update
 	// based on whether it supports the source chain or not.
 	updatesPerChain := make(map[uint64]updateRequestWithMeta)
