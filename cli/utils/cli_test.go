@@ -221,9 +221,8 @@ func TestPromptForInput(t *testing.T) {
 	}
 }
 
+// nolint: paralleltest,nolintlint
 func TestPresentPrompt(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name      string
 		prompt    string
@@ -263,8 +262,6 @@ func TestPresentPrompt(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
 			// Mock stdin
 			oldStdin := os.Stdin
 			defer func() { os.Stdin = oldStdin }()
