@@ -9,12 +9,12 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -35,7 +35,7 @@ type Processor struct {
 	rmnController          rmn.Controller
 	rmnControllerCfgDigest cciptypes.Bytes32
 	rmnCrypto              cciptypes.RMNCrypto
-	rmnHomeReader          reader.RMNHome
+	rmnHomeReader          readerpkg.RMNHome
 }
 
 // NewProcessor creates a new Processor
@@ -52,7 +52,7 @@ func NewProcessor(
 	chainSupport plugincommon.ChainSupport,
 	rmnController rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
 ) *Processor {
 	observer := ObserverImpl{
 		lggr,

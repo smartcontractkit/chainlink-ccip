@@ -15,7 +15,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
@@ -24,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -114,7 +114,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	// Bind the RMNHome contract
-	var rmnHomeReader reader.RMNHome
+	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
 		rmnCr, ok := p.contractReaders[p.homeChainSelector]
@@ -131,7 +131,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err1 := rmnCr.Bind(ctx, []types.BoundContract{rmnHomeBoundContract}); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind RMNHome contract: %w", err1)
 		}
-		rmnHomeReader = reader.NewRMNHomePoller(
+		rmnHomeReader = readerpkg.NewRMNHomePoller(
 			rmnCr,
 			rmnHomeBoundContract,
 			p.lggr,
@@ -143,7 +143,21 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		}
 	}
 
-	var onChainTokenPricesReader reader.PriceReader
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
+	ccipReader := readerpkg.NewCCIPChainReader(
+		ctx,
+		p.lggr,
+		readers,
+		p.chainWriters,
+		p.ocrConfig.Config.ChainSelector,
+		p.ocrConfig.Config.OfframpAddress,
+	)
+
 	// The node supports the chain that the token prices are on.
 	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
 	if ok {
@@ -158,26 +172,15 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err1 := tokenPricesCr.Bind(ctx, bcs); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
 		}
-		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
-			tokenPricesCr,
-			offchainConfig.TokenInfo,
-		)
 	}
 
-	// map types to the facade.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
-	for chain, cr := range p.contractReaders {
-		readers[chain] = cr
-	}
-
-	ccipReader := readerpkg.NewCCIPChainReader(
-		ctx,
+	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		p.lggr,
-		readers,
-		p.chainWriters,
-		p.ocrConfig.Config.ChainSelector,
-		p.ocrConfig.Config.OfframpAddress,
+		tokenPricesCr,
+		offchainConfig.TokenInfo,
+		ccipReader,
 	)
+
 	return NewPlugin(
 			p.donID,
 			config.OracleID,

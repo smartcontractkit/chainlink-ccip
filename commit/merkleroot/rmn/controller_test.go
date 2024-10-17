@@ -13,20 +13,22 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -48,7 +50,7 @@ type testSetup struct {
 	rmnController  *controller
 	peerClient     *mockPeerClient
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
-	rmnHomeMock    *reader_mock.MockRMNHome
+	rmnHomeMock    *readerpkg_mock.MockRMNHome
 	remoteRMNCfg   rmntypes.RemoteConfig
 	minObservers   int
 	rmnNodes       []rmntypes.HomeNodeInfo
@@ -235,7 +237,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ctx := tests.Context(t)
 		resChan := make(chan PeerResponse, 200)
 		peerClient := newMockPeerClient(resChan)
-		rmnHomeReaderMock := reader_mock.NewMockRMNHome(t)
+		rmnHomeReaderMock := readerpkg_mock.NewMockRMNHome(t)
 
 		const numNodes = 4
 		rmnNodes := make([]rmntypes.HomeNodeInfo, numNodes)

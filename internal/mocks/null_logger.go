@@ -1,8 +1,9 @@
 package mocks
 
 import (
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 var NullLogger logger.Logger = &nullLogger{}

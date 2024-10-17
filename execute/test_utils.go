@@ -9,20 +9,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-
-	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -39,6 +37,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -284,6 +283,13 @@ func newNode(
 		OracleID: commontypes.OracleID(id),
 	}
 
+	costlyMessageObserver := exectypes.NewCostlyMessageObserver(
+		lggr,
+		true,
+		ccipReader,
+		cfg.RelativeBoostPerWaitHour,
+	)
+
 	node1 := NewPlugin(
 		donID,
 		rCfg,
@@ -297,6 +303,7 @@ func newNode(
 		tokenDataObserver,
 		evm.EstimateProvider{},
 		lggr,
+		costlyMessageObserver,
 	)
 
 	return nodeSetup{
@@ -385,6 +392,7 @@ func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, execute
 				SourceChainSelector: src,
 				SequenceNumber:      seqNum,
 			},
+			FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
 		},
 		Destination: dest,
 		Executed:    executed,

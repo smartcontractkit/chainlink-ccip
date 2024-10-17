@@ -3,9 +3,8 @@ package exectypes
 import (
 	"encoding/json"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // CommitObservations contain the commit plugin report data organized by the source chain selector.

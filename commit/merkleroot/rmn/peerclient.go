@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -15,9 +16,9 @@ import (
 	"github.com/smartcontractkit/libocr/ragep2p"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var ErrNoConn = fmt.Errorf("no connection, please call InitConnection before further interaction")
@@ -93,6 +94,8 @@ func (r *peerClient) InitConnection(
 
 	h := sha256.Sum256(append(commitConfigDigest[:], rmnHomeConfigDigest[:]...))
 	r.genericEndpointConfigDigest = writePrefix(ocr2types.ConfigDigestPrefixCCIPMultiRoleRMNCombo, h)
+	r.lggr.Infow("Creating new peer group",
+		"genericEndpointConfigDigest", r.genericEndpointConfigDigest.String())
 
 	peerGroup, err := r.peerGroupFactory.NewPeerGroup(
 		[32]byte(r.genericEndpointConfigDigest),
@@ -143,18 +146,14 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 }
 
 func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (Stream, error) {
-	r.mu.RLock()
 	stream, ok := r.rageP2PStreams[rmnNode.ID]
-	r.mu.RUnlock()
 	if ok {
 		return stream, nil
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	// todo: versioning for stream names e.g. for 'v1_7'
-	streamName := fmt.Sprintf("ccip-rmn/v1_6/%x", r.genericEndpointConfigDigest)
+	streamName := fmt.Sprintf("ccip-rmn/v1_6/%s",
+		strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x"))
 	r.lggr.Infow("Creating new stream", "streamName", streamName)
 
 	var err error

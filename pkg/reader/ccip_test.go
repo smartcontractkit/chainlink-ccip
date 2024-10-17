@@ -16,14 +16,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -481,7 +482,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
-			map[string]any{},
+			map[string]any{
+				"destChainSelector": selector,
+			},
 			mock.Anything,
 		).Return(contractreader.ErrNoBindings)
 	}
@@ -605,7 +608,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			consts.ContractNameOnRamp,
 			consts.MethodNameOnRampGetDestChainConfig,
 			primitives.Unconfirmed,
-			map[string]any{},
+			map[string]any{
+				"destChainSelector": selector,
+			},
 			mock.Anything,
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
 			v := returnVal.(*onRampDestChainConfig)
@@ -889,8 +894,8 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	) {
 		givenTokenAddr := params.(map[string]any)["token"].([]byte)
 		if bytes.Equal(tokenAddr, givenTokenAddr) {
-			price := returnVal.(*big.Int)
-			price.SetInt64(145)
+			price := returnVal.(*plugintypes.TimestampedUnixBig)
+			price.Value = big.NewInt(145)
 		}
 	}).Return(nil)
 
@@ -937,13 +942,13 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 	destCR.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetTokenPrices,
+		consts.MethodNameFeeQuoterGetTokenPrice,
 		primitives.Unconfirmed,
 		map[string]interface{}{"token": tokenAddr},
 		mock.Anything,
 	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		price := returnVal.(*big.Int)
-		price.SetInt64(145)
+		price := returnVal.(*plugintypes.TimestampedUnixBig)
+		price.Value = big.NewInt(145)
 	}))
 
 	offrampAddress := []byte{0x3}

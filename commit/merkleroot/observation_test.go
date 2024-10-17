@@ -9,15 +9,14 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
@@ -29,9 +28,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
 	rmn_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
-	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -614,7 +613,7 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 	err = p.initializeRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "previous outcome does not contain remote config digest")
 
-	rmnHomeReader := reader.NewMockRMNHome(t)
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
 	rmnController := rmn_mock.NewMockController(t)
 	p.rmnHomeReader = rmnHomeReader
 	p.rmnController = rmnController

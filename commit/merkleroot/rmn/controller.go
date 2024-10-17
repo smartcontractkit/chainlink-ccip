@@ -15,16 +15,17 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
+	chainsel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -96,7 +97,7 @@ type controller struct {
 	peerClient PeerClient
 
 	// rmnHomeReader is used to read the RMN home contract configuration.
-	rmnHomeReader reader.RMNHome
+	rmnHomeReader readerpkg.RMNHome
 
 	// ed25519Verifier is used to verify the RMN offchain observation signatures.
 	ed25519Verifier ED25519Verifier
@@ -116,7 +117,7 @@ func NewController(
 	rmnCrypto cciptypes.RMNCrypto,
 	signObservationPrefix string,
 	peerClient PeerClient,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Controller {
@@ -144,6 +145,9 @@ func (c *controller) ComputeReportSignatures(
 	if err != nil {
 		return nil, fmt.Errorf("get rmn nodes info: %w", err)
 	}
+
+	c.lggr.Infow("got RMN nodes info", "nodes", rmnNodes)
+	c.lggr.Infow("requested updates", "updates", updateRequests)
 
 	// Group the lane update requests by their source chain and mark the RMN nodes that can sign each update
 	// based on whether it supports the source chain or not.

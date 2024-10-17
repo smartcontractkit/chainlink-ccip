@@ -42,6 +42,7 @@ const (
 
 	// FeeQuoter view/pure methods
 	MethodNameFeeQuoterGetTokenPrices       = "GetTokenPrices"
+	MethodNameFeeQuoterGetTokenPrice        = "GetTokenPrice"
 	MethodNameGetFeePriceUpdate             = "GetDestinationChainGasPrice"
 	MethodNameFeeQuoterGetStaticConfig      = "GetStaticConfig"
 	MethodNameGetDestChainConfig            = "GetDestChainConfig"

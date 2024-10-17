@@ -10,22 +10,27 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 const (
 	rmnMaxSizeCommittee = 256 // bitmap is 256 bits making the max committee size 256
+	MaxFailedPolls      = uint(10)
 )
+
+type HomeNodeInfo = rmntypes.HomeNodeInfo
+
+type NodeID = rmntypes.NodeID
 
 type RMNHome interface {
 	// GetRMNNodesInfo gets the RMNHomeNodeInfo for the given configDigest
@@ -316,7 +321,7 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 	// Validate the bitmap
 	maxValidBitmap := new(big.Int).Lsh(big.NewInt(1), uint(totalNodes))
 	maxValidBitmap.Sub(maxValidBitmap, big.NewInt(1))
-	if sourceChain.ObserverNodesBitmap.Int.Cmp(maxValidBitmap) > 0 {
+	if sourceChain.ObserverNodesBitmap.Cmp(maxValidBitmap) > 0 {
 		return false, fmt.Errorf("invalid observer nodes bitmap")
 	}
 
@@ -324,7 +329,7 @@ func IsNodeObserver(sourceChain SourceChain, nodeIndex int, totalNodes int) (boo
 	mask := new(big.Int).Lsh(big.NewInt(1), uint(nodeIndex))
 
 	// Perform the bitwise AND operation
-	result := new(big.Int).And(sourceChain.ObserverNodesBitmap.Int, mask)
+	result := new(big.Int).And(sourceChain.ObserverNodesBitmap, mask)
 
 	// Check if the result equals the mask
 	return result.Cmp(mask) == 0, nil
@@ -365,7 +370,7 @@ type Node struct {
 type SourceChain struct {
 	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
 	MinObservers        uint64                  `json:"minObservers"`
-	ObserverNodesBitmap cciptypes.BigInt        `json:"observerNodesBitmap"`
+	ObserverNodesBitmap *big.Int                `json:"observerNodesBitmap"`
 }
 
 var _ RMNHome = (*rmnHomePoller)(nil)
