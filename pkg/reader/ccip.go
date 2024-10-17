@@ -669,7 +669,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			&staticConfig,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("unable to lookup nonce manager (offramp static config): %w", err)
+			return nil, fmt.Errorf("unable to lookup nonce manager and rmn remote (offramp static config): %w", err)
 		}
 		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfig.NonceManager)
 		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.RmnRemote)
@@ -695,10 +695,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 	return resp, nil
 }
 
-func (r *ccipChainReader) DiscoverContracts(
-	ctx context.Context,
-	_ []cciptypes.ChainSelector, //Deprecated
-) (ContractAddresses, error) {
+func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddresses, error) {
 	var resp ContractAddresses
 
 	// Discover destination contracts if the dest chain is supported.

@@ -503,7 +503,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
@@ -631,7 +631,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, expectedContractAddresses, contractAddresses)
@@ -721,7 +721,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 	require.Equal(t, expectedContractAddresses, contractAddresses)
 }
@@ -761,7 +761,7 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	_, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	_, err := ccipChainReader.DiscoverContracts(ctx)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 }
@@ -808,7 +808,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	_, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	_, err := ccipChainReader.DiscoverContracts(ctx)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 }
