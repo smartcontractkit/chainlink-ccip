@@ -109,10 +109,16 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		Address: typeconv.AddressBytesToString(feeQuoterAddress[:], uint64(chain)),
 		Name:    consts.ContractNameFeeQuoter,
 	}
+
+	cr, ok := pr.chainReaders[chain]
+	if !ok {
+		pr.lggr.Warnw("contract reader not found", "chain", chain)
+		return nil, nil
+	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
 	if err :=
-		pr.chainReaders[chain].GetLatestValue(
+		cr.GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
@@ -156,7 +162,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 				Address: pr.tokenInfo[token].AggregatorAddress,
 				Name:    consts.ContractNamePriceAggregator,
 			}
-			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
+			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract, pr.feedChainReader())
 			if err != nil {
 				return fmt.Errorf("token price for %s: %w", token, err)
 			}
@@ -187,10 +193,11 @@ func (pr *priceReader) getFeedDecimals(
 	ctx context.Context,
 	token ocr2types.Account,
 	boundContract commontypes.BoundContract,
+	feedChainReader contractreader.ContractReaderFacade,
 ) (uint8, error) {
 	var decimals uint8
 	if err :=
-		pr.feedChainReader().GetLatestValue(
+		feedChainReader.GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
@@ -207,11 +214,12 @@ func (pr *priceReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
 	token ocr2types.Account,
 	boundContract commontypes.BoundContract,
+	feedChainReader contractreader.ContractReaderFacade,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
 	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 	if err :=
-		pr.feedChainReader().GetLatestValue(
+		feedChainReader.GetLatestValue(
 			ctx,
 			identifier,
 			primitives.Unconfirmed,
@@ -221,7 +229,7 @@ func (pr *priceReader) getRawTokenPriceE18Normalized(
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
 	}
 
-	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract)
+	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract, feedChainReader)
 	if err1 != nil {
 		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
 	}
