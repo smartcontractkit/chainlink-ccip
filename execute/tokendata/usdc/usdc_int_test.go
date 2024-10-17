@@ -436,7 +436,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 }
 
 func createToken(t *testing.T, nonce uint64, sourceDomain uint32, pool string) cciptypes.RampTokenAmount {
-	bytesPool, err := cciptypes.NewBytesFromString(pool)
+	bytesPool, err := cciptypes.NewUnknownAddressFromHex(pool)
 	require.NoError(t, err)
 
 	return cciptypes.RampTokenAmount{
