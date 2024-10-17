@@ -89,7 +89,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	pr.lggr.Infow("getting fee quoter token updates",
 		"tokens", tokens,
 		"chain", chain,
-		"feeQuoterAddress", feeQuoterAddress,
+		"feeQuoterAddress", typeconv.AddressBytesToString(feeQuoterAddress, uint64(chain)),
 	)
 
 	byteTokens := make([][]byte, 0, len(tokens))

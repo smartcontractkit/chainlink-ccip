@@ -93,6 +93,7 @@ func TestCCIPChainReader_GetContractAddress(t *testing.T) {
 	ecr := reader_mocks.NewMockExtended(t)
 
 	ccipReader := ccipChainReader{
+		lggr: logger.Test(t),
 		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 			chainA: ecr,
 		},
