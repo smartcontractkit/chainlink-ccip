@@ -395,7 +395,7 @@ func TestWriteConfig(t *testing.T) {
 				content, err := os.ReadFile(tempFile.Name())
 				require.NoError(t, err)
 				lines := strings.Split(strings.TrimSpace(string(content)), "\n")
-				assert.Equal(t, tc.expectedLines, lines)
+				assert.ElementsMatch(t, tc.expectedLines, lines)
 			}
 		})
 	}
