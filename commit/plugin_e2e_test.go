@@ -19,7 +19,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -46,11 +45,11 @@ const (
 	destChain         = ccipocr3.ChainSelector(1)
 	sourceChain1      = ccipocr3.ChainSelector(2)
 	sourceChain2      = ccipocr3.ChainSelector(3)
-	arbAddr           = ocr2types.Account("0xa100000000000000000000000000000000000000")
-	arbAggregatorAddr = ocr2types.Account("0xa2000000000000000000000000000000000000000")
+	arbAddr           = ccipocr3.UnknownEncodedAddress("0xa100000000000000000000000000000000000000")
+	arbAggregatorAddr = ccipocr3.UnknownEncodedAddress("0xa2000000000000000000000000000000000000000")
 
-	ethAddr           = ocr2types.Account("0xe100000000000000000000000000000000000000")
-	ethAggregatorAddr = ocr2types.Account("0xe200000000000000000000000000000000000000")
+	ethAddr           = ccipocr3.UnknownEncodedAddress("0xe100000000000000000000000000000000000000")
+	ethAggregatorAddr = ccipocr3.UnknownEncodedAddress("0xe200000000000000000000000000000000000000")
 )
 
 var (
@@ -61,7 +60,7 @@ var (
 	ethPrice = new(big.Int).Mul(big.NewInt(7), big.NewInt(1e18))
 
 	// a map to ease working with tests
-	tokenPriceMap = map[ocr2types.Account]ccipocr3.TokenPrice{
+	tokenPriceMap = map[ccipocr3.UnknownEncodedAddress]ccipocr3.TokenPrice{
 		arbAddr: {
 			TokenID: arbAddr,
 			Price:   ccipocr3.NewBigInt(arbPrice),
@@ -75,12 +74,12 @@ var (
 	decimals18 = uint8(18)
 
 	arbInfo = pluginconfig.TokenInfo{
-		AggregatorAddress: string(arbAggregatorAddr),
+		AggregatorAddress: arbAggregatorAddr,
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
 	}
 	ethInfo = pluginconfig.TokenInfo{
-		AggregatorAddress: string(ethAggregatorAddr),
+		AggregatorAddress: ethAggregatorAddr,
 		DeviationPPB:      ccipocr3.NewBigInt(big.NewInt(1e5)),
 		Decimals:          decimals18,
 	}
@@ -236,7 +235,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
-						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
+						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
 				n.priceReader.EXPECT().
@@ -298,14 +297,14 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ocr2types.Account{arbAddr, ethAddr}).
+					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
 					Return([]*big.Int{arbPrice, ethPrice}, nil).
 					Maybe()
 
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
-						map[ocr2types.Account]plugintypes.TimestampedBig{}, nil,
+						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
 					).
 					Maybe()
 			},
@@ -322,7 +321,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ocr2types.Account{arbAddr, ethAddr}).
+					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
 					Return([]*big.Int{arbPrice, ethPrice}, nil).
 					Maybe()
 
@@ -330,7 +329,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
-						map[ocr2types.Account]plugintypes.TimestampedBig{
+						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{
 							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
 							ethAddr: {Value: ccipocr3.NewBigInt(ethPrice), Timestamp: time.Now()},
 						}, nil,
@@ -348,14 +347,14 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
-					GetFeedPricesUSD(params.ctx, []ocr2types.Account{arbAddr, ethAddr}).
+					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
 					Return([]*big.Int{arbPrice, ethPrice}, nil).
 					Maybe()
 
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
-						map[ocr2types.Account]plugintypes.TimestampedBig{
+						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{
 							// Arb is fresh, will not be updated
 							arbAddr: {Value: ccipocr3.NewBigInt(arbPrice), Timestamp: time.Now()},
 							// Eth is stale, should update
@@ -643,7 +642,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		NewMsgScanBatchSize:                100,
 		MaxReportTransmissionCheckAttempts: 2,
 		TokenPriceBatchWriteFrequency:      writeFrequency,
-		TokenInfo: map[ocr2types.Account]pluginconfig.TokenInfo{
+		TokenInfo: map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo{
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
