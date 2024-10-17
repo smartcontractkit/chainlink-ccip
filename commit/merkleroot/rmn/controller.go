@@ -597,7 +597,7 @@ func (c *controller) getRmnReportSignatures(
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               rmnRemoteCfg.RmnReportVersion.String(),
+		ReportVersionDigest:         rmnRemoteCfg.RmnReportVersion,
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(destChainInfo.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(destChain.DestChainSelector),
 		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,

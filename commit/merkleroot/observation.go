@@ -157,7 +157,7 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               rmnRemoteCfg.RmnReportVersion.String(),
+		ReportVersionDigest:         rmnRemoteCfg.RmnReportVersion,
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(ch.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(ch.Selector),
 		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,
