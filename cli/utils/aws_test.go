@@ -10,7 +10,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
@@ -44,12 +43,14 @@ func MockAwsConfigFile(content []byte, perm fs.FileMode) *os.File {
 }
 
 // LoadTestAwsConfig is a convenience wrapper for config.LoadDefaultConfig from AWS Go SDK
-func LoadTestAwsConfig(awsConfigFile string, profileName string) (aws.Config, error) {
-	os.Unsetenv("AWS_DEFAULT_REGION")
-	return config.LoadDefaultConfig(
+func LoadTestAwsConfig(awsConfigFile string, profileName string) (config.SharedConfig, error) {
+	return config.LoadSharedConfigProfile(
 		context.TODO(),
-		config.WithSharedConfigFiles([]string{awsConfigFile}),
-		config.WithSharedConfigProfile(profileName))
+		profileName,
+		func(o *config.LoadSharedConfigOptions) {
+			o.ConfigFiles = []string{awsConfigFile}
+		},
+	)
 }
 
 // InMemIniWithAwsProfiles takes a list of AwsProfile and returns an in-memory *ini.File instance
