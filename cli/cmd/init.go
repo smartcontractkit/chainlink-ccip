@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -128,20 +127,11 @@ var initCmd = &cobra.Command{
 		}
 
 		stsClient := wrappers.NewSTSClientWrapper(awsSdkConfig)
-		if !utils.HasValidAwsSession(stsClient) {
-			msg := "No valid AWS session found."
-			if viper.GetBool("CRIB_CI_ENV") {
-				logger.Error(msg)
-				os.Exit(1)
-			}
-			logger.Warn(fmt.Sprintf("%s Attempting to login via AWS SSO", msg))
-			if err := utils.AwsSsoLogin(viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE")); err != nil {
-				logger.Error("failed to aws sso login", slog.Any("error", err))
-				os.Exit(1)
-			}
-		} else {
-			logger.Info("AWS credentials working.")
+		if err := utils.EnsureValidAwsSession(stsClient, viper.GetString("AWS_CONFIG_FILE"), viper.GetString("AWS_PROFILE"), !viper.GetBool("CRIB_CI_ENV")); err != nil {
+			logger.Error("failed to get a valid AWS session", slog.Any("error", err))
+			os.Exit(1)
 		}
+		logger.Info("AWS credentials working.")
 
 		if !viper.GetBool("CRIB_CI_ENV") && !utils.HasValidAwsSession(stsClient) {
 			logger.Error("AWS credentials still not detected. Exiting.")
@@ -197,49 +187,42 @@ var initCmd = &cobra.Command{
 			)
 		}
 
-		if viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") && viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
-			logger.Info("CRIB initialization complete")
-			return
+		var dockerCli wrappers.DockerCLI
+		var helmRegistryClient wrappers.HelmRegistryAPI
+
+		if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
+			dockerCli, err = utils.InitializeDockerCLI()
+			if err != nil {
+				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+				os.Exit(1)
+			}
+		} else {
+			logger.Info("Skipping Docker ECR login")
 		}
 
-		parsedHelmRegistryURI, err := url.Parse(viper.GetString("CHAINLINK_HELM_REGISTRY_URI"))
-		if err != nil {
-			logger.Error("failed to parse CHAINLINK_HELM_REGISTRY_URI", slog.Any("error", err))
-			os.Exit(1)
+		if !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
+			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
+			if err != nil {
+				logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
+				os.Exit(1)
+			}
+		} else {
+			logger.Info("Skipping Helm Registry ECR login")
 		}
 
 		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
-		ecrAuthToken, err := utils.GetDecodedECRAuthorizationToken(ecrClient)
-		if err != nil {
-			logger.Error("failed to get ECR auth token", slog.Any("error", err))
+		refreshRegistriesOutput := utils.RefreshRegistriesECRCredentials(ecrClient, dockerCli, helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI"))
+		if refreshRegistriesOutput.ECRGetAuthorizationTokenError != nil {
+			logger.Error("failed to refresh ECR credentials", slog.Any("error", refreshRegistriesOutput.ECRGetAuthorizationTokenError))
 			os.Exit(1)
 		}
 
-		for _, authData := range ecrAuthToken {
-			if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-				dockerCli, err := utils.InitializeDockerCLI()
-				if err != nil {
-					logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
-					os.Exit(1)
-				}
-				if _, err := utils.DockerLogin(dockerCli, authData.Username, authData.Password, authData.RegistryURL); err != nil && !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-					logger.Error("failed to docker login", slog.Any("error", err))
-					os.Exit(1)
-				}
-				logger.Info("Docker login successful", "registry", authData.RegistryURL)
-			}
-
-			if !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
-				helmRegistryClient, err := utils.InitializeHelmRegistryClient(nil)
-				if err != nil {
-					logger.Error("failed to initialize Helm Registry Client", slog.Any("error", err))
-					os.Exit(1)
-				}
-				if err := utils.HelmRegistryLogin(helmRegistryClient, authData.Username, authData.Password, parsedHelmRegistryURI.Host); err != nil {
-					logger.Error("failed to helm registry login", slog.Any("error", err))
-					os.Exit(1)
-				}
-				logger.Info("Helm registry login successful", "registry", parsedHelmRegistryURI.Host)
+		for _, attempt := range *refreshRegistriesOutput.RegistryLoginAttempts {
+			if attempt.LoginErr != nil {
+				logger.Error("failed to refresh ECR credentials for registry", slog.String("registry_type", attempt.RegistryType), slog.String("registry_host", attempt.RegistryHost), slog.Any("error", attempt.LoginErr))
+				os.Exit(1)
+			} else {
+				logger.Info("Registry login successful", slog.String("registry_type", attempt.RegistryType), slog.String("registry_host", attempt.RegistryHost))
 			}
 		}
 
@@ -274,9 +257,6 @@ func init() {
 	initCmd.Flags().String("provider", "", fmt.Sprintf("Provider to initialize (should be one of: %v)", supportedProviders))
 
 	// flow control flags
-	initCmd.Flags().Bool("crib-ignore-namespace-prefix", false, "Skips validating the crib- prefix in DEVSPACE_NAMESPACE")
-	initCmd.Flags().Bool("crib-skip-docker-ecr-login", false, "Skips logging into Docker ECR registry")
-	initCmd.Flags().Bool("crib-skip-helm-ecr-login", false, "Skips logging into Helm ECR registry")
 	initCmd.Flags().Bool("write-config", false, "Persists config acquired interactively back to .env passed via --config (WARNING: comments will be lost!)")
 
 	// bind to viper (we can safely ignore the errors here, as the flags are guaranteed to exist)
@@ -290,9 +270,6 @@ func init() {
 	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("eks-cluster-name"))
 	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("eks-alias-name"))
 	_ = viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
-	_ = viper.BindPFlag("CRIB_IGNORE_NAMESPACE_PREFIX", initCmd.Flags().Lookup("crib-ignore-namespace-prefix"))
-	_ = viper.BindPFlag("CRIB_SKIP_DOCKER_ECR_LOGIN", initCmd.Flags().Lookup("crib-skip-docker-ecr-login"))
-	_ = viper.BindPFlag("CRIB_SKIP_HELM_ECR_LOGIN", initCmd.Flags().Lookup("crib-skip-helm-ecr-login"))
 	_ = viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
 	_ = viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))
 

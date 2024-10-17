@@ -355,3 +355,62 @@ func TestHasValidAwsSession(t *testing.T) {
 		})
 	}
 }
+
+func TestEnsureValidAwsSession(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		description     string
+		mockStsClient   wrappers.STSAPI
+		awsConfigFile   string
+		awsProfile      string
+		shouldTryAwsSso bool
+		wantError       string
+	}
+
+	mockStsClientValidSession := wrappermocks.NewSTSAPI(t)
+	mockStsClientValidSession.EXPECT().
+		GetCallerIdentity(
+			context.TODO(), &sts.GetCallerIdentityInput{},
+		).Return(&sts.GetCallerIdentityOutput{}, nil)
+
+	mockStsClientInvalidSession := wrappermocks.NewSTSAPI(t)
+	mockStsClientInvalidSession.EXPECT().
+		GetCallerIdentity(
+			context.TODO(), &sts.GetCallerIdentityInput{},
+		).Return(nil, fmt.Errorf("some error"))
+
+	testCases := []testCase{
+		{
+			description:     "valid session",
+			mockStsClient:   mockStsClientValidSession,
+			awsConfigFile:   "mockConfigFile",
+			awsProfile:      "mockProfile",
+			shouldTryAwsSso: false,
+			wantError:       "",
+		},
+		{
+			description:     "invalid session, should not try SSO",
+			mockStsClient:   mockStsClientInvalidSession,
+			awsConfigFile:   "mockConfigFile",
+			awsProfile:      "mockProfile",
+			shouldTryAwsSso: false,
+			wantError:       "No valid AWS session found.",
+		},
+		// TODO: can't easily test SSO login here, that will require refactoring the EnsureValidAwsSession to receive an interface that forces the AwsSsoLogin function
+		// or, we can take care of it in future integration tests
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			err := EnsureValidAwsSession(tc.mockStsClient, tc.awsConfigFile, tc.awsProfile, tc.shouldTryAwsSso)
+			if tc.wantError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantError)
+			}
+		})
+	}
+}

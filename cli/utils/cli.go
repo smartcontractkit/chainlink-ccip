@@ -4,13 +4,26 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/smartcontractkit/crib/cli/wrappers"
 )
+
+type RegistryLoginAttempt struct {
+	RegistryType string // "docker" or "helm"
+	RegistryHost string // e.g. "123456789012.dkr.ecr.us-west-2.amazonaws.com"
+	LoginErr     error
+}
+type RefreshRegistriesECRCredentialsOutput struct {
+	RegistryLoginAttempts         *[]RegistryLoginAttempt
+	ECRGetAuthorizationTokenError error
+}
 
 func GetGitTopLevelDir(dir string) (string, error) {
 	if stat, err := os.Stat(dir); os.IsNotExist(err) || !stat.IsDir() {
@@ -168,4 +181,68 @@ func WriteConfig(path string, kv map[string]string) error {
 	}
 
 	return nil
+}
+
+func ExtractHostFromUrl(input string) (string, error) {
+	parsedUrl, err := url.Parse(input)
+	if err != nil {
+		return "", err
+	}
+	return parsedUrl.Host, nil
+}
+
+func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappers.DockerCLI, helmRegistryClient wrappers.HelmRegistryAPI, chainlinkHelmRegistryUri string) *RefreshRegistriesECRCredentialsOutput {
+	registryLoginAttempts := []RegistryLoginAttempt{}
+	output := &RefreshRegistriesECRCredentialsOutput{
+		RegistryLoginAttempts:         &registryLoginAttempts,
+		ECRGetAuthorizationTokenError: nil,
+	}
+	if dockerCli == nil && helmRegistryClient == nil {
+		return output
+	}
+
+	ecrAuthToken, err := GetDecodedECRAuthorizationToken(ecrClient)
+	if err != nil {
+		output.ECRGetAuthorizationTokenError = err
+		return output
+	}
+
+	if len(ecrAuthToken) == 0 {
+		output.ECRGetAuthorizationTokenError = fmt.Errorf("no authorization data returned")
+		return output
+	}
+
+	if len(ecrAuthToken) > 1 {
+		slog.Warn("got multiple ECR auth tokens back from ecr.GetAuthorizationToken. Only the first one will be used")
+	}
+
+	if dockerCli != nil {
+		dockerRegistryLoginAttempt := RegistryLoginAttempt{RegistryType: "docker"}
+		dockerRegistryHost, err := ExtractHostFromUrl(ecrAuthToken[0].RegistryURL)
+		if err == nil {
+			dockerRegistryLoginAttempt.RegistryHost = dockerRegistryHost
+			if _, loginErr := DockerLogin(dockerCli, ecrAuthToken[0].Username, ecrAuthToken[0].Password, dockerRegistryHost); loginErr != nil {
+				dockerRegistryLoginAttempt.LoginErr = loginErr
+			}
+		} else {
+			dockerRegistryLoginAttempt.LoginErr = err
+		}
+		registryLoginAttempts = append(registryLoginAttempts, dockerRegistryLoginAttempt)
+	}
+
+	if helmRegistryClient != nil {
+		helmRegistryLoginAttempt := RegistryLoginAttempt{RegistryType: "helm"}
+		helmRegistryHost, err := ExtractHostFromUrl(chainlinkHelmRegistryUri)
+		if err == nil {
+			helmRegistryLoginAttempt.RegistryHost = helmRegistryHost
+			if loginErr := HelmRegistryLogin(helmRegistryClient, ecrAuthToken[0].Username, ecrAuthToken[0].Password, helmRegistryHost); loginErr != nil {
+				helmRegistryLoginAttempt.LoginErr = loginErr
+			}
+		} else {
+			helmRegistryLoginAttempt.LoginErr = err
+		}
+		registryLoginAttempts = append(registryLoginAttempts, helmRegistryLoginAttempt)
+	}
+
+	return output
 }
