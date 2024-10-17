@@ -68,7 +68,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 				readers[cciptypes.ChainSelector(1)] = m
 				return readers
 			},
-			errorMessage: "unable to bind MessageTransmitter for chain 1",
+			errorMessage: "unable to bind MessageTransmitter 0x0000000000000000000000000000000000000002 for chain 1",
 		},
 		{
 			name: "happy path",
