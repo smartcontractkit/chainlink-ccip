@@ -39,24 +39,26 @@ type PriceReader interface {
 }
 
 type priceReader struct {
-	lggr logger.Logger
-	// Reader for the feed chain. This can be Nil if node doesn't support feed chain.
-	feedChainReader contractreader.ContractReaderFacade
-	tokenInfo       map[types.Account]pluginconfig.TokenInfo
-	ccipReader      CCIPReader
+	lggr         logger.Logger
+	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
+	tokenInfo    map[types.Account]pluginconfig.TokenInfo
+	ccipReader   CCIPReader
+	feedChain    ccipocr3.ChainSelector
 }
 
 func NewPriceReader(
 	lggr logger.Logger,
-	feedChainReader contractreader.ContractReaderFacade,
+	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
+	feedChain ccipocr3.ChainSelector,
 ) PriceReader {
 	return &priceReader{
-		lggr:            lggr,
-		feedChainReader: feedChainReader,
-		tokenInfo:       tokenInfo,
-		ccipReader:      ccipReader,
+		lggr:         lggr,
+		chainReaders: chainReaders,
+		tokenInfo:    tokenInfo,
+		ccipReader:   ccipReader,
+		feedChain:    feedChain,
 	}
 }
 
@@ -110,7 +112,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
 	if err :=
-		pr.feedChainReader.GetLatestValue(
+		pr.chainReaders[chain].GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
@@ -141,7 +143,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
 	prices := make([]*big.Int, len(tokens))
-	if pr.feedChainReader == nil {
+	if pr.feedChainReader() == nil {
 		pr.lggr.Debug("node does not support feed chain")
 		return prices, nil
 	}
@@ -188,7 +190,7 @@ func (pr *priceReader) getFeedDecimals(
 ) (uint8, error) {
 	var decimals uint8
 	if err :=
-		pr.feedChainReader.GetLatestValue(
+		pr.feedChainReader().GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
@@ -209,7 +211,7 @@ func (pr *priceReader) getRawTokenPriceE18Normalized(
 	var latestRoundData LatestRoundData
 	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 	if err :=
-		pr.feedChainReader.GetLatestValue(
+		pr.feedChainReader().GetLatestValue(
 			ctx,
 			identifier,
 			primitives.Unconfirmed,
@@ -230,6 +232,10 @@ func (pr *priceReader) getRawTokenPriceE18Normalized(
 		answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
 	}
 	return answer, nil
+}
+
+func (pr *priceReader) feedChainReader() contractreader.ContractReaderFacade {
+	return pr.chainReaders[pr.feedChain]
 }
 
 // Input price is USD per full token, with 18 decimal precision

@@ -159,7 +159,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	)
 
 	// The node supports the chain that the token prices are on.
-	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
+	_, ok := readers[offchainConfig.PriceFeedChainSelector]
 	if ok {
 		// Bind all token aggregate contracts
 		var bcs []types.BoundContract
@@ -169,16 +169,17 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 				Name:    consts.ContractNamePriceAggregator,
 			})
 		}
-		if err1 := tokenPricesCr.Bind(ctx, bcs); err1 != nil {
+		if err1 := readers[offchainConfig.PriceFeedChainSelector].Bind(ctx, bcs); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
 		}
 	}
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		p.lggr,
-		tokenPricesCr,
+		readers,
 		offchainConfig.TokenInfo,
 		ccipReader,
+		offchainConfig.PriceFeedChainSelector,
 	)
 
 	return NewPlugin(

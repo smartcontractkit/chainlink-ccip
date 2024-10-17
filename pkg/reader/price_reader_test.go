@@ -19,6 +19,7 @@ import (
 
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -92,9 +93,13 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 
 	for _, tc := range testCases {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
+		feedChain := cciptypes.ChainSelector(1)
 		tokenPricesReader := priceReader{
-			feedChainReader: contractReader,
-			tokenInfo:       tc.tokenInfo,
+			chainReaders: map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+				feedChain: contractReader,
+			},
+			tokenInfo: tc.tokenInfo,
+			feedChain: feedChain,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
