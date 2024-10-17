@@ -47,3 +47,8 @@ func CreateRMNRemoteCfg() rmntypes.RemoteConfig {
 		RmnReportVersion: rand.RandomReportVersion(),
 	}
 }
+
+// ReportVersion is the version of the report that the RMNRemote contract supports.
+// todo: fetch it from rmnRemoteCfg when the contract supports it and delete this constant.
+// currently rmnRemoteCfg.RmnReportVersion is the hash of the report version string.
+const ReportVersion string = "RMN_V1_6_ANY2EVM_REPORT"
