@@ -20,8 +20,6 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -599,7 +597,7 @@ func (c *controller) getRmnReportSignatures(
 	}
 
 	rmnReport := cciptypes.RMNReport{
-		ReportVersion:               testhelpers.ReportVersion, // todo: fetch from rmn remote
+		ReportVersionDigest:         rmnRemoteCfg.RmnReportVersion,
 		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(destChainInfo.EvmChainID)),
 		DestChainSelector:           cciptypes.ChainSelector(destChain.DestChainSelector),
 		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,

@@ -2,8 +2,8 @@ package ccipocr3
 
 // RMNReport is the payload that is signed by the RMN nodes, transmitted and verified onchain.
 type RMNReport struct {
-	ReportVersion               string // e.g. "RMN_V1_6_ANY2EVM_REPORT".
-	DestChainID                 BigInt // If applies, a chain specific id, e.g. evm chain id otherwise empty.
+	ReportVersionDigest         Bytes32 // e.g. keccak256("RMN_V1_6_ANY2EVM_REPORT")
+	DestChainID                 BigInt  // If applies, a chain specific id, e.g. evm chain id otherwise empty.
 	DestChainSelector           ChainSelector
 	RmnRemoteContractAddress    Bytes
 	OfframpAddress              Bytes
