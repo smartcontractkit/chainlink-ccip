@@ -793,11 +793,6 @@ func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptype
 		return nil, fmt.Errorf("expected one binding for the %s contract, got %d", contractName, len(bindings))
 	}
 
-	r.lggr.Infow("got contract address",
-		"contractName", contractName,
-		"chain", chain,
-		"address", bindings[0].Binding.Address)
-
 	addressBytes, err := typeconv.AddressStringToBytes(bindings[0].Binding.Address, uint64(chain))
 	if err != nil {
 		return nil, fmt.Errorf("convert address %s to bytes: %w", bindings[0].Binding.Address, err)
