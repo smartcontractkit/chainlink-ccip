@@ -755,6 +755,11 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	var errs []error
 	for contractName, chainSelToAddress := range contracts {
 		for chainSel, address := range chainSelToAddress {
+			r.lggr.Infow("Syncing contract",
+				"contractName", contractName,
+				"chainSel", chainSel,
+				"address", typeconv.AddressBytesToString(address, uint64(chainSel)),
+			)
 			// defense in depth: don't bind if the address is empty.
 			// callers should ensure this but we double check here.
 			if len(address) == 0 {
