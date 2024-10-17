@@ -17,10 +17,11 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/smartcontractkit/libocr/quorumhelper"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
