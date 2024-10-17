@@ -23,11 +23,11 @@ import (
 )
 
 const (
-	ArbAddr           = ocr2types.Account("0x1e03388D351BF87CF2409EFf18C45Df59775Fbb2")
-	ArbAggregatorAddr = ocr2types.Account("024e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	ArbAddr           = ocr2types.Account("0xa100000000000000000000000000000000000000")
+	ArbAggregatorAddr = ocr2types.Account("0xa2000000000000000000000000000000000000000")
 
-	EthAddr           = ocr2types.Account("0x3e03388D351BF87CF2409EFf18C45Df59775Fbb2")
-	EthAggregatorAddr = ocr2types.Account("0x4e03388D351BF87CF2409EFf18C45Df59775Fbb2")
+	EthAddr           = ocr2types.Account("0xe100000000000000000000000000000000000000")
+	EthAggregatorAddr = ocr2types.Account("0xe200000000000000000000000000000000000000")
 )
 
 var (
@@ -92,14 +92,13 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 
 	for _, tc := range testCases {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
-		tokenPricesReader := OnchainTokenPricesReader{
-			ContractReader:   contractReader,
-			TokenInfo:        tc.tokenInfo,
-			feeQuoterEnabled: true,
+		tokenPricesReader := priceReader{
+			feedChainReader: contractReader,
+			tokenInfo:       tc.tokenInfo,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			result, err := tokenPricesReader.GetTokenFeedPricesUSD(ctx, tc.inputTokens)
+			result, err := tokenPricesReader.GetFeedPricesUSD(ctx, tc.inputTokens)
 
 			if tc.wantErr {
 				require.Error(t, err)

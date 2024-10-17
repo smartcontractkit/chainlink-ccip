@@ -3,7 +3,6 @@ package tokenprice
 import (
 	"context"
 	"fmt"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -15,6 +14,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -24,7 +24,7 @@ type processor struct {
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
-	tokenPriceReader reader.PriceReader
+	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
 	fRoleDON         int
 }
@@ -35,7 +35,7 @@ func NewProcessor(
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
-	tokenPriceReader reader.PriceReader,
+	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
@@ -53,35 +53,6 @@ func NewProcessor(
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
-}
-
-func (p *processor) Observation(
-	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
-) (Observation, error) {
-
-	fChain := p.ObserveFChain()
-	if len(fChain) == 0 {
-		return Observation{}, nil
-	}
-
-	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
-	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
-	ts := time.Now().UTC()
-	p.lggr.Infow(
-		"observed token prices",
-		"feed prices", feedTokenPrices,
-		"fee quoter updates", feeQuoterUpdates,
-		"timestamp", ts,
-	)
-
-	return Observation{
-		FeedTokenPrices:       feedTokenPrices,
-		FeeQuoterTokenUpdates: feeQuoterUpdates,
-		FChain:                fChain,
-		Timestamp:             ts,
-	}, nil
 }
 
 func (p *processor) ValidateObservation(

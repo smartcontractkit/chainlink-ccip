@@ -143,7 +143,21 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		}
 	}
 
-	var onChainTokenPricesReader reader.PriceReader
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
+	for chain, cr := range p.contractReaders {
+		readers[chain] = cr
+	}
+
+	ccipReader := readerpkg.NewCCIPChainReader(
+		ctx,
+		p.lggr,
+		readers,
+		p.chainWriters,
+		p.ocrConfig.Config.ChainSelector,
+		p.ocrConfig.Config.OfframpAddress,
+	)
+
 	// The node supports the chain that the token prices are on.
 	tokenPricesCr, ok := p.contractReaders[offchainConfig.PriceFeedChainSelector]
 	if ok {
@@ -158,26 +172,15 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err1 := tokenPricesCr.Bind(ctx, bcs); err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to bind token price contracts: %w", err1)
 		}
-		onChainTokenPricesReader = reader.NewOnchainTokenPricesReader(
-			tokenPricesCr,
-			offchainConfig.TokenInfo,
-		)
 	}
 
-	// map types to the facade.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
-	for chain, cr := range p.contractReaders {
-		readers[chain] = cr
-	}
-
-	ccipReader := readerpkg.NewCCIPChainReader(
-		ctx,
+	onChainTokenPricesReader := readerpkg.NewPriceReader(
 		p.lggr,
-		readers,
-		p.chainWriters,
-		p.ocrConfig.Config.ChainSelector,
-		p.ocrConfig.Config.OfframpAddress,
+		tokenPricesCr,
+		offchainConfig.TokenInfo,
+		ccipReader,
 	)
+
 	return NewPlugin(
 			p.donID,
 			config.OracleID,
