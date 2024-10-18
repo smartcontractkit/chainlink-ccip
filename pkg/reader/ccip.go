@@ -727,6 +727,10 @@ func (r *ccipChainReader) DiscoverContracts(
 			return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
 		} else {
 			for chain, cfg := range dynamicConfigs {
+				r.lggr.Infow("appending source fee quoter contract address",
+					"chain", chain,
+					"address", cfg.FeeQuoter,
+				)
 				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
 			}
 		}
@@ -742,6 +746,10 @@ func (r *ccipChainReader) DiscoverContracts(
 			return nil, fmt.Errorf("unable to lookup source routers (onRamp dest chain config): %w", err)
 		} else {
 			for chain, cfg := range destChainConfig {
+				r.lggr.Infow("appending Router contract address",
+					"chain", chain,
+					"address", cfg.Router,
+				)
 				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
 			}
 		}
