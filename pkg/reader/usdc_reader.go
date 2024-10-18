@@ -45,6 +45,10 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
+	// Tests
+	sel.GETH_TESTNET.Selector:  100,
+	sel.GETH_DEVNET_2.Selector: 101,
+	sel.GETH_DEVNET_3.Selector: 103,
 }
 
 type usdcMessageReader struct {
@@ -90,6 +94,7 @@ func NewUSDCMessageReader(
 
 		contract, err := bindFacadeReaderContract(
 			ctx,
+			lggr,
 			contractReaders,
 			chainSelector,
 			consts.ContractNameCCTPMessageTransmitter,
