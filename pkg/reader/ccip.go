@@ -626,7 +626,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 }
 
 func (r *ccipChainReader) isValidAddress(address []byte, contractName string, chain cciptypes.ChainSelector) bool {
-	if address == nil || len(address) == 0 {
+	if len(address) == 0 {
 		r.lggr.Errorw("address for contract is empty",
 			"contract", contractName,
 			"chain", chain,
@@ -733,7 +733,9 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddres
 			return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
 		} else {
 			for chain, cfg := range dynamicConfigs {
-				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.DynamicConfig.FeeQuoter)
+				if r.isValidAddress(cfg.DynamicConfig.FeeQuoter, consts.ContractNameFeeQuoter, chain) {
+					resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.DynamicConfig.FeeQuoter)
+				}
 			}
 		}
 	}
