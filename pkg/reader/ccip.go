@@ -1149,15 +1149,14 @@ func (r *ccipChainReader) GetOnRampDestChainConfig(
 		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
-			//resp := onRampDestChainConfig{}
-			resp := make(map[string]any)
+			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{
-					"destChainSelector": chainSel,
+					"destChainSelector": r.destChain,
 				},
 				&resp,
 			)
@@ -1165,7 +1164,7 @@ func (r *ccipChainReader) GetOnRampDestChainConfig(
 				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
 			}
 			mu.Lock()
-			//result[chainSel] = resp
+			result[chainSel] = resp
 			mu.Unlock()
 
 			return nil
