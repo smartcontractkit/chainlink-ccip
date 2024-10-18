@@ -84,7 +84,7 @@ deployments:
         repo: https://charts.devspace.sh
       values:
         containers:
-          - image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:197d0d889bb2ffdea2ab5bb387ca9e94a071663d
+          - image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:qa-latest
             env:
               - name: OTEL_COLLECTOR_GRPC_ENDPOINT
                 value: "beholder-otel-collector-agent:4317"
