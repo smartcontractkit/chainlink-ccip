@@ -762,7 +762,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 			}
 
 			// try to bind
-			_, err := bindExtendedReaderContract(ctx, r.contractReaders, chainSel, contractName, address)
+			_, err := bindExtendedReaderContract(ctx, r.lggr, r.contractReaders, chainSel, contractName, address)
 			if err != nil {
 				if errors.Is(err, ErrContractReaderNotFound) {
 					// don't support this chain
