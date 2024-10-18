@@ -440,8 +440,32 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
 	addDestinationContractAssertions(mockReaders[destChain], destNonceMgr, destRMNRemote, destFeeQuoter)
 
+	mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
+		mock.Anything,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOffRampGetAllSourceChainConfigs,
+		primitives.Unconfirmed,
+		map[string]any{},
+		mock.Anything,
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+		v := returnVal.(*selectorsAndConfigs)
+		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
+		v.SourceChainConfigs = []sourceChainConfig{
+			{
+				OnRamp:    onramps[0],
+				Router:    destRouter,
+				IsEnabled: true,
+			},
+			{
+				OnRamp:    onramps[1],
+				Router:    destRouter,
+				IsEnabled: true,
+			},
+		}
+	}))
+
 	// mock calls to get fee quoter from onramps and source chain config from offramp.
-	for i, selector := range sourceChain {
+	for _, selector := range sourceChain {
 		mockReaders[selector] = reader_mocks.NewMockExtended(t)
 
 		// ErrNoBindings is ignored.
@@ -464,20 +488,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 			},
 			mock.Anything,
 		).Return(contractreader.ErrNoBindings)
-
-		mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
-			mock.Anything,
-			consts.ContractNameOffRamp,
-			consts.MethodNameGetSourceChainConfig,
-			primitives.Unconfirmed,
-			map[string]any{"sourceChainSelector": selector},
-			mock.Anything,
-		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*sourceChainConfig)
-			v.OnRamp = onramps[i]
-			v.Router = destRouter
-			v.IsEnabled = true
-		}))
 	}
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
@@ -494,7 +504,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 
 	assert.Equal(t, expectedContractAddresses, contractAddresses)
@@ -554,6 +564,30 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	mockReaders[destChain] = reader_mocks.NewMockExtended(t)
 	addDestinationContractAssertions(mockReaders[destChain], destNonceMgr, destRMNRemote, destFeeQuoter)
 
+	mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
+		mock.Anything,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOffRampGetAllSourceChainConfigs,
+		primitives.Unconfirmed,
+		map[string]any{},
+		mock.Anything,
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+		v := returnVal.(*selectorsAndConfigs)
+		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
+		v.SourceChainConfigs = []sourceChainConfig{
+			{
+				OnRamp:    onramps[0],
+				Router:    destRouter[0],
+				IsEnabled: true,
+			},
+			{
+				OnRamp:    onramps[1],
+				Router:    destRouter[1],
+				IsEnabled: true,
+			},
+		}
+	}))
+
 	// mock calls to get fee quoter from onramps and source chain config from offramp.
 	for i, selector := range sourceChain {
 		mockReaders[selector] = reader_mocks.NewMockExtended(t)
@@ -583,21 +617,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			v := returnVal.(*onRampDestChainConfig)
 			v.Router = srcRouters[i]
 		}))
-
-		// mock the call for sourceChain2
-		mockReaders[destChain].EXPECT().ExtendedGetLatestValue(
-			mock.Anything,
-			consts.ContractNameOffRamp,
-			consts.MethodNameGetSourceChainConfig,
-			primitives.Unconfirmed,
-			map[string]any{"sourceChainSelector": selector},
-			mock.Anything,
-		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*sourceChainConfig)
-			v.OnRamp = onramps[i]
-			v.Router = destRouter[i]
-			v.IsEnabled = true
-		}))
 	}
 
 	castToExtended := make(map[cciptypes.ChainSelector]contractreader.Extended)
@@ -613,7 +632,7 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 
 	require.Equal(t, expectedContractAddresses, contractAddresses)
@@ -624,21 +643,23 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.T) {
 	ctx := tests.Context(t)
 	destChain := cciptypes.ChainSelector(1)
+	sourceChain := [2]cciptypes.ChainSelector{2, 3}
+	onramps := [2][]byte{{0x1}, {0x2}}
 	destNonceMgr := []byte{0x3}
 	destRMNRemote := []byte{0x4}
 	destFeeQuoter := []byte{0x5}
-	//destRouter := []byte{0x6}
+	destRouter := []byte{0x6}
 
 	var expectedContractAddresses ContractAddresses
+	for i := range onramps {
+		expectedContractAddresses = expectedContractAddresses.Append(
+			consts.ContractNameOnRamp, sourceChain[i], onramps[i])
+	}
 	// All dest chain contracts should be discovered, they do not require source chain support.
-	//expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter)
+	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameFeeQuoter, destChain, destFeeQuoter)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRMNRemote, destChain, destRMNRemote)
 	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameNonceManager, destChain, destNonceMgr)
-
-	// since the source chains are not supported, we should not have any onramp addresses
-	// after discovery.
-	require.Len(t, expectedContractAddresses[consts.ContractNameOnRamp], 0)
 
 	destExtended := reader_mocks.NewMockExtended(t)
 
@@ -667,20 +688,29 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 		v := returnVal.(*offRampDynamicChainConfig)
 		v.FeeQuoter = destFeeQuoter
 	}))
-	// mock the call to get the router
-	/*
-		destExtended.EXPECT().ExtendedGetLatestValue(
-			mock.Anything,
-			consts.ContractNameOffRamp,
-			consts.MethodNameGetDestChainConfig,
-			primitives.Unconfirmed,
-			map[string]any{},
-			mock.Anything,
-		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*offRampDestChainConfig)
-			v.Router = destRouter
-		}))
-	*/
+	destExtended.EXPECT().ExtendedGetLatestValue(
+		mock.Anything,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOffRampGetAllSourceChainConfigs,
+		primitives.Unconfirmed,
+		map[string]any{},
+		mock.Anything,
+	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
+		v := returnVal.(*selectorsAndConfigs)
+		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
+		v.SourceChainConfigs = []sourceChainConfig{
+			{
+				OnRamp:    onramps[0],
+				Router:    destRouter,
+				IsEnabled: true,
+			},
+			{
+				OnRamp:    onramps[1],
+				Router:    destRouter,
+				IsEnabled: true,
+			},
+		}
+	}))
 
 	// create the reader
 	ccipChainReader := &ccipChainReader{
@@ -692,43 +722,26 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 	require.Equal(t, expectedContractAddresses, contractAddresses)
 }
 
-func TestCCIPChainReader_DiscoverContracts_GetSourceChainConfig_Errors(t *testing.T) {
+func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *testing.T) {
 	ctx := tests.Context(t)
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
-	s1Onramp := []byte{0x1}
-	destRouter := []byte{0x6}
 	destExtended := reader_mocks.NewMockExtended(t)
-
-	// mock the call for sourceChain1 - successful
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameGetSourceChainConfig,
-		primitives.Unconfirmed,
-		map[string]any{"sourceChainSelector": sourceChain1},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*sourceChainConfig)
-		v.OnRamp = s1Onramp
-		v.Router = destRouter
-		v.IsEnabled = true
-	}))
 
 	// mock the call for sourceChain2 - failure
 	getLatestValueErr := errors.New("some error")
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameGetSourceChainConfig,
+		consts.MethodNameOffRampGetAllSourceChainConfigs,
 		primitives.Unconfirmed,
-		map[string]any{"sourceChainSelector": sourceChain2},
+		map[string]any{},
 		mock.Anything,
 	).Return(getLatestValueErr)
 
@@ -749,7 +762,7 @@ func TestCCIPChainReader_DiscoverContracts_GetSourceChainConfig_Errors(t *testin
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	_, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	_, err := ccipChainReader.DiscoverContracts(ctx)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 }
@@ -759,36 +772,17 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	destChain := cciptypes.ChainSelector(1)
 	sourceChain1 := cciptypes.ChainSelector(2)
 	sourceChain2 := cciptypes.ChainSelector(3)
-	s1Onramp := []byte{0x1}
-	s2Onramp := []byte{0x2}
 	destExtended := reader_mocks.NewMockExtended(t)
 
-	// mock the call for sourceChain1 - successful
+	// mock the call for source chain configs
 	destExtended.EXPECT().ExtendedGetLatestValue(
 		mock.Anything,
 		consts.ContractNameOffRamp,
-		consts.MethodNameGetSourceChainConfig,
+		consts.MethodNameOffRampGetAllSourceChainConfigs,
 		primitives.Unconfirmed,
-		map[string]any{"sourceChainSelector": sourceChain1},
+		map[string]any{},
 		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*sourceChainConfig)
-		v.OnRamp = s1Onramp
-		v.IsEnabled = true
-	}))
-	// mock the call for sourceChain2 - successful
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameGetSourceChainConfig,
-		primitives.Unconfirmed,
-		map[string]any{"sourceChainSelector": sourceChain2},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*sourceChainConfig)
-		v.OnRamp = s2Onramp
-		v.IsEnabled = true
-	}))
+	).Return(nil) // doesn't matter for this test
 	// mock the call to get the nonce manager - failure
 	getLatestValueErr := errors.New("some error")
 	destExtended.EXPECT().ExtendedGetLatestValue(
@@ -815,7 +809,7 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 	}
 
 	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	_, err := ccipChainReader.DiscoverContracts(ctx, nil)
+	_, err := ccipChainReader.DiscoverContracts(ctx)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
 }
