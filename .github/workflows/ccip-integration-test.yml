@@ -31,7 +31,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink
           #ref: develop
-          ref: develop
+          ref: fix-fee-quoter
           path: chainlink
       - name: Get the correct commit SHA via GitHub API
         id: get_sha
