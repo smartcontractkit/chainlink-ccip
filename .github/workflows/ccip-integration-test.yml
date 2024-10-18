@@ -31,7 +31,7 @@ jobs:
         with:
           repository: smartcontractkit/chainlink
           #ref: develop
-          ref: will/kill-common
+          ref: develop
           path: chainlink
       - name: Get the correct commit SHA via GitHub API
         id: get_sha
