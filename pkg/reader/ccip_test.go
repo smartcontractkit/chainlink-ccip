@@ -566,8 +566,8 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 			map[string]any{},
 			mock.Anything,
 		).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-			v := returnVal.(*onRampDynamicChainConfig)
-			v.FeeQuoter = srcFeeQuoters[i]
+			v := returnVal.(*getOnRampDynamicConfigResponse)
+			v.DynamicConfig.FeeQuoter = srcFeeQuoters[i]
 		}))
 
 		mockReaders[selector].EXPECT().ExtendedGetLatestValue(
