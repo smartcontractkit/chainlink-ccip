@@ -761,7 +761,7 @@ func (r *ccipChainReader) DiscoverContracts(
 
 	// Read onRamps for Router in DestChainConfig.
 	{
-		destChainConfig, err := r.getOnRampDestChainConfig(ctx, myChains)
+		destChainConfig, err := r.GetOnRampDestChainConfig(ctx, myChains)
 		if errors.Is(err, contractreader.ErrNoBindings) {
 			// ErrNoBindings is an allowable error.
 			r.lggr.Infow("unable to lookup source routers, this is expected during initialization", "err", err)
@@ -1128,7 +1128,7 @@ type onRampDestChainConfig struct {
 	Router           []byte `json:"router"`
 }
 
-func (r *ccipChainReader) getOnRampDestChainConfig(
+func (r *ccipChainReader) GetOnRampDestChainConfig(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
 ) (map[cciptypes.ChainSelector]onRampDestChainConfig, error) {
@@ -1149,8 +1149,8 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
-			resp := onRampDestChainConfig{}
-			//resp := make(map[string]any)
+			//resp := onRampDestChainConfig{}
+			resp := make(map[string]any)
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
@@ -1165,7 +1165,7 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
 			}
 			mu.Lock()
-			result[chainSel] = resp
+			//result[chainSel] = resp
 			mu.Unlock()
 
 			return nil
