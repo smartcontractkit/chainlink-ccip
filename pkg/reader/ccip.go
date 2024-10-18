@@ -636,7 +636,7 @@ func (r *ccipChainReader) isValidAddress(address []byte, contractName string, ch
 	return true
 }
 
-func (r *ccipChainReader) discoverDestinationContracts(
+func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
