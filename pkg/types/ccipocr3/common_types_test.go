@@ -132,5 +132,15 @@ func TestNewBytesFromString(t *testing.T) {
 				require.Equal(t, tt.want, got)
 			}
 		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewUnknownAddressFromHex(tt.arg)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, UnknownAddress(tt.want), got)
+			}
+		})
 	}
 }

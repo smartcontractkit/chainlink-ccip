@@ -13,8 +13,6 @@ import (
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
-	ocr3types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
@@ -99,7 +97,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	type TokenPriceUpdate struct {
-		SourceToken []byte
+		SourceToken cciptypes.UnknownAddress
 		UsdPerToken *big.Int
 	}
 
@@ -188,8 +186,9 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 		for _, tokenPriceUpdate := range ev.PriceUpdates.TokenPriceUpdates {
 			priceUpdates.TokenPriceUpdates = append(priceUpdates.TokenPriceUpdates, cciptypes.TokenPrice{
-				TokenID: ocr3types.Account(typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
-				Price:   cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
+				TokenID: cciptypes.UnknownEncodedAddress(
+					typeconv.AddressBytesToString(tokenPriceUpdate.SourceToken, uint64(r.destChain))),
+				Price: cciptypes.NewBigInt(tokenPriceUpdate.UsdPerToken),
 			})
 		}
 
