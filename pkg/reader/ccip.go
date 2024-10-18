@@ -625,6 +625,17 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}, nil
 }
 
+func (r *ccipChainReader) isValidAddress(address []byte, contractName string, chain cciptypes.ChainSelector) bool {
+	if address == nil || len(address) == 0 {
+		r.lggr.Errorw("address for contract is empty",
+			"contract", contractName,
+			"chain", chain,
+		)
+		return false
+	}
+	return true
+}
+
 func (r *ccipChainReader) discoverDestinationContracts(
 	ctx context.Context,
 	allChains []cciptypes.ChainSelector,
@@ -648,10 +659,14 @@ func (r *ccipChainReader) discoverDestinationContracts(
 		sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 		for _, chain := range keys {
 			cfg := sourceConfigs[chain]
-			resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
+			if r.isValidAddress(cfg.OnRamp, consts.ContractNameOnRamp, chain) {
+				resp = resp.Append(consts.ContractNameOnRamp, chain, cfg.OnRamp)
+			}
 			// The local router is located in each source chain config. Add it once.
 			if len(resp[consts.ContractNameRouter][r.destChain]) == 0 {
-				resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+				if r.isValidAddress(cfg.Router, consts.ContractNameRouter, chain) {
+					resp = resp.Append(consts.ContractNameRouter, r.destChain, cfg.Router)
+				}
 			}
 		}
 	}
@@ -668,8 +683,12 @@ func (r *ccipChainReader) discoverDestinationContracts(
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup nonce manager (offramp static config): %w", err)
 	}
-	resp = resp.Append(consts.ContractNameNonceManager, r.destChain, staticConfig.NonceManager)
-	resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.RmnRemote)
+	if r.isValidAddress(staticConfig.NonceManager, consts.ContractNameNonceManager, r.destChain) {
+		resp = resp.Append(consts.ContractNameNonceManager, r.destChain, staticConfig.NonceManager)
+	}
+	if r.isValidAddress(staticConfig.RmnRemote, consts.ContractNameRMNRemote, r.destChain) {
+		resp = resp.Append(consts.ContractNameRMNRemote, r.destChain, staticConfig.RmnRemote)
+	}
 	r.lggr.Infow("appending RMN remote contract address", "address", staticConfig.RmnRemote)
 
 	// FeeQuoter from the offRamp dynamic config.
@@ -684,7 +703,9 @@ func (r *ccipChainReader) discoverDestinationContracts(
 	if err != nil {
 		return nil, fmt.Errorf("unable to lookup fee quoter (offramp dynamic config): %w", err)
 	}
-	resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, dynamicConfig.FeeQuoter)
+	if r.isValidAddress(dynamicConfig.FeeQuoter, consts.ContractNameFeeQuoter, r.destChain) {
+		resp = resp.Append(consts.ContractNameFeeQuoter, r.destChain, dynamicConfig.FeeQuoter)
+	}
 
 	return resp, nil
 }
@@ -727,11 +748,13 @@ func (r *ccipChainReader) DiscoverContracts(
 			return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
 		} else {
 			for chain, cfg := range dynamicConfigs {
-				r.lggr.Infow("appending source fee quoter contract address",
-					"chain", chain,
-					"feequoter-address", typeconv.AddressBytesToString(cfg.FeeQuoter, uint64(chain)),
-				)
-				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
+				//r.lggr.Infow("appending source fee quoter contract address",
+				//	"chain", chain,
+				//	"feequoter-address", typeconv.AddressBytesToString(cfg.FeeQuoter, uint64(chain)),
+				//)
+				if r.isValidAddress(cfg.FeeQuoter, consts.ContractNameFeeQuoter, chain) {
+					resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
+				}
 			}
 		}
 	}
@@ -746,11 +769,13 @@ func (r *ccipChainReader) DiscoverContracts(
 			return nil, fmt.Errorf("unable to lookup source routers (onRamp dest chain config): %w", err)
 		} else {
 			for chain, cfg := range destChainConfig {
-				r.lggr.Infow("appending Router contract address",
-					"chain", chain,
-					"router-address", typeconv.AddressBytesToString(cfg.Router, uint64(chain)),
-				)
-				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
+				//r.lggr.Infow("appending Router contract address",
+				//	"chain", chain,
+				//	"router-address", typeconv.AddressBytesToString(cfg.Router, uint64(chain)),
+				//)
+				if r.isValidAddress(cfg.Router, consts.ContractNameRouter, chain) {
+					resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
+				}
 			}
 		}
 	}
@@ -1052,39 +1077,40 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 	result := make(map[cciptypes.ChainSelector]onRampDynamicChainConfig)
 
 	mu := new(sync.Mutex)
-	eg := new(errgroup.Group)
+	//eg := new(errgroup.Group)
 	for _, chainSel := range srcChains {
 		// no onramp for the destination chain
 		if chainSel == r.destChain {
 			continue
 		}
 
-		chainSel := chainSel
-		eg.Go(func() error {
-			// read onramp dynamic config
-			resp := onRampDynamicChainConfig{}
-			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
-				ctx,
-				consts.ContractNameOnRamp,
-				consts.MethodNameOnRampGetDynamicConfig,
-				primitives.Unconfirmed,
-				map[string]any{},
-				&resp,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
-			}
-			mu.Lock()
-			result[chainSel] = resp
-			mu.Unlock()
+		//chainSel := chainSel
+		//eg.Go(func() error {
+		// read onramp dynamic config
+		resp := onRampDynamicChainConfig{}
+		err := r.contractReaders[chainSel].ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameOnRamp,
+			consts.MethodNameOnRampGetDynamicConfig,
+			primitives.Unconfirmed,
+			map[string]any{},
+			&resp,
+		)
+		if err != nil {
+			r.lggr.Errorw("failed to get onramp dynamic config", "chain", chainSel, "err", err)
+			//	return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+		}
+		mu.Lock()
+		result[chainSel] = resp
+		mu.Unlock()
 
-			return nil
-		})
+		//return nil
+		//})
 	}
 
-	if err := eg.Wait(); err != nil {
-		return nil, err
-	}
+	//if err := eg.Wait(); err != nil {
+	//	return nil, err
+	//}
 	return result, nil
 }
 
