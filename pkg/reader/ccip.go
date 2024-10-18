@@ -625,8 +625,18 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}, nil
 }
 
-// discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
-func (r *ccipChainReader) discoverOffRampContracts(
+func (r *ccipChainReader) isValidAddress(address []byte, contractName string, chain cciptypes.ChainSelector) bool {
+	if address == nil || len(address) == 0 {
+		r.lggr.Errorw("address for contract is empty",
+			"contract", contractName,
+			"chain", chain,
+		)
+		return false
+	}
+	return true
+}
+
+func (r *ccipChainReader) discoverDestinationContracts(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
 ) (ContractAddresses, error) {
@@ -723,7 +733,7 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddres
 			return nil, fmt.Errorf("unable to lookup source fee quoters (onRamp dynamic config): %w", err)
 		} else {
 			for chain, cfg := range dynamicConfigs {
-				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
+				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.DynamicConfig.FeeQuoter)
 			}
 		}
 	}
@@ -1087,22 +1097,27 @@ func (r *ccipChainReader) getDestinationData(
 }
 
 // See DynamicChainConfig in OnRamp.sol
-type onRampDynamicChainConfig struct {
-	FeeQuoter        []byte `json:"feeQuoter"`
-	MessageValidator []byte `json:"messageValidator"`
-	FeeAggregator    []byte `json:"feeAggregator"`
-	AllowListAdmin   []byte `json:"allowListAdmin"`
+type onRampDynamicConfig struct {
+	FeeQuoter              []byte `json:"feeQuoter"`
+	ReentrancyGuardEntered bool   `json:"reentrancyGuardEntered"`
+	MessageInterceptor     []byte `json:"messageInterceptor"`
+	FeeAggregator          []byte `json:"feeAggregator"`
+	AllowListAdmin         []byte `json:"allowListAdmin"`
+}
+
+type getOnRampDynamicConfigResponse struct {
+	DynamicConfig onRampDynamicConfig `json:"dynamicConfig"`
 }
 
 func (r *ccipChainReader) getOnRampDynamicConfigs(
 	ctx context.Context,
 	srcChains []cciptypes.ChainSelector,
-) (map[cciptypes.ChainSelector]onRampDynamicChainConfig, error) {
+) (map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, srcChains...); err != nil {
 		return nil, err
 	}
 
-	result := make(map[cciptypes.ChainSelector]onRampDynamicChainConfig)
+	result := make(map[cciptypes.ChainSelector]getOnRampDynamicConfigResponse)
 
 	mu := new(sync.Mutex)
 	eg := new(errgroup.Group)
@@ -1115,7 +1130,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
-			resp := onRampDynamicChainConfig{}
+			resp := getOnRampDynamicConfigResponse{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
@@ -1124,6 +1139,9 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				map[string]any{},
 				&resp,
 			)
+			r.lggr.Debugw("got onramp dynamic config",
+				"chain", chainSel,
+				"resp", resp)
 			if err != nil {
 				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
 			}
@@ -1166,6 +1184,8 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 			continue
 		}
 
+		//TODO: loop over all other source chains except self and make sure
+		// that to get at least one valid router
 		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
@@ -1176,7 +1196,7 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{
-					"destChainSelector": chainSel,
+					"destChainSelector": r.destChain, // Any other chain other than self should work fine in happy case.
 				},
 				&resp,
 			)
