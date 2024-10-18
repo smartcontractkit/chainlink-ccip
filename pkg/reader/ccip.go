@@ -729,7 +729,7 @@ func (r *ccipChainReader) DiscoverContracts(
 			for chain, cfg := range dynamicConfigs {
 				r.lggr.Infow("appending source fee quoter contract address",
 					"chain", chain,
-					"address", cfg.FeeQuoter,
+					"feequoter-address", typeconv.AddressBytesToString(cfg.FeeQuoter, uint64(chain)),
 				)
 				resp = resp.Append(consts.ContractNameFeeQuoter, chain, cfg.FeeQuoter)
 			}
@@ -748,7 +748,7 @@ func (r *ccipChainReader) DiscoverContracts(
 			for chain, cfg := range destChainConfig {
 				r.lggr.Infow("appending Router contract address",
 					"chain", chain,
-					"address", cfg.Router,
+					"router-address", typeconv.AddressBytesToString(cfg.Router, uint64(chain)),
 				)
 				resp = resp.Append(consts.ContractNameRouter, chain, cfg.Router)
 			}
