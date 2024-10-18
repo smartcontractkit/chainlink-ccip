@@ -61,7 +61,7 @@ pipelines:
   deploy:
     run: |-
       run_dependency_pipelines prometheus grafana loki tempo redpanda
-      create_deployments beholder-test-client beholder-otel-collector-agent-2 beholder-otel-collector-gateway-2
+      create_deployments beholder-test-client beholder-otel-collector-agent-2 beholder-otel-collector-gateway
 
 deployments:
   beholder-test-client:
@@ -168,8 +168,12 @@ deployments:
         sidecar:
           config:
             exporters:
-              debug: null
-              otlp: null
+              otlp:
+                protocols:
+                  grpc:
+                    endpoint: 0.0.0.0:4317
+                  http:
+                    endpoint: 0.0.0.0:4318
               otlphttp:
                 endpoint: beholder-otel-collector-gateway:4317
                 tls:
@@ -230,7 +234,8 @@ deployments:
                   receivers:
                     - otlp
               telemetry:
-                logs: null
+                logs:
+                  level: "debug"
           enabled: true
 
 
