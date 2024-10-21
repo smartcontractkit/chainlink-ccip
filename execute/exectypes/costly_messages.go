@@ -8,6 +8,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -27,12 +29,13 @@ type CostlyMessageObserver interface {
 // NewCostlyMessageObserverWithDefaults creates a new CostlyMessageObserver with default calculators.
 // The default calculators are:
 // - CCIPMessageFeeUSD18Calculator
-// - ZeroMessageExecCostUSD18Calculator
+// - CCIPMessageExecCostUSD18Calculator
 func NewCostlyMessageObserverWithDefaults(
 	lggr logger.Logger,
 	enabled bool,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
+	estimateProvider gas.EstimateProvider,
 ) CostlyMessageObserver {
 	return NewCostlyMessageObserver(
 		lggr,
@@ -43,8 +46,11 @@ func NewCostlyMessageObserverWithDefaults(
 			relativeBoostPerWaitHour,
 			time.Now,
 		),
-		// TODO: Implement exec cost calculator
-		NewZeroMessageExecCostUSD18Calculator(),
+		&CCIPMessageExecCostUSD18Calculator{
+			lggr:             lggr,
+			ccipReader:       ccipReader,
+			estimateProvider: estimateProvider,
+		},
 	)
 }
 
@@ -314,3 +320,48 @@ func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHo
 
 	return res
 }
+
+type CCIPMessageExecCostUSD18Calculator struct {
+	lggr             logger.Logger
+	ccipReader       readerpkg.CCIPReader
+	estimateProvider gas.EstimateProvider
+}
+
+// MessageExecCostUSD18 returns a map from message ID to the message's estimated execution cost in USD18s.
+func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
+	ctx context.Context,
+	messages []cciptypes.Message,
+) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
+	feeComponents, err := c.ccipReader.GetDestChainFeeComponents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get fee components: %w", err)
+	}
+	if feeComponents.ExecutionFee == nil {
+		return nil, fmt.Errorf("missing execution fee")
+	}
+
+	for _, msg := range messages {
+		executionCostUSD18 := c.computeExecutionCostUSD18(feeComponents.ExecutionFee, msg)
+		// TODO: implement data availability cost
+		dataAvailabilityCostUSD18 := new(big.Int)
+		totalCostUSD18 := new(big.Int).Add(executionCostUSD18, dataAvailabilityCostUSD18)
+		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
+	}
+
+	return messageExecCosts, nil
+}
+
+// computeExecutionCostUSD18 computes the execution cost of a message in USD18s.
+// The cost is:
+// messageGas (gas) * executionFee (USD18/gas) = USD18
+func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
+	executionFee *big.Int,
+	message cciptypes.Message,
+) plugintypes.USD18 {
+	messageGas := new(big.Int).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
+	cost := new(big.Int).Mul(messageGas, executionFee)
+	return cost
+}
+
+var _ MessageExecCostUSD18Calculator = &CCIPMessageExecCostUSD18Calculator{}
