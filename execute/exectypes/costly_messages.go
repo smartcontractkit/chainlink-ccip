@@ -268,3 +268,42 @@ func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHo
 
 	return res
 }
+
+// CCIPMessageExecCostUSD18Calculator TODO: doc
+type CCIPMessageExecCostUSD18Calculator struct {
+	lggr       logger.Logger
+	ccipReader readerpkg.CCIPReader
+}
+
+// MessageExecCostUSD18 returns a cost of 0 for all messages.
+func (n *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
+	ctx context.Context,
+	messages []cciptypes.Message,
+) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
+	feeComponents, err := n.ccipReader.GetDestChainFeeComponents(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get fee components: %w", err)
+	}
+
+	for _, msg := range messages {
+		executionCostUSD18 := computeExecutionCostUSD18(feeComponents.ExecutionFee, msg)
+		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(feeComponents.DataAvailabilityFee, msg)
+		totalCostUSD18 := big.NewInt(0).Add(executionCostUSD18, dataAvailabilityCostUSD18)
+		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
+	}
+
+	return messageExecCosts, nil
+}
+
+// TODO: doc, impl
+func computeExecutionCostUSD18(executionFee *big.Int, message cciptypes.Message) plugintypes.USD18 {
+	return plugintypes.NewUSD18(0)
+}
+
+// TODO: doc, impl
+func computeDataAvailabilityCostUSD18(dataAvailabilityFee *big.Int, message cciptypes.Message) plugintypes.USD18 {
+	return plugintypes.NewUSD18(0)
+}
+
+var _ MessageExecCostUSD18Calculator = &CCIPMessageExecCostUSD18Calculator{}

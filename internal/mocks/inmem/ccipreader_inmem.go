@@ -124,6 +124,11 @@ func (r InMemoryCCIPReader) GetAvailableChainsFeeComponents(
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	panic("implement me")
 }
+
+func (r InMemoryCCIPReader) GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error) {
+	return types.ChainFeeComponents{}, nil
+}
+
 func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
