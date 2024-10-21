@@ -88,9 +88,11 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 
 	peerIDs := make([]string, 0, len(rmnNodesInfo))
 	for _, node := range rmnNodesInfo {
+		w.lggr.Infow("Adding RMN node to peerIDs", "node", node.PeerID.String())
 		peerIDs = append(peerIDs, node.PeerID.String())
 	}
 	for _, p2pID := range w.oracleIDToP2pID {
+		w.lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
 		peerIDs = append(peerIDs, p2pID.String())
 	}
 
