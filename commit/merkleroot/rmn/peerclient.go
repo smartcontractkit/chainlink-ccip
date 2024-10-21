@@ -140,6 +140,11 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 		return fmt.Errorf("get or create rage p2p stream: %w", err)
 	}
 
+	r.lggr.Infow("RMN Peer Client sending message to RMN node",
+		"rmnNodeID", rmnNode.ID,
+		"requestSize", len(request),
+	)
+
 	stream.SendMessage(request)
 
 	return nil
@@ -185,6 +190,11 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 
 func (r *peerClient) listenToStream(rmnNodeID rmntypes.NodeID, stream Stream) {
 	for msg := range stream.ReceiveMessages() {
+		r.lggr.Infow("RMN Peer Client received message from RMN node",
+			"rmnNodeID", rmnNodeID,
+			"msgSize", len(msg),
+		)
+
 		r.respChan <- PeerResponse{
 			RMNNodeID: rmnNodeID,
 			Body:      msg,
