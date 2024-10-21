@@ -636,6 +636,7 @@ func (r *ccipChainReader) isValidAddress(address []byte, contractName string, ch
 	return true
 }
 
+// discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
 func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
 	chain cciptypes.ChainSelector,
@@ -1186,11 +1187,9 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 			continue
 		}
 
-		//TODO: loop over all other source chains except self and make sure
-		// that to get at least one valid router
+		// For chain X, all DestChainConfigs will have same OnRamp address which is the chainX OnRamp
 		chainSel := chainSel
 		eg.Go(func() error {
-			// read onramp dynamic config
 			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
@@ -1198,7 +1197,10 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{
-					"destChainSelector": r.destChain, // Any other chain other than self should work fine in happy case.
+					// Any other chain other than self should work as a chain don't have self as a destination
+					// Here we use destChain as the chainSel is looping over all source chains, so all of them should have
+					// a config for the destChain
+					"destChainSelector": r.destChain,
 				},
 				&resp,
 			)

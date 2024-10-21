@@ -73,7 +73,7 @@ func bindReaderContract(
 		Name:    contractName,
 	}
 
-	lggr.Infow("Binding contract",
+	lggr.Debugw("Binding contract",
 		"chainSel", chainSel,
 		"contractName", contractName,
 		"address", encAddress,
