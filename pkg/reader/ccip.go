@@ -465,6 +465,24 @@ func (r *ccipChainReader) GetAvailableChainsFeeComponents(
 	return feeComponents
 }
 
+func (r *ccipChainReader) GetDestChainFeeComponents(
+	ctx context.Context,
+) (types.ChainFeeComponents, error) {
+	chainWriter, ok := r.contractWriters[r.destChain]
+	if !ok {
+		r.lggr.Errorw("dest chain contract writer not found", "chain", r.destChain)
+		return types.ChainFeeComponents{}, errors.New("dest chain contract writer not found")
+	}
+
+	feeComponents, err := chainWriter.GetFeeComponents(ctx)
+	if err != nil {
+		r.lggr.Errorw("failed to get dest chain fee components", "chain", r.destChain)
+		return types.ChainFeeComponents{}, err
+	}
+
+	return *feeComponents, nil
+}
+
 func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
