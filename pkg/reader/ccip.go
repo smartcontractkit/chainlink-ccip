@@ -627,7 +627,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 
 func (r *ccipChainReader) isValidAddress(address []byte, contractName string, chain cciptypes.ChainSelector) bool {
 	if len(address) == 0 {
-		r.lggr.Warnw("address for contract is empty",
+		r.lggr.Errorw("address for contract is empty",
 			"contract", contractName,
 			"chain", chain,
 		)
