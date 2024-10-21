@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type Query struct {
@@ -81,8 +81,10 @@ func FromPackedFee(packedFee *big.Int) ComponentsUSDPrices {
 
 // ToPackedFee PackedFee is a Bitwise operation:
 // (dataAvFeeUSD << 112) | executionFeeUSD
-// nolint:lll
+//
 // https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
+//
+//nolint:lll
 func (c ComponentsUSDPrices) ToPackedFee() *big.Int {
 	daShifted := new(big.Int).Lsh(c.DataAvFeePriceUSD, 112)
 	return new(big.Int).Or(daShifted, c.ExecutionFeePriceUSD)

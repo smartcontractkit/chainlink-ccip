@@ -7,13 +7,13 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // Observation collects data across two phases which happen in separate rounds.
@@ -128,7 +128,9 @@ func (p *Plugin) getMessagesObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	messages := make(exectypes.MessageObservations)
+	messageObs := make(exectypes.MessageObservations)
+	messages := make([]cciptypes.Message, 0)
+	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
 	if len(previousOutcome.PendingCommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
@@ -156,28 +158,35 @@ func (p *Plugin) getMessagesObservation(
 				if err != nil {
 					return exectypes.Observation{}, err
 				}
+				messages = append(messages, msgs...)
 				for _, msg := range msgs {
-					if _, ok := messages[srcChain]; !ok {
-						messages[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+					if _, ok := messageObs[srcChain]; !ok {
+						messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 					}
-					messages[srcChain][msg.Header.SequenceNumber] = msg
+					messageObs[srcChain][msg.Header.SequenceNumber] = msg
 				}
 			}
 		}
+
+		var err error
+		messageTimestamps, err = getMessageTimestampMap(commitReportCache, messageObs)
+		if err != nil {
+			return exectypes.Observation{}, err
+		}
 	}
 
-	tkData, err1 := p.tokenDataObserver.Observe(ctx, messages)
+	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
-	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages)
+	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages, messageTimestamps)
 	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages %w", err)
+		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
 	}
 
 	observation.CommitReports = regroup(previousOutcome.PendingCommitReports)
-	observation.Messages = messages
+	observation.Messages = messageObs
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 

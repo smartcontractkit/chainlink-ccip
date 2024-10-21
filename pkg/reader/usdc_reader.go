@@ -11,12 +11,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -45,6 +45,10 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
+	// Tests
+	sel.GETH_TESTNET.Selector:  100,
+	sel.GETH_DEVNET_2.Selector: 101,
+	sel.GETH_DEVNET_3.Selector: 103,
 }
 
 type usdcMessageReader struct {
@@ -90,6 +94,7 @@ func NewUSDCMessageReader(
 
 		contract, err := bindFacadeReaderContract(
 			ctx,
+			lggr,
 			contractReaders,
 			chainSelector,
 			consts.ContractNameCCTPMessageTransmitter,
@@ -216,7 +221,7 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 			return nil, fmt.Errorf("destination domain not found for chain %d", destChainSelector)
 		}
 
-		// nolint:lll
+		//nolint:lll
 		// USDC message payload:
 		// uint32 _msgVersion,
 		// uint32 _msgSourceDomain,

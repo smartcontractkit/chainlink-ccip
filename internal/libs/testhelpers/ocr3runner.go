@@ -10,10 +10,11 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -53,7 +54,8 @@ func NewOCR3Runner[RI any](
 
 // RunRound will run some basic steps of an OCR3 flow.
 // This is not a full OCR3 round but only the bare minimum.
-// nolint:gocyclo // This is a test helper.
+//
+//nolint:gocyclo // This is a test helper.
 func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], err error) {
 	r.round++
 	seqNr := uint64(r.round)

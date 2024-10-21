@@ -4,53 +4,61 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type PriceReader interface {
-	// GetTokenFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18.
+	// GetFeedPricesUSD returns the prices of the provided tokens in USD normalized to e18.
 	//	1 USDC = 1.00 USD per full token, each full token is 1e6 units -> 1 * 1e18 * 1e18 / 1e6 = 1e30
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetTokenFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
 
-	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the dest chain.
+	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the specified chain
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
 		tokens []ocr2types.Account,
+		chain ccipocr3.ChainSelector,
 	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
 }
 
-type OnchainTokenPricesReader struct {
-	// Reader for the chain that will have the token prices on-chain
-	ContractReader   contractreader.ContractReaderFacade
-	TokenInfo        map[types.Account]pluginconfig.TokenInfo
-	FeeQuoterAddress types.Account
-	// FeeQuoterEnabled Flag until we discover feeQuoter address and bind it correctly
-	feeQuoterEnabled bool
+type priceReader struct {
+	lggr         logger.Logger
+	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
+	tokenInfo    map[types.Account]pluginconfig.TokenInfo
+	ccipReader   CCIPReader
+	feedChain    ccipocr3.ChainSelector
 }
 
-func NewOnchainTokenPricesReader(
-	contractReader contractreader.ContractReaderFacade,
+func NewPriceReader(
+	lggr logger.Logger,
+	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade,
 	tokenInfo map[types.Account]pluginconfig.TokenInfo,
-) *OnchainTokenPricesReader {
-	return &OnchainTokenPricesReader{
-		ContractReader: contractReader,
-		TokenInfo:      tokenInfo,
+	ccipReader CCIPReader,
+	feedChain ccipocr3.ChainSelector,
+) PriceReader {
+	return &priceReader{
+		lggr:         lggr,
+		chainReaders: chainReaders,
+		tokenInfo:    tokenInfo,
+		ccipReader:   ccipReader,
+		feedChain:    feedChain,
 	}
 }
 
@@ -66,64 +74,101 @@ type LatestRoundData struct {
 	AnsweredInRound *big.Int
 }
 
-func (pr *OnchainTokenPricesReader) GetFeeQuoterTokenUpdates(
+func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ocr2types.Account,
+	chain ccipocr3.ChainSelector,
 ) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
-	if !pr.feeQuoterEnabled {
-		return make(map[ocr2types.Account]plugintypes.TimestampedBig), nil
+	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
+	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
+
+	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
+	if err != nil {
+		pr.lggr.Debugw("failed to get fee quoter address.", "chain", chain, "err", err)
+		return updateMap, nil
 	}
-	var updates []plugintypes.TimestampedBig
+
+	pr.lggr.Infow("getting fee quoter token updates",
+		"tokens", tokens,
+		"chain", chain,
+		"feeQuoterAddress", typeconv.AddressBytesToString(feeQuoterAddress, uint64(chain)),
+	)
+
+	byteTokens := make([][]byte, 0, len(tokens))
+	for _, token := range tokens {
+		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
+		if err != nil {
+			pr.lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
+			continue
+		}
+
+		byteTokens = append(byteTokens, byteToken)
+	}
 
 	boundContract := commontypes.BoundContract{
-		Address: string(pr.FeeQuoterAddress),
+		Address: typeconv.AddressBytesToString(feeQuoterAddress[:], uint64(chain)),
 		Name:    consts.ContractNameFeeQuoter,
+	}
+
+	cr, ok := pr.chainReaders[chain]
+	if !ok {
+		pr.lggr.Warnw("contract reader not found", "chain", chain)
+		return nil, nil
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
 	if err :=
-		pr.ContractReader.GetLatestValue(
+		cr.GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
 			primitives.Unconfirmed,
-			tokens,
+			map[string]any{
+				"tokens": byteTokens,
+			},
 			&updates,
 		); err != nil {
-		return nil, fmt.Errorf("failed to get token prices: %w", err)
+		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
 	}
 
-	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
 	for i, token := range tokens {
 		// token not available on fee quoter
-		if updates[i].Timestamp == time.Unix(0, 0) {
+		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
+			pr.lggr.Debugw("empty fee quoter update found",
+				"chain", chain,
+				"token", token,
+			)
 			continue
 		}
-		updateMap[token] = updates[i]
+		updateMap[token] = plugintypes.TimeStampedBigFromUnix(updates[i])
 	}
 
 	return updateMap, nil
 }
 
-func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
+func (pr *priceReader) GetFeedPricesUSD(
 	ctx context.Context, tokens []ocr2types.Account,
 ) ([]*big.Int, error) {
 	prices := make([]*big.Int, len(tokens))
+	if pr.feedChainReader() == nil {
+		pr.lggr.Debug("node does not support feed chain")
+		return prices, nil
+	}
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
 		idx := idx
 		token := token
 		eg.Go(func() error {
 			boundContract := commontypes.BoundContract{
-				Address: pr.TokenInfo[token].AggregatorAddress,
+				Address: pr.tokenInfo[token].AggregatorAddress,
 				Name:    consts.ContractNamePriceAggregator,
 			}
-			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract)
+			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract, pr.feedChainReader())
 			if err != nil {
-				return fmt.Errorf("failed to get token price for %s: %w", token, err)
+				return fmt.Errorf("token price for %s: %w", token, err)
 			}
-			tokenInfo, ok := pr.TokenInfo[token]
+			tokenInfo, ok := pr.tokenInfo[token]
 			if !ok {
-				return fmt.Errorf("failed to get tokenInfo for %s: %w", token, err)
+				return fmt.Errorf("get tokenInfo for %s: %w", token, err)
 			}
 
 			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, tokenInfo.Decimals)
@@ -144,14 +189,15 @@ func (pr *OnchainTokenPricesReader) GetTokenFeedPricesUSD(
 	return prices, nil
 }
 
-func (pr *OnchainTokenPricesReader) getFeedDecimals(
+func (pr *priceReader) getFeedDecimals(
 	ctx context.Context,
 	token ocr2types.Account,
 	boundContract commontypes.BoundContract,
+	feedChainReader contractreader.ContractReaderFacade,
 ) (uint8, error) {
 	var decimals uint8
 	if err :=
-		pr.ContractReader.GetLatestValue(
+		feedChainReader.GetLatestValue(
 			ctx,
 			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
 			primitives.Unconfirmed,
@@ -164,15 +210,16 @@ func (pr *OnchainTokenPricesReader) getFeedDecimals(
 	return decimals, nil
 }
 
-func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
+func (pr *priceReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
 	token ocr2types.Account,
 	boundContract commontypes.BoundContract,
+	feedChainReader contractreader.ContractReaderFacade,
 ) (*big.Int, error) {
 	var latestRoundData LatestRoundData
 	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
 	if err :=
-		pr.ContractReader.GetLatestValue(
+		feedChainReader.GetLatestValue(
 			ctx,
 			identifier,
 			primitives.Unconfirmed,
@@ -182,7 +229,7 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
 	}
 
-	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract)
+	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract, feedChainReader)
 	if err1 != nil {
 		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
 	}
@@ -193,6 +240,10 @@ func (pr *OnchainTokenPricesReader) getRawTokenPriceE18Normalized(
 		answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
 	}
 	return answer, nil
+}
+
+func (pr *priceReader) feedChainReader() contractreader.ContractReaderFacade {
+	return pr.chainReaders[pr.feedChain]
 }
 
 // Input price is USD per full token, with 18 decimal precision
@@ -207,5 +258,5 @@ func calculateUsdPer1e18TokenAmount(price *big.Int, decimals uint8) *big.Int {
 	return tmp.Div(tmp, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil))
 }
 
-// Ensure OnchainTokenPricesReader implements PriceReader
-var _ PriceReader = (*OnchainTokenPricesReader)(nil)
+// Ensure priceReader implements PriceReader
+var _ PriceReader = (*priceReader)(nil)

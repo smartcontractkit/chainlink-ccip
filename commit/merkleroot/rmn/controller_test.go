@@ -13,20 +13,22 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	chainsel "github.com/smartcontractkit/chain-selectors"
 
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 var (
@@ -48,7 +50,7 @@ type testSetup struct {
 	rmnController  *controller
 	peerClient     *mockPeerClient
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
-	rmnHomeMock    *reader_mock.MockRMNHome
+	rmnHomeMock    *readerpkg_mock.MockRMNHome
 	remoteRMNCfg   rmntypes.RemoteConfig
 	minObservers   int
 	rmnNodes       []rmntypes.HomeNodeInfo
@@ -235,7 +237,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ctx := tests.Context(t)
 		resChan := make(chan PeerResponse, 200)
 		peerClient := newMockPeerClient(resChan)
-		rmnHomeReaderMock := reader_mock.NewMockRMNHome(t)
+		rmnHomeReaderMock := readerpkg_mock.NewMockRMNHome(t)
 
 		const numNodes = 4
 		rmnNodes := make([]rmntypes.HomeNodeInfo, numNodes)
@@ -324,6 +326,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
+
+		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
 
 		_, err := ts.rmnController.ComputeReportSignatures(
 			ts.ctx,
@@ -627,7 +631,15 @@ func (m *mockPeerClient) resetReceivedRequests() {
 	m.receivedRequests = make(map[rmntypes.NodeID][]*rmnpb.Request)
 }
 
-func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
+func (m *mockPeerClient) InitConnection(_ context.Context, _ cciptypes.Bytes32, _ cciptypes.Bytes32, _ []string) error {
+	return nil
+}
+
+func (m *mockPeerClient) Close() error {
+	return nil
+}
+
+func (m *mockPeerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -635,8 +647,8 @@ func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
 		m.receivedRequests = map[rmntypes.NodeID][]*rmnpb.Request{}
 	}
 
-	if _, ok := m.receivedRequests[rmnNodeID]; !ok {
-		m.receivedRequests[rmnNodeID] = []*rmnpb.Request{}
+	if _, ok := m.receivedRequests[rmnNode.ID]; !ok {
+		m.receivedRequests[rmnNode.ID] = []*rmnpb.Request{}
 	}
 
 	req := &rmnpb.Request{}
@@ -645,7 +657,7 @@ func (m *mockPeerClient) Send(rmnNodeID rmntypes.NodeID, request []byte) error {
 		return err
 	}
 
-	m.receivedRequests[rmnNodeID] = append(m.receivedRequests[rmnNodeID], req)
+	m.receivedRequests[rmnNode.ID] = append(m.receivedRequests[rmnNode.ID], req)
 	return nil
 }
 

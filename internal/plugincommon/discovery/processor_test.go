@@ -14,7 +14,6 @@ import (
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -23,6 +22,7 @@ import (
 	mock_reader "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testing.T) {
@@ -59,13 +59,12 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 			dest: expectedRMNRemote,
 		},
 		consts.ContractNameRouter: map[cciptypes.ChainSelector][]byte{
-			dest: expectedRouter,
+			source: expectedRouter,
 		},
 	}
-	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, emptySelectors).
+		DiscoverContracts(mock.Anything).
 		Return(expectedContracts, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
@@ -92,7 +91,7 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 	require.Len(t, observation.Addresses[consts.ContractNameRMNRemote], 1)
 	assert.Equal(t, expectedRMNRemote, observation.Addresses[consts.ContractNameRMNRemote][dest])
 	require.Len(t, observation.Addresses[consts.ContractNameRouter], 1)
-	assert.Equal(t, expectedRouter, observation.Addresses[consts.ContractNameRouter][dest])
+	assert.Equal(t, expectedRouter, observation.Addresses[consts.ContractNameRouter][source])
 }
 
 func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T) {
@@ -124,7 +123,8 @@ func TestContractDiscoveryProcessor_Observation_ErrorGettingFChain(t *testing.T)
 	assert.Empty(t, observation.FChain)
 }
 
-func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFChain(t *testing.T) {
+// No dest reader and source readers not ready, still observes fChain from home chain.
+func TestContractDiscoveryProcessor_Observation_SourceReadersNotReady(t *testing.T) {
 	mockReader := mock_reader.NewMockCCIPReader(t)
 	mockReaderIface := reader.CCIPReader(mockReader)
 	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
@@ -138,11 +138,10 @@ func TestContractDiscoveryProcessor_Observation_DontSupportDest_StillObserveFCha
 		dest:   1,
 		source: 2,
 	}
-	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, emptySelectors).
-		Return(nil, reader.ErrContractReaderNotFound)
+		DiscoverContracts(mock.Anything).
+		Return(nil, nil)
 
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
@@ -178,10 +177,9 @@ func TestContractDiscoveryProcessor_Observation_ErrorDiscoveringContracts(t *tes
 		source: 2,
 	}
 	discoveryErr := fmt.Errorf("discovery error")
-	var emptySelectors []cciptypes.ChainSelector
 	mockReader.
 		EXPECT().
-		DiscoverContracts(mock.Anything, emptySelectors).
+		DiscoverContracts(mock.Anything).
 		Return(nil, discoveryErr)
 	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
 	defer mockReader.AssertExpectations(t)
@@ -233,8 +231,11 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
-		consts.ContractNameFeeQuoter: {},
-		consts.ContractNameRouter:    {},
+		consts.ContractNameFeeQuoter: map[cciptypes.ChainSelector][]byte{
+			source1: []byte("feeQuoter1"),
+			source2: []byte("feeQuoter2"),
+		},
+		consts.ContractNameRouter: {},
 	}
 	mockReader.
 		EXPECT().
@@ -251,7 +252,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		nil, // oracleIDToP2PID, not needed for this test
 	)
 
-	obs := discoverytypes.Observation{
+	obsSrc := discoverytypes.Observation{
 		FChain: expectedFChain,
 		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
 			consts.ContractNameOnRamp: expectedOnRamp,
@@ -261,15 +262,20 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 			consts.ContractNameRMNRemote: {
 				dest: expectedRMNRemote,
 			},
+			consts.ContractNameFeeQuoter: {
+				source1: expectedContracts[consts.ContractNameFeeQuoter][source1],
+				source2: expectedContracts[consts.ContractNameFeeQuoter][source2],
+			},
 		},
 	}
+
 	// here we have:
 	// 2*fRoleDON + 1 observations of fChain
 	// 2*fDest + 1 observations of the onramps and the dest nonce manager
 	aos := []plugincommon.AttributedObservation[discoverytypes.Observation]{
-		{Observation: obs},
-		{Observation: obs},
-		{Observation: obs},
+		{Observation: obsSrc},
+		{Observation: obsSrc},
+		{Observation: obsSrc},
 	}
 
 	ctx := tests.Context(t)
@@ -309,8 +315,10 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
 			dest: expectedRMNRemote,
 		},
-		consts.ContractNameFeeQuoter: {},
-		consts.ContractNameRouter:    {},
+		consts.ContractNameRouter: {
+			dest: []byte("router"),
+		},
+		consts.ContractNameFeeQuoter: {}, // no consensus
 	}
 	mockReader.
 		EXPECT().
@@ -329,6 +337,12 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 
 	fChainObs := discoverytypes.Observation{
 		FChain: expectedFChain,
+		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			consts.ContractNameFeeQuoter: {
+				source1: []byte("fee_quoter_1"),
+				source2: []byte("fee_quoter_2"),
+			},
+		},
 	}
 	destObs := discoverytypes.Observation{
 		FChain: expectedFChain,
@@ -339,6 +353,9 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 			},
 			consts.ContractNameRMNRemote: {
 				dest: expectedRMNRemote,
+			},
+			consts.ContractNameRouter: {
+				dest: []byte("router"),
 			},
 		},
 	}
@@ -352,7 +369,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		{Observation: destObs},
 		{Observation: destObs},
 		{Observation: fChainObs},
-		{Observation: fChainObs},
+		{Observation: fChainObs}, // no consensus on fChainObs
 	}
 
 	ctx := tests.Context(t)

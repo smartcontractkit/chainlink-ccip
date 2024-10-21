@@ -4,19 +4,20 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -132,7 +133,8 @@ func groupByChainSelector(
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
-// nolint:gocyclo // todo
+//
+//nolint:gocyclo // todo
 func filterOutExecutedMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ([]exectypes.CommitData, error) {
@@ -310,7 +312,6 @@ func mergeTokenObservations(
 	fChain map[cciptypes.ChainSelector]int,
 ) (exectypes.TokenDataObservations, error) {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
-	//nolint:lll
 	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
 
@@ -500,4 +501,30 @@ func getConsensusObservation(
 	)
 
 	return observation, nil
+}
+
+// getMessageTimestampMap returns a map of message IDs to their timestamps.
+// cciptypes.Message does not contain a timestamp, so we need to derive the timestamp from the commit data.
+func getMessageTimestampMap(
+	commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData,
+	messages exectypes.MessageObservations,
+) (map[cciptypes.Bytes32]time.Time, error) {
+	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
+
+	for chainSel, SeqNumToMsg := range messages {
+		commitData, ok := commitReportCache[chainSel]
+		if !ok {
+			return nil, fmt.Errorf("missing commit data for chain %s", chainSel)
+		}
+
+		for seqNum, msg := range SeqNumToMsg {
+			for _, commit := range commitData {
+				if commit.SequenceNumberRange.Contains(seqNum) {
+					messageTimestamps[msg.Header.MessageID] = commit.Timestamp
+				}
+			}
+		}
+	}
+
+	return messageTimestamps, nil
 }

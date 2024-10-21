@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
@@ -19,6 +18,7 @@ import (
 	rmnmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -236,12 +236,14 @@ func TestProcessor_Query(t *testing.T) {
 			}
 
 			w := Processor{
-				offchainCfg: tc.cfg,
-				destChain:   tc.destChain,
-				ccipReader:  ccipReader,
-				rmnClient:   tc.rmnClient(t),
-				lggr:        logger.Test(t),
+				offchainCfg:   tc.cfg,
+				destChain:     tc.destChain,
+				ccipReader:    ccipReader,
+				rmnController: tc.rmnClient(t),
+				lggr:          logger.Test(t),
 			}
+
+			w.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller init
 
 			q, err := w.Query(ctx, tc.prevOutcome)
 			if tc.expErr {

@@ -3,18 +3,18 @@ package tokenprice
 import (
 	"context"
 	"fmt"
-	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -24,22 +24,21 @@ type processor struct {
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
-	tokenPriceReader reader.PriceReader
+	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
 	fRoleDON         int
 }
 
-// nolint: revive
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	lggr logger.Logger,
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
-	tokenPriceReader reader.PriceReader,
+	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
-) *processor {
+) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
 		lggr:             lggr,
@@ -54,35 +53,6 @@ func NewProcessor(
 
 func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
 	return Query{}, nil
-}
-
-func (p *processor) Observation(
-	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
-) (Observation, error) {
-
-	fChain := p.ObserveFChain()
-	if len(fChain) == 0 {
-		return Observation{}, nil
-	}
-
-	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
-	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
-	ts := time.Now().UTC()
-	p.lggr.Infow(
-		"observed token prices",
-		"feed prices", feedTokenPrices,
-		"fee quoter updates", feeQuoterUpdates,
-		"timestamp", ts,
-	)
-
-	return Observation{
-		FeedTokenPrices:       feedTokenPrices,
-		FeeQuoterTokenUpdates: feeQuoterUpdates,
-		FChain:                fChain,
-		Timestamp:             ts,
-	}, nil
 }
 
 func (p *processor) ValidateObservation(
@@ -119,6 +89,10 @@ func (p *processor) Outcome(
 	return Outcome{
 		TokenPrices: tokenPriceOutcome,
 	}, nil
+}
+
+func (p *processor) Close() error {
+	return nil
 }
 
 func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {

@@ -8,11 +8,11 @@ import (
 	"slices"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // buildSingleChainReportHelper converts the on-chain event data stored in cciptypes.ExecutePluginCommitData into the
@@ -148,8 +148,7 @@ const (
 
 func (b *execReportBuilder) checkMessage(
 	_ context.Context, idx int, execReport exectypes.CommitData,
-	// TODO: get rid of the nolint when the error is used
-) (exectypes.CommitData, messageStatus, error) { // nolint this will use the error eventually
+) (exectypes.CommitData, messageStatus, error) {
 	result := execReport
 
 	if idx >= len(execReport.Messages) {
@@ -320,7 +319,8 @@ func (b *execReportBuilder) verifyReport(
 
 // buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
-// nolint:gocyclo // todo
+//
+//nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	report exectypes.CommitData,

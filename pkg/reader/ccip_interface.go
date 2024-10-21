@@ -7,12 +7,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -141,11 +141,8 @@ type CCIPReader interface {
 		destChainSelector cciptypes.ChainSelector,
 	) (rmntypes.RemoteConfig, error)
 
-	// DiscoverContracts reads the destination chain for contract addresses. They are returned per
-	// contract and source chain selector.
-	// allChains is needed because there is currently no way to discover all source contracts. So we allow them
-	// to be passed in here. We'll attempt to fetch the source config from the offramp for each of them.
-	DiscoverContracts(ctx context.Context, allChains []cciptypes.ChainSelector) (ContractAddresses, error)
+	// DiscoverContracts reads from all available contract readers to discover contract addresses.
+	DiscoverContracts(ctx context.Context) (ContractAddresses, error)
 
 	// LinkPriceUSD gets the LINK price in 1e-18 USDs from the FeeQuoter contract on the destination chain.
 	// For example, if the price is 1 LINK = 10 USD, this function will return 10e18 (10 * 1e18). You can think of this

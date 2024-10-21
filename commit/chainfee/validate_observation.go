@@ -6,12 +6,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"golang.org/x/exp/maps"
 )
 
-// nolint:revive,govet
 func (p *processor) ValidateObservation(
 	prevOutcome Outcome,
 	query Query,

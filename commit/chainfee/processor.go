@@ -8,9 +8,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type processor struct {
@@ -48,3 +48,7 @@ func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 }
 
 var _ plugincommon.PluginProcessor[Query, Observation, Outcome] = &processor{}
+
+func (p *processor) Close() error {
+	return nil
+}

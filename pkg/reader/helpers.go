@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // bindable is a helper interface to represent all different types of contract readers.
@@ -19,6 +20,7 @@ type bindable interface {
 
 func bindExtendedReaderContract(
 	ctx context.Context,
+	lggr logger.Logger,
 	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
@@ -28,11 +30,12 @@ func bindExtendedReaderContract(
 	for k, v := range readers {
 		casted[k] = v
 	}
-	return bindReaderContract(ctx, casted, chainSel, contractName, address)
+	return bindReaderContract(ctx, lggr, casted, chainSel, contractName, address)
 }
 
 func bindFacadeReaderContract(
 	ctx context.Context,
+	lggr logger.Logger,
 	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
@@ -42,7 +45,7 @@ func bindFacadeReaderContract(
 	for k, v := range readers {
 		casted[k] = v
 	}
-	return bindReaderContract(ctx, casted, chainSel, contractName, address)
+	return bindReaderContract(ctx, lggr, casted, chainSel, contractName, address)
 }
 
 // bindReaderContract is a generic helper for binding contracts to readers, the addresses input is the same object
@@ -52,6 +55,7 @@ func bindFacadeReaderContract(
 // contracts are discovered.
 func bindReaderContract(
 	ctx context.Context,
+	lggr logger.Logger,
 	readers map[cciptypes.ChainSelector]bindable,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
@@ -69,12 +73,17 @@ func bindReaderContract(
 		Name:    contractName,
 	}
 
+	lggr.Debugw("Binding contract",
+		"chainSel", chainSel,
+		"contractName", contractName,
+		"address", encAddress,
+	)
 	// Bind the contract address to the reader.
 	// If the same address exists -> no-op
 	// If the address is changed -> updates the address, overwrites the existing one
 	// If the contract not bound -> binds to the new address
 	if err := readers[chainSel].Bind(ctx, []types.BoundContract{contract}); err != nil {
-		return empty, fmt.Errorf("unable to bind %s for chain %d: %w", contractName, chainSel, err)
+		return empty, fmt.Errorf("unable to bind %s %s for chain %d: %w", contractName, encAddress, chainSel, err)
 	}
 
 	return contract, nil

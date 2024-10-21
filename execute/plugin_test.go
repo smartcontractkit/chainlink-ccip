@@ -19,7 +19,6 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -30,6 +29,7 @@ import (
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
@@ -302,7 +302,7 @@ func TestPlugin_Observation_EligibilityCheckFailure(t *testing.T) {
 
 	_, err := p.Observation(context.Background(), ocr3types.OutcomeContext{}, nil)
 	require.Error(t, err)
-	// nolint:lll // error message
+	//nolint:lll // error message
 	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
 }
 
@@ -498,7 +498,7 @@ func TestPlugin_ShouldTransmitAcceptReport_ElegibilityCheckFailure(t *testing.T)
 
 	_, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{})
 	require.Error(t, err)
-	// nolint:lll // error message
+	//nolint:lll // error message
 	assert.Contains(t, err.Error(), "unable to determine if the destination chain is supported: error getting supported chains: oracle ID 0 not found in oracleIDToP2pID")
 }
 

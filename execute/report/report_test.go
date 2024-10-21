@@ -17,13 +17,13 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func randomAddress() string {
@@ -34,7 +34,6 @@ func randomAddress() string {
 
 // mustMakeBytes parses a given string into a byte array, any error causes a panic. Pass in an empty string for a
 // random byte array.
-// nolint:unparam // surly this will be useful at some point...
 func mustMakeBytes(byteStr string) cciptypes.Bytes32 {
 	if byteStr == "" {
 		var randomBytes cciptypes.Bytes32

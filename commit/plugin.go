@@ -3,6 +3,8 @@ package commit
 import (
 	"context"
 	"fmt"
+	"io"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -11,9 +13,8 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -38,11 +40,11 @@ type Plugin struct {
 	oracleIDToP2PID     map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg         pluginconfig.CommitOffchainConfig
 	ccipReader          readerpkg.CCIPReader
-	tokenPricesReader   reader.PriceReader
+	tokenPricesReader   readerpkg.PriceReader
 	reportCodec         cciptypes.CommitPluginCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
-	rmnHomeReader       reader.RMNHome
+	rmnHomeReader       readerpkg.RMNHome
 	reportingCfg        ocr3types.ReportingPluginConfig
 	chainSupport        plugincommon.ChainSupport
 	merkleRootProcessor plugincommon.PluginProcessor[merkleroot.Query, merkleroot.Observation, merkleroot.Outcome]
@@ -61,12 +63,14 @@ func NewPlugin(
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	ccipReader readerpkg.CCIPReader,
-	tokenPricesReader reader.PriceReader,
+	tokenPricesReader readerpkg.PriceReader,
 	reportCodec cciptypes.CommitPluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
-	rmnHomeReader reader.RMNHome,
+	rmnHomeReader readerpkg.RMNHome,
+	rmnCrypto cciptypes.RMNCrypto,
+	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
 	lggr = logger.Named(lggr, "CommitPlugin")
@@ -87,8 +91,19 @@ func NewPlugin(
 		destChain,
 	)
 
+	rmnController := rmn.NewController(
+		lggr,
+		rmnCrypto,
+		offchainCfg.SignObservationPrefix,
+		rmnPeerClient,
+		rmnHomeReader,
+		2*time.Second, /* observationsInitialRequestTimerDuration */
+		2*time.Second, /* observationsRequestTimerDuration */
+	)
+
 	merkleRootProcessor := merkleroot.NewProcessor(
 		oracleID,
+		oracleIDToP2pID,
 		lggr,
 		offchainCfg,
 		destChain,
@@ -97,8 +112,8 @@ func NewPlugin(
 		msgHasher,
 		reportingCfg,
 		chainSupport,
-		rmn.Controller(nil),      // todo
-		cciptypes.RMNCrypto(nil), // todo
+		rmnController,
+		rmnCrypto,
 		rmnHomeReader,
 	)
 
@@ -202,9 +217,18 @@ func (p *Plugin) Observation(
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
 		if !p.contractsInitialized {
+			obs := Observation{DiscoveryObs: discoveryObs}
+			encoded, err := obs.Encode()
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode observation: %w, observation: %+v", err, obs)
+			}
+
 			p.lggr.Infow("contracts not initialized, only making discovery observations",
 				"discoveryObs", discoveryObs)
-			return Observation{DiscoveryObs: discoveryObs}.Encode()
+			p.lggr.Debugw("Commit plugin making observation",
+				"encodedObservation", encoded,
+				"observation", obs)
+			return encoded, nil
 		}
 	}
 
@@ -228,7 +252,14 @@ func (p *Plugin) Observation(
 		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
-	return obs.Encode()
+	encoded, err := obs.Encode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode observation: %w, observation: %+v", err, obs)
+	}
+
+	p.lggr.Debugw("Commit plugin making observation",
+		"encodedObservation", encoded, "observation", obs)
+	return encoded, nil
 }
 
 func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
@@ -271,6 +302,7 @@ func (p *Plugin) Outcome(
 			p.lggr.Errorw("failed to decode observation", "err", err)
 			continue
 		}
+		p.lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
 		merkleObservations = append(merkleObservations,
 			MerkleRootObservation{
 				OracleID:    ao.Observer,
@@ -346,7 +378,12 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	return nil
+	return services.CloseAll([]io.Closer{
+		p.merkleRootProcessor,
+		p.tokenPriceProcessor,
+		p.chainFeeProcessor,
+		p.discoveryProcessor,
+	}...)
 }
 
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {

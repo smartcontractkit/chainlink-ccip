@@ -14,9 +14,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
@@ -26,9 +26,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot"
+	rmn_mock "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -150,6 +152,7 @@ func TestObservation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.setupMocks()
 
+			p.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller setup
 			obs, err := p.Observation(ctx, tc.prevOutcome, tc.query)
 
 			if tc.expectedErr != "" {
@@ -588,6 +591,50 @@ func Test_computeMerkleRoot(t *testing.T) {
 			assert.Equal(t, tc.expMerkleRoot, rootString)
 		})
 	}
+}
+
+func Test_Processor_initializeRMNController(t *testing.T) {
+	ctx := tests.Context(t)
+
+	p := &Processor{
+		lggr:        logger.Test(t),
+		offchainCfg: pluginconfig.CommitOffchainConfig{RMNEnabled: false},
+	}
+
+	err := p.initializeRMNController(ctx, Outcome{})
+	assert.NoError(t, err, "rmn is not enabled")
+
+	p.offchainCfg.RMNEnabled = true
+	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
+	err = p.initializeRMNController(ctx, Outcome{})
+	assert.NoError(t, err, "rmn enabled but controller already initialized")
+
+	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
+	err = p.initializeRMNController(ctx, Outcome{})
+	assert.NoError(t, err, "previous outcome does not contain remote config digest")
+
+	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
+	rmnController := rmn_mock.NewMockController(t)
+	p.rmnHomeReader = rmnHomeReader
+	p.rmnController = rmnController
+
+	cfg := testhelpers.CreateRMNRemoteCfg()
+	rmnNodes := []rmntypes.HomeNodeInfo{
+		{ID: 1, PeerID: types.PeerID{1, 2, 3}},
+		{ID: 10, PeerID: types.PeerID{1, 2, 31}},
+	}
+	rmnHomeReader.EXPECT().GetRMNNodesInfo(cfg.ConfigDigest).Return(rmnNodes, nil)
+
+	rmnController.EXPECT().InitConnection(
+		ctx,
+		cciptypes.Bytes32(p.reportingCfg.ConfigDigest),
+		cfg.ConfigDigest,
+		[]string{rmnNodes[0].PeerID.String(), rmnNodes[1].PeerID.String()},
+	).Return(nil)
+
+	err = p.initializeRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
+	assert.NoError(t, err, "rmn controller initialized")
+	assert.Equal(t, cfg.ConfigDigest, p.rmnControllerCfgDigest)
 }
 
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {

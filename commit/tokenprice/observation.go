@@ -3,15 +3,44 @@ package tokenprice
 import (
 	"context"
 	"sort"
-
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
+
+func (p *processor) Observation(
+	ctx context.Context,
+	prevOutcome Outcome,
+	query Query,
+) (Observation, error) {
+
+	fChain := p.ObserveFChain()
+	if len(fChain) == 0 {
+		return Observation{}, nil
+	}
+
+	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
+	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
+	ts := time.Now().UTC()
+	p.lggr.Infow(
+		"observed token prices",
+		"feed prices", feedTokenPrices,
+		"fee quoter updates", feeQuoterUpdates,
+		"timestamp", ts,
+	)
+
+	return Observation{
+		FeedTokenPrices:       feedTokenPrices,
+		FeeQuoterTokenUpdates: feeQuoterUpdates,
+		FChain:                fChain,
+		Timestamp:             ts,
+	}, nil
+}
 
 func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
@@ -35,7 +64,7 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	}
 
 	if !supportedChains.Contains(p.offChainCfg.PriceFeedChainSelector) {
-		p.lggr.Debugw("oracle does not support token price observation")
+		p.lggr.Debugf("oracle does not support feed chain %d", p.offChainCfg.PriceFeedChainSelector)
 		return []cciptypes.TokenPrice{}
 
 	}
@@ -44,9 +73,10 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing feed token prices", "tokens", tokensToQuery)
-	tokenPrices, err := p.tokenPriceReader.GetTokenFeedPricesUSD(ctx, tokensToQuery)
+	tokenPrices, err := p.tokenPriceReader.GetFeedPricesUSD(ctx, tokensToQuery)
 	if err != nil {
-		p.lggr.Errorw("call to GetTokenFeedPricesUSD failed", "err", err)
+		p.lggr.Errorw("call to GetFeedPricesUSD failed",
+			"err", err)
 		return []cciptypes.TokenPrice{}
 	}
 
@@ -84,7 +114,7 @@ func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 	// sort tokens to query to ensure deterministic order
 	sort.Slice(tokensToQuery, func(i, j int) bool { return tokensToQuery[i] < tokensToQuery[j] })
 	p.lggr.Infow("observing fee quoter token updates")
-	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery)
+	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, p.destChain)
 	if err != nil {
 		p.lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
 		return map[types.Account]plugintypes.TimestampedBig{}

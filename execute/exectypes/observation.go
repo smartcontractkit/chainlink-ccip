@@ -1,12 +1,10 @@
 package exectypes
 
 import (
-	"context"
 	"encoding/json"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
-
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // CommitObservations contain the commit plugin report data organized by the source chain selector.
@@ -98,17 +96,3 @@ func DecodeObservation(b []byte) (Observation, error) {
 	err := json.Unmarshal(b, &obs)
 	return obs, err
 }
-
-// CostlyMessageObserver observes messages that are too costly to execute.
-type CostlyMessageObserver interface {
-	// Observe takes a set of messages and returns a slice of message IDs that are too costly to execute.
-	Observe(context.Context, MessageObservations) ([]cciptypes.Bytes32, error)
-}
-
-type NoOpCostlyMessageObserver struct{}
-
-func (n *NoOpCostlyMessageObserver) Observe(_ context.Context, _ MessageObservations) ([]cciptypes.Bytes32, error) {
-	return nil, nil
-}
-
-var _ CostlyMessageObserver = &NoOpCostlyMessageObserver{}

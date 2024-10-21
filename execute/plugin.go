@@ -14,7 +14,6 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -25,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
@@ -68,26 +68,26 @@ func NewPlugin(
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
+	costlyMessageObserver exectypes.CostlyMessageObserver,
 ) *Plugin {
 	lggr = logger.Named(lggr, "ExecutePlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	return &Plugin{
-		donID:             donID,
-		reportingCfg:      reportingCfg,
-		offchainCfg:       offchainCfg,
-		destChain:         destChain,
-		oracleIDToP2pID:   oracleIDToP2pID,
-		ccipReader:        ccipReader,
-		reportCodec:       reportCodec,
-		msgHasher:         msgHasher,
-		homeChain:         homeChain,
-		tokenDataObserver: tokenDataObserver,
-		estimateProvider:  estimateProvider,
-		lggr:              lggr,
-		// TODO: implement
-		costlyMessageObserver: &exectypes.NoOpCostlyMessageObserver{},
+		donID:                 donID,
+		reportingCfg:          reportingCfg,
+		offchainCfg:           offchainCfg,
+		destChain:             destChain,
+		oracleIDToP2pID:       oracleIDToP2pID,
+		ccipReader:            ccipReader,
+		reportCodec:           reportCodec,
+		msgHasher:             msgHasher,
+		homeChain:             homeChain,
+		tokenDataObserver:     tokenDataObserver,
+		estimateProvider:      estimateProvider,
+		lggr:                  lggr,
+		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
 			lggr,
 			&ccipReader,

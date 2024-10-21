@@ -3,7 +3,7 @@ package plugintypes
 import (
 	"time"
 
-	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // NOTE: The following type should be moved to internal plugin types after it's not required anymore in chainlink repo.
