@@ -627,7 +627,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 
 func (r *ccipChainReader) isValidAddress(address []byte, contractName string, chain cciptypes.ChainSelector) bool {
 	if len(address) == 0 {
-		r.lggr.Errorw("address for contract is empty",
+		r.lggr.Warnw("address for contract is empty",
 			"contract", contractName,
 			"chain", chain,
 		)
@@ -1108,6 +1108,9 @@ type onRampDynamicConfig struct {
 	AllowListAdmin         []byte `json:"allowListAdmin"`
 }
 
+// We're wrapping the onRampDynamicConfig this way to map to on-chain return type which is a named struct
+// nolint:lll
+// https://github.com/smartcontractkit/chainlink/blob/12af1de88238e0e918177d6b5622070417f48adf/contracts/src/v0.8/ccip/onRamp/OnRamp.sol#L328
 type getOnRampDynamicConfigResponse struct {
 	DynamicConfig onRampDynamicConfig `json:"dynamicConfig"`
 }
@@ -1187,7 +1190,9 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 			continue
 		}
 
-		// For chain X, all DestChainConfigs will have same OnRamp address which is the chainX OnRamp
+		// For chain X, all DestChainConfigs will have one of 2 values for the Router address
+		// 1. Chain X Test Router in case we're testing a new lane
+		// 2. Chain X Router
 		chainSel := chainSel
 		eg.Go(func() error {
 			resp := onRampDestChainConfig{}
@@ -1197,15 +1202,12 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				consts.MethodNameOnRampGetDestChainConfig,
 				primitives.Unconfirmed,
 				map[string]any{
-					// Any other chain other than self should work as a chain don't have self as a destination
-					// Here we use destChain as the chainSel is looping over all source chains, so all of them should have
-					// a config for the destChain
 					"destChainSelector": r.destChain,
 				},
 				&resp,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+				return fmt.Errorf("failed to get onramp dest chain config: %w", err)
 			}
 			mu.Lock()
 			result[chainSel] = resp
