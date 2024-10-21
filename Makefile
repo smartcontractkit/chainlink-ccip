@@ -1,3 +1,4 @@
+#test
 TEST_COUNT ?= 10
 COVERAGE_FILE ?= coverage.out
 
