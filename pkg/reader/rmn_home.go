@@ -42,7 +42,7 @@ type RMNHome interface {
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
 	// GetAllConfigs gets the active and candidate RMNHomeConfigs
-	GetAllConfigs() (activeConfig rmntypes.HomeConfig, candidateConfig rmntypes.HomeConfig)
+	GetAllConfigs() (activeConfigDigest cciptypes.Bytes32, candidateConfigDigest cciptypes.Bytes32)
 	services.Service
 }
 
@@ -214,22 +214,11 @@ func (r *rmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (ccipt
 }
 
 func (r *rmnHomePoller) GetAllConfigs() (
-	activeConfig rmntypes.HomeConfig,
-	candidateConfig rmntypes.HomeConfig) {
+	activeConfigDigest cciptypes.Bytes32,
+	candidateConfigDigest cciptypes.Bytes32) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
-	activeConfig, ok := r.rmnHomeState.rmnHomeConfig[r.rmnHomeState.activeConfigDigest]
-	if !ok {
-		r.lggr.Infow("activeConfig not found in RMNHomeConfig",
-			"activeConfigDigest", r.rmnHomeState.activeConfigDigest)
-	}
-
-	candidateConfig, ok = r.rmnHomeState.rmnHomeConfig[r.rmnHomeState.candidateConfigDigest]
-	if !ok {
-		r.lggr.Infow("candidateConfig not found in RMNHomeConfig",
-			"candidateConfigDigest", r.rmnHomeState.candidateConfigDigest)
-	}
-	return activeConfig, candidateConfig
+	return r.rmnHomeState.activeConfigDigest, r.rmnHomeState.candidateConfigDigest
 }
 
 func (r *rmnHomePoller) Close() error {

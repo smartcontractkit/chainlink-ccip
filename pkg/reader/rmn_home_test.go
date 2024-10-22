@@ -263,10 +263,9 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 					require.Equal(t, i+1, minObs)
 				}
 
-				activeVersionedConfig, candidateVersionedConfig := configPoller.GetAllConfigs()
-				mapConfig := convertOnChainConfigToRMNHomeChainConfig(logger.Test(t), primaryConfig, secondaryConfig)
-				require.Equal(t, mapConfig[activeVersionedConfig.ConfigDigest], activeVersionedConfig)
-				require.Equal(t, mapConfig[candidateVersionedConfig.ConfigDigest], candidateVersionedConfig)
+				activeConfigDigest, candidateConfigDigest := configPoller.GetAllConfigs()
+				require.Equal(t, primaryConfig.ConfigDigest, activeConfigDigest)
+				require.Equal(t, secondaryConfig.ConfigDigest, candidateConfigDigest)
 
 			}
 		})
