@@ -60,7 +60,7 @@ install-golangcilint:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59
 
 ensure_go_version:
-	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
+	@go version | grep -q 'go1.23' || (echo "Please use go1.23" && exit 1)
 
 ensure_golangcilint_1_59:
 	@golangci-lint --version | grep -q '1.59' || (echo "Please use golangci-lint 1.59" && exit 1)
