@@ -41,12 +41,14 @@ type RMNHome interface {
 	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
+	// GetAllConfigs gets the active and candidate RMNHomeConfigs
+	GetAllConfigs() (activeConfig rmntypes.HomeConfig, candidateConfig rmntypes.HomeConfig)
 	services.Service
 }
 
 type rmnHomeState struct {
-	primaryConfigDigest   cciptypes.Bytes32
-	secondaryConfigDigest cciptypes.Bytes32
+	activeConfigDigest    cciptypes.Bytes32
+	candidateConfigDigest cciptypes.Bytes32
 	rmnHomeConfig         map[cciptypes.Bytes32]rmntypes.HomeConfig
 }
 
@@ -161,15 +163,15 @@ func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 }
 
 func (r *rmnHomePoller) setRMNHomeState(
-	primaryConfigDigest cciptypes.Bytes32,
-	secondaryConfigDigest cciptypes.Bytes32,
+	activeConfigDigest cciptypes.Bytes32,
+	candidateConfigDigest cciptypes.Bytes32,
 	rmnHomeConfig map[cciptypes.Bytes32]rmntypes.HomeConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	s := &r.rmnHomeState
 
-	s.primaryConfigDigest = primaryConfigDigest
-	s.secondaryConfigDigest = secondaryConfigDigest
+	s.activeConfigDigest = activeConfigDigest
+	s.candidateConfigDigest = candidateConfigDigest
 	s.rmnHomeConfig = rmnHomeConfig
 }
 
@@ -209,6 +211,25 @@ func (r *rmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (ccipt
 		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
 	}
 	return cfg.OffchainConfig, nil
+}
+
+func (r *rmnHomePoller) GetAllConfigs() (
+	activeConfig rmntypes.HomeConfig,
+	candidateConfig rmntypes.HomeConfig) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	activeConfig, ok := r.rmnHomeState.rmnHomeConfig[r.rmnHomeState.activeConfigDigest]
+	if !ok {
+		r.lggr.Infow("activeConfig not found in RMNHomeConfig",
+			"activeConfigDigest", r.rmnHomeState.activeConfigDigest)
+	}
+
+	candidateConfig, ok = r.rmnHomeState.rmnHomeConfig[r.rmnHomeState.candidateConfigDigest]
+	if !ok {
+		r.lggr.Infow("candidateConfig not found in RMNHomeConfig",
+			"candidateConfigDigest", r.rmnHomeState.candidateConfigDigest)
+	}
+	return activeConfig, candidateConfig
 }
 
 func (r *rmnHomePoller) Close() error {

@@ -262,6 +262,12 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 					require.True(t, exists)
 					require.Equal(t, i+1, minObs)
 				}
+
+				activeVersionedConfig, candidateVersionedConfig := configPoller.GetAllConfigs()
+				mapConfig := convertOnChainConfigToRMNHomeChainConfig(logger.Test(t), primaryConfig, secondaryConfig)
+				require.Equal(t, mapConfig[activeVersionedConfig.ConfigDigest], activeVersionedConfig)
+				require.Equal(t, mapConfig[candidateVersionedConfig.ConfigDigest], candidateVersionedConfig)
+
 			}
 		})
 	}
@@ -388,6 +394,11 @@ func TestIsNodeObserver(t *testing.T) {
 			require.Equal(t, tt.expectedResult, result)
 		})
 	}
+}
+
+func isEmptyConfig(config VersionedConfig) bool {
+	return config.ConfigDigest == (cciptypes.Bytes32{}) &&
+		config.Version == 0
 }
 
 func createTestRMNHomeConfigs(
