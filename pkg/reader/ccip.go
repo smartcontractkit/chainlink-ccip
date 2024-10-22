@@ -518,8 +518,8 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
-		if update == nil {
-			r.lggr.Errorw("native token price is nil", "chain", chain)
+		if update == nil || update.Timestamp == 0 {
+			r.lggr.Warnw("no native token price available", "chain", chain)
 			continue
 		}
 		prices[chain] = cciptypes.NewBigInt(update.Value)
