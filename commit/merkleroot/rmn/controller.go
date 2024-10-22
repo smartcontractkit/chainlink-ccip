@@ -310,12 +310,29 @@ func (c *controller) sendObservationRequests(
 			return requests[i].LaneSource.SourceChainSelector < requests[j].LaneSource.SourceChainSelector
 		})
 
+		fixedDestLaneUpdateRequests := make([]*rmnpb.FixedDestLaneUpdateRequest, 0)
+
+		// OnRamp address from 32bytes to 20bytes
+		for _, request := range requests {
+			onRampAddress := request.LaneSource.OnrampAddress
+			if len(onRampAddress) == 32 { // todo: not chain-agnostic
+				onRampAddress = onRampAddress[12:]
+			}
+			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
+				LaneSource: &rmnpb.LaneSource{
+					SourceChainSelector: request.LaneSource.SourceChainSelector,
+					OnrampAddress:       onRampAddress,
+				},
+				ClosedInterval: request.ClosedInterval,
+			})
+		}
+
 		req := &rmnpb.Request{
 			RequestId: newRequestID(),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: &rmnpb.ObservationRequest{
 					LaneDest:                    destChain,
-					FixedDestLaneUpdateRequests: requests,
+					FixedDestLaneUpdateRequests: fixedDestLaneUpdateRequests,
 				},
 			},
 		}
@@ -522,7 +539,12 @@ func (c *controller) validateSignedObservationResponse(
 		if updateReq.Data.LaneSource.SourceChainSelector != signedObsLu.LaneSource.SourceChainSelector {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
-		if !bytes.Equal(updateReq.Data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
+
+		onRampAddressOfReq := updateReq.Data.LaneSource.OnrampAddress
+		if len(onRampAddressOfReq) == 32 { // todo: not chain-agnostic
+			onRampAddressOfReq = onRampAddressOfReq[12:] // OnRamp address from 32bytes to 20bytes
+		}
+		if !bytes.Equal(onRampAddressOfReq, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 
