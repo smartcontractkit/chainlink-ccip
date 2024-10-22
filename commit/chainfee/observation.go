@@ -33,7 +33,7 @@ func (p *processor) Observation(
 	fChain := p.ObserveFChain()
 
 	p.lggr.Infow("observed fee components",
-		"available chains", availableChains,
+		"availableChains", availableChains,
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,
