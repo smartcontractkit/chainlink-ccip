@@ -1,11 +1,13 @@
 package chainfee
 
 import (
-	"context"
-	mapset "github.com/deckarep/golang-set/v2"
-	"time"
-
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	"context"
+
+	mapset "github.com/deckarep/golang-set/v2"
+
+	"time"
 )
 
 func (p *processor) Observation(
