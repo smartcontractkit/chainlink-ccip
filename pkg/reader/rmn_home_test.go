@@ -395,11 +395,6 @@ func TestIsNodeObserver(t *testing.T) {
 	}
 }
 
-func isEmptyConfig(config VersionedConfig) bool {
-	return config.ConfigDigest == (cciptypes.Bytes32{}) &&
-		config.Version == 0
-}
-
 func createTestRMNHomeConfigs(
 	primaryEmpty bool,
 	secondaryEmpty bool) (primary, secondary VersionedConfig) {
