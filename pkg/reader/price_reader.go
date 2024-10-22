@@ -115,6 +115,8 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 		pr.lggr.Warnw("contract reader not found", "chain", chain)
 		return nil, nil
 	}
+
+	// TODO should these tokens be strings instead of bytes?
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
 	// a timestamp and price of 0 if the token is not found
 	if err :=

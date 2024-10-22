@@ -119,6 +119,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 	// ---------------------------------------------------
 
+	// TODO should any addresses in CommitReportAcceptedEvent be string? OnRampAddress, SourceToken?
 	ev := CommitReportAcceptedEvent{}
 
 	iter, err := r.contractReaders[dest].ExtendedQueryKey(
@@ -150,6 +151,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
 		}
 
+		// TODO do this through QueryKey
 		valid := item.Timestamp >= uint64(ts.Unix())
 		if !valid {
 			r.lggr.Debugw("commit report too old, skipping", "report", ev, "item", item,
@@ -263,6 +265,7 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
 
+		// TODO reminder
 		// todo: filter via the query
 		valid := stateChange.SourceChainSelector == source &&
 			stateChange.SequenceNumber >= seqNumRange.Start() &&
@@ -291,6 +294,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		return nil, fmt.Errorf("get onRamp address: %w", err)
 	}
 
+	// TODO should any addresses in here be handled as strings instead?
 	type SendRequestedEvent struct {
 		DestChainSelector cciptypes.ChainSelector
 		Message           cciptypes.Message
@@ -329,6 +333,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
+		// TODO reminder
 		// todo: filter via the query
 		valid := msg.Message.Header.SourceChainSelector == sourceChainSelector &&
 			msg.Message.Header.DestChainSelector == r.destChain &&
@@ -423,6 +428,7 @@ func (r *ccipChainReader) Nonces(
 				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 			}
 
+			// TODO should sender be a string?
 			var resp uint64
 			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 				ctx,
@@ -482,6 +488,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
+		// TODO should nativeTokenAddress be a string?
 		//TODO: Use batching in the future
 		var nativeTokenAddress cciptypes.Bytes
 		err := reader.ExtendedGetLatestValue(
@@ -502,6 +509,7 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			continue
 		}
 
+		// TODO should nativeTokenAddress be a string instead?
 		var update *plugintypes.TimestampedUnixBig
 		err = reader.ExtendedGetLatestValue(
 			ctx,
@@ -660,6 +668,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// NonceManager and RMNRemote are in the offramp static config.
 	{
+		// TODO should any fields in offRampStaticChainConfig be strings?
 		var staticConfig offRampStaticChainConfig
 		err := r.getDestinationData(
 			ctx,
@@ -678,6 +687,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 
 	// FeeQuoter from the offRamp dynamic config.
 	{
+		// TODO should any fields in offRampDynamicChainConfig be strings?
 		var dynamicConfig offRampDynamicChainConfig
 		err := r.getDestinationData(
 			ctx,
@@ -778,6 +788,7 @@ func (r *ccipChainReader) Sync(ctx context.Context, contracts ContractAddresses)
 	return errors.Join(errs...)
 }
 
+// TODO can this be removed if contract Reader always handles addresses as strings?
 func (r *ccipChainReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
 	extendedReader, ok := r.contractReaders[chain]
 	if !ok {
@@ -841,6 +852,7 @@ type feeQuoterStaticConfig struct {
 
 // getDestFeeQuoterStaticConfig returns the destination chain's Fee Quoter's StaticConfig
 func (r *ccipChainReader) getDestFeeQuoterStaticConfig(ctx context.Context) (feeQuoterStaticConfig, error) {
+	// TODO should any fields in feeQuoterStaticConfig be a string instead, LinkToken?
 	var staticConfig feeQuoterStaticConfig
 	err := r.getDestinationData(
 		ctx,
@@ -869,6 +881,7 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		return cciptypes.BigInt{}, fmt.Errorf("contract reader not found for chain %d", r.destChain)
 	}
 
+	// TODO should tokenAddr be a string?
 	var timestampedPrice plugintypes.TimestampedUnixBig
 	err := reader.ExtendedGetLatestValue(
 		ctx,
@@ -1124,6 +1137,7 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
+			// TODO should any fields in getOnRampDynamicConfigResponse be strings? FeeQuoter>
 			resp := getOnRampDynamicConfigResponse{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
@@ -1183,6 +1197,7 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 		// 2. Chain X Router
 		chainSel := chainSel
 		eg.Go(func() error {
+			// TOdo should any fields in onRampDestChainConfig be strings? is Router an address?
 			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
