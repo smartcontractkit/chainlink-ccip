@@ -70,12 +70,12 @@ func (_c *MockRMNHome_Close_Call) RunAndReturn(run func() error) *MockRMNHome_Cl
 	return _c
 }
 
-// GetAllConfigs provides a mock function with given fields:
-func (_m *MockRMNHome) GetAllConfigs() (ccipocr3.Bytes32, ccipocr3.Bytes32) {
+// GetAllConfigDigests provides a mock function with given fields:
+func (_m *MockRMNHome) GetAllConfigDigests() (ccipocr3.Bytes32, ccipocr3.Bytes32) {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetAllConfigs")
+		panic("no return value specified for GetAllConfigDigests")
 	}
 
 	var r0 ccipocr3.Bytes32
@@ -102,29 +102,29 @@ func (_m *MockRMNHome) GetAllConfigs() (ccipocr3.Bytes32, ccipocr3.Bytes32) {
 	return r0, r1
 }
 
-// MockRMNHome_GetAllConfigs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAllConfigs'
-type MockRMNHome_GetAllConfigs_Call struct {
+// MockRMNHome_GetAllConfigDigests_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAllConfigDigests'
+type MockRMNHome_GetAllConfigDigests_Call struct {
 	*mock.Call
 }
 
-// GetAllConfigs is a helper method to define mock.On call
-func (_e *MockRMNHome_Expecter) GetAllConfigs() *MockRMNHome_GetAllConfigs_Call {
-	return &MockRMNHome_GetAllConfigs_Call{Call: _e.mock.On("GetAllConfigs")}
+// GetAllConfigDigests is a helper method to define mock.On call
+func (_e *MockRMNHome_Expecter) GetAllConfigDigests() *MockRMNHome_GetAllConfigDigests_Call {
+	return &MockRMNHome_GetAllConfigDigests_Call{Call: _e.mock.On("GetAllConfigDigests")}
 }
 
-func (_c *MockRMNHome_GetAllConfigs_Call) Run(run func()) *MockRMNHome_GetAllConfigs_Call {
+func (_c *MockRMNHome_GetAllConfigDigests_Call) Run(run func()) *MockRMNHome_GetAllConfigDigests_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockRMNHome_GetAllConfigs_Call) Return(activeConfigDigest ccipocr3.Bytes32, candidateConfigDigest ccipocr3.Bytes32) *MockRMNHome_GetAllConfigs_Call {
+func (_c *MockRMNHome_GetAllConfigDigests_Call) Return(activeConfigDigest ccipocr3.Bytes32, candidateConfigDigest ccipocr3.Bytes32) *MockRMNHome_GetAllConfigDigests_Call {
 	_c.Call.Return(activeConfigDigest, candidateConfigDigest)
 	return _c
 }
 
-func (_c *MockRMNHome_GetAllConfigs_Call) RunAndReturn(run func() (ccipocr3.Bytes32, ccipocr3.Bytes32)) *MockRMNHome_GetAllConfigs_Call {
+func (_c *MockRMNHome_GetAllConfigDigests_Call) RunAndReturn(run func() (ccipocr3.Bytes32, ccipocr3.Bytes32)) *MockRMNHome_GetAllConfigDigests_Call {
 	_c.Call.Return(run)
 	return _c
 }

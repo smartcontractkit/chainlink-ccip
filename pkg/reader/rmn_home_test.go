@@ -263,7 +263,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 					require.Equal(t, i+1, minObs)
 				}
 
-				activeConfigDigest, candidateConfigDigest := configPoller.GetAllConfigs()
+				activeConfigDigest, candidateConfigDigest := configPoller.GetAllConfigDigests()
 				require.Equal(t, primaryConfig.ConfigDigest, activeConfigDigest)
 				require.Equal(t, secondaryConfig.ConfigDigest, candidateConfigDigest)
 

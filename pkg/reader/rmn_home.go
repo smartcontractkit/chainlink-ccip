@@ -41,8 +41,8 @@ type RMNHome interface {
 	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
-	// GetAllConfigs gets the active and candidate RMNHomeConfigs
-	GetAllConfigs() (activeConfigDigest cciptypes.Bytes32, candidateConfigDigest cciptypes.Bytes32)
+	// GetAllConfigDigests gets the active and candidate RMNHomeConfigs
+	GetAllConfigDigests() (activeConfigDigest cciptypes.Bytes32, candidateConfigDigest cciptypes.Bytes32)
 	services.Service
 }
 
@@ -213,7 +213,7 @@ func (r *rmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (ccipt
 	return cfg.OffchainConfig, nil
 }
 
-func (r *rmnHomePoller) GetAllConfigs() (
+func (r *rmnHomePoller) GetAllConfigDigests() (
 	activeConfigDigest cciptypes.Bytes32,
 	candidateConfigDigest cciptypes.Bytes32) {
 	r.mutex.RLock()
