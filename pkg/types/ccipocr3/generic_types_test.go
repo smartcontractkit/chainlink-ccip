@@ -152,7 +152,7 @@ func TestCCIPMsg_String(t *testing.T) {
 					Nonce:               1,
 
 					MsgHash: mustNewBytes32(t, "0x23"),
-					OnRamp:  mustNewBytes(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
+					OnRamp:  mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
 				},
 			},
 			//nolint:lll // test input
@@ -169,18 +169,18 @@ func TestCCIPMsg_String(t *testing.T) {
 					Nonce:               1,
 
 					MsgHash: mustNewBytes32(t, "0x23"),
-					OnRamp:  mustNewBytes(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
+					OnRamp:  mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
 				},
-				Sender:         mustNewBytes(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
-				Receiver:       mustNewBytes(t, "0x101112131415"), // simulate a non-evm receiver
+				Sender:         mustNewUnknownAddress(t, "0x04D4cC5972ad487F71b85654d48b27D32b13a22F"),
+				Receiver:       mustNewUnknownAddress(t, "0x101112131415"), // simulate a non-evm receiver
 				Data:           []byte("some data"),
 				ExtraArgs:      []byte("extra args"),
-				FeeToken:       mustNewBytes(t, "0xB5fCC870d2aC8745054b4ba99B1f176B93382162"),
+				FeeToken:       mustNewUnknownAddress(t, "0xB5fCC870d2aC8745054b4ba99B1f176B93382162"),
 				FeeTokenAmount: BigInt{Int: big.NewInt(1000)},
 				FeeValueJuels:  BigInt{Int: big.NewInt(287)},
 				TokenAmounts: []RampTokenAmount{
 					{
-						SourcePoolAddress: mustNewBytes(t, "0x3E8456720B88A1DAdce8E2808C9Bf73dfFFd807c"),
+						SourcePoolAddress: mustNewUnknownAddress(t, "0x3E8456720B88A1DAdce8E2808C9Bf73dfFFd807c"),
 						DestTokenAddress:  []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}, // simulate a non-evm token
 						ExtraData:         []byte("extra token data"),
 						Amount:            BigInt{Int: big.NewInt(2000)},
@@ -248,8 +248,8 @@ func mustNewBytes32(t *testing.T, s string) Bytes32 {
 	return b32
 }
 
-func mustNewBytes(t *testing.T, s string) Bytes {
-	b, err := NewBytesFromString(s)
+func mustNewUnknownAddress(t *testing.T, s string) UnknownAddress {
+	b, err := NewUnknownAddressFromHex(s)
 	require.NoError(t, err)
 	return b
 }

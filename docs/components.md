@@ -1,6 +1,6 @@
 # Plugin Components
 
-* shared types and interfaces - [chainlink-common, ccipocr3](https://github.com/smartcontractkit/chainlink-common/tree/main/pkg/types/ccipocr3)
+* shared types and interfaces - [chainlink-common, ccipocr3](https://github.com/smartcontractkit/chainlink-ccip/tree/main/pkg/types/ccipocr3)
 * [OCR Plugins](https://github.com/smartcontractkit/chainlink-ccip)
   * [commit](https://github.com/smartcontractkit/chainlink-ccip/tree/main/commit)
   * [execute](https://github.com/smartcontractkit/chainlink-ccip/tree/main/execute)

@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"math/big"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -68,8 +66,8 @@ func stringToBytes32(s string) cciptypes.Bytes32 {
 	return result
 }
 
-func RandomAddress() types.Account {
+func RandomAddress() cciptypes.UnknownEncodedAddress {
 	b := make([]byte, 20)
 	_, _ = rand.Read(b) // Assignment for errcheck. Only used in tests so we can ignore.
-	return types.Account(cciptypes.Bytes(b).String())
+	return cciptypes.UnknownEncodedAddress(cciptypes.Bytes(b).String())
 }

@@ -5,8 +5,8 @@ type RMNReport struct {
 	ReportVersionDigest         Bytes32 // e.g. keccak256("RMN_V1_6_ANY2EVM_REPORT")
 	DestChainID                 BigInt  // If applies, a chain specific id, e.g. evm chain id otherwise empty.
 	DestChainSelector           ChainSelector
-	RmnRemoteContractAddress    Bytes
-	OfframpAddress              Bytes
+	RmnRemoteContractAddress    UnknownAddress
+	OfframpAddress              UnknownAddress
 	RmnHomeContractConfigDigest Bytes32
 	LaneUpdates                 []RMNLaneUpdate
 }
@@ -15,7 +15,7 @@ type RMNReport struct {
 // It is part of the payload that is signed and transmitted onchain.
 type RMNLaneUpdate struct {
 	SourceChainSelector ChainSelector
-	OnRampAddress       Bytes // (for EVM should be abi-encoded)
+	OnRampAddress       UnknownAddress // (for EVM should be abi-encoded)
 	MinSeqNr            SeqNum
 	MaxSeqNr            SeqNum
 	MerkleRoot          Bytes32
