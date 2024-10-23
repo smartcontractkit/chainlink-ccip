@@ -19,9 +19,10 @@ on:
       # Exclude .gitignore
       - "!.gitignore"
     types:
-      - review_requested
-      - ready_for_review
+      - opened
+      - reopened
       - synchronize
+      - ready_for_review
   push:
     branches:
       - main # Trigger only on pushes to the main branch
