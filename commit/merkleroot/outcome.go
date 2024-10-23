@@ -170,7 +170,7 @@ func buildReport(
 			OnRampAddress string
 		}
 		onRampAddressToString := func(onRampAddress []byte) string {
-			return hex.EncodeToString(onRampAddress)
+			return "0x" + hex.EncodeToString(onRampAddress)
 		}
 
 		signedRoots := mapset.NewSet[rootKey]()
