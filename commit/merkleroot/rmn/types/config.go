@@ -30,12 +30,12 @@ type HomeNodeInfo struct {
 
 // RemoteConfig contains the configuration fetched from the RMNRemote contract.
 type RemoteConfig struct {
-	ContractAddress  cciptypes.Bytes    `json:"contractAddress"`
-	ConfigDigest     cciptypes.Bytes32  `json:"configDigest"`
-	Signers          []RemoteSignerInfo `json:"signers"`
-	MinSigners       uint64             `json:"minSigners"`
-	ConfigVersion    uint32             `json:"configVersion"`
-	RmnReportVersion cciptypes.Bytes32  `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
+	ContractAddress  cciptypes.UnknownAddress `json:"contractAddress"`
+	ConfigDigest     cciptypes.Bytes32        `json:"configDigest"`
+	Signers          []RemoteSignerInfo       `json:"signers"`
+	MinSigners       uint64                   `json:"minSigners"`
+	ConfigVersion    uint32                   `json:"configVersion"`
+	RmnReportVersion cciptypes.Bytes32        `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
 }
 
 func (r RemoteConfig) IsEmpty() bool {
@@ -50,7 +50,7 @@ func (r RemoteConfig) IsEmpty() bool {
 // RemoteSignerInfo contains information about a signer from the RMNRemote contract.
 type RemoteSignerInfo struct {
 	// The signer's onchain address, used to verify report signature
-	OnchainPublicKey cciptypes.Bytes `json:"onchainPublicKey"`
+	OnchainPublicKey cciptypes.UnknownAddress `json:"onchainPublicKey"`
 	// The index of the node in the RMN config
 	NodeIndex uint64 `json:"nodeIndex"`
 }

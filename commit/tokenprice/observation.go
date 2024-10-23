@@ -5,8 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -94,20 +92,21 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 	return tokenPricesUSD
 }
 
-func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.Account]plugintypes.TimestampedBig {
+func (p *processor) ObserveFeeQuoterTokenUpdates(
+	ctx context.Context) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig {
 	if p.tokenPriceReader == nil {
 		p.lggr.Debugw("no token price reader available")
-		return map[types.Account]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 
 	supportsDestChain, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
 		p.lggr.Warnw("call to SupportsDestChain failed", "err", err)
-		return map[types.Account]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 	if !supportsDestChain {
 		p.lggr.Debugw("oracle does not support fee quoter observation")
-		return map[types.Account]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 
 	tokensToQuery := maps.Keys(p.offChainCfg.TokenInfo)
@@ -117,10 +116,10 @@ func (p *processor) ObserveFeeQuoterTokenUpdates(ctx context.Context) map[types.
 	priceUpdates, err := p.tokenPriceReader.GetFeeQuoterTokenUpdates(ctx, tokensToQuery, p.destChain)
 	if err != nil {
 		p.lggr.Errorw("call to GetFeeQuoterTokenUpdates failed", "err", err)
-		return map[types.Account]plugintypes.TimestampedBig{}
+		return map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{}
 	}
 
-	tokenUpdates := make(map[types.Account]plugintypes.TimestampedBig)
+	tokenUpdates := make(map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig)
 
 	for token, update := range priceUpdates {
 		tokenUpdates[token] = plugintypes.TimestampedBig{
