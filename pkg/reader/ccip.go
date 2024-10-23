@@ -125,11 +125,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		query.KeyFilter{
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
+				query.Timestamp(uint64(ts.Unix()), primitives.Gt),
 				query.Confidence(primitives.Finalized),
-				query.Comparator("timestamp", primitives.ValueComparator{
-					Value:    ts.Unix(),
-					Operator: primitives.Gte,
-				}),
 			},
 		},
 		query.LimitAndSort{
