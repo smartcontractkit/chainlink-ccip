@@ -802,7 +802,7 @@ func (c *controller) sendReportSignatureRequest(
 // the address of the private key that signed it.
 type reportSigWithSignerAddress struct {
 	reportSig     *rmnpb.ReportSignature
-	signerAddress cciptypes.Bytes
+	signerAddress cciptypes.UnknownAddress
 }
 
 //nolint:gocyclo // todo
@@ -932,7 +932,7 @@ func (c *controller) validateReportSigResponse(
 		ctx,
 		[]cciptypes.RMNECDSASignature{*sig},
 		rmnReport,
-		[]cciptypes.Bytes{signerNode.OnchainPublicKey},
+		[]cciptypes.UnknownAddress{signerNode.OnchainPublicKey},
 	)
 
 	if err != nil {

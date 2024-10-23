@@ -148,7 +148,7 @@ func (w *Processor) verifyQuery(ctx context.Context, prevOutcome Outcome, q Quer
 		return fmt.Errorf("RMN remote config is not provided in the previous outcome")
 	}
 
-	signerAddresses := make([]cciptypes.Bytes, 0, len(sigs))
+	signerAddresses := make([]cciptypes.UnknownAddress, 0, len(sigs))
 	for _, rmnNode := range rmnRemoteCfg.Signers {
 		signerAddresses = append(signerAddresses, rmnNode.OnchainPublicKey)
 	}

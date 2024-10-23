@@ -139,6 +139,7 @@ func NewPlugin(
 
 	chainFeeProcessr := chainfee.NewProcessor(
 		lggr,
+		oracleID,
 		destChain,
 		homeChain,
 		ccipReader,

@@ -189,7 +189,7 @@ func makeTestCommitReportWithSenders(
 	firstSeqNum,
 	block int,
 	timestamp int64,
-	senders []cciptypes.Bytes,
+	senders []cciptypes.UnknownAddress,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
 ) exectypes.CommitData {
@@ -216,7 +216,7 @@ func makeTestCommitReport(
 	firstSeqNum,
 	block int,
 	timestamp int64,
-	sender cciptypes.Bytes,
+	sender cciptypes.UnknownAddress,
 	rootOverride cciptypes.Bytes32,
 	executed []cciptypes.SeqNum,
 ) exectypes.CommitData {
@@ -437,7 +437,7 @@ func Test_Builder_Build(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
 	codec := mocks.NewExecutePluginJSONReportCodec()
 	lggr := logger.Test(t)
-	sender, err := cciptypes.NewBytesFromString(randomAddress())
+	sender, err := cciptypes.NewUnknownAddressFromHex(randomAddress())
 	require.NoError(t, err)
 	defaultNonces := map[cciptypes.ChainSelector]map[string]uint64{
 		1: {
@@ -447,9 +447,9 @@ func Test_Builder_Build(t *testing.T) {
 			sender.String(): 0,
 		},
 	}
-	tenSenders := make([]cciptypes.Bytes, 10)
+	tenSenders := make([]cciptypes.UnknownAddress, 10)
 	for i := range tenSenders {
-		tenSenders[i], err = cciptypes.NewBytesFromString(randomAddress())
+		tenSenders[i], err = cciptypes.NewUnknownAddressFromHex(randomAddress())
 		require.NoError(t, err)
 	}
 
