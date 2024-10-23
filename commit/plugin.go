@@ -92,7 +92,7 @@ func NewPlugin(
 	)
 
 	rmnController := rmn.NewController(
-		lggr,
+		logger.Named(lggr, "RMNController"),
 		rmnCrypto,
 		offchainCfg.SignObservationPrefix,
 		rmnPeerClient,
@@ -104,7 +104,7 @@ func NewPlugin(
 	merkleRootProcessor := merkleroot.NewProcessor(
 		oracleID,
 		oracleIDToP2pID,
-		lggr,
+		logger.Named(lggr, "MerkleRootProcessor"),
 		offchainCfg,
 		destChain,
 		homeChain,
