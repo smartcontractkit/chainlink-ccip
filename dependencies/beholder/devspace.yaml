@@ -60,8 +60,8 @@ pipelines:
       create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
   deploy:
     run: |-
-      run_dependency_pipelines prometheus grafana loki tempo redpanda
-      create_deployments beholder-test-client beholder-otel-collector-agent-2 beholder-otel-collector-gateway
+      run_dependency_pipelines redpanda
+      create_deployments beholder-test-client beholder-otel-collector-agent-2 beholder-otel-collector-gateway-2
 
 deployments:
   beholder-test-client:
@@ -500,7 +500,7 @@ deployments:
         image:
           registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
           repository: atlas-beholder-gateway-otel-collector
-          tag: 76e023194a9ad7104b563e92d4b6da4bd00c878b
+          tag: d8248682187c21d4609b57b778f8b7c17306f0aa
         opentelemetry-operator:
           enabled: false
           kubeRBACProxy:
