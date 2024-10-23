@@ -443,9 +443,12 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(hashes), err)
 	}
 
+	hashesStr := make([]string, len(hashes))
+	for i, h := range hashes {
+		hashesStr[i] = cciptypes.Bytes32(h).String()
+	}
 	root := tree.Root()
-	o.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", cciptypes.Bytes32(root).String())
-
+	o.lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
 	return root, nil
 }
 

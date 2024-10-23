@@ -204,7 +204,7 @@ func buildReport(
 				lggr.Infow("Root is signed, appending to the report", "root", rk)
 				rootsToReport = append(rootsToReport, root)
 			} else {
-				lggr.Warnw("Root not signed, skipping from the report", "root", root)
+				lggr.Warnw("Root not signed, skipping from the report", "root", rk)
 			}
 		}
 		roots = rootsToReport
