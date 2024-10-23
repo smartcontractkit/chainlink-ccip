@@ -23,11 +23,12 @@
     * [Configuring CRIB ingress](#configuring-crib-ingress)
     * [Adding local-charts profile](#adding-local-charts-profile)
     * [CRIB and devspace global variables](#crib-and-devspace-global-variables)
+    * [Scripting](#scripting)
     * [Linking other code repos from CHAINLINK_CODE_DIR](#linking-other-code-repos-from-chainlink_code_dir)
-    * [Docker image builds](#docker-image-builds)
-    * [Scripting and tool dependencies](#scripting-and-tool-dependencies)
-    * [Anti-patterns](#anti-patterns)
-      * [1) Do not link scripts via `$CHAINLINK_CODE_DIR`.](#1-do-not-link-scripts-via-chainlink_code_dir)
+      * [Docker image builds](#docker-image-builds)
+      * [Anti-patterns](#anti-patterns)
+        * [1) Do not link scripts via `$CHAINLINK_CODE_DIR`.](#1-do-not-link-scripts-via-chainlink_code_dir)
+    * [Adding tools](#adding-tools)
   * [Best practices](#best-practices)
     * [Incremental patching of devspace config](#incremental-patching-of-devspace-config)
     * [Activating profiles based on the variables](#activating-profiles-based-on-the-variables)
@@ -318,32 +319,30 @@ The full list of global variables you can find in the following places:
 Before introducing duplicated values, please consider reusing them where applicable.
 When defining profiles, we recommend using `overwriteVars: true`, that will make CRIB global vars available in dependencies initialized from the main devspace.yaml config.
 
+### Scripting
+Scripts which are used in devspace pipelines should follow the guidelines below.
+
+One option is to have scripts fully embedded in the CRIB repo. Examples:
+* dashboard-lib
+* `dependencies/atlas/init` scripts
+
+So far we use bash and golang for scripting. Try to refrain from adding additional technologies, unless you have a very special use case that requires it.
+* If you need a simple script use bash
+* If you need a general purpose programming language to solve your problem use golang
+* If you need to pull libraries or SDKs from other places, use go.mod for that, don't rely on `$CHAINLINK_CODE_DIR`, for linking code from you workspace, read more in [the next section](#linking-other-code-repos-from-chainlink_code_dir)
+
 ### Linking other code repos from CHAINLINK_CODE_DIR
 As mentioned earlier `CHAINLINK_CODE_DIR` allows you to link your local sources for other repos, so you can develop code in the given repo and test using CRIB.
-That is very handy for development and we support that flow.
+That is very handy for development, and we support that flow.
 
-From the other side In CRIB we have a hard requirement that CRIB should work in standalone mode, without any dependencies from `CHAINLINK_CODE_DIR`.
+From the other side In CRIB we have a hard requirement that CRIB should work in the standalone mode, without any dependencies from `CHAINLINK_CODE_DIR`.
 
-### Docker image builds
-One example can include a docker image build. CRIB supports building images from source and pushing them via devspace to ECR. CRIB would use `$CHAINLINK_CODE_DIR/chainlink` path to build chainlink image.
-That flow is enabled in development, but we also have a standalone mode, where it simply uses the pre-built image.
+#### Docker image builds
+One example of supporting 2 different modes is a docker image build. CRIB supports building images from source and pushing them via devspace to ECR. CRIB would use `$CHAINLINK_CODE_DIR/chainlink` path to build chainlink image.
+That flow is enabled in development, but we also have a standalone mode, where it simply uses the pre-built image from CI.
 
-### Scripting and tool dependencies
-Scripts or tools which are used in devspace pipelines should be configured using the options.
-
-Tools should be:
-* Ideally added as a nix shell dependency (example gomplate, jq)
-* Worst case scenario pulled in the devspace pipeline. This is not great as it doesn't rely on nix cache for caching dependencies and increases the CRIB provisioning time.
-
-Scripts should be:
-* Fully embedded in the CRIB repo. Examples:
-  * dashboard-lib
-  * atlas init scripts
-* pulled as artifacts, if the script is built and published as artifact, you can pull them in devspace pipeline. It can be either binary or docker image.
-* pulled as dependency in the wrapper code, see example in the [anti-patterns section](#anti-patterns)
-
-### Anti-patterns
-#### 1) Do not link scripts via `$CHAINLINK_CODE_DIR`.
+#### Anti-patterns
+##### 1) Do not link scripts via `$CHAINLINK_CODE_DIR`.
 
 **Bad)** Pulling v2 deployment scripts directly from chainlink repo:
 
@@ -385,7 +384,14 @@ func main() {
 	fmt.Println(overrides)
 }
 ```
+### Adding tools
+If you need to add a new tool to be available in devspace runtime, you should add it as nix shell dependency.
 
+For some unique scenarios, you may pull the tool binaries directly in devspace pipeline.
+This is not great as it doesn't rely on nix cache for caching dependencies and increases the CRIB provisioning time.
+
+Another option could be to rely on the dockerized version of the tool. CRIB requires docker in the runtime, so it should 
+be ok to run a dockerized version of the tool.
 
 ## Best practices
 ### Incremental patching of devspace config
