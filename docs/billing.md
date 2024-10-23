@@ -2,6 +2,8 @@
 
 Before diving into billing let's do a recap of some parts of important parts of the system.
 
+Note: During the rest of the documentation we'll consider ChainA as source chain and chainB as destinationChain.
+
 
 ## On Chain
 
@@ -29,16 +31,19 @@ Execute is responsible for fee boosting [Add Link] during the actual execution o
 
 To send a message from ChainA to ChainB we need to account for multiple fees
 
-1. ChainA transaction fees
+1. Network/Premium fees.
 2. ChainB Transaction fees (execution fees on the destination chain)
+3. Data Availability fees.
 
 Of-course the details of the calculation will depend on the message being sent and whether it has tokens to send or not, data availability..etc.
 For in details look on how the fees is calculated you can check FeeQuoter's `getValidatedFee` (TODO: Put link)
 
-In the end the user pays in one of the available fee tokens on ChainA. 
+To be able to pay in one of the available fee tokens on ChainA we need to convert whatever the estimated fees the user will pay on ChainB 
 
-To be able to do this we need to convert whatever the estimated fees the user will pay on ChainB 
-
+So the components we need to calculate the final price are:
+1. ChainA fee token price, usually LINK and the native token of the chain. This is what the user pays in the end. TokenPriceProcessor will update them. [TODO: link]
+2. ChainB Fee/Gas price. FeeChainProcessor will update them. [TODO: link]
+3. ChainB native token price (to be able to calculate the full fees on execution as the Gas from step 2 is usually in the native token price)
 
 
 ## Token Prices
