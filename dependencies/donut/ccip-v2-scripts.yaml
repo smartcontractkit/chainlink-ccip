@@ -12,6 +12,11 @@ pipelines:
   # ccip v2 scripts wrapper to generate nodes toml overrides
   generate-nodes-toml: |-
     # go run main.go cobra_cmd_here --output=${DEVSPACE_TMPDIR}/node_overrides.toml
+    pushd ${CHAINLINK_REPO_DIR}/chainlink/integration-tests/deployment/crib/envsetup
+    go build -o crib_env_setup .
+
+    echo "
+    " > ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts.chain-configs.yaml
 
     # todo: this is the placeholder to invoke @Ani scripts
     # from https://github.com/smartcontractkit/chainlink/tree/develop/integration-tests/deployment/devenv
