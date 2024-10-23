@@ -245,18 +245,18 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 		query.KeyFilter{
 			Key: consts.EventNameExecutionStateChanged,
 			Expressions: []query.Expression{
-				query.Comparator("SourceChainSelector", primitives.ValueComparator{
+				query.Comparator("sourceChainSelector", primitives.ValueComparator{
 					Value:    source,
 					Operator: primitives.Eq,
 				}),
-				query.Comparator("SequenceNumber", primitives.ValueComparator{
+				query.Comparator("sequenceNumber", primitives.ValueComparator{
 					Value:    seqNumRange.Start(),
 					Operator: primitives.Gte,
 				}, primitives.ValueComparator{
 					Value:    seqNumRange.End(),
 					Operator: primitives.Lte,
 				}),
-				query.Comparator("State", primitives.ValueComparator{
+				query.Comparator("state", primitives.ValueComparator{
 					Value:    0,
 					Operator: primitives.Gt,
 				}),
@@ -318,15 +318,15 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
-				query.Comparator("SourceChainSelector", primitives.ValueComparator{
+				query.Comparator("sourceChainSelector", primitives.ValueComparator{
 					Value:    sourceChainSelector,
 					Operator: primitives.Eq,
 				}),
-				query.Comparator("DestChainSelector", primitives.ValueComparator{
+				query.Comparator("destChainSelector", primitives.ValueComparator{
 					Value:    r.destChain,
 					Operator: primitives.Eq,
 				}),
-				query.Comparator("SequenceNumber", primitives.ValueComparator{
+				query.Comparator("sequenceNumber", primitives.ValueComparator{
 					Value:    seqNumRange.Start(),
 					Operator: primitives.Gte,
 				}, primitives.ValueComparator{
