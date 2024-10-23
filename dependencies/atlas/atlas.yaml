@@ -148,17 +148,17 @@ profiles:
                   - name: regcred-atlas
                 topologySpreadConstraints: []
                 image:
-                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  tag: "qa-latest"
                   pullPolicy: IfNotPresent
               atlas-setup:
                 imagePullSecrets:
                   - name: regcred-atlas
                 image:
-                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  tag: "qa-latest"
                   pullPolicy: IfNotPresent
                 initContainers:
                   - name: wait-for-services
-                    image: "804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-setup:9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    image: "804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-setup:qa-latest"
                     command: ["/bin/sh", "-c"]
                     args:
                       - -c
@@ -187,74 +187,75 @@ profiles:
                 imagePullSecrets:
                   - name: regcred-atlas
                 image:
-                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  tag: "qa-latest"
                   pullPolicy: IfNotPresent
               atlas-evm-ccip:
                 imagePullSecrets:
                   - name: regcred-atlas
                 image:
-                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  tag: "qa-latest"
                   pullPolicy: IfNotPresent
               atlas-core:
                 imagePullSecrets:
                   - name: regcred-atlas
                 dataCoverage:
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-blocks:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-events:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-events-retry:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-logs:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-logs-retry:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-receipts:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-receipts-retry:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-txn-rdd-filter:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-logs-abi-decoder:
+                  enabled: false
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
 
         atlas-network-2:
@@ -264,72 +265,73 @@ profiles:
                 imagePullSecrets:
                   - name: regcred-atlas
                 image:
-                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  tag: "qa-latest"
                   pullPolicy: IfNotPresent
               atlas-evm-ccip:
                 imagePullSecrets:
                   - name: regcred-atlas
                 image:
-                  tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                  tag: "qa-latest"
                   pullPolicy: IfNotPresent
               atlas-core:
                 imagePullSecrets:
                   - name: regcred-atlas
                 dataCoverage:
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-blocks:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-events:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-events-retry:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-logs:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-logs-retry:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-receipts:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-receipts-retry:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-txn-rdd-filter:
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
                 evm-logs-abi-decoder:
+                  enabled: false
                   imagePullSecrets:
                     - name: regcred-atlas
                   image:
-                    tag: "9c01ec09cd88856bc54ce0df0448bcef7e9261b2"
+                    tag: "qa-latest"
                     pullPolicy: IfNotPresent
