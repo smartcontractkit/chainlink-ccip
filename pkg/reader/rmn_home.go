@@ -41,12 +41,14 @@ type RMNHome interface {
 	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
+	// GetAllConfigDigests gets the active and candidate RMNHomeConfigs
+	GetAllConfigDigests() (activeConfigDigest cciptypes.Bytes32, candidateConfigDigest cciptypes.Bytes32)
 	services.Service
 }
 
 type rmnHomeState struct {
-	primaryConfigDigest   cciptypes.Bytes32
-	secondaryConfigDigest cciptypes.Bytes32
+	activeConfigDigest    cciptypes.Bytes32
+	candidateConfigDigest cciptypes.Bytes32
 	rmnHomeConfig         map[cciptypes.Bytes32]rmntypes.HomeConfig
 }
 
@@ -161,15 +163,15 @@ func (r *rmnHomePoller) fetchAndSetRmnHomeConfigs(ctx context.Context) error {
 }
 
 func (r *rmnHomePoller) setRMNHomeState(
-	primaryConfigDigest cciptypes.Bytes32,
-	secondaryConfigDigest cciptypes.Bytes32,
+	activeConfigDigest cciptypes.Bytes32,
+	candidateConfigDigest cciptypes.Bytes32,
 	rmnHomeConfig map[cciptypes.Bytes32]rmntypes.HomeConfig) {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 	s := &r.rmnHomeState
 
-	s.primaryConfigDigest = primaryConfigDigest
-	s.secondaryConfigDigest = secondaryConfigDigest
+	s.activeConfigDigest = activeConfigDigest
+	s.candidateConfigDigest = candidateConfigDigest
 	s.rmnHomeConfig = rmnHomeConfig
 }
 
@@ -209,6 +211,14 @@ func (r *rmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (ccipt
 		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
 	}
 	return cfg.OffchainConfig, nil
+}
+
+func (r *rmnHomePoller) GetAllConfigDigests() (
+	activeConfigDigest cciptypes.Bytes32,
+	candidateConfigDigest cciptypes.Bytes32) {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return r.rmnHomeState.activeConfigDigest, r.rmnHomeState.candidateConfigDigest
 }
 
 func (r *rmnHomePoller) Close() error {

@@ -70,6 +70,65 @@ func (_c *MockRMNHome_Close_Call) RunAndReturn(run func() error) *MockRMNHome_Cl
 	return _c
 }
 
+// GetAllConfigDigests provides a mock function with given fields:
+func (_m *MockRMNHome) GetAllConfigDigests() (ccipocr3.Bytes32, ccipocr3.Bytes32) {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAllConfigDigests")
+	}
+
+	var r0 ccipocr3.Bytes32
+	var r1 ccipocr3.Bytes32
+	if rf, ok := ret.Get(0).(func() (ccipocr3.Bytes32, ccipocr3.Bytes32)); ok {
+		return rf()
+	}
+	if rf, ok := ret.Get(0).(func() ccipocr3.Bytes32); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(ccipocr3.Bytes32)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func() ccipocr3.Bytes32); ok {
+		r1 = rf()
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(ccipocr3.Bytes32)
+		}
+	}
+
+	return r0, r1
+}
+
+// MockRMNHome_GetAllConfigDigests_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAllConfigDigests'
+type MockRMNHome_GetAllConfigDigests_Call struct {
+	*mock.Call
+}
+
+// GetAllConfigDigests is a helper method to define mock.On call
+func (_e *MockRMNHome_Expecter) GetAllConfigDigests() *MockRMNHome_GetAllConfigDigests_Call {
+	return &MockRMNHome_GetAllConfigDigests_Call{Call: _e.mock.On("GetAllConfigDigests")}
+}
+
+func (_c *MockRMNHome_GetAllConfigDigests_Call) Run(run func()) *MockRMNHome_GetAllConfigDigests_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockRMNHome_GetAllConfigDigests_Call) Return(activeConfigDigest ccipocr3.Bytes32, candidateConfigDigest ccipocr3.Bytes32) *MockRMNHome_GetAllConfigDigests_Call {
+	_c.Call.Return(activeConfigDigest, candidateConfigDigest)
+	return _c
+}
+
+func (_c *MockRMNHome_GetAllConfigDigests_Call) RunAndReturn(run func() (ccipocr3.Bytes32, ccipocr3.Bytes32)) *MockRMNHome_GetAllConfigDigests_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetMinObservers provides a mock function with given fields: configDigest
 func (_m *MockRMNHome) GetMinObservers(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error) {
 	ret := _m.Called(configDigest)

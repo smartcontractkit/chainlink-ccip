@@ -1,12 +1,13 @@
 package chainfee
 
 import (
-	"context"
-	"time"
-
-	"golang.org/x/exp/maps"
-
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	"context"
+
+	mapset "github.com/deckarep/golang-set/v2"
+
+	"time"
 )
 
 func (p *processor) Observation(
@@ -16,8 +17,12 @@ func (p *processor) Observation(
 ) (Observation, error) {
 	// Get the fee components for all available chains that we can read from
 	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx)
+	feeComponentsChains, err := p.chainSupport.SupportedChains(p.oracleID)
+	if err != nil {
+		return Observation{}, err
+	}
 
-	availableChains := maps.Keys(feeComponents)
+	availableChains := feeComponentsChains.Intersect(mapset.NewSetFromMapKeys(feeComponents)).ToSlice()
 	// Get the native token prices for all available chains that we can read from
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, availableChains)
 	// Get the latest chain fee price updates for the source chains
@@ -28,6 +33,7 @@ func (p *processor) Observation(
 	fChain := p.ObserveFChain()
 
 	p.lggr.Infow("observed fee components",
+		"availableChains", availableChains,
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,

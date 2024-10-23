@@ -7,9 +7,6 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -28,20 +25,20 @@ type PriceReader interface {
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetFeedPricesUSD(ctx context.Context, tokens []ocr2types.Account) ([]*big.Int, error)
+	GetFeedPricesUSD(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress) ([]*big.Int, error)
 
 	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the specified chain
 	GetFeeQuoterTokenUpdates(
 		ctx context.Context,
-		tokens []ocr2types.Account,
+		tokens []ccipocr3.UnknownEncodedAddress,
 		chain ccipocr3.ChainSelector,
-	) (map[ocr2types.Account]plugintypes.TimestampedBig, error)
+	) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error)
 }
 
 type priceReader struct {
 	lggr         logger.Logger
 	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
-	tokenInfo    map[types.Account]pluginconfig.TokenInfo
+	tokenInfo    map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
 	ccipReader   CCIPReader
 	feedChain    ccipocr3.ChainSelector
 }
@@ -49,7 +46,7 @@ type priceReader struct {
 func NewPriceReader(
 	lggr logger.Logger,
 	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade,
-	tokenInfo map[types.Account]pluginconfig.TokenInfo,
+	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
 	feedChain ccipocr3.ChainSelector,
 ) PriceReader {
@@ -76,11 +73,11 @@ type LatestRoundData struct {
 
 func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
-	tokens []ocr2types.Account,
+	tokens []ccipocr3.UnknownEncodedAddress,
 	chain ccipocr3.ChainSelector,
-) (map[ocr2types.Account]plugintypes.TimestampedBig, error) {
+) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error) {
 	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
-	updateMap := make(map[ocr2types.Account]plugintypes.TimestampedBig)
+	updateMap := make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig)
 
 	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
 	if err != nil {
@@ -146,7 +143,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 }
 
 func (pr *priceReader) GetFeedPricesUSD(
-	ctx context.Context, tokens []ocr2types.Account,
+	ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress,
 ) ([]*big.Int, error) {
 	prices := make([]*big.Int, len(tokens))
 	if pr.feedChainReader() == nil {
@@ -159,7 +156,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 		token := token
 		eg.Go(func() error {
 			boundContract := commontypes.BoundContract{
-				Address: pr.tokenInfo[token].AggregatorAddress,
+				Address: string(pr.tokenInfo[token].AggregatorAddress),
 				Name:    consts.ContractNamePriceAggregator,
 			}
 			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract, pr.feedChainReader())
@@ -191,7 +188,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 
 func (pr *priceReader) getFeedDecimals(
 	ctx context.Context,
-	token ocr2types.Account,
+	token ccipocr3.UnknownEncodedAddress,
 	boundContract commontypes.BoundContract,
 	feedChainReader contractreader.ContractReaderFacade,
 ) (uint8, error) {
@@ -212,7 +209,7 @@ func (pr *priceReader) getFeedDecimals(
 
 func (pr *priceReader) getRawTokenPriceE18Normalized(
 	ctx context.Context,
-	token ocr2types.Account,
+	token ccipocr3.UnknownEncodedAddress,
 	boundContract commontypes.BoundContract,
 	feedChainReader contractreader.ContractReaderFacade,
 ) (*big.Int, error) {
