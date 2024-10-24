@@ -278,7 +278,6 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
-		c.lggr.Infow("calculated fee for message", "messageID", msg.Header.MessageID, "feeUSD18", feeUSD18)
 		messageFees[msg.Header.MessageID] = feeUSD18
 	}
 
