@@ -67,9 +67,9 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	dstSelector := cciptypes.ChainSelector(2)
 
 	messages := []inmem.MessagesWithMetadata{
-		makeMsg(100, srcSelector, dstSelector, false, withFeeValueJuels(cciptypes.NewBigIntFromInt64(100))),
-		makeMsg(101, srcSelector, dstSelector, false, withFeeValueJuels(cciptypes.NewBigIntFromInt64(200))),
-		makeMsg(102, srcSelector, dstSelector, false, withFeeValueJuels(cciptypes.NewBigIntFromInt64(300))),
+		makeMsg(100, srcSelector, dstSelector, false, withFeeValueJuels(100)),
+		makeMsg(101, srcSelector, dstSelector, false, withFeeValueJuels(200)),
+		makeMsg(102, srcSelector, dstSelector, false, withFeeValueJuels(300)),
 	}
 
 	messageTimestamp := time.Now().Add(-4 * time.Hour)

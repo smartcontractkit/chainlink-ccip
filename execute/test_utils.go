@@ -374,13 +374,13 @@ func newMessageSentEvent(
 
 type msgOption func(*cciptypes.Message)
 
-func withFeeValueJuels(fee cciptypes.BigInt) msgOption {
+func withFeeValueJuels(fee int64) msgOption {
 	return func(m *cciptypes.Message) {
-		m.FeeValueJuels = fee
+		m.FeeValueJuels = cciptypes.NewBigIntFromInt64(fee)
 	}
 }
 
-func withTokens(tokenAmounts []cciptypes.RampTokenAmount) msgOption {
+func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
 		m.TokenAmounts = tokenAmounts
 	}
