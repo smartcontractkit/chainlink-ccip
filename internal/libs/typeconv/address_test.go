@@ -12,3 +12,10 @@ func TestAddressBytesToString(t *testing.T) {
 	got := AddressBytesToString(addr, 1)
 	assert.Equal(t, want, got)
 }
+
+func TestKeepNRightBytes(t *testing.T) {
+	b := []byte{0x01, 0x02, 0x03, 0x04}
+	assert.Equal(t, []byte{0x03, 0x04}, KeepNRightBytes(b, 2))
+	assert.Equal(t, []byte{}, KeepNRightBytes(b, 0))
+	assert.Equal(t, []byte{0x01, 0x02, 0x03, 0x04}, KeepNRightBytes(b, 21))
+}
