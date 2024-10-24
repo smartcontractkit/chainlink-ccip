@@ -1,11 +1,11 @@
 # Billing
 
-Before diving into billing let's do a recap of some parts of important parts of the system.
+Before diving into billing let's do a recap of some important parts of the system.
 
 ## On Chain
 
 We have multiple contracts interactions that happen to send message from sourceChain to destinationChain. These contracts are deployed on each chain that need to support CCIP
-1. Router: Non changing initial contract that users/dApps call to send a message
+1. Router: Immutable entry point contract that users/dapps call to get quotes and send messages
 2. OnRamp: Forwards Router's send request
 3. FeeQuoter: OnRamp calls to estimate the fees for sending a message <<< Important
 4. OffRamp: Receives the messages (Offchain part plays the part here to send the message to the other chain's OffRamp)
@@ -22,11 +22,11 @@ We have 2 plugins (Commit and Execute).
 
 Commit is the one responsible for reporting gas prices, and token prices that don't come from keystone.
 
-Execute is responsible for fee boosting [Add Link] during the actual execution of messages.
+Execute is responsible for [fee boosting](https://github.com/smartcontractkit/chainlink-ccip/blob/28a1b54783a0023e82f92833aa8379164e799bf2/docs/billing.md#fee-boosting) during the actual execution of messages.
 
 ## Fee Structure
 
-To send a message from sourceChain to destinationChain we need to account for multiple fees. For in detailed doc check [billing](https://docs.chain.link/ccip/billing)
+To send a message from sourceChain to destinationChain we need to account for multiple fees. For in detailed doc check [billing documentation](https://docs.chain.link/ccip/billing)
 
 1. Network/Premium fees.
 2. destinationChain Transaction fees (execution costs + data availability cost on the destination chain)
@@ -37,9 +37,9 @@ For in details look on how the fees is calculated you can check FeeQuoter's [`ge
 To be able to pay in one of the available fee tokens on sourceChain we need to arrive at a quote in USD and convert the USD amount into corresponding fee token amount.
 
 So the components we need to calculate the final price are:
-1. sourceChain fee token price, usually LINK and the native token of the chain. This is what the user pays in the end. TokenPriceProcessor will update them 
-2. destinationChain Fee/Gas price. FeeChainProcessor will update them.
-3. destinationChain native token price (to be able to calculate the fees denominated in USD
+1. sourceChain fee token price in USD, usually LINK and the native token of the chain. This is what the user pays in the end. TokenPriceProcessor will update them 
+2. destinationChain Fee/Gas price. This comes in native token. FeeChainProcessor will update them.
+3. destinationChain native token price in USD (to be able to calculate the fees denominated in USD
 
 
 ## Token Prices Processor
