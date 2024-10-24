@@ -44,13 +44,14 @@ So the components we need to calculate the final price are:
 
 ## Token Prices Processor
 
-During commit round. Token prices are updated by TokenPriceProcessor. 
+TokenPrices [processor](https://github.com/smartcontractkit/chainlink-ccip/blob/f151a0cb6f3838be4e8290c7f5695d58d065a18a/commit/tokenprice/processor.go#L20-L20) is part of the Commit Plugin. It is responsible for updating the token prices on the destination chain FeeQuoter. 
+This is done to be able to calculate the fees in USD.
 
 For each round these are the steps:
-1. **Observation:**  
+1. **Observation:**  [source code](https://github.com/smartcontractkit/chainlink-ccip/blob/f151a0cb6f3838be4e8290c7f5695d58d065a18a/commit/tokenprice/observation.go)
    a. Fetches the token prices from USD feed for tokens we [configure](https://github.com/smartcontractkit/chainlink-ccip/blob/f03ff5183eb8323ba8e0a13dc58d1da13b755307/pluginconfig/commit.go#L89-L91) during the plugin initiation.   
    b. Fetches current token prices stored in **destination chain FeeQuoter** (the chain the current node is supposed to commit to).
-2. **Outcome:**  
+2. **Outcome:**  [source code](https://github.com/smartcontractkit/chainlink-ccip/blob/f151a0cb6f3838be4e8290c7f5695d58d065a18a/commit/tokenprice/outcome.go)
 Cross-check values from 1a and 1b. and posts the tokens that needs updating in the Outcome. The prices from the feed (1a) will be used when:  
    a. If the token price on FeeQuoter is not available.  
    b. If the token price on FeeQuoter is stale by checking against when it was last updated and the [TokenPriceBatchWriteFrequency](https://github.com/smartcontractkit/chainlink-ccip/blob/f03ff5183eb8323ba8e0a13dc58d1da13b755307/pluginconfig/commit.go#L87).  
@@ -59,16 +60,17 @@ Cross-check values from 1a and 1b. and posts the tokens that needs updating in t
 
 ## Gas Prices / Chain fees Processor
 
-During the commit round, chain fees are updated by the ChainFeeProcessor.
+
+ChainFeeProcessor is part of the Commit Plugin. It is responsible for updating the chain fees on the destination chain FeeQuoter.
 
 For each round, these are the steps:
 
-1. **Observation:**
+1. **Observation:** [source code](https://github.com/smartcontractkit/chainlink-ccip/blob/f151a0cb6f3838be4e8290c7f5695d58d065a18a/commit/chainfee/observation.go)
    a. Fetches the current gas prices from RPCs (Using chain writer). Prices are in native chains' token.
    b. Fetch native token price from **source chains' FeeQuoters**. These are all the source chains that have a [DestChainConfig](https://github.com/smartcontractkit/chainlink/blob/12af1de88238e0e918177d6b5622070417f48adf/contracts/src/v0.8/ccip/onRamp/OnRamp.sol#L406-L414) with the current chain as the destination chain. (and that the current node can read from as not all nodes can read from all chains)
    c. Fetches current gas prices stored in **destination chain FeeQuoter** (the chain the current node is supposed to commit to).
 
-2. **Outcome:**
+2. **Outcome:** [source code](https://github.com/smartcontractkit/chainlink-ccip/blob/f151a0cb6f3838be4e8290c7f5695d58d065a18a/commit/chainfee/outcome.go)
    Cross-check values from 1a and 1b, and posts the gas prices that need updating in the Outcome. The prices from the feed (1a) will be used when:
    a. If the gas price on FeeQuoter is not available.
    b. If the gas price on FeeQuoter is stale by checking against when it was last updated and the [RemoteGasPriceBatchWriteFrequency](https://github.com/smartcontractkit/chainlink-ccip/blob/f03ff5183eb8323ba8e0a13dc58d1da13b755307/pluginconfig/commit.go#L80).
