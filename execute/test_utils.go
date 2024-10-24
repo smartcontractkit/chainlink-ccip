@@ -301,7 +301,7 @@ func newNode(
 		msgHasher,
 		homeChain,
 		tokenDataObserver,
-		evm.EstimateProvider{},
+		evm.NewEstimateProvider(lggr),
 		lggr,
 		costlyMessageObserver,
 	)

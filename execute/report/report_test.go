@@ -750,7 +750,7 @@ func Test_Builder_Build(t *testing.T) {
 				lggr,
 				hasher,
 				codec,
-				evm.EstimateProvider{},
+				evm.NewEstimateProvider(lggr),
 				tt.args.nonces,
 				1,
 				tt.args.maxReportSize,
@@ -808,6 +808,7 @@ func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecuteP
 }
 
 func Test_execReportBuilder_verifyReport(t *testing.T) {
+	lggr := logger.Test(t)
 	type fields struct {
 		encoder            cciptypes.ExecutePluginCodec
 		estimateProvider   gas.EstimateProvider
@@ -833,7 +834,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				execReport: cciptypes.ExecutePluginReportSingleChain{},
 			},
 			fields: fields{
-				estimateProvider:   evm.EstimateProvider{},
+				estimateProvider:   evm.NewEstimateProvider(lggr),
 				maxReportSizeBytes: 1000,
 				maxGas:             1000000,
 			},
@@ -855,7 +856,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				estimateProvider:   evm.EstimateProvider{},
+				estimateProvider:   evm.NewEstimateProvider(lggr),
 				maxReportSizeBytes: 10000,
 				maxGas:             1000000,
 			},
@@ -878,7 +879,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				estimateProvider:   evm.EstimateProvider{},
+				estimateProvider:   evm.NewEstimateProvider(lggr),
 				maxReportSizeBytes: 1000,
 				maxGas:             1000000,
 			},
@@ -897,7 +898,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				estimateProvider: evm.EstimateProvider{},
+				estimateProvider: evm.NewEstimateProvider(lggr),
 				accumulated: validationMetadata{
 					encodedSizeBytes: 1000,
 				},
@@ -917,7 +918,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				estimateProvider: evm.EstimateProvider{},
+				estimateProvider: evm.NewEstimateProvider(lggr),
 				encoder:          badCodec{},
 			},
 			expectedError: "unable to encode report",
@@ -1158,7 +1159,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 
 			b := &execReportBuilder{
 				lggr:             lggr,
-				estimateProvider: evm.EstimateProvider{},
+				estimateProvider: evm.NewEstimateProvider(lggr),
 				accumulated:      tt.fields.accumulated,
 				sendersNonce:     tt.args.nonces,
 			}
