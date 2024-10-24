@@ -22,6 +22,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -310,12 +312,26 @@ func (c *controller) sendObservationRequests(
 			return requests[i].LaneSource.SourceChainSelector < requests[j].LaneSource.SourceChainSelector
 		})
 
+		fixedDestLaneUpdateRequests := make([]*rmnpb.FixedDestLaneUpdateRequest, 0)
+
+		// convert OnRamp address from 32bytes (abi encoded) to 20bytes (evm address) before sending the request
+		// todo: make this part chain-agnostic
+		for _, request := range requests {
+			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
+				LaneSource: &rmnpb.LaneSource{
+					SourceChainSelector: request.LaneSource.SourceChainSelector,
+					OnrampAddress:       typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
+				},
+				ClosedInterval: request.ClosedInterval,
+			})
+		}
+
 		req := &rmnpb.Request{
 			RequestId: newRequestID(),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: &rmnpb.ObservationRequest{
 					LaneDest:                    destChain,
-					FixedDestLaneUpdateRequests: requests,
+					FixedDestLaneUpdateRequests: fixedDestLaneUpdateRequests,
 				},
 			},
 		}
@@ -522,7 +538,11 @@ func (c *controller) validateSignedObservationResponse(
 		if updateReq.Data.LaneSource.SourceChainSelector != signedObsLu.LaneSource.SourceChainSelector {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
-		if !bytes.Equal(updateReq.Data.LaneSource.OnrampAddress, signedObsLu.LaneSource.OnrampAddress) {
+
+		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
+		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
+		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
+		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 
