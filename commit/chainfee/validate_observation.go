@@ -25,14 +25,20 @@ func (p *processor) ValidateObservation(
 
 	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
 	if err != nil {
-		return fmt.Errorf("failed to get supported chains: %w", err)
+		return fmt.Errorf("failed to get node supported chains: %w", err)
 	}
+
+	ccipHomeSupportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
+	if err != nil {
+		return fmt.Errorf("failed to get CCIPHome supported chains: %w", err)
+	}
+	validChains := ccipHomeSupportedChains.Intersect(observerSupportedChains)
 
 	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
 
 	for _, chain := range observedChains {
-		if !observerSupportedChains.Contains(chain) {
-			return fmt.Errorf("chain %d is not supported by observer", chain)
+		if !validChains.Contains(chain) {
+			return fmt.Errorf("chain %d is not supported by node or CCIPHome", chain)
 		}
 	}
 
