@@ -39,6 +39,7 @@ func NewCostlyMessageObserverWithZeroExec(
 			relativeBoostPerWaitHour: relativeBoostPerWaitHour,
 			now:                      time.Now,
 		},
+		// TODO: Implement exec cost calculator
 		&ZeroMessageExecCostUSD18Calculator{},
 	)
 }
