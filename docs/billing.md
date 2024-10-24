@@ -47,13 +47,27 @@ So the components we need to calculate the final price are:
 
 ## Token Prices
 
+During commit round. Token prices are updated by TokenPriceProcessor. 
+
+For each round these are the steps:
+1. Observation:  
+   a. Fetches the token prices from USD feed for tokens we [configure](https://github.com/smartcontractkit/chainlink-ccip/blob/f03ff5183eb8323ba8e0a13dc58d1da13b755307/pluginconfig/commit.go#L89-L91) during the plugin initiation.   
+   b. Fetches current token prices stored in FeeQuoter
+2. Outcome:  
+Cross-check values from 1a and 1b. and posts the tokens that needs updating in the Outcome. The prices from the feed (1a) will be used when:  
+   a. If the token price on FeeQuoter is not available.  
+   b. If the token price on FeeQuoter is stale by checking against when it was last updated and the [TokenPriceBatchWriteFrequency](https://github.com/smartcontractkit/chainlink-ccip/blob/f03ff5183eb8323ba8e0a13dc58d1da13b755307/pluginconfig/commit.go#L87).  
+   c. If the token price on FeeQuoter is not within the [PriceDeviationThreshold](https://github.com/smartcontractkit/chainlink-ccip/blob/f03ff5183eb8323ba8e0a13dc58d1da13b755307/pluginconfig/commit.go#L41), this is per chain configuration.
+   
+
 ### Fee Token
 
-Assigning inflight messages that were previously skipped due to being underpaid an increasing weight for execution as time passes
 
 ## Gas Prices
 
 ## Fee Boosting
+
+Assigning inflight messages that were previously skipped due to being underpaid an increasing weight for execution as time passes
 
 ## Aggregate Rate Limiting
 
