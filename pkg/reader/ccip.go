@@ -568,13 +568,15 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
 		return rmntypes.RemoteConfig{}, err
 	}
+
+	// RMNRemote address stored in the offramp static config is actually the proxy contract address.
+	// Here we will get the RMNRemote address from the proxy contract by calling the RMNProxy contract.
 	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, destChainSelector)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
 
-	var rmnRemoteAddress []byte
-	err = r.getRMNRemoteAddress(ctx, rmnRemoteAddress, destChainSelector, proxyContractAddress)
+	rmnRemoteAddress, err := r.getRMNRemoteAddress(ctx, destChainSelector, proxyContractAddress)
 	if err != nil {
 		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
 	}
@@ -1244,15 +1246,15 @@ type versionedConfig struct {
 //nolint:lll
 func (r *ccipChainReader) getRMNRemoteAddress(
 	ctx context.Context,
-	rmnRemoteAddress []byte,
 	chain cciptypes.ChainSelector,
-	rmnRemoteProxyAddress []byte) error {
+	rmnRemoteProxyAddress []byte) ([]byte, error) {
 	_, err := bindExtendedReaderContract(ctx, r.lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
 	if err != nil {
-		return fmt.Errorf("bind RMN proxy contract: %w", err)
+		return nil, fmt.Errorf("bind RMN proxy contract: %w", err)
 	}
 
 	// get the RMN remote address from the proxy
+	var rmnRemoteAddress []byte
 	err = r.getDestinationData(
 		ctx,
 		chain,
@@ -1261,10 +1263,10 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 		&rmnRemoteAddress,
 	)
 	if err != nil {
-		return fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+		return nil, fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
 	}
 
-	return nil
+	return rmnRemoteAddress, nil
 }
 
 // Interface compliance check
