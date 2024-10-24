@@ -476,6 +476,9 @@ profiles:
                       PriceMax = '200 gwei'
                       LimitDefault = 6000000
                       FeeCapDefault = '200 gwei'
+              db:
+                statefulSet:
+                  enabled: true
   - name: kind
     merge:
       deployments:
