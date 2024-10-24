@@ -125,6 +125,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		query.KeyFilter{
 			Key: consts.EventNameCommitReportAccepted,
 			Expressions: []query.Expression{
+				query.Timestamp(uint64(ts.Unix()), primitives.Gte),
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -146,15 +147,6 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 		ev, is := (item.Data).(*CommitReportAcceptedEvent)
 		if !is {
 			return nil, fmt.Errorf("unexpected type %T while expecting a commit report", item)
-		}
-
-		valid := item.Timestamp >= uint64(ts.Unix())
-		if !valid {
-			r.lggr.Debugw("commit report too old, skipping", "report", ev, "item", item,
-				"destChain", dest,
-				"ts", ts,
-				"limit", limit)
-			continue
 		}
 
 		r.lggr.Debugw("processing commit report", "report", ev, "item", item)
@@ -243,6 +235,21 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 		query.KeyFilter{
 			Key: consts.EventNameExecutionStateChanged,
 			Expressions: []query.Expression{
+				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+					Value:    source,
+					Operator: primitives.Eq,
+				}),
+				query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
+					Value:    seqNumRange.Start(),
+					Operator: primitives.Gte,
+				}, primitives.ValueComparator{
+					Value:    seqNumRange.End(),
+					Operator: primitives.Lte,
+				}),
+				query.Comparator(consts.EventAttributeState, primitives.ValueComparator{
+					Value:    0,
+					Operator: primitives.Gt,
+				}),
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -261,17 +268,6 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 		if !ok {
 			return nil, fmt.Errorf("failed to cast %T to executionStateChangedEvent", item.Data)
 		}
-
-		// todo: filter via the query
-		valid := stateChange.SourceChainSelector == source &&
-			stateChange.SequenceNumber >= seqNumRange.Start() &&
-			stateChange.SequenceNumber <= seqNumRange.End() &&
-			stateChange.State > 0
-		if !valid {
-			r.lggr.Debugw("skipping invalid state change", "stateChange", stateChange)
-			continue
-		}
-
 		executed = append(executed, cciptypes.NewSeqNumRange(stateChange.SequenceNumber, stateChange.SequenceNumber))
 	}
 
@@ -301,6 +297,21 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		query.KeyFilter{
 			Key: consts.EventNameCCIPMessageSent,
 			Expressions: []query.Expression{
+				query.Comparator(consts.EventAttributeSourceChain, primitives.ValueComparator{
+					Value:    sourceChainSelector,
+					Operator: primitives.Eq,
+				}),
+				query.Comparator(consts.EventAttributeDestChain, primitives.ValueComparator{
+					Value:    r.destChain,
+					Operator: primitives.Eq,
+				}),
+				query.Comparator(consts.EventAttributeSequenceNumber, primitives.ValueComparator{
+					Value:    seqNumRange.Start(),
+					Operator: primitives.Gte,
+				}, primitives.ValueComparator{
+					Value:    seqNumRange.End(),
+					Operator: primitives.Lte,
+				}),
 				query.Confidence(primitives.Finalized),
 			},
 		},
@@ -328,17 +339,8 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 			return nil, fmt.Errorf("failed to cast %v to Message", item.Data)
 		}
 
-		// todo: filter via the query
-		valid := msg.Message.Header.SourceChainSelector == sourceChainSelector &&
-			msg.Message.Header.DestChainSelector == r.destChain &&
-			msg.Message.Header.SequenceNumber >= seqNumRange.Start() &&
-			msg.Message.Header.SequenceNumber <= seqNumRange.End()
-
 		msg.Message.Header.OnRamp = onRampAddress
-
-		if valid {
-			msgs = append(msgs, msg.Message)
-		}
+		msgs = append(msgs, msg.Message)
 	}
 
 	r.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,

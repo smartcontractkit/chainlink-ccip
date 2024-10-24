@@ -122,7 +122,8 @@ const (
 const (
 	EventAttributeSequenceNumber = "SequenceNumber"
 	EventAttributeSourceChain    = "SourceChain"
-	EventAttributeDestChain      = "destChain"
+	EventAttributeDestChain      = "DestChain"
+	EventAttributeState          = "State"
 )
 
 // Dedicated filters
