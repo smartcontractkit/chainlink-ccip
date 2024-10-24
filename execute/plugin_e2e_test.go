@@ -109,7 +109,7 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100})
 
-	// Second message execution cost drops, it should be included in the next round
+	// Second message execution cost drops, it should be included in the outcome
 	// Message1 cost=40000,  fee=50000   boosted original_fee * (1 + 4*1.0),
 	// Message2 cost=40000,  fee=100000
 	// Message3 cost=200000, fee=150000
