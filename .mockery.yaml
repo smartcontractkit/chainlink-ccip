@@ -2,9 +2,6 @@ with-expecter: true
 filename: "{{.InterfaceName | snakecase}}.go"
 dir: mocks/{{ replaceAll .InterfaceDirRelative "internal" "internal_" }}
 packages:
-    github.com/smartcontractkit/chainlink-ccip/execute/internal/gen:
-        interfaces:
-            ExecutePluginCodec:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot:
         interfaces:
             Observer:
@@ -23,6 +20,9 @@ packages:
             PeerGroup:
             PeerGroupFactory:
             Stream:
+    github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm:
+        interfaces:
+            EstimateProvider:
     github.com/smartcontractkit/chainlink-ccip/pkg/reader:
         interfaces:
             CCIPReader:
@@ -32,3 +32,6 @@ packages:
         interfaces:
             Extended:
             ContractReaderFacade:
+    github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3:
+        interfaces:
+            ExecutePluginCodec:
