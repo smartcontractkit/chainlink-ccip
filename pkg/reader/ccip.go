@@ -450,7 +450,9 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context, chains []cciptypes.ChainSelector) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
+	chains []cciptypes.ChainSelector,
+) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
 
 	for _, chain := range chains {
