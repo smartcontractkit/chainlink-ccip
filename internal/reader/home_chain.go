@@ -25,7 +25,6 @@ const (
 	defaultConfigPageSize = uint64(100)
 )
 
-//go:generate mockery --name HomeChain --output ./mocks/ --case underscore
 type HomeChain interface {
 	GetChainConfig(chainSelector cciptypes.ChainSelector) (ChainConfig, error)
 	GetAllChainConfigs() (map[cciptypes.ChainSelector]ChainConfig, error)

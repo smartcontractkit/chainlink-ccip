@@ -24,7 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -34,6 +34,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -240,11 +241,15 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		execCostCalculator,
 	)
 
+	ep := gasmock.NewMockEstimateProvider(it.t)
+	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
+	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1),
-		it.newNode(cfg, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1),
-		it.newNode(cfg, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -275,6 +280,7 @@ func (it *IntTest) UpdateExecutionCost(id cciptypes.Bytes32, val int64) {
 func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
+	ep gas.EstimateProvider,
 	tokenDataObserver tokendata.TokenDataObserver,
 	costlyMessageObserver exectypes.CostlyMessageObserver,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
@@ -299,7 +305,7 @@ func (it *IntTest) newNode(
 		it.msgHasher,
 		homeChain,
 		tokenDataObserver,
-		evm.EstimateProvider{},
+		ep,
 		logger.Test(it.t),
 		costlyMessageObserver,
 	)
