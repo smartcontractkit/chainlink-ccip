@@ -122,7 +122,7 @@ type CCIPReader interface {
 	) (map[string]uint64, error)
 
 	// GetAvailableChainsFeeComponents Reads all fee components for known chains (chains that have chain writer defined)
-	GetAvailableChainsFeeComponents(ctx context.Context) map[cciptypes.ChainSelector]types.ChainFeeComponents
+	GetAvailableChainsFeeComponents(ctx context.Context, chains []cciptypes.ChainSelector) map[cciptypes.ChainSelector]types.ChainFeeComponents
 
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
 	GetWrappedNativeTokenPriceUSD(

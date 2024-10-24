@@ -450,14 +450,18 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GetAvailableChainsFeeComponents(
-	ctx context.Context,
-) map[cciptypes.ChainSelector]types.ChainFeeComponents {
+func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context, chains []cciptypes.ChainSelector) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
-	for chain, chainWriter := range r.contractWriters {
+
+	for _, chain := range chains {
+		chainWriter, ok := r.contractWriters[chain]
+		if !ok {
+			r.lggr.Warnw("contract writer not found", "chain", chain)
+			continue
+		}
 		feeComponent, err := chainWriter.GetFeeComponents(ctx)
 		if err != nil {
-			r.lggr.Errorw("failed to get chain fee components for chain %d: %w", chain, err)
+			r.lggr.Errorw("failed to get chain fee components", "chain", chain, "err", err)
 			continue
 		}
 		feeComponents[chain] = *feeComponent
