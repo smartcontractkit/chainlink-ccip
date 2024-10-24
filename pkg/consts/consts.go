@@ -13,6 +13,7 @@ const (
 	ContractNameNonceManager           = "NonceManager"
 	ContractNameRMNHome                = "RMNHome"
 	ContractNameRMNRemote              = "RMNRemote"
+	ContractNameRMNProxy               = "RMNProxy"
 	ContractNameRouter                 = "Router"
 	ContractNameCCTPMessageTransmitter = "MessageTransmitter"
 )
@@ -104,6 +105,9 @@ const (
 	// Used by the rmn remote reader.
 	MethodNameGetVersionedConfig    = "GetVersionedConfig"
 	MethodNameGetReportDigestHeader = "GetReportDigestHeader"
+
+	// RMNProxy.sol methods
+	MethodNameGetARM = "GetARM"
 )
 
 // Event Names

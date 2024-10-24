@@ -568,11 +568,17 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	if err := validateExtendedReaderExistence(r.contractReaders, destChainSelector); err != nil {
 		return rmntypes.RemoteConfig{}, err
 	}
-
-	contractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, destChainSelector)
+	proxyContractAddress, err := r.GetContractAddress(consts.ContractNameRMNRemote, destChainSelector)
 	if err != nil {
-		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote contract address: %w", err)
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote proxy contract address: %w", err)
 	}
+
+	var rmnRemoteAddress []byte
+	err = r.getRMNRemoteAddress(ctx, rmnRemoteAddress, destChainSelector, proxyContractAddress)
+	if err != nil {
+		return rmntypes.RemoteConfig{}, fmt.Errorf("get RMNRemote address: %w", err)
+	}
+	r.lggr.Debugw("got RMNRemote address", "address", rmnRemoteAddress)
 
 	// TODO: make the calls in parallel using errgroup
 	var vc versionedConfig
@@ -615,7 +621,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}
 
 	return rmntypes.RemoteConfig{
-		ContractAddress:  contractAddress,
+		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
 		Signers:          signers,
 		MinSigners:       vc.Config.MinSigners,
@@ -668,7 +674,7 @@ func (r *ccipChainReader) discoverOffRampContracts(
 			&staticConfig,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("unable to lookup nonce manager and rmn remote (offramp static config): %w", err)
+			return nil, fmt.Errorf("unable to lookup nonce manager and rmn proxy remote (offramp static config): %w", err)
 		}
 		resp = resp.Append(consts.ContractNameNonceManager, chain, staticConfig.NonceManager)
 		resp = resp.Append(consts.ContractNameRMNRemote, chain, staticConfig.RmnRemote)
@@ -1225,11 +1231,40 @@ type config struct {
 	MinSigners                  uint64   `json:"minSigners"`
 }
 
-// versionnedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
+// versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L167-L169
 type versionedConfig struct {
 	Version uint32 `json:"version"`
 	Config  config `json:"config"`
+}
+
+// getARM gets the RMN remote address from the RMN proxy address.
+// See: https://github.com/smartcontractkit/chainlink/blob/3c7817c566c5d0aa14519c679fa85b227ac97cc5/contracts/src/v0.8/ccip/rmn/ARMProxy.sol#L40-L44
+//
+//nolint:lll
+func (r *ccipChainReader) getRMNRemoteAddress(
+	ctx context.Context,
+	rmnRemoteAddress []byte,
+	chain cciptypes.ChainSelector,
+	rmnRemoteProxyAddress []byte) error {
+	_, err := bindExtendedReaderContract(ctx, r.lggr, r.contractReaders, chain, consts.ContractNameRMNProxy, rmnRemoteProxyAddress)
+	if err != nil {
+		return fmt.Errorf("bind RMN proxy contract: %w", err)
+	}
+
+	// get the RMN remote address from the proxy
+	err = r.getDestinationData(
+		ctx,
+		chain,
+		consts.ContractNameRMNProxy,
+		consts.MethodNameGetARM,
+		&rmnRemoteAddress,
+	)
+	if err != nil {
+		return fmt.Errorf("unable to lookup RMN remote address (RMN proxy): %w", err)
+	}
+
+	return nil
 }
 
 // Interface compliance check
