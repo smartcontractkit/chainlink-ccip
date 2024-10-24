@@ -26,7 +26,7 @@ Execute is responsible for [fee boosting](https://github.com/smartcontractkit/ch
 
 ## Fee Structure
 
-To send a message from sourceChain to destinationChain we need to account for multiple fees. For in detailed doc check [billing documentation](https://docs.chain.link/ccip/billing)
+To send a message from sourceChain to destinationChain we need to account for multiple fees. For more details [billing documentation](https://docs.chain.link/ccip/billing)
 
 1. Network/Premium fees.
 2. destinationChain Transaction fees (execution costs + data availability cost on the destination chain)
