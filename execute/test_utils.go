@@ -392,7 +392,12 @@ func withTokens(tokenAmounts []cciptypes.RampTokenAmount) msgOption {
 	}
 }
 
-func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool, opts ...msgOption) inmem.MessagesWithMetadata {
+func makeMsg(
+	seqNum cciptypes.SeqNum,
+	src, dest cciptypes.ChainSelector,
+	executed bool,
+	opts ...msgOption,
+) inmem.MessagesWithMetadata {
 	msg := cciptypes.Message{
 		Header: cciptypes.RampMessageHeader{
 			SourceChainSelector: src,
