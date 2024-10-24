@@ -24,7 +24,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas/evm"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -33,6 +33,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -202,6 +203,10 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	)
 	require.NoError(it.t, err)
 
+	ep := gasmock.NewMockEstimateProvider(it.t)
+	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
+	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
+
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
 		newNode(
@@ -212,6 +217,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 			it.msgHasher,
 			it.ccipReader,
 			homeChain,
+			ep,
 			tkObs,
 			oracleIDToP2pID,
 			1,
@@ -224,6 +230,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 			it.msgHasher,
 			it.ccipReader,
 			homeChain,
+			ep,
 			tkObs,
 			oracleIDToP2pID,
 			2,
@@ -236,6 +243,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 			it.msgHasher,
 			it.ccipReader,
 			homeChain,
+			ep,
 			tkObs,
 			oracleIDToP2pID,
 			3,
@@ -271,6 +279,7 @@ func newNode(
 	msgHasher cciptypes.MessageHasher,
 	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
+	ep gas.EstimateProvider,
 	tokenDataObserver tokendata.TokenDataObserver,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
@@ -301,7 +310,7 @@ func newNode(
 		msgHasher,
 		homeChain,
 		tokenDataObserver,
-		evm.EstimateProvider{},
+		ep,
 		lggr,
 		costlyMessageObserver,
 	)
