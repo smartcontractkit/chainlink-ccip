@@ -143,11 +143,7 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 		return fmt.Errorf("get or create rage p2p stream: %w", err)
 	}
 
-	r.lggr.Infow("RMN Peer Client sending message to RMN node",
-		"rmnNodeID", rmnNode.ID,
-		"requestSize", len(request),
-	)
-
+	r.lggr.Infow("sending message to RMN node", "rmnNodeID", rmnNode.ID, "requestSize", len(request))
 	stream.SendMessage(request)
 
 	return nil
@@ -164,7 +160,8 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	// todo: versioning for stream names e.g. for 'v1_7'
 	streamName := fmt.Sprintf("ccip-rmn/v1_6/%s",
 		strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x"))
-	r.lggr.Infow("RMN Peer Client creating new stream",
+
+	r.lggr.Infow("creating new stream",
 		"streamName", streamName,
 		"rmnPeerID", rmnPeerID,
 		"rmnNodeIdx", rmnNode.ID,
@@ -174,14 +171,14 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	var err error
 	stream, err = r.peerGroup.NewStream(
 		rmnPeerID,
-		networking.NewStreamArgs1{
+		networking.NewStreamArgs1{ // todo: make it configurable
 			StreamName:         streamName,
 			OutgoingBufferSize: 1,
 			IncomingBufferSize: 1,
-			MaxMessageLength:   2_097_152, // 2MB
+			MaxMessageLength:   4_194_304, // 4MB
 			MessagesLimit: ragep2p.TokenBucketParams{
-				Rate:     20,
-				Capacity: 100,
+				Rate:     50,
+				Capacity: 200,
 			},
 			BytesLimit: ragep2p.TokenBucketParams{
 				Rate:     20_971_520,  // 20MB
@@ -200,11 +197,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 
 func (r *peerClient) listenToStream(rmnNodeID rmntypes.NodeID, stream Stream) {
 	for msg := range stream.ReceiveMessages() {
-		r.lggr.Infow("RMN Peer Client received message from RMN node",
-			"rmnNodeID", rmnNodeID,
-			"msgSize", len(msg),
-		)
-
+		r.lggr.Infow("received message from RMN node", "rmnNodeID", rmnNodeID, "msgSize", len(msg))
 		r.respChan <- PeerResponse{
 			RMNNodeID: rmnNodeID,
 			Body:      msg,

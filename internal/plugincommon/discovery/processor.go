@@ -272,7 +272,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	if len(feeQuoterConsensus) == 0 {
 		cdp.lggr.Warnw("No consensus on fee quoters, feeQuoterConsensus map is empty")
 	}
-	//contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
+	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
 	// Router address consensus
 	routerConsensus := consensus.GetConsensusMap(

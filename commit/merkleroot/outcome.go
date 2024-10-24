@@ -2,7 +2,6 @@ package merkleroot
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"sort"
 	"time"
@@ -12,6 +11,8 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -169,9 +170,6 @@ func buildReport(
 			MerkleRoot    cciptypes.Bytes32
 			OnRampAddress string
 		}
-		onRampAddressToString := func(onRampAddress []byte) string {
-			return hex.EncodeToString(onRampAddress)
-		}
 
 		signedRoots := mapset.NewSet[rootKey]()
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
@@ -183,7 +181,9 @@ func buildReport(
 				),
 				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
 				// NOTE: convert address into a comparable value for mapset.
-				OnRampAddress: onRampAddressToString(laneUpdate.LaneSource.OnrampAddress),
+				OnRampAddress: typconv.AddressBytesToString(
+					laneUpdate.LaneSource.OnrampAddress,
+					laneUpdate.LaneSource.SourceChainSelector),
 			}
 
 			lggr.Infow("Found signed root", "root", rk)
@@ -197,7 +197,7 @@ func buildReport(
 				ChainSel:      root.ChainSel,
 				SeqNumsRange:  root.SeqNumsRange,
 				MerkleRoot:    root.MerkleRoot,
-				OnRampAddress: onRampAddressToString(root.OnRampAddress),
+				OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
 			}
 
 			if signedRoots.Contains(rk) {

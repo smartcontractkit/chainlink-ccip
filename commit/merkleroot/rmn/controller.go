@@ -22,6 +22,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -312,16 +314,13 @@ func (c *controller) sendObservationRequests(
 
 		fixedDestLaneUpdateRequests := make([]*rmnpb.FixedDestLaneUpdateRequest, 0)
 
-		// OnRamp address from 32bytes to 20bytes
+		// convert OnRamp address from 32bytes (abi encoded) to 20bytes (evm address) before sending the request
+		// todo: make this part chain-agnostic
 		for _, request := range requests {
-			onRampAddress := request.LaneSource.OnrampAddress
-			if len(onRampAddress) == 32 { // todo: not chain-agnostic
-				onRampAddress = onRampAddress[12:]
-			}
 			fixedDestLaneUpdateRequests = append(fixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
 				LaneSource: &rmnpb.LaneSource{
 					SourceChainSelector: request.LaneSource.SourceChainSelector,
-					OnrampAddress:       onRampAddress,
+					OnrampAddress:       typconv.KeepNRightBytes(request.LaneSource.OnrampAddress, 20),
 				},
 				ClosedInterval: request.ClosedInterval,
 			})
@@ -540,11 +539,10 @@ func (c *controller) validateSignedObservationResponse(
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 
-		onRampAddressOfReq := updateReq.Data.LaneSource.OnrampAddress
-		if len(onRampAddressOfReq) == 32 { // todo: not chain-agnostic
-			onRampAddressOfReq = onRampAddressOfReq[12:] // OnRamp address from 32bytes to 20bytes
-		}
-		if !bytes.Equal(onRampAddressOfReq, signedObsLu.LaneSource.OnrampAddress) {
+		// todo: The original updateReq contains abi encoded onRamp address, the one in the RMN response
+		// is 20 bytes evm address. This is chain specific and should be handled in a chain specific way.
+		expOnRampAddress := typconv.KeepNRightBytes(updateReq.Data.LaneSource.OnrampAddress, 20)
+		if !bytes.Equal(expOnRampAddress, signedObsLu.LaneSource.OnrampAddress) {
 			return fmt.Errorf("unexpected lane source %v", signedObsLu.LaneSource)
 		}
 
