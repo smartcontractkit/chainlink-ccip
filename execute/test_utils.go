@@ -177,7 +177,6 @@ func (it *IntTest) WithUSDC(
 	}
 }
 
-//nolint:lll
 func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	cfg := pluginconfig.ExecuteOffchainConfig{
 		MessageVisibilityInterval: *commonconfig.MustNewDuration(8 * time.Hour),
@@ -243,9 +242,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1),
-		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1),
-		newNode(it.donID, logger.Test(it.t), cfg, it.dstSelector, it.msgHasher, it.ccipReader, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1),
+		it.newNode(cfg, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1),
+		it.newNode(cfg, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1),
+		it.newNode(cfg, homeChain, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -273,13 +272,8 @@ func (it *IntTest) UpdateExecutionCost(id cciptypes.Bytes32, val int64) {
 	it.execCostCalculator.UpdateCosts(id, plugintypes.NewUSD18(val))
 }
 
-func newNode(
-	donID plugintypes.DonID,
-	lggr logger.Logger,
+func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
-	destChain cciptypes.ChainSelector,
-	msgHasher cciptypes.MessageHasher,
-	ccipReader readerpkg.CCIPReader,
 	homeChain reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,
 	costlyMessageObserver exectypes.CostlyMessageObserver,
@@ -295,25 +289,25 @@ func newNode(
 	}
 
 	node1 := NewPlugin(
-		donID,
+		it.donID,
 		rCfg,
 		cfg,
-		destChain,
+		it.dstSelector,
 		oracleIDToP2pID,
-		ccipReader,
+		it.ccipReader,
 		reportCodec,
-		msgHasher,
+		it.msgHasher,
 		homeChain,
 		tokenDataObserver,
 		evm.EstimateProvider{},
-		lggr,
+		logger.Test(it.t),
 		costlyMessageObserver,
 	)
 
 	return nodeSetup{
 		node:        node1,
 		reportCodec: reportCodec,
-		msgHasher:   msgHasher,
+		msgHasher:   it.msgHasher,
 	}
 }
 
