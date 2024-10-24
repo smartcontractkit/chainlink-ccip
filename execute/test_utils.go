@@ -215,7 +215,8 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 			tkObs,
 			oracleIDToP2pID,
 			1,
-			1),
+			1,
+		),
 		newNode(
 			it.donID,
 			logger.Test(it.t),
@@ -313,17 +314,6 @@ func newNode(
 	}
 }
 
-func makeMsgWithToken(
-	seqNum cciptypes.SeqNum,
-	src, dest cciptypes.ChainSelector,
-	executed bool,
-	tokens []cciptypes.RampTokenAmount,
-) inmem.MessagesWithMetadata {
-	msg := makeMsg(seqNum, src, dest, executed)
-	msg.Message.TokenAmounts = tokens
-	return msg
-}
-
 func mustEncodeChainConfig(cc chainconfig.ChainConfig) []byte {
 	encoded, err := chainconfig.EncodeChainConfig(cc)
 	if err != nil {
@@ -385,15 +375,35 @@ func newMessageSentEvent(
 	return &readerpkg.MessageSentEvent{Arg0: buf}
 }
 
-func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool) inmem.MessagesWithMetadata {
-	return inmem.MessagesWithMetadata{
-		Message: cciptypes.Message{
-			Header: cciptypes.RampMessageHeader{
-				SourceChainSelector: src,
-				SequenceNumber:      seqNum,
-			},
-			FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
+type msgOption func(*cciptypes.Message)
+
+func withFeeValueJuels(fee cciptypes.BigInt) msgOption {
+	return func(m *cciptypes.Message) {
+		m.FeeValueJuels = fee
+	}
+}
+
+func withTokens(tokenAmounts []cciptypes.RampTokenAmount) msgOption {
+	return func(m *cciptypes.Message) {
+		m.TokenAmounts = tokenAmounts
+	}
+}
+
+func makeMsg(seqNum cciptypes.SeqNum, src, dest cciptypes.ChainSelector, executed bool, opts ...msgOption) inmem.MessagesWithMetadata {
+	msg := cciptypes.Message{
+		Header: cciptypes.RampMessageHeader{
+			SourceChainSelector: src,
+			SequenceNumber:      seqNum,
 		},
+		FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
+	}
+
+	for _, opt := range opts {
+		opt(&msg)
+	}
+
+	return inmem.MessagesWithMetadata{
+		Message:     msg,
 		Destination: dest,
 		Executed:    executed,
 	}

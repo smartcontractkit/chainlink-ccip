@@ -58,3 +58,31 @@ func TestPlugin(t *testing.T) {
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
+
+func Test_ExcludingCostlyMessages(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcSelector := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	messages := []inmem.MessagesWithMetadata{
+		makeMsg(100, srcSelector, dstSelector, false, withFeeValueJuels(cciptypes.NewBigIntFromInt64(100))),
+		makeMsg(101, srcSelector, dstSelector, false, withFeeValueJuels(cciptypes.NewBigIntFromInt64(200))),
+		makeMsg(102, srcSelector, dstSelector, false, withFeeValueJuels(cciptypes.NewBigIntFromInt64(300))),
+	}
+
+	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	outcome := runner.MustRunRound(ctx, t)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	for i := 0; i < 3; i++ {
+		outcome = runner.MustRunRound(ctx, t)
+	}
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100, 101, 102})
+}

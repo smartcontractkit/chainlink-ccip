@@ -29,18 +29,18 @@ func Test_USDC_Transfer(t *testing.T) {
 	messages := []inmem.MessagesWithMetadata{
 		makeMsg(102, sourceChain, destChain, false),
 		makeMsg(103, sourceChain, destChain, false),
-		makeMsgWithToken(104, sourceChain, destChain, false, []cciptypes.RampTokenAmount{
+		makeMsg(104, sourceChain, destChain, false, withTokens([]cciptypes.RampTokenAmount{
 			{
 				SourcePoolAddress: addressBytes,
 				ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
 			},
-		}),
-		makeMsgWithToken(105, sourceChain, destChain, false, []cciptypes.RampTokenAmount{
+		})),
+		makeMsg(105, sourceChain, destChain, false, withTokens([]cciptypes.RampTokenAmount{
 			{
 				SourcePoolAddress: addressBytes,
 				ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 0).ToBytes(),
 			},
-		}),
+		})),
 	}
 
 	events := []*readerpkg.MessageSentEvent{
