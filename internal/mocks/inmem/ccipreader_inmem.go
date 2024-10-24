@@ -2,9 +2,8 @@ package inmem
 
 import (
 	"context"
-	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"time"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -12,6 +11,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/plugintypes"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 type MessagesWithMetadata struct {
@@ -121,6 +122,7 @@ func (r InMemoryCCIPReader) Nonces(
 
 func (r InMemoryCCIPReader) GetAvailableChainsFeeComponents(
 	ctx context.Context,
+	chains []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	panic("implement me")
 }

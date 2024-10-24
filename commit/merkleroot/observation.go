@@ -88,9 +88,11 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 
 	peerIDs := make([]string, 0, len(rmnNodesInfo))
 	for _, node := range rmnNodesInfo {
+		w.lggr.Infow("Adding RMN node to peerIDs", "node", node.PeerID.String())
 		peerIDs = append(peerIDs, node.PeerID.String())
 	}
 	for _, p2pID := range w.oracleIDToP2pID {
+		w.lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
 		peerIDs = append(peerIDs, p2pID.String())
 	}
 
@@ -441,9 +443,12 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(hashes), err)
 	}
 
+	hashesStr := make([]string, len(hashes))
+	for i, h := range hashes {
+		hashesStr[i] = cciptypes.Bytes32(h).String()
+	}
 	root := tree.Root()
-	o.lggr.Infow("computeMerkleRoot: Computed merkle root", "root", cciptypes.Bytes32(root).String())
-
+	o.lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
 	return root, nil
 }
 
