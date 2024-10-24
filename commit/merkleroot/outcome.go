@@ -12,6 +12,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -168,9 +170,10 @@ func buildReport(
 			MerkleRoot    cciptypes.Bytes32
 			OnRampAddress string
 		}
+
 		signedRoots := mapset.NewSet[rootKey]()
 		for _, laneUpdate := range q.RMNSignatures.LaneUpdates {
-			signedRoots.Add(rootKey{
+			rk := rootKey{
 				ChainSel: cciptypes.ChainSelector(laneUpdate.LaneSource.SourceChainSelector),
 				SeqNumsRange: cciptypes.NewSeqNumRange(
 					cciptypes.SeqNum(laneUpdate.ClosedInterval.MinMsgNr),
@@ -178,23 +181,30 @@ func buildReport(
 				),
 				MerkleRoot: cciptypes.Bytes32(laneUpdate.Root),
 				// NOTE: convert address into a comparable value for mapset.
-				OnRampAddress: string(laneUpdate.LaneSource.OnrampAddress),
-			})
+				OnRampAddress: typconv.AddressBytesToString(
+					laneUpdate.LaneSource.OnrampAddress,
+					laneUpdate.LaneSource.SourceChainSelector),
+			}
+
+			lggr.Infow("Found signed root", "root", rk)
+			signedRoots.Add(rk)
 		}
 
 		// Only report roots that are present in RMN signatures.
 		rootsToReport := make([]cciptypes.MerkleRootChain, 0)
 		for _, root := range roots {
-			if signedRoots.Contains(rootKey{
-				ChainSel:     root.ChainSel,
-				SeqNumsRange: root.SeqNumsRange,
-				MerkleRoot:   root.MerkleRoot,
-				// NOTE: convert address into a comparable value for mapset.
-				OnRampAddress: string(root.OnRampAddress),
-			}) {
+			rk := rootKey{
+				ChainSel:      root.ChainSel,
+				SeqNumsRange:  root.SeqNumsRange,
+				MerkleRoot:    root.MerkleRoot,
+				OnRampAddress: typconv.AddressBytesToString(root.OnRampAddress, uint64(root.ChainSel)),
+			}
+
+			if signedRoots.Contains(rk) {
+				lggr.Infow("Root is signed, appending to the report", "root", rk)
 				rootsToReport = append(rootsToReport, root)
 			} else {
-				lggr.Warnw("skipping merkle root not signed by RMN", "root", root)
+				lggr.Warnw("Root not signed, skipping from the report", "root", rk)
 			}
 		}
 		roots = rootsToReport
