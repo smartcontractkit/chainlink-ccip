@@ -61,7 +61,7 @@ pipelines:
   deploy:
     run: |-
       run_dependency_pipelines redpanda
-      create_deployments beholder-test-client beholder-otel-collector-agent-2 beholder-otel-collector-gateway-2
+      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
 
 deployments:
   beholder-test-client:
@@ -146,100 +146,6 @@ deployments:
             app: beholder-load-tester
 
 
-  beholder-otel-collector-agent-2:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      releaseName: beholder-otel-collector-agent
-      displayOutput: true
-      chart:
-        name: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/otel-resources"
-        version: "0.68.4"
-      values:
-        daemonset:
-          enabled: false
-        deployment:
-          enabled: false
-        image:
-          registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
-          repository: otelcol-cll-k8s
-        opentelemetry-operator:
-          enabled: false
-        sidecar:
-          config:
-            exporters:
-              otlp:
-                protocols:
-                  grpc:
-                    endpoint: 0.0.0.0:4317
-                  http:
-                    endpoint: 0.0.0.0:4318
-              otlphttp:
-                endpoint: beholder-otel-collector-gateway:4317
-                tls:
-                  insecure: true
-            extensions:
-              health_check/1:
-                check_collector_pipeline:
-                  enabled: true
-                  exporter_failure_threshold: 3
-                  interval: 1m
-                endpoint: 0.0.0.0:13133
-                path: /health/status
-            processors:
-              batch:
-                send_batch_size: 512
-                timeout: 5s
-              memory_limiter:
-                check_interval: 5s
-                limit_mib: 120
-                spike_limit_mib: 30
-            receivers:
-              otlp:
-                protocols:
-                  grpc:
-                    endpoint: 0.0.0.0:4317
-                  http:
-                    endpoint: 0.0.0.0:4318
-            service:
-              pipelines:
-                logs:
-                  exporters:
-                    - debug
-                    - otlphttp
-                  processors:
-                    - resource
-                    - memory_limiter
-                    - batch
-                  receivers:
-                    - otlp
-                metrics:
-                  exporters:
-                    - debug
-                    - otlphttp
-                  processors:
-                    - resource
-                    - memory_limiter
-                    - batch
-                  receivers:
-                    - otlp
-                traces:
-                  exporters:
-                    - debug
-                    - otlphttp
-                  processors:
-                    - resource
-                    - memory_limiter
-                    - batch
-                  receivers:
-                    - otlp
-              telemetry:
-                logs:
-                  level: "debug"
-          enabled: true
-
-
-
   beholder-otel-collector-agent:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
@@ -275,7 +181,7 @@ deployments:
             debug:
               verbosity: detailed
             otlp:
-              endpoint: beholder-otel-collector-gateway:4317
+              endpoint: deployment-collector:4317
               tls:
                 insecure: true
           service:
@@ -326,91 +232,8 @@ deployments:
       releaseName: beholder-otel-collector-gateway
       displayOutput: true
       chart:
-        name: opentelemetry-collector
-        repo: https://open-telemetry.github.io/opentelemetry-helm-charts
-        version: "0.101.2"
-      values:
-        fullnameOverride: beholder-otel-collector-gateway
-        mode: deployment
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsUser: 1001
-          runAsNonRoot: true
-          capabilities:
-            drop:
-              - ALL
-        image:
-          repository: otel/opentelemetry-collector
-          tag: 0.106.1
-        ports:
-          prometheus:
-            enabled: true
-            containerPort: 8889
-            servicePort: 8889
-            hostPort: 8889
-            protocol: TCP
-          metrics:
-            enabled: true
-        config:
-          receivers:
-            otlp:
-              protocols:
-                grpc:
-                  endpoint: 0.0.0.0:4317
-                http:
-                  endpoint: 0.0.0.0:4318
-            prometheus:
-              config:
-                scrape_configs:
-                  - job_name: "otel-collector"
-                    scrape_interval: 5s
-                    static_configs:
-                      - targets: ["127.0.0.1:8888"]
-                  - job_name: "beholder-demo"
-                    scrape_interval: 5s
-                    static_configs:
-                      - targets: ["beholder-test-client:9091"]
-          exporters:
-            debug:
-              verbosity: detailed
-            kafka:
-              brokers:
-                - redpanda:9093
-              topic: beholder-test-client
-              encoding: otlp_json
-            prometheus:
-              endpoint: "0.0.0.0:8889"
-          service:
-            telemetry:
-              logs:
-                level: "debug"
-            pipelines:
-              traces:
-                receivers: [otlp]
-                exporters: [debug, kafka]
-              metrics:
-                receivers: [otlp, prometheus]
-                exporters: [debug, kafka, prometheus]
-              logs:
-                receivers: [otlp]
-                exporters: [debug, kafka]
-        serviceMonitor:
-          enabled: true
-          metricsEndpoints:
-            - port: metrics
-              interval: 1s
-          extraLabels:
-            release: prometheus
-
-  beholder-otel-collector-gateway-2:
-    updateImageTags: false
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      releaseName: beholder-otel-collector-gateway
-      displayOutput: true
-      chart:
         name: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/otel-resources"
-        version: "0.68.4"
+        version: "0.68.5-preview-1697-c7e6bc6"
       values:
         daemonset:
           enabled: false
@@ -420,17 +243,10 @@ deployments:
               beholder_kafka:
                 brokers:
                   - redpanda:9093
+                schema_registry_url: http://redpanda:8081
                 exporter_topic: beholder-test-client
-                encoding: otlp_json
               debug:
                 verbosity: detailed
-              health_check: null
-              health_check/1:
-                check_collector_pipeline: null
-                endpoint: 0.0.0.0:13133
-                path: /health/status
-              pprof:
-                endpoint: 0.0.0.0:1777
             processors:
               batch:
                 send_batch_size: 512
@@ -461,9 +277,6 @@ deployments:
                   http:
                     endpoint: 0.0.0.0:4318
             service:
-              extensions:
-                - health_check/1
-                - pprof
               pipelines:
                 logs:
                   exporters:
@@ -472,7 +285,7 @@ deployments:
                   processors:
                     - batch
                   receivers:
-                    - otlp/auth
+                    - otlp
                 metrics:
                   exporters:
                     - debug
@@ -480,14 +293,14 @@ deployments:
                   processors:
                     - batch
                   receivers:
-                    - otlp/auth
+                    - otlp
                 traces:
                   exporters:
                     - debug
                   processors:
                     - batch
                   receivers:
-                    - otlp/auth
+                    - otlp
               telemetry:
                 metrics:
                   address: 0.0.0.0:8888
@@ -503,29 +316,12 @@ deployments:
           tag: d8248682187c21d4609b57b778f8b7c17306f0aa
         opentelemetry-operator:
           enabled: false
-          kubeRBACProxy:
-            enabled: true
-            image:
-              repository: 637423271652.dkr.ecr.us-west-2.amazonaws.com/quay-io/brancz/kube-rbac-proxy
-          manager:
-            collectorImage:
-              repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-gateway-otel-collector
-              tag: 76e023194a9ad7104b563e92d4b6da4bd00c878b
-            image:
-              repository: 637423271652.dkr.ecr.us-west-2.amazonaws.com/docker-io/otel/opentelemetry-operator
-            resources:
-              limits:
-                cpu: "1"
-                memory: 1Gi
-              requests:
-                cpu: 500m
-                memory: 256Mi
-          testFramework:
-            image:
-              repository: 637423271652.dkr.ecr.us-west-2.amazonaws.com/docker-io/busybox
         sidecar:
           enabled: false
-
+        clusterRole:
+          enabled: false
+        clusterRoleBinding:
+          enabled: false
 
 profiles:
   - name: kind
