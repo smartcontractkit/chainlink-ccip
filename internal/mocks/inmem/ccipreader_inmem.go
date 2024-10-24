@@ -2,7 +2,7 @@ package inmem
 
 import (
 	"context"
-
+	"math/big"
 	"time"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
@@ -126,6 +126,15 @@ func (r InMemoryCCIPReader) GetAvailableChainsFeeComponents(
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	panic("implement me")
 }
+
+func (r InMemoryCCIPReader) GetDestChainFeeComponents(_ context.Context) (types.ChainFeeComponents, error) {
+	feeComponents := types.ChainFeeComponents{
+		ExecutionFee:        big.NewInt(0),
+		DataAvailabilityFee: big.NewInt(0),
+	}
+	return feeComponents, nil
+}
+
 func (r InMemoryCCIPReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,

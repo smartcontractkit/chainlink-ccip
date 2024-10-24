@@ -140,6 +140,7 @@ func (p PluginFactory) NewReportingPlugin(
 		false, // TODO: enable
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
+		p.estimateProvider,
 	)
 
 	return NewPlugin(

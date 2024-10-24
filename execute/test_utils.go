@@ -297,6 +297,7 @@ func newNode(
 		true,
 		ccipReader,
 		cfg.RelativeBoostPerWaitHour,
+		ep,
 	)
 
 	node1 := NewPlugin(
