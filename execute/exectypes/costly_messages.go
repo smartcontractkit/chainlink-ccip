@@ -24,23 +24,36 @@ type CostlyMessageObserver interface {
 	) ([]cciptypes.Bytes32, error)
 }
 
-func NewCostlyMessageObserver(
+func NewCostlyMessageObserverWithZeroExec(
 	lggr logger.Logger,
 	enabled bool,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 ) CostlyMessageObserver {
-	return &CCIPCostlyMessageObserver{
-		lggr:    lggr,
-		enabled: enabled,
-		feeCalculator: &CCIPMessageFeeUSD18Calculator{
+	return NewCostlyMessageObserver(
+		lggr,
+		enabled,
+		&CCIPMessageFeeUSD18Calculator{
 			lggr:                     lggr,
 			ccipReader:               ccipReader,
 			relativeBoostPerWaitHour: relativeBoostPerWaitHour,
 			now:                      time.Now,
 		},
-		// TODO: Implement exec cost calculator
-		execCostCalculator: &ZeroMessageExecCostUSD18Calculator{},
+		&ZeroMessageExecCostUSD18Calculator{},
+	)
+}
+
+func NewCostlyMessageObserver(
+	lggr logger.Logger,
+	enabled bool,
+	feeCalculator MessageFeeE18USDCalculator,
+	execCostCalculator MessageExecCostUSD18Calculator,
+) CostlyMessageObserver {
+	return &CCIPCostlyMessageObserver{
+		lggr:               lggr,
+		enabled:            enabled,
+		feeCalculator:      feeCalculator,
+		execCostCalculator: execCostCalculator,
 	}
 }
 
@@ -206,6 +219,10 @@ func (n *StaticMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	return messageExecCosts, nil
 }
 
+func (n *StaticMessageExecCostUSD18Calculator) UpdateCosts(msgID cciptypes.Bytes32, fee plugintypes.USD18) {
+	n.costs[msgID] = fee
+}
+
 var _ MessageExecCostUSD18Calculator = &StaticMessageExecCostUSD18Calculator{}
 
 // CCIPMessageFeeUSD18Calculator calculates the fees (paid at source) of a set of messages in USD18s.
@@ -220,6 +237,20 @@ type CCIPMessageFeeUSD18Calculator struct {
 	relativeBoostPerWaitHour float64
 
 	now func() time.Time
+}
+
+func NewCCIPMessageFeeUSD18Calculator(
+	lggr logger.Logger,
+	ccipReader readerpkg.CCIPReader,
+	relativeBoostPerWaitHour float64,
+	now func() time.Time,
+) *CCIPMessageFeeUSD18Calculator {
+	return &CCIPMessageFeeUSD18Calculator{
+		lggr:                     lggr,
+		ccipReader:               ccipReader,
+		relativeBoostPerWaitHour: relativeBoostPerWaitHour,
+		now:                      now,
+	}
 }
 
 var _ MessageFeeE18USDCalculator = &CCIPMessageFeeUSD18Calculator{}
@@ -247,6 +278,7 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
+		c.lggr.Infow("calculated fee for message", "messageID", msg.Header.MessageID, "feeUSD18", feeUSD18)
 		messageFees[msg.Header.MessageID] = feeUSD18
 	}
 
