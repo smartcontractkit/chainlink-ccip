@@ -234,6 +234,7 @@ func (n *StaticMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	return messageExecCosts, nil
 }
 
+// UpdateCosts updates the costs of the single message. Not thread-safe, meant to be used only for tests.
 func (n *StaticMessageExecCostUSD18Calculator) UpdateCosts(msgID cciptypes.Bytes32, cost plugintypes.USD18) {
 	n.costs[msgID] = cost
 }
