@@ -224,14 +224,14 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	if it.feeCalculator != nil {
 		feeCalculator = it.feeCalculator
 	} else {
-		feeCalculator = &exectypes.ZeroMessageFeeUSD18Calculator{}
+		feeCalculator = exectypes.NewZeroMessageFeeUSD18Calculator()
 	}
 
 	var execCostCalculator exectypes.MessageExecCostUSD18Calculator
 	if it.execCostCalculator != nil {
 		execCostCalculator = it.execCostCalculator
 	} else {
-		execCostCalculator = &exectypes.ZeroMessageExecCostUSD18Calculator{}
+		execCostCalculator = exectypes.NewZeroMessageExecCostUSD18Calculator()
 	}
 
 	costlyMessageObserver := exectypes.NewCostlyMessageObserver(

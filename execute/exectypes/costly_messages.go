@@ -24,7 +24,11 @@ type CostlyMessageObserver interface {
 	) ([]cciptypes.Bytes32, error)
 }
 
-func NewCostlyMessageObserverWithZeroExec(
+// NewCostlyMessageObserverWithDefaults creates a new CostlyMessageObserver with default calculators.
+// The default calculators are:
+// - CCIPMessageFeeUSD18Calculator
+// - ZeroMessageExecCostUSD18Calculator
+func NewCostlyMessageObserverWithDefaults(
 	lggr logger.Logger,
 	enabled bool,
 	ccipReader readerpkg.CCIPReader,
@@ -33,17 +37,19 @@ func NewCostlyMessageObserverWithZeroExec(
 	return NewCostlyMessageObserver(
 		lggr,
 		enabled,
-		&CCIPMessageFeeUSD18Calculator{
-			lggr:                     lggr,
-			ccipReader:               ccipReader,
-			relativeBoostPerWaitHour: relativeBoostPerWaitHour,
-			now:                      time.Now,
-		},
+		NewCCIPMessageFeeUSD18Calculator(
+			lggr,
+			ccipReader,
+			relativeBoostPerWaitHour,
+			time.Now,
+		),
 		// TODO: Implement exec cost calculator
-		&ZeroMessageExecCostUSD18Calculator{},
+		NewZeroMessageExecCostUSD18Calculator(),
 	)
 }
 
+// NewCostlyMessageObserver allows to specific feeCalculator and execCostCalculator.
+// Therefore, it's very convenient for testing.
 func NewCostlyMessageObserver(
 	lggr logger.Logger,
 	enabled bool,
@@ -121,6 +127,10 @@ type MessageFeeE18USDCalculator interface {
 // ZeroMessageFeeUSD18Calculator returns a fee of 0 for all messages.
 type ZeroMessageFeeUSD18Calculator struct{}
 
+func NewZeroMessageFeeUSD18Calculator() *ZeroMessageFeeUSD18Calculator {
+	return &ZeroMessageFeeUSD18Calculator{}
+}
+
 // MessageFeeUSD18 returns a fee of 0 for all messages.
 func (n *ZeroMessageFeeUSD18Calculator) MessageFeeUSD18(
 	_ context.Context,
@@ -144,6 +154,10 @@ type MessageExecCostUSD18Calculator interface {
 
 // ZeroMessageExecCostUSD18Calculator returns a cost of 0 for all messages.
 type ZeroMessageExecCostUSD18Calculator struct{}
+
+func NewZeroMessageExecCostUSD18Calculator() *ZeroMessageExecCostUSD18Calculator {
+	return &ZeroMessageExecCostUSD18Calculator{}
+}
 
 // MessageExecCostUSD18 returns a cost of 0 for all messages.
 func (n *ZeroMessageExecCostUSD18Calculator) MessageExecCostUSD18(
