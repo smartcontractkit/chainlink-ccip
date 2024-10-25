@@ -599,7 +599,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 				if req.GetReportSignatureRequest() == nil {
 					continue
 				}
-				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= homeF)
+				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= homeF+1)
 
 				aos := req.GetReportSignatureRequest().AttributedSignedObservations
 

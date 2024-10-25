@@ -176,12 +176,12 @@ func (c *controller) ComputeReportSignatures(
 
 	homeFMap, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
-		return nil, fmt.Errorf("get min observers: %w", err)
+		return nil, fmt.Errorf("get f: %w", err)
 	}
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
 	for chain, l := range updatesPerChain {
 		if _, exists := homeFMap[cciptypes.ChainSelector(chain)]; !exists {
-			return nil, fmt.Errorf("no min observers for chain %d", chain)
+			return nil, fmt.Errorf("no f for chain %d", chain)
 		}
 		if l.RmnNodes.Cardinality() < homeFMap[cciptypes.ChainSelector(chain)]+1 {
 			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
@@ -265,7 +265,7 @@ func (c *controller) getRmnSignedObservations(
 		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
 		homeF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exist {
-			return nil, fmt.Errorf("no min observers for chain %d", sourceChain)
+			return nil, fmt.Errorf("no f for chain %d", sourceChain)
 		}
 
 		for nodeID := range updateRequest.RmnNodes.Iter() {
@@ -473,7 +473,7 @@ func gotSufficientObservationResponses(
 		}
 		homeF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exists {
-			lggr.Errorw("no min observers for chain", "chain", sourceChain)
+			lggr.Errorw("no f for chain", "chain", sourceChain)
 			return false
 		}
 
@@ -721,7 +721,7 @@ func selectRoots(
 	for chain, votes := range votesPerRoot {
 		f, exists := homeFMap[chain]
 		if !exists {
-			return nil, fmt.Errorf("no min observers for chain %d", chain)
+			return nil, fmt.Errorf("no f for chain %d", chain)
 		}
 
 		var selectedRoot cciptypes.Bytes32
