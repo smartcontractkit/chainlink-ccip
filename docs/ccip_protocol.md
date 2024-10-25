@@ -1,25 +1,25 @@
 # Cross-Chain Interoperability Protocol (CCIP)
 
-A protocol designed to transfer data and value across blockchains in a trust
-minimized fashion. This is done using a combination of checks on the source
-chain(s), destination chains, and offchain security. This document describes
-the most important security considerations along with the messaging protocol
-at the data and event processing level. As this repository is for the off-chain
+A protocol designed to transfer data and value across blockchains in a
+trust-minimized manner. This is done using a combination of checks on the source
+chain(s), destination chains, and off-chain security. This document outlines
+key security considerations and details the messaging protocol at the data and
+event processing levels. As this repository is for the off-chain
 portion of CCIP, we'll focus on off-chain components and the on-chain
 integration points.
 
 The user interface is not described here. It is largely unchanged compared to
 the earlier architecture and the [public docoumentation][public-docs] provides
-an excellent guide for how to use CCIP.
+a comprehensive guide to using CCIP.
 
 ## OffChain Reporting (OCR)
 
 The [libOCR][ocr-repo] framework provides security to the system with a
 Distributed Oracle Network (DON) utilizing a [byzantine fault tolerant][bft]
-protocol. Security is assumed given the [Reporting Plugin][ocr-interface] built
-within this framework ensures observation thresholds on the data used by the
-system. See the [Consensus and Sub-consensus](consensus.md) page for more
-information about how the CCIP plugins use and extend this the typical OCR
+protocol. Security is enhanced by the [Reporting Plugin][ocr-interface] when
+the plugins ensure observation thresholds on data used by the system.
+See the [Consensus and Sub-consensus](consensus.md) page for more
+information about how the CCIP plugins use and extend the typical OCR
 framework.
 
 ## Plugins
@@ -35,8 +35,8 @@ are put into a [Commit Report][commit-report-src]. The report is sent to the
 on-chain code for final processing where a commit report log is written to the
 blockchain.
 
-An independant Risk Management Network (RMN) is used as a second layer of
-security to ensure the merkle roots are valid. RMN can be thought of as a
+An independant Risk Management Network (RMN) serves as an additional security
+layer to validate merkle roots. RMN can be thought of as a
 validation network with veto power. In the previous version of CCIP RMN was
 an independent component which provided a blessing or curse after the commit
 report was written to the network. With this architecture the plugin queries
@@ -52,8 +52,8 @@ More detail about the implementation can be found in the [README](commit#readme)
 ### Execute
 
 In the execute phase, the plugin searches for commit reports with pending
-executions. All messages for these commit reports are gathered and a
-[special merkle proof][merklemulti] is computed for all messsages ready for
+executions. All messages for these commit reports are gathered, and a
+[special merkle proof][merklemulti] is computed for all messages ready for
 execution. These proofs are put into the [Execute Plugin Report][exec-report-src].
 
 Due to the [Role DON](consensus.md#role-don) architecture, this
@@ -64,7 +64,7 @@ process has to be done across several rounds of consensus:
 3. Based on the messages, the destination reader determines execution order.
 
 The commit report is sent to the on-chain code for final processing. This
-includes all token transfers, data handling and user contract interaction.
+step includes token transfers, data handling and user contract interaction.
 
 [public-docs]: https://docs.chain.link/ccip
 [ocr-repo]: https://github.com/smartcontractkit/libocr/tree/master
