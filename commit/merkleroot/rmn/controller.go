@@ -183,7 +183,7 @@ func (c *controller) ComputeReportSignatures(
 		if _, exists := homeFMap[cciptypes.ChainSelector(chain)]; !exists {
 			return nil, fmt.Errorf("no min observers for chain %d", chain)
 		}
-		if l.RmnNodes.Cardinality() < homeFMap[cciptypes.ChainSelector(chain)] {
+		if l.RmnNodes.Cardinality() < homeFMap[cciptypes.ChainSelector(chain)]+1 {
 			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
 				"chain", chain,
 				"homeFMap", homeFMap[cciptypes.ChainSelector(chain)],
@@ -260,7 +260,7 @@ func (c *controller) getRmnSignedObservations(
 	requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
 	// For each lane update request send an observation request to at most 'f' number of rmn nodes.
-	// At this point we can safely assume that we have at least #f supporting each source chain.
+	// At this point we can safely assume that we have at least f+1 supporting each source chain.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
 		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
 		homeF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
@@ -269,7 +269,7 @@ func (c *controller) getRmnSignedObservations(
 		}
 
 		for nodeID := range updateRequest.RmnNodes.Iter() {
-			if requestedNodes[sourceChain].Cardinality() >= homeF {
+			if requestedNodes[sourceChain].Cardinality() >= homeF+1 {
 				break // We have enough initial observers for this source chain.
 			}
 
@@ -466,7 +466,7 @@ func gotSufficientObservationResponses(
 	}
 
 	for sourceChain := range updateRequests {
-		// make sure we got at least #f observing the same merkle root for a target chain.
+		// make sure we got at least f+1 observing the same merkle root for a target chain.
 		countsPerRoot, ok := merkleRootsCount[sourceChain]
 		if !ok || len(countsPerRoot) == 0 {
 			return false
@@ -479,7 +479,7 @@ func gotSufficientObservationResponses(
 
 		values := maps.Values(countsPerRoot)
 		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if values[len(values)-1] < homeF {
+		if values[len(values)-1] < homeF+1 {
 			return false
 		}
 	}
@@ -569,7 +569,7 @@ func (c *controller) getRmnReportSignatures(
 	// from the same node.
 	//
 	// e.g.
-	// The following nodes support the following chains and f=2:
+	// The following nodes support the following chains and f=1:
 	// node1: [1]	node2:[1,2,3]	node3:[1,2,3]
 	//
 	// node1: getObservations(1)          ->             never_responds
@@ -582,7 +582,7 @@ func (c *controller) getRmnReportSignatures(
 
 	homeF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
-		return nil, fmt.Errorf("get min observers: %w", err)
+		return nil, fmt.Errorf("get remote f: %w", err)
 	}
 
 	rootsPerChain, err := selectRoots(rmnSignedObservations, homeF)
@@ -727,7 +727,7 @@ func selectRoots(
 		var selectedRoot cciptypes.Bytes32
 
 		for root, vote := range votes {
-			if vote < f {
+			if vote < f+1 {
 				continue
 			}
 
@@ -747,7 +747,7 @@ func selectRoots(
 	return selectedRoots, nil
 }
 
-// sendReportSignatureRequest sends the report signature request to #remoteF random RMN nodes.
+// sendReportSignatureRequest sends the report signature request to #remoteF+1 random RMN nodes.
 // If not enough requests were sent, it returns an error.
 func (c *controller) sendReportSignatureRequest(
 	reportSigReq *rmnpb.ReportSignatureRequest,
@@ -759,9 +759,9 @@ func (c *controller) sendReportSignatureRequest(
 	requestIDs = mapset.NewSet[uint64]()
 	signersRequested = mapset.NewSet[rmntypes.NodeID]()
 
-	// Send the report signature request to at least #remoteF
+	// Send the report signature request to at least #remoteF+1
 	for _, node := range randomShuffle(remoteSigners) {
-		if requestIDs.Cardinality() >= remoteF {
+		if requestIDs.Cardinality() >= remoteF+1 {
 			break
 		}
 
@@ -790,7 +790,7 @@ func (c *controller) sendReportSignatureRequest(
 		signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
 	}
 
-	if requestIDs.Cardinality() < remoteF {
+	if requestIDs.Cardinality() < remoteF+1 {
 		return requestIDs, signersRequested, fmt.Errorf("not able to send to enough report signers")
 	}
 	return requestIDs, signersRequested, nil
@@ -841,7 +841,7 @@ func (c *controller) listenForRmnReportSignatures(
 				reportSigs = append(reportSigs, *reportSig)
 			}
 
-			if len(reportSigs) >= remoteF {
+			if len(reportSigs) >= remoteF+1 {
 				c.lggr.Infof("got enough RMN report signatures")
 				return sortAndParseReportSigs(reportSigs), nil
 			}

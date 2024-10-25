@@ -69,8 +69,20 @@ func Test_selectRoots(t *testing.T) {
 		expRoots     map[cciptypes.ChainSelector]cciptypes.Bytes32
 	}{
 		{
-			name: "happy path",
+			name: "happy path f+1 observations",
 			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
 				{
 					SignedObservation: &rmnpb.SignedObservation{
 						Observation: &rmnpb.Observation{
@@ -88,6 +100,25 @@ func Test_selectRoots(t *testing.T) {
 			expRoots: map[cciptypes.ChainSelector]cciptypes.Bytes32{
 				chainS1: root1,
 			},
+		},
+		{
+			name: "f observations instead of minimum f+1",
+			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+			},
+			homeF:  map[cciptypes.ChainSelector]int{chainS1: 1},
+			expErr: true,
 		},
 		{
 			name: "zero valid roots",
@@ -128,8 +159,20 @@ func Test_selectRoots(t *testing.T) {
 			expErr: true,
 		},
 		{
-			name: "more than one roots but one of them less than f",
+			name: "more than one roots but one of them less than f+1",
 			observations: []rmnSignedObservationWithMeta{
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
 				{
 					SignedObservation: &rmnpb.SignedObservation{
 						Observation: &rmnpb.Observation{
@@ -194,6 +237,18 @@ func Test_selectRoots(t *testing.T) {
 								{
 									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
 									Root:       root1[:],
+								},
+							},
+						},
+					},
+				},
+				{
+					SignedObservation: &rmnpb.SignedObservation{
+						Observation: &rmnpb.Observation{
+							FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+								{
+									LaneSource: &rmnpb.LaneSource{SourceChainSelector: uint64(chainS1)},
+									Root:       root2[:],
 								},
 							},
 						},
@@ -366,7 +421,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F))
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F+1))
 		// Make sure signature are in ascending signer address order
 		for i := 1; i < len(sigs.Signatures); i++ {
 			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
@@ -416,7 +471,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F))
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F+1))
 	})
 }
 
