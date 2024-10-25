@@ -247,7 +247,7 @@ func (c *controller) Close() error {
 	return c.peerClient.Close()
 }
 
-// getRmnSignedObservations guarantees to return at least f signed observations for each source chain.
+// getRmnSignedObservations guarantees to return at least f+1 signed observations for each source chain.
 func (c *controller) getRmnSignedObservations(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
@@ -259,7 +259,7 @@ func (c *controller) getRmnSignedObservations(
 	requestedNodes := make(map[uint64]mapset.Set[rmntypes.NodeID])                   // sourceChain -> requested rmnNodeIDs
 	requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
-	// For each lane update request send an observation request to at most 'f' number of rmn nodes.
+	// For each lane update request send an observation request to at most 'f+1' number of rmn nodes.
 	// At this point we can safely assume that we have at least f+1 supporting each source chain.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
 		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
