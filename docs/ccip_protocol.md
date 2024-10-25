@@ -43,9 +43,10 @@ report was written to the network. With this architecture the plugin queries
 the RMN network directly so that the RMN signatures can be included in the
 initial report.
 
-The report includes additional gas and token price data required by the billing
-algorithm. Strictly speaking, it is not part of the protocol and could be
-implemented separately. For convenience it is included in the commit plugin.
+The report includes additional gas and token price data required by the
+[billing algorithm](billing.md). Strictly speaking, it is not part of the
+protocol and could be implemented separately. For convenience it is included in
+the commit plugin.
 
 More detail about the implementation can be found in the [README](commit#readme).
 
