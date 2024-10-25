@@ -1,11 +1,5 @@
 version: v2beta1
 
-vars:
-  ECR_BASE_URL:
-    source: env
-    default: "804282218731.dkr.ecr.us-west-2.amazonaws.com"
-
-
 dependencies:
   prometheus:
     path: ${DEPENDENCIES_DIR}/prometheus
@@ -78,8 +72,11 @@ deployments:
           fsGroup: 999
 
         beholder-test-client:
+          image:
+            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-test-client
+            tag: qa-latest
           args:
-            - -otel-exporter-grpc-enpoint
+            - -otel-exporter-grpc-endpoint
             - beholder-otel-collector-agent:4317
 
   beholder-load-tester:
@@ -233,7 +230,7 @@ deployments:
       displayOutput: true
       chart:
         name: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/otel-resources"
-        version: "0.68.5-preview-1697-c7e6bc6"
+        version: "0.68.5"
       values:
         daemonset:
           enabled: false
@@ -243,8 +240,9 @@ deployments:
               beholder_kafka:
                 brokers:
                   - redpanda:9093
+                kafka_sasl_password: ""
+                kafka_sasl_username: ""
                 schema_registry_url: http://redpanda:8081
-                exporter_topic: beholder-test-client
               debug:
                 verbosity: detailed
             processors:
@@ -289,7 +287,7 @@ deployments:
                 metrics:
                   exporters:
                     - debug
-                    - otlphttp
+#                    - otlphttp
                   processors:
                     - batch
                   receivers:
@@ -310,12 +308,47 @@ deployments:
           env:
             - name: BEHOLDER_EXPORTER_TOPIC
               value: beholder-test-client
+            - name: KAFKA_SASL_MECHANISM
+              value: PLAINTEXT
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
         image:
           registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
           repository: atlas-beholder-gateway-otel-collector
-          tag: d8248682187c21d4609b57b778f8b7c17306f0aa
+          tag: qa-latest
         opentelemetry-operator:
-          enabled: false
+          # -- Global flag to enable install of the OpenTelemetry Operator
+          enabled: true
+          manager:
+            featureGates: '+operator.observability.prometheus'
+            ## Enable ServiceMonitor for Prometheus metrics scrape
+            serviceMonitor:
+              enabled: true
+              # Additional labels on the ServiceMonitor
+              extraLabels: { }
+              # Add annotations on the ServiceMonitor
+              annotations: { }
+              # Define metrics port
+              metricsEndpoints:
+                - port: metrics
+            collectorImage:
+              repository: otel/opentelemetry-collector-contrib
+            image:
+              repository: otel/opentelemetry-operator
+            resources:
+              limits:
+                # -- Number of CPUs Manager is allowed to use
+                cpu: '1'
+                # -- Amount of memory Manager is allowed to use
+                memory: 1Gi
+              requests:
+                # -- Number of CPUs Manager will request on start
+                cpu: 500m
+                # -- Amount of memory Manager will request on start
+                memory: 256Mi
         sidecar:
           enabled: false
         clusterRole:

@@ -9,6 +9,7 @@ pipelines:
   deploy:
     run: |-
       create_deployments redpanda
+      create_deployments register-schema-job
 
 deployments:
   redpanda:
@@ -84,6 +85,15 @@ deployments:
         tuning:
           tune_aio_events: false
         console:
+          config:
+            kafka:
+              protobuf:
+                enabled: true
+                schemaRegistry:
+                  # Enable Schema Registry for Protobuf deserialization.
+                  enabled: true
+                  # Interval to refresh schemas from the Schema Registry.
+                  refreshInterval: 5m
           ingress:
             enabled: true
             className: "alb"
@@ -99,3 +109,10 @@ deployments:
                 paths:
                   - path: /
                     pathType: Prefix
+
+  register-schema-job:
+    namespace: ${DEVSPACE_NAMESPACE}
+    kubectl:
+      manifests:
+        - ./k8s/register-schema-config-map.yaml
+        - ./k8s/register-schema-job.yaml

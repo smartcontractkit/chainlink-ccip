@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: schema-config
+data:
+  example.proto: |
+    "syntax = \"proto3\";\npackage pb;\n\noption go_package = \"github.com/smartcontractkit/chainlink-common/pkg/beholder/pb\";\n\nmessage TestCustomMessage {\n  bool bool_val = 1;\n  int64 int_val = 2;\n  float float_val = 3;\n  string string_val = 4;\n  bytes bytes_val = 5;\n}"
