@@ -220,8 +220,8 @@ func (n *StaticMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	return messageExecCosts, nil
 }
 
-func (n *StaticMessageExecCostUSD18Calculator) UpdateCosts(msgID cciptypes.Bytes32, fee plugintypes.USD18) {
-	n.costs[msgID] = fee
+func (n *StaticMessageExecCostUSD18Calculator) UpdateCosts(msgID cciptypes.Bytes32, cost plugintypes.USD18) {
+	n.costs[msgID] = cost
 }
 
 var _ MessageExecCostUSD18Calculator = &StaticMessageExecCostUSD18Calculator{}
