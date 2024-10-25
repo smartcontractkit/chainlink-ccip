@@ -37,8 +37,8 @@ type RMNHome interface {
 	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.HomeNodeInfo, error)
 	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
 	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool
-	// GetMinObservers gets the minimum number of observers required for each chain in the given configDigest
-	GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
+	// GetF gets the F value for each source chain in the given configDigest
+	GetF(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
 	// GetAllConfigDigests gets the active and candidate RMNHomeConfigs
@@ -193,14 +193,14 @@ func (r *rmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32)
 	return ok
 }
 
-func (r *rmnHomePoller) GetMinObservers(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error) {
+func (r *rmnHomePoller) GetF(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
 	if !ok {
 		return nil, fmt.Errorf("configDigest %s not found in RMNHomeConfig", configDigest)
 	}
-	return r.rmnHomeState.rmnHomeConfig[configDigest].SourceChainMinObservers, nil
+	return r.rmnHomeState.rmnHomeConfig[configDigest].SourceChainF, nil
 }
 
 func (r *rmnHomePoller) GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error) {
@@ -292,10 +292,10 @@ func convertOnChainConfigToRMNHomeChainConfig(
 			}
 		}
 
-		minObservers := make(map[cciptypes.ChainSelector]int)
+		homeFMap := make(map[cciptypes.ChainSelector]int)
 
 		for _, chain := range versionedConfig.DynamicConfig.SourceChains {
-			minObservers[chain.ChainSelector] = int(chain.MinObservers)
+			homeFMap[chain.ChainSelector] = int(chain.F)
 			for j := 0; j < len(nodes); j++ {
 				isObserver, err := IsNodeObserver(chain, j, len(nodes))
 				if err != nil {
@@ -309,10 +309,10 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		}
 
 		rmnHomeConfigs[versionedConfig.ConfigDigest] = rmntypes.HomeConfig{
-			Nodes:                   nodes,
-			SourceChainMinObservers: minObservers,
-			ConfigDigest:            versionedConfig.ConfigDigest,
-			OffchainConfig:          versionedConfig.DynamicConfig.OffchainConfig,
+			Nodes:          nodes,
+			SourceChainF:   homeFMap,
+			ConfigDigest:   versionedConfig.ConfigDigest,
+			OffchainConfig: versionedConfig.DynamicConfig.OffchainConfig,
 		}
 	}
 	return rmnHomeConfigs
@@ -379,7 +379,7 @@ type Node struct {
 // SourceChain mirrors RMNHome.sol's SourceChain struct
 type SourceChain struct {
 	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
-	MinObservers        uint64                  `json:"minObservers"`
+	F                   uint64                  `json:"f"` // previously: MinObservers
 	ObserverNodesBitmap *big.Int                `json:"observerNodesBitmap"`
 }
 

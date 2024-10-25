@@ -52,7 +52,7 @@ type testSetup struct {
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest
 	rmnHomeMock    *readerpkg_mock.MockRMNHome
 	remoteRMNCfg   rmntypes.RemoteConfig
-	minObservers   int
+	homeF          int
 	rmnNodes       []rmntypes.HomeNodeInfo
 }
 
@@ -64,7 +64,7 @@ func Test_selectRoots(t *testing.T) {
 	testCases := []struct {
 		name         string
 		observations []rmnSignedObservationWithMeta
-		minObservers map[cciptypes.ChainSelector]int
+		homeF        map[cciptypes.ChainSelector]int
 		expErr       bool
 		expRoots     map[cciptypes.ChainSelector]cciptypes.Bytes32
 	}{
@@ -84,7 +84,7 @@ func Test_selectRoots(t *testing.T) {
 					},
 				},
 			},
-			minObservers: map[cciptypes.ChainSelector]int{chainS1: 1},
+			homeF: map[cciptypes.ChainSelector]int{chainS1: 1},
 			expRoots: map[cciptypes.ChainSelector]cciptypes.Bytes32{
 				chainS1: root1,
 			},
@@ -105,8 +105,8 @@ func Test_selectRoots(t *testing.T) {
 					},
 				},
 			},
-			minObservers: map[cciptypes.ChainSelector]int{chainS1: 2}, // <-----
-			expErr:       true,
+			homeF:  map[cciptypes.ChainSelector]int{chainS1: 2}, // <-----
+			expErr: true,
 		},
 		{
 			name: "observers not defined",
@@ -124,8 +124,8 @@ func Test_selectRoots(t *testing.T) {
 					},
 				},
 			},
-			minObservers: map[cciptypes.ChainSelector]int{}, // <-------
-			expErr:       true,
+			homeF:  map[cciptypes.ChainSelector]int{}, // <-------
+			expErr: true,
 		},
 		{
 			name: "more than one roots but one of them less than f",
@@ -167,7 +167,7 @@ func Test_selectRoots(t *testing.T) {
 					},
 				},
 			},
-			minObservers: map[cciptypes.ChainSelector]int{chainS1: 2},
+			homeF: map[cciptypes.ChainSelector]int{chainS1: 2},
 			expRoots: map[cciptypes.ChainSelector]cciptypes.Bytes32{
 				chainS1: root1,
 			},
@@ -212,14 +212,14 @@ func Test_selectRoots(t *testing.T) {
 					},
 				},
 			},
-			minObservers: map[cciptypes.ChainSelector]int{chainS1: 1},
-			expErr:       true,
+			homeF:  map[cciptypes.ChainSelector]int{chainS1: 1},
+			expErr: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			roots, err := selectRoots(tc.observations, tc.minObservers)
+			roots, err := selectRoots(tc.observations, tc.homeF)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
@@ -278,7 +278,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		rmnRemoteCfg := rmntypes.RemoteConfig{
 			ContractAddress: []byte{1, 2, 3},
 			ConfigDigest:    cciptypes.Bytes32{0x1, 0x2, 0x3},
-			MinSigners:      2,
+			F:               2,
 			Signers: []rmntypes.RemoteSignerInfo{
 				{
 					OnchainPublicKey: []byte{1, 2, 3},
@@ -311,7 +311,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			updateRequests: updateRequests,
 			rmnHomeMock:    rmnHomeReaderMock,
 			remoteRMNCfg:   rmnRemoteCfg,
-			minObservers:   2,
+			homeF:          2,
 			rmnNodes:       rmnNodes,
 		}
 	}
@@ -324,7 +324,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	t.Run("empty lane update request", func(t *testing.T) {
 		ts := newTestSetup(t)
 
-		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
@@ -342,18 +342,18 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts := newTestSetup(t)
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
-		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2, chainD1: 2}, nil)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.peerClient, ts.minObservers)
+				ts.peerClient, ts.homeF)
 
 			ts.nodesRespondToTheObservationRequests(
 				ts.peerClient, requestIDs, requestedChains, ts.remoteRMNCfg.ConfigDigest, destChain)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.peerClient, int(ts.remoteRMNCfg.MinSigners),
-				ts.minObservers)
+				t, ts.peerClient, int(ts.remoteRMNCfg.F),
+				ts.homeF)
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
@@ -366,7 +366,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.MinSigners))
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F))
 		// Make sure signature are in ascending signer address order
 		for i := 1; i < len(sigs.Signatures); i++ {
 			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
@@ -381,23 +381,23 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnController.reportsInitialRequestTimerDuration = time.Nanosecond
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
-		ts.rmnHomeMock.On("GetMinObservers", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
-				ts.peerClient, ts.minObservers)
+				ts.peerClient, ts.homeF)
 
 			// requests should be sent to at least two nodes
-			assert.GreaterOrEqual(t, len(requestIDs), ts.minObservers)
-			assert.GreaterOrEqual(t, len(requestedChains), ts.minObservers)
+			assert.GreaterOrEqual(t, len(requestIDs), ts.homeF)
+			assert.GreaterOrEqual(t, len(requestedChains), ts.homeF)
 
 			ts.nodesRespondToTheObservationRequests(
 				ts.peerClient, requestIDs, requestedChains, ts.remoteRMNCfg.ConfigDigest, destChain)
 			time.Sleep(time.Millisecond)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.peerClient, len(ts.remoteRMNCfg.Signers), ts.minObservers)
+				t, ts.peerClient, len(ts.remoteRMNCfg.Signers), ts.homeF)
 			time.Sleep(time.Millisecond)
 
 			t.Logf("requestIDs: %v", requestIDs)
@@ -416,13 +416,13 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.MinSigners))
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F))
 	})
 }
 
 func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockPeerClient,
-	minObservers int,
+	homeF int,
 ) (map[rmntypes.NodeID]uint64, map[rmntypes.NodeID]mapset.Set[uint64]) {
 	requestIDs := make(map[rmntypes.NodeID]uint64)
 	requestedChains := make(map[rmntypes.NodeID]mapset.Set[uint64])
@@ -438,7 +438,7 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 				}
 			}
 		}
-		if requestsPerChain[uint64(chainS1)] >= minObservers && requestsPerChain[uint64(chainS2)] >= minObservers {
+		if requestsPerChain[uint64(chainS1)] >= homeF && requestsPerChain[uint64(chainS2)] >= homeF {
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
@@ -521,12 +521,12 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 	t *testing.T,
 	rmnClient *mockPeerClient,
 	expectedResponses int,
-	minObservers int,
+	homeF int,
 ) map[rmntypes.NodeID]uint64 {
 	requestIDs := make(map[rmntypes.NodeID]uint64)
 	// plugin now has received the observation responses and should send
 	// the report requests to the nodes, wait for them to be received by the nodes
-	// should a total of minSigners requests each one containing the observation requests
+	// should a total of #remoteF requests each one containing the observation requests
 	for {
 		time.Sleep(time.Millisecond)
 
@@ -542,7 +542,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 				if req.GetReportSignatureRequest() == nil {
 					continue
 				}
-				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= minObservers)
+				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= homeF)
 
 				aos := req.GetReportSignatureRequest().AttributedSignedObservations
 

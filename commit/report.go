@@ -16,8 +16,8 @@ import (
 // ReportInfo is the info data that will be sent with the along with the report
 // It will be used to determine if the report should be accepted or not
 type ReportInfo struct {
-	// MinSigners is the minimum number of RMN signatures required for the report to be accepted
-	MinSigners uint64 `json:"minSigners"`
+	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
+	RemoteF uint64 `json:"remoteF"`
 }
 
 func (ri ReportInfo) Encode() ([]byte, error) {
@@ -68,7 +68,7 @@ func (p *Plugin) Reports(
 
 	// Prepare the info data
 	reportInfo := ReportInfo{
-		MinSigners: outcome.MerkleRootOutcome.RMNRemoteCfg.MinSigners,
+		RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F,
 	}
 
 	// Serialize reportInfo to []byte
@@ -104,9 +104,9 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
-		len(decodedReport.RMNSignatures) < int(reportInfo.MinSigners) {
+		len(decodedReport.RMNSignatures) < int(reportInfo.RemoteF) {
 		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
-			len(decodedReport.RMNSignatures), reportInfo.MinSigners)
+			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, nil
 	}
 
