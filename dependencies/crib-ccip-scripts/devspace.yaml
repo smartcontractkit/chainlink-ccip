@@ -82,5 +82,4 @@ profiles:
           helm:
             values:
               waitForJob: false
-            valuesFiles:
-              ["./values-profiles/values-dev-eks-bix-ship-ccip-scripts.yaml"]
+              enabled: false

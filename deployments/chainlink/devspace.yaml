@@ -279,23 +279,26 @@ profiles:
     parents:
       - profile: ccip
     patches:
-      - op: replace
+      - op: add
         path: dependencies.crib-chainlink-cluster.profiles
-        value:
-          - ccip-eks-bix-ship
-      - op: replace
+        value: ccip-eks-bix-ship
+      - op: add
         path: dependencies.crib-ccip-scripts.profiles
-        value:
-          - ccip-eks-bix-ship
+        value: ccip-eks-bix-ship
   - name: ccip-kind-bix-ship
     parents:
       - profile: ccip-no-geth
     patches:
-      - op: replace
+      - op: add
         path: dependencies.crib-chainlink-cluster.profiles
+        value: ccip-kind-bix-ship
+      - op: add
+        path: dependencies.crib-chainlink-cluster.profiles
+        value: kind
+      - op: replace
+        path: dependencies.crib-ccip-scripts.profiles
         value:
-          - ccip-kind-bix-ship
-          - kind
+          - ccip-eks-bix-ship
   - name: ccip-v2
     patches:
       - op: add
