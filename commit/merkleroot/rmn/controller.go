@@ -448,7 +448,7 @@ func (c *controller) listenForRmnObservationResponses(
 }
 
 // gotSufficientObservationResponses checks if we got enough observation responses for each source chain.
-// Enough meaning that we got at least #f observing the same merkle root for a target chain.
+// Enough meaning that we got at least f+1 observing the same merkle root for a target chain.
 func gotSufficientObservationResponses(
 	lggr logger.Logger,
 	updateRequests map[uint64]updateRequestWithMeta,

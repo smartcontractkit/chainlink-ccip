@@ -160,6 +160,7 @@ func Test_selectRoots(t *testing.T) {
 		},
 		{
 			name: "more than one roots but one of them less than f+1",
+			//nolint:dupl // to be fixed
 			observations: []rmnSignedObservationWithMeta{
 				{
 					SignedObservation: &rmnpb.SignedObservation{
@@ -217,6 +218,7 @@ func Test_selectRoots(t *testing.T) {
 		},
 		{
 			name: "more than one valid roots",
+			//nolint:dupl // to be fixed
 			observations: []rmnSignedObservationWithMeta{
 				{
 					SignedObservation: &rmnpb.SignedObservation{
