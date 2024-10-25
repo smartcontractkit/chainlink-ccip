@@ -24,23 +24,43 @@ type CostlyMessageObserver interface {
 	) ([]cciptypes.Bytes32, error)
 }
 
-func NewCostlyMessageObserver(
+// NewCostlyMessageObserverWithDefaults creates a new CostlyMessageObserver with default calculators.
+// The default calculators are:
+// - CCIPMessageFeeUSD18Calculator
+// - ZeroMessageExecCostUSD18Calculator
+func NewCostlyMessageObserverWithDefaults(
 	lggr logger.Logger,
 	enabled bool,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 ) CostlyMessageObserver {
-	return &CCIPCostlyMessageObserver{
-		lggr:    lggr,
-		enabled: enabled,
-		feeCalculator: &CCIPMessageFeeUSD18Calculator{
-			lggr:                     lggr,
-			ccipReader:               ccipReader,
-			relativeBoostPerWaitHour: relativeBoostPerWaitHour,
-			now:                      time.Now,
-		},
+	return NewCostlyMessageObserver(
+		lggr,
+		enabled,
+		NewCCIPMessageFeeUSD18Calculator(
+			lggr,
+			ccipReader,
+			relativeBoostPerWaitHour,
+			time.Now,
+		),
 		// TODO: Implement exec cost calculator
-		execCostCalculator: &ZeroMessageExecCostUSD18Calculator{},
+		NewZeroMessageExecCostUSD18Calculator(),
+	)
+}
+
+// NewCostlyMessageObserver allows to specific feeCalculator and execCostCalculator.
+// Therefore, it's very convenient for testing.
+func NewCostlyMessageObserver(
+	lggr logger.Logger,
+	enabled bool,
+	feeCalculator MessageFeeE18USDCalculator,
+	execCostCalculator MessageExecCostUSD18Calculator,
+) CostlyMessageObserver {
+	return &CCIPCostlyMessageObserver{
+		lggr:               lggr,
+		enabled:            enabled,
+		feeCalculator:      feeCalculator,
+		execCostCalculator: execCostCalculator,
 	}
 }
 
@@ -107,6 +127,10 @@ type MessageFeeE18USDCalculator interface {
 // ZeroMessageFeeUSD18Calculator returns a fee of 0 for all messages.
 type ZeroMessageFeeUSD18Calculator struct{}
 
+func NewZeroMessageFeeUSD18Calculator() *ZeroMessageFeeUSD18Calculator {
+	return &ZeroMessageFeeUSD18Calculator{}
+}
+
 // MessageFeeUSD18 returns a fee of 0 for all messages.
 func (n *ZeroMessageFeeUSD18Calculator) MessageFeeUSD18(
 	_ context.Context,
@@ -130,6 +154,10 @@ type MessageExecCostUSD18Calculator interface {
 
 // ZeroMessageExecCostUSD18Calculator returns a cost of 0 for all messages.
 type ZeroMessageExecCostUSD18Calculator struct{}
+
+func NewZeroMessageExecCostUSD18Calculator() *ZeroMessageExecCostUSD18Calculator {
+	return &ZeroMessageExecCostUSD18Calculator{}
+}
 
 // MessageExecCostUSD18 returns a cost of 0 for all messages.
 func (n *ZeroMessageExecCostUSD18Calculator) MessageExecCostUSD18(
@@ -206,6 +234,11 @@ func (n *StaticMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	return messageExecCosts, nil
 }
 
+// UpdateCosts updates the costs of the single message. Not thread-safe, meant to be used only for tests.
+func (n *StaticMessageExecCostUSD18Calculator) UpdateCosts(msgID cciptypes.Bytes32, cost plugintypes.USD18) {
+	n.costs[msgID] = cost
+}
+
 var _ MessageExecCostUSD18Calculator = &StaticMessageExecCostUSD18Calculator{}
 
 // CCIPMessageFeeUSD18Calculator calculates the fees (paid at source) of a set of messages in USD18s.
@@ -220,6 +253,20 @@ type CCIPMessageFeeUSD18Calculator struct {
 	relativeBoostPerWaitHour float64
 
 	now func() time.Time
+}
+
+func NewCCIPMessageFeeUSD18Calculator(
+	lggr logger.Logger,
+	ccipReader readerpkg.CCIPReader,
+	relativeBoostPerWaitHour float64,
+	now func() time.Time,
+) *CCIPMessageFeeUSD18Calculator {
+	return &CCIPMessageFeeUSD18Calculator{
+		lggr:                     lggr,
+		ccipReader:               ccipReader,
+		relativeBoostPerWaitHour: relativeBoostPerWaitHour,
+		now:                      now,
+	}
 }
 
 var _ MessageFeeE18USDCalculator = &CCIPMessageFeeUSD18Calculator{}
