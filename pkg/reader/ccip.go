@@ -851,6 +851,18 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 	return linkPriceUSD, nil
 }
 
+func (r *ccipChainReader) GetDataAvailabilityConfig(ctx context.Context) (destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error) {
+	feeQuoterDynamicConfig, err := r.getDestChainConfig(ctx)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("get destination fee quoter static config: %w", err)
+	}
+
+	return int64(feeQuoterDynamicConfig.DestDataAvailabilityOverheadGas),
+		int64(feeQuoterDynamicConfig.DestGasPerDataAvailabilityByte),
+		int64(feeQuoterDynamicConfig.DestDataAvailabilityMultiplierBps),
+		nil
+}
+
 // feeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/FeeQuoter.sol#L946
 //
@@ -914,6 +926,34 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	}
 
 	return cciptypes.NewBigInt(price), nil
+}
+
+// destChainConfig is used to parse the response from the feeQuoter contract's getDestChainConfig method.
+// See: https://github.com/smartcontractkit/chainlink/blob/23452266132228234312947660374fb393e96f1a/contracts/src/v0.8/ccip/FeeQuoter.sol#L1005
+//
+//nolint:lll // It's a URL.
+type destChainConfig struct {
+	DestDataAvailabilityOverheadGas   uint32 `json:"destDataAvailabilityOverheadGas"`
+	DestGasPerDataAvailabilityByte    uint16 `json:"destGasPerDataAvailabilityByte"`
+	DestDataAvailabilityMultiplierBps uint16 `json:"destDataAvailabilityMultiplierBps"`
+}
+
+// getDestChainConfig returns the destination chain's Fee Quoter's DestChainConfig
+func (r *ccipChainReader) getDestChainConfig(ctx context.Context) (destChainConfig, error) {
+	var dynamicConfig destChainConfig
+	err := r.getDestinationData(
+		ctx,
+		r.destChain,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameFeeQuoterGetDynamicConfig,
+		&dynamicConfig,
+	)
+
+	if err != nil {
+		return destChainConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
+	}
+
+	return dynamicConfig, nil
 }
 
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.

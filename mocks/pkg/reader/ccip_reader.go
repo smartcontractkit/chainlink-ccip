@@ -372,6 +372,76 @@ func (_c *MockCCIPReader_GetContractAddress_Call) RunAndReturn(run func(string, 
 	return _c
 }
 
+// GetDataAvailabilityConfig provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) GetDataAvailabilityConfig(ctx context.Context) (int64, int64, int64, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDataAvailabilityConfig")
+	}
+
+	var r0 int64
+	var r1 int64
+	var r2 int64
+	var r3 error
+	if rf, ok := ret.Get(0).(func(context.Context) (int64, int64, int64, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) int64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) int64); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context) int64); ok {
+		r2 = rf(ctx)
+	} else {
+		r2 = ret.Get(2).(int64)
+	}
+
+	if rf, ok := ret.Get(3).(func(context.Context) error); ok {
+		r3 = rf(ctx)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
+}
+
+// MockCCIPReader_GetDataAvailabilityConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDataAvailabilityConfig'
+type MockCCIPReader_GetDataAvailabilityConfig_Call struct {
+	*mock.Call
+}
+
+// GetDataAvailabilityConfig is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockCCIPReader_Expecter) GetDataAvailabilityConfig(ctx interface{}) *MockCCIPReader_GetDataAvailabilityConfig_Call {
+	return &MockCCIPReader_GetDataAvailabilityConfig_Call{Call: _e.mock.On("GetDataAvailabilityConfig", ctx)}
+}
+
+func (_c *MockCCIPReader_GetDataAvailabilityConfig_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetDataAvailabilityConfig_Call) Return(destDAOverheadGas int64, destGasPerDAByte int64, destDAMultiplierBps int64, err error) *MockCCIPReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Return(destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps, err)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetDataAvailabilityConfig_Call) RunAndReturn(run func(context.Context) (int64, int64, int64, error)) *MockCCIPReader_GetDataAvailabilityConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetDestChainFeeComponents provides a mock function with given fields: ctx
 func (_m *MockCCIPReader) GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error) {
 	ret := _m.Called(ctx)

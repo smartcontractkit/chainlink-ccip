@@ -156,6 +156,16 @@ type CCIPReader interface {
 	// the price of ETH not in ETH but in wei (1e-18 ETH).
 	LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error)
 
+	// GetDataAvailabilityConfig reads the destination chain for the data availability config.
+	// destDAOverheadGas is the overhead gas for data availability.
+	// destGasPerDAByte is the gas per byte for data availability.
+	// destDAMultiplierBps is the multiplier in basis points for data availability.
+	GetDataAvailabilityConfig(ctx context.Context) (
+		destDAOverheadGas,
+		destGasPerDAByte,
+		destDAMultiplierBps int64,
+		err error)
+
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error

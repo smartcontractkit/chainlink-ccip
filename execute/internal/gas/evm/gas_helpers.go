@@ -4,6 +4,7 @@ package evm
 
 import (
 	"math"
+	"math/big"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 )
@@ -28,6 +29,7 @@ const (
 	ExecutionStateProcessingOverheadGas = 2_100 + // COLD_SLOAD_COST for first reading the state
 		20_000 + // SSTORE_SET_GAS for writing from 0 (untouched) to non-zero (in-progress)
 		100 //# SLOAD_GAS = WARM_STORAGE_READ_COST for rewriting from non-zero (in-progress) to non-zero (success/failure)
+	daMultiplierBase = 10_000 // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
 )
 
 type EstimateProvider struct {
@@ -78,4 +80,41 @@ func (gp EstimateProvider) CalculateMessageMaxGas(msg ccipocr3.Message) uint64 {
 		adminRegistryOverhead +
 		rateLimiterOverhead +
 		PerTokenOverheadGas*uint64(numTokens)
+}
+
+// CalculateMessageMaxDAGas calculates the total DA gas needed for a CCIP message
+func (gp EstimateProvider) CalculateMessageMaxDAGas(
+	msg ccipocr3.Message,
+	daOverheadGas int64,
+	daGasPerByte int64,
+	daMultiplier int64,
+) *big.Int {
+	// Calculate token data length
+	var totalTokenDataLen int
+	for _, tokenAmount := range msg.TokenAmounts {
+		totalTokenDataLen += len(tokenAmount.SourcePoolAddress) +
+			len(tokenAmount.DestTokenAddress) +
+			len(tokenAmount.ExtraData) +
+			EvmWordBytes +
+			len(tokenAmount.DestExecData)
+	}
+
+	// Calculate total message data length
+	dataLen := ConstantMessagePartBytes +
+		len(msg.Data) +
+		len(msg.Sender) +
+		len(msg.Receiver) +
+		len(msg.ExtraArgs) +
+		len(msg.FeeToken) +
+		EvmWordBytes*2 + // FeeTokenAmount and FeeValueJuels
+		totalTokenDataLen
+
+	// Calculate base gas cost
+	dataGas := new(big.Int).SetInt64(int64(dataLen)*daGasPerByte + daOverheadGas)
+
+	// Then apply the multiplier as: (dataGas * daMultiplier) / multiplierBase
+	dataGas = new(big.Int).Mul(dataGas, big.NewInt(daMultiplier))
+	dataGas = new(big.Int).Div(dataGas, big.NewInt(daMultiplierBase))
+
+	return dataGas
 }

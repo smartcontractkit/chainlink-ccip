@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-common/pkg/types/ccipocr3"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -269,26 +270,39 @@ func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHo
 	return res
 }
 
-// CCIPMessageExecCostUSD18Calculator TODO: doc
 type CCIPMessageExecCostUSD18Calculator struct {
-	lggr       logger.Logger
-	ccipReader readerpkg.CCIPReader
+	lggr             logger.Logger
+	ccipReader       readerpkg.CCIPReader
+	estimateProvider gas.EstimateProvider
 }
 
 // MessageExecCostUSD18 returns a cost of 0 for all messages.
-func (n *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
+func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	ctx context.Context,
 	messages []cciptypes.Message,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
 	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
-	feeComponents, err := n.ccipReader.GetDestChainFeeComponents(ctx)
+	feeComponents, err := c.ccipReader.GetDestChainFeeComponents(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get fee components: %w", err)
 	}
+	if feeComponents.ExecutionFee == nil {
+		return nil, fmt.Errorf("missing execution fee")
+	}
+
+	destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps, err := c.ccipReader.GetDataAvailabilityConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get data availability config: %w", err)
+	}
 
 	for _, msg := range messages {
-		executionCostUSD18 := computeExecutionCostUSD18(feeComponents.ExecutionFee, msg)
-		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(feeComponents.DataAvailabilityFee, msg)
+		executionCostUSD18 := c.computeExecutionCostUSD18(feeComponents.ExecutionFee, msg)
+		dataAvailabilityCostUSD18 := c.computeDataAvailabilityCostUSD18(
+			feeComponents.DataAvailabilityFee,
+			destDAOverheadGas,
+			destGasPerDAByte,
+			destDAMultiplierBps,
+			msg)
 		totalCostUSD18 := big.NewInt(0).Add(executionCostUSD18, dataAvailabilityCostUSD18)
 		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
 	}
@@ -296,14 +310,41 @@ func (n *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	return messageExecCosts, nil
 }
 
-// TODO: doc, impl
-func computeExecutionCostUSD18(executionFee *big.Int, message cciptypes.Message) plugintypes.USD18 {
-	return plugintypes.NewUSD18(0)
+// computeExecutionCostUSD18 computes the execution cost of a message in USD18s.
+// The cost is:
+// messageGas (gas) * executionFee (USD18/gas) = USD18
+func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
+	executionFee *big.Int,
+	message cciptypes.Message,
+) plugintypes.USD18 {
+	messageGas := big.NewInt(0).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
+	cost := big.NewInt(0).Mul(messageGas, executionFee)
+	return cost
 }
 
-// TODO: doc, impl
-func computeDataAvailabilityCostUSD18(dataAvailabilityFee *big.Int, message cciptypes.Message) plugintypes.USD18 {
-	return plugintypes.NewUSD18(0)
+// computeDataAvailabilityCostUSD18 computes the data availability cost of a message in USD18s.
+// The cost is:
+// messageDataSize (bytes) * dataAvailabilityFee (USD18/byte) = USD18
+func (c *CCIPMessageExecCostUSD18Calculator) computeDataAvailabilityCostUSD18(
+	dataAvailabilityFee *big.Int,
+	destDAOverheadGas int64,
+	destGasPerDAByte int64,
+	destDAMultiplierBps int64,
+	message cciptypes.Message,
+) plugintypes.USD18 {
+	if dataAvailabilityFee == nil || dataAvailabilityFee.Cmp(big.NewInt(0)) == 0 {
+		return big.NewInt(0)
+	}
+
+	// Get data size from the estimate provider
+	messageGas := c.estimateProvider.CalculateMessageMaxDAGas(
+		message,
+		destDAOverheadGas,
+		destGasPerDAByte,
+		destDAMultiplierBps)
+
+	// Calculate cost: messageDataSize * dataAvailabilityFee
+	return big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
 }
 
 var _ MessageExecCostUSD18Calculator = &CCIPMessageExecCostUSD18Calculator{}
