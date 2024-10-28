@@ -851,7 +851,8 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 	return linkPriceUSD, nil
 }
 
-func (r *ccipChainReader) GetDataAvailabilityConfig(ctx context.Context) (destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error) {
+func (r *ccipChainReader) GetDataAvailabilityConfig(ctx context.Context) (
+	destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error) {
 	feeQuoterDynamicConfig, err := r.getDestChainConfig(ctx)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("get destination fee quoter static config: %w", err)

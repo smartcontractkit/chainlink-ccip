@@ -12,5 +12,4 @@ type EstimateProvider interface {
 	CalculateMessageMaxDAGas(
 		msg ccipocr3.Message,
 		destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64) *big.Int
-	GetDataAvailabilityConfig() (destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error)
 }

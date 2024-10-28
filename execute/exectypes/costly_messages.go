@@ -271,7 +271,6 @@ func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHo
 }
 
 type CCIPMessageExecCostUSD18Calculator struct {
-	lggr             logger.Logger
 	ccipReader       readerpkg.CCIPReader
 	estimateProvider gas.EstimateProvider
 }

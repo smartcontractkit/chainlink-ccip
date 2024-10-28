@@ -160,6 +160,14 @@ func (r InMemoryCCIPReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt,
 	return cciptypes.NewBigIntFromInt64(100), nil
 }
 
+func (r InMemoryCCIPReader) GetDataAvailabilityConfig(ctx context.Context) (
+	destDAOverheadGas,
+	destGasPerDAByte,
+	destDAMultiplierBps int64,
+	err error) {
+	return 0, 0, 0, nil
+}
+
 // Sync can be used to perform frequent syncing operations inside the reader implementation.
 // Returns a bool indicating whether something was updated.
 func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) error {
