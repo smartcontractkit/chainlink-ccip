@@ -182,12 +182,12 @@ func (c *controller) ComputeReportSignatures(
 	}
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
 	for chain, l := range updatesPerChain {
-		chainF, exists := homeFMap[cciptypes.ChainSelector(chain)]
+		homeChainF, exists := homeFMap[cciptypes.ChainSelector(chain)]
 		if !exists {
 			return nil, fmt.Errorf("no F for chain %d", chain)
 		}
 
-		if consensus.Threshold(l.RmnNodes.Cardinality()) < consensus.FPlus1(chainF) {
+		if consensus.Threshold(l.RmnNodes.Cardinality()) < consensus.FPlus1(homeChainF) {
 			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
 				"chain", chain,
 				"homeF", homeFMap[cciptypes.ChainSelector(chain)],
@@ -267,13 +267,13 @@ func (c *controller) getRmnSignedObservations(
 	// At this point we can safely assume that we have at least F+1 supporting each source chain.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
 		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
-		chainF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
+		homeChainF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exist {
 			return nil, fmt.Errorf("no F for chain %d", sourceChain)
 		}
 
 		for nodeID := range updateRequest.RmnNodes.Iter() {
-			if consensus.Threshold(requestedNodes[sourceChain].Cardinality()) >= consensus.FPlus1(chainF) {
+			if consensus.Threshold(requestedNodes[sourceChain].Cardinality()) >= consensus.FPlus1(homeChainF) {
 				break // We have enough initial observers for this source chain.
 			}
 
@@ -475,7 +475,7 @@ func gotSufficientObservationResponses(
 		if !ok || len(countsPerRoot) == 0 {
 			return false
 		}
-		chainF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
+		homeChainF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exists {
 			lggr.Errorw("no F for chain", "chain", sourceChain)
 			return false
@@ -483,7 +483,7 @@ func gotSufficientObservationResponses(
 
 		values := maps.Values(countsPerRoot)
 		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if consensus.Threshold(values[len(values)-1]) < consensus.FPlus1(chainF) {
+		if consensus.Threshold(values[len(values)-1]) < consensus.FPlus1(homeChainF) {
 			return false
 		}
 	}
@@ -584,12 +584,12 @@ func (c *controller) getRmnReportSignatures(
 	// At this point it is also possible that the signed observations contain
 	// different roots for the same source chain and interval.
 
-	chainF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
+	homeChainF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
 		return nil, fmt.Errorf("get home reader f: %w", err)
 	}
 
-	rootsPerChain, err := selectRoots(rmnSignedObservations, chainF)
+	rootsPerChain, err := selectRoots(rmnSignedObservations, homeChainF)
 	if err != nil {
 		return nil, fmt.Errorf("get most voted roots from observations: %w", err)
 	}
@@ -723,15 +723,15 @@ func selectRoots(
 
 	selectedRoots := make(map[cciptypes.ChainSelector]cciptypes.Bytes32)
 	for chain, votes := range votesPerRoot {
-		f, exists := homeFMap[chain]
+		homeF, exists := homeFMap[chain]
 		if !exists {
-			return nil, fmt.Errorf("no F for chain %d", chain)
+			return nil, fmt.Errorf("no home F for chain %d", chain)
 		}
 
 		var selectedRoot cciptypes.Bytes32
 
 		for root, vote := range votes {
-			if consensus.Threshold(vote) < consensus.FPlus1(f) {
+			if consensus.Threshold(vote) < consensus.FPlus1(homeF) {
 				continue
 			}
 
