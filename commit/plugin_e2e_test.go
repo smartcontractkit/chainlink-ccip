@@ -120,9 +120,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				{ChainSel: sourceChain2, SeqNum: 20},
 			},
 			RMNReportSignatures: []ccipocr3.RMNECDSASignature{},
-			// TODO: Calculate the bitmap
-			RMNRawVs:     ccipocr3.NewBigIntFromInt64(0),
-			RMNRemoteCfg: params.rmnReportCfg,
+			RMNRemoteCfg:        params.rmnReportCfg,
 		},
 	}
 
@@ -167,7 +165,6 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 					},
 					PriceUpdates:  ccipocr3.PriceUpdates{},
 					RMNSignatures: []ccipocr3.RMNECDSASignature{},
-					RMNRawVs:      ccipocr3.NewBigIntFromInt64(0),
 				},
 			},
 		},
