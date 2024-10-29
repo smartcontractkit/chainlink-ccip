@@ -18,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -1290,6 +1292,72 @@ func (r *ccipChainReader) getRMNRemoteAddress(
 	}
 
 	return rmnRemoteAddress, nil
+}
+
+// Get the DestChainConfig from the FeeQuoter contract on the given chain.
+func (r *ccipChainReader) getFeeQuoterDestChainConfig(
+	ctx context.Context,
+	chainSelector cciptypes.ChainSelector,
+) (cciptypes.FeeQuoterDestChainConfig, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, chainSelector); err != nil {
+		return cciptypes.FeeQuoterDestChainConfig{}, err
+	}
+
+	var destChainConfig cciptypes.FeeQuoterDestChainConfig
+	srcReader := r.contractReaders[chainSelector]
+	err := srcReader.ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameFeeQuoter,
+		consts.MethodNameGetDestChainConfig,
+		primitives.Unconfirmed,
+		map[string]any{
+			"destChainSelector": r.destChain,
+		},
+		&destChainConfig,
+	)
+
+	if err != nil {
+		return cciptypes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get dest chain config: %w", err)
+	}
+
+	return destChainConfig, nil
+}
+
+// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
+func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
+	ctx context.Context,
+) (cciptypes.DataAvailabilityGasConfig, error) {
+	overheadGasValues := make([]uint32, 0)
+	gasPerByteValues := make([]uint16, 0)
+	multiplierBpsValues := make([]uint16, 0)
+	for chain := range r.contractReaders {
+		config, err := r.getFeeQuoterDestChainConfig(ctx, chain)
+		if err != nil {
+			continue
+		}
+		if config.IsEnabled && config.HasNonEmptyDAGasParams() {
+			overheadGasValues = append(overheadGasValues, config.DestDataAvailabilityOverheadGas)
+			gasPerByteValues = append(gasPerByteValues, config.DestGasPerDataAvailabilityByte)
+			multiplierBpsValues = append(multiplierBpsValues, config.DestDataAvailabilityMultiplierBps)
+		}
+	}
+
+	if len(overheadGasValues) == 0 {
+		return cciptypes.DataAvailabilityGasConfig{}, fmt.Errorf("no valid fee quoter destChainConfigs found")
+	}
+
+	// Calculate medians
+	medianOverheadGas := consensus.Median(overheadGasValues, func(a, b uint32) bool { return a < b })
+	medianGasPerByte := consensus.Median(gasPerByteValues, func(a, b uint16) bool { return a < b })
+	medianMultiplierBps := consensus.Median(multiplierBpsValues, func(a, b uint16) bool { return a < b })
+
+	daConfig := cciptypes.DataAvailabilityGasConfig{
+		DestDataAvailabilityOverheadGas:   medianOverheadGas,
+		DestGasPerDataAvailabilityByte:    medianGasPerByte,
+		DestDataAvailabilityMultiplierBps: medianMultiplierBps,
+	}
+
+	return daConfig, nil
 }
 
 // Interface compliance check

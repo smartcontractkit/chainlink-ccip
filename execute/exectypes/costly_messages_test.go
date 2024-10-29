@@ -292,16 +292,18 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 
 func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 	tests := []struct {
-		name               string
-		messages           []ccipocr3.Message
-		messageGases       []uint64
-		executionFee       *big.Int
-		feeComponentsError error
-		want               map[ccipocr3.Bytes32]plugintypes.USD18
-		wantErr            bool
+		name                string
+		messages            []ccipocr3.Message
+		messageGases        []uint64
+		executionFee        *big.Int
+		dataAvailabilityFee *big.Int
+		feeComponentsError  error
+		daGasConfig         ccipocr3.DataAvailabilityGasConfig
+		want                map[ccipocr3.Bytes32]plugintypes.USD18
+		wantErr             bool
 	}{
 		{
-			name: "happy path",
+			name: "happy path, no DA cost",
 			messages: []ccipocr3.Message{
 				{
 					Header: ccipocr3.RampMessageHeader{MessageID: b1},
@@ -313,13 +315,48 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 					Header: ccipocr3.RampMessageHeader{MessageID: b3},
 				},
 			},
-			messageGases:       []uint64{100, 200, 300},
-			executionFee:       big.NewInt(100),
-			feeComponentsError: nil,
+			messageGases:        []uint64{100, 200, 300},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(0),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1,
+				DestGasPerDataAvailabilityByte:    1,
+				DestDataAvailabilityMultiplierBps: 1,
+			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
 				b1: plugintypes.NewUSD18(10000),
 				b2: plugintypes.NewUSD18(20000),
 				b3: plugintypes.NewUSD18(30000),
+			},
+			wantErr: false,
+		},
+		{
+			name: "happy path, with DA cost",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b2},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b3},
+				},
+			},
+			messageGases:        []uint64{100, 200, 300},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(400),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1200,
+				DestGasPerDataAvailabilityByte:    10,
+				DestDataAvailabilityMultiplierBps: 200,
+			},
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(50000),
+				b2: plugintypes.NewUSD18(60000),
+				b3: plugintypes.NewUSD18(70000),
 			},
 			wantErr: false,
 		},
@@ -336,11 +373,17 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 					Header: ccipocr3.RampMessageHeader{MessageID: b3},
 				},
 			},
-			messageGases:       []uint64{100, 200, 300},
-			executionFee:       big.NewInt(100),
-			feeComponentsError: fmt.Errorf("error"),
-			want:               map[ccipocr3.Bytes32]plugintypes.USD18{},
-			wantErr:            true,
+			messageGases:        []uint64{100, 200, 300},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(0),
+			feeComponentsError:  fmt.Errorf("error"),
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1,
+				DestGasPerDataAvailabilityByte:    1,
+				DestDataAvailabilityMultiplierBps: 1,
+			},
+			want:    map[ccipocr3.Bytes32]plugintypes.USD18{},
+			wantErr: true,
 		},
 	}
 
@@ -352,9 +395,10 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			feeComponents := types.ChainFeeComponents{
 				ExecutionFee:        tt.executionFee,
-				DataAvailabilityFee: big.NewInt(0),
+				DataAvailabilityFee: tt.dataAvailabilityFee,
 			}
 			mockReader.EXPECT().GetDestChainFeeComponents(ctx).Return(feeComponents, tt.feeComponentsError)
+			mockReader.EXPECT().GetMedianDataAvailabilityGasConfig(ctx).Return(tt.daGasConfig, nil).Maybe()
 
 			ep := gasmock.NewMockEstimateProvider(t)
 			if !tt.wantErr {

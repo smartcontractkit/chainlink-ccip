@@ -15,6 +15,12 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+const (
+	EvmWordBytes             = 32
+	ConstantMessagePartBytes = 10 * 32 // A message consists of 10 abi encoded fields 32B each (after encoding)
+	daMultiplierBase         = 10_000  // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
+)
+
 // CostlyMessageObserver observes messages that are too costly to execute.
 type CostlyMessageObserver interface {
 	// Observe takes a set of messages and returns a slice of message IDs that are too costly to execute.
@@ -340,11 +346,17 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	if feeComponents.ExecutionFee == nil {
 		return nil, fmt.Errorf("missing execution fee")
 	}
+	if feeComponents.DataAvailabilityFee == nil {
+		return nil, fmt.Errorf("missing data availability fee")
+	}
+	daConfig, err := c.ccipReader.GetMedianDataAvailabilityGasConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get data availability gas config: %w", err)
+	}
 
 	for _, msg := range messages {
 		executionCostUSD18 := c.computeExecutionCostUSD18(feeComponents.ExecutionFee, msg)
-		// TODO: implement data availability cost
-		dataAvailabilityCostUSD18 := new(big.Int)
+		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(feeComponents.DataAvailabilityFee, daConfig, msg)
 		totalCostUSD18 := new(big.Int).Add(executionCostUSD18, dataAvailabilityCostUSD18)
 		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
 	}
@@ -362,6 +374,57 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
 	messageGas := new(big.Int).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
 	cost := new(big.Int).Mul(messageGas, executionFee)
 	return cost
+}
+
+// computeDataAvailabilityCostUSD18 computes the data availability cost of a message in USD18s.
+func computeDataAvailabilityCostUSD18(
+	dataAvailabilityFee *big.Int,
+	daConfig cciptypes.DataAvailabilityGasConfig,
+	message cciptypes.Message,
+) plugintypes.USD18 {
+	if dataAvailabilityFee == nil || dataAvailabilityFee.Cmp(big.NewInt(0)) == 0 {
+		return big.NewInt(0)
+	}
+
+	messageGas := CalculateMessageMaxDAGas(message, daConfig)
+	return big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
+}
+
+// CalculateMessageMaxDAGas calculates the total DA gas needed for a CCIP message
+func CalculateMessageMaxDAGas(
+	msg cciptypes.Message,
+	daConfig cciptypes.DataAvailabilityGasConfig,
+) *big.Int {
+	// Calculate token data length
+	var totalTokenDataLen int
+	for _, tokenAmount := range msg.TokenAmounts {
+		totalTokenDataLen += len(tokenAmount.SourcePoolAddress) +
+			len(tokenAmount.DestTokenAddress) +
+			len(tokenAmount.ExtraData) +
+			EvmWordBytes +
+			len(tokenAmount.DestExecData)
+	}
+
+	// Calculate total message data length
+	dataLen := ConstantMessagePartBytes +
+		len(msg.Data) +
+		len(msg.Sender) +
+		len(msg.Receiver) +
+		len(msg.ExtraArgs) +
+		len(msg.FeeToken) +
+		EvmWordBytes*2 + // FeeTokenAmount and FeeValueJuels
+		totalTokenDataLen
+
+	// Calculate base gas cost
+	dataGas := big.NewInt(int64(dataLen))
+	dataGas = new(big.Int).Mul(dataGas, big.NewInt(int64(daConfig.DestGasPerDataAvailabilityByte)))
+	dataGas = new(big.Int).Add(dataGas, big.NewInt(int64(daConfig.DestDataAvailabilityOverheadGas)))
+
+	// Then apply the multiplier as: (dataGas * daMultiplier) / multiplierBase
+	dataGas = new(big.Int).Mul(dataGas, big.NewInt(int64(daConfig.DestDataAvailabilityMultiplierBps)))
+	dataGas = new(big.Int).Div(dataGas, big.NewInt(daMultiplierBase))
+
+	return dataGas
 }
 
 var _ MessageExecCostUSD18Calculator = &CCIPMessageExecCostUSD18Calculator{}
