@@ -556,9 +556,7 @@ func prepareCcipReaderMock(
 ) {
 	ccipReader.EXPECT().
 		GetAvailableChainsFeeComponents(ctx, mock.Anything).
-		Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-			destChain: {big.NewInt(1e5), big.NewInt(3e8)},
-		}).Maybe()
+		Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
 	ccipReader.EXPECT().
 		GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
