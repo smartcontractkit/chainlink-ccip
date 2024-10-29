@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"math/big"
 	"sort"
 	"testing"
@@ -418,10 +419,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	merkleOutcome := baseMerkleOutcome(params.rmnReportCfg)
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
-	packedGasPrice := ccipocr3.NewBigInt(chainfee.ComponentsUSDPrices{
-		ExecutionFeePriceUSD: big.NewInt(15e10),
-		DataAvFeePriceUSD:    big.NewInt(20e11),
-	}.ToPackedFee())
+	newFeeComponents, newNativePrice, packedGasPrice := newRandomFees()
 	expectedChainFeeOutcome := chainfee.Outcome{
 		GasPrices: []ccipocr3.GasPriceChain{
 			{
@@ -431,8 +429,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		},
 	}
 
-	newFeeComponents := types.ChainFeeComponents{ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)}
-	newNativePrice := ccipocr3.NewBigIntFromInt64(5e15)
+	newFeeComponents2, newNativePrice2, newPackedGasPrice2 := newRandomFees()
 
 	testCases := []struct {
 		name                  string
@@ -552,10 +549,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
-							GasPrice: ccipocr3.NewBigInt(chainfee.ComponentsUSDPrices{
-								ExecutionFeePriceUSD: big.NewInt(15e13),
-								DataAvFeePriceUSD:    big.NewInt(20e14),
-							}.ToPackedFee()),
+							GasPrice: newPackedGasPrice2,
 							ChainSel: destChain,
 						},
 					},
@@ -567,7 +561,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: newFeeComponents,
+							destChain: newFeeComponents2,
 						}).
 					Maybe()
 
@@ -575,7 +569,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						destChain: ccipocr3.NewBigIntFromInt64(5e18),
+						destChain: newNativePrice2,
 					}).Maybe()
 			},
 		},
@@ -899,4 +893,17 @@ func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 		RMNRemoteCfg:            r,
 		RMNRawVs:                ccipocr3.NewBigIntFromInt64(0),
 	}
+}
+
+func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt) {
+	execFee := rand.RandomRoundedFloat()
+	dataAvFee := rand.RandomRoundedFloat()
+	nativePrice := rand.RandomRoundedFloat()
+
+	usdPrices := chainfee.ComponentsUSDPrices{
+		ExecutionFeePriceUSD: big.NewInt(int64(execFee * nativePrice / 1e18)),
+		DataAvFeePriceUSD:    big.NewInt(int64(dataAvFee * nativePrice / 1e18)),
+	}.ToPackedFee()
+
+	return types.ChainFeeComponents{ExecutionFee: big.NewInt(int64(execFee)), DataAvailabilityFee: big.NewInt(int64(dataAvFee))}, ccipocr3.NewBigIntFromInt64(int64(nativePrice)), ccipocr3.NewBigInt(usdPrices)
 }
