@@ -19,8 +19,6 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -305,7 +303,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			require.NoError(t, err)
 			rmnNodes[i] = rmntypes.HomeNodeInfo{
 				ID:                    rmntypes.NodeID(i + 1),
-				PeerID:                ragep2ptypes.PeerID([32]byte{1, 2, 3}),
+				PeerID:                [32]byte{1, 2, 3},
 				SupportedSourceChains: mapset.NewSet(chainS1, chainS2),
 				OffchainPublicKey:     &publicKey,
 			}
@@ -409,8 +407,10 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 				ts.peerClient, requestIDs, requestedChains, ts.remoteRMNCfg.ConfigDigest, destChain)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.peerClient, int(ts.remoteRMNCfg.F),
-				ts.homeF)
+				t, ts.peerClient,
+				int(ts.remoteRMNCfg.F)+1,
+				ts.homeF,
+			)
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
@@ -454,7 +454,11 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			time.Sleep(time.Millisecond)
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
-				t, ts.peerClient, len(ts.remoteRMNCfg.Signers), ts.homeF)
+				t,
+				ts.peerClient,
+				int(ts.remoteRMNCfg.F)+1,
+				ts.homeF,
+			)
 			time.Sleep(time.Millisecond)
 
 			t.Logf("requestIDs: %v", requestIDs)
@@ -495,7 +499,7 @@ func (ts *testSetup) waitForObservationRequestsToBeSent(
 				}
 			}
 		}
-		if requestsPerChain[uint64(chainS1)] >= homeF && requestsPerChain[uint64(chainS2)] >= homeF {
+		if requestsPerChain[uint64(chainS1)] >= homeF+1 && requestsPerChain[uint64(chainS2)] >= homeF+1 {
 			for nodeID, reqs := range recvReqs {
 				requestIDs[nodeID] = reqs[0].RequestId
 				requestedChains[nodeID] = mapset.NewSet[uint64]()
@@ -599,7 +603,7 @@ func (ts *testSetup) waitForReportSignatureRequestsToBeSent(
 				if req.GetReportSignatureRequest() == nil {
 					continue
 				}
-				assert.True(t, len(req.GetReportSignatureRequest().AttributedSignedObservations) >= homeF+1)
+				assert.Greater(t, len(req.GetReportSignatureRequest().AttributedSignedObservations), homeF)
 
 				aos := req.GetReportSignatureRequest().AttributedSignedObservations
 
