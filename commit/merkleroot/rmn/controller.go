@@ -178,13 +178,13 @@ func (c *controller) ComputeReportSignatures(
 
 	homeFMap, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
-		return nil, fmt.Errorf("get f: %w", err)
+		return nil, fmt.Errorf("get home F: %w", err)
 	}
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
 	for chain, l := range updatesPerChain {
 		homeChainF, exists := homeFMap[cciptypes.ChainSelector(chain)]
 		if !exists {
-			return nil, fmt.Errorf("no F for chain %d", chain)
+			return nil, fmt.Errorf("no home F for chain %d", chain)
 		}
 
 		if consensus.Threshold(l.RmnNodes.Cardinality()) < consensus.FPlus1(homeChainF) {
@@ -269,7 +269,7 @@ func (c *controller) getRmnSignedObservations(
 		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
 		homeChainF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exist {
-			return nil, fmt.Errorf("no F for chain %d", sourceChain)
+			return nil, fmt.Errorf("no home F for chain %d", sourceChain)
 		}
 
 		for nodeID := range updateRequest.RmnNodes.Iter() {
