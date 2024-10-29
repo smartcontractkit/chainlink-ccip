@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"math/big"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 
 	"golang.org/x/exp/maps"
 

@@ -3,8 +3,9 @@ package rand
 import (
 	"crypto/rand"
 	"encoding/hex"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"math/big"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func RandomBytes(n int) []byte {
