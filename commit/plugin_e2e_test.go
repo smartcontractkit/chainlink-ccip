@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"math/big"
 	"sort"
@@ -896,14 +897,13 @@ func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 }
 
 func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt) {
-	execFee := rand.RandomRoundedFloat()
-	dataAvFee := rand.RandomRoundedFloat()
-	nativePrice := rand.RandomRoundedFloat()
-
+	execFee := big.NewInt(rand.RandomInt64())
+	dataAvFee := big.NewInt(rand.RandomInt64())
+	nativePrice := big.NewInt(rand.RandomInt64())
 	usdPrices := chainfee.ComponentsUSDPrices{
-		ExecutionFeePriceUSD: big.NewInt(int64(execFee * nativePrice / 1e18)),
-		DataAvFeePriceUSD:    big.NewInt(int64(dataAvFee * nativePrice / 1e18)),
+		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
+		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
 	}.ToPackedFee()
 
-	return types.ChainFeeComponents{ExecutionFee: big.NewInt(int64(execFee)), DataAvailabilityFee: big.NewInt(int64(dataAvFee))}, ccipocr3.NewBigIntFromInt64(int64(nativePrice)), ccipocr3.NewBigInt(usdPrices)
+	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee}, ccipocr3.NewBigInt(nativePrice), ccipocr3.NewBigInt(usdPrices)
 }
