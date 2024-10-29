@@ -23,6 +23,7 @@ import (
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -853,15 +854,32 @@ func (r *ccipChainReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, e
 
 func (r *ccipChainReader) GetDataAvailabilityConfig(ctx context.Context) (
 	destDAOverheadGas, destGasPerDAByte, destDAMultiplierBps int64, err error) {
-	feeQuoterDynamicConfig, err := r.getDestChainConfig(ctx)
+	feeQuoterDynamicConfigs, err := r.getDestChainConfigs(ctx)
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("get destination fee quoter static config: %w", err)
 	}
 
-	return int64(feeQuoterDynamicConfig.DestDataAvailabilityOverheadGas),
-		int64(feeQuoterDynamicConfig.DestGasPerDataAvailabilityByte),
-		int64(feeQuoterDynamicConfig.DestDataAvailabilityMultiplierBps),
-		nil
+	if len(feeQuoterDynamicConfigs) == 0 {
+		return 0, 0, 0, fmt.Errorf("no fee quoter configs found")
+	}
+
+	// Extract values into separate slices for median calculation
+	overheadGasValues := make([]uint32, len(feeQuoterDynamicConfigs))
+	gasPerByteValues := make([]uint16, len(feeQuoterDynamicConfigs))
+	multiplierBpsValues := make([]uint16, len(feeQuoterDynamicConfigs))
+
+	for i, config := range feeQuoterDynamicConfigs {
+		overheadGasValues[i] = config.DestDataAvailabilityOverheadGas
+		gasPerByteValues[i] = config.DestGasPerDataAvailabilityByte
+		multiplierBpsValues[i] = config.DestDataAvailabilityMultiplierBps
+	}
+
+	// Calculate medians
+	medianOverheadGas := consensus.Median(overheadGasValues, func(a, b uint32) bool { return a < b })
+	medianGasPerByte := consensus.Median(gasPerByteValues, func(a, b uint16) bool { return a < b })
+	medianMultiplierBps := consensus.Median(multiplierBpsValues, func(a, b uint16) bool { return a < b })
+
+	return int64(medianOverheadGas), int64(medianGasPerByte), int64(medianMultiplierBps), nil
 }
 
 // feeQuoterStaticConfig is used to parse the response from the feeQuoter contract's getStaticConfig method.
@@ -934,27 +952,64 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 //
 //nolint:lll // It's a URL.
 type destChainConfig struct {
+	IsEnabled                         bool   `json:"isEnabled"`
 	DestDataAvailabilityOverheadGas   uint32 `json:"destDataAvailabilityOverheadGas"`
 	DestGasPerDataAvailabilityByte    uint16 `json:"destGasPerDataAvailabilityByte"`
 	DestDataAvailabilityMultiplierBps uint16 `json:"destDataAvailabilityMultiplierBps"`
 }
 
-// getDestChainConfig returns the destination chain's Fee Quoter's DestChainConfig
-func (r *ccipChainReader) getDestChainConfig(ctx context.Context) (destChainConfig, error) {
-	var dynamicConfig destChainConfig
-	err := r.getDestinationData(
-		ctx,
-		r.destChain,
-		consts.ContractNameFeeQuoter,
-		consts.MethodNameGetDestChainConfig,
-		&dynamicConfig,
-	)
+// is empty
+func (c destChainConfig) isEmpty() bool {
+	return c.DestDataAvailabilityOverheadGas == 0 &&
+		c.DestGasPerDataAvailabilityByte == 0 &&
+		c.DestDataAvailabilityMultiplierBps == 0
+}
 
-	if err != nil {
-		return destChainConfig{}, fmt.Errorf("unable to lookup fee quoter (offramp static config): %w", err)
+// getDestChainConfigs returns all the destination chain configurations for the source chains.
+// It will skip all cases where the src chain doesn't have a config for the dest chain.
+func (r *ccipChainReader) getDestChainConfigs(ctx context.Context) ([]destChainConfig, error) {
+	myChains := maps.Keys(r.contractReaders)
+
+	res := make([]destChainConfig, 0, len(myChains))
+
+	for _, srcChain := range myChains {
+		if srcChain == r.destChain {
+			continue
+		}
+
+		var destChainConfig destChainConfig
+
+		if err := validateExtendedReaderExistence(r.contractReaders, srcChain); err != nil {
+			continue
+		}
+
+		srcReader := r.contractReaders[srcChain]
+
+		err := srcReader.ExtendedGetLatestValue(
+			ctx,
+			consts.ContractNameFeeQuoter,
+			consts.MethodNameGetDestChainConfig,
+			primitives.Unconfirmed,
+			map[string]any{
+				"destChainSelector": r.destChain,
+			},
+			&destChainConfig,
+		)
+
+		if err != nil {
+			continue
+		}
+		if destChainConfig.isEmpty() {
+			continue
+		}
+		if !destChainConfig.IsEnabled {
+			continue
+		}
+
+		res = append(res, destChainConfig)
 	}
 
-	return dynamicConfig, nil
+	return res, nil
 }
 
 // sourceChainConfig is used to parse the response from the offRamp contract's getSourceChainConfig method.
