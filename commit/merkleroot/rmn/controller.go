@@ -573,7 +573,7 @@ func (c *controller) getRmnReportSignatures(
 	// from the same node.
 	//
 	// e.g.
-	// The following nodes support the following chains and f=1:
+	// The following nodes support the following chains and F=1:
 	// node1: [1]	node2:[1,2,3]	node3:[1,2,3]
 	//
 	// node1: getObservations(1)          ->             never_responds
@@ -586,7 +586,7 @@ func (c *controller) getRmnReportSignatures(
 
 	homeChainF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
-		return nil, fmt.Errorf("get home reader f: %w", err)
+		return nil, fmt.Errorf("get home reader F: %w", err)
 	}
 
 	rootsPerChain, err := selectRoots(rmnSignedObservations, homeChainF)

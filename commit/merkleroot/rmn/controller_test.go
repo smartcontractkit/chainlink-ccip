@@ -67,7 +67,7 @@ func Test_selectRoots(t *testing.T) {
 		expRoots     map[cciptypes.ChainSelector]cciptypes.Bytes32
 	}{
 		{
-			name: "happy path f+1 observations",
+			name: "happy path F+1 observations",
 			observations: []rmnSignedObservationWithMeta{
 				{
 					SignedObservation: &rmnpb.SignedObservation{
@@ -100,7 +100,7 @@ func Test_selectRoots(t *testing.T) {
 			},
 		},
 		{
-			name: "f observations instead of minimum f+1",
+			name: "F observations instead of minimum F+1",
 			observations: []rmnSignedObservationWithMeta{
 				{
 					SignedObservation: &rmnpb.SignedObservation{
@@ -157,7 +157,7 @@ func Test_selectRoots(t *testing.T) {
 			expErr: true,
 		},
 		{
-			name: "more than one roots but one of them less than f+1",
+			name: "more than one roots but one of them less than F+1",
 			//nolint:dupl // to be fixed
 			observations: []rmnSignedObservationWithMeta{
 				{
@@ -463,7 +463,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 			t.Logf("requestIDs: %v", requestIDs)
 
-			// requests should be sent to more than f+1 nodes, since we hit the timer timeout
+			// requests should be sent to more than F+1 nodes, since we hit the timer timeout
 			assert.Greater(t, len(requestIDs), int(ts.remoteRMNCfg.F)+1)
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
