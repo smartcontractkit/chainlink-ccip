@@ -498,13 +498,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					reportCodec = n.reportCodec
 				}
 
-				prepareCcipReaderMock(
-					params.ctx,
-					n.ccipReader,
-					false,
-					false,
-				)
-
+				n.ccipReader.EXPECT().
+					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
+				n.ccipReader.EXPECT().
+					GetChainFeePriceUpdate(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
