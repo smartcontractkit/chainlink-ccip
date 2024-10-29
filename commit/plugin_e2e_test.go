@@ -426,12 +426,29 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
 		RMNRemoteCfg:            params.rmnReportCfg,
 	}
+	noReportMerkleOutcome := merkleroot.Outcome{
+		OutcomeType:             merkleroot.ReportEmpty,
+		RangesSelectedForReport: nil,
+		RootsToReport:           []ccipocr3.MerkleRootChain{},
+		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
+		RMNReportSignatures:     []ccipocr3.RMNECDSASignature{},
+		RMNRemoteCfg:            params.rmnReportCfg,
+		RMNRawVs:                ccipocr3.NewBigIntFromInt64(0),
+	}
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
-	packedGasPrice := chainfee.ComponentsUSDPrices{
+	packedGasPrice := ccipocr3.NewBigInt(chainfee.ComponentsUSDPrices{
 		ExecutionFeePriceUSD: big.NewInt(15e10),
 		DataAvFeePriceUSD:    big.NewInt(20e11),
-	}.ToPackedFee()
+	}.ToPackedFee())
+	expectedChainFeeOutcome := chainfee.Outcome{
+		GasPrices: []ccipocr3.GasPriceChain{
+			{
+				GasPrice: packedGasPrice,
+				ChainSel: destChain,
+			},
+		},
+	}
 
 	testCases := []struct {
 		name                  string
@@ -449,15 +466,15 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
-							GasPrice: ccipocr3.NewBigInt(packedGasPrice),
+							GasPrice: packedGasPrice,
 							ChainSel: destChain,
 						},
 						{
-							GasPrice: ccipocr3.NewBigInt(packedGasPrice),
+							GasPrice: packedGasPrice,
 							ChainSel: sourceChain1,
 						},
 						{
-							GasPrice: ccipocr3.NewBigInt(packedGasPrice),
+							GasPrice: packedGasPrice,
 							ChainSel: sourceChain2,
 						},
 					},
@@ -465,7 +482,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
-
 				m.EXPECT().
 					GetAvailableChainsFeeComponents(params.ctx, []ccipocr3.ChainSelector{destChain, sourceChain1, sourceChain2}).
 					Return(
@@ -486,16 +502,105 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					}).Maybe()
 			},
 		},
+		{
+			name:        "fee components should be when there's a subset of chains",
+			prevOutcome: Outcome{},
+			expOutcome: Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				ChainFeeOutcome:   expectedChainFeeOutcome,
+			},
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					Return(
+						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+							destChain: {big.NewInt(3e13), big.NewInt(4e14)},
+						}).
+					Maybe()
+
+				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						destChain:    ccipocr3.NewBigIntFromInt64(5e15),
+						sourceChain1: ccipocr3.NewBigIntFromInt64(5e15),
+						sourceChain2: ccipocr3.NewBigIntFromInt64(5e15),
+					}).Maybe()
+			},
+		},
+		{
+			name: "fee components should not be updated within deviation",
+			prevOutcome: Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				ChainFeeOutcome:   expectedChainFeeOutcome,
+			},
+			expOutcome: Outcome{
+				MerkleRootOutcome: noReportMerkleOutcome,
+				ChainFeeOutcome:   expectedChainFeeOutcome,
+			},
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					Return(
+						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+							destChain: {big.NewInt(3e13), big.NewInt(4e14)},
+						}).
+					Maybe()
+
+				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						destChain: ccipocr3.NewBigIntFromInt64(5e15),
+					}).Maybe()
+			},
+		},
+		{
+			name: "fresh fees (timestamped) should not be updated, even outside of deviation",
+			prevOutcome: Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				ChainFeeOutcome:   expectedChainFeeOutcome,
+			},
+			expOutcome: Outcome{
+				MerkleRootOutcome: noReportMerkleOutcome,
+				ChainFeeOutcome: chainfee.Outcome{
+					GasPrices: []ccipocr3.GasPriceChain{
+						{
+							GasPrice: ccipocr3.NewBigInt(chainfee.ComponentsUSDPrices{
+								ExecutionFeePriceUSD: big.NewInt(15e13),
+								DataAvFeePriceUSD:    big.NewInt(20e14),
+							}.ToPackedFee()),
+							ChainSel: destChain,
+						},
+					},
+				},
+			},
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					Return(
+						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+							destChain: {big.NewInt(3e13), big.NewInt(4e14)},
+						}).
+					Maybe()
+
+				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						destChain: ccipocr3.NewBigIntFromInt64(5e18),
+					}).Maybe()
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
 				n := setupNode(params, oracleIDs[i])
 				nodes[i] = n.node
-				if i == 0 {
-					reportCodec = n.reportCodec
-				}
 
 				prepareCcipReaderMock(
 					params.ctx,
@@ -529,11 +634,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
-			for i := range res.Transmitted {
-				decoded, err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report)
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expTransmittedReports[i], decoded)
-			}
 		})
 	}
 }

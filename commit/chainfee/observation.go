@@ -1,10 +1,8 @@
 package chainfee
 
 import (
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"sort"
-
 	"context"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"time"
 )
@@ -18,21 +16,19 @@ func (p *processor) Observation(
 	if err != nil {
 		return Observation{}, err
 	}
-	sortedChains := supportedChains.ToSlice()
-	sort.Slice(sortedChains, func(i, j int) bool { return uint64(sortedChains[i]) < uint64(sortedChains[j]) })
 	// Get the fee components for all available chains that we can read from
-	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx, sortedChains)
+	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx, supportedChains.ToSlice())
 	// Get the native token prices for all available chains that we can read from
-	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, sortedChains)
+	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChains.ToSlice())
 	// Get the latest chain fee price updates for the source chains
-	timestampedPriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, sortedChains)
+	timestampedPriceUpdates := p.ccipReader.GetChainFeePriceUpdate(ctx, supportedChains.ToSlice())
 	// Convert the timestamped price updates to a map of chain fee updates
 	chainFeeUpdates := FeeUpdatesFromTimestampedBig(timestampedPriceUpdates)
 
 	fChain := p.ObserveFChain()
 
 	p.lggr.Infow("observed fee components",
-		"supportedChains", sortedChains,
+		"supportedChains", supportedChains.ToSlice(),
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,
