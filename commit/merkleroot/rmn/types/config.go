@@ -14,10 +14,10 @@ type NodeID uint32
 
 // HomeConfig contains the configuration fetched from the RMNHome contract.
 type HomeConfig struct {
-	Nodes                   []HomeNodeInfo
-	SourceChainMinObservers map[cciptypes.ChainSelector]int
-	ConfigDigest            cciptypes.Bytes32
-	OffchainConfig          cciptypes.Bytes // The raw offchain config
+	Nodes          []HomeNodeInfo
+	SourceChainF   map[cciptypes.ChainSelector]int
+	ConfigDigest   cciptypes.Bytes32
+	OffchainConfig cciptypes.Bytes // The raw offchain config
 }
 
 // HomeNodeInfo contains information about a node from the RMNHome contract.
@@ -30,19 +30,20 @@ type HomeNodeInfo struct {
 
 // RemoteConfig contains the configuration fetched from the RMNRemote contract.
 type RemoteConfig struct {
-	ContractAddress  cciptypes.UnknownAddress `json:"contractAddress"`
-	ConfigDigest     cciptypes.Bytes32        `json:"configDigest"`
-	Signers          []RemoteSignerInfo       `json:"signers"`
-	MinSigners       uint64                   `json:"minSigners"`
-	ConfigVersion    uint32                   `json:"configVersion"`
-	RmnReportVersion cciptypes.Bytes32        `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
+	ContractAddress cciptypes.UnknownAddress `json:"contractAddress"`
+	ConfigDigest    cciptypes.Bytes32        `json:"configDigest"`
+	Signers         []RemoteSignerInfo       `json:"signers"`
+	// F defines the max number of faulty RMN nodes; F+1 signers are required to verify a report.
+	F                uint64            `json:"f"` // previously: MinSigners
+	ConfigVersion    uint32            `json:"configVersion"`
+	RmnReportVersion cciptypes.Bytes32 `json:"rmnReportVersion"` // e.g., keccak256("RMN_V1_6_ANY2EVM_REPORT")
 }
 
 func (r RemoteConfig) IsEmpty() bool {
 	return len(r.ContractAddress) == 0 &&
 		r.ConfigDigest == (cciptypes.Bytes32{}) &&
 		len(r.Signers) == 0 &&
-		r.MinSigners == 0 &&
+		r.F == 0 &&
 		r.ConfigVersion == 0 &&
 		r.RmnReportVersion == (cciptypes.Bytes32{})
 }
