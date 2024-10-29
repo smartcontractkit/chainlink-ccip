@@ -906,5 +906,7 @@ func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt
 		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
 	}.ToPackedFee()
 
-	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee}, ccipocr3.NewBigInt(nativePrice), ccipocr3.NewBigInt(usdPrices)
+	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
+		ccipocr3.NewBigInt(nativePrice),
+		ccipocr3.NewBigInt(usdPrices)
 }
