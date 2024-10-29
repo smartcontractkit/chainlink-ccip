@@ -44,7 +44,6 @@ const (
 	MethodNameFeeQuoterGetTokenPrice        = "GetTokenPrice"
 	MethodNameGetFeePriceUpdate             = "GetDestinationChainGasPrice"
 	MethodNameFeeQuoterGetStaticConfig      = "GetStaticConfig"
-	MethodNameFeeQuoterGetDynamicConfig     = "GetDynamicConfig"
 	MethodNameGetDestChainConfig            = "GetDestChainConfig"
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"

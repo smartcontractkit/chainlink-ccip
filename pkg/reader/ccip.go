@@ -946,7 +946,7 @@ func (r *ccipChainReader) getDestChainConfig(ctx context.Context) (destChainConf
 		ctx,
 		r.destChain,
 		consts.ContractNameFeeQuoter,
-		consts.MethodNameFeeQuoterGetDynamicConfig,
+		consts.MethodNameGetDestChainConfig,
 		&dynamicConfig,
 	)
 
