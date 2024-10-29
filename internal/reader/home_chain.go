@@ -226,6 +226,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 		allConfigs ActiveAndCandidate
 	)
 
+	// TODO should addresses in OCR3Config be strings instead of bytes?
 	err := r.homeChainReader.GetLatestValue(
 		ctx,
 		r.ccipConfigBoundContract.ReadIdentifier(consts.MethodNameGetOCRConfig),
