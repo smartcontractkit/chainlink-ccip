@@ -427,6 +427,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		RMNRemoteCfg:            params.rmnReportCfg,
 	}
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
+
+	packedGasPrice := chainfee.ComponentsUSDPrices{
+		ExecutionFeePriceUSD: big.NewInt(15e10),
+		DataAvFeePriceUSD:    big.NewInt(20e11),
+	}.ToPackedFee()
+
 	testCases := []struct {
 		name                  string
 		prevOutcome           Outcome
@@ -436,55 +442,48 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		mockCCIPReader func(*readerpkg_mock.MockCCIPReader)
 	}{
 		{
-			name: "fee components should be updated",
-			prevOutcome: Outcome{
-				ChainFeeOutcome: chainfee.Outcome{
-					GasPrices: []ccipocr3.GasPriceChain{
-						{
-							GasPrice: ccipocr3.NewBigIntFromInt64(0),
-							ChainSel: destChain,
-						},
-						{
-							GasPrice: ccipocr3.NewBigIntFromInt64(0),
-							ChainSel: sourceChain1,
-						},
-						{
-							GasPrice: ccipocr3.NewBigIntFromInt64(0),
-							ChainSel: sourceChain2,
-						},
-					},
-				},
-			},
+			name:        "fee components should be updated",
+			prevOutcome: Outcome{},
 			expOutcome: Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
-							GasPrice: ccipocr3.NewBigIntFromInt64(1e10),
+							GasPrice: ccipocr3.NewBigInt(packedGasPrice),
 							ChainSel: destChain,
 						},
 						{
-							GasPrice: ccipocr3.NewBigIntFromInt64(1e10),
+							GasPrice: ccipocr3.NewBigInt(packedGasPrice),
 							ChainSel: sourceChain1,
 						},
 						{
-							GasPrice: ccipocr3.NewBigIntFromInt64(1e10),
+							GasPrice: ccipocr3.NewBigInt(packedGasPrice),
 							ChainSel: sourceChain2,
 						},
 					},
 				},
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
+
 				m.EXPECT().
 					GetAvailableChainsFeeComponents(params.ctx, []ccipocr3.ChainSelector{destChain, sourceChain1, sourceChain2}).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain:    {big.NewInt(1e5), big.NewInt(3e8)},
-							sourceChain1: {big.NewInt(1e5), big.NewInt(3e8)},
-							sourceChain2: {big.NewInt(1e5), big.NewInt(3e8)},
+							destChain:    {big.NewInt(3e13), big.NewInt(4e14)},
+							sourceChain1: {big.NewInt(3e13), big.NewInt(4e14)},
+							sourceChain2: {big.NewInt(3e13), big.NewInt(4e14)},
 						}).
 					Maybe()
 
+				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
+				m.EXPECT().
+					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						destChain:    ccipocr3.NewBigIntFromInt64(5e15),
+						sourceChain1: ccipocr3.NewBigIntFromInt64(5e15),
+						sourceChain2: ccipocr3.NewBigIntFromInt64(5e15),
+					}).Maybe()
 			},
 		},
 	}
@@ -497,19 +496,14 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
-				n.ccipReader.EXPECT().
-					NextSeqNum(params.ctx, mock.Anything).
-					Unset()
-				n.ccipReader.EXPECT().
-					NextSeqNum(params.ctx, mock.Anything).
-					Return([]ccipocr3.SeqNum{}, nil).
-					Maybe()
-				n.ccipReader.EXPECT().
-					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
-					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
-				n.ccipReader.EXPECT().
-					GetChainFeePriceUpdate(params.ctx, mock.Anything).
-					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
+
+				prepareCcipReaderMock(
+					params.ctx,
+					n.ccipReader,
+					true,
+					false,
+				)
+
 				n.priceReader.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
 					Return(
