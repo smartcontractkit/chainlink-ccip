@@ -486,9 +486,9 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetAvailableChainsFeeComponents(params.ctx, []ccipocr3.ChainSelector{destChain, sourceChain1, sourceChain2}).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain:    {big.NewInt(3e13), big.NewInt(4e14)},
-							sourceChain1: {big.NewInt(3e13), big.NewInt(4e14)},
-							sourceChain2: {big.NewInt(3e13), big.NewInt(4e14)},
+							destChain:    {ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)},
+							sourceChain1: {ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)},
+							sourceChain2: {ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)},
 						}).
 					Maybe()
 
@@ -515,7 +515,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: {big.NewInt(3e13), big.NewInt(4e14)},
+							destChain: {ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)},
 						}).
 					Maybe()
 
@@ -545,7 +545,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: {big.NewInt(3e13), big.NewInt(4e14)},
+							destChain: {ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)},
 						}).
 					Maybe()
 
@@ -583,7 +583,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: {big.NewInt(3e13), big.NewInt(4e14)},
+							destChain: {ExecutionFee: big.NewInt(3e13), DataAvailabilityFee: big.NewInt(4e14)},
 						}).
 					Maybe()
 
