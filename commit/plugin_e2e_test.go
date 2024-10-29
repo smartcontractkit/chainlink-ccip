@@ -476,7 +476,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					GetAvailableChainsFeeComponents(params.ctx, []ccipocr3.ChainSelector{destChain, sourceChain1, sourceChain2}).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain:    {big.NewInt(1e5), big.NewInt(3e8)},
@@ -497,7 +497,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
-
+				n.ccipReader.EXPECT().
+					NextSeqNum(params.ctx, mock.Anything).
+					Unset()
+				n.ccipReader.EXPECT().
+					NextSeqNum(params.ctx, mock.Anything).
+					Return([]ccipocr3.SeqNum{}, nil).
+					Maybe()
 				n.ccipReader.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
