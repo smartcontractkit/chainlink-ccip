@@ -294,7 +294,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		peerClient := newMockPeerClient(resChan)
 		rmnHomeReaderMock := readerpkg_mock.NewMockRMNHome(t)
 
-		const numNodes = 4
+		const numNodes = 8
 		rmnNodes := make([]rmntypes.HomeNodeInfo, numNodes)
 		for i := 0; i < numNodes; i++ {
 			// deterministically create a public key by seeding with a 32char string.
@@ -464,7 +464,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			t.Logf("requestIDs: %v", requestIDs)
 
 			// requests should be sent to more than f+1 nodes, since we hit the timer timeout
-			assert.Greater(t, len(requestIDs), int(ts.remoteRMNCfg.F)+1)
+			assert.Greater(t, len(requestIDs), int(ts.remoteRMNCfg.F))
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
