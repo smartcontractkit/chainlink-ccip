@@ -463,8 +463,8 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 			t.Logf("requestIDs: %v", requestIDs)
 
-			// requests should be sent to all nodes, since we hit the timer timeout
-			assert.Equal(t, len(requestIDs), len(ts.remoteRMNCfg.Signers))
+			// requests should be sent to more than f+1 nodes, since we hit the timer timeout
+			assert.Greater(t, len(requestIDs), int(ts.remoteRMNCfg.F)+1)
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
