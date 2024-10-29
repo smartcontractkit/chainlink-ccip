@@ -2,33 +2,38 @@ package exectypes
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
-	b1, err := ccipocr3.NewBytes32FromString("0x01")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b2, err := ccipocr3.NewBytes32FromString("0x02")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b3, err := ccipocr3.NewBytes32FromString("0x03")
-	if err != nil {
-		t.Fatal(err)
-	}
+var (
+	b1 = mustMakeBytes("0x01")
+	b2 = mustMakeBytes("0x02")
+	b3 = mustMakeBytes("0x03")
+)
 
+func mustMakeBytes(s string) ccipocr3.Bytes32 {
+	b, err := ccipocr3.NewBytes32FromString(s)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 	tests := []struct {
 		name         string
 		messageIDs   []ccipocr3.Bytes32
@@ -212,20 +217,7 @@ func TestWaitBoostedFee(t *testing.T) {
 	}
 }
 
-func TestCcipMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
-	b1, err := ccipocr3.NewBytes32FromString("0x01")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b2, err := ccipocr3.NewBytes32FromString("0x02")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b3, err := ccipocr3.NewBytes32FromString("0x03")
-	if err != nil {
-		t.Fatal(err)
-	}
-
+func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 	mockNow := func() time.Time {
 		return time.Date(2023, time.January, 1, 14, 0, 0, 0, time.UTC)
 	}
@@ -293,6 +285,96 @@ func TestCcipMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 			if tt.wantErr(t, err, "MessageFeeUSD18(...)") {
 				return
 			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
+	tests := []struct {
+		name               string
+		messages           []ccipocr3.Message
+		messageGases       []uint64
+		executionFee       *big.Int
+		feeComponentsError error
+		want               map[ccipocr3.Bytes32]plugintypes.USD18
+		wantErr            bool
+	}{
+		{
+			name: "happy path",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b2},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b3},
+				},
+			},
+			messageGases:       []uint64{100, 200, 300},
+			executionFee:       big.NewInt(100),
+			feeComponentsError: nil,
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(10000),
+				b2: plugintypes.NewUSD18(20000),
+				b3: plugintypes.NewUSD18(30000),
+			},
+			wantErr: false,
+		},
+		{
+			name: "fee components error",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b2},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b3},
+				},
+			},
+			messageGases:       []uint64{100, 200, 300},
+			executionFee:       big.NewInt(100),
+			feeComponentsError: fmt.Errorf("error"),
+			want:               map[ccipocr3.Bytes32]plugintypes.USD18{},
+			wantErr:            true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			lggr := logger.Test(t)
+
+			mockReader := readerpkg_mock.NewMockCCIPReader(t)
+			feeComponents := types.ChainFeeComponents{
+				ExecutionFee:        tt.executionFee,
+				DataAvailabilityFee: big.NewInt(0),
+			}
+			mockReader.EXPECT().GetDestChainFeeComponents(ctx).Return(feeComponents, tt.feeComponentsError)
+
+			ep := gasmock.NewMockEstimateProvider(t)
+			if !tt.wantErr {
+				for _, messageGas := range tt.messageGases {
+					ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(messageGas).Once()
+				}
+			}
+
+			calculator := CCIPMessageExecCostUSD18Calculator{
+				lggr:             lggr,
+				ccipReader:       mockReader,
+				estimateProvider: ep,
+			}
+
+			got, err := calculator.MessageExecCostUSD18(ctx, tt.messages)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
