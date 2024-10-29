@@ -9,6 +9,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -104,7 +105,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
-		len(decodedReport.RMNSignatures) < int(reportInfo.RemoteF)+1 {
+		consensus.Threshold(len(decodedReport.RMNSignatures)) < consensus.FPlus1(int(reportInfo.RemoteF)) {
 		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, nil

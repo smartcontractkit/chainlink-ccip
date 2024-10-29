@@ -22,6 +22,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
+
 	typconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -180,13 +182,15 @@ func (c *controller) ComputeReportSignatures(
 	}
 	// Filter out the lane update requests for chains without enough RMN nodes supporting them.
 	for chain, l := range updatesPerChain {
-		if _, exists := homeFMap[cciptypes.ChainSelector(chain)]; !exists {
-			return nil, fmt.Errorf("no f for chain %d", chain)
+		chainF, exists := homeFMap[cciptypes.ChainSelector(chain)]
+		if !exists {
+			return nil, fmt.Errorf("no F for chain %d", chain)
 		}
-		if l.RmnNodes.Cardinality() < homeFMap[cciptypes.ChainSelector(chain)]+1 {
+
+		if consensus.Threshold(l.RmnNodes.Cardinality()) < consensus.FPlus1(chainF) {
 			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
 				"chain", chain,
-				"homeFMap", homeFMap[cciptypes.ChainSelector(chain)],
+				"homeF", homeFMap[cciptypes.ChainSelector(chain)],
 				"nodes", l.RmnNodes.ToSlice(),
 			)
 			delete(updatesPerChain, chain)
@@ -247,7 +251,7 @@ func (c *controller) Close() error {
 	return c.peerClient.Close()
 }
 
-// getRmnSignedObservations guarantees to return at least f+1 signed observations for each source chain.
+// getRmnSignedObservations guarantees to return at least F+1 signed observations for each source chain.
 func (c *controller) getRmnSignedObservations(
 	ctx context.Context,
 	destChain *rmnpb.LaneDest,
@@ -259,17 +263,17 @@ func (c *controller) getRmnSignedObservations(
 	requestedNodes := make(map[uint64]mapset.Set[rmntypes.NodeID])                   // sourceChain -> requested rmnNodeIDs
 	requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest) // grouped requests for each node
 
-	// For each lane update request send an observation request to at most 'f+1' number of rmn nodes.
-	// At this point we can safely assume that we have at least f+1 supporting each source chain.
+	// For each lane update request send an observation request to at most 'F+1' number of rmn nodes.
+	// At this point we can safely assume that we have at least F+1 supporting each source chain.
 	for sourceChain, updateRequest := range updateRequestsPerChain {
 		requestedNodes[sourceChain] = mapset.NewSet[rmntypes.NodeID]()
-		homeF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
+		chainF, exist := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exist {
-			return nil, fmt.Errorf("no f for chain %d", sourceChain)
+			return nil, fmt.Errorf("no F for chain %d", sourceChain)
 		}
 
 		for nodeID := range updateRequest.RmnNodes.Iter() {
-			if requestedNodes[sourceChain].Cardinality() >= homeF+1 {
+			if consensus.Threshold(requestedNodes[sourceChain].Cardinality()) >= consensus.FPlus1(chainF) {
 				break // We have enough initial observers for this source chain.
 			}
 
@@ -448,7 +452,7 @@ func (c *controller) listenForRmnObservationResponses(
 }
 
 // gotSufficientObservationResponses checks if we got enough observation responses for each source chain.
-// Enough meaning that we got at least f+1 observing the same merkle root for a target chain.
+// Enough meaning that we got at least F+1 observing the same merkle root for a target chain.
 func gotSufficientObservationResponses(
 	lggr logger.Logger,
 	updateRequests map[uint64]updateRequestWithMeta,
@@ -466,20 +470,20 @@ func gotSufficientObservationResponses(
 	}
 
 	for sourceChain := range updateRequests {
-		// make sure we got at least f+1 observing the same merkle root for a target chain.
+		// make sure we got at least F+1 observing the same merkle root for a target chain.
 		countsPerRoot, ok := merkleRootsCount[sourceChain]
 		if !ok || len(countsPerRoot) == 0 {
 			return false
 		}
-		homeF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
+		chainF, exists := homeFMap[cciptypes.ChainSelector(sourceChain)]
 		if !exists {
-			lggr.Errorw("no f for chain", "chain", sourceChain)
+			lggr.Errorw("no F for chain", "chain", sourceChain)
 			return false
 		}
 
 		values := maps.Values(countsPerRoot)
 		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if values[len(values)-1] < homeF+1 {
+		if consensus.Threshold(values[len(values)-1]) < consensus.FPlus1(chainF) {
 			return false
 		}
 	}
@@ -580,12 +584,12 @@ func (c *controller) getRmnReportSignatures(
 	// At this point it is also possible that the signed observations contain
 	// different roots for the same source chain and interval.
 
-	homeF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
+	chainF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
-		return nil, fmt.Errorf("get remote f: %w", err)
+		return nil, fmt.Errorf("get home reader f: %w", err)
 	}
 
-	rootsPerChain, err := selectRoots(rmnSignedObservations, homeF)
+	rootsPerChain, err := selectRoots(rmnSignedObservations, chainF)
 	if err != nil {
 		return nil, fmt.Errorf("get most voted roots from observations: %w", err)
 	}
@@ -702,7 +706,7 @@ func transformAndSortObservations(
 }
 
 // selectsRoots selects the roots from the signed observations.
-// If there are more than one valid roots based on the provided f it returns an error.
+// If there are more than one valid roots based on the provided F it returns an error.
 func selectRoots(
 	observations []rmnSignedObservationWithMeta,
 	homeFMap map[cciptypes.ChainSelector]int,
@@ -721,13 +725,13 @@ func selectRoots(
 	for chain, votes := range votesPerRoot {
 		f, exists := homeFMap[chain]
 		if !exists {
-			return nil, fmt.Errorf("no f for chain %d", chain)
+			return nil, fmt.Errorf("no F for chain %d", chain)
 		}
 
 		var selectedRoot cciptypes.Bytes32
 
 		for root, vote := range votes {
-			if vote < f+1 {
+			if consensus.Threshold(vote) < consensus.FPlus1(f) {
 				continue
 			}
 
@@ -761,7 +765,7 @@ func (c *controller) sendReportSignatureRequest(
 
 	// Send the report signature request to at least #remoteF+1
 	for _, node := range randomShuffle(remoteSigners) {
-		if requestIDs.Cardinality() >= remoteF+1 {
+		if consensus.Threshold(requestIDs.Cardinality()) >= consensus.FPlus1(remoteF) {
 			break
 		}
 
@@ -790,7 +794,7 @@ func (c *controller) sendReportSignatureRequest(
 		signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
 	}
 
-	if requestIDs.Cardinality() < remoteF+1 {
+	if consensus.Threshold(requestIDs.Cardinality()) < consensus.FPlus1(remoteF) {
 		return requestIDs, signersRequested, fmt.Errorf("not able to send to enough report signers")
 	}
 	return requestIDs, signersRequested, nil
@@ -841,7 +845,7 @@ func (c *controller) listenForRmnReportSignatures(
 				reportSigs = append(reportSigs, *reportSig)
 			}
 
-			if len(reportSigs) >= remoteF+1 {
+			if consensus.Threshold(len(reportSigs)) >= consensus.FPlus1(remoteF) {
 				c.lggr.Infof("got enough RMN report signatures")
 				return sortAndParseReportSigs(reportSigs), nil
 			}

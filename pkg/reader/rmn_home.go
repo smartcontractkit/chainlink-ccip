@@ -37,7 +37,8 @@ type RMNHome interface {
 	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.HomeNodeInfo, error)
 	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
 	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool
-	// GetF gets the F value for each source chain in the given configDigest
+	// GetF gets the F value for each source chain in the given configDigest.
+	// Maximum number of faulty observers; F+1 observers required to agree on an observation for a source chain.
 	GetF(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
