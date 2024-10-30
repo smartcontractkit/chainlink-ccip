@@ -634,16 +634,7 @@ func TestContractDiscoveryProcessor_ValidateObservation_ErrorGettingSupportedCha
 }
 
 func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserve(t *testing.T) {
-	mockHomeChain := mock_home_chain.NewMockHomeChain(t)
-	lggr := logger.Test(t)
 	dest := cciptypes.ChainSelector(1)
-	fRoleDON := 1
-	oracleID := commontypes.OracleID(1)
-	peerID := ragep2ptypes.PeerID([32]byte{1, 2, 3})
-
-	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{
-		oracleID: peerID,
-	}
 
 	cases := []struct {
 		name            string
@@ -704,7 +695,16 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+			fRoleDON := 1
+			oracleID := commontypes.OracleID(1)
+			peerID := ragep2ptypes.PeerID([32]byte{1, 2, 3})
 
+			oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{
+				oracleID: peerID,
+			}
+
+			mockHomeChain := mock_home_chain.NewMockHomeChain(t)
 			mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(mapset.NewSet(tc.supportedChains...), nil)
 			defer mockHomeChain.AssertExpectations(t)
 
