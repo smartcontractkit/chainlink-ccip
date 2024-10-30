@@ -471,6 +471,24 @@ func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
 	return feeComponents
 }
 
+func (r *ccipChainReader) GetDestChainFeeComponents(
+	ctx context.Context,
+) (types.ChainFeeComponents, error) {
+	chainWriter, ok := r.contractWriters[r.destChain]
+	if !ok {
+		r.lggr.Errorw("dest chain contract writer not found", "chain", r.destChain)
+		return types.ChainFeeComponents{}, errors.New("dest chain contract writer not found")
+	}
+
+	feeComponents, err := chainWriter.GetFeeComponents(ctx)
+	if err != nil {
+		r.lggr.Errorw("failed to get dest chain fee components", "chain", r.destChain)
+		return types.ChainFeeComponents{}, err
+	}
+
+	return *feeComponents, nil
+}
+
 func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 	ctx context.Context,
 	selectors []cciptypes.ChainSelector,
@@ -632,7 +650,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
 		Signers:          signers,
-		MinSigners:       vc.Config.MinSigners,
+		F:                vc.Config.F,
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
@@ -1057,13 +1075,12 @@ type offRampStaticChainConfig struct {
 	NonceManager       []byte                  `json:"nonceManager"`
 }
 
-// offRampDynamicChainConfig maps to DynamicChainConfig in OffRamp.sol
+// offRampDynamicChainConfig maps to DynamicConfig in OffRamp.sol
 type offRampDynamicChainConfig struct {
 	FeeQuoter                               []byte `json:"feeQuoter"`
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
-	MaxTokenTransferGas                     uint32 `json:"maxTokenTransferGas"`
-	MaxPoolReleaseOrMintGas                 uint32 `json:"maxPoolReleaseOrMintGas"`
-	MessageValidator                        []byte `json:"messageValidator"`
+	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
+	MessageInterceptor                      []byte `json:"messageInterceptor"`
 }
 
 //nolint:unused // it will be used soon // TODO: Remove nolint
@@ -1236,7 +1253,7 @@ type signer struct {
 type config struct {
 	RMNHomeContractConfigDigest []byte   `json:"rmnHomeContractConfigDigest"`
 	Signers                     []signer `json:"signers"`
-	MinSigners                  uint64   `json:"minSigners"`
+	F                           uint64   `json:"f"` // previously: MinSigners
 }
 
 // versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.

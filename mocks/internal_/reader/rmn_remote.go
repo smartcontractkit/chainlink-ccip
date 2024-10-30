@@ -22,12 +22,12 @@ func (_m *MockRMNRemote) EXPECT() *MockRMNRemote_Expecter {
 	return &MockRMNRemote_Expecter{mock: &_m.Mock}
 }
 
-// GetMinSigners provides a mock function with given fields:
-func (_m *MockRMNRemote) GetMinSigners() uint64 {
+// GetF provides a mock function with given fields:
+func (_m *MockRMNRemote) GetF() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetMinSigners")
+		panic("no return value specified for GetF")
 	}
 
 	var r0 uint64
@@ -40,29 +40,29 @@ func (_m *MockRMNRemote) GetMinSigners() uint64 {
 	return r0
 }
 
-// MockRMNRemote_GetMinSigners_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMinSigners'
-type MockRMNRemote_GetMinSigners_Call struct {
+// MockRMNRemote_GetF_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetF'
+type MockRMNRemote_GetF_Call struct {
 	*mock.Call
 }
 
-// GetMinSigners is a helper method to define mock.On call
-func (_e *MockRMNRemote_Expecter) GetMinSigners() *MockRMNRemote_GetMinSigners_Call {
-	return &MockRMNRemote_GetMinSigners_Call{Call: _e.mock.On("GetMinSigners")}
+// GetF is a helper method to define mock.On call
+func (_e *MockRMNRemote_Expecter) GetF() *MockRMNRemote_GetF_Call {
+	return &MockRMNRemote_GetF_Call{Call: _e.mock.On("GetF")}
 }
 
-func (_c *MockRMNRemote_GetMinSigners_Call) Run(run func()) *MockRMNRemote_GetMinSigners_Call {
+func (_c *MockRMNRemote_GetF_Call) Run(run func()) *MockRMNRemote_GetF_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockRMNRemote_GetMinSigners_Call) Return(_a0 uint64) *MockRMNRemote_GetMinSigners_Call {
+func (_c *MockRMNRemote_GetF_Call) Return(_a0 uint64) *MockRMNRemote_GetF_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRMNRemote_GetMinSigners_Call) RunAndReturn(run func() uint64) *MockRMNRemote_GetMinSigners_Call {
+func (_c *MockRMNRemote_GetF_Call) RunAndReturn(run func() uint64) *MockRMNRemote_GetF_Call {
 	_c.Call.Return(run)
 	return _c
 }
