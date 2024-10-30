@@ -907,7 +907,6 @@ func noReportMerkleOutcome(r rmntypes.RemoteConfig) merkleroot.Outcome {
 		OffRampNextSeqNums:      []plugintypes.SeqNumChain{},
 		RMNReportSignatures:     []ccipocr3.RMNECDSASignature{},
 		RMNRemoteCfg:            r,
-		RMNRawVs:                ccipocr3.NewBigIntFromInt64(0),
 	}
 }
 
