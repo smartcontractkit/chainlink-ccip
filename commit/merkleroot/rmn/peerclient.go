@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/networking"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/smartcontractkit/libocr/ragep2p"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -169,23 +168,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	)
 
 	var err error
-	stream, err = r.peerGroup.NewStream(
-		rmnPeerID,
-		networking.NewStreamArgs1{ // todo: make it configurable
-			StreamName:         streamName,
-			OutgoingBufferSize: 1,
-			IncomingBufferSize: 1,
-			MaxMessageLength:   4_194_304, // 4MB
-			MessagesLimit: ragep2p.TokenBucketParams{
-				Rate:     50,
-				Capacity: 200,
-			},
-			BytesLimit: ragep2p.TokenBucketParams{
-				Rate:     20_971_520,  // 20MB
-				Capacity: 104_857_600, // 100MB
-			},
-		},
-	)
+	stream, err = r.peerGroup.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName))
 	if err != nil {
 		return nil, fmt.Errorf("new stream %s: %w", streamName, err)
 	}
