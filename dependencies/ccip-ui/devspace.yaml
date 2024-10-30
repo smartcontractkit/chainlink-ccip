@@ -42,13 +42,12 @@ deployments:
           NEXT_PUBLIC_CCIP_LOCAL_NETWORK_2_CHAIN_ID: "${NETWORK_2_CHAINID}"
           NEXT_PUBLIC_CCIP_LOCAL_NETWORK_2_RPC_URL: ${NETWORK_2_RPC}
           NEXT_PUBLIC_CCIP_LOCAL_NETWORK_2_CHAIN_SELECTOR: "12922642891491394802" # from https://github.com/smartcontractkit/chain-selectors/blob/e25527c097e7d7be17791c814704b3c0894c17bf/test_selectors.yml#L5-L7
-          NEXT_PRIVATE_CL_ONCHAIN_DATA_V2_URL: http://atlas-postgraphile.${DEVSPACE_NAMESPACE}.svc.cluster.local:5000/graphql
-          NEXT_PUBLIC_CL_ONCHAIN_DATA_V2_URL: http://atlas-postgraphile.${DEVSPACE_NAMESPACE}.svc.cluster.local:5000/graphql
+          NEXT_PRIVATE_CL_CCIP_POSTGRAPHILE_URL: http://atlas-postgraphile.${DEVSPACE_NAMESPACE}.svc.cluster.local:5000/graphql
           NEXT_PUBLIC_CL_NODE_ENV: crib
           NEXT_PRIVATE_CL_SUPABASE_URL: ""
           NEXT_PRIVATE_CL_SUPABASE_KEY: ""
           NEXT_PUBLIC_CL_WALLET_CONNECT_PROJECT_ID: ""
-          NEXT_PRIVATE_CL_ONCHAIN_DATA_V2_API_KEY: ""
+          NEXT_PRIVATE_CL_CCIP_POSTGRAPHILE_API_KEY: ""
         podSecurityContext:
           runAsUser: 1001
           runAsGroup: 1001
