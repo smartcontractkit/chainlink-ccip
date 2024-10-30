@@ -3,7 +3,6 @@ package commit
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -379,12 +378,12 @@ func (p *Plugin) Outcome(
 }
 
 func (p *Plugin) Close() error {
-	return services.CloseAll([]io.Closer{
+	return services.CloseAll(
 		p.merkleRootProcessor,
 		p.tokenPriceProcessor,
 		p.chainFeeProcessor,
 		p.discoveryProcessor,
-	}...)
+	)
 }
 
 func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
