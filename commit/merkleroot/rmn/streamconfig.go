@@ -8,8 +8,9 @@ import (
 	"github.com/smartcontractkit/libocr/ragep2p"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 )
 
 const (
