@@ -453,8 +453,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 							destChain:    newFeeComponents,
 							sourceChain1: newFeeComponents,
 							sourceChain2: newFeeComponents,
-						}).
-					Maybe()
+						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
@@ -462,7 +461,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						destChain:    newNativePrice,
 						sourceChain1: newNativePrice,
 						sourceChain2: newNativePrice,
-					}).Maybe()
+					})
 			},
 		},
 		{
@@ -478,8 +477,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents,
-						}).
-					Maybe()
+						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
@@ -487,7 +485,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						destChain:    newNativePrice,
 						sourceChain1: newNativePrice,
 						sourceChain2: newNativePrice,
-					}).Maybe()
+					})
 			},
 		},
 		{
@@ -506,14 +504,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents,
-						}).
-					Maybe()
+						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						destChain: newNativePrice,
-					}).Maybe()
+					})
 			},
 		},
 		{
@@ -539,14 +536,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents2,
-						}).
-					Maybe()
+						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						destChain: newNativePrice2,
-					}).Maybe()
+					})
 			},
 		},
 		{
@@ -572,14 +568,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents2,
-						}).
-					Maybe()
-
+						})
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						destChain: newNativePrice2,
-					}).Maybe()
+					})
 
 				m.EXPECT().GetChainFeePriceUpdate(params.ctx, mock.Anything).Unset()
 				elapsed, err := time.ParseDuration("3h")
@@ -592,7 +586,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 							Timestamp: t,
 							Value:     expectedChainFeeOutcome.GasPrices[0].GasPrice,
 						},
-					}).Maybe()
+					})
 			},
 		},
 	}
