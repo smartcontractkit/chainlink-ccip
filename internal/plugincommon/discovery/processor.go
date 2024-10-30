@@ -97,7 +97,7 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 		// discovered on the chain that the contract is deployed on.
 		case consts.ContractNameFeeQuoter,
 			consts.ContractNameRouter:
-			for chain, _ := range addrs {
+			for chain := range addrs {
 				if !supportedChains.Contains(chain) {
 					return fmt.Errorf(
 						"oracle %d is not allowed to observe chain %s for %s", ao.OracleID, chain, contract)
