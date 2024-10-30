@@ -640,29 +640,96 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	fRoleDON := 1
 	oracleID := commontypes.OracleID(1)
 	peerID := ragep2ptypes.PeerID([32]byte{1, 2, 3})
-	supportedChains := mapset.NewSet(cciptypes.ChainSelector(2)) // Different chain
 
 	oracleIDToP2PID := map[commontypes.OracleID]ragep2ptypes.PeerID{
 		oracleID: peerID,
 	}
 
-	mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil)
-	defer mockHomeChain.AssertExpectations(t)
-
-	cdp := NewContractDiscoveryProcessor(
-		lggr,
-		nil, // reader, not needed for this test
-		mockHomeChain,
-		dest,
-		fRoleDON,
-		oracleIDToP2PID,
-	)
-
-	ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
-		OracleID: oracleID,
+	cases := []struct {
+		name            string
+		supportedChains []cciptypes.ChainSelector
+		addresses       reader.ContractAddresses
+		errStr          string
+	}{
+		{
+			name: "no observations no error",
+		},
+		{
+			name: "onramps are only discovered on dest (error)",
+			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+				consts.ContractNameOnRamp: {
+					dest + 1: []byte("1"),
+					dest + 2: []byte("2"),
+					dest + 3: []byte("3"),
+				},
+			},
+			errStr: "oracle 1 is not allowed to observe contract (OnRamp) on the destination chain ChainSelector(1)",
+		},
+		{
+			name:            "onramps are only discovered on dest (pass)",
+			supportedChains: []cciptypes.ChainSelector{dest},
+			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+				consts.ContractNameOnRamp: {
+					dest + 1: []byte("1"),
+					dest + 2: []byte("2"),
+					dest + 3: []byte("3"),
+				},
+			},
+		},
+		{
+			name:            "FeeQuoter is discovered on the same chain (error)",
+			supportedChains: []cciptypes.ChainSelector{dest},
+			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+				consts.ContractNameFeeQuoter: {
+					dest + 1: []byte("1"),
+					dest + 2: []byte("2"),
+					dest + 3: []byte("3"),
+				},
+			},
+			errStr: "oracle 1 is not allowed to observe chain ChainSelector",
+		},
+		{
+			name:            "FeeQuoter is discovered on the same chain (pass)",
+			supportedChains: []cciptypes.ChainSelector{dest + 1, dest + 2, dest + 3},
+			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+				consts.ContractNameFeeQuoter: {
+					dest + 1: []byte("1"),
+					dest + 2: []byte("2"),
+					dest + 3: []byte("3"),
+				},
+			},
+		},
 	}
 
-	err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), fmt.Sprintf("oracle %d is not allowed to observe chain %s", ao.OracleID, cdp.dest))
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockHomeChain.EXPECT().GetSupportedChainsForPeer(peerID).Return(mapset.NewSet(tc.supportedChains...), nil)
+			defer mockHomeChain.AssertExpectations(t)
+
+			cdp := NewContractDiscoveryProcessor(
+				lggr,
+				nil, // reader, not needed for this test
+				mockHomeChain,
+				dest,
+				fRoleDON,
+				oracleIDToP2PID,
+			)
+
+			ao := plugincommon.AttributedObservation[discoverytypes.Observation]{
+				OracleID: oracleID,
+				Observation: discoverytypes.Observation{
+					Addresses: tc.addresses,
+				},
+			}
+
+			err := cdp.ValidateObservation(discoverytypes.Outcome{}, discoverytypes.Query{}, ao)
+			if tc.errStr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.errStr)
+			}
+		})
+	}
 }
