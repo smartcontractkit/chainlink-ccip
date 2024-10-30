@@ -49,7 +49,6 @@ func (p *Plugin) Reports(
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
 		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
 		"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
-		"rmnRawVs", outcome.MerkleRootOutcome.RMNRawVs,
 	)
 
 	rep := cciptypes.CommitPluginReport{
@@ -59,7 +58,6 @@ func (p *Plugin) Reports(
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
-		RMNRawVs:      outcome.MerkleRootOutcome.RMNRawVs,
 	}
 
 	encodedReport, err := p.reportCodec.Encode(ctx, rep)
