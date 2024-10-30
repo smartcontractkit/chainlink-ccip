@@ -982,7 +982,10 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 		enabled    bool
 	}
 
-	setupConfigMocks := func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended, chains []cciptypes.ChainSelector, values []mockValue) {
+	setupConfigMocks := func(
+		readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended,
+		chains []cciptypes.ChainSelector,
+		values []mockValue) {
 		for i, chain := range chains {
 			readers[chain].EXPECT().
 				ExtendedGetLatestValue(
@@ -1004,7 +1007,9 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 		}
 	}
 
-	setupErrorMocks := func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended, chains []cciptypes.ChainSelector, err error) {
+	setupErrorMocks := func(
+		readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended,
+		chains []cciptypes.ChainSelector, err error) {
 		for _, chain := range chains {
 			readers[chain].EXPECT().
 				ExtendedGetLatestValue(
@@ -1024,7 +1029,7 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 		expectedConfig cciptypes.DataAvailabilityGasConfig
 		expectError    bool
 		chains         []cciptypes.ChainSelector
-		setupMocks     func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
+		setupMocks     func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended)
 	}{
 		{
 			name: "success - returns median values from multiple configs",
@@ -1034,13 +1039,13 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 2000,
 			},
 			chains: []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
+			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
 				values := []mockValue{
 					{100, 10, 1000, true},
 					{200, 20, 2000, true},
 					{300, 30, 3000, true},
 				}
-				setupConfigMocks(t, readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
+				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
 			},
 		},
 		{
@@ -1051,33 +1056,33 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 3000,
 			},
 			chains: []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
+			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
 				values := []mockValue{
 					{100, 10, 1000, true},
 					{200, 20, 2000, false},
 					{300, 30, 3000, true},
 				}
-				setupConfigMocks(t, readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
+				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
 			},
 		},
 		{
 			name:        "error - no valid configs found",
 			expectError: true,
 			chains:      []cciptypes.ChainSelector{chainA, chainB, chainC},
-			setupMocks: func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				setupErrorMocks(t, readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, errors.New("mock error"))
+			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
+				setupErrorMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, errors.New("mock error"))
 			},
 		},
 		{
 			name:        "error - all configs disabled",
 			expectError: true,
 			chains:      []cciptypes.ChainSelector{chainA, chainB},
-			setupMocks: func(t *testing.T, readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
+			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
 				values := []mockValue{
 					{100, 10, 1000, false},
 					{200, 20, 2000, false},
 				}
-				setupConfigMocks(t, readers, []cciptypes.ChainSelector{chainA, chainB}, values)
+				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB}, values)
 			},
 		},
 	}
@@ -1093,7 +1098,7 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 				contractReaders[chain] = mockReaders[chain]
 			}
 
-			tt.setupMocks(t, mockReaders)
+			tt.setupMocks(mockReaders)
 
 			reader := &ccipChainReader{
 				lggr:            logger.Test(t),
