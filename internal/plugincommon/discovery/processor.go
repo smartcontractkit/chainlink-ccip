@@ -106,11 +106,11 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 // aggObs is used to store multiple observations for each value being observed.
 type aggObs struct {
 	fChain            map[cciptypes.ChainSelector][]int
-	onrampAddrs       map[cciptypes.ChainSelector][][]byte
-	feeQuoterAddrs    map[cciptypes.ChainSelector][][]byte
-	nonceManagerAddrs map[cciptypes.ChainSelector][][]byte
-	rmnRemoteAddrs    map[cciptypes.ChainSelector][][]byte
-	routerAddrs       map[cciptypes.ChainSelector][][]byte
+	onrampAddrs       map[cciptypes.ChainSelector][]cciptypes.UnknownAddress
+	feeQuoterAddrs    map[cciptypes.ChainSelector][]cciptypes.UnknownAddress
+	nonceManagerAddrs map[cciptypes.ChainSelector][]cciptypes.UnknownAddress
+	rmnRemoteAddrs    map[cciptypes.ChainSelector][]cciptypes.UnknownAddress
+	routerAddrs       map[cciptypes.ChainSelector][]cciptypes.UnknownAddress
 }
 
 // aggregateObservations combines observations for multiple objects into aggObs, which is a convenient
@@ -122,11 +122,11 @@ func aggregateObservations(
 ) aggObs {
 	obs := aggObs{
 		fChain:            make(map[cciptypes.ChainSelector][]int),
-		onrampAddrs:       make(map[cciptypes.ChainSelector][][]byte),
-		feeQuoterAddrs:    make(map[cciptypes.ChainSelector][][]byte),
-		nonceManagerAddrs: make(map[cciptypes.ChainSelector][][]byte),
-		rmnRemoteAddrs:    make(map[cciptypes.ChainSelector][][]byte),
-		routerAddrs:       make(map[cciptypes.ChainSelector][][]byte),
+		onrampAddrs:       make(map[cciptypes.ChainSelector][]cciptypes.UnknownAddress),
+		feeQuoterAddrs:    make(map[cciptypes.ChainSelector][]cciptypes.UnknownAddress),
+		nonceManagerAddrs: make(map[cciptypes.ChainSelector][]cciptypes.UnknownAddress),
+		rmnRemoteAddrs:    make(map[cciptypes.ChainSelector][]cciptypes.UnknownAddress),
+		routerAddrs:       make(map[cciptypes.ChainSelector][]cciptypes.UnknownAddress),
 	}
 	for _, ao := range aos {
 		for chainSel, f := range ao.Observation.FChain {

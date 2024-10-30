@@ -23,7 +23,7 @@ var (
 
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
-type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
+type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
@@ -31,7 +31,7 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 		resp = make(ContractAddresses)
 	}
 	if resp[contract] == nil {
-		resp[contract] = make(map[cciptypes.ChainSelector][]byte)
+		resp[contract] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress)
 	}
 	resp[contract][chain] = address
 	return resp
