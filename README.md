@@ -1,12 +1,23 @@
+<div style="text-align:center" align="center">
+    <a href="https://chain.link" target="_blank">
+        <img src="https://raw.githubusercontent.com/smartcontractkit/chainlink/develop/docs/logo-chainlink-blue.svg" width="225" alt="Chainlink logo">
+    </a>
+
+[![License](https://img.shields.io/static/v1?label=license&message=BUSL%201.1&color=green)](https://github.com/smartcontractkit/chainlink-ccip/blob/master/LICENSE)
+[![Code Documentation](https://img.shields.io/static/v1?label=code-docs&message=latest&color=blue)](docs/ccip_protocol.md)
+[![API Documentation](https://img.shields.io/static/v1?label=api-docs&message=latest&color=blue)](https://docs.chain.link/ccip)
+</div>
+
 # chainlink-ccip
 
-This is the repo that implements the OCR3 CCIP plugins. This includes the commit and execution plugins.
+This repo contains [OCR3 plugins][ocr3] for CCIP. See the [documentation](docs/ccip_protocol.md) for more.
 
 ## Getting Started
 
 ### Go Version
 
-This repo uses Go 1.22. You can install Go from their [installation page](https://go.dev/doc/install).
+The version of go is specified in the project's [go.mod](go.mod) file.
+You can install Go from their [installation page](https://go.dev/doc/install).
 
 ### Running the Linter
 
@@ -50,3 +61,5 @@ the `ccip-develop` branch of chainlink-ccip. You can do this by:
 5. Go back to your chainlink-ccip PR and re-run the integration test workflow.
 6. Once the integration test passes, merge your chainlink-ccip PR into `ccip-develop`, however do not delete the branch on the remote.
 7. Create a new PR in ccip that points to the newly merged commit in the `ccip-develop` tree and merge that.
+
+[ocr3]: https://github.com/smartcontractkit/libocr/blob/master/offchainreporting2plus/ocr3types/plugin.go#L108
