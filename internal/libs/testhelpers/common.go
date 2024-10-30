@@ -42,7 +42,7 @@ func CreateRMNRemoteCfg() rmntypes.RemoteConfig {
 				NodeIndex:        rand.RandomUint64(),
 			},
 		},
-		MinSigners:       rand.RandomUint64(),
+		F:                rand.RandomUint64(),
 		ConfigVersion:    rand.RandomUint32(),
 		RmnReportVersion: rand.RandomReportVersion(),
 	}
