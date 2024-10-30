@@ -221,11 +221,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 				if i == 0 {
 					reportCodec = n.reportCodec
 				}
-				prepareCcipReaderMock(params.ctx,
-					n.ccipReader,
-					false, // mockEmptySeqNr
-					tc.enableDiscovery,
-				)
+				prepareCcipReaderMock(params.ctx, n.ccipReader, false, tc.enableDiscovery, true)
 
 				if len(tc.offRampNextSeqNumDefaultOverrideKeys) > 0 {
 					require.Equal(t, len(tc.offRampNextSeqNumDefaultOverrideKeys), len(tc.offRampNextSeqNumDefaultOverrideValues))
@@ -236,16 +232,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 						Maybe()
 				}
 
-				n.priceReader.EXPECT().
-					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
-					Return(
-						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
-					).
-					Maybe()
-				n.priceReader.EXPECT().
-					GetFeedPricesUSD(params.ctx, mock.Anything).
-					Return([]*big.Int{}, nil).
-					Maybe()
+				preparePriceReaderMock(params.ctx, n.priceReader)
 			}
 
 			encodedPrevOutcome, err := tc.prevOutcome.Encode()
@@ -387,12 +374,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					reportCodec = n.reportCodec
 				}
 
-				prepareCcipReaderMock(
-					params.ctx,
-					n.ccipReader,
-					true, // mockEmptySeqNr
-					false,
-				)
+				prepareCcipReaderMock(params.ctx, n.ccipReader, true, false, true)
 				tc.mockPriceReader(n.priceReader)
 			}
 
@@ -464,7 +446,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				},
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
-				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
@@ -475,7 +456,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						}).
 					Maybe()
 
-				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
@@ -493,7 +473,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
-				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
@@ -502,7 +481,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						}).
 					Maybe()
 
-				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
@@ -523,7 +501,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
-				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
@@ -532,7 +509,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						}).
 					Maybe()
 
-				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
@@ -558,7 +534,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				},
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
-				m.EXPECT().GetAvailableChainsFeeComponents(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
@@ -567,11 +542,56 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						}).
 					Maybe()
 
-				m.EXPECT().GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).Unset()
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
 						destChain: newNativePrice2,
+					}).Maybe()
+			},
+		},
+		{
+			name: "stale fees should be updated",
+			prevOutcome: Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				ChainFeeOutcome:   expectedChainFeeOutcome,
+			},
+			expOutcome: Outcome{
+				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
+				ChainFeeOutcome: chainfee.Outcome{
+					GasPrices: []ccipocr3.GasPriceChain{
+						{
+							GasPrice: newPackedGasPrice2,
+							ChainSel: destChain,
+						},
+					},
+				},
+			},
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().
+					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					Return(
+						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+							destChain: newFeeComponents2,
+						}).
+					Maybe()
+
+				m.EXPECT().
+					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						destChain: newNativePrice2,
+					}).Maybe()
+
+				m.EXPECT().GetChainFeePriceUpdate(params.ctx, mock.Anything).Unset()
+				elapsed, err := time.ParseDuration("3h")
+				require.NoError(t, err)
+				t := time.Now().UTC().Add(-elapsed)
+				m.EXPECT().
+					GetChainFeePriceUpdate(params.ctx, mock.Anything).
+					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
+						destChain: {
+							Timestamp: t,
+							Value:     expectedChainFeeOutcome.GasPrices[0].GasPrice,
+						},
 					}).Maybe()
 			},
 		},
@@ -582,23 +602,9 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				n := setupNode(params, oracleIDs[i])
 				nodes[i] = n.node
 
-				prepareCcipReaderMock(
-					params.ctx,
-					n.ccipReader,
-					true,
-					false,
-				)
+				prepareCcipReaderMock(params.ctx, n.ccipReader, true, false, false)
 
-				n.priceReader.EXPECT().
-					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
-					Return(
-						map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
-					).
-					Maybe()
-				n.priceReader.EXPECT().
-					GetFeedPricesUSD(params.ctx, mock.Anything).
-					Return([]*big.Int{}, nil).
-					Maybe()
+				preparePriceReaderMock(params.ctx, n.priceReader)
 
 				tc.mockCCIPReader(n.ccipReader)
 			}
@@ -632,13 +638,16 @@ func prepareCcipReaderMock(
 	ccipReader *readerpkg_mock.MockCCIPReader,
 	mockEmptySeqNrs bool,
 	enableDiscovery bool,
-) {
-	ccipReader.EXPECT().
-		GetAvailableChainsFeeComponents(ctx, mock.Anything).
-		Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
-	ccipReader.EXPECT().
-		GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).
-		Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
+	mockChainFee bool) {
+
+	if mockChainFee {
+		ccipReader.EXPECT().
+			GetAvailableChainsFeeComponents(ctx, mock.Anything).
+			Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
+		ccipReader.EXPECT().
+			GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).
+			Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
+	}
 	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(ctx, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
@@ -656,6 +665,20 @@ func prepareCcipReaderMock(
 		ccipReader.EXPECT().DiscoverContracts(mock.Anything).Return(nil, nil)
 		ccipReader.EXPECT().Sync(mock.Anything, mock.Anything).Return(nil)
 	}
+}
+
+func preparePriceReaderMock(ctx context.Context, priceReader *readerpkg_mock.MockPriceReader) {
+	priceReader.EXPECT().
+		GetFeeQuoterTokenUpdates(ctx, mock.Anything, mock.Anything).
+		Return(
+			map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig{}, nil,
+		).
+		Maybe()
+
+	priceReader.EXPECT().
+		GetFeedPricesUSD(ctx, mock.Anything).
+		Return([]*big.Int{}, nil).
+		Maybe()
 }
 
 type nodeSetup struct {
