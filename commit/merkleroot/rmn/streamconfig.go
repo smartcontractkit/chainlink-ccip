@@ -26,6 +26,10 @@ const (
 	rateScale     = 1.2
 	capacityScale = 3
 
+	// bufferSize should be set to 1 as advised by the RMN team.
+	outgoingBufferSize = 1
+	incomingBufferSize = 1
+
 	estimatedRoundInterval = time.Second
 )
 
@@ -40,8 +44,8 @@ func newStreamConfig(
 ) networking.NewStreamArgs1 {
 	cfg := networking.NewStreamArgs1{
 		StreamName:         streamName,
-		OutgoingBufferSize: 1, // should always be set to 1.
-		IncomingBufferSize: 1, // should always be set to 1.
+		OutgoingBufferSize: outgoingBufferSize,
+		IncomingBufferSize: incomingBufferSize,
 		MaxMessageLength:   maxMessageLength(),
 		MessagesLimit:      messagesLimit(),
 		BytesLimit:         bytesLimit(),
