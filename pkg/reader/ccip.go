@@ -1324,12 +1324,17 @@ func (r *ccipChainReader) getFeeQuoterDestChainConfig(
 }
 
 // GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
+// DA data lives in the FeeQuoter contract on the source chain. To get the config of the destination chain, we need to
+// read the FeeQuoter contract on the source chain. As nodes are not required to have all chains configured, we need to
+// read all FeeQuoter contracts to get the median.
 func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 	ctx context.Context,
 ) (cciptypes.DataAvailabilityGasConfig, error) {
 	overheadGasValues := make([]uint32, 0)
 	gasPerByteValues := make([]uint16, 0)
 	multiplierBpsValues := make([]uint16, 0)
+
+	// TODO: pay attention to performance here, as we are looping through all chains
 	for chain := range r.contractReaders {
 		config, err := r.getFeeQuoterDestChainConfig(ctx, chain)
 		if err != nil {

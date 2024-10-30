@@ -386,12 +386,12 @@ func computeDataAvailabilityCostUSD18(
 		return big.NewInt(0)
 	}
 
-	messageGas := CalculateMessageMaxDAGas(message, daConfig)
+	messageGas := calculateMessageMaxDAGas(message, daConfig)
 	return big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
 }
 
-// CalculateMessageMaxDAGas calculates the total DA gas needed for a CCIP message
-func CalculateMessageMaxDAGas(
+// calculateMessageMaxDAGas calculates the total DA gas needed for a CCIP message
+func calculateMessageMaxDAGas(
 	msg cciptypes.Message,
 	daConfig cciptypes.DataAvailabilityGasConfig,
 ) *big.Int {
