@@ -207,14 +207,8 @@ var ensureNamespaceCmd = &cobra.Command{
 var checkEnvVarsCmd = &cobra.Command{
 	Use:       "check-env-vars [core|ccip]",
 	Short:     "Ensure all required environment variables are set for the given product (core|ccip). core is the default product",
-	Args:      cobra.OnlyValidArgs,
+	Args:      cobra.MatchAll(cobra.OnlyValidArgs, cobra.MaximumNArgs(1)),
 	ValidArgs: []string{"", "core", "ccip"},
-	PreRun: func(cmd *cobra.Command, args []string) {
-		if len(args) > 1 {
-			logger.Error("invalid number of arguments", slog.Int("expected", 1), slog.Int("received", len(args)))
-			os.Exit(1)
-		}
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
 
