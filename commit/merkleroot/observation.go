@@ -29,6 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 func (w *Processor) ObservationQuorum(
@@ -86,21 +88,18 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 		return fmt.Errorf("failed to get RMN nodes info: %w", err)
 	}
 
-	peerIDs := make([]string, 0, len(rmnNodesInfo))
-	for _, node := range rmnNodesInfo {
-		w.lggr.Infow("Adding RMN node to peerIDs", "node", node.PeerID.String())
-		peerIDs = append(peerIDs, node.PeerID.String())
-	}
+	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(w.oracleIDToP2pID))
 	for _, p2pID := range w.oracleIDToP2pID {
 		w.lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
-		peerIDs = append(peerIDs, p2pID.String())
+		oraclePeerIDs = append(oraclePeerIDs, p2pID)
 	}
 
 	if err := w.rmnController.InitConnection(
 		ctx,
 		cciptypes.Bytes32(w.reportingCfg.ConfigDigest),
 		prevOutcome.RMNRemoteCfg.ConfigDigest,
-		peerIDs,
+		oraclePeerIDs,
+		rmnNodesInfo,
 	); err != nil {
 		return fmt.Errorf("failed to init connection to RMN: %w", err)
 	}

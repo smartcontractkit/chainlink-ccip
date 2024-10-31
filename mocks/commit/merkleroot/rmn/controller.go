@@ -9,6 +9,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
 	rmn "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 
 	rmnpb "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -135,17 +137,17 @@ func (_c *MockController_ComputeReportSignatures_Call) RunAndReturn(run func(con
 	return _c
 }
 
-// InitConnection provides a mock function with given fields: ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs
-func (_m *MockController) InitConnection(ctx context.Context, commitConfigDigest ccipocr3.Bytes32, rmnHomeConfigDigest ccipocr3.Bytes32, peerIDs []string) error {
-	ret := _m.Called(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)
+// InitConnection provides a mock function with given fields: ctx, commitConfigDigest, rmnHomeConfigDigest, oraclePeerIDs, rmnNodes
+func (_m *MockController) InitConnection(ctx context.Context, commitConfigDigest ccipocr3.Bytes32, rmnHomeConfigDigest ccipocr3.Bytes32, oraclePeerIDs []ragep2ptypes.PeerID, rmnNodes []types.HomeNodeInfo) error {
+	ret := _m.Called(ctx, commitConfigDigest, rmnHomeConfigDigest, oraclePeerIDs, rmnNodes)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InitConnection")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.Bytes32, ccipocr3.Bytes32, []string) error); ok {
-		r0 = rf(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.Bytes32, ccipocr3.Bytes32, []ragep2ptypes.PeerID, []types.HomeNodeInfo) error); ok {
+		r0 = rf(ctx, commitConfigDigest, rmnHomeConfigDigest, oraclePeerIDs, rmnNodes)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -162,14 +164,15 @@ type MockController_InitConnection_Call struct {
 //   - ctx context.Context
 //   - commitConfigDigest ccipocr3.Bytes32
 //   - rmnHomeConfigDigest ccipocr3.Bytes32
-//   - peerIDs []string
-func (_e *MockController_Expecter) InitConnection(ctx interface{}, commitConfigDigest interface{}, rmnHomeConfigDigest interface{}, peerIDs interface{}) *MockController_InitConnection_Call {
-	return &MockController_InitConnection_Call{Call: _e.mock.On("InitConnection", ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)}
+//   - oraclePeerIDs []ragep2ptypes.PeerID
+//   - rmnNodes []types.HomeNodeInfo
+func (_e *MockController_Expecter) InitConnection(ctx interface{}, commitConfigDigest interface{}, rmnHomeConfigDigest interface{}, oraclePeerIDs interface{}, rmnNodes interface{}) *MockController_InitConnection_Call {
+	return &MockController_InitConnection_Call{Call: _e.mock.On("InitConnection", ctx, commitConfigDigest, rmnHomeConfigDigest, oraclePeerIDs, rmnNodes)}
 }
 
-func (_c *MockController_InitConnection_Call) Run(run func(ctx context.Context, commitConfigDigest ccipocr3.Bytes32, rmnHomeConfigDigest ccipocr3.Bytes32, peerIDs []string)) *MockController_InitConnection_Call {
+func (_c *MockController_InitConnection_Call) Run(run func(ctx context.Context, commitConfigDigest ccipocr3.Bytes32, rmnHomeConfigDigest ccipocr3.Bytes32, oraclePeerIDs []ragep2ptypes.PeerID, rmnNodes []types.HomeNodeInfo)) *MockController_InitConnection_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(ccipocr3.Bytes32), args[2].(ccipocr3.Bytes32), args[3].([]string))
+		run(args[0].(context.Context), args[1].(ccipocr3.Bytes32), args[2].(ccipocr3.Bytes32), args[3].([]ragep2ptypes.PeerID), args[4].([]types.HomeNodeInfo))
 	})
 	return _c
 }
@@ -179,7 +182,7 @@ func (_c *MockController_InitConnection_Call) Return(_a0 error) *MockController_
 	return _c
 }
 
-func (_c *MockController_InitConnection_Call) RunAndReturn(run func(context.Context, ccipocr3.Bytes32, ccipocr3.Bytes32, []string) error) *MockController_InitConnection_Call {
+func (_c *MockController_InitConnection_Call) RunAndReturn(run func(context.Context, ccipocr3.Bytes32, ccipocr3.Bytes32, []ragep2ptypes.PeerID, []types.HomeNodeInfo) error) *MockController_InitConnection_Call {
 	_c.Call.Return(run)
 	return _c
 }

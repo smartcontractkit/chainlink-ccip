@@ -18,6 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 
@@ -692,7 +693,12 @@ func (m *mockPeerClient) resetReceivedRequests() {
 	m.receivedRequests = make(map[rmntypes.NodeID][]*rmnpb.Request)
 }
 
-func (m *mockPeerClient) InitConnection(_ context.Context, _ cciptypes.Bytes32, _ cciptypes.Bytes32, _ []string) error {
+func (m *mockPeerClient) InitConnection(
+	_ context.Context,
+	_ cciptypes.Bytes32,
+	_ cciptypes.Bytes32,
+	_ []ragep2ptypes.PeerID,
+	_ []rmntypes.HomeNodeInfo) error {
 	return nil
 }
 
