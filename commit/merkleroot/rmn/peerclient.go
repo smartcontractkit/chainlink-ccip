@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/networking"
@@ -59,13 +60,16 @@ type peerClient struct {
 	genericEndpointConfigDigest cciptypes.Bytes32
 	rageP2PStreams              map[rmntypes.NodeID]Stream
 	bootstrappers               []commontypes.BootstrapperLocator
-	mu                          *sync.RWMutex
+	// ocrRoundInterval is the estimated interval between OCR rounds.
+	ocrRoundInterval time.Duration
+	mu               *sync.RWMutex
 }
 
 func NewPeerClient(
 	lggr logger.Logger,
 	peerGroupFactory PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
+	ocrRoundInterval time.Duration,
 ) PeerClient {
 	return &peerClient{
 		lggr:                        lggr,
@@ -75,6 +79,7 @@ func NewPeerClient(
 		rageP2PStreams:              make(map[rmntypes.NodeID]Stream),
 		genericEndpointConfigDigest: cciptypes.Bytes32{},
 		bootstrappers:               bootstrappers,
+		ocrRoundInterval:            ocrRoundInterval,
 		mu:                          &sync.RWMutex{},
 	}
 }
@@ -168,7 +173,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	)
 
 	var err error
-	stream, err = r.peerGroup.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName))
+	stream, err = r.peerGroup.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName, r.ocrRoundInterval))
 	if err != nil {
 		return nil, fmt.Errorf("new stream %s: %w", streamName, err)
 	}

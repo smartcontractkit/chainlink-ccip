@@ -91,14 +91,33 @@ func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 		return fmt.Errorf("unable to get supported chains for Oracle %d: %w", ao.OracleID, err)
 	}
 
-	// check that the oracle is allowed to observe the dest chain.
-	if !supportedChains.Contains(cdp.dest) {
-		return fmt.Errorf("oracle %d is not allowed to observe chain %s", ao.OracleID, cdp.dest)
-	}
+	for contract, addrs := range ao.Observation.Addresses {
+		// some contract addresses come from the destination, others are from the source.
+		switch contract {
+		// discovered on the chain that the contract is deployed on.
+		case consts.ContractNameFeeQuoter,
+			consts.ContractNameRouter:
+			for chain := range addrs {
+				if !supportedChains.Contains(chain) {
+					return fmt.Errorf(
+						"oracle %d is not allowed to observe chain %s for %s", ao.OracleID, chain, contract)
+				}
+			}
+		// discovered on the destination chain.
+		case consts.ContractNameOnRamp,
+			consts.ContractNameOffRamp,
+			consts.ContractNameNonceManager,
+			consts.ContractNameRMNRemote:
 
-	// NOTE: once oracles can also discover things on source chains, we must
-	// check that they can read whatever source chain is used to determine the
-	// address, e.g source fee quoter / router.
+			if !supportedChains.Contains(cdp.dest) {
+				return fmt.Errorf(
+					"oracle %d is not allowed to observe contract (%s) on the destination chain %s",
+					ao.OracleID, contract, cdp.dest)
+			}
+		default:
+			return fmt.Errorf("unknown contract name %s", contract)
+		}
+	}
 
 	return nil
 }
