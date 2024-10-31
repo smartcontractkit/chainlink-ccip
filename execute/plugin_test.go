@@ -27,8 +27,6 @@ import (
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -533,10 +531,6 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 	const donID = uint32(1)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
-	homeChain.
-		EXPECT().
-		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeExecute).
-		Return(reader.OCR3ConfigsWithMeta{}, nil)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
@@ -563,10 +557,6 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
-	homeChain.
-		EXPECT().
-		GetOCRConfigs(mock.Anything, donID, consts.PluginTypeExecute).
-		Return(reader.OCR3ConfigsWithMeta{}, nil)
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
