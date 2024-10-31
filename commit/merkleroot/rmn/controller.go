@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -59,7 +60,8 @@ type Controller interface {
 		ctx context.Context,
 		commitConfigDigest cciptypes.Bytes32,
 		rmnHomeConfigDigest cciptypes.Bytes32,
-		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs (oracles required for peer discovery)
+		oraclePeerIDs []ragep2ptypes.PeerID,
+		rmnNodes []rmntypes.HomeNodeInfo,
 	) error
 
 	// Close closes the connection to the generic peer group endpoint and all the underlying streams.
@@ -242,9 +244,10 @@ func (c *controller) InitConnection(
 	ctx context.Context,
 	commitConfigDigest cciptypes.Bytes32,
 	rmnHomeConfigDigest cciptypes.Bytes32,
-	peerIDs []string,
+	oraclePeerIDs []ragep2ptypes.PeerID,
+	rmnNodes []rmntypes.HomeNodeInfo,
 ) error {
-	return c.peerClient.InitConnection(ctx, commitConfigDigest, rmnHomeConfigDigest, peerIDs)
+	return c.peerClient.InitConnection(ctx, commitConfigDigest, rmnHomeConfigDigest, oraclePeerIDs, rmnNodes)
 }
 
 func (c *controller) Close() error {
