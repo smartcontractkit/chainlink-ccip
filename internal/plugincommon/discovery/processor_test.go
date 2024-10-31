@@ -39,26 +39,26 @@ func TestContractDiscoveryProcessor_Observation_SupportsDest_HappyPath(t *testin
 		dest:   1,
 		source: 2,
 	}
-	expectedNonceManager := []byte("nonceManager")
-	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
-		source: []byte("onRamp"),
+	expectedNonceManager := cciptypes.UnknownAddress("nonceManager")
+	expectedOnRamp := map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		source: cciptypes.UnknownAddress("onRamp"),
 	}
-	expectedFeeQuoter := map[cciptypes.ChainSelector][]byte{
-		source: []byte("from_source_onramp"),
-		dest:   []byte("from_dest_offramp"),
+	expectedFeeQuoter := map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		source: cciptypes.UnknownAddress("from_source_onramp"),
+		dest:   cciptypes.UnknownAddress("from_dest_offramp"),
 	}
-	expectedRMNRemote := []byte("rmnRemote")
-	expectedRouter := []byte("router")
+	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
+	expectedRouter := cciptypes.UnknownAddress("router")
 	expectedContracts := reader.ContractAddresses{
-		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp:    expectedOnRamp,
 		consts.ContractNameFeeQuoter: expectedFeeQuoter,
-		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedRMNRemote,
 		},
-		consts.ContractNameRouter: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameRouter: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			source: expectedRouter,
 		},
 	}
@@ -218,22 +218,22 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 		source1: fSource1,
 		source2: fSource2,
 	}
-	expectedNonceManager := []byte("nonceManager")
-	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
-		dest: []byte("onRamp"),
+	expectedNonceManager := cciptypes.UnknownAddress("nonceManager")
+	expectedOnRamp := map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		dest: cciptypes.UnknownAddress("onRamp"),
 	}
-	expectedRMNRemote := []byte("rmnRemote")
+	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
-		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
-		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedRMNRemote,
 		},
-		consts.ContractNameFeeQuoter: map[cciptypes.ChainSelector][]byte{
-			source1: []byte("feeQuoter1"),
-			source2: []byte("feeQuoter2"),
+		consts.ContractNameFeeQuoter: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+			source1: cciptypes.UnknownAddress("feeQuoter1"),
+			source2: cciptypes.UnknownAddress("feeQuoter2"),
 		},
 		consts.ContractNameRouter: {},
 	}
@@ -254,7 +254,7 @@ func TestContractDiscoveryProcessor_Outcome_HappyPath(t *testing.T) {
 
 	obsSrc := discoverytypes.Observation{
 		FChain: expectedFChain,
-		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+		Addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			consts.ContractNameOnRamp: expectedOnRamp,
 			consts.ContractNameNonceManager: {
 				dest: expectedNonceManager,
@@ -302,21 +302,21 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 		source1: fSource1,
 		source2: fSource2,
 	}
-	expectedNonceManager := []byte("nonceManager")
-	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
-		dest: []byte("onRamp"),
+	expectedNonceManager := cciptypes.UnknownAddress("nonceManager")
+	expectedOnRamp := map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		dest: cciptypes.UnknownAddress("onRamp"),
 	}
-	expectedRMNRemote := []byte("rmnRemote")
+	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
-		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
-		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedRMNRemote,
 		},
 		consts.ContractNameRouter: {
-			dest: []byte("router"),
+			dest: cciptypes.UnknownAddress("router"),
 		},
 		consts.ContractNameFeeQuoter: {}, // no consensus
 	}
@@ -337,16 +337,16 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 
 	fChainObs := discoverytypes.Observation{
 		FChain: expectedFChain,
-		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+		Addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			consts.ContractNameFeeQuoter: {
-				source1: []byte("fee_quoter_1"),
-				source2: []byte("fee_quoter_2"),
+				source1: cciptypes.UnknownAddress("fee_quoter_1"),
+				source2: cciptypes.UnknownAddress("fee_quoter_2"),
 			},
 		},
 	}
 	destObs := discoverytypes.Observation{
 		FChain: expectedFChain,
-		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+		Addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			consts.ContractNameOnRamp: expectedOnRamp,
 			consts.ContractNameNonceManager: {
 				dest: expectedNonceManager,
@@ -355,7 +355,7 @@ func TestContractDiscovery_Outcome_HappyPath_FRoleDONAndFDestChainAreDifferent(t
 				dest: expectedRMNRemote,
 			},
 			consts.ContractNameRouter: {
-				dest: []byte("router"),
+				dest: cciptypes.UnknownAddress("router"),
 			},
 		},
 	}
@@ -396,11 +396,11 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 		source1: fSource1,
 		source2: fSource2,
 	}
-	observedNonceManager := []byte("nonceManager")
-	observedRMNRemote := []byte("rmnRemote")
-	observedOnRamp := map[cciptypes.ChainSelector][]byte{
-		source1: []byte("onRamp"),
-		source2: []byte("onRamp"),
+	observedNonceManager := cciptypes.UnknownAddress("nonceManager")
+	observedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
+	observedOnRamp := map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		source1: cciptypes.UnknownAddress("onRamp"),
+		source2: cciptypes.UnknownAddress("onRamp"),
 	}
 	// we expect no contracts here due to not enough observations to come to consensus.
 	expectedContracts := reader.ContractAddresses{
@@ -430,7 +430,7 @@ func TestContractDiscoveryProcessor_Outcome_NotEnoughObservations(t *testing.T) 
 	}
 	destObs := discoverytypes.Observation{
 		FChain: expectedFChain,
-		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+		Addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			consts.ContractNameOnRamp: observedOnRamp,
 			consts.ContractNameNonceManager: {
 				dest: observedNonceManager,
@@ -479,17 +479,17 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 		source1: fSource1,
 		source2: fSource2,
 	}
-	expectedNonceManager := []byte("nonceManager")
-	expectedOnRamp := map[cciptypes.ChainSelector][]byte{
-		dest: []byte("onRamp"),
+	expectedNonceManager := cciptypes.UnknownAddress("nonceManager")
+	expectedOnRamp := map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
+		dest: cciptypes.UnknownAddress("onRamp"),
 	}
-	expectedRMNRemote := []byte("rmnRemote")
+	expectedRMNRemote := cciptypes.UnknownAddress("rmnRemote")
 	expectedContracts := reader.ContractAddresses{
-		consts.ContractNameNonceManager: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameNonceManager: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedNonceManager,
 		},
 		consts.ContractNameOnRamp: expectedOnRamp,
-		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector][]byte{
+		consts.ContractNameRMNRemote: map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			dest: expectedRMNRemote,
 		},
 		consts.ContractNameFeeQuoter: {},
@@ -513,7 +513,7 @@ func TestContractDiscoveryProcessor_Outcome_ErrorSyncingContracts(t *testing.T) 
 
 	obs := discoverytypes.Observation{
 		FChain: expectedFChain,
-		Addresses: map[string]map[cciptypes.ChainSelector][]byte{
+		Addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 			consts.ContractNameOnRamp: expectedOnRamp,
 			consts.ContractNameNonceManager: {
 				dest: expectedNonceManager,
@@ -647,11 +647,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		},
 		{
 			name: "onramps are only discovered on dest (error)",
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameOnRamp: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 			errStr: "oracle 1 is not allowed to observe contract (OnRamp) on the destination chain ChainSelector(1)",
@@ -659,22 +659,22 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		{
 			name:            "onramps are only discovered on dest (pass)",
 			supportedChains: []cciptypes.ChainSelector{dest},
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameOnRamp: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 		},
 		{
 			name:            "FeeQuoter is discovered on the same chain (error)",
 			supportedChains: []cciptypes.ChainSelector{dest},
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameFeeQuoter: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 			errStr: "oracle 1 is not allowed to observe chain ChainSelector",
@@ -682,11 +682,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		{
 			name:            "FeeQuoter is discovered on the same chain (pass)",
 			supportedChains: []cciptypes.ChainSelector{dest + 1, dest + 2, dest + 3},
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameFeeQuoter: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 		},
