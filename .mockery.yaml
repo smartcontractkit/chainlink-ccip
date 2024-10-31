@@ -17,7 +17,6 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
             Controller:
-            PeerGroup:
             Stream:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/gas:
         interfaces:
@@ -30,6 +29,7 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/pkg/peergroup:
         interfaces:
             PeerGroupFactory:
+            PeerGroup:
     github.com/smartcontractkit/chainlink-ccip/pkg/contractreader:
         interfaces:
             Extended:

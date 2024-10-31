@@ -56,7 +56,7 @@ type peerClient struct {
 	lggr             logger.Logger
 	peerGroupCreator *peergroup.Creator
 	respChan         chan PeerResponse
-	currentGroup     peergroup.Group
+	currentGroup     peergroup.PeerGroup
 	configDigest     cciptypes.Bytes32
 	rageP2PStreams   map[rmntypes.NodeID]Stream
 	mu               *sync.RWMutex
@@ -102,7 +102,7 @@ func (r *peerClient) InitConnection(
 		return fmt.Errorf("create peer group: %w", err)
 	}
 
-	r.currentGroup = result.Group
+	r.currentGroup = result.PeerGroup
 	r.configDigest = result.ConfigDigest
 	return nil
 }
@@ -163,7 +163,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 		"rmnNodeSupportedSourceChains", rmnNode.SupportedSourceChains.String(),
 	)
 
-	pg := r.currentGroup.(PeerGroup) // safe cast since we control creation
+	pg := r.currentGroup.(peergroup.PeerGroup) // safe cast since we control creation
 	stream, err := pg.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName))
 	if err != nil {
 		return nil, fmt.Errorf("new stream %s: %w", streamName, err)
@@ -189,11 +189,6 @@ func (r *peerClient) Recv() <-chan PeerResponse {
 }
 
 // Redeclare interfaces for mocking purposes.
-
-type PeerGroup interface {
-	networking.PeerGroup
-}
-
 type Stream interface {
 	networking.Stream
 }

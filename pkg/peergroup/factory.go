@@ -16,11 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-// Group represents a peer group
-type Group interface {
-	Close() error
-}
-
 // Creator handles peer group creation
 type Creator struct {
 	lggr          logger.Logger
@@ -50,7 +45,7 @@ type CreateOpts struct {
 
 // Result contains the created peer group and its config digest
 type Result struct {
-	Group        Group
+	PeerGroup    PeerGroup
 	ConfigDigest cciptypes.Bytes32
 }
 
@@ -87,7 +82,7 @@ func (c *Creator) Create(opts CreateOpts) (Result, error) {
 	c.lggr.Infow("Created new peer group successfully")
 
 	return Result{
-		Group:        peerGroup,
+		PeerGroup:    peerGroup,
 		ConfigDigest: genericEndpointConfigDigest,
 	}, nil
 }
@@ -106,4 +101,8 @@ func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cc
 
 type PeerGroupFactory interface {
 	networking.PeerGroupFactory
+}
+
+type PeerGroup interface {
+	networking.PeerGroup
 }

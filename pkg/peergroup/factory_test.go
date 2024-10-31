@@ -193,7 +193,7 @@ func TestCreator_Create(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.NotNil(t, result.Group)
+			assert.NotNil(t, result.PeerGroup)
 			assert.NotEmpty(t, result.ConfigDigest)
 
 			// Config digest should have correct prefix
