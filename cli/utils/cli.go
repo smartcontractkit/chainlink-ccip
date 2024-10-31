@@ -246,3 +246,10 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 
 	return output
 }
+
+func IsValidCribNamespace(namespace string, skipPrefixCheck bool) error {
+	if !skipPrefixCheck && !strings.HasPrefix(namespace, "crib-") {
+		return fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
+	}
+	return nil
+}

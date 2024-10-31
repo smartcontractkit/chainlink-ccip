@@ -134,10 +134,8 @@ hooks:
   - command: crib
     args: ["devspace", "refresh-ecr-credentials", "--docker"]
     events: ["before:build:*"]
-  - command: ${SCRIPTS_DIR}/before_deploy_checks.sh
-    events: ["before:deploy:app"]
-  - command: ./${SCRIPTS_DIR}/manage_namespace.sh
-    args: ["create"]
+  - command: crib
+    args: ["devspace", "ensure-namespace"]
     events: ["before:deploy:*"]
   - wait:
       running: true
@@ -329,7 +327,8 @@ profiles:
       - op: add
         path: hooks
         value:
-          command: ${SCRIPTS_DIR}/check_env_vars.sh
+          command: crib
+          args: ["devspace", "check-env-vars"]
           events: ["before:deploy:app"]
     merge:
       images:
@@ -393,8 +392,8 @@ profiles:
       - op: add
         path: hooks
         value:
-          command: ${SCRIPTS_DIR}/check_env_vars.sh
-          args: ["ccip"]
+          command: crib
+          args: ["devspace", "check-env-vars", "ccip"]
           events: ["before:deploy:app"]
     merge:
       images:

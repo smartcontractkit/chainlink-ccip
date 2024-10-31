@@ -665,3 +665,59 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestIsValidCribNamespace(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name            string
+		namespace       string
+		skipPrefixCheck bool
+		expectedErr     error
+	}{
+		{
+			name:            "ValidNamespaceWithPrefix",
+			namespace:       "crib-validnamespace",
+			skipPrefixCheck: false,
+			expectedErr:     nil,
+		},
+		{
+			name:            "InvalidNamespaceWithoutPrefix",
+			namespace:       "invalidnamespace",
+			skipPrefixCheck: false,
+			expectedErr:     fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix"),
+		},
+		{
+			name:            "ValidNamespaceWithoutPrefixButSkipCheck",
+			namespace:       "validnamespace",
+			skipPrefixCheck: true,
+			expectedErr:     nil,
+		},
+		{
+			name:            "EmptyNamespaceWithPrefixCheck",
+			namespace:       "",
+			skipPrefixCheck: false,
+			expectedErr:     fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix"),
+		},
+		{
+			name:            "EmptyNamespaceWithoutPrefixCheck",
+			namespace:       "",
+			skipPrefixCheck: true,
+			expectedErr:     nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := IsValidCribNamespace(tc.namespace, tc.skipPrefixCheck)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

@@ -57,8 +57,8 @@ var initCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if !viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX") && !strings.HasPrefix(viper.GetString("DEVSPACE_NAMESPACE"), "crib-") {
-			logger.Error("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
+		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
+			logger.Error("invalid namespace for CRIB", slog.Any("error", err))
 			os.Exit(1)
 		}
 
