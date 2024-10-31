@@ -647,11 +647,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		},
 		{
 			name: "onramps are only discovered on dest (error)",
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameOnRamp: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 			errStr: "oracle 1 is not allowed to observe contract (OnRamp) on the destination chain ChainSelector(1)",
@@ -659,22 +659,22 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		{
 			name:            "onramps are only discovered on dest (pass)",
 			supportedChains: []cciptypes.ChainSelector{dest},
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameOnRamp: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 		},
 		{
 			name:            "FeeQuoter is discovered on the same chain (error)",
 			supportedChains: []cciptypes.ChainSelector{dest},
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameFeeQuoter: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 			errStr: "oracle 1 is not allowed to observe chain ChainSelector",
@@ -682,11 +682,11 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 		{
 			name:            "FeeQuoter is discovered on the same chain (pass)",
 			supportedChains: []cciptypes.ChainSelector{dest + 1, dest + 2, dest + 3},
-			addresses: map[string]map[cciptypes.ChainSelector][]byte{
+			addresses: map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress{
 				consts.ContractNameFeeQuoter: {
-					dest + 1: []byte("1"),
-					dest + 2: []byte("2"),
-					dest + 3: []byte("3"),
+					dest + 1: cciptypes.UnknownAddress("1"),
+					dest + 2: cciptypes.UnknownAddress("2"),
+					dest + 3: cciptypes.UnknownAddress("3"),
 				},
 			},
 		},
