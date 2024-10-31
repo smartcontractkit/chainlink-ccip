@@ -28,8 +28,6 @@ const (
 	// bufferSize should be set to 1 as advised by the RMN team.
 	outgoingBufferSize = 1
 	incomingBufferSize = 1
-
-	estimatedRoundInterval = time.Second
 )
 
 var (
@@ -40,14 +38,15 @@ var (
 func newStreamConfig(
 	lggr logger.Logger,
 	streamName string,
+	estimatedOcrRoundInterval time.Duration,
 ) networking.NewStreamArgs1 {
 	cfg := networking.NewStreamArgs1{
 		StreamName:         streamName,
 		OutgoingBufferSize: outgoingBufferSize,
 		IncomingBufferSize: incomingBufferSize,
 		MaxMessageLength:   maxMessageLength(),
-		MessagesLimit:      messagesLimit(),
-		BytesLimit:         bytesLimit(),
+		MessagesLimit:      messagesLimit(estimatedOcrRoundInterval),
+		BytesLimit:         bytesLimit(estimatedOcrRoundInterval),
 	}
 
 	lggr.Infow("new stream config",
@@ -67,14 +66,14 @@ func maxMessageLength() int {
 	)
 }
 
-func messagesLimit() ragep2p.TokenBucketParams {
+func messagesLimit(estimatedRoundInterval time.Duration) ragep2p.TokenBucketParams {
 	return ragep2p.TokenBucketParams{
 		Rate:     rateScale * (float64(maxNumOfMsgsPerRound) / estimatedRoundInterval.Seconds()),
 		Capacity: maxNumOfMsgsPerRound * uint32(capacityScale/estimatedRoundInterval.Seconds()),
 	}
 }
 
-func bytesLimit() ragep2p.TokenBucketParams {
+func bytesLimit(estimatedRoundInterval time.Duration) ragep2p.TokenBucketParams {
 	maxSumLenOutboundPerRound := maxObservationResponseBytes + maxReportSigResponseBytes
 
 	return ragep2p.TokenBucketParams{
