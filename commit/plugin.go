@@ -55,6 +55,10 @@ type Plugin struct {
 	contractsInitialized bool
 }
 
+func PrintSomething() {
+	fmt.Println("---")
+}
+
 func NewPlugin(
 	donID plugintypes.DonID,
 	oracleID commontypes.OracleID,
