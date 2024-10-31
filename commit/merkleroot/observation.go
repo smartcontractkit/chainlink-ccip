@@ -369,6 +369,7 @@ func (o ObserverImpl) ObserveMerkleRoots(
 	rootsMu := &sync.Mutex{}
 	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
+		chainRange := chainRange
 		if supportedChains.Contains(chainRange.ChainSel) {
 			wg.Add(1)
 			go func() {
