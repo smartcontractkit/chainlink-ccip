@@ -2,7 +2,6 @@ package commit
 
 import (
 	"context"
-	crand "crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"math/big"
@@ -23,8 +22,6 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2t "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -867,9 +864,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		PriceFeedChainSelector: sourceChain1,
 	}
 
-	b := make([]byte, 32)
-	_, _ = crand.Read(b)
-	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: ocr2t.ConfigDigest(b)}
+	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
 
 	params := SetupNodeParams{
 		ctx:               ctx,

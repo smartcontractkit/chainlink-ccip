@@ -2,7 +2,6 @@ package execute
 
 import (
 	"context"
-	crand "crypto/rand"
 	"fmt"
 	"testing"
 	"time"
@@ -532,8 +531,6 @@ func TestPlugin_ShouldTransmitAcceptReport_Ineligible(t *testing.T) {
 
 func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 	const donID = uint32(1)
-	b := make([]byte, 32)
-	_, _ = crand.Read(b)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
 	homeChain.
@@ -548,7 +545,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 		donID:        donID,
 		lggr:         logger.Test(t),
 		destChain:    1,
-		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2, ConfigDigest: types.ConfigDigest(b)},
+		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{
@@ -563,9 +560,6 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 
 func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 	const donID = uint32(1)
-	b := make([]byte, 32)
-	_, _ = crand.Read(b)
-
 	lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 	homeChain := reader_mock.NewMockHomeChain(t)
 	homeChain.On("GetSupportedChainsForPeer", mock.Anything).Return(mapset.NewSet(cciptypes.ChainSelector(1)), nil)
@@ -581,7 +575,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 		donID:        donID,
 		lggr:         lggr,
 		destChain:    1,
-		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2, ConfigDigest: types.ConfigDigest(b)},
+		reportingCfg: ocr3types.ReportingPluginConfig{OracleID: 2},
 		reportCodec:  codec,
 		homeChain:    homeChain,
 		oracleIDToP2pID: map[commontypes.OracleID]libocrtypes.PeerID{

@@ -326,7 +326,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
 	if p.reportingCfg.ConfigDigest == [32]byte{} {
-		return false, fmt.Errorf("current digest is nil")
+		return false, nil
 	}
 	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
 	if err != nil {
