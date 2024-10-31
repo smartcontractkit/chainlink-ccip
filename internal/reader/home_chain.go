@@ -35,7 +35,7 @@ type HomeChain interface {
 	// GetFChain Gets the FChain value for each chain
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
 	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
-	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
+	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) (ActiveAndCandidate, error)
 	services.Service
 }
 
@@ -220,9 +220,8 @@ func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 
 func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
-) ([]OCR3ConfigWithMeta, error) {
+) (ActiveAndCandidate, error) {
 	var (
-		ocrConfigs []OCR3ConfigWithMeta
 		allConfigs ActiveAndCandidate
 	)
 
@@ -235,7 +234,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 			"pluginType": pluginType,
 		}, &allConfigs)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
+		return ActiveAndCandidate{}, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
 
 	r.lggr.Infow(
@@ -244,15 +243,10 @@ func (r *homeChainPoller) GetOCRConfigs(
 		"candidateConfig", allConfigs.CandidateConfig,
 	)
 
-	if allConfigs.ActiveConfig.ConfigDigest != [32]byte{} {
-		ocrConfigs = append(ocrConfigs, allConfigs.ActiveConfig)
-	}
-
-	if allConfigs.CandidateConfig.ConfigDigest != [32]byte{} {
-		ocrConfigs = append(ocrConfigs, allConfigs.CandidateConfig)
-	}
-
-	return ocrConfigs, nil
+	return ActiveAndCandidate{
+		ActiveConfig:    allConfigs.ActiveConfig,
+		CandidateConfig: allConfigs.CandidateConfig,
+	}, nil
 }
 
 func (r *homeChainPoller) Close() error {

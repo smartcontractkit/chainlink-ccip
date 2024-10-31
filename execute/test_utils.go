@@ -2,6 +2,7 @@ package execute
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/binary"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocr2t "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -288,10 +290,12 @@ func (it *IntTest) newNode(
 	N int,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
-
+	b := make([]byte, 32)
+	_, _ = crand.Read(b)
 	rCfg := ocr3types.ReportingPluginConfig{
-		N:        N,
-		OracleID: commontypes.OracleID(id),
+		N:            N,
+		OracleID:     commontypes.OracleID(id),
+		ConfigDigest: ocr2t.ConfigDigest(b),
 	}
 
 	node1 := NewPlugin(

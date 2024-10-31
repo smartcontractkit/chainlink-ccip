@@ -325,12 +325,15 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
+	if p.reportingCfg.ConfigDigest == [32]byte{} {
+		return false, fmt.Errorf("current digest is nil")
+	}
 	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
 	if err != nil {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
+	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }
 
 func (p *Plugin) Close() error {
