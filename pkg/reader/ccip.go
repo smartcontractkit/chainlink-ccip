@@ -278,6 +278,7 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 	return executed, nil
 }
 
+// Temporary struct to properly deserialize cciptypes.Message before we have support for cciptypes.BigInt
 type ccipMessageTokenAmount struct {
 	SourcePoolAddress cciptypes.UnknownAddress
 	DestTokenAddress  cciptypes.UnknownAddress
