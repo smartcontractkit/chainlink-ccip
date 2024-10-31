@@ -146,11 +146,8 @@ func WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterfa
 		case <-ticker.C:
 			_, err := resourceClient.Get(ctx, resourceName, metav1.GetOptions{})
 			if err == nil {
-				fmt.Printf("Resource %s exists\n", resourceName)
 				return nil
 			}
-
-			fmt.Printf("Resource %s not found, retrying...\n", resourceName)
 		}
 	}
 }
