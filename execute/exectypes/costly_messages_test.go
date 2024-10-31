@@ -354,9 +354,9 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(50000), // 10_000 (exec) + 40_000 (da)
-				b2: plugintypes.NewUSD18(60000), // 20_000 (exec) + 40_000 (da)
-				b3: plugintypes.NewUSD18(70000), // 30_000 (exec) + 40_000 (da)
+				b1: plugintypes.NewUSD18(55200), // 10_000 (exec) + 45_200 (da)
+				b2: plugintypes.NewUSD18(65200), // 20_000 (exec) + 45_200 (da)
+				b3: plugintypes.NewUSD18(75200), // 30_000 (exec) + 45_200 (da)
 			},
 			wantErr: false,
 		},
@@ -390,7 +390,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(56400), // 10_000 (exec) + 46_400 (da)
+				b1: plugintypes.NewUSD18(79200), // 10_000 (exec) + 69_200 (da)
 			},
 			wantErr: false,
 		},
@@ -453,7 +453,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(221600), // 10_000 (exec) + 211_600 (da)
+				b1: plugintypes.NewUSD18(219600), // 10_000 (exec) + 218_600 (da)
 			},
 			wantErr: false,
 		},
@@ -499,7 +499,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18(48400), // 10_000 (exec) + 38_400 (da)
+				b1: plugintypes.NewUSD18(53600), // 10_000 (exec) + 43_600 (da)
 			},
 			wantErr: false,
 		},

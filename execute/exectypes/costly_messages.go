@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	EvmWordBytes             = 32
-	ConstantMessagePartBytes = 10 * 32 // A message consists of 10 abi encoded fields 32B each (after encoding)
-	daMultiplierBase         = 10_000  // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
+	EvmWordBytes              = 32
+	MessageFixedBytesPerToken = 32 * ((2 * 3) + 3)
+	ConstantMessagePartBytes  = 32 * 14 // A message consists of 14 abi encoded fields 32B each (after encoding)
+	daMultiplierBase          = 10_000  // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
 )
 
 // CostlyMessageObserver observes messages that are too costly to execute.
@@ -398,10 +399,8 @@ func calculateMessageMaxDAGas(
 	// Calculate token data length
 	var totalTokenDataLen int
 	for _, tokenAmount := range msg.TokenAmounts {
-		totalTokenDataLen += len(tokenAmount.SourcePoolAddress) +
-			len(tokenAmount.DestTokenAddress) +
+		totalTokenDataLen += MessageFixedBytesPerToken +
 			len(tokenAmount.ExtraData) +
-			EvmWordBytes +
 			len(tokenAmount.DestExecData)
 	}
 
@@ -409,10 +408,6 @@ func calculateMessageMaxDAGas(
 	dataLen := ConstantMessagePartBytes +
 		len(msg.Data) +
 		len(msg.Sender) +
-		len(msg.Receiver) +
-		len(msg.ExtraArgs) +
-		len(msg.FeeToken) +
-		EvmWordBytes*2 + // FeeTokenAmount and FeeValueJuels
 		totalTokenDataLen
 
 	// Calculate base gas cost
