@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/networking"
@@ -53,12 +54,15 @@ type PeerResponse struct {
 }
 
 type peerClient struct {
-	lggr             logger.Logger
-	peerGroupCreator *peergroup.Creator
-	respChan         chan PeerResponse
-	currentGroup     peergroup.PeerGroup
-	configDigest     cciptypes.Bytes32
-	rageP2PStreams   map[rmntypes.NodeID]Stream
+	lggr                        logger.Logger
+	peerGroupCreator            *peergroup.Creator
+	respChan                    chan PeerResponse
+	peerGroup                   peergroup.PeerGroup
+	genericEndpointConfigDigest cciptypes.Bytes32
+	rageP2PStreams              map[rmntypes.NodeID]Stream
+	bootstrappers               []commontypes.BootstrapperLocator
+	// ocrRoundInterval is the estimated interval between OCR rounds.
+	ocrRoundInterval time.Duration
 	mu               *sync.RWMutex
 }
 
@@ -66,13 +70,18 @@ func NewPeerClient(
 	lggr logger.Logger,
 	peerGroupFactory peergroup.PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
+	ocrRoundInterval time.Duration,
 ) PeerClient {
 	return &peerClient{
-		lggr:             lggr,
-		peerGroupCreator: peergroup.NewCreator(lggr, peerGroupFactory, bootstrappers),
-		respChan:         make(chan PeerResponse),
-		rageP2PStreams:   make(map[rmntypes.NodeID]Stream),
-		mu:               &sync.RWMutex{},
+		lggr:                        lggr,
+		peerGroupCreator:            peergroup.NewCreator(lggr, peerGroupFactory, bootstrappers),
+		respChan:                    make(chan PeerResponse),
+		peerGroup:                   nil,
+		rageP2PStreams:              make(map[rmntypes.NodeID]Stream),
+		genericEndpointConfigDigest: cciptypes.Bytes32{},
+		bootstrappers:               bootstrappers,
+		ocrRoundInterval:            ocrRoundInterval,
+		mu:                          &sync.RWMutex{},
 	}
 }
 
@@ -102,8 +111,8 @@ func (r *peerClient) InitConnection(
 		return fmt.Errorf("create peer group: %w", err)
 	}
 
-	r.currentGroup = result.PeerGroup
-	r.configDigest = result.ConfigDigest
+	r.peerGroup = result.PeerGroup
+	r.genericEndpointConfigDigest = result.ConfigDigest
 	return nil
 }
 
@@ -111,16 +120,16 @@ func (r *peerClient) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.currentGroup == nil {
+	if r.peerGroup == nil {
 		return nil
 	}
 
 	// individual streams are closed by the peer group
-	if err := r.currentGroup.Close(); err != nil {
+	if err := r.peerGroup.Close(); err != nil {
 		return fmt.Errorf("close peer group: %w", err)
 	}
 
-	r.currentGroup = nil
+	r.peerGroup = nil
 	r.rageP2PStreams = make(map[rmntypes.NodeID]Stream)
 	return nil
 }
@@ -129,7 +138,7 @@ func (r *peerClient) Send(rmnNode rmntypes.HomeNodeInfo, request []byte) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.currentGroup == nil {
+	if r.peerGroup == nil {
 		return ErrNoConn
 	}
 
@@ -154,7 +163,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 
 	// todo: versioning for stream names e.g. for 'v1_7'
 	streamName := fmt.Sprintf("ccip-rmn/v1_6/%s",
-		strings.TrimPrefix(r.configDigest.String(), "0x"))
+		strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x"))
 
 	r.lggr.Infow("creating new stream",
 		"streamName", streamName,
@@ -163,8 +172,8 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 		"rmnNodeSupportedSourceChains", rmnNode.SupportedSourceChains.String(),
 	)
 
-	pg := r.currentGroup.(peergroup.PeerGroup) // safe cast since we control creation
-	stream, err := pg.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName))
+	var err error
+	stream, err = r.peerGroup.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName, r.ocrRoundInterval))
 	if err != nil {
 		return nil, fmt.Errorf("new stream %s: %w", streamName, err)
 	}

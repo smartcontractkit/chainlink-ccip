@@ -22,40 +22,38 @@ const (
 	// initialObservationRequest + observationRequestWithOtherSourcesAfterTimeout + reportSignatureRequest
 	maxNumOfMsgsPerRound = 3
 
-	// values below chosen by research team
 	rateScale     = 1.2
-	capacityScale = 3
+	capacityScale = 5
 
 	// bufferSize should be set to 1 as advised by the RMN team.
 	outgoingBufferSize = 1
 	incomingBufferSize = 1
-
-	estimatedRoundInterval = time.Second
 )
 
 var (
-	maxObservationRequestBytes int
-	maxReportSigRequestBytes   int
+	maxObservationResponseBytes int
+	maxReportSigResponseBytes   int
 )
 
 func newStreamConfig(
 	lggr logger.Logger,
 	streamName string,
+	estimatedOcrRoundInterval time.Duration,
 ) networking.NewStreamArgs1 {
 	cfg := networking.NewStreamArgs1{
 		StreamName:         streamName,
 		OutgoingBufferSize: outgoingBufferSize,
 		IncomingBufferSize: incomingBufferSize,
 		MaxMessageLength:   maxMessageLength(),
-		MessagesLimit:      messagesLimit(),
-		BytesLimit:         bytesLimit(),
+		MessagesLimit:      messagesLimit(estimatedOcrRoundInterval),
+		BytesLimit:         bytesLimit(estimatedOcrRoundInterval),
 	}
 
 	lggr.Infow("new stream config",
 		"streamName", streamName,
 		"cfg", cfg,
-		"maxObservationRequestBytes", maxObservationRequestBytes,
-		"maxReportSigRequestBytes", maxReportSigRequestBytes,
+		"maxObservationResponseBytes", maxObservationResponseBytes,
+		"maxReportSigResponseBytes", maxReportSigResponseBytes,
 	)
 
 	return cfg
@@ -63,20 +61,20 @@ func newStreamConfig(
 
 func maxMessageLength() int {
 	return max(
-		maxObservationRequestBytes,
-		maxReportSigRequestBytes,
+		maxObservationResponseBytes,
+		maxReportSigResponseBytes,
 	)
 }
 
-func messagesLimit() ragep2p.TokenBucketParams {
+func messagesLimit(estimatedRoundInterval time.Duration) ragep2p.TokenBucketParams {
 	return ragep2p.TokenBucketParams{
 		Rate:     rateScale * (float64(maxNumOfMsgsPerRound) / estimatedRoundInterval.Seconds()),
-		Capacity: maxNumOfMsgsPerRound * capacityScale,
+		Capacity: maxNumOfMsgsPerRound * uint32(capacityScale/estimatedRoundInterval.Seconds()),
 	}
 }
 
-func bytesLimit() ragep2p.TokenBucketParams {
-	maxSumLenOutboundPerRound := (2 * maxObservationRequestBytes) + maxReportSigRequestBytes
+func bytesLimit(estimatedRoundInterval time.Duration) ragep2p.TokenBucketParams {
+	maxSumLenOutboundPerRound := maxObservationResponseBytes + maxReportSigResponseBytes
 
 	return ragep2p.TokenBucketParams{
 		Rate:     (float64(maxSumLenOutboundPerRound) / estimatedRoundInterval.Seconds()) * rateScale,
@@ -86,45 +84,6 @@ func bytesLimit() ragep2p.TokenBucketParams {
 
 // compute max observation request size and max report signatures request size
 func init() {
-	req := &rmnpb.Request{
-		Request: &rmnpb.Request_ObservationRequest{
-			ObservationRequest: &rmnpb.ObservationRequest{
-				LaneDest: &rmnpb.LaneDest{
-					DestChainSelector: math.MaxUint64,
-					OfframpAddress:    make([]byte, 32),
-				},
-				FixedDestLaneUpdateRequests: make([]*rmnpb.FixedDestLaneUpdateRequest, 0, estimatedMaxNumberOfSourceChains),
-			},
-		},
-	}
-	for i := 0; i < estimatedMaxNumberOfSourceChains; i++ {
-		req.GetObservationRequest().FixedDestLaneUpdateRequests = append(
-			req.GetObservationRequest().FixedDestLaneUpdateRequests, &rmnpb.FixedDestLaneUpdateRequest{
-				LaneSource: &rmnpb.LaneSource{
-					SourceChainSelector: math.MaxUint64,
-					OnrampAddress:       make([]byte, 32),
-				},
-				ClosedInterval: &rmnpb.ClosedInterval{
-					MinMsgNr: math.MaxUint64,
-					MaxMsgNr: math.MaxUint64,
-				},
-			},
-		)
-	}
-	reqBytes, err := proto.Marshal(req)
-	if err != nil {
-		panic(err)
-	}
-	maxObservationRequestBytes = len(reqBytes)
-
-	req = &rmnpb.Request{
-		Request: &rmnpb.Request_ReportSignatureRequest{
-			ReportSignatureRequest: &rmnpb.ReportSignatureRequest{
-				Context:                      &rmnpb.ReportContext{},
-				AttributedSignedObservations: make([]*rmnpb.AttributedSignedObservation, 0, estimatedMaxNumberOfSourceChains),
-			},
-		},
-	}
 	fixedDestLaneUpdates := make([]*rmnpb.FixedDestLaneUpdate, 0, estimatedMaxNumberOfSourceChains)
 	for i := 0; i < estimatedMaxNumberOfSourceChains; i++ {
 		fixedDestLaneUpdates = append(fixedDestLaneUpdates, &rmnpb.FixedDestLaneUpdate{
@@ -132,33 +91,54 @@ func init() {
 				SourceChainSelector: math.MaxUint64,
 				OnrampAddress:       make([]byte, 32),
 			},
-			ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: math.MaxUint64, MaxMsgNr: math.MaxUint64},
-			Root:           make([]byte, 32),
+			ClosedInterval: &rmnpb.ClosedInterval{
+				MinMsgNr: math.MaxUint64,
+				MaxMsgNr: math.MaxUint64,
+			},
+			Root: make([]byte, 32),
 		})
 	}
 
-	for i := 0; i < estimatedMaxNumberOfSourceChains; i++ {
-		req.GetReportSignatureRequest().AttributedSignedObservations = append(
-			req.GetReportSignatureRequest().AttributedSignedObservations, &rmnpb.AttributedSignedObservation{
-				SignedObservation: &rmnpb.SignedObservation{
-					Observation: &rmnpb.Observation{
-						RmnHomeContractConfigDigest: make([]byte, 32),
-						LaneDest: &rmnpb.LaneDest{
-							DestChainSelector: math.MaxUint64,
-							OfframpAddress:    make([]byte, 32),
-						},
-						FixedDestLaneUpdates: fixedDestLaneUpdates,
-						Timestamp:            math.MaxUint64,
+	obsResponse := &rmnpb.Response{
+		RequestId: math.MaxUint64,
+		Response: &rmnpb.Response_SignedObservation{
+			SignedObservation: &rmnpb.SignedObservation{
+				Observation: &rmnpb.Observation{
+					RmnHomeContractConfigDigest: make([]byte, 32),
+					LaneDest: &rmnpb.LaneDest{
+						DestChainSelector: math.MaxUint64,
+						OfframpAddress:    make([]byte, 32),
 					},
-					Signature: make([]byte, 256),
+					FixedDestLaneUpdates: fixedDestLaneUpdates,
+					Timestamp:            math.MaxUint64,
 				},
-				SignerNodeIndex: math.MaxUint32,
-			})
+				Signature: make([]byte, 256),
+			},
+		},
 	}
 
-	reqBytes, err = proto.Marshal(req)
+	sigResponse := &rmnpb.Response{
+		RequestId: math.MaxUint64,
+		Response: &rmnpb.Response_ReportSignature{
+			ReportSignature: &rmnpb.ReportSignature{
+				Signature: &rmnpb.EcdsaSignature{
+					R: make([]byte, 32),
+					S: make([]byte, 32),
+				},
+			},
+		},
+	}
+
+	obsResponseBytes, err := proto.Marshal(obsResponse)
 	if err != nil {
 		panic(err)
 	}
-	maxReportSigRequestBytes = len(reqBytes)
+
+	sigResponseBytes, err := proto.Marshal(sigResponse)
+	if err != nil {
+		panic(err)
+	}
+
+	maxObservationResponseBytes = len(obsResponseBytes)
+	maxReportSigResponseBytes = len(sigResponseBytes)
 }
