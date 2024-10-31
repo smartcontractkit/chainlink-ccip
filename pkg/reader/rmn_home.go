@@ -247,7 +247,7 @@ func (r *rmnHomePoller) HealthReport() map[string]error {
 }
 
 func (r *rmnHomePoller) Name() string {
-	return "rmnHomePoller"
+	return r.lggr.Name()
 }
 
 func validate(config VersionedConfig) error {

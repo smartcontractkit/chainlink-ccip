@@ -279,7 +279,7 @@ func (r *homeChainPoller) HealthReport() map[string]error {
 }
 
 func (r *homeChainPoller) Name() string {
-	return "homeChainPoller"
+	return r.lggr.Name()
 }
 
 func createFChain(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[cciptypes.ChainSelector]int {
