@@ -15,7 +15,9 @@ type ChainConfig = reader_internal.ChainConfig
 
 type ChainConfigInfo = reader_internal.ChainConfigInfo
 
-type OCR3ConfigsWithMeta = reader_internal.ActiveAndCandidate
+type OCR3ConfigWithMeta = reader_internal.OCR3ConfigWithMeta
+
+type ActiveAndCandidate = reader_internal.ActiveAndCandidate
 
 type OCR3Config = reader_internal.OCR3Config
 
