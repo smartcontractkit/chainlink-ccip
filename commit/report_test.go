@@ -124,6 +124,7 @@ func TestPluginReports(t *testing.T) {
 			}
 
 			outcomeBytes, err := tc.outc.Encode()
+			require.NoError(t, err)
 
 			reports, err := p.Reports(ctx, 0, outcomeBytes)
 			if tc.expErr {
