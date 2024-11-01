@@ -26,6 +26,7 @@ type HomeNodeInfo struct {
 	PeerID                ragep2ptypes.PeerID                 // The peer ID of the node
 	SupportedSourceChains mapset.Set[cciptypes.ChainSelector] // Set of supported source chains by the node
 	OffchainPublicKey     *ed25519.PublicKey                  // The public key is used to verify observations
+	StreamNamePrefix      string                              // RageP2P stream name prefix e.g. "ccip-rmn/v1_6/"
 }
 
 // RemoteConfig contains the configuration fetched from the RMNRemote contract.

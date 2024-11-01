@@ -160,10 +160,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	}
 
 	rmnPeerID := rmnNode.PeerID.String()
-
-	// todo: versioning for stream names e.g. for 'v1_7'
-	streamName := fmt.Sprintf("ccip-rmn/v1_6/%s",
-		strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x"))
+	streamName := rmnNode.StreamNamePrefix + strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x")
 
 	r.lggr.Infow("creating new stream",
 		"streamName", streamName,
