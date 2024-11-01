@@ -57,7 +57,7 @@ type peerClient struct {
 	lggr                        logger.Logger
 	peerGroupCreator            *peergroup.Creator
 	respChan                    chan PeerResponse
-	peerGroup                   peergroup.PeerGroup
+	peerGroup                   networking.PeerGroup
 	genericEndpointConfigDigest cciptypes.Bytes32
 	rageP2PStreams              map[rmntypes.NodeID]Stream
 	bootstrappers               []commontypes.BootstrapperLocator
@@ -68,7 +68,7 @@ type peerClient struct {
 
 func NewPeerClient(
 	lggr logger.Logger,
-	peerGroupFactory peergroup.PeerGroupFactory,
+	peerGroupFactory networking.PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
 	ocrRoundInterval time.Duration,
 ) PeerClient {
