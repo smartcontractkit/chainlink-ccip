@@ -170,5 +170,11 @@ func (r InMemoryCCIPReader) Sync(_ context.Context, _ reader.ContractAddresses) 
 	return nil
 }
 
+func (r InMemoryCCIPReader) GetMedianDataAvailabilityGasConfig(
+	ctx context.Context,
+) (cciptypes.DataAvailabilityGasConfig, error) {
+	return cciptypes.DataAvailabilityGasConfig{}, nil
+}
+
 // Interface compatibility check.
 var _ reader.CCIPReader = InMemoryCCIPReader{}

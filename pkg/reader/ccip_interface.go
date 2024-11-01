@@ -158,4 +158,7 @@ type CCIPReader interface {
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
+
+	// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
+	GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error)
 }

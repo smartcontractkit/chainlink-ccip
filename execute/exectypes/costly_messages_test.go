@@ -292,16 +292,18 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 
 func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 	tests := []struct {
-		name               string
-		messages           []ccipocr3.Message
-		messageGases       []uint64
-		executionFee       *big.Int
-		feeComponentsError error
-		want               map[ccipocr3.Bytes32]plugintypes.USD18
-		wantErr            bool
+		name                string
+		messages            []ccipocr3.Message
+		messageGases        []uint64
+		executionFee        *big.Int
+		dataAvailabilityFee *big.Int
+		feeComponentsError  error
+		daGasConfig         ccipocr3.DataAvailabilityGasConfig
+		want                map[ccipocr3.Bytes32]plugintypes.USD18
+		wantErr             bool
 	}{
 		{
-			name: "happy path",
+			name: "happy path, no DA cost",
 			messages: []ccipocr3.Message{
 				{
 					Header: ccipocr3.RampMessageHeader{MessageID: b1},
@@ -313,13 +315,145 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 					Header: ccipocr3.RampMessageHeader{MessageID: b3},
 				},
 			},
-			messageGases:       []uint64{100, 200, 300},
-			executionFee:       big.NewInt(100),
-			feeComponentsError: nil,
+			messageGases:        []uint64{100, 200, 300},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(0),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1,
+				DestGasPerDataAvailabilityByte:    1,
+				DestDataAvailabilityMultiplierBps: 1,
+			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
 				b1: plugintypes.NewUSD18(10000),
 				b2: plugintypes.NewUSD18(20000),
 				b3: plugintypes.NewUSD18(30000),
+			},
+			wantErr: false,
+		},
+		{
+			name: "happy path, with DA cost",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b2},
+				},
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b3},
+				},
+			},
+			messageGases:        []uint64{100, 200, 300},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(400),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1200,
+				DestGasPerDataAvailabilityByte:    10,
+				DestDataAvailabilityMultiplierBps: 200,
+			},
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(55200), // 10_000 (exec) + 45_200 (da)
+				b2: plugintypes.NewUSD18(65200), // 20_000 (exec) + 45_200 (da)
+				b3: plugintypes.NewUSD18(75200), // 30_000 (exec) + 45_200 (da)
+			},
+			wantErr: false,
+		},
+		{
+			name: "message with token amounts affects DA gas calculation",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+					TokenAmounts: []ccipocr3.RampTokenAmount{
+						{
+							SourcePoolAddress: []byte("source_pool"),
+							DestTokenAddress:  []byte("dest_token"),
+							ExtraData:         []byte("extra"),
+							DestExecData:      []byte("exec_data"),
+							Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
+						},
+					},
+					Data:      []byte("some_data"),
+					Sender:    []byte("sender"),
+					Receiver:  []byte("receiver"),
+					ExtraArgs: []byte("extra_args"),
+				},
+			},
+			messageGases:        []uint64{100},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(400),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1000,
+				DestGasPerDataAvailabilityByte:    10,
+				DestDataAvailabilityMultiplierBps: 200,
+			},
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(79200), // 10_000 (exec) + 69_200 (da)
+			},
+			wantErr: false,
+		},
+		{
+			name: "zero DA multiplier results in only overhead gas",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+					Data:   []byte("some_data"),
+				},
+			},
+			messageGases:        []uint64{100},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(400),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1000,
+				DestGasPerDataAvailabilityByte:    10,
+				DestDataAvailabilityMultiplierBps: 0, // Zero multiplier
+			},
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(10000), // Only exec cost, DA cost is 0
+			},
+			wantErr: false,
+		},
+		{
+			name: "large message with multiple tokens",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+					TokenAmounts: []ccipocr3.RampTokenAmount{
+						{
+							SourcePoolAddress: make([]byte, 100), // Large token data
+							DestTokenAddress:  make([]byte, 100),
+							ExtraData:         make([]byte, 100),
+							DestExecData:      make([]byte, 100),
+							Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
+						},
+						{
+							SourcePoolAddress: make([]byte, 100), // Second token
+							DestTokenAddress:  make([]byte, 100),
+							ExtraData:         make([]byte, 100),
+							DestExecData:      make([]byte, 100),
+							Amount:            ccipocr3.NewBigInt(big.NewInt(1)),
+						},
+					},
+					Data:      make([]byte, 1000), // Large message data
+					Sender:    make([]byte, 100),
+					Receiver:  make([]byte, 100),
+					ExtraArgs: make([]byte, 100),
+				},
+			},
+			messageGases:        []uint64{100},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(400),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1000,
+				DestGasPerDataAvailabilityByte:    10,
+				DestDataAvailabilityMultiplierBps: 200,
+			},
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(219600), // 10_000 (exec) + 218_600 (da)
 			},
 			wantErr: false,
 		},
@@ -336,11 +470,38 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 					Header: ccipocr3.RampMessageHeader{MessageID: b3},
 				},
 			},
-			messageGases:       []uint64{100, 200, 300},
-			executionFee:       big.NewInt(100),
-			feeComponentsError: fmt.Errorf("error"),
-			want:               map[ccipocr3.Bytes32]plugintypes.USD18{},
-			wantErr:            true,
+			messageGases:        []uint64{100, 200, 300},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(0),
+			feeComponentsError:  fmt.Errorf("error"),
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1,
+				DestGasPerDataAvailabilityByte:    1,
+				DestDataAvailabilityMultiplierBps: 1,
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name: "minimal message - only constant parts",
+			messages: []ccipocr3.Message{
+				{
+					Header: ccipocr3.RampMessageHeader{MessageID: b1},
+				},
+			},
+			messageGases:        []uint64{100},
+			executionFee:        big.NewInt(100),
+			dataAvailabilityFee: big.NewInt(400),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1000,
+				DestGasPerDataAvailabilityByte:    10,
+				DestDataAvailabilityMultiplierBps: 200,
+			},
+			want: map[ccipocr3.Bytes32]plugintypes.USD18{
+				b1: plugintypes.NewUSD18(53600), // 10_000 (exec) + 43_600 (da)
+			},
+			wantErr: false,
 		},
 	}
 
@@ -352,9 +513,12 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 			mockReader := readerpkg_mock.NewMockCCIPReader(t)
 			feeComponents := types.ChainFeeComponents{
 				ExecutionFee:        tt.executionFee,
-				DataAvailabilityFee: big.NewInt(0),
+				DataAvailabilityFee: tt.dataAvailabilityFee,
 			}
 			mockReader.EXPECT().GetDestChainFeeComponents(ctx).Return(feeComponents, tt.feeComponentsError)
+			if !tt.wantErr {
+				mockReader.EXPECT().GetMedianDataAvailabilityGasConfig(ctx).Return(tt.daGasConfig, nil)
+			}
 
 			ep := gasmock.NewMockEstimateProvider(t)
 			if !tt.wantErr {
