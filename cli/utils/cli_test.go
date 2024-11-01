@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
@@ -21,6 +22,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestGetGitTopLevelDir(t *testing.T) {
@@ -712,6 +716,141 @@ func TestIsValidCribNamespace(t *testing.T) {
 			t.Parallel()
 
 			err := IsValidCribNamespace(tc.namespace, tc.skipPrefixCheck)
+			if tc.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedErr.Error(), err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestEnsureCribNamespaceReady(t *testing.T) {
+	t.Parallel()
+
+	defaultWaitTimeout := 3 * time.Second
+	defaultsleepBetweenAttempts := 100 * time.Millisecond
+
+	testCases := []struct {
+		name                          string
+		namespace                     string
+		provider                      string
+		waitTimeout                   *time.Duration
+		sleepBetweenAttempts          *time.Duration
+		applyNamespaceClientMockCalls func(*wrappermocks.NamespaceInterface)
+		applyResourceClientMockCalls  func(*wrappermocks.ResourceInterface)
+		expectedErr                   error
+	}{
+		{
+			name:                 "NamespaceExistsAWSProvider",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
+					Return(&v1.Namespace{}, nil)
+			},
+			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test-crib-poweruser", metav1.GetOptions{}).
+					Return(&unstructured.Unstructured{}, nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:                 "NamespaceDoesNotExistAWSProvider",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
+					Return(nil, errors.New("namespace not found"))
+				m.EXPECT().
+					Create(context.TODO(), &v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "crib-test",
+						},
+					}, metav1.CreateOptions{}).
+					Return(&v1.Namespace{}, nil)
+			},
+			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test-crib-poweruser", metav1.GetOptions{}).
+					Return(&unstructured.Unstructured{}, nil)
+			},
+			expectedErr: nil,
+		},
+		{
+			name:                 "NamespaceExistsKindProvider",
+			namespace:            "crib-test",
+			provider:             "kind",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
+					Return(&v1.Namespace{}, nil)
+			},
+			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {},
+			expectedErr:                  nil,
+		},
+		{
+			name:                 "NamespaceCreationFails",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
+					Return(nil, errors.New("namespace not found"))
+				m.EXPECT().
+					Create(context.TODO(), &v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "crib-test",
+						},
+					}, metav1.CreateOptions{}).
+					Return(nil, errors.New("failed to create namespace"))
+			},
+			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {},
+			expectedErr:                  fmt.Errorf("failed to ensure namespace existence: failed to create namespace crib-test: %w", errors.New("failed to create namespace")),
+		},
+		{
+			name:                 "RoleBindingCreationFails",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
+					Return(&v1.Namespace{}, nil)
+			},
+			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {
+				m.EXPECT().
+					Get(context.TODO(), "crib-test-crib-poweruser", metav1.GetOptions{}).
+					Return(nil, errors.New("role binding not found"))
+			},
+			expectedErr: fmt.Errorf("failed to wait for crib-power-user role binding to be created: %w", errors.New("timed out waiting for resource crib-test-crib-poweruser")),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNamespaceClient := wrappermocks.NewNamespaceInterface(t)
+			mockRolebindingClient := wrappermocks.NewResourceInterface(t)
+
+			tc.applyNamespaceClientMockCalls(mockNamespaceClient)
+			tc.applyResourceClientMockCalls(mockRolebindingClient)
+
+			err := EnsureCribNamespaceReady(context.TODO(), mockNamespaceClient, mockRolebindingClient, tc.namespace, tc.provider, tc.waitTimeout, tc.sleepBetweenAttempts)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())

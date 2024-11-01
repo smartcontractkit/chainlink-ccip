@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/go-git/go-git/v5"
@@ -170,34 +169,21 @@ var ensureNamespaceCmd = &cobra.Command{
 			slog.String("kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME")),
 		)
 
-		created, err := utils.EnsureNamespaceExists(context.TODO(), kubeClientset.CoreV1().Namespaces(), viper.GetString("DEVSPACE_NAMESPACE"))
+		dynamicClient, err := dynamic.NewForConfig(kubeconfig)
 		if err != nil {
-			logger.Error("failed to ensure namespace existence", slog.String("name", viper.GetString("DEVSPACE_NAMESPACE")), slog.Bool("already_exists", !created), slog.Any("error", err))
+			logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
 			os.Exit(1)
 		}
-		logger.Debug("k8s namespace in place", slog.String("name", viper.GetString("DEVSPACE_NAMESPACE")), slog.Bool("already_exists", !created))
 
-		if viper.GetString("PROVIDER") == "aws" {
-			dynamicClient, err := dynamic.NewForConfig(kubeconfig)
-			if err != nil {
-				logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
-				os.Exit(1)
-			}
+		rolebindingClient := dynamicClient.Resource(schema.GroupVersionResource{
+			Group:    "rbac.authorization.k8s.io",
+			Version:  "v1",
+			Resource: "rolebindings",
+		}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 
-			rolebindingClient := dynamicClient.Resource(schema.GroupVersionResource{
-				Group:    "rbac.authorization.k8s.io",
-				Version:  "v1",
-				Resource: "rolebindings",
-			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
-
-			// Use the WaitForResource function to check if a RoleBinding exists
-			roleBindingName := fmt.Sprintf("%s-crib-poweruser", viper.GetString("DEVSPACE_NAMESPACE"))
-			timeout := 20 * time.Second
-			if err := utils.WaitForResource(context.TODO(), rolebindingClient, roleBindingName, 2*time.Second, timeout); err != nil {
-				logger.Error("timed out waiting for role binding to be created", slog.String("role_binding_name", roleBindingName), slog.Duration("timeout", timeout), slog.String("namespace", viper.GetString("DEVSPACE_NAMESPACE")), slog.Any("error", err))
-				os.Exit(1)
-			}
-			logger.Info("role binding found", slog.String("role_binding_name", roleBindingName), slog.String("namespace", viper.GetString("DEVSPACE_NAMESPACE")))
+		if err := utils.EnsureCribNamespaceReady(context.TODO(), kubeClientset.CoreV1().Namespaces(), rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
+			os.Exit(1)
 		}
 		logger.Info("k8s namespace ready", slog.String("name", viper.GetString("DEVSPACE_NAMESPACE")))
 	},
