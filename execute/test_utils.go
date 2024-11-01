@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"encoding/binary"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -382,7 +383,9 @@ type msgOption func(*cciptypes.Message)
 
 func withFeeValueJuels(fee int64) msgOption {
 	return func(m *cciptypes.Message) {
-		m.FeeValueJuels = cciptypes.NewBigIntFromInt64(fee)
+		// Convert fee to JUELS by multiplying by 1e18
+		juels := new(big.Int).Mul(big.NewInt(fee), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+		m.FeeValueJuels = cciptypes.NewBigInt(juels)
 	}
 }
 

@@ -355,6 +355,10 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	if feeComponents.DataAvailabilityFee == nil {
 		return nil, fmt.Errorf("missing data availability fee")
 	}
+	if len(messages) == 0 {
+		return messageExecCosts, nil
+	}
+
 	feeComponentsUSD18, err := c.getFeeComponentsInUSD18(ctx, feeComponents, messages[0].Header.DestChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert fee components to USD18: %w", err)
