@@ -1007,23 +1007,6 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 		}
 	}
 
-	setupErrorMocks := func(
-		readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended,
-		chains []cciptypes.ChainSelector, err error) {
-		for _, chain := range chains {
-			readers[chain].EXPECT().
-				ExtendedGetLatestValue(
-					mock.Anything,
-					consts.ContractNameFeeQuoter,
-					consts.MethodNameGetDestChainConfig,
-					primitives.Unconfirmed,
-					mock.Anything,
-					mock.Anything,
-				).
-				Return(err).Once()
-		}
-	}
-
 	tests := []struct {
 		name           string
 		expectedConfig cciptypes.DataAvailabilityGasConfig
@@ -1066,17 +1049,32 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 			},
 		},
 		{
-			name:        "error - no valid configs found",
-			expectError: true,
+			name: "no valid configs found due to empty DA params",
+			expectedConfig: cciptypes.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   0,
+				DestGasPerDataAvailabilityByte:    0,
+				DestDataAvailabilityMultiplierBps: 0,
+			},
+			expectError: false,
 			chains:      []cciptypes.ChainSelector{chainA, chainB, chainC},
 			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
-				setupErrorMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, errors.New("mock error"))
+				values := []mockValue{
+					{0, 0, 0, true}, // Empty DA params
+					{0, 0, 0, true}, // Empty DA params
+					{0, 0, 0, true}, // Empty DA params
+				}
+				setupConfigMocks(readers, []cciptypes.ChainSelector{chainA, chainB, chainC}, values)
 			},
 		},
 		{
-			name:        "error - all configs disabled",
-			expectError: true,
-			chains:      []cciptypes.ChainSelector{chainA, chainB},
+			name:        "all configs disabled",
+			expectError: false,
+			expectedConfig: cciptypes.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   0,
+				DestGasPerDataAvailabilityByte:    0,
+				DestDataAvailabilityMultiplierBps: 0,
+			},
+			chains: []cciptypes.ChainSelector{chainA, chainB},
 			setupMocks: func(readers map[cciptypes.ChainSelector]*reader_mocks.MockExtended) {
 				values := []mockValue{
 					{100, 10, 1000, false},
