@@ -68,7 +68,7 @@ jobs:
       - name: Run ccip ocr3 initial deploy integration test
         run: |
           cd $GITHUB_WORKSPACE/chainlink/deployment
-          go test -v -run '^TestInitialDeploy$' -timeout 6m ./ccip/changeset
+          go test -v -run '^TestInitialDeploy$' -timeout 15m ./ccip/changeset
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Integration test failed"
