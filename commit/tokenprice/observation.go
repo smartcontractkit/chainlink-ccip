@@ -24,19 +24,19 @@ func (p *processor) Observation(
 
 	feedTokenPrices := p.ObserveFeedTokenPrices(ctx)
 	feeQuoterUpdates := p.ObserveFeeQuoterTokenUpdates(ctx)
-	ts := time.Now().UTC()
+	now := time.Now().UTC()
 	p.lggr.Infow(
 		"observed token prices",
 		"feed prices", feedTokenPrices,
 		"fee quoter updates", feeQuoterUpdates,
-		"timestamp", ts,
+		"timestampNow", now,
 	)
 
 	return Observation{
 		FeedTokenPrices:       feedTokenPrices,
 		FeeQuoterTokenUpdates: feeQuoterUpdates,
 		FChain:                fChain,
-		Timestamp:             ts,
+		Timestamp:             now,
 	}, nil
 }
 

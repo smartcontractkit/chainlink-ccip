@@ -28,6 +28,7 @@ func (p *processor) Observation(
 	chainFeeUpdates := FeeUpdatesFromTimestampedBig(timestampedPriceUpdates)
 
 	fChain := p.ObserveFChain()
+	now := time.Now().UTC()
 
 	p.lggr.Infow("observed fee components",
 		"supportedChains", supportedChains.ToSlice(),
@@ -35,6 +36,7 @@ func (p *processor) Observation(
 		"nativeTokenPrices", nativeTokenPrices,
 		"chainFeeUpdates", chainFeeUpdates,
 		"fChain", fChain,
+		"timestampNow", now,
 	)
 
 	return Observation{
@@ -42,7 +44,7 @@ func (p *processor) Observation(
 		FeeComponents:     feeComponents,
 		NativeTokenPrices: nativeTokenPrices,
 		ChainFeeUpdates:   chainFeeUpdates,
-		TimestampNow:      time.Now().UTC(),
+		TimestampNow:      now,
 	}, nil
 }
 

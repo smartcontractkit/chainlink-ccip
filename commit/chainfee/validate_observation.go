@@ -56,9 +56,9 @@ func (p *processor) ValidateObservation(
 }
 
 func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for _, f := range fChain {
-		if f < 0 {
-			return fmt.Errorf("fChain %d is negative", f)
+	for chainSelector, f := range fChain {
+		if f <= 0 {
+			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
 		}
 	}
 	return nil
