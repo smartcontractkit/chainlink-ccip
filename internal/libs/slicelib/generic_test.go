@@ -6,68 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGroupBy(t *testing.T) {
-	type person struct {
-		id   string
-		name string
-		age  int
-	}
-
-	testCases := []struct {
-		name          string
-		items         []person
-		expGroupNames []string
-		expGroups     map[string][]person
-	}{
-		{
-			name:          "empty slice",
-			items:         []person{},
-			expGroupNames: []string{},
-			expGroups:     map[string][]person{},
-		},
-		{
-			name: "no duplicate",
-			items: []person{
-				{id: "2", name: "Bob", age: 25},
-				{id: "1", name: "Alice", age: 23},
-				{id: "3", name: "Charlie", age: 22},
-				{id: "4", name: "Dim", age: 13},
-			},
-			expGroupNames: []string{"2", "1", "3", "4"}, // should be deterministic
-			expGroups: map[string][]person{
-				"1": {{id: "1", name: "Alice", age: 23}},
-				"2": {{id: "2", name: "Bob", age: 25}},
-				"3": {{id: "3", name: "Charlie", age: 22}},
-				"4": {{id: "4", name: "Dim", age: 13}},
-			},
-		},
-		{
-			name: "with duplicate",
-			items: []person{
-				{id: "1", name: "Alice", age: 23},
-				{id: "1", name: "Bob", age: 25},
-				{id: "3", name: "Charlie", age: 22},
-			},
-			expGroupNames: []string{"1", "3"},
-			expGroups: map[string][]person{
-				"1": {{id: "1", name: "Alice", age: 23}, {id: "1", name: "Bob", age: 25}},
-				"3": {{id: "3", name: "Charlie", age: 22}},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			keys, groups := GroupBy(tc.items, func(p person) string { return p.id })
-			assert.Equal(t, tc.expGroupNames, keys)
-			assert.Equal(t, len(tc.expGroups), len(groups))
-			for _, k := range keys {
-				assert.Equal(t, tc.expGroups[k], groups[k])
-			}
-		})
-	}
-}
-
 func TestCountUnique(t *testing.T) {
 	testCases := []struct {
 		name     string

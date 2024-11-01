@@ -145,37 +145,22 @@ func (c *controller) ComputeReportSignatures(
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
 	rmnRemoteCfg rmntypes.RemoteConfig,
 ) (*ReportSignatures, error) {
-	rmnNodeInfo := make(map[rmntypes.NodeID]rmntypes.HomeNodeInfo)
-
 	rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
 		return nil, fmt.Errorf("get rmn nodes info: %w", err)
 	}
 
-	c.lggr.Infow("got RMN nodes info", "nodes", rmnNodes)
+	rmnNodeInfo := make(map[rmntypes.NodeID]rmntypes.HomeNodeInfo, len(rmnNodes))
+	for _, node := range rmnNodes {
+		rmnNodeInfo[node.ID] = node
+	}
+
+	c.lggr.Infow("got RMN nodes info", "nodes", rmnNodeInfo)
 	c.lggr.Infow("requested updates", "updates", updateRequests)
 
-	// Group the lane update requests by their source chain and mark the RMN nodes that can sign each update
-	// based on whether it supports the source chain or not.
-	updatesPerChain := make(map[uint64]updateRequestWithMeta)
-	for _, updateReq := range updateRequests {
-		if _, exists := updatesPerChain[updateReq.LaneSource.SourceChainSelector]; exists {
-			return nil, errors.New("controller implementation assumes each lane update is for a different chain")
-		}
-
-		updatesPerChain[updateReq.LaneSource.SourceChainSelector] = updateRequestWithMeta{
-			Data:     updateReq,
-			RmnNodes: mapset.NewSet[rmntypes.NodeID](),
-		}
-
-		for _, node := range rmnNodes {
-			rmnNodeInfo[node.ID] = node
-
-			// If RMN node supports the chain add it to the list of RMN nodes that can sign the update.
-			if node.SupportedSourceChains.Contains(cciptypes.ChainSelector(updateReq.LaneSource.SourceChainSelector)) {
-				updatesPerChain[updateReq.LaneSource.SourceChainSelector].RmnNodes.Add(node.ID)
-			}
-		}
+	updatesPerChain, err := populateUpdatesPerChain(updateRequests, rmnNodes)
+	if err != nil {
+		return nil, fmt.Errorf("process update requests: %w", err)
 	}
 
 	homeFMap, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
@@ -238,6 +223,35 @@ func (c *controller) ComputeReportSignatures(
 	)
 
 	return rmnReportSignatures, nil
+}
+
+// populateUpdatesPerChain processes a list of update requests, groups the lane updates by their source chain
+// and populates the items with metadata for each update request, including a set of RMN nodes supporting that request.
+func populateUpdatesPerChain(
+	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
+	rmnNodes []rmntypes.HomeNodeInfo,
+) (map[uint64]updateRequestWithMeta, error) {
+	updatesPerChain := make(map[uint64]updateRequestWithMeta)
+
+	for _, updateReq := range updateRequests {
+		if _, exists := updatesPerChain[updateReq.LaneSource.SourceChainSelector]; exists {
+			return nil, errors.New("controller implementation assumes each lane update is for a different chain")
+		}
+
+		updatesPerChain[updateReq.LaneSource.SourceChainSelector] = updateRequestWithMeta{
+			Data:     updateReq,
+			RmnNodes: mapset.NewSet[rmntypes.NodeID](),
+		}
+
+		for _, node := range rmnNodes {
+			// If RMN node supports the chain add it to the list of RMN nodes that can sign the update.
+			if node.SupportedSourceChains.Contains(cciptypes.ChainSelector(updateReq.LaneSource.SourceChainSelector)) {
+				updatesPerChain[updateReq.LaneSource.SourceChainSelector].RmnNodes.Add(node.ID)
+			}
+		}
+	}
+
+	return updatesPerChain, nil
 }
 
 func (c *controller) InitConnection(

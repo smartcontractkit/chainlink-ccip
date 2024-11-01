@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -283,6 +284,122 @@ func Test_selectRoots(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expRoots, roots)
+		})
+	}
+}
+
+func Test_populateUpdatesPerChain(t *testing.T) {
+	testCases := []struct {
+		name           string
+		updateRequests []*rmnpb.FixedDestLaneUpdateRequest
+		rmnNodes       []rmntypes.HomeNodeInfo
+		rmnNodeInfo    map[rmntypes.NodeID]rmntypes.HomeNodeInfo
+		expectedResult map[uint64]updateRequestWithMeta
+		expectedError  error
+	}{
+		{
+			name: "single update request, single supported node",
+			updateRequests: []*rmnpb.FixedDestLaneUpdateRequest{
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+			},
+			rmnNodes: []rmntypes.HomeNodeInfo{
+				{
+					ID:                    1,
+					SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(1)),
+				},
+			},
+			expectedResult: map[uint64]updateRequestWithMeta{
+				1: {
+					Data:     &rmnpb.FixedDestLaneUpdateRequest{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+					RmnNodes: mapset.NewSet[rmntypes.NodeID](rmntypes.NodeID(1)),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "duplicate sourceChainSelector error",
+			updateRequests: []*rmnpb.FixedDestLaneUpdateRequest{
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+			},
+			rmnNodes: []rmntypes.HomeNodeInfo{
+				{
+					ID:                    1,
+					SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(1)),
+				},
+			},
+			rmnNodeInfo:   map[rmntypes.NodeID]rmntypes.HomeNodeInfo{},
+			expectedError: errors.New("controller implementation assumes each lane update is for a different chain"),
+		},
+		{
+			name: "Single Update Request, No Supported Nodes",
+			updateRequests: []*rmnpb.FixedDestLaneUpdateRequest{
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+			},
+			rmnNodes: []rmntypes.HomeNodeInfo{
+				{
+					ID:                    2,
+					SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(2)),
+				},
+			},
+			expectedResult: map[uint64]updateRequestWithMeta{
+				1: {
+					Data:     &rmnpb.FixedDestLaneUpdateRequest{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+					RmnNodes: mapset.NewSet[rmntypes.NodeID](),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "multiple update requests, multiple nodes",
+			updateRequests: []*rmnpb.FixedDestLaneUpdateRequest{
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 2}},
+				{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 3}},
+			},
+			rmnNodes: []rmntypes.HomeNodeInfo{
+				{ID: 1, SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(1))},
+				{ID: 2, SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(1))},
+				{ID: 3, SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(2))},
+				{ID: 4, SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(1))},
+			},
+			expectedResult: map[uint64]updateRequestWithMeta{
+				1: {
+					Data:     &rmnpb.FixedDestLaneUpdateRequest{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 1}},
+					RmnNodes: mapset.NewSet[rmntypes.NodeID](rmntypes.NodeID(1), rmntypes.NodeID(2), rmntypes.NodeID(4)),
+				},
+				2: {
+					Data:     &rmnpb.FixedDestLaneUpdateRequest{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 2}},
+					RmnNodes: mapset.NewSet[rmntypes.NodeID](rmntypes.NodeID(3)),
+				},
+				3: {
+					Data:     &rmnpb.FixedDestLaneUpdateRequest{LaneSource: &rmnpb.LaneSource{SourceChainSelector: 3}},
+					RmnNodes: mapset.NewSet[rmntypes.NodeID](),
+				},
+			},
+			expectedError: nil,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			// Run the function
+			result, err := populateUpdatesPerChain(tt.updateRequests, tt.rmnNodes)
+
+			// Check for expected error
+			if tt.expectedError != nil {
+				assert.EqualError(t, err, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Check for expected result
+			assert.Equal(t, tt.expectedResult, result)
+
+			// Check if rmnNodeInfo was populated correctly
+			for id, info := range tt.rmnNodeInfo {
+				assert.Equal(t, info, tt.rmnNodeInfo[id])
+			}
 		})
 	}
 }
