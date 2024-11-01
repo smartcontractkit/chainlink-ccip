@@ -290,6 +290,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 				PeerID:                ragep2ptypes.PeerID(node.PeerID),
 				OffchainPublicKey:     &pubKey,
 				SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](),
+				StreamNamePrefix:      "ccip-rmn/v1_6/", // todo: when contract is updated, this should be fetched from the contract
 			}
 		}
 
