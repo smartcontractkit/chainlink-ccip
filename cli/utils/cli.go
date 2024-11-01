@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,9 +11,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/smartcontractkit/crib/cli/wrappers"
+	"k8s.io/client-go/dynamic"
+	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 type RegistryLoginAttempt struct {
@@ -250,6 +254,39 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 func IsValidCribNamespace(namespace string, skipPrefixCheck bool) error {
 	if !skipPrefixCheck && !strings.HasPrefix(namespace, "crib-") {
 		return fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
+	}
+	return nil
+}
+
+func EnsureCribNamespaceReady(ctx context.Context, namespaceClient corev1.NamespaceInterface, rolebindingClient dynamic.ResourceInterface, namespace string, provider string, waitTimeout *time.Duration, sleepBetweenAttempts *time.Duration) error {
+	defaultWaitTimeout := 20 * time.Second
+	defaultSleepBetweenAttempts := 500 * time.Millisecond
+
+	if waitTimeout == nil {
+		waitTimeout = &defaultWaitTimeout
+	}
+	if sleepBetweenAttempts == nil {
+		sleepBetweenAttempts = &defaultSleepBetweenAttempts
+	}
+
+	created, err := EnsureNamespaceExists(ctx, namespaceClient, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to ensure namespace existence: %w", err)
+	}
+	slog.Debug("k8s namespace in place", slog.String("name", namespace), slog.Bool("already_exists", !created))
+
+	if provider == "aws" {
+		roleBindingName := fmt.Sprintf("%s-crib-poweruser", namespace)
+		slog.Info("waiting for rolebinding creation", slog.String("role_binding_name", roleBindingName), slog.String("namespace", namespace))
+		startTime := time.Now()
+		if err := WaitForResource(ctx, rolebindingClient, roleBindingName, *sleepBetweenAttempts, *waitTimeout); err != nil {
+			return fmt.Errorf("failed to wait for crib-power-user role binding to be created: %w", err)
+		}
+		slog.Info("role binding found",
+			slog.String("role_binding_name", roleBindingName),
+			slog.String("namespace", namespace),
+			slog.Float64("elapsed_seconds", time.Since(startTime).Seconds()),
+		)
 	}
 	return nil
 }
