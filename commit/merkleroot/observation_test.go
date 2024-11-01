@@ -15,6 +15,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/ragep2p/types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -623,13 +624,15 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 		{ID: 1, PeerID: types.PeerID{1, 2, 3}},
 		{ID: 10, PeerID: types.PeerID{1, 2, 31}},
 	}
+	oracleIDs := []ragep2ptypes.PeerID{}
 	rmnHomeReader.EXPECT().GetRMNNodesInfo(cfg.ConfigDigest).Return(rmnNodes, nil)
 
 	rmnController.EXPECT().InitConnection(
 		ctx,
 		cciptypes.Bytes32(p.reportingCfg.ConfigDigest),
 		cfg.ConfigDigest,
-		[]string{rmnNodes[0].PeerID.String(), rmnNodes[1].PeerID.String()},
+		oracleIDs,
+		rmnNodes,
 	).Return(nil)
 
 	err = p.initializeRMNController(ctx, Outcome{RMNRemoteCfg: cfg})

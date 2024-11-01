@@ -137,7 +137,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	costlyMessageObserver := exectypes.NewCostlyMessageObserverWithDefaults(
 		p.lggr,
-		false, // TODO: enable
+		true,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
