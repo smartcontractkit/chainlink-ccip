@@ -1397,10 +1397,6 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 		}
 	}
 
-	if len(overheadGasValues) == 0 {
-		return cciptypes.DataAvailabilityGasConfig{}, fmt.Errorf("no valid fee quoter destChainConfigs found")
-	}
-
 	// Calculate medians
 	medianOverheadGas := consensus.Median(overheadGasValues, func(a, b uint32) bool { return a < b })
 	medianGasPerByte := consensus.Median(gasPerByteValues, func(a, b uint16) bool { return a < b })
