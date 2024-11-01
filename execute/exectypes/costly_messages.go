@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	EvmWordBytes              = 32
+	EVMWordBytes              = 32
 	MessageFixedBytesPerToken = 32 * ((2 * 3) + 3)
 	ConstantMessagePartBytes  = 32 * 14 // A message consists of 14 abi encoded fields 32B each (after encoding)
 	daMultiplierBase          = 10_000  // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
