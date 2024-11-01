@@ -359,7 +359,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 		return messageExecCosts, nil
 	}
 
-	feeComponentsUSD18, err := c.getFeeComponentsInUSD18(ctx, feeComponents, messages[0].Header.DestChainSelector)
+	executionFee, daFee, err := c.getFeesUSD18(ctx, feeComponents, messages[0].Header.DestChainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert fee components to USD18: %w", err)
 	}
@@ -370,8 +370,8 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	}
 
 	for _, msg := range messages {
-		executionCostUSD18 := c.computeExecutionCostUSD18(feeComponentsUSD18.ExecutionFee, msg)
-		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(feeComponentsUSD18.DataAvailabilityFee, daConfig, msg)
+		executionCostUSD18 := c.computeExecutionCostUSD18(executionFee, msg)
+		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(daFee, daConfig, msg)
 		totalCostUSD18 := new(big.Int).Add(executionCostUSD18, dataAvailabilityCostUSD18)
 		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
 	}
@@ -379,26 +379,34 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	return messageExecCosts, nil
 }
 
-func (c *CCIPMessageExecCostUSD18Calculator) getFeeComponentsInUSD18(
+func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	ctx context.Context,
 	feeComponents types.ChainFeeComponents,
 	destChainSelector cciptypes.ChainSelector,
-) (types.ChainFeeComponents, error) {
+) (plugintypes.USD18, plugintypes.USD18, error) {
 	nativeTokenPrices := c.ccipReader.GetWrappedNativeTokenPriceUSD(
 		ctx,
 		[]cciptypes.ChainSelector{destChainSelector})
 	if nativeTokenPrices == nil {
-		return types.ChainFeeComponents{}, fmt.Errorf("unable to get native token prices")
+		return nil, nil, fmt.Errorf("unable to get native token prices")
 	}
 	nativeTokenPrice, ok := nativeTokenPrices[destChainSelector]
 	if !ok {
-		return types.ChainFeeComponents{}, fmt.Errorf("missing native token price for chain %s", destChainSelector)
+		return nil, nil, fmt.Errorf("missing native token price for chain %s", destChainSelector)
 	}
 
-	feeComponents.ExecutionFee = new(big.Int).Mul(feeComponents.ExecutionFee, nativeTokenPrice.Int)
-	feeComponents.DataAvailabilityFee = new(big.Int).Mul(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
+	// nativeTokenPrice is in USD * 1e18 (from the price feed)
+	// feeComponents are in WEI (ETH * 1e18)
+	executionFee := new(big.Int).Div(
+		new(big.Int).Mul(feeComponents.ExecutionFee, nativeTokenPrice.Int),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+	)
+	dataAvailabilityFee := new(big.Int).Div(
+		new(big.Int).Mul(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+	)
 
-	return feeComponents, nil
+	return executionFee, dataAvailabilityFee, nil
 }
 
 // computeExecutionCostUSD18 computes the execution cost of a message in USD18s.

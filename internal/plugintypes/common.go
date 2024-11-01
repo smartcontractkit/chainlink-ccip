@@ -36,3 +36,8 @@ type USD18 = *big.Int
 func NewUSD18(value int64) USD18 {
 	return big.NewInt(value)
 }
+
+// use big int and multiply by 1e18 to avoid floating point errors
+func NewUSD18FromUSD(value int64) USD18 {
+	return new(big.Int).Mul(big.NewInt(value), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+}
