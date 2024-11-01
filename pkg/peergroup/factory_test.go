@@ -20,7 +20,7 @@ import (
 	// pgmocks "github.com/smartcontractkit/chainlink-ccip/mocks/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/libocr/networking"
 
-	pgfactorymocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/peergroup"
+	pgfactorymocks "github.com/smartcontractkit/chainlink-ccip/mocks/libocr_networking"
 )
 
 type mockPeerGroup struct {

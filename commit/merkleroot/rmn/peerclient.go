@@ -57,7 +57,7 @@ type peerClient struct {
 	lggr                        logger.Logger
 	peerGroupCreator            *peergroup.Creator
 	respChan                    chan PeerResponse
-	peerGroup                   peergroup.PeerGroup
+	peerGroup                   networking.PeerGroup
 	genericEndpointConfigDigest cciptypes.Bytes32
 	rageP2PStreams              map[rmntypes.NodeID]Stream
 	bootstrappers               []commontypes.BootstrapperLocator
@@ -68,7 +68,7 @@ type peerClient struct {
 
 func NewPeerClient(
 	lggr logger.Logger,
-	peerGroupFactory peergroup.PeerGroupFactory,
+	peerGroupFactory networking.PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
 	ocrRoundInterval time.Duration,
 ) PeerClient {
@@ -160,10 +160,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	}
 
 	rmnPeerID := rmnNode.PeerID.String()
-
-	// todo: versioning for stream names e.g. for 'v1_7'
-	streamName := fmt.Sprintf("ccip-rmn/v1_6/%s",
-		strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x"))
+	streamName := rmnNode.StreamNamePrefix + strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x")
 
 	r.lggr.Infow("creating new stream",
 		"streamName", streamName,

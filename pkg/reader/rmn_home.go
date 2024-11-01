@@ -247,7 +247,7 @@ func (r *rmnHomePoller) HealthReport() map[string]error {
 }
 
 func (r *rmnHomePoller) Name() string {
-	return "rmnHomePoller"
+	return r.lggr.Name()
 }
 
 func validate(config VersionedConfig) error {
@@ -290,6 +290,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 				PeerID:                ragep2ptypes.PeerID(node.PeerID),
 				OffchainPublicKey:     &pubKey,
 				SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](),
+				StreamNamePrefix:      "ccip-rmn/v1_6/", // todo: when contract is updated, this should be fetched from the contract
 			}
 		}
 

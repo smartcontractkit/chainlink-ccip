@@ -5,9 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/smartcontractkit/libocr/networking"
-
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/networking"
 	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
@@ -20,13 +19,13 @@ import (
 // Creator handles peer group creation
 type Creator struct {
 	lggr          logger.Logger
-	factory       PeerGroupFactory
+	factory       networking.PeerGroupFactory
 	bootstrappers []commontypes.BootstrapperLocator
 }
 
 func NewCreator(
 	lggr logger.Logger,
-	factory PeerGroupFactory,
+	factory networking.PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
 ) *Creator {
 	return &Creator{
@@ -46,7 +45,7 @@ type CreateOpts struct {
 
 // Result contains the created peer group and its config digest
 type Result struct {
-	PeerGroup    PeerGroup
+	PeerGroup    networking.PeerGroup
 	ConfigDigest cciptypes.Bytes32
 }
 
@@ -98,12 +97,4 @@ func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cc
 	hCopy[1] = prefixBytes[1]
 
 	return hCopy
-}
-
-type PeerGroupFactory interface {
-	networking.PeerGroupFactory
-}
-
-type PeerGroup interface {
-	networking.PeerGroup
 }
