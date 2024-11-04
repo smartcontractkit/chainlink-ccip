@@ -121,10 +121,11 @@ func Test_maxObservationLength(t *testing.T) {
 	maxObs := Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenprice.Observation{
-			FeedTokenPrices:       make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
-			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, estimatedMaxNumberOfPricedTokens),
-			FChain:                make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
-			Timestamp:             time.Now(),
+			FeedTokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig,
+				estimatedMaxNumberOfPricedTokens),
+			FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+			Timestamp: time.Now(),
 		},
 		ChainFeeObs: chainfee.Observation{
 			FeeComponents:     make(map[ccipocr3.ChainSelector]types.ChainFeeComponents, estimatedMaxNumberOfSourceChains),
