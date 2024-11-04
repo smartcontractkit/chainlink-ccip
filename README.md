@@ -77,7 +77,11 @@ This prints the final config, including patches from the selected profile.
 
 ## Repository Management and Contribution Guidelines
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md).
+
+## Developer Documentation
+
+See [docs/development/README.md](docs/development/README.md)
 
 ## Questions?
 For questions, please reach out to us on [#project-crib slack channel](https://chainlink.enterprise.slack.com/archives/C0637K4BBC2) 

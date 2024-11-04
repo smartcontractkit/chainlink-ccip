@@ -5,10 +5,13 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/smartcontractkit/crib/cli/wrappers"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/dynamic"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -105,4 +108,46 @@ func SetupKubeConfig(input *SetupKubeConfigInput) error {
 func CheckK8sAccess(kubeCoreV1Client corev1.CoreV1Interface) error {
 	_, err := kubeCoreV1Client.Namespaces().List(context.TODO(), metav1.ListOptions{})
 	return err
+}
+
+func EnsureNamespaceExists(ctx context.Context, namespaceClient corev1.NamespaceInterface, name string) (bool, error) {
+	_, err := namespaceClient.Get(ctx, name, metav1.GetOptions{})
+	if err == nil {
+		return true, nil
+	}
+
+	newNamespace := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+	}
+	_, err = namespaceClient.Create(ctx, newNamespace, metav1.CreateOptions{})
+	if err != nil {
+		return false, fmt.Errorf("failed to create namespace %s: %w", name, err)
+	}
+
+	return true, nil
+}
+
+// WaitForResource waits for a specified resource to be created in a namespace.
+// It periodically checks for the resource until the timeout is reached.
+func WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	for {
+		select {
+		case <-timeoutCtx.Done():
+			return fmt.Errorf("timed out waiting for resource %s", resourceName)
+
+		case <-ticker.C:
+			_, err := resourceClient.Get(ctx, resourceName, metav1.GetOptions{})
+			if err == nil {
+				return nil
+			}
+		}
+	}
 }

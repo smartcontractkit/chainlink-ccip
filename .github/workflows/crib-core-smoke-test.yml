@@ -11,6 +11,7 @@ on:
       - "dependencies/crib-chainlink-cluster/**"
       - "imports/**"
       - "scripts/**"
+      - "cli/**"
       # Include crib core changes
       - "deployments/chainlink/**"
       - ".github/workflows/crib-core-smoke-test.yml"
@@ -19,9 +20,10 @@ on:
       # Exclude .gitignore
       - "!.gitignore"
     types:
-      - review_requested
-      - ready_for_review
+      - opened
+      - reopened
       - synchronize
+      - ready_for_review
   push:
     branches:
       - main # Trigger only on pushes to the main branch

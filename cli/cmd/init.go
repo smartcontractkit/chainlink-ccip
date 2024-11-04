@@ -14,6 +14,8 @@ import (
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -57,8 +59,8 @@ var initCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if !viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX") && !strings.HasPrefix(viper.GetString("DEVSPACE_NAMESPACE"), "crib-") {
-			logger.Error("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
+		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
+			logger.Error("invalid namespace for CRIB", slog.Any("error", err))
 			os.Exit(1)
 		}
 
@@ -185,6 +187,24 @@ var initCmd = &cobra.Command{
 				"kubeconfig", viper.GetString("KUBECONFIG"),
 				"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
 			)
+
+			dynamicClient, err := dynamic.NewForConfig(kubeconfig)
+			if err != nil {
+				logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
+				os.Exit(1)
+			}
+
+			rolebindingClient := dynamicClient.Resource(schema.GroupVersionResource{
+				Group:    "rbac.authorization.k8s.io",
+				Version:  "v1",
+				Resource: "rolebindings",
+			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
+
+			if err := utils.EnsureCribNamespaceReady(context.TODO(), kubeClientset.CoreV1().Namespaces(), rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+				logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
+				os.Exit(1)
+			}
+			logger.Info("k8s namespace ready", slog.String("name", viper.GetString("DEVSPACE_NAMESPACE")))
 		}
 
 		var dockerCli wrappers.DockerCLI

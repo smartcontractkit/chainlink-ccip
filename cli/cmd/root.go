@@ -54,6 +54,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", ".env", "config file")
 	rootCmd.PersistentFlags().String("log-level", "info", "Log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().Bool("debug", false, "Syntactic sugar for --log-level debug")
 
 	// flow control flags
 	rootCmd.PersistentFlags().Bool("crib-ci-env", false, "Flag to indicate that this is a CI environment")
@@ -63,12 +64,14 @@ func init() {
 
 	// Bind the viper flag to the cobra flag (we can safely ignore the errors here)
 	_ = viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))
+	_ = viper.BindPFlag("debug", rootCmd.PersistentFlags().Lookup("debug"))
 	_ = viper.BindPFlag("CRIB_CI_ENV", rootCmd.PersistentFlags().Lookup("crib-ci-env"))
 	_ = viper.BindPFlag("CRIB_IGNORE_NAMESPACE_PREFIX", rootCmd.Flags().Lookup("crib-ignore-namespace-prefix"))
 	_ = viper.BindPFlag("CRIB_SKIP_DOCKER_ECR_LOGIN", rootCmd.Flags().Lookup("crib-skip-docker-ecr-login"))
 	_ = viper.BindPFlag("CRIB_SKIP_HELM_ECR_LOGIN", rootCmd.Flags().Lookup("crib-skip-helm-ecr-login"))
 
 	viper.SetDefault("log_level", rootCmd.PersistentFlags().Lookup("log-level").DefValue)
+	viper.SetDefault("debug", rootCmd.PersistentFlags().Lookup("debug").DefValue)
 	viper.SetDefault("CRIB_CI_ENV", rootCmd.PersistentFlags().Lookup("crib-ci-env").DefValue)
 	viper.SetDefault("CRIB_IGNORE_NAMESPACE_PREFIX", rootCmd.PersistentFlags().Lookup("crib-ignore-namespace-prefix").DefValue)
 	viper.SetDefault("CRIB_SKIP_DOCKER_ECR_LOGIN", rootCmd.PersistentFlags().Lookup("crib-skip-docker-ecr-login").DefValue)
@@ -122,14 +125,16 @@ func initConfig(isChildOfDevspaceCmd bool) {
 		fmt.Fprintln(os.Stdout, "Running in CI, reading values from the environment")
 		return
 	}
-	if isChildOfDevspaceCmd {
-		fmt.Fprintln(os.Stdout, "Running devspace command, reading values from the environment")
-		return
-	}
 
 	err := viper.ReadInConfig()
 	if err == nil {
 		fmt.Fprintln(os.Stdout, "Using config file:", viper.ConfigFileUsed())
+		return
+	}
+
+	// preventing interactive prompt while running devspace commands
+	if isChildOfDevspaceCmd {
+		fmt.Fprintln(os.Stdout, "Running devspace command")
 		return
 	}
 
@@ -160,6 +165,9 @@ func initConfig(isChildOfDevspaceCmd bool) {
 
 func initLogger() {
 	requestedLogLevel := viper.GetString("log_level")
+	if viper.GetBool("debug") {
+		requestedLogLevel = "debug"
+	}
 	var slogLevel slog.Level
 	var w io.Writer
 	switch requestedLogLevel {

@@ -134,10 +134,8 @@ hooks:
   - command: crib
     args: ["devspace", "refresh-ecr-credentials", "--docker"]
     events: ["before:build:*"]
-  - command: ${SCRIPTS_DIR}/before_deploy_checks.sh
-    events: ["before:deploy:app"]
-  - command: ./${SCRIPTS_DIR}/manage_namespace.sh
-    args: ["create"]
+  - command: crib
+    args: ["devspace", "ensure-namespace"]
     events: ["before:deploy:*"]
   - wait:
       running: true
@@ -168,7 +166,7 @@ deployments:
       releaseName: "app"
       chart:
         name: ${CHAINLINK_CLUSTER_HELM_CHART_URI}
-        version: "2.0.0"
+        version: "2.0.1"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
@@ -329,7 +327,8 @@ profiles:
       - op: add
         path: hooks
         value:
-          command: ${SCRIPTS_DIR}/check_env_vars.sh
+          command: crib
+          args: ["devspace", "check-env-vars"]
           events: ["before:deploy:app"]
     merge:
       images:
@@ -393,8 +392,8 @@ profiles:
       - op: add
         path: hooks
         value:
-          command: ${SCRIPTS_DIR}/check_env_vars.sh
-          args: ["ccip"]
+          command: crib
+          args: ["devspace", "check-env-vars", "ccip"]
           events: ["before:deploy:app"]
     merge:
       images:
@@ -476,6 +475,9 @@ profiles:
                       PriceMax = '200 gwei'
                       LimitDefault = 6000000
                       FeeCapDefault = '200 gwei'
+              db:
+                statefulSet:
+                  enabled: true
   - name: kind
     merge:
       deployments:

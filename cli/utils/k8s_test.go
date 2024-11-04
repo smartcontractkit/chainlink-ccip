@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -322,6 +324,127 @@ func TestCheckK8sAccess(t *testing.T) {
 			t.Parallel()
 
 			err := CheckK8sAccess(tt.corev1)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestEnsureNamespaceExists(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		namespaceName  string
+		getErr         error
+		createErr      error
+		expectedExists bool
+		expectedErr    string
+	}{
+		{
+			name:           "NamespaceExists",
+			namespaceName:  "existing-namespace",
+			getErr:         nil,
+			expectedExists: true,
+			expectedErr:    "",
+		},
+		{
+			name:           "NamespaceDoesNotExistAndCreateSucceeds",
+			namespaceName:  "new-namespace",
+			getErr:         fmt.Errorf("not found"),
+			createErr:      nil,
+			expectedExists: true,
+			expectedErr:    "",
+		},
+		{
+			name:           "NamespaceDoesNotExistAndCreateFails",
+			namespaceName:  "new-namespace",
+			getErr:         fmt.Errorf("not found"),
+			createErr:      fmt.Errorf("create error"),
+			expectedExists: false,
+			expectedErr:    "failed to create namespace new-namespace: create error",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNamespaceClient := wrappermocks.NewNamespaceInterface(t)
+			mockNamespaceClient.EXPECT().
+				Get(context.TODO(), tt.namespaceName, metav1.GetOptions{}).
+				Return(&v1.Namespace{}, tt.getErr)
+
+			if tt.getErr != nil {
+				mockNamespaceClient.EXPECT().
+					Create(context.TODO(), &v1.Namespace{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tt.namespaceName,
+						},
+					}, metav1.CreateOptions{}).
+					Return(&v1.Namespace{}, tt.createErr)
+			}
+
+			exists, err := EnsureNamespaceExists(context.TODO(), mockNamespaceClient, tt.namespaceName)
+			assert.Equal(t, tt.expectedExists, exists)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestWaitForResource(t *testing.T) {
+	t.Parallel()
+
+	resourceName := "test-resource"
+	interval := 100 * time.Millisecond
+	timeout := 500 * time.Millisecond
+
+	testCases := []struct {
+		name          string
+		getErr        error
+		expectedErr   string
+		resourceFound bool
+	}{
+		{
+			name:          "ResourceFound",
+			getErr:        nil,
+			expectedErr:   "",
+			resourceFound: true,
+		},
+		{
+			name:          "ResourceNotFound",
+			getErr:        fmt.Errorf("not found"),
+			expectedErr:   fmt.Sprintf("timed out waiting for resource %s", resourceName),
+			resourceFound: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockResourceClient := wrappermocks.NewResourceInterface(t)
+			if tt.resourceFound {
+				mockResourceClient.EXPECT().
+					Get(context.TODO(), resourceName, metav1.GetOptions{}).
+					Return(&unstructured.Unstructured{}, tt.getErr).Times(1)
+			} else {
+				mockResourceClient.EXPECT().
+					Get(context.TODO(), resourceName, metav1.GetOptions{}).
+					Return(nil, tt.getErr)
+			}
+
+			ctx := context.TODO()
+			err := WaitForResource(ctx, mockResourceClient, resourceName, interval, timeout)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
 			} else {
