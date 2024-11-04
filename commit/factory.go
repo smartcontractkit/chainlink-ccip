@@ -29,7 +29,7 @@ import (
 
 // maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
 // that assumes 1,000 source chains and 256 (theoretical max) RMN nodes.
-const maxQueryLength = 603_872
+const maxQueryLength = 615_520
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
