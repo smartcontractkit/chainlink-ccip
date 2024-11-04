@@ -27,19 +27,19 @@ func Test_maxQueryLength(t *testing.T) {
 
 	// Estimate the maximum number of source chains we are going to ever have.
 	// This value should be tweaked after we are close to supporting that many chains.
-	const estimateMaxNumberOfSourceChains = 1000
+	const estimatedMaxNumberOfSourceChains = 1000
 
 	// Estimate the maximum number of RMN report signers we are going to ever have.
 	// This value is defined in RMNRemote contract as `f`.
 	// This value should be tweaked if necessary in order to define new limits.
-	const estimatedMaxRmnReportSigners = 200
+	const estimatedMaxRmnReportSigners = 256
 
 	sigs := make([]*rmnpb.EcdsaSignature, estimatedMaxRmnReportSigners)
 	for i := range sigs {
 		sigs[i] = &rmnpb.EcdsaSignature{R: make([]byte, 32), S: make([]byte, 32)}
 	}
 
-	laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, estimateMaxNumberOfSourceChains)
+	laneUpdates := make([]*rmnpb.FixedDestLaneUpdate, estimatedMaxNumberOfSourceChains)
 	for i := range laneUpdates {
 		laneUpdates[i] = &rmnpb.FixedDestLaneUpdate{
 			LaneSource: &rmnpb.LaneSource{
