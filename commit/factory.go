@@ -46,9 +46,10 @@ const (
 	// maxObservationLength is set to the maximum size of an observation
 	maxObservationLength = 1_047_202
 
-	maxOutcomeLength = 10_000
+	// maxOutcomeLength is set to the maximum size of an outcome
+	maxOutcomeLength = 1_167_765
 
-	maxReportLength = 10_000
+	maxReportLength = 993_982
 
 	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
 	maxReportCount = 1

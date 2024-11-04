@@ -150,10 +150,126 @@ func Test_maxObservationLength(t *testing.T) {
 	b, err := maxObs.Encode()
 	require.NoError(t, err)
 
-	const compareOffset = 10 // the produced bytes are not deterministic, so we need to allow some offset
-	assert.Greater(t, len(b), maxObservationLength-compareOffset)
-	assert.Less(t, len(b), maxObservationLength+compareOffset)
+	assert.Equal(t, len(b), maxObservationLength)
 	assert.Less(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
+}
+
+func Test_maxOutcomeLength(t *testing.T) {
+	maxOutc := Outcome{
+		MerkleRootOutcome: merkleroot.Outcome{
+			OutcomeType:                     merkleroot.OutcomeType(math.MaxInt),
+			RangesSelectedForReport:         make([]plugintypes.ChainRange, estimatedMaxNumberOfSourceChains),
+			RootsToReport:                   make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
+			OffRampNextSeqNums:              make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
+			ReportTransmissionCheckAttempts: math.MaxUint64,
+			RMNReportSignatures:             make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
+			RMNRemoteCfg: rmntypes.RemoteConfig{
+				ContractAddress:  make([]byte, 20),
+				ConfigDigest:     [32]byte{},
+				Signers:          make([]rmntypes.RemoteSignerInfo, estimatedMaxRmnNodesCount),
+				F:                math.MaxUint64,
+				ConfigVersion:    math.MaxUint32,
+				RmnReportVersion: [32]byte{},
+			},
+		},
+		TokenPriceOutcome: tokenprice.Outcome{
+			TokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+		},
+		ChainFeeOutcome: chainfee.Outcome{
+			GasPrices: make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
+		},
+	}
+
+	for i := range maxOutc.MerkleRootOutcome.RangesSelectedForReport {
+		maxOutc.MerkleRootOutcome.RangesSelectedForReport[i] = plugintypes.ChainRange{
+			ChainSel:    math.MaxUint64,
+			SeqNumRange: ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
+		}
+	}
+
+	for i := range maxOutc.MerkleRootOutcome.RootsToReport {
+		maxOutc.MerkleRootOutcome.RootsToReport[i] = ccipocr3.MerkleRootChain{
+			ChainSel:      math.MaxUint64,
+			OnRampAddress: make([]byte, 40),
+			SeqNumsRange:  ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
+			MerkleRoot:    [32]byte{},
+		}
+	}
+
+	for i := range maxOutc.MerkleRootOutcome.OffRampNextSeqNums {
+		maxOutc.MerkleRootOutcome.OffRampNextSeqNums[i] = plugintypes.SeqNumChain{
+			ChainSel: math.MaxUint64,
+			SeqNum:   math.MaxUint64,
+		}
+	}
+
+	for i := range maxOutc.MerkleRootOutcome.RMNRemoteCfg.Signers {
+		maxOutc.MerkleRootOutcome.RMNRemoteCfg.Signers[i] = rmntypes.RemoteSignerInfo{
+			OnchainPublicKey: make([]byte, 40),
+			NodeIndex:        math.MaxUint64,
+		}
+	}
+
+	for i := range maxOutc.TokenPriceOutcome.TokenPrices {
+		maxOutc.TokenPriceOutcome.TokenPrices[i] = ccipocr3.TokenPrice{
+			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
+			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
+		}
+	}
+
+	for i := range maxOutc.ChainFeeOutcome.GasPrices {
+		maxOutc.ChainFeeOutcome.GasPrices[i] = ccipocr3.GasPriceChain{
+			ChainSel: math.MaxUint64,
+			GasPrice: ccipocr3.NewBigIntFromInt64(math.MaxInt64),
+		}
+	}
+
+	b, err := maxOutc.Encode()
+	require.NoError(t, err)
+
+	assert.Equal(t, len(b), maxOutcomeLength)
+	assert.Less(t, maxOutcomeLength, ocr3types.MaxMaxOutcomeLength)
+}
+
+func Test_maxReportLength(t *testing.T) {
+	rep := ccipocr3.CommitPluginReport{
+		MerkleRoots: make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
+		PriceUpdates: ccipocr3.PriceUpdates{
+			TokenPriceUpdates: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			GasPriceUpdates:   make([]ccipocr3.GasPriceChain, estimatedMaxNumberOfSourceChains),
+		},
+		RMNSignatures: make([]ccipocr3.RMNECDSASignature, estimatedMaxRmnNodesCount),
+	}
+
+	for i := range rep.MerkleRoots {
+		rep.MerkleRoots[i] = ccipocr3.MerkleRootChain{
+			ChainSel:      math.MaxUint64,
+			OnRampAddress: make([]byte, 40),
+			SeqNumsRange:  ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
+			MerkleRoot:    [32]byte{},
+		}
+	}
+
+	for i := range rep.PriceUpdates.TokenPriceUpdates {
+		rep.PriceUpdates.TokenPriceUpdates[i] = ccipocr3.TokenPrice{
+			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
+			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
+		}
+	}
+
+	for i := range rep.PriceUpdates.GasPriceUpdates {
+		rep.PriceUpdates.GasPriceUpdates[i] = ccipocr3.GasPriceChain{
+			ChainSel: math.MaxUint64,
+			GasPrice: ccipocr3.NewBigIntFromInt64(math.MaxInt64),
+		}
+	}
+
+	// Chain specific encoding are more compact than JSON. We measure using JSON encoding.
+	b, err := json.Marshal(rep)
+	require.NoError(t, err)
+
+	assert.Equal(t, len(b), maxReportLength)
+	assert.Less(t, maxReportLength, ocr3types.MaxMaxReportLength)
 }
 
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
