@@ -243,10 +243,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 		"candidateConfig", allConfigs.CandidateConfig,
 	)
 
-	return ActiveAndCandidate{
-		ActiveConfig:    allConfigs.ActiveConfig,
-		CandidateConfig: allConfigs.CandidateConfig,
-	}, nil
+	return allConfigs, nil
 }
 
 func (r *homeChainPoller) Close() error {

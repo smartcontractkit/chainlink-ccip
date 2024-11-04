@@ -302,12 +302,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	// we only transmit reports if we are the "blue" instance.
 	// we can check this by reading the OCR conigs home chain.
-	isGreen, err := p.isGreenInstance(ctx)
+	isCandidate, err := p.isCandidateInstance(ctx)
 	if err != nil {
-		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isGreenInstance: %w", err)
+		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isCandidateInstance: %w", err)
 	}
 
-	if isGreen {
+	if isCandidate {
 		p.lggr.Debugw("not the blue instance, skipping report transmission",
 			"myDigest", p.reportingCfg.ConfigDigest.Hex())
 		return false, nil
@@ -324,7 +324,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	return true, nil
 }
 
-func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
+func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
 	if p.reportingCfg.ConfigDigest == [32]byte{} {
 		return false, nil
 	}
