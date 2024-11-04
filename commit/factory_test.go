@@ -68,6 +68,7 @@ func Test_maxQueryLength(t *testing.T) {
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
 	assert.Equal(t, 2*len(b), maxQueryLength)
+	require.Less(t, maxQueryLength, ocr3types.MaxMaxQueryLength)
 }
 
 func Test_maxObservationLength(t *testing.T) {
