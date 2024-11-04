@@ -13,6 +13,7 @@ on:
       - "imports/**"
       - "dependencies/atlas/**"
       - "scripts/**"
+      - "cli/**"
       # Include crib ccip changes
       - "deployments/chainlink/**"
       - ".github/workflows/crib-ccip-atlas-smoke-test.yml"
