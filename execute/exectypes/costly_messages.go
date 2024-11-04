@@ -380,7 +380,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 
 	for _, msg := range messages {
 		executionCostUSD18 := c.computeExecutionCostUSD18(executionFee, msg)
-		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(c.lggr, daFee, daConfig, msg)
+		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(daFee, daConfig, msg)
 		totalCostUSD18 := new(big.Int).Add(executionCostUSD18, dataAvailabilityCostUSD18)
 		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
 	}
