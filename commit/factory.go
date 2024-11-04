@@ -42,15 +42,21 @@ const (
 	estimatedMaxNumberOfPricedTokens = 10_000
 
 	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
-	// that assumes 1,000 source chains and 256 (theoretical max) RMN nodes.
+	// that assumes estimatedMaxNumberOfSourceChains source chains and
+	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
+	// check factory_test for the calculation
 	maxQueryLength = 559_320
 
 	// maxObservationLength is set to the maximum size of an observation
+	// check factory_test for the calculation
 	maxObservationLength = 1_047_202
 
 	// maxOutcomeLength is set to the maximum size of an outcome
+	// check factory_test for the calculation
 	maxOutcomeLength = 1_167_765
 
+	// maxReportLength is set to an estimate of a maximum report size
+	// check factory_test for the calculation
 	maxReportLength = 993_982
 
 	// maxReportCount is set to 1 because the commit plugin only generates one report per round.

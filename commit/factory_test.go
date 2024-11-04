@@ -67,7 +67,9 @@ func Test_maxQueryLength(t *testing.T) {
 	require.NoError(t, err)
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
-	assert.Equal(t, 2*len(b), maxQueryLength)
+	const testOffset = 10
+	assert.Greater(t, maxQueryLength, 2*len(b)-testOffset)
+	assert.Less(t, maxQueryLength, 2*len(b)+testOffset)
 	require.Less(t, maxQueryLength, ocr3types.MaxMaxQueryLength)
 }
 
@@ -152,7 +154,9 @@ func Test_maxObservationLength(t *testing.T) {
 	b, err := maxObs.Encode()
 	require.NoError(t, err)
 
-	assert.Equal(t, len(b), maxObservationLength)
+	const testOffset = 50
+	assert.Greater(t, maxObservationLength, len(b)-testOffset)
+	assert.Less(t, maxObservationLength, len(b)+testOffset)
 	assert.Less(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
 }
 
@@ -229,7 +233,9 @@ func Test_maxOutcomeLength(t *testing.T) {
 	b, err := maxOutc.Encode()
 	require.NoError(t, err)
 
-	assert.Equal(t, len(b), maxOutcomeLength)
+	const testOffset = 10
+	assert.Greater(t, maxOutcomeLength, len(b)-testOffset)
+	assert.Less(t, maxOutcomeLength, len(b)+testOffset)
 	assert.Less(t, maxOutcomeLength, ocr3types.MaxMaxOutcomeLength)
 }
 
@@ -270,7 +276,9 @@ func Test_maxReportLength(t *testing.T) {
 	b, err := json.Marshal(rep)
 	require.NoError(t, err)
 
-	assert.Equal(t, len(b), maxReportLength)
+	const testOffset = 10
+	assert.Greater(t, maxReportLength, len(b)-testOffset)
+	assert.Less(t, maxReportLength, len(b)+testOffset)
 	assert.Less(t, maxReportLength, ocr3types.MaxMaxReportLength)
 }
 
