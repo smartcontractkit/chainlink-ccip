@@ -11,6 +11,7 @@ on:
       - "dependencies/crib-chainlink-cluster/**"
       - "imports/**"
       - "scripts/**"
+      - "cli/**"
       # Include crib core changes
       - "deployments/chainlink/**"
       - ".github/workflows/crib-core-smoke-test.yml"
