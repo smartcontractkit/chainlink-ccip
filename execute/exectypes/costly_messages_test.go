@@ -293,7 +293,7 @@ func TestCCIPMessageFeeE18USDCalculator_MessageFeeE18USD(t *testing.T) {
 func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 	destChainSelector := ccipocr3.ChainSelector(1)
 	nativeTokenPrice := ccipocr3.BigInt{
-		Int: new(big.Int).Mul(big.NewInt(2), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))}
+		Int: new(big.Int).Mul(big.NewInt(9), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))}
 
 	tests := []struct {
 		name                string
@@ -320,7 +320,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				},
 			},
 			messageGases:        []uint64{100, 200, 300},
-			executionFee:        new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
 			dataAvailabilityFee: big.NewInt(0),
 			feeComponentsError:  nil,
 			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
@@ -329,9 +329,9 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 1,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18FromUSD(20000), // 10000 * 2 (price conversion)
-				b2: plugintypes.NewUSD18FromUSD(40000), // 20000 * 2
-				b3: plugintypes.NewUSD18FromUSD(60000), // 30000 * 2
+				b1: plugintypes.NewUSD18(45000000000),  // 5_000_000_000 * 9 (price conversion)
+				b2: plugintypes.NewUSD18(90000000000),  // 10_000_000_000 * 9
+				b3: plugintypes.NewUSD18(135000000000), // 15_000_000_000 * 9
 			},
 			wantErr: false,
 		},
@@ -349,8 +349,8 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				},
 			},
 			messageGases:        []uint64{100, 200, 300},
-			executionFee:        new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
-			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(400), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
+			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
 			feeComponentsError:  nil,
 			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
 				DestDataAvailabilityOverheadGas:   1200,
@@ -358,9 +358,9 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18FromUSD(110400), // 20_000 (exec) + 90_400 (da)
-				b2: plugintypes.NewUSD18FromUSD(130400), // 40_000 (exec) + 90_400 (da)
-				b3: plugintypes.NewUSD18FromUSD(150400), // 60_000 (exec) + 90_400 (da)
+				b1: plugintypes.NewUSD18(55170000000),  // 4.5e10 (exec) + 1.017e10 (da)
+				b2: plugintypes.NewUSD18(100170000000), // 9e10 (exec) + 1.017e10 (da)
+				b3: plugintypes.NewUSD18(145170000000), // 135e10 (exec) + 1.017e10 (da)
 			},
 			wantErr: false,
 		},
@@ -385,8 +385,8 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				},
 			},
 			messageGases:        []uint64{100},
-			executionFee:        new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
-			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(400), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
+			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
 			feeComponentsError:  nil,
 			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
 				DestDataAvailabilityOverheadGas:   1000,
@@ -394,7 +394,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18FromUSD(158_400), // 20_000 (exec) + 138_400 (da)
+				b1: plugintypes.NewUSD18(60570000000), //  4.5e10 (exec) + 1.557e10 (da)
 			},
 			wantErr: false,
 		},
@@ -407,8 +407,8 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				},
 			},
 			messageGases:        []uint64{100},
-			executionFee:        new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
-			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(400), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
+			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
 			feeComponentsError:  nil,
 			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
 				DestDataAvailabilityOverheadGas:   1000,
@@ -416,7 +416,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 0, // Zero multiplier
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18FromUSD(20000), // Only exec cost, DA cost is 0
+				b1: plugintypes.NewUSD18(45000000000), // Only exec cost, DA cost is 0
 			},
 			wantErr: false,
 		},
@@ -448,8 +448,8 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				},
 			},
 			messageGases:        []uint64{100},
-			executionFee:        new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
-			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(400), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
+			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
 			feeComponentsError:  nil,
 			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
 				DestDataAvailabilityOverheadGas:   1000,
@@ -457,7 +457,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18FromUSD(439_200), // 20_000 (exec) + 437_200 (da)
+				b1: plugintypes.NewUSD18(92160000000), // 4.5e10 (exec) + 4.716e10 (da)
 			},
 			wantErr: false,
 		},
@@ -494,8 +494,8 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				},
 			},
 			messageGases:        []uint64{100},
-			executionFee:        new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
-			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(400), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil)),
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
+			dataAvailabilityFee: new(big.Int).Mul(big.NewInt(100), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
 			feeComponentsError:  nil,
 			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
 				DestDataAvailabilityOverheadGas:   1000,
@@ -503,7 +503,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				DestDataAvailabilityMultiplierBps: 200,
 			},
 			want: map[ccipocr3.Bytes32]plugintypes.USD18{
-				b1: plugintypes.NewUSD18FromUSD(107_200), // 20_000 (exec) + 87_200 (da)
+				b1: plugintypes.NewUSD18(54810000000), // 4.5e10 (exec) + 0.981e10 (da)
 			},
 			wantErr: false,
 		},
