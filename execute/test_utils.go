@@ -15,7 +15,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocr2t "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -295,7 +295,7 @@ func (it *IntTest) newNode(
 	rCfg := ocr3types.ReportingPluginConfig{
 		N:            N,
 		OracleID:     commontypes.OracleID(id),
-		ConfigDigest: ocr2t.ConfigDigest(b),
+		ConfigDigest: ocrtypes.ConfigDigest(b),
 	}
 
 	node1 := NewPlugin(

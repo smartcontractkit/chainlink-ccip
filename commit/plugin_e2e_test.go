@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
@@ -832,7 +832,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 
 	donID := uint32(1)
 	rb := rand.RandomBytes32()
-	digest := ocrTypes.ConfigDigest(rb[:])
+	digest := ocrtypes.ConfigDigest(rb[:])
 
 	require.Equal(t, len(oracleIDs), len(peerIDs))
 
