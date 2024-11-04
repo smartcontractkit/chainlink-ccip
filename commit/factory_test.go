@@ -1,9 +1,14 @@
 package commit
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +17,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_maxQueryLength(t *testing.T) {
@@ -62,4 +70,45 @@ func Test_maxQueryLength(t *testing.T) {
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
 	assert.Equal(t, 2*len(b), maxQueryLength)
+}
+
+func TestPluginFactory_NewReportingPlugin(t *testing.T) {
+	t.Run("basic checks for the happy flow", func(t *testing.T) {
+		ctx := tests.Context(t)
+		lggr := logger.Test(t)
+
+		offChainConfig := pluginconfig.CommitOffchainConfig{
+			MaxMerkleTreeSize: 123,
+		}
+		b, err := json.Marshal(offChainConfig)
+		require.NoError(t, err)
+
+		p := &PluginFactory{
+			lggr: lggr,
+			ocrConfig: reader.OCR3ConfigWithMeta{
+				Version:      1,
+				ConfigDigest: [32]byte{1, 2, 3},
+				Config: reader2.OCR3Config{
+					OfframpAddress: []byte{1, 2, 3},
+					OffchainConfig: b,
+					ChainSelector:  1,
+				},
+			},
+		}
+
+		plugin, pluginInfo, err := p.NewReportingPlugin(ctx, ocr3types.ReportingPluginConfig{
+			OffchainConfig: b,
+		})
+		require.NoError(t, err)
+
+		pluginCommit, is := plugin.(*Plugin)
+		require.True(t, is)
+		pluginOffchainConfig := pluginCommit.offchainCfg
+
+		require.Equal(t, uint(5), pluginOffchainConfig.MaxReportTransmissionCheckAttempts)          // default is used
+		require.Equal(t, merklemulti.MaxNumberTreeLeaves, pluginOffchainConfig.NewMsgScanBatchSize) // default is used
+		require.Equal(t, offChainConfig.MaxMerkleTreeSize, pluginOffchainConfig.MaxMerkleTreeSize)  // override
+
+		require.Equal(t, maxQueryLength, pluginInfo.Limits.MaxQueryLength)
+	})
 }
