@@ -36,7 +36,9 @@ const (
 	// Estimated maximum number of RMN nodes the system will support.
 	estimatedMaxRmnNodesCount = 256
 
-	// Estimated maximum number of priced tokens that the Commit DON will support.
+	// Estimated maximum number of priced tokens that the Commit DON supports.
+	// This value does not indicate a system limitation but just an estimation to properly tune the OCR parameters.
+	// The value can be adjusted as needed.
 	estimatedMaxNumberOfPricedTokens = 10_000
 
 	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
