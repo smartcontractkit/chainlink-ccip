@@ -85,8 +85,12 @@ func (p *Plugin) Reports(
 	}
 
 	return []ocr3types.ReportPlus[[]byte]{
-		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-			Report: encodedReport, Info: infoBytes}},
+		{
+			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+				Report: encodedReport,
+				Info:   infoBytes,
+			},
+		},
 	}, nil
 }
 
