@@ -302,24 +302,22 @@ func (_c *MockHomeChain_GetKnownCCIPChains_Call) RunAndReturn(run func() (mapset
 }
 
 // GetOCRConfigs provides a mock function with given fields: ctx, donID, pluginType
-func (_m *MockHomeChain) GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]reader.OCR3ConfigWithMeta, error) {
+func (_m *MockHomeChain) GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) (reader.ActiveAndCandidate, error) {
 	ret := _m.Called(ctx, donID, pluginType)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetOCRConfigs")
 	}
 
-	var r0 []reader.OCR3ConfigWithMeta
+	var r0 reader.ActiveAndCandidate
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint32, uint8) ([]reader.OCR3ConfigWithMeta, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint32, uint8) (reader.ActiveAndCandidate, error)); ok {
 		return rf(ctx, donID, pluginType)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint32, uint8) []reader.OCR3ConfigWithMeta); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, uint32, uint8) reader.ActiveAndCandidate); ok {
 		r0 = rf(ctx, donID, pluginType)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]reader.OCR3ConfigWithMeta)
-		}
+		r0 = ret.Get(0).(reader.ActiveAndCandidate)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, uint32, uint8) error); ok {
@@ -351,12 +349,12 @@ func (_c *MockHomeChain_GetOCRConfigs_Call) Run(run func(ctx context.Context, do
 	return _c
 }
 
-func (_c *MockHomeChain_GetOCRConfigs_Call) Return(_a0 []reader.OCR3ConfigWithMeta, _a1 error) *MockHomeChain_GetOCRConfigs_Call {
+func (_c *MockHomeChain_GetOCRConfigs_Call) Return(_a0 reader.ActiveAndCandidate, _a1 error) *MockHomeChain_GetOCRConfigs_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockHomeChain_GetOCRConfigs_Call) RunAndReturn(run func(context.Context, uint32, uint8) ([]reader.OCR3ConfigWithMeta, error)) *MockHomeChain_GetOCRConfigs_Call {
+func (_c *MockHomeChain_GetOCRConfigs_Call) RunAndReturn(run func(context.Context, uint32, uint8) (reader.ActiveAndCandidate, error)) *MockHomeChain_GetOCRConfigs_Call {
 	_c.Call.Return(run)
 	return _c
 }

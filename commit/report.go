@@ -40,10 +40,13 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
 	}
 
-	// Until we start adding tokens and gas to the report, we don't need to report anything
+	// Gas prices and token prices do not need to get reported when merkle roots do not exist.
 	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
+		p.lggr.Infow("skipping report generation merkle roots do not exist",
+			"merkleRootProcessorOutcomeType", outcome.MerkleRootOutcome.OutcomeType)
 		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
+
 	p.lggr.Infow("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
@@ -58,6 +61,11 @@ func (p *Plugin) Reports(
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+	}
+
+	if rep.IsEmpty() {
+		p.lggr.Infow("empty report", "report", rep)
+		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
 
 	encodedReport, err := p.reportCodec.Encode(ctx, rep)
@@ -125,7 +133,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR conigs home chain.
+	// we can check this by reading the OCR configs from the home chain.
 	isCandidate, err := p.isCandidateInstance(ctx)
 	if err != nil {
 		return false, fmt.Errorf("isCandidateInstance: %w", err)
@@ -163,5 +171,5 @@ func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
+	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }
