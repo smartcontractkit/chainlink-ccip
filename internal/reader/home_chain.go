@@ -222,7 +222,7 @@ func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
 ) (ActiveAndCandidate, error) {
 	var (
-		allConfigs ActiveAndCandidate
+		activeAndCandidate ActiveAndCandidate
 	)
 
 	err := r.homeChainReader.GetLatestValue(
@@ -232,18 +232,18 @@ func (r *homeChainPoller) GetOCRConfigs(
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
-		}, &allConfigs)
+		}, &activeAndCandidate)
 	if err != nil {
 		return ActiveAndCandidate{}, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
 
 	r.lggr.Infow(
 		"GetOCRConfigs",
-		"activeConfig", allConfigs.ActiveConfig,
-		"candidateConfig", allConfigs.CandidateConfig,
+		"activeConfig", activeAndCandidate.ActiveConfig,
+		"candidateConfig", activeAndCandidate.CandidateConfig,
 	)
 
-	return allConfigs, nil
+	return activeAndCandidate, nil
 }
 
 func (r *homeChainPoller) Close() error {

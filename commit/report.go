@@ -166,9 +166,6 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 }
 
 func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
-	if p.reportingCfg.ConfigDigest == [32]byte{} {
-		return false, nil
-	}
 	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeCommit)
 	if err != nil {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
