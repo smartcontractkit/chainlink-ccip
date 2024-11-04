@@ -3,10 +3,13 @@ package commit
 import (
 	"encoding/json"
 	"math"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/assert"
@@ -16,25 +19,20 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
+	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader2 "github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 func Test_maxQueryLength(t *testing.T) {
 	// This test will verify that the maxQueryLength constant is set to a proper value.
 
-	// Estimate the maximum number of source chains we are going to ever have.
-	// This value should be tweaked after we are close to supporting that many chains.
-	const estimatedMaxNumberOfSourceChains = 1000
-
-	// Estimate the maximum number of RMN report signers we are going to ever have.
-	// This value is defined in RMNRemote contract as `f`.
-	// This value should be tweaked if necessary in order to define new limits.
-	const estimatedMaxRmnReportSigners = 256
-
-	sigs := make([]*rmnpb.EcdsaSignature, estimatedMaxRmnReportSigners)
+	sigs := make([]*rmnpb.EcdsaSignature, estimatedMaxRmnNodesCount)
 	for i := range sigs {
 		sigs[i] = &rmnpb.EcdsaSignature{R: make([]byte, 32), S: make([]byte, 32)}
 	}
@@ -70,6 +68,92 @@ func Test_maxQueryLength(t *testing.T) {
 
 	// We set twice the size, for extra safety while making breaking changes between oracle versions.
 	assert.Equal(t, 2*len(b), maxQueryLength)
+}
+
+func Test_maxObservationLength(t *testing.T) {
+	const maxContractsPerChain = 6 // router/onramp/offramp/rmnHome/rmnRemote/priceRegistry
+
+	merkleRootObs := merkleroot.Observation{
+		MerkleRoots:        make([]ccipocr3.MerkleRootChain, estimatedMaxNumberOfSourceChains),
+		OnRampMaxSeqNums:   make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
+		OffRampNextSeqNums: make([]plugintypes.SeqNumChain, estimatedMaxNumberOfSourceChains),
+		RMNRemoteConfig: rmntypes.RemoteConfig{
+			ContractAddress:  make([]byte, 20),
+			ConfigDigest:     [32]byte{},
+			Signers:          make([]rmntypes.RemoteSignerInfo, estimatedMaxRmnNodesCount),
+			F:                math.MaxUint64,
+			ConfigVersion:    math.MaxUint32,
+			RmnReportVersion: [32]byte{},
+		},
+		FChain: make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+	}
+
+	for i := range merkleRootObs.MerkleRoots {
+		merkleRootObs.MerkleRoots[i] = ccipocr3.MerkleRootChain{
+			ChainSel:      math.MaxUint64,
+			OnRampAddress: make([]byte, 40),
+			SeqNumsRange:  ccipocr3.NewSeqNumRange(math.MaxUint64, math.MaxUint64),
+			MerkleRoot:    [32]byte{},
+		}
+	}
+
+	for i := range merkleRootObs.OnRampMaxSeqNums {
+		merkleRootObs.OnRampMaxSeqNums[i] = plugintypes.SeqNumChain{
+			ChainSel: math.MaxUint64,
+			SeqNum:   math.MaxUint64,
+		}
+	}
+
+	for i := range merkleRootObs.OffRampNextSeqNums {
+		merkleRootObs.OffRampNextSeqNums[i] = plugintypes.SeqNumChain{
+			ChainSel: math.MaxUint64,
+			SeqNum:   math.MaxUint64,
+		}
+	}
+
+	for i := range merkleRootObs.RMNRemoteConfig.Signers {
+		merkleRootObs.RMNRemoteConfig.Signers[i] = rmntypes.RemoteSignerInfo{
+			OnchainPublicKey: make([]byte, 40),
+			NodeIndex:        math.MaxUint64,
+		}
+	}
+
+	maxObs := Observation{
+		MerkleRootObs: merkleRootObs,
+		TokenPriceObs: tokenprice.Observation{
+			FeedTokenPrices:       make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
+			FeeQuoterTokenUpdates: make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, estimatedMaxNumberOfPricedTokens),
+			FChain:                make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+			Timestamp:             time.Now(),
+		},
+		ChainFeeObs: chainfee.Observation{
+			FeeComponents:     make(map[ccipocr3.ChainSelector]types.ChainFeeComponents, estimatedMaxNumberOfSourceChains),
+			NativeTokenPrices: make(map[ccipocr3.ChainSelector]ccipocr3.BigInt, estimatedMaxNumberOfPricedTokens),
+			ChainFeeUpdates:   make(map[ccipocr3.ChainSelector]chainfee.Update, estimatedMaxNumberOfSourceChains),
+			FChain:            make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+			TimestampNow:      time.Now(),
+		},
+		DiscoveryObs: dt.Observation{
+			FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+			Addresses: make(reader.ContractAddresses, estimatedMaxNumberOfSourceChains*maxContractsPerChain),
+		},
+		FChain: make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+	}
+
+	for i := range maxObs.TokenPriceObs.FeedTokenPrices {
+		maxObs.TokenPriceObs.FeedTokenPrices[i] = ccipocr3.TokenPrice{
+			TokenID: ccipocr3.UnknownEncodedAddress(strings.Repeat("x", 20)),
+			Price:   ccipocr3.NewBigIntFromInt64(math.MaxInt64),
+		}
+	}
+
+	b, err := maxObs.Encode()
+	require.NoError(t, err)
+
+	const compareOffset = 10 // the produced bytes are not deterministic, so we need to allow some offset
+	assert.Greater(t, len(b), maxObservationLength-compareOffset)
+	assert.Less(t, len(b), maxObservationLength+compareOffset)
+	assert.Less(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
 }
 
 func TestPluginFactory_NewReportingPlugin(t *testing.T) {
