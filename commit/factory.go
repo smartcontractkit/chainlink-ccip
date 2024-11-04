@@ -27,7 +27,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const maxQueryLength = 1024 * 1024 // 1MB
+// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
+// that assumes 1,000 source chains and 256 (theoretical max) RMN nodes.
+const maxQueryLength = 615_520
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -47,14 +49,13 @@ func (p PluginFactoryConstructor) NewReportingPluginFactory(
 	keyValueStore core.KeyValueStore,
 	relayerSet core.RelayerSet,
 ) (core.OCR3ReportingPluginFactory, error) {
-	return nil, errors.New("unimplemented")
+	return nil, errors.New("this functionality should not be used")
 }
 
 func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
-	panic("implement me")
+	return nil, errors.New("this functionality should not be used")
 }
 
-// PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
 	lggr              logger.Logger
 	donID             plugintypes.DonID
@@ -69,6 +70,8 @@ type PluginFactory struct {
 	rmnCrypto         cciptypes.RMNCrypto
 }
 
+// NewPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
+// factory. It is safe to assume that a factory instance will create exactly one plugin instance.
 func NewPluginFactory(
 	lggr logger.Logger,
 	donID plugintypes.DonID,
@@ -149,6 +152,10 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		readers[chain] = cr
 	}
 
+	if err := validateOcrConfig(p.ocrConfig.Config); err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("validate ocr config: %w", err)
+	}
+
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
 		p.lggr,
@@ -210,24 +217,36 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		}, nil
 }
 
+func validateOcrConfig(cfg readerpkg.OCR3Config) error {
+	if cfg.ChainSelector == 0 {
+		return errors.New("chain selector must be set")
+	}
+
+	if cfg.OfframpAddress == nil {
+		return errors.New("offramp address must be set")
+	}
+
+	return nil
+}
+
 func (p PluginFactory) Name() string {
-	panic("implement me")
+	panic("should not be called")
 }
 
 func (p PluginFactory) Start(ctx context.Context) error {
-	panic("implement me")
+	panic("should not be called")
 }
 
 func (p PluginFactory) Close() error {
-	panic("implement me")
+	panic("should not be called")
 }
 
 func (p PluginFactory) Ready() error {
-	panic("implement me")
+	panic("should not be called")
 }
 
 func (p PluginFactory) HealthReport() map[string]error {
-	panic("implement me")
+	panic("should not be called")
 }
 
 // Interface compatibility checks.
