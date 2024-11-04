@@ -9,7 +9,12 @@ pipelines:
   deploy:
     run: |-
       create_deployments redpanda
-      create_deployments register-schema-job
+
+  beholder:
+    run: |-
+      create_deployments redpanda
+      create_deployments beholder-register-schema-job
+      create_deployments beholder-create-topic-job
 
 deployments:
   redpanda:
@@ -110,9 +115,15 @@ deployments:
                   - path: /
                     pathType: Prefix
 
-  register-schema-job:
+  beholder-register-schema-job:
     namespace: ${DEVSPACE_NAMESPACE}
     kubectl:
       manifests:
-        - ./k8s/register-schema-config-map.yaml
-        - ./k8s/register-schema-job.yaml
+        - ./k8s/beholder/register-schema-config-map.yaml
+        - ./k8s/beholder/register-schema-job.yaml
+
+  beholder-create-topic-job:
+    namespace: ${DEVSPACE_NAMESPACE}
+    kubectl:
+      manifests:
+        - ./k8s/beholder/create-topic-job.yaml

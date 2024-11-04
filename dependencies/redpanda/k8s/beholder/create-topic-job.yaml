@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-topic-job
+  labels:
+    app: redpanda
+spec:
+  template:
+    spec:
+      containers:
+        - name: create-topic
+          image: docker.redpanda.com/redpandadata/redpanda:v24.1.15
+          command: [ "sh", "-c", "--" ]
+          args:
+            - |
+              rpk topic create beholder__beholderdemo__messages -X brokers=redpanda:9093
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+      restartPolicy: Never
+  backoffLimit: 4

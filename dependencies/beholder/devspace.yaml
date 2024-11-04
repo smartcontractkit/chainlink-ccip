@@ -29,6 +29,7 @@ dependencies:
     path: ${DEPENDENCIES_DIR}/redpanda
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
+    pipeline: beholder
 
 pullSecrets:
   regcred-beholder:
@@ -240,6 +241,7 @@ deployments:
               beholder_kafka:
                 brokers:
                   - redpanda:9093
+#                client_id: beholder-otel-collector-gateway-client-id-crib
                 kafka_sasl_password: ""
                 kafka_sasl_username: ""
                 schema_registry_url: http://redpanda:8081
@@ -306,8 +308,6 @@ deployments:
           enabled: true
           enabledLB: false
           env:
-            - name: BEHOLDER_EXPORTER_TOPIC
-              value: beholder-test-client
             - name: KAFKA_SASL_MECHANISM
               value: PLAINTEXT
             - name: NODE_NAME
@@ -320,35 +320,7 @@ deployments:
           repository: atlas-beholder-gateway-otel-collector
           tag: qa-latest
         opentelemetry-operator:
-          # -- Global flag to enable install of the OpenTelemetry Operator
-          enabled: true
-          manager:
-            featureGates: '+operator.observability.prometheus'
-            ## Enable ServiceMonitor for Prometheus metrics scrape
-            serviceMonitor:
-              enabled: true
-              # Additional labels on the ServiceMonitor
-              extraLabels: { }
-              # Add annotations on the ServiceMonitor
-              annotations: { }
-              # Define metrics port
-              metricsEndpoints:
-                - port: metrics
-            collectorImage:
-              repository: otel/opentelemetry-collector-contrib
-            image:
-              repository: otel/opentelemetry-operator
-            resources:
-              limits:
-                # -- Number of CPUs Manager is allowed to use
-                cpu: '1'
-                # -- Amount of memory Manager is allowed to use
-                memory: 1Gi
-              requests:
-                # -- Number of CPUs Manager will request on start
-                cpu: 500m
-                # -- Amount of memory Manager will request on start
-                memory: 256Mi
+          enabled: false
         sidecar:
           enabled: false
         clusterRole:
