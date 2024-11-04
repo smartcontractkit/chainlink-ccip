@@ -301,7 +301,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR conigs home chain.
+	// we can check this by reading the OCR configs home chain.
 	isCandidate, err := p.isCandidateInstance(ctx)
 	if err != nil {
 		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isCandidateInstance: %w", err)

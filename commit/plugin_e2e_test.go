@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	ocrTypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 
@@ -721,7 +723,11 @@ func setupNode(params SetupNodeParams, nodeID commontypes.OracleID) nodeSetup {
 	homeChainReader.EXPECT().GetFChain().Return(fChain, nil)
 	homeChainReader.EXPECT().
 		GetOCRConfigs(mock.Anything, params.donID, consts.PluginTypeCommit).
-		Return(reader.ActiveAndCandidate{}, nil).Maybe()
+		Return(reader.ActiveAndCandidate{
+			ActiveConfig: reader.OCR3ConfigWithMeta{
+				ConfigDigest: params.reportingCfg.ConfigDigest,
+			},
+		}, nil).Maybe()
 
 	for peerID, supportedChains := range supportedChainsForPeer {
 		homeChainReader.EXPECT().GetSupportedChainsForPeer(peerID).Return(supportedChains, nil).Maybe()
@@ -825,6 +831,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 	lggr := logger.Test(t)
 
 	donID := uint32(1)
+	rb := rand.RandomBytes32()
+	digest := ocrTypes.ConfigDigest(rb[:])
 
 	require.Equal(t, len(oracleIDs), len(peerIDs))
 
@@ -864,7 +872,7 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 		PriceFeedChainSelector: sourceChain1,
 	}
 
-	reportingCfg := ocr3types.ReportingPluginConfig{F: 1}
+	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}
 
 	params := SetupNodeParams{
 		ctx:               ctx,
