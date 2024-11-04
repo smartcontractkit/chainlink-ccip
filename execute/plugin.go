@@ -300,15 +300,15 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
-	// we only transmit reports if we are the "blue" instance.
-	// we can check this by reading the OCR conigs home chain.
-	isGreen, err := p.isGreenInstance(ctx)
+	// we only transmit reports if we are the "active" instance.
+	// we can check this by reading the OCR configs home chain.
+	isCandidate, err := p.isCandidateInstance(ctx)
 	if err != nil {
-		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isGreenInstance: %w", err)
+		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isCandidateInstance: %w", err)
 	}
 
-	if isGreen {
-		p.lggr.Debugw("not the blue instance, skipping report transmission",
+	if isCandidate {
+		p.lggr.Debugw("not the active instance, skipping report transmission",
 			"myDigest", p.reportingCfg.ConfigDigest.Hex())
 		return false, nil
 	}
@@ -324,13 +324,13 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	return true, nil
 }
 
-func (p *Plugin) isGreenInstance(ctx context.Context) (bool, error) {
+func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
 	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
 	if err != nil {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
+	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }
 
 func (p *Plugin) Close() error {

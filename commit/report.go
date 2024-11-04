@@ -133,7 +133,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR conigs home chain.
+	// we can check this by reading the OCR configs from the home chain.
 	isCandidate, err := p.isCandidateInstance(ctx)
 	if err != nil {
 		return false, fmt.Errorf("isCandidateInstance: %w", err)
@@ -171,5 +171,5 @@ func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
+	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }
