@@ -27,7 +27,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const maxQueryLength = 1024 * 1024 // 1MB
+const maxQueryLength = 603_872
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
