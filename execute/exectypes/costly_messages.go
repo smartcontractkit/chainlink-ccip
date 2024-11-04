@@ -401,8 +401,12 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	}
 
 	// nativeTokenPrice is in USD * 1e18 (from the price feed)
+	// get the native token price per wei by dividing by 1e18
 	// feeComponents are in WEI (ETH * 1e18)
-	executionFee := new(big.Int).Mul(feeComponents.ExecutionFee, nativeTokenPrice.Int)
+	executionFee := new(big.Int).Div(
+		new(big.Int).Mul(feeComponents.ExecutionFee, new(big.Int).Div(nativeTokenPrice.Int, big.NewInt(1e18))),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+	)
 	dataAvailabilityFee := new(big.Int).Mul(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
 	c.lggr.Warnw("execution fee", "nativeTokenPrice", nativeTokenPrice,
