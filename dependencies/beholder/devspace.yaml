@@ -46,7 +46,7 @@ pipelines:
       run_dependency_pipelines redpanda
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
       wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-otel-collector-agent
-      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-otel-collector-gateway
+      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/name=deployment-collector
       create_deployments beholder-load-tester
   kind:
     run: |-
