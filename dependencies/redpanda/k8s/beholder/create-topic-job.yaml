@@ -10,7 +10,7 @@ spec:
       containers:
         - name: create-topic
           image: docker.redpanda.com/redpandadata/redpanda:v24.1.15
-          command: [ "sh", "-c", "--" ]
+          command: ["sh", "-c", "--"]
           args:
             - |
               rpk topic create beholder__beholderdemo__messages -X brokers=redpanda:9093

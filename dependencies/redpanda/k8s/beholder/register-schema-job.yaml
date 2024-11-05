@@ -10,7 +10,7 @@ spec:
       containers:
         - name: schema-registrar
           image: curlimages/curl:latest
-          command: [ "sh", "-c", "--" ]
+          command: ["sh", "-c", "--"]
           args:
             - |
               SCHEMA_CONTENT=$(cat /schemas/example.proto) && \
