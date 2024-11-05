@@ -249,7 +249,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			defer chainSupport.AssertExpectations(t)
 			defer ccipReader.AssertExpectations(t)
 
-			o := ObserverImpl{
+			o := observerImpl{
 				nodeID:       nodeID,
 				lggr:         logger.Test(t),
 				msgHasher:    mocks.NewMessageHasher(),
@@ -468,7 +468,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				chainSupport.On("SupportedChains", nodeID).Return(tc.supportedChains, nil)
 			}
 
-			o := ObserverImpl{
+			o := observerImpl{
 				nodeID:       nodeID,
 				lggr:         logger.Test(t),
 				msgHasher:    mocks.NewMessageHasher(),
@@ -571,7 +571,7 @@ func Test_computeMerkleRoot(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			p := ObserverImpl{
+			p := observerImpl{
 				lggr:      logger.Test(t),
 				msgHasher: tc.messageHasher,
 			}

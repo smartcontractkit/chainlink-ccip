@@ -31,8 +31,8 @@ func (o Observation) IsEmpty() bool {
 		len(o.FChain) == 0
 }
 
-// MerkleAggregatedObservation is the aggregation of a list of observations
-type MerkleAggregatedObservation struct {
+// aggregatedObservation is the aggregation of a list of merkle root processor observations
+type aggregatedObservation struct {
 	// A map from chain selectors to the list of merkle roots observed for each chain
 	MerkleRoots map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain
 
@@ -50,8 +50,8 @@ type MerkleAggregatedObservation struct {
 }
 
 // aggregateObservations takes a list of observations and produces an MerkleAggregatedObservation
-func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) MerkleAggregatedObservation {
-	aggObs := MerkleAggregatedObservation{
+func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]) aggregatedObservation {
+	aggObs := aggregatedObservation{
 		MerkleRoots:        make(map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain),
 		OnRampMaxSeqNums:   make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
 		OffRampNextSeqNums: make(map[cciptypes.ChainSelector][]cciptypes.SeqNum),
@@ -94,8 +94,8 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 	return aggObs
 }
 
-// ConsensusObservation holds the consensus values for all chains across all observations in a round
-type ConsensusObservation struct {
+// consensusObservation holds the consensus values for all chains across all observations in a round
+type consensusObservation struct {
 	// A map from chain selectors to each chain's consensus merkle root
 	MerkleRoots map[cciptypes.ChainSelector]cciptypes.MerkleRootChain
 
