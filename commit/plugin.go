@@ -82,7 +82,7 @@ func NewPlugin(
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
-		lggr,
+		logger.Named(lggr, "CCIPChainSupport"),
 		homeChain,
 		oracleIDToP2pID,
 		reportingCfg.OracleID,
