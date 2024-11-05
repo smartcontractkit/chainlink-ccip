@@ -29,9 +29,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-type MerkleRootObservation = plugincommon.AttributedObservation[merkleroot.Observation]
-type TokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
-type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
+type merkleRootObservation = plugincommon.AttributedObservation[merkleroot.Observation]
+type tokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
+type chainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
 	donID               plugintypes.DonID
@@ -57,7 +57,6 @@ type Plugin struct {
 
 func NewPlugin(
 	donID plugintypes.DonID,
-	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
@@ -86,7 +85,7 @@ func NewPlugin(
 		lggr,
 		homeChain,
 		oracleIDToP2pID,
-		oracleID,
+		reportingCfg.OracleID,
 		destChain,
 	)
 
@@ -101,7 +100,7 @@ func NewPlugin(
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
-		oracleID,
+		reportingCfg.OracleID,
 		oracleIDToP2pID,
 		logger.Named(lggr, "MerkleRootProcessor"),
 		offchainCfg,
@@ -117,7 +116,7 @@ func NewPlugin(
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
-		oracleID,
+		reportingCfg.OracleID,
 		lggr,
 		offchainCfg,
 		destChain,
@@ -138,7 +137,7 @@ func NewPlugin(
 
 	chainFeeProcessr := chainfee.NewProcessor(
 		lggr,
-		oracleID,
+		reportingCfg.OracleID,
 		destChain,
 		homeChain,
 		ccipReader,
@@ -149,7 +148,7 @@ func NewPlugin(
 
 	return &Plugin{
 		donID:               donID,
-		oracleID:            oracleID,
+		oracleID:            reportingCfg.OracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
 		lggr:                lggr,
 		offchainCfg:         offchainCfg,
@@ -291,9 +290,9 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
-	var merkleObservations []MerkleRootObservation
-	var tokensObservations []TokenPricesObservation
-	var feeObservations []ChainFeeObservation
+	var merkleObservations []merkleRootObservation
+	var tokensObservations []tokenPricesObservation
+	var feeObservations []chainFeeObservation
 	var discoveryObservations []plugincommon.AttributedObservation[dt.Observation]
 
 	for _, ao := range aos {
@@ -304,21 +303,21 @@ func (p *Plugin) Outcome(
 		}
 		p.lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
 		merkleObservations = append(merkleObservations,
-			MerkleRootObservation{
+			merkleRootObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.MerkleRootObs,
 			},
 		)
 
 		tokensObservations = append(tokensObservations,
-			TokenPricesObservation{
+			tokenPricesObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.TokenPriceObs,
 			},
 		)
 
 		feeObservations = append(feeObservations,
-			ChainFeeObservation{
+			chainFeeObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.ChainFeeObs,
 			},

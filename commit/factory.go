@@ -223,7 +223,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	return NewPlugin(
 			p.donID,
-			config.OracleID,
 			oracleIDToP2PID,
 			offchainConfig,
 			p.ocrConfig.Config.ChainSelector,
