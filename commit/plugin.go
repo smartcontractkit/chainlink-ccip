@@ -3,6 +3,7 @@ package commit
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -52,7 +53,7 @@ type Plugin struct {
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
 
 	// state
-	contractsInitialized bool
+	contractsInitialized atomic.Bool
 }
 
 func NewPlugin(
@@ -215,7 +216,7 @@ func (p *Plugin) Observation(
 		if err != nil {
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
-		if !p.contractsInitialized {
+		if !p.contractsInitialized.Load() {
 			obs := Observation{DiscoveryObs: discoveryObs}
 			encoded, err := obs.Encode()
 			if err != nil {
@@ -336,7 +337,7 @@ func (p *Plugin) Outcome(
 		if err != nil {
 			return nil, fmt.Errorf("unable to process outcome of discovery processor: %w", err)
 		}
-		p.contractsInitialized = true
+		p.contractsInitialized.Store(true)
 	}
 
 	merkleRootOutcome, err := p.merkleRootProcessor.Outcome(
