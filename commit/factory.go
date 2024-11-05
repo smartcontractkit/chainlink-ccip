@@ -27,9 +27,41 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
-// that assumes 1,000 source chains and 256 (theoretical max) RMN nodes.
-const maxQueryLength = 615_520
+const (
+	// Estimated maximum number of source chains the system will support.
+	// This value should be adjusted as we approach supporting that number of chains.
+	// Its primary purpose is to assist in defining the limits below.
+	estimatedMaxNumberOfSourceChains = 900
+
+	// Estimated maximum number of RMN nodes the system will support.
+	estimatedMaxRmnNodesCount = 256
+
+	// Estimated maximum number of priced tokens that the Commit DON supports.
+	// This value does not indicate a system limitation but just an estimation to properly tune the OCR parameters.
+	// The value can be adjusted as needed.
+	estimatedMaxNumberOfPricedTokens = 10_000
+
+	// maxQueryLength is set to twice the maximum size of a theoretical merkle root processor query
+	// that assumes estimatedMaxNumberOfSourceChains source chains and
+	// estimatedMaxRmnNodesCount (theoretical max) RMN nodes.
+	// check factory_test for the calculation
+	maxQueryLength = 559_320
+
+	// maxObservationLength is set to the maximum size of an observation
+	// check factory_test for the calculation
+	maxObservationLength = 1_047_202
+
+	// maxOutcomeLength is set to the maximum size of an outcome
+	// check factory_test for the calculation
+	maxOutcomeLength = 1_167_765
+
+	// maxReportLength is set to an estimate of a maximum report size
+	// check factory_test for the calculation
+	maxReportLength = 993_982
+
+	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
+	maxReportCount = 1
+)
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
 // and a validation service.
@@ -209,10 +241,10 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 			Name: "CCIPRoleCommit",
 			Limits: ocr3types.ReportingPluginLimits{
 				MaxQueryLength:       maxQueryLength,
-				MaxObservationLength: 20_000, // 20kB
-				MaxOutcomeLength:     10_000, // 10kB
-				MaxReportLength:      10_000, // 10kB
-				MaxReportCount:       10,
+				MaxObservationLength: maxObservationLength,
+				MaxOutcomeLength:     maxOutcomeLength,
+				MaxReportLength:      maxReportLength,
+				MaxReportCount:       maxReportCount,
 			},
 		}, nil
 }
