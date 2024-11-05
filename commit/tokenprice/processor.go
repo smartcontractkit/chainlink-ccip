@@ -77,13 +77,13 @@ func (p *processor) Outcome(
 
 	consensusObservation, err := p.getConsensusObservation(aos)
 	if err != nil {
-		return Outcome{}, err
+		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
 	}
 
 	tokenPriceOutcome := p.selectTokensForUpdate(consensusObservation)
 	p.lggr.Infow(
 		"outcome token prices",
-		"token prices", tokenPriceOutcome,
+		"tokenPrices", tokenPriceOutcome,
 	)
 	return Outcome{
 		TokenPrices: tokenPriceOutcome,
@@ -103,7 +103,7 @@ func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
 		tokensWithPrice.Add(t.TokenID)
 
 		if t.Price.IsEmpty() {
-			return fmt.Errorf("token price must not be empty")
+			return fmt.Errorf("token price of token %v must not be empty", t.TokenID)
 		}
 	}
 	return nil

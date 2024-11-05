@@ -4,21 +4,21 @@ package rmn
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/binary"
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/networking"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/smartcontractkit/libocr/ragep2p"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/peergroup"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 var ErrNoConn = fmt.Errorf("no connection, please call InitConnection before further interaction")
@@ -31,7 +31,8 @@ type PeerClient interface {
 		ctx context.Context,
 		commitConfigDigest cciptypes.Bytes32,
 		rmnHomeConfigDigest cciptypes.Bytes32,
-		peerIDs []string, // union of oraclePeerIDs and rmnNodePeerIDs (oracles required for peer discovery)
+		oraclePeerIDs []ragep2ptypes.PeerID,
+		rmnNodes []rmntypes.HomeNodeInfo,
 	) error
 
 	Close() error
@@ -54,28 +55,32 @@ type PeerResponse struct {
 
 type peerClient struct {
 	lggr                        logger.Logger
-	peerGroupFactory            PeerGroupFactory
+	peerGroupCreator            *peergroup.Creator
 	respChan                    chan PeerResponse
-	peerGroup                   PeerGroup // nil initially, until InitConnection is called
+	peerGroup                   networking.PeerGroup
 	genericEndpointConfigDigest cciptypes.Bytes32
 	rageP2PStreams              map[rmntypes.NodeID]Stream
 	bootstrappers               []commontypes.BootstrapperLocator
-	mu                          *sync.RWMutex
+	// ocrRoundInterval is the estimated interval between OCR rounds.
+	ocrRoundInterval time.Duration
+	mu               *sync.RWMutex
 }
 
 func NewPeerClient(
 	lggr logger.Logger,
-	peerGroupFactory PeerGroupFactory,
+	peerGroupFactory networking.PeerGroupFactory,
 	bootstrappers []commontypes.BootstrapperLocator,
+	ocrRoundInterval time.Duration,
 ) PeerClient {
 	return &peerClient{
 		lggr:                        lggr,
-		peerGroupFactory:            peerGroupFactory,
+		peerGroupCreator:            peergroup.NewCreator(lggr, peerGroupFactory, bootstrappers),
 		respChan:                    make(chan PeerResponse),
 		peerGroup:                   nil,
 		rageP2PStreams:              make(map[rmntypes.NodeID]Stream),
 		genericEndpointConfigDigest: cciptypes.Bytes32{},
 		bootstrappers:               bootstrappers,
+		ocrRoundInterval:            ocrRoundInterval,
 		mu:                          &sync.RWMutex{},
 	}
 }
@@ -83,7 +88,9 @@ func NewPeerClient(
 func (r *peerClient) InitConnection(
 	_ context.Context,
 	commitConfigDigest, rmnHomeConfigDigest cciptypes.Bytes32,
-	peerIDs []string,
+	oraclePeerIDs []ragep2ptypes.PeerID,
+	rmnNodes []rmntypes.HomeNodeInfo,
+
 ) error {
 	if err := r.Close(); err != nil {
 		return fmt.Errorf("close existing peer group: %w", err)
@@ -92,25 +99,20 @@ func (r *peerClient) InitConnection(
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	h := sha256.Sum256(append(commitConfigDigest[:], rmnHomeConfigDigest[:]...))
-	r.genericEndpointConfigDigest = writePrefix(ocr2types.ConfigDigestPrefixCCIPMultiRoleRMNCombo, h)
-	r.lggr.Infow("Creating new peer group",
-		"genericEndpointConfigDigest", r.genericEndpointConfigDigest.String(),
-		"peerIDs", peerIDs,
-		"bootstrappers", r.bootstrappers,
-	)
-
-	peerGroup, err := r.peerGroupFactory.NewPeerGroup(
-		[32]byte(r.genericEndpointConfigDigest),
-		peerIDs,
-		r.bootstrappers,
-	)
-
+	result, err := r.peerGroupCreator.Create(peergroup.CreateOpts{
+		CommitConfigDigest:  commitConfigDigest,
+		RMNHomeConfigDigest: rmnHomeConfigDigest,
+		// Note: For RMN peer client, we receive the combined peer IDs directly
+		// and don't need to separate oracle/RMN peers
+		OraclePeerIDs: oraclePeerIDs,
+		RMNNodes:      rmnNodes,
+	})
 	if err != nil {
-		return fmt.Errorf("new peer group: %w", err)
+		return fmt.Errorf("create peer group: %w", err)
 	}
 
-	r.peerGroup = peerGroup
+	r.peerGroup = result.PeerGroup
+	r.genericEndpointConfigDigest = result.ConfigDigest
 	return nil
 }
 
@@ -127,6 +129,8 @@ func (r *peerClient) Close() error {
 		return fmt.Errorf("close peer group: %w", err)
 	}
 
+	r.peerGroup = nil
+	r.rageP2PStreams = make(map[rmntypes.NodeID]Stream)
 	return nil
 }
 
@@ -156,10 +160,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	}
 
 	rmnPeerID := rmnNode.PeerID.String()
-
-	// todo: versioning for stream names e.g. for 'v1_7'
-	streamName := fmt.Sprintf("ccip-rmn/v1_6/%s",
-		strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x"))
+	streamName := rmnNode.StreamNamePrefix + strings.TrimPrefix(r.genericEndpointConfigDigest.String(), "0x")
 
 	r.lggr.Infow("creating new stream",
 		"streamName", streamName,
@@ -169,23 +170,7 @@ func (r *peerClient) getOrCreateRageP2PStream(rmnNode rmntypes.HomeNodeInfo) (St
 	)
 
 	var err error
-	stream, err = r.peerGroup.NewStream(
-		rmnPeerID,
-		networking.NewStreamArgs1{ // todo: make it configurable
-			StreamName:         streamName,
-			OutgoingBufferSize: 1,
-			IncomingBufferSize: 1,
-			MaxMessageLength:   4_194_304, // 4MB
-			MessagesLimit: ragep2p.TokenBucketParams{
-				Rate:     50,
-				Capacity: 200,
-			},
-			BytesLimit: ragep2p.TokenBucketParams{
-				Rate:     20_971_520,  // 20MB
-				Capacity: 104_857_600, // 100MB
-			},
-		},
-	)
+	stream, err = r.peerGroup.NewStream(rmnPeerID, newStreamConfig(r.lggr, streamName, r.ocrRoundInterval))
 	if err != nil {
 		return nil, fmt.Errorf("new stream %s: %w", streamName, err)
 	}
@@ -209,28 +194,7 @@ func (r *peerClient) Recv() <-chan PeerResponse {
 	return r.respChan
 }
 
-// writePrefix writes the prefix to the first 2 bytes of the hash.
-func writePrefix(prefix ocr2types.ConfigDigestPrefix, hash cciptypes.Bytes32) cciptypes.Bytes32 {
-	var prefixBytes [2]byte
-	binary.BigEndian.PutUint16(prefixBytes[:], uint16(prefix))
-
-	hCopy := hash
-	hCopy[0] = prefixBytes[0]
-	hCopy[1] = prefixBytes[1]
-
-	return hCopy
-}
-
 // Redeclare interfaces for mocking purposes.
-
-type PeerGroupFactory interface {
-	networking.PeerGroupFactory
-}
-
-type PeerGroup interface {
-	networking.PeerGroup
-}
-
 type Stream interface {
 	networking.Stream
 }

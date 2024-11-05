@@ -2,13 +2,13 @@ package commit
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -16,15 +16,15 @@ import (
 // ReportInfo is the info data that will be sent with the along with the report
 // It will be used to determine if the report should be accepted or not
 type ReportInfo struct {
-	// MinSigners is the minimum number of RMN signatures required for the report to be accepted
-	MinSigners uint64 `json:"minSigners"`
+	// RemoteF Max number of faulty RMN nodes; f+1 signers are required to verify a report.
+	RemoteF uint64 `json:"remoteF"`
 }
 
 func (ri ReportInfo) Encode() ([]byte, error) {
 	return json.Marshal(ri)
 }
 
-// decode should be used to decode the report info
+// Decode should be used to decode the report info
 func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 	return json.Unmarshal(encodedReportInfo, ri)
 }
@@ -32,23 +32,24 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	outcome, err := DecodeOutcome(outcomeBytes)
+	outcome, err := decodeOutcome(outcomeBytes)
 	if err != nil {
-		// TODO: metrics
-		p.lggr.Errorw("failed to decode Outcome", "outcomeBytes", outcomeBytes, "err", err)
-		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
+		p.lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
+		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
-	// Until we start adding tokens and gas to the report, we don't need to report anything
+	// Gas prices and token prices do not need to get reported when merkle roots do not exist.
 	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
+		p.lggr.Infow("skipping report generation merkle roots do not exist",
+			"merkleRootProcessorOutcomeType", outcome.MerkleRootOutcome.OutcomeType)
 		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
+
 	p.lggr.Infow("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
 		"gasPriceUpdates", outcome.ChainFeeOutcome.GasPrices,
 		"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
-		"rmnRawVs", outcome.MerkleRootOutcome.RMNRawVs,
 	)
 
 	rep := cciptypes.CommitPluginReport{
@@ -58,7 +59,11 @@ func (p *Plugin) Reports(
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
-		RMNRawVs:      outcome.MerkleRootOutcome.RMNRawVs,
+	}
+
+	if rep.IsEmpty() {
+		p.lggr.Infow("empty report", "report", rep)
+		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
 
 	encodedReport, err := p.reportCodec.Encode(ctx, rep)
@@ -66,20 +71,18 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
-	// Prepare the info data
-	reportInfo := ReportInfo{
-		MinSigners: outcome.MerkleRootOutcome.RMNRemoteCfg.MinSigners,
-	}
-
-	// Serialize reportInfo to []byte
-	infoBytes, err := reportInfo.Encode()
+	reportInfo, err := ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F}.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("encode report info: %w", err)
 	}
 
 	return []ocr3types.ReportPlus[[]byte]{
-		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-			Report: encodedReport, Info: infoBytes}},
+		{
+			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+				Report: encodedReport,
+				Info:   reportInfo,
+			},
+		},
 	}, nil
 }
 
@@ -104,9 +107,9 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
-		len(decodedReport.RMNSignatures) < int(reportInfo.MinSigners) {
-		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d",
-			len(decodedReport.RMNSignatures), reportInfo.MinSigners)
+		consensus.Threshold(len(decodedReport.RMNSignatures)) < consensus.FPlus1(int(reportInfo.RemoteF)) {
+		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d+1",
+			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, nil
 	}
 
@@ -126,7 +129,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR conigs home chain.
+	// we can check this by reading the OCR configs from the home chain.
 	isCandidate, err := p.isCandidateInstance(ctx)
 	if err != nil {
 		return false, fmt.Errorf("isCandidateInstance: %w", err)
@@ -164,5 +167,5 @@ func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return len(ocrConfigs) == 2 && ocrConfigs[1].ConfigDigest == p.reportingCfg.ConfigDigest, nil
+	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }

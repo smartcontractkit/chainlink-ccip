@@ -35,7 +35,7 @@ type HomeChain interface {
 	// GetFChain Gets the FChain value for each chain
 	GetFChain() (map[cciptypes.ChainSelector]int, error)
 	// GetOCRConfigs Gets the OCR3Configs for a given donID and pluginType
-	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) ([]OCR3ConfigWithMeta, error)
+	GetOCRConfigs(ctx context.Context, donID uint32, pluginType uint8) (ActiveAndCandidate, error)
 	services.Service
 }
 
@@ -220,10 +220,9 @@ func (r *homeChainPoller) GetFChain() (map[cciptypes.ChainSelector]int, error) {
 
 func (r *homeChainPoller) GetOCRConfigs(
 	ctx context.Context, donID uint32, pluginType uint8,
-) ([]OCR3ConfigWithMeta, error) {
+) (ActiveAndCandidate, error) {
 	var (
-		ocrConfigs []OCR3ConfigWithMeta
-		allConfigs ActiveAndCandidate
+		activeAndCandidate ActiveAndCandidate
 	)
 
 	err := r.homeChainReader.GetLatestValue(
@@ -233,26 +232,18 @@ func (r *homeChainPoller) GetOCRConfigs(
 		map[string]any{
 			"donId":      donID,
 			"pluginType": pluginType,
-		}, &allConfigs)
+		}, &activeAndCandidate)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching OCR configs: %w", err)
+		return ActiveAndCandidate{}, fmt.Errorf("error fetching OCR configs: %w", err)
 	}
 
 	r.lggr.Infow(
 		"GetOCRConfigs",
-		"activeConfig", allConfigs.ActiveConfig,
-		"candidateConfig", allConfigs.CandidateConfig,
+		"activeConfig", activeAndCandidate.ActiveConfig,
+		"candidateConfig", activeAndCandidate.CandidateConfig,
 	)
 
-	if allConfigs.ActiveConfig.ConfigDigest != [32]byte{} {
-		ocrConfigs = append(ocrConfigs, allConfigs.ActiveConfig)
-	}
-
-	if allConfigs.CandidateConfig.ConfigDigest != [32]byte{} {
-		ocrConfigs = append(ocrConfigs, allConfigs.CandidateConfig)
-	}
-
-	return ocrConfigs, nil
+	return activeAndCandidate, nil
 }
 
 func (r *homeChainPoller) Close() error {
@@ -279,7 +270,7 @@ func (r *homeChainPoller) HealthReport() map[string]error {
 }
 
 func (r *homeChainPoller) Name() string {
-	return "homeChainPoller"
+	return r.lggr.Name()
 }
 
 func createFChain(chainConfigs map[cciptypes.ChainSelector]ChainConfig) map[cciptypes.ChainSelector]int {

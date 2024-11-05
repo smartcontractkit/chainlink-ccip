@@ -29,6 +29,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 )
 
 func (w *Processor) ObservationQuorum(
@@ -86,21 +88,18 @@ func (w *Processor) initializeRMNController(ctx context.Context, prevOutcome Out
 		return fmt.Errorf("failed to get RMN nodes info: %w", err)
 	}
 
-	peerIDs := make([]string, 0, len(rmnNodesInfo))
-	for _, node := range rmnNodesInfo {
-		w.lggr.Infow("Adding RMN node to peerIDs", "node", node.PeerID.String())
-		peerIDs = append(peerIDs, node.PeerID.String())
-	}
+	oraclePeerIDs := make([]ragep2ptypes.PeerID, 0, len(w.oracleIDToP2pID))
 	for _, p2pID := range w.oracleIDToP2pID {
 		w.lggr.Infow("Adding oracle node to peerIDs", "p2pID", p2pID.String())
-		peerIDs = append(peerIDs, p2pID.String())
+		oraclePeerIDs = append(oraclePeerIDs, p2pID)
 	}
 
 	if err := w.rmnController.InitConnection(
 		ctx,
 		cciptypes.Bytes32(w.reportingCfg.ConfigDigest),
 		prevOutcome.RMNRemoteCfg.ConfigDigest,
-		peerIDs,
+		oraclePeerIDs,
+		rmnNodesInfo,
 	); err != nil {
 		return fmt.Errorf("failed to init connection to RMN: %w", err)
 	}
@@ -256,7 +255,7 @@ type Observer interface {
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
 
-type ObserverImpl struct {
+type observerImpl struct {
 	lggr         logger.Logger
 	homeChain    reader.HomeChain
 	nodeID       commontypes.OracleID
@@ -266,7 +265,7 @@ type ObserverImpl struct {
 }
 
 // ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
-func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
+func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.nodeID)
 	if err != nil {
 		o.lggr.Warnw("call to SupportsDestChain failed", "err", err)
@@ -305,7 +304,7 @@ func (o ObserverImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 }
 
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
-func (o ObserverImpl) ObserveLatestOnRampSeqNums(
+func (o observerImpl) ObserveLatestOnRampSeqNums(
 	ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain {
 
 	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
@@ -354,7 +353,7 @@ func (o ObserverImpl) ObserveLatestOnRampSeqNums(
 }
 
 // ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
-func (o ObserverImpl) ObserveMerkleRoots(
+func (o observerImpl) ObserveMerkleRoots(
 	ctx context.Context,
 	ranges []plugintypes.ChainRange,
 ) []cciptypes.MerkleRootChain {
@@ -369,6 +368,7 @@ func (o ObserverImpl) ObserveMerkleRoots(
 	rootsMu := &sync.Mutex{}
 	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
+		chainRange := chainRange
 		if supportedChains.Contains(chainRange.ChainSel) {
 			wg.Add(1)
 			go func() {
@@ -414,7 +414,7 @@ func (o ObserverImpl) ObserveMerkleRoots(
 }
 
 // computeMerkleRoot computes the merkle root of a list of messages
-func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
+func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
 	var hashes [][32]byte
 	sort.Slice(msgs, func(i, j int) bool { return msgs[i].Header.SequenceNumber < msgs[j].Header.SequenceNumber })
 
@@ -452,7 +452,7 @@ func (o ObserverImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 	return root, nil
 }
 
-func (o ObserverImpl) ObserveRMNRemoteCfg(
+func (o observerImpl) ObserveRMNRemoteCfg(
 	ctx context.Context,
 	dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig {
 	rmnRemoteCfg, err := o.ccipReader.GetRMNRemoteConfig(ctx, dstChain)
@@ -468,7 +468,7 @@ func (o ObserverImpl) ObserveRMNRemoteCfg(
 	return rmnRemoteCfg
 }
 
-func (o ObserverImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
+func (o observerImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics

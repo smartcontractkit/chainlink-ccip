@@ -129,12 +129,12 @@ func (_c *MockRMNHome_GetAllConfigDigests_Call) RunAndReturn(run func() (ccipocr
 	return _c
 }
 
-// GetMinObservers provides a mock function with given fields: configDigest
-func (_m *MockRMNHome) GetMinObservers(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error) {
+// GetF provides a mock function with given fields: configDigest
+func (_m *MockRMNHome) GetF(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error) {
 	ret := _m.Called(configDigest)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetMinObservers")
+		panic("no return value specified for GetF")
 	}
 
 	var r0 map[ccipocr3.ChainSelector]int
@@ -159,30 +159,30 @@ func (_m *MockRMNHome) GetMinObservers(configDigest ccipocr3.Bytes32) (map[ccipo
 	return r0, r1
 }
 
-// MockRMNHome_GetMinObservers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMinObservers'
-type MockRMNHome_GetMinObservers_Call struct {
+// MockRMNHome_GetF_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetF'
+type MockRMNHome_GetF_Call struct {
 	*mock.Call
 }
 
-// GetMinObservers is a helper method to define mock.On call
+// GetF is a helper method to define mock.On call
 //   - configDigest ccipocr3.Bytes32
-func (_e *MockRMNHome_Expecter) GetMinObservers(configDigest interface{}) *MockRMNHome_GetMinObservers_Call {
-	return &MockRMNHome_GetMinObservers_Call{Call: _e.mock.On("GetMinObservers", configDigest)}
+func (_e *MockRMNHome_Expecter) GetF(configDigest interface{}) *MockRMNHome_GetF_Call {
+	return &MockRMNHome_GetF_Call{Call: _e.mock.On("GetF", configDigest)}
 }
 
-func (_c *MockRMNHome_GetMinObservers_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockRMNHome_GetMinObservers_Call {
+func (_c *MockRMNHome_GetF_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockRMNHome_GetF_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(ccipocr3.Bytes32))
 	})
 	return _c
 }
 
-func (_c *MockRMNHome_GetMinObservers_Call) Return(_a0 map[ccipocr3.ChainSelector]int, _a1 error) *MockRMNHome_GetMinObservers_Call {
+func (_c *MockRMNHome_GetF_Call) Return(_a0 map[ccipocr3.ChainSelector]int, _a1 error) *MockRMNHome_GetF_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRMNHome_GetMinObservers_Call) RunAndReturn(run func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error)) *MockRMNHome_GetMinObservers_Call {
+func (_c *MockRMNHome_GetF_Call) RunAndReturn(run func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error)) *MockRMNHome_GetF_Call {
 	_c.Call.Return(run)
 	return _c
 }

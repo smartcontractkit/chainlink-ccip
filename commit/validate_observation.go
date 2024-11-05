@@ -27,12 +27,16 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("failed to decode commit plugin observation: %w", err)
 	}
 
-	prevOutcome := p.decodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := decodeOutcome(outCtx.PreviousOutcome)
+	if err != nil {
+		return fmt.Errorf("decode previous outcome: %w", err)
+	}
+
 	if err := validateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	merkleObs := MerkleRootObservation{
+	merkleObs := attributedMerkleRootObservation{
 		OracleID:    ao.Observer,
 		Observation: obs.MerkleRootObs,
 	}
@@ -42,7 +46,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate merkle roots observation: %w", err)
 	}
 
-	tokenObs := TokenPricesObservation{
+	tokenObs := attributedTokenPricesObservation{
 		OracleID:    ao.Observer,
 		Observation: obs.TokenPriceObs,
 	}
@@ -51,7 +55,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate token prices observation: %w", err)
 	}
 
-	gasObs := ChainFeeObservation{
+	gasObs := attributedChainFeeObservation{
 		OracleID:    ao.Observer,
 		Observation: obs.ChainFeeObs,
 	}

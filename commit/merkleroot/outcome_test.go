@@ -19,7 +19,7 @@ func Test_buildReport(t *testing.T) {
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 
-		obs := ConsensusObservation{
+		obs := consensusObservation{
 			MerkleRoots: map[cciptypes.ChainSelector]cciptypes.MerkleRootChain{
 				cciptypes.ChainSelector(1): {
 					ChainSel:     1,
@@ -54,7 +54,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 
 	testCases := []struct {
 		name                 string
-		consensusObservation ConsensusObservation
+		consensusObservation consensusObservation
 		merkleTreeSizeLimit  uint64
 		expectedOutcome      Outcome
 	}{
@@ -69,7 +69,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 		},
 		{
 			name: "simple scenario with one chain",
-			consensusObservation: ConsensusObservation{
+			consensusObservation: consensusObservation{
 				OnRampMaxSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 					1: 20,
 				},
@@ -94,7 +94,7 @@ func Test_reportRangesOutcome(t *testing.T) {
 		},
 		{
 			name: "simple scenario with one chain",
-			consensusObservation: ConsensusObservation{
+			consensusObservation: consensusObservation{
 				OnRampMaxSeqNums: map[cciptypes.ChainSelector]cciptypes.SeqNum{
 					1: 20,
 					2: 1000,

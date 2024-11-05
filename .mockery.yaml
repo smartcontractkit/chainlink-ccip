@@ -17,8 +17,6 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
             Controller:
-            PeerGroup:
-            PeerGroupFactory:
             Stream:
     github.com/smartcontractkit/chainlink-ccip/execute/internal/gas:
         interfaces:
@@ -35,3 +33,11 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3:
         interfaces:
             ExecutePluginCodec:
+    github.com/smartcontractkit/libocr/networking:
+        interfaces:
+            PeerGroupFactory:
+                config:
+                    dir: mocks/libocr_networking/
+            PeerGroup:
+                config:
+                    dir: mocks/libocr_networking/

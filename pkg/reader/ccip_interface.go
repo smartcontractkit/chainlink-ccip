@@ -23,7 +23,7 @@ var (
 
 // ContractAddresses is a map of contract names across all chain selectors and their address.
 // Currently only one contract per chain per name is supported.
-type ContractAddresses map[string]map[cciptypes.ChainSelector][]byte
+type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 
 func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelector, address []byte) ContractAddresses {
 	resp := ca
@@ -31,7 +31,7 @@ func (ca ContractAddresses) Append(contract string, chain cciptypes.ChainSelecto
 		resp = make(ContractAddresses)
 	}
 	if resp[contract] == nil {
-		resp[contract] = make(map[cciptypes.ChainSelector][]byte)
+		resp[contract] = make(map[cciptypes.ChainSelector]cciptypes.UnknownAddress)
 	}
 	resp[contract][chain] = address
 	return resp
@@ -126,6 +126,9 @@ type CCIPReader interface {
 		chains []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]types.ChainFeeComponents
 
+	// GetDestChainFeeComponents Reads the fee components for the destination chain.
+	GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error)
+
 	// GetWrappedNativeTokenPriceUSD Gets the wrapped native token price in USD for the provided chains.
 	GetWrappedNativeTokenPriceUSD(
 		ctx context.Context,
@@ -155,4 +158,7 @@ type CCIPReader interface {
 	// Sync can be used to perform frequent syncing operations inside the reader implementation.
 	// Returns a bool indicating whether something was updated.
 	Sync(ctx context.Context, contracts ContractAddresses) error
+
+	// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
+	GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error)
 }

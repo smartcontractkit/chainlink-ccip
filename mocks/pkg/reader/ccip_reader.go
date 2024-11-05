@@ -372,6 +372,62 @@ func (_c *MockCCIPReader_GetContractAddress_Call) RunAndReturn(run func(string, 
 	return _c
 }
 
+// GetDestChainFeeComponents provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) GetDestChainFeeComponents(ctx context.Context) (types.ChainFeeComponents, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDestChainFeeComponents")
+	}
+
+	var r0 types.ChainFeeComponents
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (types.ChainFeeComponents, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) types.ChainFeeComponents); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(types.ChainFeeComponents)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_GetDestChainFeeComponents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDestChainFeeComponents'
+type MockCCIPReader_GetDestChainFeeComponents_Call struct {
+	*mock.Call
+}
+
+// GetDestChainFeeComponents is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockCCIPReader_Expecter) GetDestChainFeeComponents(ctx interface{}) *MockCCIPReader_GetDestChainFeeComponents_Call {
+	return &MockCCIPReader_GetDestChainFeeComponents_Call{Call: _e.mock.On("GetDestChainFeeComponents", ctx)}
+}
+
+func (_c *MockCCIPReader_GetDestChainFeeComponents_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetDestChainFeeComponents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetDestChainFeeComponents_Call) Return(_a0 types.ChainFeeComponents, _a1 error) *MockCCIPReader_GetDestChainFeeComponents_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetDestChainFeeComponents_Call) RunAndReturn(run func(context.Context) (types.ChainFeeComponents, error)) *MockCCIPReader_GetDestChainFeeComponents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetExpectedNextSequenceNumber provides a mock function with given fields: ctx, sourceChainSelector, destChainSelector
 func (_m *MockCCIPReader) GetExpectedNextSequenceNumber(ctx context.Context, sourceChainSelector ccipocr3.ChainSelector, destChainSelector ccipocr3.ChainSelector) (ccipocr3.SeqNum, error) {
 	ret := _m.Called(ctx, sourceChainSelector, destChainSelector)
@@ -426,6 +482,62 @@ func (_c *MockCCIPReader_GetExpectedNextSequenceNumber_Call) Return(_a0 ccipocr3
 }
 
 func (_c *MockCCIPReader_GetExpectedNextSequenceNumber_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, ccipocr3.ChainSelector) (ccipocr3.SeqNum, error)) *MockCCIPReader_GetExpectedNextSequenceNumber_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetMedianDataAvailabilityGasConfig provides a mock function with given fields: ctx
+func (_m *MockCCIPReader) GetMedianDataAvailabilityGasConfig(ctx context.Context) (ccipocr3.DataAvailabilityGasConfig, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMedianDataAvailabilityGasConfig")
+	}
+
+	var r0 ccipocr3.DataAvailabilityGasConfig
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (ccipocr3.DataAvailabilityGasConfig, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) ccipocr3.DataAvailabilityGasConfig); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(ccipocr3.DataAvailabilityGasConfig)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMedianDataAvailabilityGasConfig'
+type MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call struct {
+	*mock.Call
+}
+
+// GetMedianDataAvailabilityGasConfig is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockCCIPReader_Expecter) GetMedianDataAvailabilityGasConfig(ctx interface{}) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
+	return &MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call{Call: _e.mock.On("GetMedianDataAvailabilityGasConfig", ctx)}
+}
+
+func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) Run(run func(ctx context.Context)) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) Return(_a0 ccipocr3.DataAvailabilityGasConfig, _a1 error) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) RunAndReturn(run func(context.Context) (ccipocr3.DataAvailabilityGasConfig, error)) *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }
