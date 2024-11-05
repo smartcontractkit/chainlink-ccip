@@ -1,0 +1,126 @@
+---
+in: |
+  deployments:
+    blockscout-postgres-{{ .Env.CHAIN_ID }}:
+      namespace: ${DEVSPACE_NAMESPACE}
+      helm:
+        chart:
+          name: oci://registry-1.docker.io/bitnamicharts/postgresql
+        values:
+          architecture: standalone
+          fullnameOverride: blockscout-postgres-{{ .Env.CHAIN_ID }}
+          auth:
+            enablePostgresUser: true
+            postgresPassword: postgres
+            username: blockscout
+            password: insecure_password
+            database: blockscout
+            existingSecret: ''
+          image:
+            registry: docker.io
+            repository: bitnami/postgresql
+          tls:
+            enabled: false
+          containerPorts:
+            postgresql: 5432
+          primary:
+            # The values for presets are here: https://github.com/bitnami/charts/blob/main/bitnami/common/templates/_resources.tpl#L15
+            resourcesPreset: "large"
+            persistence:
+              enabled: false
+            # Blockscout ORM uses a lot of connections bumping from 100 -> 300
+            extendedConfiguration: |
+              max_connections = 400
+              shared_buffers = 64MB
+            networkPolicy:
+              enabled: true
+          volumePermissions:
+            enabled: false
+          metrics:
+            enabled: false
+    blockscout-{{ .Env.CHAIN_ID }}:
+      # Heavily inspired by BCM setup:
+      # https://github.com/smartcontractkit/bcm-enterprise-sandbox/blob/main/tools/pulumi-chainlinkx/yaml/blockchain/alpha-blockscout.yaml
+      namespace: ${DEVSPACE_NAMESPACE}
+      helm:
+        chart:
+          repo: https://blockscout.github.io/helm-charts
+          name: blockscout-stack
+          version: 1.6.11
+        values:
+          config:
+            network:
+              id: {{ .Env.CHAIN_ID }}
+              name: Geth-{{ .Env.CHAIN_ID }}
+              shortname: {{ .Env.CHAIN_ID }}
+              currency:
+                name: Ether
+                symbol: ETH
+                decimals: 18
+                # if network uses dual token model like gnosis (in most case it should be set to false)
+                dualToken: false
+          blockscout:
+            image:
+              tag: ${BLOCKSCOUT_BACKEND_IMAGE_TAG}
+            # Deploy Indexer and API separately to increase stability and simplify debugging
+            separateApi:
+              enabled: true
+              replicaCount: 1
+            env:
+              # Not clear if we need an override on the BLOCK_TRANSFORMER, probably not as current verion of GETH in use
+              # have Consensus
+              # BLOCK_TRANSFORMER: clique
+              ETHEREUM_JSONRPC_VARIANT: geth
+              ETHEREUM_JSONRPC_HTTP_URL: http://geth-{{ .Env.CHAIN_ID }}:8544
+              ETHEREUM_JSONRPC_WS_URL: ws://geth-{{ .Env.CHAIN_ID }}:8546
+              # see: https://github.com/blockscout/blockscout/issues/7858
+              #  and https://docs.blockscout.com/setup/requirements/client-settings#variables-to-connect-to-json-rpc-client
+              ETHEREUM_JSONRPC_TRACE_URL: http://geth-{{ .Env.CHAIN_ID }}:8544
+              POOL_SIZE: 50
+              ECTO_USE_SSL: "false"
+              CHECK_ORIGIN: "false"
+              DATABASE_URL: postgresql://blockscout:insecure_password@blockscout-postgres-{{ .Env.CHAIN_ID }}:5432/blockscout
+            ingress:
+              enabled: true
+              hostname: ${DEVSPACE_NAMESPACE}-blockscout-{{ .Env.CHAIN_ID }}-backend.${DEVSPACE_INGRESS_BASE_DOMAIN}
+            securityContext:
+              capabilities:
+                drop:
+                  - ALL
+              runAsUser: 10001
+              runAsGroup: 10001
+              runAsNonRoot: true
+            resources:
+              limits:
+                memory: "2Gi"
+                cpu: "3000m"
+              requests:
+                memory: "1Gi"
+                cpu: "1000m"
+          frontend:
+            enabled: true
+            image:
+              tag: ${BLOCKSCOUT_FRONTEND_IMAGE_TAG}
+            env:
+              NEXT_PUBLIC_AD_BANNER_PROVIDER: none
+              NEXT_PUBLIC_AD_TEXT_PROVIDER: none
+            ingress:
+              enabled: true
+              hostname: ${DEVSPACE_NAMESPACE}-blockscout-{{ .Env.CHAIN_ID }}.${DEVSPACE_INGRESS_BASE_DOMAIN}
+            resources:
+              limits:
+                memory: "2Gi"
+                cpu: "2000m"
+              requests:
+                memory: "512Mi"
+                cpu: "1000m"
+            # Same user as in Dockerfile: https://github.com/blockscout/blockscout/blob/master/docker/Dockerfile#L75C20-L75C25
+            securityContext:
+              capabilities:
+                drop:
+                  - ALL
+              runAsUser: 10001
+              runAsGroup: 10001
+              runAsNonRoot: true
+          stats:
+            enabled: false

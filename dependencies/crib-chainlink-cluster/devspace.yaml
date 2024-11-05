@@ -43,6 +43,15 @@ vars:
     source: env
     default: "${CHAINLINK_HELM_REGISTRY_URI}/crib-chainlink-cluster"
 
+pullSecrets:
+  regcred-stage-ecr:
+    registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-stage-ecr
+  # To support pre-built images from develop branch
+  regcred-sdlc-ecr:
+    registry: 795953128386.dkr.ecr.us-west-2.amazonaws.com
+    secret: regcred-sdlc-ecr
+
 pipelines:
   kind:
     run: |-
@@ -105,15 +114,6 @@ pipelines:
       create_deployments app --from-file="${DEVSPACE_TMPDIR}/crib-cluster-overrides.yaml"
       kubectl delete pod -l "app=app" # restart pods to apply the new configuration changes
       kubectl wait --for=condition=ready pod -l "app=app" --timeout=2m
-
-pullSecrets:
-  regcred-stage-ecr:
-    registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
-    secret: regcred-stage-ecr
-  # To support pre-built images from develop branch
-  regcred-sdlc-ecr:
-    registry: 795953128386.dkr.ecr.us-west-2.amazonaws.com
-    secret: regcred-sdlc-ecr
 
 commands:
   workload:

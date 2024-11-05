@@ -1,0 +1,131 @@
+version: v2beta1
+name: blockscout
+
+vars:
+  # Check image versions against compatibility matrix
+  #   https://docs.blockscout.com/setup/requirements/back-front-compatibility-matrix
+  BLOCKSCOUT_BACKEND_IMAGE_TAG:
+    source: env
+    value: 6.8.1
+  BLOCKSCOUT_FRONTEND_IMAGE_TAG:
+    source: env
+    value: v1.34.2
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  ENABLE_GETH_1337:
+    source: env
+    default: true
+  ENABLE_GETH_2337:
+    source: env
+    default: false
+
+pipelines:
+  deploy:
+    run: |-
+      if [[ "$ENABLE_GETH_1337" == "true" ]]; then
+        create_deployments blockscout-postgres-1337
+        create_deployments blockscout-1337
+      fi
+
+       if [[ "$ENABLE_GETH_2337" == "true" ]]; then
+        create_deployments blockscout-postgres-2337
+        create_deployments blockscout-2337
+      fi
+
+profiles:
+  # Geth 1337 Profiles
+  - name: blockscout-base-1337
+    activation:
+      - vars:
+          ENABLE_GETH_1337: "true"
+    merge: |-
+      $(
+        CHAIN_ID=1337 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.base.yaml
+      )
+  - name: kind-1337
+    activation:
+      - vars:
+          PROVIDER: "kind"
+          ENABLE_GETH_1337: "true"
+    merge: |-
+      $(
+        CHAIN_ID=1337 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-kind.yaml
+      )
+  - name: aws-1337
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          ENABLE_GETH_1337: "true"
+    merge: |-
+      $(
+        CHAIN_ID=1337 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-staging.yaml
+      )
+  # Geth 2337 Profiles
+  - name: blockscout-base-2337
+    activation:
+      - vars:
+          ENABLE_GETH_2337: "true"
+    merge: |-
+      $(
+        CHAIN_ID=2337 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.base.yaml
+      )
+  - name: kind-2337
+    activation:
+      - vars:
+          PROVIDER: "kind"
+          ENABLE_GETH_2337: "true"
+    merge: |-
+      $(
+        CHAIN_ID=2337 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-kind.yaml
+      )
+  - name: aws-2337
+    activation:
+      - vars:
+          PROVIDER: "aws"
+          ENABLE_GETH_2337: "true"
+    merge: |-
+      $(
+        CHAIN_ID=2337 \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/blockscout.env.crib-staging.yaml
+      )
+  - name: local-charts-1337
+    # todo: delete automatic activations after fix is merged with upstream and release
+    activation:
+      - vars:
+          ENABLE_GETH_1337: "true"
+          PROVIDER: "aws"
+    merge:
+      deployments:
+        blockscout-1337:
+          helm:
+            chart:
+              name: blockscout-stack
+              path: ${CHAINLINK_CODE_DIR}/blockscout-helm-charts/charts/blockscout-stack
+              repo: null
+              version: null
+  - name: local-charts-2337
+    activation:
+      - vars:
+          ENABLE_GETH_2337: "true"
+          PROVIDER: "aws"
+    merge:
+      deployments:
+        blockscout-2337:
+          helm:
+            chart:
+              name: blockscout-stack
+              path: ${CHAINLINK_CODE_DIR}/blockscout-helm-charts/charts/blockscout-stack
+              repo: null
+              version: null

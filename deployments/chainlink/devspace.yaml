@@ -80,7 +80,7 @@ pipelines:
 
   ccip-kind:
     run: |-
-      run_pipelines kind-dependencies
+      # run_pipelines kind-dependencies
       run_pipelines ccip
 
   ccip-atlas:
@@ -102,6 +102,11 @@ pipelines:
   beholder:
     run: |-
       run_dependency_pipelines beholder
+
+  blockscout:
+    run: |-
+      run_dependency_pipelines blockscout
+      run_pipelines ingress-check
 
 profiles:
   - name: core
@@ -493,7 +498,15 @@ profiles:
       - op: add
         path: dependencies.beholder.pipeline
         value: kind
-
+  - name: blockscout
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          blockscout:
+            path: ${DEPENDENCIES_DIR}/blockscout
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
 commands:
   core:
     command: devspace run-pipeline core -p core
@@ -574,4 +587,8 @@ commands:
   beholder-kind:
     command: devspace run-pipeline beholder -p beholder-kind
     description: Run the Beholder pipeline for Kind.
+    appendArgs: true
+  blockscout:
+    command: devspace run-pipeline blockscout -p blockscout
+    description: Run blockscout pipeline
     appendArgs: true

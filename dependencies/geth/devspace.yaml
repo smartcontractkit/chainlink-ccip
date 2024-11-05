@@ -12,11 +12,9 @@ pipelines:
       create_deployments geth
 
 pullSecrets:
-  regcred-don:
+  regcred-stage-ecr:
     registry: 323150190480.dkr.ecr.us-west-2.amazonaws.com
-    secret: regcred-don
-    serviceAccounts:
-      - default
+    secret: regcred-stage-ecr
 
 hooks:
   - wait:
@@ -109,11 +107,16 @@ deployments:
             # Example format: 10.0.0.0/16,192.168.0.1/24
             customCidrs: ${DEVSPACE_INGRESS_CIDRS}
         networkPolicy:
+          enabled: true
           extraIngressSelectors:
             # whitelist chainlink-don deployment from donut dependency
             - podSelector:
                 matchLabels:
                   app.kubernetes.io/name: chainlink-don
+            # whitelist blockscout
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: blockscout-stack
 
 profiles:
   - name: local-charts

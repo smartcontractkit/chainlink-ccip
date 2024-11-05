@@ -22,9 +22,9 @@ commands:
     description: Download the testInput.toml file from the S3 bucket
 
 pullSecrets:
-  regcred-ccip:
+  regcred-prod-ecr:
     registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
-    secret: regcred-ccip
+    secret: regcred-prod-ecr
 
 pipelines:
   kind:
@@ -65,7 +65,7 @@ profiles:
                 - name: AWS_IAM_ENABLED
                   value: "false"
               imagePullSecrets:
-                - name: regcred-ccip
+                - name: regcred-prod-ecr
   - name: local-charts
     merge:
       deployments:
