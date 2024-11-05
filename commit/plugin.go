@@ -95,8 +95,8 @@ func NewPlugin(
 		offchainCfg.SignObservationPrefix,
 		rmnPeerClient,
 		rmnHomeReader,
-		2*time.Second, /* observationsInitialRequestTimerDuration */
-		2*time.Second, /* observationsRequestTimerDuration */
+		observationsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
+		reportsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
@@ -397,6 +397,47 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
 	}
 
 	return decodedOutcome
+}
+
+// Assuming that we have to delegate a specific amount of time to the observation requests and the report requests.
+// We define some percentages in order to help us calculate the time we have to delegate to each request timer.
+const (
+	observationDurationPercentage = 0.55
+	reportDurationPercentage      = 0.4
+	// remaining 5% for other query processing
+
+	maxAllowedObservationTimeout = 3 * time.Second
+	maxAllowedReportTimeout      = 2 * time.Second
+)
+
+func observationsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Duration {
+	// we have queryCapacityForObservations to make the initial observation request and potentially a secondary request
+	queryCapacityForObservations := time.Duration(observationDurationPercentage * float64(maxQueryDuration))
+
+	// we divide in two parts one for the initial observation and one for the retry
+	queryCapacityForInitialObservations := queryCapacityForObservations / 2
+
+	// if the capacity is greater than the maximum allowed we return the max allowed
+	if queryCapacityForInitialObservations < maxAllowedObservationTimeout {
+		return queryCapacityForObservations
+	}
+
+	return maxAllowedObservationTimeout
+}
+
+func reportsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Duration {
+	// we have queryCapacityForReports to make the initial reports request and potentially a secondary request
+	queryCapacityForReports := time.Duration(reportDurationPercentage * float64(maxQueryDuration))
+
+	// we divide in two parts one for the initial signatures request and one for the retry
+	queryCapacityForInitialObservations := queryCapacityForReports / 2
+
+	// if the capacity is greater than the maximum allowed we return the max allowed
+	if queryCapacityForInitialObservations < maxAllowedReportTimeout {
+		return queryCapacityForInitialObservations
+	}
+
+	return maxAllowedReportTimeout
 }
 
 // Interface compatibility checks.
