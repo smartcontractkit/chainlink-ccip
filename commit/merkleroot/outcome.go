@@ -75,7 +75,7 @@ func (w *Processor) getOutcome(
 func reportRangesOutcome(
 	_ Query,
 	lggr logger.Logger,
-	consensusObservation ConsensusObservation,
+	consensusObservation consensusObservation,
 	maxMerkleTreeSize uint64,
 	dstChain cciptypes.ChainSelector,
 ) Outcome {
@@ -143,7 +143,7 @@ func reportRangesOutcome(
 func buildReport(
 	q Query,
 	lggr logger.Logger,
-	consensusObservation ConsensusObservation,
+	consensusObservation consensusObservation,
 	prevOutcome Outcome,
 ) Outcome {
 	roots := maps.Values(consensusObservation.MerkleRoots)
@@ -232,7 +232,7 @@ func checkForReportTransmission(
 	lggr logger.Logger,
 	maxReportTransmissionCheckAttempts uint,
 	previousOutcome Outcome,
-	consensusObservation ConsensusObservation,
+	consensusObservation consensusObservation,
 ) Outcome {
 
 	offRampUpdated := false
@@ -271,7 +271,7 @@ func getConsensusObservation(
 	fRoleDON int,
 	destChain cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[Observation],
-) (ConsensusObservation, error) {
+) (consensusObservation, error) {
 	aggObs := aggregateObservations(aos)
 
 	// consensus on the fChain map uses the role DON F value
@@ -281,7 +281,7 @@ func getConsensusObservation(
 
 	_, exists := fChains[destChain]
 	if !exists {
-		return ConsensusObservation{},
+		return consensusObservation{},
 			fmt.Errorf("no consensus value for fDestChain, destChain: %d, fChainObs: %+v, fChainsConsensus: %+v",
 				destChain, aggObs.FChain, fChains,
 			)
@@ -292,7 +292,7 @@ func getConsensusObservation(
 
 	// Get consensus using strict 2fChain+1 threshold.
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
-	consensusObs := ConsensusObservation{
+	consensusObs := consensusObservation{
 		MerkleRoots:      consensus.GetConsensusMap(lggr, "Merkle Root", aggObs.MerkleRoots, twoFChainPlus1),
 		OnRampMaxSeqNums: consensus.GetConsensusMap(lggr, "OnRamp Max Seq Nums", aggObs.OnRampMaxSeqNums, twoFChainPlus1),
 		OffRampNextSeqNums: consensus.GetConsensusMap(

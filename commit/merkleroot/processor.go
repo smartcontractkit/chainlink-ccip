@@ -52,7 +52,7 @@ func NewProcessor(
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
 ) *Processor {
-	observer := ObserverImpl{
+	observer := observerImpl{
 		lggr,
 		homeChain,
 		oracleID,
