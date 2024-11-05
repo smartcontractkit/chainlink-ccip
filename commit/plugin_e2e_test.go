@@ -214,8 +214,10 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				params.enableDiscovery = tc.enableDiscovery
-				n := setupNode(params, oracleIDs[i])
+				paramsCp := params
+				paramsCp.enableDiscovery = tc.enableDiscovery
+				paramsCp.reportingCfg.OracleID = oracleIDs[i]
+				n := setupNode(paramsCp)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
@@ -367,7 +369,9 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var reportCodec ccipocr3.CommitPluginCodec
 			for i := range oracleIDs {
-				n := setupNode(params, oracleIDs[i])
+				paramsCp := params
+				paramsCp.reportingCfg.OracleID = oracleIDs[i]
+				n := setupNode(paramsCp)
 				nodes[i] = n.node
 				if i == 0 {
 					reportCodec = n.reportCodec
@@ -592,7 +596,9 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for i := range oracleIDs {
-				n := setupNode(params, oracleIDs[i])
+				paramsCp := params
+				paramsCp.reportingCfg.OracleID = oracleIDs[i]
+				n := setupNode(paramsCp)
 				nodes[i] = n.node
 
 				prepareCcipReaderMock(params.ctx, n.ccipReader, true, false, false)
@@ -699,7 +705,7 @@ type SetupNodeParams struct {
 }
 
 //nolint:gocyclo // todo
-func setupNode(params SetupNodeParams, nodeID commontypes.OracleID) nodeSetup {
+func setupNode(params SetupNodeParams) nodeSetup {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(params.t)
 	tokenPricesReader := readerpkg_mock.NewMockPriceReader(params.t)
 	reportCodec := mocks.NewCommitPluginJSONReportCodec()
@@ -795,7 +801,6 @@ func setupNode(params SetupNodeParams, nodeID commontypes.OracleID) nodeSetup {
 
 	p := NewPlugin(
 		params.donID,
-		nodeID,
 		params.oracleIDToP2pID,
 		params.offchainCfg,
 		destChain,

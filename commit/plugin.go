@@ -29,9 +29,9 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-type MerkleRootObservation = plugincommon.AttributedObservation[merkleroot.Observation]
-type TokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
-type ChainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
+type merkleRootObservation = plugincommon.AttributedObservation[merkleroot.Observation]
+type tokenPricesObservation = plugincommon.AttributedObservation[tokenprice.Observation]
+type chainFeeObservation = plugincommon.AttributedObservation[chainfee.Observation]
 
 type Plugin struct {
 	donID               plugintypes.DonID
@@ -57,7 +57,6 @@ type Plugin struct {
 
 func NewPlugin(
 	donID plugintypes.DonID,
-	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
@@ -83,10 +82,10 @@ func NewPlugin(
 	}
 
 	chainSupport := plugincommon.NewCCIPChainSupport(
-		lggr,
+		logger.Named(lggr, "CCIPChainSupport"),
 		homeChain,
 		oracleIDToP2pID,
-		oracleID,
+		reportingCfg.OracleID,
 		destChain,
 	)
 
@@ -96,12 +95,12 @@ func NewPlugin(
 		offchainCfg.SignObservationPrefix,
 		rmnPeerClient,
 		rmnHomeReader,
-		2*time.Second, /* observationsInitialRequestTimerDuration */
-		2*time.Second, /* observationsRequestTimerDuration */
+		observationsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
+		reportsInitialRequestTimerDuration(reportingCfg.MaxDurationQuery),
 	)
 
 	merkleRootProcessor := merkleroot.NewProcessor(
-		oracleID,
+		reportingCfg.OracleID,
 		oracleIDToP2pID,
 		logger.Named(lggr, "MerkleRootProcessor"),
 		offchainCfg,
@@ -117,7 +116,7 @@ func NewPlugin(
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
-		oracleID,
+		reportingCfg.OracleID,
 		lggr,
 		offchainCfg,
 		destChain,
@@ -138,7 +137,7 @@ func NewPlugin(
 
 	chainFeeProcessr := chainfee.NewProcessor(
 		lggr,
-		oracleID,
+		reportingCfg.OracleID,
 		destChain,
 		homeChain,
 		ccipReader,
@@ -149,7 +148,7 @@ func NewPlugin(
 
 	return &Plugin{
 		donID:               donID,
-		oracleID:            oracleID,
+		oracleID:            reportingCfg.OracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
 		lggr:                lggr,
 		offchainCfg:         offchainCfg,
@@ -291,9 +290,9 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
-	var merkleObservations []MerkleRootObservation
-	var tokensObservations []TokenPricesObservation
-	var feeObservations []ChainFeeObservation
+	var merkleObservations []merkleRootObservation
+	var tokensObservations []tokenPricesObservation
+	var feeObservations []chainFeeObservation
 	var discoveryObservations []plugincommon.AttributedObservation[dt.Observation]
 
 	for _, ao := range aos {
@@ -304,21 +303,21 @@ func (p *Plugin) Outcome(
 		}
 		p.lggr.Debugw("Commit plugin outcome decoded observation", "observation", obs)
 		merkleObservations = append(merkleObservations,
-			MerkleRootObservation{
+			merkleRootObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.MerkleRootObs,
 			},
 		)
 
 		tokensObservations = append(tokensObservations,
-			TokenPricesObservation{
+			tokenPricesObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.TokenPriceObs,
 			},
 		)
 
 		feeObservations = append(feeObservations,
-			ChainFeeObservation{
+			chainFeeObservation{
 				OracleID:    ao.Observer,
 				Observation: obs.ChainFeeObs,
 			},
@@ -398,6 +397,47 @@ func (p *Plugin) decodeOutcome(outcome ocr3types.Outcome) Outcome {
 	}
 
 	return decodedOutcome
+}
+
+// Assuming that we have to delegate a specific amount of time to the observation requests and the report requests.
+// We define some percentages in order to help us calculate the time we have to delegate to each request timer.
+const (
+	observationDurationPercentage = 0.55
+	reportDurationPercentage      = 0.4
+	// remaining 5% for other query processing
+
+	maxAllowedObservationTimeout = 3 * time.Second
+	maxAllowedReportTimeout      = 2 * time.Second
+)
+
+func observationsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Duration {
+	// we have queryCapacityForObservations to make the initial observation request and potentially a secondary request
+	queryCapacityForObservations := time.Duration(observationDurationPercentage * float64(maxQueryDuration))
+
+	// we divide in two parts one for the initial observation and one for the retry
+	queryCapacityForInitialObservations := queryCapacityForObservations / 2
+
+	// if the capacity is greater than the maximum allowed we return the max allowed
+	if queryCapacityForInitialObservations < maxAllowedObservationTimeout {
+		return queryCapacityForObservations
+	}
+
+	return maxAllowedObservationTimeout
+}
+
+func reportsInitialRequestTimerDuration(maxQueryDuration time.Duration) time.Duration {
+	// we have queryCapacityForReports to make the initial reports request and potentially a secondary request
+	queryCapacityForReports := time.Duration(reportDurationPercentage * float64(maxQueryDuration))
+
+	// we divide in two parts one for the initial signatures request and one for the retry
+	queryCapacityForInitialObservations := queryCapacityForReports / 2
+
+	// if the capacity is greater than the maximum allowed we return the max allowed
+	if queryCapacityForInitialObservations < maxAllowedReportTimeout {
+		return queryCapacityForInitialObservations
+	}
+
+	return maxAllowedReportTimeout
 }
 
 // Interface compatibility checks.

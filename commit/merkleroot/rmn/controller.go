@@ -127,6 +127,11 @@ func NewController(
 	observationsInitialRequestTimerDuration time.Duration,
 	reportsInitialRequestTimerDuration time.Duration,
 ) Controller {
+
+	lggr.Infow("creating new RMN controller",
+		"observationsInitialRequestTimerDuration", observationsInitialRequestTimerDuration,
+		"reportsInitialRequestTimerDuration", reportsInitialRequestTimerDuration)
+
 	return &controller{
 		lggr:                                    lggr,
 		rmnCrypto:                               rmnCrypto,
