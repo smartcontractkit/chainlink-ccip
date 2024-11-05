@@ -10,6 +10,12 @@ pipelines:
     run: |-
       create_deployments redpanda
 
+  beholder:
+    run: |-
+      create_deployments redpanda
+      create_deployments beholder-register-schema-job
+      create_deployments beholder-create-topic-job
+
 deployments:
   redpanda:
     updateImageTags: false
@@ -84,6 +90,15 @@ deployments:
         tuning:
           tune_aio_events: false
         console:
+          config:
+            kafka:
+              protobuf:
+                enabled: true
+                schemaRegistry:
+                  # Enable Schema Registry for Protobuf deserialization.
+                  enabled: true
+                  # Interval to refresh schemas from the Schema Registry.
+                  refreshInterval: 5m
           ingress:
             enabled: true
             className: "alb"
@@ -99,3 +114,16 @@ deployments:
                 paths:
                   - path: /
                     pathType: Prefix
+
+  beholder-register-schema-job:
+    namespace: ${DEVSPACE_NAMESPACE}
+    kubectl:
+      manifests:
+        - ./k8s/beholder/register-schema-config-map.yaml
+        - ./k8s/beholder/register-schema-job.yaml
+
+  beholder-create-topic-job:
+    namespace: ${DEVSPACE_NAMESPACE}
+    kubectl:
+      manifests:
+        - ./k8s/beholder/create-topic-job.yaml

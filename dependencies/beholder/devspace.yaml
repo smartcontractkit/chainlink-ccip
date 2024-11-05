@@ -29,6 +29,7 @@ dependencies:
     path: ${DEPENDENCIES_DIR}/redpanda
     overwriteVars: true
     namespace: ${DEVSPACE_NAMESPACE}
+    pipeline: beholder
 
 pullSecrets:
   regcred-beholder:
@@ -38,14 +39,14 @@ pullSecrets:
 pipelines:
   ci-e2e-test:
     run: |-
-      run_dependency_pipelines prometheus grafana loki tempo redpanda
+      run_dependency_pipelines redpanda
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
   load-test:
     run: |-
       run_dependency_pipelines redpanda
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
       wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-otel-collector-agent
-      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-otel-collector-gateway
+      wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/name=deployment-collector
       create_deployments beholder-load-tester
   kind:
     run: |-
@@ -54,7 +55,7 @@ pipelines:
       create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
   deploy:
     run: |-
-      run_dependency_pipelines prometheus grafana loki tempo redpanda
+      run_dependency_pipelines redpanda
       create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
 
 deployments:
@@ -72,8 +73,11 @@ deployments:
           fsGroup: 999
 
         beholder-test-client:
+          image:
+            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-test-client
+            tag: qa-latest
           args:
-            - -otel-exporter-grpc-enpoint
+            - -otel-exporter-grpc-endpoint
             - beholder-otel-collector-agent:4317
 
   beholder-load-tester:
@@ -139,6 +143,7 @@ deployments:
           selector:
             app: beholder-load-tester
 
+
   beholder-otel-collector-agent:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
@@ -174,7 +179,7 @@ deployments:
             debug:
               verbosity: detailed
             otlp:
-              endpoint: beholder-otel-collector-gateway:4317
+              endpoint: deployment-collector:4317
               tls:
                 insecure: true
           service:
@@ -225,81 +230,103 @@ deployments:
       releaseName: beholder-otel-collector-gateway
       displayOutput: true
       chart:
-        name: opentelemetry-collector
-        repo: https://open-telemetry.github.io/opentelemetry-helm-charts
-        version: "0.101.2"
+        name: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts/otel-resources"
+        version: "0.68.5"
       values:
-        fullnameOverride: beholder-otel-collector-gateway
-        mode: deployment
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsUser: 1001
-          runAsNonRoot: true
-          capabilities:
-            drop:
-              - ALL
-        image:
-          repository: otel/opentelemetry-collector
-          tag: 0.106.1
-        ports:
-          prometheus:
-            enabled: true
-            containerPort: 8889
-            servicePort: 8889
-            hostPort: 8889
-            protocol: TCP
-          metrics:
-            enabled: true
-        config:
-          receivers:
-            otlp:
-              protocols:
-                grpc:
-                  endpoint: 0.0.0.0:4317
-                http:
-                  endpoint: 0.0.0.0:4318
-            prometheus:
-              config:
-                scrape_configs:
-                  - job_name: "otel-collector"
-                    scrape_interval: 5s
-                    static_configs:
-                      - targets: ["127.0.0.1:8888"]
-                  - job_name: "beholder-demo"
-                    scrape_interval: 5s
-                    static_configs:
-                      - targets: ["beholder-test-client:9091"]
-          exporters:
-            debug:
-              verbosity: detailed
-            kafka:
-              brokers:
-                - redpanda:9093
-              topic: beholder-test-client
-              encoding: otlp_json
-            prometheus:
-              endpoint: "0.0.0.0:8889"
-          service:
-            telemetry:
-              logs:
-                level: "debug"
-            pipelines:
-              traces:
-                receivers: [otlp]
-                exporters: [debug, kafka]
-              metrics:
-                receivers: [otlp, prometheus]
-                exporters: [debug, kafka, prometheus]
-              logs:
-                receivers: [otlp]
-                exporters: [debug, kafka]
-        serviceMonitor:
+        daemonset:
+          enabled: false
+        deployment:
+          config:
+            exporters:
+              beholder_kafka:
+                brokers:
+                  - redpanda:9093
+#                client_id: beholder-otel-collector-gateway-client-id-crib
+                kafka_sasl_password: ""
+                kafka_sasl_username: ""
+                schema_registry_url: http://redpanda:8081
+              debug:
+                verbosity: detailed
+            processors:
+              batch:
+                send_batch_size: 512
+                timeout: 5s
+              memory_limiter:
+                check_interval: 5s
+                limit_mib: 4000
+                spike_limit_mib: 800
+              tail_sampling:
+                decision_wait: 10s
+                expected_new_traces_per_sec: 10
+                num_traces: 1000
+                policies:
+                  - name: a-status-policy
+                    status_code:
+                      status_codes:
+                        - ERROR
+                    type: status_code
+                  - name: probabilistic-policy
+                    probabilistic:
+                      sampling_percentage: 10
+                    type: probabilistic
+            receivers:
+              otlp:
+                protocols:
+                  grpc:
+                    endpoint: 0.0.0.0:4317
+                  http:
+                    endpoint: 0.0.0.0:4318
+            service:
+              pipelines:
+                logs:
+                  exporters:
+                    - debug
+                    - beholder_kafka
+                  processors:
+                    - batch
+                  receivers:
+                    - otlp
+                metrics:
+                  exporters:
+                    - debug
+#                    - otlphttp
+                  processors:
+                    - batch
+                  receivers:
+                    - otlp
+                traces:
+                  exporters:
+                    - debug
+                  processors:
+                    - batch
+                  receivers:
+                    - otlp
+              telemetry:
+                metrics:
+                  address: 0.0.0.0:8888
+                  level: detailed
           enabled: true
-          metricsEndpoints:
-            - port: metrics
-              interval: 1s
-          extraLabels:
-            release: prometheus
+          enabledLB: false
+          env:
+            - name: KAFKA_SASL_MECHANISM
+              value: PLAINTEXT
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+        image:
+          registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+          repository: atlas-beholder-gateway-otel-collector
+          tag: qa-latest
+        opentelemetry-operator:
+          enabled: false
+        sidecar:
+          enabled: false
+        clusterRole:
+          enabled: false
+        clusterRoleBinding:
+          enabled: false
 
 profiles:
   - name: kind
@@ -322,40 +349,7 @@ profiles:
               name: beholder-test-client
               path: ${CHAINLINK_CODE_DIR}/infra-charts/beholder-test-client
               version: null
-  - name: ci-e2e-test
-    patches:
-      - op: remove
-        path: deployments.beholder-otel-collector-gateway.helm.values.config.receivers.prometheus
-      - op: remove
-        path: deployments.beholder-otel-collector-gateway.helm.values.config.exporters.prometheus
-    merge:
-      deployments:
-        beholder-otel-collector-gateway:
-          helm:
-            values:
-              config:
-                exporters:
-                  debug:
-                    verbosity: detailed
-                  kafka:
-                    brokers:
-                      - redpanda:9093
-                    topic: beholder_otlp_logs
-                    encoding: otlp_json
-                service:
-                  telemetry:
-                    logs:
-                      level: "debug"
-                  pipelines:
-                    traces:
-                      receivers: [otlp]
-                      exporters: [debug, kafka]
-                    metrics:
-                      receivers: [otlp]
-                      exporters: [debug, kafka]
-                    logs:
-                      receivers: [otlp]
-                      exporters: [debug, kafka]
+
   - name: load-test
     patches:
       - op: add
