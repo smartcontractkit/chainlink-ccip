@@ -205,9 +205,10 @@ func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 
 	configs, err := configPoller.GetOCRConfigs(context.Background(), donID, pluginType)
 	require.NoError(t, err)
-	require.Len(t, configs, 1)
-	require.Equal(t, uint8(1), configs[0].Config.PluginType)
-	require.Equal(t, cciptypes.ChainSelector(1), configs[0].Config.ChainSelector)
-	require.Equal(t, uint8(1), configs[0].Config.FRoleDON)
-	require.Equal(t, []byte("offramp"), configs[0].Config.OfframpAddress)
+	require.NotEqual(t, [32]byte{}, configs.ActiveConfig.ConfigDigest)
+	require.Equal(t, [32]byte{}, configs.CandidateConfig.ConfigDigest)
+	require.Equal(t, uint8(1), configs.ActiveConfig.Config.PluginType)
+	require.Equal(t, cciptypes.ChainSelector(1), configs.ActiveConfig.Config.ChainSelector)
+	require.Equal(t, uint8(1), configs.ActiveConfig.Config.FRoleDON)
+	require.Equal(t, []byte("offramp"), configs.ActiveConfig.Config.OfframpAddress)
 }

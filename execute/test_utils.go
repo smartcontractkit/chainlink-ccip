@@ -2,7 +2,9 @@ package execute
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/binary"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -288,10 +291,12 @@ func (it *IntTest) newNode(
 	N int,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
-
+	b := make([]byte, 32)
+	_, _ = crand.Read(b)
 	rCfg := ocr3types.ReportingPluginConfig{
-		N:        N,
-		OracleID: commontypes.OracleID(id),
+		N:            N,
+		OracleID:     commontypes.OracleID(id),
+		ConfigDigest: ocrtypes.ConfigDigest(b),
 	}
 
 	node1 := NewPlugin(
@@ -382,7 +387,8 @@ type msgOption func(*cciptypes.Message)
 
 func withFeeValueJuels(fee int64) msgOption {
 	return func(m *cciptypes.Message) {
-		m.FeeValueJuels = cciptypes.NewBigIntFromInt64(fee)
+		juels := new(big.Int).Mul(big.NewInt(fee), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+		m.FeeValueJuels = cciptypes.NewBigInt(juels)
 	}
 }
 
