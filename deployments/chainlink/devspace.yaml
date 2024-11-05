@@ -80,7 +80,7 @@ pipelines:
 
   ccip-kind:
     run: |-
-      # run_pipelines kind-dependencies
+      run_pipelines kind-dependencies
       run_pipelines ccip
 
   ccip-atlas:
