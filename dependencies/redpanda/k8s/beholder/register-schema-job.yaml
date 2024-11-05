@@ -17,6 +17,10 @@ spec:
               curl -X POST http://redpanda:8081/subjects/beholder__beholderdemo__messages___TestCustomMessage/versions \
                    -H "Content-Type: application/vnd.schemaregistry.v1+json" \
                    -d "{\"schema\": $SCHEMA_CONTENT, \"schemaType\": \"PROTOBUF\"}"
+              curl -X POST http://redpanda:8081/subjects/beholder__test_domain__messages___test_entity/versions \
+                   -H "Content-Type: application/vnd.schemaregistry.v1+json" \
+                   -d "{\"compatibility\": \"NONE\"}"
+
           volumeMounts:
             - name: schema-volume
               mountPath: /schemas

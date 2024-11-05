@@ -39,7 +39,7 @@ pullSecrets:
 pipelines:
   ci-e2e-test:
     run: |-
-      run_dependency_pipelines prometheus grafana loki tempo redpanda
+      run_dependency_pipelines redpanda
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
   load-test:
     run: |-
@@ -349,40 +349,7 @@ profiles:
               name: beholder-test-client
               path: ${CHAINLINK_CODE_DIR}/infra-charts/beholder-test-client
               version: null
-  - name: ci-e2e-test
-    patches:
-      - op: remove
-        path: deployments.beholder-otel-collector-gateway.helm.values.config.receivers.prometheus
-      - op: remove
-        path: deployments.beholder-otel-collector-gateway.helm.values.config.exporters.prometheus
-    merge:
-      deployments:
-        beholder-otel-collector-gateway:
-          helm:
-            values:
-              config:
-                exporters:
-                  debug:
-                    verbosity: detailed
-                  kafka:
-                    brokers:
-                      - redpanda:9093
-                    topic: beholder_otlp_logs
-                    encoding: otlp_json
-                service:
-                  telemetry:
-                    logs:
-                      level: "debug"
-                  pipelines:
-                    traces:
-                      receivers: [otlp]
-                      exporters: [debug, kafka]
-                    metrics:
-                      receivers: [otlp]
-                      exporters: [debug, kafka]
-                    logs:
-                      receivers: [otlp]
-                      exporters: [debug, kafka]
+
   - name: load-test
     patches:
       - op: add
