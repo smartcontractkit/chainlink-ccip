@@ -210,36 +210,35 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
-	var discoveryObs dt.Observation
-	if p.discoveryProcessor != nil {
-		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+	// If the contracts are not initialized then only submit contracts discovery related observations.
+	if !p.contractsInitialized.Load() && p.discoveryProcessor != nil {
+		discoveryObs, err := p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
 		if err != nil {
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
-		if !p.contractsInitialized.Load() {
-			obs := Observation{DiscoveryObs: discoveryObs}
-			encoded, err := obs.Encode()
-			if err != nil {
-				return nil, fmt.Errorf("failed to encode observation: %w, observation: %+v", err, obs)
-			}
 
-			p.lggr.Infow("contracts not initialized, only making discovery observations",
-				"discoveryObs", discoveryObs)
-			p.lggr.Debugw("Commit plugin making observation",
-				"encodedObservation", encoded,
-				"observation", obs)
-			return encoded, nil
+		obs := Observation{DiscoveryObs: discoveryObs}
+		encoded, err := obs.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
 		}
+
+		p.lggr.Infow("contracts not initialized, only making discovery observations", "discoveryObs", discoveryObs)
+		p.lggr.Debugw("commit plugin making observation", "encodedObservation", encoded, "observation", obs)
+
+		return encoded, nil
 	}
 
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get merkle observation", "err", err)
 	}
+
 	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get token prices", "err", err)
 	}
+
 	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
 	if err != nil {
 		p.lggr.Errorw("failed to get gas prices", "err", err)
@@ -249,7 +248,6 @@ func (p *Plugin) Observation(
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		ChainFeeObs:   chainFeeObs,
-		DiscoveryObs:  discoveryObs,
 		FChain:        fChain,
 	}
 	encoded, err := obs.Encode()
@@ -257,8 +255,7 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("failed to encode observation: %w, observation: %+v", err, obs)
 	}
 
-	p.lggr.Debugw("Commit plugin making observation",
-		"encodedObservation", encoded, "observation", obs)
+	p.lggr.Debugw("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 	return encoded, nil
 }
 
