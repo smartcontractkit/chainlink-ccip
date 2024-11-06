@@ -209,13 +209,18 @@ func (p *Plugin) ObservationQuorum(
 func (p *Plugin) Observation(
 	ctx context.Context, outCtx ocr3types.OutcomeContext, q types.Query,
 ) (types.Observation, error) {
-	// If the contracts are not initialized then only submit contracts discovery related observation.
-	if !p.contractsInitialized.Load() && p.discoveryProcessor != nil {
-		discoveryObs, err := p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
+	var discoveryObs dt.Observation
+	var err error
+
+	if p.discoveryProcessor != nil {
+		discoveryObs, err = p.discoveryProcessor.Observation(ctx, dt.Outcome{}, dt.Query{})
 		if err != nil {
 			p.lggr.Errorw("failed to discover contracts", "err", err)
 		}
+	}
 
+	// If the contracts are not initialized then only submit contracts discovery related observation.
+	if !p.contractsInitialized.Load() && p.discoveryProcessor != nil {
 		obs := Observation{DiscoveryObs: discoveryObs}
 		encoded, err := obs.Encode()
 		if err != nil {
@@ -259,6 +264,7 @@ func (p *Plugin) Observation(
 	obs := Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
+		DiscoveryObs:  discoveryObs,
 		ChainFeeObs:   chainFeeObs,
 		FChain:        p.ObserveFChain(),
 	}
