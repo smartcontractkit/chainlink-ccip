@@ -2,6 +2,7 @@ package commit
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -24,7 +25,7 @@ func (ri ReportInfo) Encode() ([]byte, error) {
 	return json.Marshal(ri)
 }
 
-// Decode should be used to decode the report info
+// decode should be used to decode the report info
 func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 	return json.Unmarshal(encodedReportInfo, ri)
 }
@@ -32,10 +33,11 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	outcome, err := decodeOutcome(outcomeBytes)
+	outcome, err := DecodeOutcome(outcomeBytes)
 	if err != nil {
-		p.lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
-		return nil, fmt.Errorf("decode outcome: %w", err)
+		// TODO: metrics
+		p.lggr.Errorw("failed to decode Outcome", "outcomeBytes", outcomeBytes, "err", err)
+		return nil, fmt.Errorf("failed to decode Outcome (%s): %w", hex.EncodeToString(outcomeBytes), err)
 	}
 
 	// Gas prices and token prices do not need to get reported when merkle roots do not exist.
@@ -71,7 +73,13 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
 
-	reportInfo, err := ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F}.Encode()
+	// Prepare the info data
+	reportInfo := ReportInfo{
+		RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F,
+	}
+
+	// Serialize reportInfo to []byte
+	infoBytes, err := reportInfo.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("encode report info: %w", err)
 	}
@@ -80,7 +88,7 @@ func (p *Plugin) Reports(
 		{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
 				Report: encodedReport,
-				Info:   reportInfo,
+				Info:   infoBytes,
 			},
 		},
 	}, nil
