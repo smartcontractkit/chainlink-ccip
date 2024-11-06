@@ -10,6 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -118,6 +120,8 @@ func (o *CCIPCostlyMessageObserver) Observe(
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
 		if fee.Cmp(execCost) < 0 {
+			o.lggr.Warnw("message is too costly to execute", "messageID",
+				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		}
 	}
@@ -297,7 +301,11 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		feeUSD18 := new(big.Int).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int)
+		feeUSD18 := new(big.Int).Div(
+			new(big.Int).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int),
+			new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+		)
+		unboostedFee := feeUSD18
 		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
 		if !ok {
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
@@ -307,6 +315,8 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
+		c.lggr.Warnw("message fee", "messageID", msg.Header.MessageID.String(), "fee", feeUSD18,
+			"linkPriceUSD", linkPriceUSD, "feeValueJuels", msg.FeeValueJuels, "unboostedFee", unboostedFee)
 		messageFees[msg.Header.MessageID] = feeUSD18
 	}
 
@@ -350,19 +360,62 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	if feeComponents.DataAvailabilityFee == nil {
 		return nil, fmt.Errorf("missing data availability fee")
 	}
+	if len(messages) == 0 {
+		return messageExecCosts, nil
+	}
+
+	executionFee, daFee, err := c.getFeesUSD18(ctx, feeComponents, messages[0].Header.DestChainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert fee components to USD18: %w", err)
+	}
+
 	daConfig, err := c.ccipReader.GetMedianDataAvailabilityGasConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get data availability gas config: %w", err)
 	}
 
 	for _, msg := range messages {
-		executionCostUSD18 := c.computeExecutionCostUSD18(feeComponents.ExecutionFee, msg)
-		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(feeComponents.DataAvailabilityFee, daConfig, msg)
+		executionCostUSD18 := c.computeExecutionCostUSD18(executionFee, msg)
+		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(c.lggr, daFee, daConfig, msg)
 		totalCostUSD18 := new(big.Int).Add(executionCostUSD18, dataAvailabilityCostUSD18)
 		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
 	}
 
 	return messageExecCosts, nil
+}
+
+func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
+	ctx context.Context,
+	feeComponents types.ChainFeeComponents,
+	destChainSelector cciptypes.ChainSelector,
+) (plugintypes.USD18, plugintypes.USD18, error) {
+	nativeTokenPrices := c.ccipReader.GetWrappedNativeTokenPriceUSD(
+		ctx,
+		[]cciptypes.ChainSelector{destChainSelector})
+	if nativeTokenPrices == nil {
+		return nil, nil, fmt.Errorf("unable to get native token prices")
+	}
+	nativeTokenPrice, ok := nativeTokenPrices[destChainSelector]
+	if !ok {
+		return nil, nil, fmt.Errorf("missing native token price for chain %s", destChainSelector)
+	}
+
+	// nativeTokenPrice is in USD * 1e18 (from the price feed)
+	// feeComponents are in WEI (ETH * 1e18)
+	executionFee := new(big.Int).Div(
+		new(big.Int).Mul(feeComponents.ExecutionFee, nativeTokenPrice.Int),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+	)
+	dataAvailabilityFee := new(big.Int).Div(
+		new(big.Int).Mul(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int),
+		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+	)
+
+	c.lggr.Warnw("execution fee", "nativeTokenPrice", nativeTokenPrice,
+		"feeComponents.ExecutionFee", feeComponents.ExecutionFee, "feeComponents.DataAvailabilityFee",
+		feeComponents.DataAvailabilityFee, "executionFee", executionFee, "dataAvailabilityFee", dataAvailabilityFee)
+
+	return executionFee, dataAvailabilityFee, nil
 }
 
 // computeExecutionCostUSD18 computes the execution cost of a message in USD18s.
@@ -374,11 +427,14 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
 ) plugintypes.USD18 {
 	messageGas := new(big.Int).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
 	cost := new(big.Int).Mul(messageGas, executionFee)
+	c.lggr.Warnw("computeExecutionCostUSD18", "messageID", message.Header.MessageID.String(), "messageGas",
+		messageGas, "executionFee", executionFee, "cost", cost)
 	return cost
 }
 
 // computeDataAvailabilityCostUSD18 computes the data availability cost of a message in USD18s.
 func computeDataAvailabilityCostUSD18(
+	lggr logger.Logger,
 	dataAvailabilityFee *big.Int,
 	daConfig cciptypes.DataAvailabilityGasConfig,
 	message cciptypes.Message,
@@ -388,7 +444,11 @@ func computeDataAvailabilityCostUSD18(
 	}
 
 	messageGas := calculateMessageMaxDAGas(message, daConfig)
-	return big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
+	cost := big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
+	lggr.Warnw("computeDataAvailabilityCostUSD18", "messageID", message.Header.MessageID.String(), "messageGas",
+		messageGas, "daConfig", daConfig, "cost", cost)
+
+	return cost
 }
 
 // calculateMessageMaxDAGas calculates the total DA gas needed for a CCIP message
