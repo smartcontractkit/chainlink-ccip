@@ -76,7 +76,6 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	tm := timeMachine{now: messageTimestamp}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-
 	intTest.WithMessages(messages, 1000, messageTimestamp)
 	intTest.WithCustomFeeBoosting(1.0, tm.Now, map[cciptypes.Bytes32]plugintypes.USD18{
 		messages[0].Header.MessageID: plugintypes.NewUSD18(40000),
