@@ -241,6 +241,95 @@ var checkEnvVarsCmd = &cobra.Command{
 	},
 }
 
+// configureCertProvisioningCmd represents the devspace configure-cert-provisioning subcommand
+var configureCertProvisioningCmd = &cobra.Command{
+	Use:   "configure-cert-provisioning",
+	Short: "Provision the certificate for usage with cert-manager in k8s",
+	Args:  cobra.NoArgs,
+	PreRun: func(cmd *cobra.Command, args []string) {
+		if viper.GetString("PROVIDER") != "kind" {
+			logger.Error("this action can only be ran when provider is kind", slog.String("provider", viper.GetString("PROVIDER")))
+			os.Exit(1)
+		}
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
+
+		configFlags := genericclioptions.NewConfigFlags(true)
+		kubeconfig := viper.GetString("KUBECONFIG")
+		configFlags.KubeConfig = &kubeconfig
+		k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+		if err != nil {
+			logger.Error("failed to initialize kube client", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		caCert, err := wrappers.NewCACert(k8sClient)
+		if err != nil {
+			logger.Error("failed to initialize CA cert", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		secretName := "mkcert-ca-key-pair"
+		secretNamespace := "cert-manager"
+		alreadyExistingSecret, err := caCert.EnsureCertManagerSecret(context.TODO(), secretName, secretNamespace)
+		if err != nil {
+			logger.Error("failed to ensure cert-manager secret", slog.Any("error", err))
+			os.Exit(1)
+		}
+		logger.Info("cert-manager secret in place",
+			slog.String("name", secretName),
+			slog.String("namespace", secretNamespace),
+			slog.Bool("already_existing", alreadyExistingSecret),
+		)
+
+		clusterIssuerName := "mkcert-issuer"
+		clusterIssuerNamespace := "cert-manager"
+		if err := caCert.EnsureCAClusterIssuer(context.TODO(), secretName, clusterIssuerName, clusterIssuerNamespace); err != nil {
+			logger.Error("failed to ensure cert-manager ClusterIssuer", slog.Any("error", err))
+			os.Exit(1)
+		}
+		logger.Info("cert-manager ClusterIssuer in place",
+			slog.String("name", clusterIssuerName),
+			slog.String("namespace", clusterIssuerNamespace),
+		)
+	},
+}
+
+// purgeKindCmd represents the devspace purge-kind subcommand
+var purgeKindCmd = &cobra.Command{
+	Use:   "purge-kind",
+	Short: "Delete the kind cluster and its associated resources",
+	Args:  cobra.MaximumNArgs(1),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		if viper.GetString("PROVIDER") != "kind" {
+			logger.Error("this action can only be ran when provider is kind", slog.String("provider", viper.GetString("PROVIDER")))
+			os.Exit(1)
+		}
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
+
+		dockerCli, err := wrappers.NewDockerCli()
+		if err != nil {
+			logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		kindClusterName := wrappers.DefaultClusterName
+		if len(args) > 0 {
+			kindClusterName = args[0]
+		}
+
+		kindCluster := wrappers.NewKindCluster(kindClusterName, nil, dockerCli, nil, viper.GetString("KUBECONFIG"), wrappers.DefaultRegistryName, nil, nil)
+		if err := kindCluster.Delete(); err != nil {
+			logger.Error("failed to delete kind cluster", slog.Any("error", err))
+			os.Exit(1)
+		}
+		logger.Info("kind cluster deleted", slog.String("name", kindClusterName))
+	},
+}
+
 //nolint:gochecknoinits
 func init() {
 	rootCmd.AddCommand(devspaceCmd)
@@ -256,4 +345,6 @@ func init() {
 
 	devspaceCmd.AddCommand(ensureNamespaceCmd)
 	devspaceCmd.AddCommand(checkEnvVarsCmd)
+	devspaceCmd.AddCommand(configureCertProvisioningCmd)
+	devspaceCmd.AddCommand(purgeKindCmd)
 }

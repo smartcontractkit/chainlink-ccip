@@ -72,12 +72,14 @@ func SetupKeystoneKindCrib(ctx context.Context, config StartCmdConfig) error {
 		// NOTE: This uses a different set of envionment variables compared to the PurgeKindCluster function
 		// This is because the PurgeKindCluster function is meant to be used as a standalone function
 		// and shouldn't depend on the environment variables set by the StartCmdConfig
+		// TODO: update since manage_kind.sh will no longer exist
 		err = executeCommand(ctx, filepath.Join(gitRoot, "scripts"), env, "./manage_kind.sh", "purge")
 		if err != nil {
 			return fmt.Errorf("failed to purge kind cluster: %w", err)
 		}
 	}
 
+	// TODO: update since manage_kind.sh will no longer exist
 	err = executeCommand(ctx, filepath.Join(gitRoot, "scripts"), env, "./manage_kind.sh")
 	if err != nil {
 		return fmt.Errorf("failed to setup kind cluster: %w", err)
@@ -375,6 +377,7 @@ func PurgeKindCluster() error {
 	}
 	env := getBaseEnvVars()
 
+	// TODO: update since manage_kind.sh will no longer exist
 	err = executeCommand(ctx, filepath.Join(gitRoot, "scripts"), env, "./manage_kind.sh", "purge")
 	if err != nil {
 		return fmt.Errorf("failed to purge kind cluster: %w", err)

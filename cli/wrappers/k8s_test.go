@@ -22,11 +22,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-// CheckAccess(ctx context.Context) error
-// EnsureNamespaceExists(ctx context.Context, name string) (bool, error)
-// WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error
-
-// NewK8sClient(configFlags *genericclioptions.ConfigFlags)
 func TestNewK8sClient(t *testing.T) {
 	t.Parallel()
 
@@ -261,6 +256,102 @@ func TestK8sClient_WaitForResource(t *testing.T) {
 			require.NoError(t, err)
 
 			err = k8sClient.WaitForResource(context.TODO(), mockResourceClient, "test-resource", interval, timeout)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestK8sClient_ApplyConfigMap(t *testing.T) {
+	t.Parallel()
+
+	name := "test-configmap"
+	namespace := "test-namespace"
+	configMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"key": "value",
+		},
+	}
+
+	testCases := []struct {
+		name                     string
+		applyConfigMapsMockCalls func(*k8smocks.ConfigMapInterface)
+		expectedExists           bool
+		expectedErr              string
+	}{
+		{
+			name: "ConfigMapExists",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, nil)
+				m.EXPECT().Update(context.TODO(), configMap, metav1.UpdateOptions{}).Return(&v1.ConfigMap{}, nil)
+			},
+			expectedExists: true,
+			expectedErr:    "",
+		},
+		{
+			name: "ConfigMapWithK8sError",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewAlreadyExists(v1.Resource("configmap"), name))
+				m.EXPECT().Update(context.TODO(), configMap, metav1.UpdateOptions{}).Return(&v1.ConfigMap{}, errors.New("update error"))
+			},
+			expectedExists: true,
+			expectedErr:    "failed to update configmap test-configmap in namespace test-namespace: update error",
+		},
+		{
+			name: "ConfigMapDoesNotExistAndCreateSucceeds",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewNotFound(v1.Resource("configmap"), name))
+				m.EXPECT().Create(context.TODO(), configMap, metav1.CreateOptions{}).Return(&v1.ConfigMap{}, nil)
+			},
+			expectedExists: false,
+			expectedErr:    "",
+		},
+		{
+			name: "ConfigMapDoesNotExistAndCreateFails",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewNotFound(v1.Resource("configmap"), name))
+				m.EXPECT().Create(context.TODO(), configMap, metav1.CreateOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewServiceUnavailable("server says no"))
+			},
+			expectedExists: false,
+			expectedErr:    "failed to create configmap test-configmap in namespace test-namespace: server says no",
+		},
+		{
+			name: "GetConfigMapError",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, errors.New("get error"))
+			},
+			expectedExists: false,
+			expectedErr:    "failed to get configmap test-configmap in namespace test-namespace: get error",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockConfigMaps := k8smocks.NewConfigMapInterface(t)
+			tt.applyConfigMapsMockCalls(mockConfigMaps)
+
+			mockCoreV1 := k8smocks.NewCoreV1Interface(t)
+			mockCoreV1.EXPECT().ConfigMaps(namespace).Return(mockConfigMaps)
+
+			mockClientset := wrappermocks.NewK8sClientset(t)
+			mockClientset.EXPECT().CoreV1().Return(mockCoreV1)
+
+			configFlags := &genericclioptions.ConfigFlags{}
+			k8sClient, err := wrappers.NewK8sClient(configFlags, mockClientset)
+			require.NoError(t, err)
+
+			exists, err := k8sClient.ApplyConfigMap(context.TODO(), configMap)
+			assert.Equal(t, tt.expectedExists, exists)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
 			} else {

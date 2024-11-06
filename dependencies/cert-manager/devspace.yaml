@@ -1,0 +1,30 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments cert-manager
+
+deployments:
+  cert-manager:
+    helm:
+      chart:
+        name: cert-manager
+        repo: https://charts.jetstack.io
+        version: v1.16.1
+      values:
+        crds:
+          enabled: true
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app: "cert-manager"
+    events: ["after:deploy:cert-manager"]
+  - command: crib
+    args: ["devspace", "configure-cert-provisioning"]
+    events: ["after:deploy:cert-manager"]

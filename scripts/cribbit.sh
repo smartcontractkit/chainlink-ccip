@@ -65,12 +65,9 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 
 	##
 	# Deploy Kind cluster
+	# Now, done by crib init. Keeping this for backwards compatibility.
 	##
 	if [ "$PROVIDER" = "kind" ]; then
-		# Execute the manage_kind.sh script
-		"${repo_root}/scripts/manage_kind.sh"
-
-		echo "Configured sucessfully"
 		export SETUP_EKS_CONFIG=false
 	fi
 fi

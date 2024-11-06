@@ -14,16 +14,19 @@ import (
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd/api"
+	crk8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type K8sCLI interface {
 	Clientset() K8sClientset
 	ClientConfig() *api.Config
+	ControllerRuntimeClient(opts crk8sclient.Options) (crk8sclient.Client, error)
 	RestConfig() *rest.Config
 	CurrentContext() string
 	CheckAccess(ctx context.Context) error
 	EnsureNamespaceExists(ctx context.Context, name string) (bool, error)
 	WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error
+	ApplyConfigMap(ctx context.Context, configMap *corev1api.ConfigMap) (bool, error)
 }
 
 type K8sClientset interface {
@@ -34,6 +37,7 @@ type K8sClient struct {
 	clientGetter genericclioptions.RESTClientGetter
 	clientset    K8sClientset
 	clientConfig *api.Config
+	crk8sClient  crk8sclient.Client
 	restConfig   *rest.Config
 }
 
@@ -77,6 +81,19 @@ func (k *K8sClient) RestConfig() *rest.Config {
 	return k.restConfig
 }
 
+func (k *K8sClient) ControllerRuntimeClient(opts crk8sclient.Options) (crk8sclient.Client, error) {
+	if k.crk8sClient != nil {
+		return k.crk8sClient, nil
+	}
+
+	crk8sClient, err := crk8sclient.New(k.restConfig, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create controller-runtime k8s client: %w", err)
+	}
+	k.crk8sClient = crk8sClient
+	return k.crk8sClient, nil
+}
+
 func (k *K8sClient) CurrentContext() string {
 	return k.clientConfig.CurrentContext
 }
@@ -94,7 +111,7 @@ func (k *K8sClient) EnsureNamespaceExists(ctx context.Context, name string) (boo
 	if err == nil || errors.IsAlreadyExists(err) {
 		return true, nil
 	}
-	if err != nil && !errors.IsNotFound(err) {
+	if !errors.IsNotFound(err) {
 		return false, fmt.Errorf("failed to get namespace %s: %w", name, err)
 	}
 
@@ -132,4 +149,28 @@ func (k *K8sClient) WaitForResource(ctx context.Context, resourceClient dynamic.
 			}
 		}
 	}
+}
+
+// ApplyConfigMap applies a ConfigMap to the cluster.
+// Returns a boolean indicating if the ConfigMap was updated instead of created.
+func (k *K8sClient) ApplyConfigMap(ctx context.Context, configMap *corev1api.ConfigMap) (bool, error) {
+	cmClient := k.clientset.CoreV1().ConfigMaps(configMap.Namespace)
+	existingConfigMap, err := cmClient.Get(ctx, configMap.Name, metav1.GetOptions{})
+
+	if err != nil && (!errors.IsNotFound(err) && !errors.IsAlreadyExists(err)) {
+		return false, fmt.Errorf("failed to get configmap %s in namespace %s: %w", configMap.Name, configMap.Namespace, err)
+	}
+
+	if err == nil || errors.IsAlreadyExists(err) {
+		configMap.ResourceVersion = existingConfigMap.ResourceVersion
+		if _, errUpdate := cmClient.Update(ctx, configMap, metav1.UpdateOptions{}); errUpdate != nil {
+			return true, fmt.Errorf("failed to update configmap %s in namespace %s: %w", configMap.Name, configMap.Namespace, errUpdate)
+		}
+		return true, nil
+	}
+
+	if _, errCreate := cmClient.Create(ctx, configMap, metav1.CreateOptions{}); errCreate != nil {
+		return false, fmt.Errorf("failed to create configmap %s in namespace %s: %w", configMap.Name, configMap.Namespace, errCreate)
+	}
+	return false, nil
 }
