@@ -26,13 +26,23 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Display Go version
         run: go version
+      - name: Get the chainlink commit sha from PR description, if applicable
+        id: get_chainlink_sha
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            COMMIT_SHA=$(echo "${{ github.event.pull_request.body }}" | grep -oP 'chainlink ref: \K[0-9a-f]{40}')
+            echo "::set-output name=sha::$COMMIT_SHA"
+          else
+            # Use develop branch by default if not specified or not running in PR.
+            echo "::set-output name=sha::develop"
+          fi
       - name: Clone Chainlink repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
         with:
           repository: smartcontractkit/chainlink
-          ref: develop
+          ref: ${{ steps.get_chainlink_sha.outputs.sha }}
           path: chainlink
-      - name: Get the correct commit SHA via GitHub API
+      - name: Get the correct chainlink-ccip commit SHA via GitHub API
         id: get_sha
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
