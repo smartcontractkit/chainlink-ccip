@@ -157,30 +157,23 @@ delete_docker_registry() {
 	fi
 }
 
-# Install cert manager component to automate generating self signed TLS certs with local CA
-install_cert_manager() {
-	echo "Install cert manager using jetstack helm chart"
-	helm repo add jetstack https://charts.jetstack.io --force-update
-	helm install \
-		cert-manager jetstack/cert-manager \
-		--namespace cert-manager \
-		--create-namespace \
-		--version v1.16.1 \
-		--set crds.enabled=true
-}
-
 # Generate CA (Certificate authority)
 # Setup is Based on https://dischord.org/2024/05/18/trusted-local-tls-certificates-with-mkcert-and-kubernetes/
-generate_certs() {
+configure_cert_provisioning() {
 	echo "Install the local CA in the system trust store."
 	mkcert -install
 
-	echo "Create secret with CA"
-	kubectl create secret tls mkcert-ca-key-pair \
-		--key "$(mkcert -CAROOT)"/rootCA-key.pem \
-		--cert "$(mkcert -CAROOT)"/rootCA.pem -n cert-manager
+	if kubectl -n cert-manager get secret mkcert-ca-key-pair; then
+		echo "mkcert-ca-key-pair secret already exists."
+	else
+		echo "Create secret with CA."
+		kubectl -n cert-manager \
+			create secret tls mkcert-ca-key-pair \
+			--key "$(mkcert -CAROOT)"/rootCA-key.pem \
+			--cert "$(mkcert -CAROOT)"/rootCA.pem
+	fi
 
-	echo "Create ClusterIssuer"
+	echo "Create ClusterIssuer."
 	kubectl apply -f - <<EOF
   apiVersion: cert-manager.io/v1
   kind: ClusterIssuer
@@ -191,6 +184,34 @@ generate_certs() {
     ca:
       secretName: mkcert-ca-key-pair
 EOF
+}
+
+# Install cert manager component to automate generating self signed TLS certs with local CA
+install_cert_manager_and_configure_cert_provisioning() {
+	echo "Checking for existing cert manager..."
+
+	# Check if the cert-manager is already installed
+	if helm -n cert-manager list | grep 'cert-manager' | grep 'deployed'; then
+		echo "cert-manager is already installed."
+		return
+	fi
+
+	if helm repo list | grep jetstack; then
+		echo "jetstack helm repo already added. "
+	else
+		echo "Adding jetstack helm repo."
+		helm repo add jetstack https://charts.jetstack.io --force-update
+	fi
+
+	echo "Install cert manager using jetstack helm chart"
+	helm install \
+		cert-manager jetstack/cert-manager \
+		--namespace cert-manager \
+		--create-namespace \
+		--version v1.16.1 \
+		--set crds.enabled=true
+
+	configure_cert_provisioning
 }
 
 # Function to install NGINX ingress controller if it is not already installed
@@ -241,8 +262,7 @@ main() {
 	document_local_registry
 	install_prometheus_crds
 	install_ingress_controller
-	install_cert_manager
-	generate_certs
+	install_cert_manager_and_configure_cert_provisioning
 
 	echo "Kubernetes cluster deployed and configured successfully"
 }
