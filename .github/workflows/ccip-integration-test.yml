@@ -26,16 +26,26 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Display Go version
         run: go version
+      - name: Fetch latest pull request data
+        id: fetch_pr_data
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const pr = await github.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            return pr.data.body;
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment="${{ github.event.pull_request.body }}"
+            comment="${{ steps.fetch_pr_data.outputs.result }}"
             echo $comment
             core_ref="$(echo "$comment" | grep -oP 'core ref: \K\S+' || true)"
             echo "::set-output name=ref::$core_ref"
           else
-            # Use develop branch by default if not specified or not running in PR.
             echo "::set-output name=ref::develop"
           fi
       - name: Clone Chainlink repo
