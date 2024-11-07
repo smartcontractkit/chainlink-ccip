@@ -6,6 +6,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -14,6 +15,8 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -31,6 +34,11 @@ import (
 // maxReportSizeBytes that should be returned as an execution report payload.
 const maxReportSizeBytes = 250_000
 
+const (
+	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	transmissionDelayMultiplier = 3 * time.Second
+)
+
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -39,11 +47,12 @@ type Plugin struct {
 	destChain    cciptypes.ChainSelector
 
 	// providers
-	ccipReader  readerpkg.CCIPReader
-	reportCodec cciptypes.ExecutePluginCodec
-	msgHasher   cciptypes.MessageHasher
-	homeChain   reader.HomeChain
-	discovery   *discovery.ContractDiscoveryProcessor
+	ccipReader   readerpkg.CCIPReader
+	reportCodec  cciptypes.ExecutePluginCodec
+	msgHasher    cciptypes.MessageHasher
+	homeChain    reader.HomeChain
+	discovery    *discovery.ContractDiscoveryProcessor
+	chainSupport plugincommon.ChainSupport
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
@@ -95,6 +104,13 @@ func NewPlugin(
 			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
+		),
+		chainSupport: plugincommon.NewCCIPChainSupport(
+			lggr,
+			homeChain,
+			oracleIDToP2pID,
+			reportingCfg.OracleID,
+			destChain,
 		),
 	}
 }
@@ -254,11 +270,25 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
 
+	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
+		p.chainSupport,
+		maps.Keys(p.oracleIDToP2pID),
+		transmissionDelayMultiplier,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get transmission schedule: %w", err)
+	}
+	p.lggr.Debugw("transmission schedule override",
+		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
+
 	report := []ocr3types.ReportPlus[[]byte]{
-		{ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-			Report: encoded,
-			Info:   nil,
-		}},
+		{
+			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
+				Report: encoded,
+				Info:   nil,
+			},
+			TransmissionScheduleOverride: transmissionSchedule,
+		},
 	}
 
 	return report, nil

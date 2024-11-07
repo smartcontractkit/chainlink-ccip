@@ -5,13 +5,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+)
+
+const (
+	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	transmissionDelayMultiplier = 3 * time.Second
 )
 
 // ReportInfo is the info data that will be sent with the along with the report
@@ -84,12 +92,24 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("encode report info: %w", err)
 	}
 
+	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
+		p.chainSupport,
+		maps.Keys(p.oracleIDToP2PID),
+		transmissionDelayMultiplier,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get transmission schedule: %w", err)
+	}
+	p.lggr.Debugw("transmission schedule override",
+		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2PID)
+
 	return []ocr3types.ReportPlus[[]byte]{
 		{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
 				Report: encodedReport,
 				Info:   infoBytes,
 			},
+			TransmissionScheduleOverride: transmissionSchedule,
 		},
 	}, nil
 }
