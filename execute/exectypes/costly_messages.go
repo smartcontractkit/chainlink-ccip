@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -123,6 +124,9 @@ func (o *CCIPCostlyMessageObserver) Observe(
 			o.lggr.Warnw("message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
+		} else {
+			o.lggr.Warnw("message is not too costly to execute", "messageID",
+				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 		}
 	}
 
@@ -399,6 +403,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	nativeTokenPrices := c.ccipReader.GetWrappedNativeTokenPriceUSD(
 		ctx,
 		[]cciptypes.ChainSelector{destChainSelector})
+	c.lggr.Warnw("getFeesUSD18", "nativeTokenPrices", nativeTokenPrices)
 	if nativeTokenPrices == nil {
 		return nil, nil, fmt.Errorf("unable to get native token prices")
 	}
@@ -406,18 +411,11 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	if !ok {
 		return nil, nil, fmt.Errorf("missing native token price for chain %s", destChainSelector)
 	}
+	c.lggr.Warnw("getFeesUSD18", "nativeTokenPrice", nativeTokenPrice)
+	executionFee := mathslib.CalculateUsdPerUnitGas(feeComponents.ExecutionFee, nativeTokenPrice.Int)
+	dataAvailabilityFee := mathslib.CalculateUsdPerUnitGas(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
-	if (feeComponents.ExecutionFee).Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0), big.NewInt(0), nil
-	}
-	executionFee := new(big.Int).Div(nativeTokenPrice.Int, feeComponents.ExecutionFee)
-
-	if (feeComponents.DataAvailabilityFee).Cmp(big.NewInt(0)) == 0 {
-		return executionFee, big.NewInt(0), nil
-	}
-	dataAvailabilityFee := new(big.Int).Div(nativeTokenPrice.Int, feeComponents.DataAvailabilityFee)
-
-	c.lggr.Warnw("execution fee", "nativeTokenPrice", nativeTokenPrice,
+	c.lggr.Warnw("getFeesUSD18", "nativeTokenPrice", nativeTokenPrice,
 		"feeComponents.ExecutionFee", feeComponents.ExecutionFee, "feeComponents.DataAvailabilityFee",
 		feeComponents.DataAvailabilityFee, "executionFee", executionFee, "dataAvailabilityFee", dataAvailabilityFee)
 
