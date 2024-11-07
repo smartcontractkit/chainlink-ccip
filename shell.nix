@@ -36,6 +36,7 @@ mkShell' {
     devspace
     kubectl
     kubernetes-helm
+    mkcert
 
     # gofuzz
   ] ++ lib.optionals stdenv.isLinux [

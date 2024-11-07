@@ -157,6 +157,42 @@ delete_docker_registry() {
 	fi
 }
 
+# Install cert manager component to automate generating self signed TLS certs with local CA
+install_cert_manager() {
+	echo "Install cert manager using jetstack helm chart"
+	helm repo add jetstack https://charts.jetstack.io --force-update
+	helm install \
+		cert-manager jetstack/cert-manager \
+		--namespace cert-manager \
+		--create-namespace \
+		--version v1.16.1 \
+		--set crds.enabled=true
+}
+
+# Generate CA (Certificate authority)
+# Setup is Based on https://dischord.org/2024/05/18/trusted-local-tls-certificates-with-mkcert-and-kubernetes/
+generate_certs() {
+	echo "Install the local CA in the system trust store."
+	mkcert -install
+
+	echo "Create secret with CA"
+	kubectl create secret tls mkcert-ca-key-pair \
+		--key "$(mkcert -CAROOT)"/rootCA-key.pem \
+		--cert "$(mkcert -CAROOT)"/rootCA.pem -n cert-manager
+
+	echo "Create ClusterIssuer"
+	kubectl apply -f - <<EOF
+  apiVersion: cert-manager.io/v1
+  kind: ClusterIssuer
+  metadata:
+    name: mkcert-issuer
+    namespace: cert-manager
+  spec:
+    ca:
+      secretName: mkcert-ca-key-pair
+EOF
+}
+
 # Function to install NGINX ingress controller if it is not already installed
 install_ingress_controller() {
 	local ingress_namespace="ingress-nginx"
@@ -205,6 +241,8 @@ main() {
 	document_local_registry
 	install_prometheus_crds
 	install_ingress_controller
+	install_cert_manager
+	generate_certs
 
 	echo "Kubernetes cluster deployed and configured successfully"
 }
