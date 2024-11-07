@@ -147,15 +147,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	isWriter, err := p.chainSupport.SupportsDestChain(p.oracleID)
-	if err != nil {
-		return false, fmt.Errorf("can't know if it's a writer: %w", err)
-	}
-	if !isWriter {
-		p.lggr.Infow("not a writer, skipping report transmission")
-		return false, nil
-	}
-
 	// we only transmit reports if we are the "active" instance.
 	// we can check this by reading the OCR configs from the home chain.
 	isCandidate, err := p.isCandidateInstance(ctx)
