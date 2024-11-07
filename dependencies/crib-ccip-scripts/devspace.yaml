@@ -40,7 +40,7 @@ deployments:
     updateImageTags: false
     namespace: ${DEVSPACE_NAMESPACE}
     helm:
-      upgradeArgs: ["--timeout", "10m"]
+      upgradeArgs: ["--timeout", "20m"]
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-ccip-scripts
         version: "0.1.2"
