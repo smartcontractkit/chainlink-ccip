@@ -120,6 +120,8 @@ func (o *CCIPCostlyMessageObserver) Observe(
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
 		if fee.Cmp(execCost) < 0 {
+			o.lggr.Warnw("message is too costly to execute", "messageID",
+				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		}
 	}
@@ -311,7 +313,8 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 		} else {
 			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
-
+		c.lggr.Warnw("message fee", "messageID", msg.Header.MessageID.String(), "fee", feeUSD18,
+			"linkPriceUSD", linkPriceUSD, "feeValueJuels", msg.FeeValueJuels)
 		messageFees[msg.Header.MessageID] = feeUSD18
 	}
 
@@ -380,7 +383,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 
 	for _, msg := range messages {
 		executionCostUSD18 := c.computeExecutionCostUSD18(executionFee, msg)
-		dataAvailabilityCostUSD18 := computeDataAvailabilityCostUSD18(daFee, daConfig, msg)
+		dataAvailabilityCostUSD18 := c.computeDataAvailabilityCostUSD18(daFee, daConfig, msg)
 		totalCostUSD18 := new(big.Int).Add(executionCostUSD18, dataAvailabilityCostUSD18)
 		messageExecCosts[msg.Header.MessageID] = totalCostUSD18
 	}
@@ -414,6 +417,10 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	}
 	dataAvailabilityFee := new(big.Int).Div(nativeTokenPrice.Int, feeComponents.DataAvailabilityFee)
 
+	c.lggr.Warnw("execution fee", "nativeTokenPrice", nativeTokenPrice,
+		"feeComponents.ExecutionFee", feeComponents.ExecutionFee, "feeComponents.DataAvailabilityFee",
+		feeComponents.DataAvailabilityFee, "executionFee", executionFee, "dataAvailabilityFee", dataAvailabilityFee)
+
 	return executionFee, dataAvailabilityFee, nil
 }
 
@@ -426,11 +433,13 @@ func (c *CCIPMessageExecCostUSD18Calculator) computeExecutionCostUSD18(
 ) plugintypes.USD18 {
 	messageGas := new(big.Int).SetUint64(c.estimateProvider.CalculateMessageMaxGas(message))
 	cost := new(big.Int).Mul(messageGas, executionFee)
+	c.lggr.Warnw("computeExecutionCostUSD18", "messageID", message.Header.MessageID.String(), "messageGas",
+		messageGas, "executionFee", executionFee, "cost", cost)
 	return cost
 }
 
 // computeDataAvailabilityCostUSD18 computes the data availability cost of a message in USD18s.
-func computeDataAvailabilityCostUSD18(
+func (c *CCIPMessageExecCostUSD18Calculator) computeDataAvailabilityCostUSD18(
 	dataAvailabilityFee *big.Int,
 	daConfig cciptypes.DataAvailabilityGasConfig,
 	message cciptypes.Message,
@@ -441,7 +450,8 @@ func computeDataAvailabilityCostUSD18(
 
 	messageGas := calculateMessageMaxDAGas(message, daConfig)
 	cost := big.NewInt(0).Mul(messageGas, dataAvailabilityFee)
-
+	c.lggr.Warnw("computeDataAvailabilityCostUSD18", "messageID", message.Header.MessageID.String(), "messageGas",
+		messageGas, "daConfig", daConfig, "cost", cost)
 	return cost
 }
 
