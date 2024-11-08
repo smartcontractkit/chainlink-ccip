@@ -43,8 +43,8 @@ make generate
 
 ## Development Cycle
 
-In order to keep the `ccip-develop` branch in working condition, we need to make sure the integration test
-[written in the CCIP repo](https://github.com/smartcontractkit/ccip/blob/03ae3bbed0e6020be5fa9be26d03af21f152d7dc/core/capabilities/ccip/ccip_integration_tests/ocr3_node_test.go#L37)
+In order to keep the `main` branch in working condition, we need to make sure the integration tests
+[written in the CCIP repo](https://github.com/smartcontractkit/chainlink/blob/340a6bfdf54745dd1c6d9f322d9c9515c97060bb/deployment/ccip/changeset/initial_deploy_test.go#L19)
 will pass.
 
 As such, part of CI will run this integration test combined with your latest pushed change.
@@ -52,14 +52,12 @@ As such, part of CI will run this integration test combined with your latest pus
 Follow the steps below to ensure that we don't run into any unexpected breakages.
 
 1. Create a PR on chainlink-ccip with the changes you want to make.
-2. CI will run the integration test in the CCIP repo after applying your changes.
+2. CI will run the integration test in the chainlink repo after applying your changes.
 3. If the integration test fails, make sure to fix it first before merging your changes into
-the `ccip-develop` branch of chainlink-ccip. You can do this by:
+the `main` branch of chainlink-ccip. You can do this by:
     - Creating a branch in the CCIP repo and running `go get github.com/smartcontractkit/chainlink-ccip@<your-branch-commit-sha>`.
     - Fixing the build/tests.
-4. Once your ccip PR is approved, merge it.
-5. Go back to your chainlink-ccip PR and re-run the integration test workflow.
-6. Once the integration test passes, merge your chainlink-ccip PR into `ccip-develop`, however do not delete the branch on the remote.
-7. Create a new PR in ccip that points to the newly merged commit in the `ccip-develop` tree and merge that.
-
-[ocr3]: https://github.com/smartcontractkit/libocr/blob/master/offchainreporting2plus/ocr3types/plugin.go#L108
+    - You can specify a particular commit hash on the chainlink repo by adding "core ref: commit sha" to your PR description. See [this](https://github.com/smartcontractkit/chainlink-ccip/pull/307) as an example. If you update the description, manually rerun the workflow.
+4. Once your chainlink-ccip PR is approved, merge it.
+5. Go back to your chainlink PR and bump the chainlink-ccip version to the latest main.
+6. Once the integration test passes, merge your chainlink PR into `develop`.
