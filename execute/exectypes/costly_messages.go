@@ -315,7 +315,8 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			// message will not be executed (as it will be considered too costly).
 			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
-			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
+			c.lggr.Warnw("message timestamp", "messageID", msg.Header.MessageID, "timestamp", timestamp)
+			feeUSD18 = waitBoostedFee(c.lggr, c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 		c.lggr.Warnw("message fee", "messageID", msg.Header.MessageID.String(), "fee", feeUSD18,
 			"linkPriceUSD", linkPriceUSD, "feeValueJuels", msg.FeeValueJuels)
@@ -331,11 +332,13 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 // At the same time, messages that are slightly underpaid will start going through after waiting for a little bit.
 //
 // wait_boosted_fee(m) = (1 + (now - m.send_time).hours * RELATIVE_BOOST_PER_WAIT_HOUR) * fee(m)
-func waitBoostedFee(waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHour float64) *big.Int {
+func waitBoostedFee(lggr logger.Logger, waitTime time.Duration, fee *big.Int, relativeBoostPerWaitHour float64) *big.Int {
 	k := 1.0 + waitTime.Hours()*relativeBoostPerWaitHour
 
 	boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(fee))
 	res, _ := boostedFee.Int(nil)
+
+	lggr.Warnw("waitBoostedFee", "feeBefore", fee, "waitTime", waitTime, "feeAfter", res)
 
 	return res
 }
@@ -416,8 +419,10 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	dataAvailabilityFee := mathslib.CalculateUsdPerUnitGas(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
 	c.lggr.Warnw("getFeesUSD18", "nativeTokenPrice", nativeTokenPrice,
-		"feeComponents.ExecutionFee", feeComponents.ExecutionFee, "feeComponents.DataAvailabilityFee",
-		feeComponents.DataAvailabilityFee, "executionFee", executionFee, "dataAvailabilityFee", dataAvailabilityFee)
+		"feeComponents.ExecutionFee", feeComponents.ExecutionFee,
+		"feeComponents.DataAvailabilityFee", feeComponents.DataAvailabilityFee,
+		"executionFee", executionFee,
+		"dataAvailabilityFee", dataAvailabilityFee)
 
 	return executionFee, dataAvailabilityFee, nil
 }
