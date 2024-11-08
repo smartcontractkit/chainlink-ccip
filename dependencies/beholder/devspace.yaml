@@ -95,7 +95,7 @@ deployments:
             spec:
               containers:
                 - name: beholder-load-tester
-                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:8892c21c79f56a0e924ee653af5599d30464e54c
+                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:qa-latest
                   env:
                     - name: OTEL_COLLECTOR_GRPC_ENDPOINT
                       value: "beholder-otel-collector-agent:4317"
