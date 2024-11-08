@@ -29,6 +29,8 @@ jobs:
       - name: Fetch latest pull request data
         id: fetch_pr_data
         uses: actions/github-script@v6
+        # only run this step if the event is a pull request
+        if: github.event_name == 'pull_request'
         with:
           script: |
             const pr = await github.rest.pulls.get({
