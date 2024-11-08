@@ -47,7 +47,7 @@ pipelines:
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
       wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/instance=beholder-otel-collector-agent
       wait_pod --namespace ${DEVSPACE_NAMESPACE} --label-selector app.kubernetes.io/name=deployment-collector
-      create_deployments beholder-load-tester
+      create_deployments beholder-load-tester-job
   kind:
     run: |-
       run_dependency_pipelines prometheus grafana loki tempo redpanda
@@ -80,68 +80,74 @@ deployments:
             - -otel-exporter-grpc-endpoint
             - beholder-otel-collector-agent:4317
 
-  beholder-load-tester:
-    namespace: ${DEVSPACE_NAMESPACE}
-    helm:
-      chart:
-        name: component-chart
-        repo: https://charts.devspace.sh
-      values:
-        containers:
-          - image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:qa-latest
-            env:
-              - name: OTEL_COLLECTOR_GRPC_ENDPOINT
-                value: "beholder-otel-collector-agent:4317"
-              - name: OTEL_METRICS_READER_INTERVAL
-                value: "${OTEL_METRICS_READER_INTERVAL}"
-              - name: OTEL_TRACE_SAMPLE_RATIO
-                value: "${OTEL_TRACE_SAMPLE_RATIO}"
-              - name: METRICS_ENABLED
-                value: "${METRICS_ENABLED}"
-              - name: METRICS_GAUGE_ATTRIBUTES_COUNT
-                value: "${METRICS_GAUGE_ATTRIBUTES_COUNT}"
-              - name: METRICS_GAUGE_ATTRIBUTES_POOL_COUNT
-                value: "${METRICS_GAUGE_ATTRIBUTES_POOL_COUNT}"
-              - name: METRICS_BYTES_PER_ATTRIBUTE
-                value: "${METRICS_BYTES_PER_ATTRIBUTE}"
-              - name: OTEL_GO_X_CARDINALITY_LIMIT
-                value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
-              - name: TRACES_ENABLED
-                value: "${TRACES_ENABLED}"
-              - name: TRACES_TRACE_DEPTH
-                value: "${TRACES_TRACE_DEPTH}"
-              - name: TRACES_ATTRIBUTES_COUNT
-                value: "${TRACES_ATTRIBUTES_COUNT}"
-              - name: TRACES_BYTES_PER_ATTRIBUTE
-                value: "${TRACES_BYTES_PER_ATTRIBUTE}"
-              - name: CUSTOM_MESSAGES_ENABLED
-                value: "${CUSTOM_MESSAGES_ENABLED}"
-              - name: CUSTOM_MESSAGES_PAYLOAD_BYTES
-                value: "${CUSTOM_MESSAGES_PAYLOAD_BYTES}"
-              - name: SCHEDULE_FROM
-                value: "${SCHEDULE_FROM}"
-              - name: SCHEDULE_INCREASE
-                value: "${SCHEDULE_INCREASE}"
-              - name: SCHEDULE_STEPS
-                value: "${SCHEDULE_STEPS}"
-              - name: SCHEDULE_STEPS_DURATION
-                value: "${SCHEDULE_STEPS_DURATION}"
-              - name: SCHEDULE_PLAIN_DURATION
-                value: "${SCHEDULE_PLAIN_DURATION}"
-              - name: LOKI_TENANT_ID
-                value: "${LOKI_TENANT_ID}"
-              - name: LOKI_URL
-                value: "${LOKI_URL}"
-        podSecurityContext:
-          fsGroup: 65534
-        securityContext:
-          runAsUser: 65534
-          runAsGroup: 65534
-          fsGroup: 65534
-        service:
+  beholder-load-tester-job:
+    kubectl:
+      inlineManifest: |-
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
           name: beholder-load-tester
-          selector:
-            app: beholder-load-tester
+        spec:
+          template:
+            metadata:
+              labels:
+                app: beholder-load-tester
+            spec:
+              containers:
+                - name: beholder-load-tester
+                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:8892c21c79f56a0e924ee653af5599d30464e54c
+                  env:
+                    - name: OTEL_COLLECTOR_GRPC_ENDPOINT
+                      value: "beholder-otel-collector-agent:4317"
+                    - name: OTEL_METRICS_READER_INTERVAL
+                      value: "${OTEL_METRICS_READER_INTERVAL}"
+                    - name: OTEL_TRACE_SAMPLE_RATIO
+                      value: "${OTEL_TRACE_SAMPLE_RATIO}"
+                    - name: METRICS_ENABLED
+                      value: "${METRICS_ENABLED}"
+                    - name: METRICS_NUMBER
+                      value: "${METRICS_NUMBER}"
+                    - name: METRICS_GAUGE_ATTRIBUTES_COUNT
+                      value: "${METRICS_GAUGE_ATTRIBUTES_COUNT}"
+                    - name: METRICS_GAUGE_ATTRIBUTES_POOL_COUNT
+                      value: "${METRICS_GAUGE_ATTRIBUTES_POOL_COUNT}"
+                    - name: METRICS_BYTES_PER_ATTRIBUTE
+                      value: "${METRICS_BYTES_PER_ATTRIBUTE}"
+                    - name: OTEL_GO_X_CARDINALITY_LIMIT
+                      value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
+                    - name: TRACES_ENABLED
+                      value: "${TRACES_ENABLED}"
+                    - name: TRACES_TRACE_DEPTH
+                      value: "${TRACES_TRACE_DEPTH}"
+                    - name: TRACES_ATTRIBUTES_COUNT
+                      value: "${TRACES_ATTRIBUTES_COUNT}"
+                    - name: TRACES_BYTES_PER_ATTRIBUTE
+                      value: "${TRACES_BYTES_PER_ATTRIBUTE}"
+                    - name: CUSTOM_MESSAGES_ENABLED
+                      value: "${CUSTOM_MESSAGES_ENABLED}"
+                    - name: CUSTOM_MESSAGES_PAYLOAD_BYTES
+                      value: "${CUSTOM_MESSAGES_PAYLOAD_BYTES}"
+                    - name: SCHEDULE_FROM
+                      value: "${SCHEDULE_FROM}"
+                    - name: SCHEDULE_INCREASE
+                      value: "${SCHEDULE_INCREASE}"
+                    - name: SCHEDULE_STEPS
+                      value: "${SCHEDULE_STEPS}"
+                    - name: SCHEDULE_STEPS_DURATION
+                      value: "${SCHEDULE_STEPS_DURATION}"
+                    - name: SCHEDULE_PLAIN_DURATION
+                      value: "${SCHEDULE_PLAIN_DURATION}"
+                    - name: LOKI_TENANT_ID
+                      value: "${LOKI_TENANT_ID}"
+                    - name: LOKI_URL
+                      value: "${LOKI_URL}"
+                  securityContext:
+                    runAsUser: 65534
+                    runAsGroup: 65534
+              restartPolicy: OnFailure
+              securityContext:
+                fsGroup: 65534
+          backoffLimit: 4  # Number of retries before considering the job as failed
 
 
   beholder-otel-collector-agent:
@@ -361,6 +367,8 @@ profiles:
             default: "1.0"
           METRICS_ENABLED:
             default: "true"
+          METRICS_NUMBER:
+            default: "1"
           METRICS_GAUGE_ATTRIBUTES_COUNT:
             default: "5"
           METRICS_GAUGE_ATTRIBUTES_POOL_COUNT:
