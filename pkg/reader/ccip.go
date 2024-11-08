@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -480,6 +481,9 @@ func (r *ccipChainReader) Nonces(
 			// TODO: evm only, need to make chain agnostic.
 			// pad the sender slice to 32 bytes from the left
 			sender = slicelib.LeftPadBytes(sender, 32)
+
+			r.lggr.Infow("getting nonce for address",
+				"address", address, "sender", hex.EncodeToString(sender))
 
 			var resp uint64
 			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
