@@ -65,8 +65,12 @@ func (p *processor) Outcome(
 			DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(feeComp.DataAvailabilityFee, usdPerFeeToken.Int),
 		}
 
+		p.lggr.Warnw("Outcome chainFeeUsd", "chainFeeUsd", chainFeeUsd, "chain", chain, "feeComp", feeComp, "usdPerFeeToken", usdPerFeeToken)
+
 		chainFeeUSDPrices[chain] = chainFeeUsd
 	}
+
+	p.lggr.Warnw("Outcome chainFeeUSDPrices", "chainFeeUSDPrices", chainFeeUSDPrices, "consensusObs", consensusObs)
 
 	gasPrices := p.getGasPricesToUpdate(
 		chainFeeUSDPrices,
