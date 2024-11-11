@@ -112,7 +112,7 @@ func (o *backgroundObserver) Observe(
 				tokenDataResults[chainSel][seqNum] = tokenData
 			} else {
 				// token data not in cache for this message, enqueue the message
-				if ok := o.msgQueue.addMsg(msg, 0); ok {
+				if ok := o.msgQueue.enqueue(msg, 0); ok {
 					lggr.Infow("message added to the queue")
 				} else {
 					lggr.Infow("message already exists in the queue")
@@ -164,7 +164,7 @@ func (o *backgroundObserver) worker(id int) {
 		case <-o.msgQueue.newMsgSignalChan:
 			lggr.Debug("new job signal received")
 
-			msg, ok := o.msgQueue.pop()
+			msg, ok := o.msgQueue.dequeue()
 			if !ok {
 				lggr.Debug("nothing to work on, waiting for new job signal")
 				continue
@@ -188,25 +188,25 @@ func (o *backgroundObserver) worker(id int) {
 
 			if err != nil {
 				lggr.Errorw("message observation failed, message pushed again to the queue", "err", err)
-				o.msgQueue.addMsg(msg, o.reprocessInterval)
+				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
 			if _, chainExists := tokenData[msg.Header.SourceChainSelector]; !chainExists {
 				lggr.Errorw("underlying observer did not return token data for the chain")
-				o.msgQueue.addMsg(msg, o.reprocessInterval)
+				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
 			if _, seqExists := tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber]; !seqExists {
 				lggr.Errorw("underlying observer did not return token data for the sequence number")
-				o.msgQueue.addMsg(msg, o.reprocessInterval)
+				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
 			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].SupportedAreReady() {
 				lggr.Infow("token data not ready by the underlying observer, message pushed again to the queue")
-				o.msgQueue.addMsg(msg, o.reprocessInterval)
+				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
@@ -220,7 +220,7 @@ func (o *backgroundObserver) worker(id int) {
 
 }
 
-// msgQueue is a simple in-memory queue that can be used for async message processing.
+// msgQueue is a simple in-memory FIFO queue that can be used for async message processing.
 type msgQueue struct {
 	lggr             logger.Logger
 	msgs             []msgWithInfo
@@ -245,8 +245,8 @@ func newMsgQueue(lggr logger.Logger) *msgQueue {
 	}
 }
 
-// addMsg adds a message to the queue with the given availableAfter duration.
-func (q *msgQueue) addMsg(msg cciptypes.Message, availableAfter time.Duration) bool {
+// enqueue adds a message to the queue with the given availableAfter duration.
+func (q *msgQueue) enqueue(msg cciptypes.Message, availableAfter time.Duration) bool {
 	lggr := logger.With(
 		q.lggr, "msgID", msg.Header.MessageID.String(),
 		"sourceChain", msg.Header.SourceChainSelector.String(),
@@ -255,9 +255,7 @@ func (q *msgQueue) addMsg(msg cciptypes.Message, availableAfter time.Duration) b
 	)
 	lggr.Debug("waiting for the lock before adding msg")
 
-	q.mu.RLock()
 	containsMsg := q.containsMsg(msg)
-	q.mu.RUnlock()
 	if containsMsg {
 		lggr.Debug("message already exists in the queue")
 		return false
@@ -277,8 +275,8 @@ func (q *msgQueue) addMsg(msg cciptypes.Message, availableAfter time.Duration) b
 	return true
 }
 
-// pop returns the first available message from the queue
-func (q *msgQueue) pop() (cciptypes.Message, bool) {
+// dequeue returns the first available message from the queue in a FIFO order.
+func (q *msgQueue) dequeue() (cciptypes.Message, bool) {
 	q.lggr.Debug("waiting for the lock before popping msg")
 
 	q.mu.Lock()
@@ -310,6 +308,9 @@ func (q *msgQueue) pop() (cciptypes.Message, bool) {
 
 // containsMsg returns true if the message is already in the queue
 func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
 	for _, qMsg := range q.msgs {
 		if qMsg.msg.Header.MessageID == msg.Header.MessageID {
 			q.lggr.Debugw("message already exists in the queue", "msg", msg, "qMsg", qMsg)
