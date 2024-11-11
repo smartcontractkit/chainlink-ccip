@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -475,6 +477,13 @@ func (r *ccipChainReader) Nonces(
 			if err != nil {
 				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 			}
+
+			// TODO: evm only, need to make chain agnostic.
+			// pad the sender slice to 32 bytes from the left
+			sender = slicelib.LeftPadBytes(sender, 32)
+
+			r.lggr.Infow("getting nonce for address",
+				"address", address, "sender", hex.EncodeToString(sender))
 
 			var resp uint64
 			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
