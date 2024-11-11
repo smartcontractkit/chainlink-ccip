@@ -13,8 +13,7 @@ import (
 
 // todo
 // 1. Add tests
-// 2. Re-org protection
-// 3. Rate limit on retries
+// 2. Rate limit on retries
 
 type backgroundObserver struct {
 	lggr            logger.Logger
@@ -41,14 +40,18 @@ func NewBackgroundObserver(
 	observeTimeout time.Duration,
 ) TokenDataObserver {
 	o := &backgroundObserver{
-		lggr:            lggr,
-		observer:        observer,
-		numWorkers:      numWorkers,
-		cachedTokenData: newInMemObservationsCache(cacheExpirationInterval, cacheCleanupInterval),
-		msgQueue:        newMsgQueue(logger.Named(lggr, "msgQueue")),
-		wg:              sync.WaitGroup{},
-		done:            make(chan struct{}),
-		observeTimeout:  observeTimeout,
+		lggr:       lggr,
+		observer:   observer,
+		numWorkers: numWorkers,
+		cachedTokenData: newInMemObservationsCache(
+			logger.Named(lggr, "inMemObservationsCache"),
+			cacheExpirationInterval,
+			cacheCleanupInterval,
+		),
+		msgQueue:       newMsgQueue(logger.Named(lggr, "msgQueue")),
+		wg:             sync.WaitGroup{},
+		done:           make(chan struct{}),
+		observeTimeout: observeTimeout,
 	}
 
 	o.startWorkers()
@@ -67,7 +70,7 @@ func (o *backgroundObserver) Observe(
 
 	for chainSel, seqNumToMsg := range observations {
 		for seqNum, msg := range seqNumToMsg {
-			tokenData, exists := o.cachedTokenData.Get(chainSel, seqNum)
+			tokenData, exists := o.cachedTokenData.Get(msg.Header.MessageID)
 			if exists && !tokenData.IsReady() {
 				return nil, fmt.Errorf("internal error, cache contains not ready token data")
 			}
@@ -173,8 +176,7 @@ func (o *backgroundObserver) worker(id int) {
 
 			lggr.Infow("message observation successful, token data cached")
 			o.cachedTokenData.Set(
-				msg.Header.SourceChainSelector,
-				msg.Header.SequenceNumber,
+				msg.Header.MessageID,
 				tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber],
 			)
 		}
@@ -265,8 +267,8 @@ func (q *msgQueue) newJobSignal() <-chan struct{} {
 type inMemTokenDataCache struct {
 	lggr               logger.Logger
 	expirationInterval time.Duration
-	inMemTokenData     map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData
-	expiresAt          map[cciptypes.ChainSelector]map[cciptypes.SeqNum]time.Time
+	inMemTokenData     map[cciptypes.Bytes32]exectypes.MessageTokenData
+	expiresAt          map[cciptypes.Bytes32]time.Time
 	mu                 *sync.RWMutex
 }
 
@@ -279,27 +281,19 @@ func newInMemObservationsCache(
 	c := &inMemTokenDataCache{
 		lggr:               lggr,
 		expirationInterval: expirationInterval,
-		inMemTokenData:     make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData),
-		expiresAt:          make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]time.Time),
+		inMemTokenData:     make(map[cciptypes.Bytes32]exectypes.MessageTokenData),
+		expiresAt:          make(map[cciptypes.Bytes32]time.Time),
 		mu:                 &sync.RWMutex{},
 	}
 	c.runExpirationLoop(cleanupInterval)
 	return c
 }
 
-func (c *inMemTokenDataCache) Get(
-	chainSel cciptypes.ChainSelector,
-	seqNum cciptypes.SeqNum,
-) (exectypes.MessageTokenData, bool) {
+func (c *inMemTokenDataCache) Get(msgID cciptypes.Bytes32) (exectypes.MessageTokenData, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	chainData, ok := c.inMemTokenData[chainSel]
-	if !ok {
-		return exectypes.MessageTokenData{}, false
-	}
-
-	msgData, ok := chainData[seqNum]
+	msgData, ok := c.inMemTokenData[msgID]
 	if !ok {
 		return exectypes.MessageTokenData{}, false
 	}
@@ -307,22 +301,13 @@ func (c *inMemTokenDataCache) Get(
 	return msgData, true
 }
 
-func (c *inMemTokenDataCache) Set(
-	chainSel cciptypes.ChainSelector,
-	seqNum cciptypes.SeqNum,
-	tokenData exectypes.MessageTokenData,
-) {
+func (c *inMemTokenDataCache) Set(msgID cciptypes.Bytes32, tokenData exectypes.MessageTokenData) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, ok := c.inMemTokenData[chainSel]; !ok {
-		c.inMemTokenData[chainSel] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-	}
-
-	c.inMemTokenData[chainSel][seqNum] = tokenData
-	c.expiresAt[chainSel][seqNum] = time.Now().Add(c.expirationInterval).UTC()
-	c.lggr.Debugw("token data cached",
-		"chainSel", chainSel, "seqNum", seqNum, "expiresAt", c.expiresAt[chainSel][seqNum])
+	c.inMemTokenData[msgID] = tokenData
+	c.expiresAt[msgID] = time.Now().Add(c.expirationInterval).UTC()
+	c.lggr.Debugw("token data cached", "msgID", msgID, "expiresAt", c.expiresAt[msgID])
 }
 
 func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
@@ -334,22 +319,19 @@ func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
 			select {
 			case <-ticker.C:
 				func() {
-					// keep the lock while running the expiration check
 					c.mu.Lock()
 					defer c.mu.Unlock()
 
-					for chainSel, seqNums := range c.expiresAt {
-						for seqNum := range seqNums {
-							if c.hasExpired(chainSel, seqNum) {
-								c.lggr.Debugw("token data expired and removed from cache",
-									"chainSel", chainSel,
-									"seqNum", seqNum,
-									"expiresAt", c.expiresAt[chainSel][seqNum],
-									"now", time.Now().UTC(),
-								)
-								delete(c.expiresAt[chainSel], seqNum)
-								delete(c.inMemTokenData[chainSel], seqNum)
-							}
+					for msgID, expiresAt := range c.expiresAt {
+						if c.hasExpired(msgID) {
+							c.lggr.Debugw("token data expired and removed from cache",
+								"msgID", msgID.String(),
+								"expiresAt", expiresAt,
+								"now", time.Now().UTC(),
+							)
+
+							delete(c.inMemTokenData, msgID)
+							delete(c.expiresAt, msgID)
 						}
 					}
 				}()
@@ -358,11 +340,12 @@ func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
 	}()
 }
 
-func (c *inMemTokenDataCache) hasExpired(chainSel cciptypes.ChainSelector, seqNum cciptypes.SeqNum) bool {
-	if chain, chainExists := c.expiresAt[chainSel]; chainExists {
-		if expiresAt, seqExists := chain[seqNum]; seqExists {
-			return time.Now().After(expiresAt)
-		}
+func (c *inMemTokenDataCache) hasExpired(msgID cciptypes.Bytes32) bool {
+	expiresAt, ok := c.expiresAt[msgID]
+	if !ok {
+		// if the data is not in the cache, it is considered expired
+		return true
 	}
-	return false
+
+	return time.Now().UTC().After(expiresAt)
 }
