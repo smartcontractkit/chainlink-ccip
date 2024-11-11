@@ -16,6 +16,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+// nolint:gocyclo // this is a test
 func Test_backgroundObserver(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := mocks.NullLogger
