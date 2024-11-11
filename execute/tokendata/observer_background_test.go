@@ -59,6 +59,9 @@ func Test_backgroundObserver(t *testing.T) {
 					SourceChainSelector: chain,
 					MessageID:           msgID,
 				},
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{},
+				},
 			}
 
 			if msgIDs.Contains(msgID) {
@@ -70,7 +73,15 @@ func Test_backgroundObserver(t *testing.T) {
 
 	tokenDataObservations, err := observer.Observe(ctx, msgObservations)
 	require.NoError(t, err)
-	require.Equal(t, 0, len(tokenDataObservations), "messages only scheduled")
+	require.Equal(t, len(msgObservations), len(tokenDataObservations))
+	for chain, seqNums := range tokenDataObservations {
+		require.Equal(t, len(msgObservations[chain]), len(seqNums))
+		for _, tokenData := range seqNums {
+			for _, td := range tokenData.TokenData {
+				require.Empty(t, td)
+			}
+		}
+	}
 
 	require.Eventually(t, func() bool {
 		tokenDataObservations, err = observer.Observe(ctx, msgObservations)
@@ -90,6 +101,17 @@ func Test_backgroundObserver(t *testing.T) {
 				chain, len(msgs), len(tokenDataObservations[chain]))
 			if len(msgs) != len(tokenDataObservations[chain]) {
 				return false
+			}
+
+			for chain, seqNums := range tokenDataObservations {
+				require.Equal(t, len(msgObservations[chain]), len(seqNums))
+				for _, tokenData := range seqNums {
+					for _, td := range tokenData.TokenData {
+						if td.Data == nil {
+							return false
+						}
+					}
+				}
 			}
 		}
 

@@ -71,6 +71,18 @@ func (o *backgroundObserver) Observe(
 ) (exectypes.TokenDataObservations, error) {
 	tokenDataResults := make(exectypes.TokenDataObservations)
 
+	// initialize the response with non-ready data since we have to respond with the same structure and
+	// number of elements as the input
+	for chainSel, seqNumToMsg := range observations {
+		tokenDataResults[chainSel] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		for seqNum, msg := range seqNumToMsg {
+			tokenDataResults[chainSel][seqNum] = exectypes.MessageTokenData{
+				TokenData: make([]exectypes.TokenData, len(msg.TokenAmounts)),
+			}
+		}
+	}
+
+	// override with the cached data that are ready
 	for chainSel, seqNumToMsg := range observations {
 		for seqNum, msg := range seqNumToMsg {
 			tokenData, exists := o.cachedTokenData.Get(msg.Header.MessageID)
@@ -83,9 +95,6 @@ func (o *backgroundObserver) Observe(
 
 			if exists {
 				// token data exist so include them in the results
-				if _, ok := tokenDataResults[chainSel]; !ok { // initialize this chain if not exists
-					tokenDataResults[chainSel] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-				}
 				lggr.Infow("token data found in cache")
 				tokenDataResults[chainSel][seqNum] = tokenData
 			} else {
