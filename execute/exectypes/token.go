@@ -42,6 +42,16 @@ func (mtd MessageTokenData) IsReady() bool {
 	return true
 }
 
+// SupportedAreReady returns true if all the supported TokenData are ready.
+func (mtd MessageTokenData) SupportedAreReady() bool {
+	for _, td := range mtd.TokenData {
+		if td.Supported && !td.IsReady() {
+			return false
+		}
+	}
+	return true
+}
+
 // Error returns combined errors from all the TokenData children.
 // If message IsReady it must return nil. Keep in mind that errors are not preserved when serializing
 // TokenDataObservations, so this method is only useful for internal processing. Observation fetched from

@@ -86,7 +86,7 @@ func (o *backgroundObserver) Observe(
 	for chainSel, seqNumToMsg := range observations {
 		for seqNum, msg := range seqNumToMsg {
 			tokenData, exists := o.cachedTokenData.Get(msg.Header.MessageID)
-			if exists && !tokenData.IsReady() {
+			if exists && !tokenData.SupportedAreReady() {
 				return nil, fmt.Errorf("internal error, cache contains not ready token data")
 			}
 
@@ -189,7 +189,7 @@ func (o *backgroundObserver) worker(id int) {
 				continue
 			}
 
-			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].IsReady() {
+			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].SupportedAreReady() {
 				lggr.Infow("token data not ready by the underlying observer, message pushed again to the queue")
 				o.msgQueue.addMsg(msg, o.reprocessInterval)
 				continue
