@@ -9,16 +9,16 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func Test_backgroundObserver(t *testing.T) {
 	ctx := tests.Context(t)
-	lggr := logger.Test(t)
+	lggr := mocks.NullLogger
 
 	baseObserver := &NoopTokenDataObserver{}
 	numWorkers := 10
