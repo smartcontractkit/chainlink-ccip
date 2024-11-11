@@ -80,6 +80,13 @@ func Test_validateFChain(t *testing.T) {
 			expErr: true,
 		},
 		{
+			name: "FChain zero",
+			fChain: map[cciptypes.ChainSelector]int{
+				12: 0,
+			},
+			expErr: true,
+		},
+		{
 			name: "FChain valid",
 			fChain: map[cciptypes.ChainSelector]int{
 				12: 6,

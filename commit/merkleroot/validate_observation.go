@@ -147,7 +147,7 @@ func validateRMNRemoteConfig(
 
 func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
 	for chainSelector, f := range fChain {
-		if f < 0 {
+		if f <= 0 {
 			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
 		}
 	}
