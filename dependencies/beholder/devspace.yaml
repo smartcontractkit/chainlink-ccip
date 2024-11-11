@@ -185,8 +185,8 @@ deployments:
           exporters:
             debug:
               verbosity: detailed
-            otlp:
-              endpoint: deployment-collector:4317
+            otlphttp:
+              endpoint: http://deployment-collector:4318
               tls:
                 insecure: true
           service:
@@ -196,13 +196,13 @@ deployments:
             pipelines:
               traces:
                 receivers: [otlp]
-                exporters: [debug, otlp]
+                exporters: [debug, otlphttp]
               metrics:
                 receivers: [otlp]
-                exporters: [debug, otlp]
+                exporters: [debug, otlphttp]
               logs:
                 receivers: [otlp]
-                exporters: [debug, otlp]
+                exporters: [debug, otlphttp]
         ingress:
           enabled: true
           ingressClassName: "alb"
