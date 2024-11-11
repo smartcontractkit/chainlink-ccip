@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 type backgroundObserver struct {
@@ -33,9 +34,12 @@ func NewBackgroundObserver(
 	lggr logger.Logger,
 	observer TokenDataObserver,
 	numWorkers int,
-	cacheExpirationInterval, cacheCleanupInterval time.Duration,
+	cacheExpirationInterval time.Duration,
+	cacheCleanupInterval time.Duration,
 	observeTimeout time.Duration,
 ) TokenDataObserver {
+	doneChan := make(chan struct{})
+
 	o := &backgroundObserver{
 		lggr:       lggr,
 		observer:   observer,
@@ -44,10 +48,11 @@ func NewBackgroundObserver(
 			logger.Named(lggr, "inMemObservationsCache"),
 			cacheExpirationInterval,
 			cacheCleanupInterval,
+			doneChan,
 		),
 		msgQueue:          newMsgQueue(logger.Named(lggr, "msgQueue")),
 		wg:                sync.WaitGroup{},
-		done:              make(chan struct{}),
+		done:              doneChan,
 		observeTimeout:    observeTimeout,
 		reprocessInterval: 5 * time.Second,
 	}
@@ -98,8 +103,14 @@ func (o *backgroundObserver) Observe(
 }
 
 // IsTokenSupported simply forwards the call to the underlying observer.
-func (o *backgroundObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
+func (o *backgroundObserver) IsTokenSupported(
+	sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool {
 	return o.observer.IsTokenSupported(sourceChain, msgToken)
+}
+
+func (o *backgroundObserver) Close() {
+	close(o.done)
+	o.wg.Wait()
 }
 
 func (o *backgroundObserver) startWorkers() {
@@ -289,20 +300,22 @@ type inMemTokenDataCache struct {
 	inMemTokenData     map[cciptypes.Bytes32]exectypes.MessageTokenData
 	expiresAt          map[cciptypes.Bytes32]time.Time
 	mu                 *sync.RWMutex
+	done               chan struct{}
 }
 
 // newInMemObservationsCache initializes an in-memory cache for token data.
 // It uses a background goroutine to periodically check and remove expired data.
 // cleanupInterval specifies the frequency for checking and cleaning up inactive data.
 // Setting a low value is discouraged, as the cleanup process holds a lock.
-func newInMemObservationsCache(
-	lggr logger.Logger, expirationInterval, cleanupInterval time.Duration) *inMemTokenDataCache {
+func newInMemObservationsCache(lggr logger.Logger,
+	expirationInterval, cleanupInterval time.Duration, doneChan chan struct{}) *inMemTokenDataCache {
 	c := &inMemTokenDataCache{
 		lggr:               lggr,
 		expirationInterval: expirationInterval,
 		inMemTokenData:     make(map[cciptypes.Bytes32]exectypes.MessageTokenData),
 		expiresAt:          make(map[cciptypes.Bytes32]time.Time),
 		mu:                 &sync.RWMutex{},
+		done:               doneChan,
 	}
 	c.runExpirationLoop(cleanupInterval)
 	return c
@@ -336,6 +349,9 @@ func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
 
 		for {
 			select {
+			case <-c.done:
+				c.lggr.Debug("expiration loop gracefully stopped")
+				return
 			case <-ticker.C:
 				func() {
 					c.mu.Lock()

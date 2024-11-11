@@ -9,10 +9,11 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 func Test_backgroundObserver(t *testing.T) {
@@ -85,7 +86,8 @@ func Test_backgroundObserver(t *testing.T) {
 		}
 
 		for chain, msgs := range msgObservations {
-			t.Logf("chain: %d, len(msgs): %d, len(tokenDataObservations[chain]): %d", chain, len(msgs), len(tokenDataObservations[chain]))
+			t.Logf("chain: %d, len(msgs): %d, len(tokenDataObservations[chain]): %d",
+				chain, len(msgs), len(tokenDataObservations[chain]))
 			if len(msgs) != len(tokenDataObservations[chain]) {
 				return false
 			}
@@ -120,6 +122,5 @@ func Test_backgroundObserver(t *testing.T) {
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
 	// graceful shutdown
-	close(rawObserver.done)
-	rawObserver.wg.Wait()
+	rawObserver.Close()
 }
