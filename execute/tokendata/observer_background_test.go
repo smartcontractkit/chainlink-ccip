@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -21,7 +21,7 @@ func Test_backgroundObserver(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := mocks.NullLogger
 
-	baseObserver := &NoopTokenDataObserver{}
+	baseObserver := &NoopTokenDataObserver{tokenSupported: true}
 	numWorkers := 10
 	cacheExpirationInterval := 10 * time.Minute
 	cacheCleanupInterval := 15 * time.Minute
@@ -43,8 +43,7 @@ func Test_backgroundObserver(t *testing.T) {
 		observeTimeout,
 	)
 
-	msgIDs := mapset.NewSet[cciptypes.Bytes32]()
-
+	// generate the msg observations
 	msgObservations := exectypes.MessageObservations{}
 	for chain, numMsgs := range msgsPerChain {
 		msgObservations[chain] = make(map[cciptypes.SeqNum]cciptypes.Message, numMsgs)
@@ -61,17 +60,19 @@ func Test_backgroundObserver(t *testing.T) {
 					MessageID:           msgID,
 				},
 				TokenAmounts: []cciptypes.RampTokenAmount{
-					{},
+					{
+						SourcePoolAddress: rand.RandomBytes(32),
+						DestTokenAddress:  rand.RandomBytes(32),
+						ExtraData:         rand.RandomBytes(32),
+						Amount:            cciptypes.NewBigIntFromInt64(123),
+						DestExecData:      nil,
+					},
 				},
 			}
-
-			if msgIDs.Contains(msgID) {
-				t.Fatalf("duplicate msgID: %s", msgID)
-			}
-			msgIDs.Add(msgID)
 		}
 	}
 
+	// call initial Observe and assert that all token data are empty since jobs were just scheduled
 	tokenDataObservations, err := observer.Observe(ctx, msgObservations)
 	require.NoError(t, err)
 	require.Equal(t, len(msgObservations), len(tokenDataObservations))
@@ -79,51 +80,49 @@ func Test_backgroundObserver(t *testing.T) {
 		require.Equal(t, len(msgObservations[chain]), len(seqNums))
 		for _, tokenData := range seqNums {
 			for _, td := range tokenData.TokenData {
-				require.Empty(t, td)
+				require.Equal(t, exectypes.TokenData{Supported: true}, td)
 			}
 		}
 	}
 
+	// call Observe again until all data are present - the NoOp base observer simply sets ready to true
 	require.Eventually(t, func() bool {
 		tokenDataObservations, err = observer.Observe(ctx, msgObservations)
 		require.NoError(t, err)
+
 		// send another request to make sure it's idempotent
 		tokenDataObservations, err = observer.Observe(ctx, msgObservations)
 		require.NoError(t, err)
 
-		t.Logf("len(tokenDataObservations): %d", len(tokenDataObservations))
-		t.Logf("len(msgObservations): %d", len(msgObservations))
+		// make sure all token data observations are present
 		if len(msgObservations) != len(tokenDataObservations) {
 			return false
 		}
-
-		for chain, msgs := range msgObservations {
-			t.Logf("chain: %d, len(msgs): %d, len(tokenDataObservations[chain]): %d",
-				chain, len(msgs), len(tokenDataObservations[chain]))
-			if len(msgs) != len(tokenDataObservations[chain]) {
+		for chain, seqNums := range tokenDataObservations {
+			if len(msgObservations[chain]) != len(seqNums) {
 				return false
 			}
-
-			for chain, seqNums := range tokenDataObservations {
-				require.Equal(t, len(msgObservations[chain]), len(seqNums))
-				for _, tokenData := range seqNums {
-					for _, td := range tokenData.TokenData {
-						if td.Data == nil {
-							return false
-						}
+			for seqNum, tokenData := range seqNums {
+				if len(msgObservations[chain][seqNum].TokenAmounts) != len(tokenData.TokenData) {
+					return false
+				}
+				for _, td := range tokenData.TokenData {
+					if !td.Ready {
+						return false
 					}
 				}
 			}
 		}
-
 		return true
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
-	// test expiration
+	// Test cache ecpiration and expiration loop.
+
 	rawObserver := observer.(*backgroundObserver)
 	// keep only len(chains) messages in the cache
 	msgsToKeep := len(msgsPerChain)
 	i := 0
+	rawObserver.cachedTokenData.mu.Lock()
 	for msgID := range rawObserver.cachedTokenData.inMemTokenData {
 		if i < msgsToKeep {
 			i++
@@ -131,16 +130,14 @@ func Test_backgroundObserver(t *testing.T) {
 		}
 		rawObserver.cachedTokenData.expiresAt[msgID] = time.Now()
 	}
-
+	rawObserver.cachedTokenData.mu.Unlock()
 	// run another expiration loop to remove expired messages
-	rawObserver.cachedTokenData.runExpirationLoop(10 * time.Millisecond)
+	rawObserver.cachedTokenData.runExpirationLoop(time.Millisecond)
 
 	require.Eventually(t, func() bool {
 		rawObserver.cachedTokenData.mu.RLock()
 		totalMsgs := len(rawObserver.cachedTokenData.inMemTokenData)
 		rawObserver.cachedTokenData.mu.RUnlock()
-		t.Logf("totalMsgs: %d", totalMsgs)
-		t.Logf("msgsToKeep: %d", msgsToKeep)
 		return msgsToKeep == totalMsgs
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 

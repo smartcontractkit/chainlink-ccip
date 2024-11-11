@@ -25,7 +25,7 @@ type backgroundObserver struct {
 }
 
 // NewBackgroundObserver initializes an observer that retrieves and caches token data in the background.
-// It uses the provided observer make the actual Observe calls, storing results in memory for efficient access later.
+// It uses the provided observer to make the actual Observe calls, storing results in memory for efficient access later.
 // Goroutines are spawned to process messages concurrently, numWorkers defines how many.
 // cacheExpirationInterval defines for how long in memory token data are considered active.
 // cacheCleanupInterval defines how often to check and cleanup inactive data.
@@ -69,6 +69,12 @@ func (o *backgroundObserver) Observe(
 	_ context.Context,
 	observations exectypes.MessageObservations,
 ) (exectypes.TokenDataObservations, error) {
+	o.lggr.Debug("Observe called",
+		"observations", observations,
+		"cachedTokenData", o.cachedTokenData.size(),
+		"queuedMsgs", o.msgQueue.size(),
+	)
+
 	tokenDataResults := make(exectypes.TokenDataObservations)
 
 	// initialize the response with non-ready data since we have to respond with the same structure and
@@ -79,13 +85,20 @@ func (o *backgroundObserver) Observe(
 			tokenDataResults[chainSel][seqNum] = exectypes.MessageTokenData{
 				TokenData: make([]exectypes.TokenData, len(msg.TokenAmounts)),
 			}
+
+			for i := range msg.TokenAmounts {
+				tokenDataResults[chainSel][seqNum].TokenData[i] = exectypes.TokenData{
+					Ready:     false,
+					Supported: o.IsTokenSupported(chainSel, msg.TokenAmounts[i]),
+				}
+			}
 		}
 	}
 
 	// override with the cached data that are ready
 	for chainSel, seqNumToMsg := range observations {
 		for seqNum, msg := range seqNumToMsg {
-			tokenData, exists := o.cachedTokenData.Get(msg.Header.MessageID)
+			tokenData, exists := o.cachedTokenData.get(msg.Header.MessageID)
 			if exists && !tokenData.SupportedAreReady() {
 				return nil, fmt.Errorf("internal error, cache contains not ready token data")
 			}
@@ -117,11 +130,13 @@ func (o *backgroundObserver) IsTokenSupported(
 	return o.observer.IsTokenSupported(sourceChain, msgToken)
 }
 
+// Close stops the background goroutines and cleans up resources.
 func (o *backgroundObserver) Close() {
 	close(o.done)
 	o.wg.Wait()
 }
 
+// startWorkers starts the worker goroutines that process messages from the queue.
 func (o *backgroundObserver) startWorkers() {
 	o.lggr.Info("waiting for existing (if any) workers to stop")
 	o.wg.Wait()
@@ -196,7 +211,7 @@ func (o *backgroundObserver) worker(id int) {
 			}
 
 			lggr.Infow("message observation successful, token data cached")
-			o.cachedTokenData.Set(
+			o.cachedTokenData.set(
 				msg.Header.MessageID,
 				tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber],
 			)
@@ -230,6 +245,7 @@ func newMsgQueue(lggr logger.Logger) *msgQueue {
 	}
 }
 
+// addMsg adds a message to the queue with the given availableAfter duration.
 func (q *msgQueue) addMsg(msg cciptypes.Message, availableAfter time.Duration) bool {
 	lggr := logger.With(
 		q.lggr, "msgID", msg.Header.MessageID.String(),
@@ -292,6 +308,7 @@ func (q *msgQueue) pop() (cciptypes.Message, bool) {
 	return cciptypes.Message{}, false
 }
 
+// containsMsg returns true if the message is already in the queue
 func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
 	for _, qMsg := range q.msgs {
 		if qMsg.msg.Header.MessageID == msg.Header.MessageID {
@@ -301,6 +318,13 @@ func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
 	}
 
 	return false
+}
+
+// size returns the number of messages in the queue
+func (q *msgQueue) size() int {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return len(q.msgs)
 }
 
 type inMemTokenDataCache struct {
@@ -330,7 +354,8 @@ func newInMemObservationsCache(lggr logger.Logger,
 	return c
 }
 
-func (c *inMemTokenDataCache) Get(msgID cciptypes.Bytes32) (exectypes.MessageTokenData, bool) {
+// get returns the token data for the given message ID if it exists in the cache.
+func (c *inMemTokenDataCache) get(msgID cciptypes.Bytes32) (exectypes.MessageTokenData, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -342,7 +367,8 @@ func (c *inMemTokenDataCache) Get(msgID cciptypes.Bytes32) (exectypes.MessageTok
 	return msgData, true
 }
 
-func (c *inMemTokenDataCache) Set(msgID cciptypes.Bytes32, tokenData exectypes.MessageTokenData) {
+// set stores the token data in memory with the given expiration interval.
+func (c *inMemTokenDataCache) set(msgID cciptypes.Bytes32, tokenData exectypes.MessageTokenData) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -351,6 +377,14 @@ func (c *inMemTokenDataCache) Set(msgID cciptypes.Bytes32, tokenData exectypes.M
 	c.lggr.Debugw("token data cached", "msgID", msgID, "expiresAt", c.expiresAt[msgID])
 }
 
+// size returns the number of cached token data
+func (c *inMemTokenDataCache) size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.inMemTokenData)
+}
+
+// runExpirationLoop is a background goroutine that periodically checks and removes expired data.
 func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(cleanupInterval)
@@ -384,6 +418,7 @@ func (c *inMemTokenDataCache) runExpirationLoop(cleanupInterval time.Duration) {
 	}()
 }
 
+// hasExpired returns true if the data for the given message ID has expired.
 func (c *inMemTokenDataCache) hasExpired(msgID cciptypes.Bytes32) bool {
 	expiresAt, ok := c.expiresAt[msgID]
 	if !ok {

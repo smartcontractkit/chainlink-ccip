@@ -202,7 +202,9 @@ func merge(
 	return base, nil
 }
 
-type NoopTokenDataObserver struct{}
+type NoopTokenDataObserver struct {
+	tokenSupported bool
+}
 
 func (n *NoopTokenDataObserver) Observe(
 	_ context.Context,
@@ -225,5 +227,5 @@ func (n *NoopTokenDataObserver) Observe(
 }
 
 func (n *NoopTokenDataObserver) IsTokenSupported(_ cciptypes.ChainSelector, _ cciptypes.RampTokenAmount) bool {
-	return false
+	return n.tokenSupported
 }
