@@ -13,17 +13,17 @@ import (
 
 // todo
 // 1. Add tests
-// 2. Rate limit on retries
 
 type backgroundObserver struct {
-	lggr            logger.Logger
-	observer        TokenDataObserver
-	numWorkers      int
-	cachedTokenData *inMemTokenDataCache
-	msgQueue        *msgQueue
-	wg              sync.WaitGroup
-	done            chan struct{}
-	observeTimeout  time.Duration
+	lggr              logger.Logger
+	observer          TokenDataObserver
+	numWorkers        int
+	cachedTokenData   *inMemTokenDataCache
+	msgQueue          *msgQueue
+	wg                sync.WaitGroup
+	done              chan struct{}
+	observeTimeout    time.Duration
+	reprocessInterval time.Duration // how long to wait before reprocessing a message
 }
 
 // NewBackgroundObserver initializes an observer that retrieves and caches token data in the background.
@@ -48,10 +48,11 @@ func NewBackgroundObserver(
 			cacheExpirationInterval,
 			cacheCleanupInterval,
 		),
-		msgQueue:       newMsgQueue(logger.Named(lggr, "msgQueue")),
-		wg:             sync.WaitGroup{},
-		done:           make(chan struct{}),
-		observeTimeout: observeTimeout,
+		msgQueue:          newMsgQueue(logger.Named(lggr, "msgQueue")),
+		wg:                sync.WaitGroup{},
+		done:              make(chan struct{}),
+		observeTimeout:    observeTimeout,
+		reprocessInterval: 5 * time.Second,
 	}
 
 	o.startWorkers()
@@ -87,8 +88,7 @@ func (o *backgroundObserver) Observe(
 				tokenDataResults[chainSel][seqNum] = tokenData
 			} else {
 				// token data not in cache for this message, enqueue the message
-
-				if ok := o.msgQueue.addJob(msg); ok {
+				if ok := o.msgQueue.addMsg(msg, 0); ok {
 					lggr.Infow("message added to the queue")
 				} else {
 					lggr.Infow("message already exists in the queue")
@@ -156,25 +156,25 @@ func (o *backgroundObserver) worker(id int) {
 
 			if err != nil {
 				lggr.Errorw("message observation failed, message pushed again to the queue", "err", err)
-				o.msgQueue.addJob(msg)
+				o.msgQueue.addMsg(msg, o.reprocessInterval)
 				continue
 			}
 
 			if _, chainExists := tokenData[msg.Header.SourceChainSelector]; !chainExists {
 				lggr.Errorw("underlying observer did not return token data for the chain")
-				o.msgQueue.addJob(msg)
+				o.msgQueue.addMsg(msg, o.reprocessInterval)
 				continue
 			}
 
 			if _, seqExists := tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber]; !seqExists {
 				lggr.Errorw("underlying observer did not return token data for the sequence number")
-				o.msgQueue.addJob(msg)
+				o.msgQueue.addMsg(msg, o.reprocessInterval)
 				continue
 			}
 
 			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].IsReady() {
 				lggr.Infow("token data not ready by the underlying observer, message pushed again to the queue")
-				o.msgQueue.addJob(msg)
+				o.msgQueue.addMsg(msg, o.reprocessInterval)
 				continue
 			}
 
@@ -191,25 +191,34 @@ func (o *backgroundObserver) worker(id int) {
 // msgQueue is a simple in-memory queue that can be used for async message processing.
 type msgQueue struct {
 	lggr             logger.Logger
-	msgs             []cciptypes.Message
+	msgs             []msgWithInfo
 	mu               *sync.RWMutex
 	newMsgSignalChan chan struct{}
+}
+
+type msgWithInfo struct {
+	msg cciptypes.Message
+	// availableAt is the time when the message can be processed
+	availableAt time.Time
+	// enqueuedAt is the time when the message was added to the queue
+	enqueuedAt time.Time
 }
 
 func newMsgQueue(lggr logger.Logger) *msgQueue {
 	return &msgQueue{
 		lggr:             lggr,
-		msgs:             make([]cciptypes.Message, 0),
+		msgs:             make([]msgWithInfo, 0),
 		mu:               &sync.RWMutex{},
 		newMsgSignalChan: make(chan struct{}),
 	}
 }
 
-func (q *msgQueue) addJob(msg cciptypes.Message) bool {
+func (q *msgQueue) addMsg(msg cciptypes.Message, availableAfter time.Duration) bool {
 	lggr := logger.With(
 		q.lggr, "msgID", msg.Header.MessageID.String(),
 		"sourceChain", msg.Header.SourceChainSelector.String(),
 		"seqNum", msg.Header.SequenceNumber.String(),
+		"availableAfter", availableAfter,
 	)
 	lggr.Debug("waiting for the lock")
 
@@ -222,12 +231,18 @@ func (q *msgQueue) addJob(msg cciptypes.Message) bool {
 		return false
 	}
 
-	q.msgs = append(q.msgs, msg)
+	q.msgs = append(q.msgs, msgWithInfo{
+		msg:         cciptypes.Message{},
+		availableAt: time.Now().Add(availableAfter).UTC(),
+		enqueuedAt:  time.Now().UTC(),
+	})
+
 	q.newMsgSignalChan <- struct{}{}
-	lggr.Debug("message added to the queue, new msg signal sent")
+	lggr.Debug("message added to the queue, new msg signal sent", "numMsgs", len(q.msgs))
 	return true
 }
 
+// pop returns the first available message from the queue
 func (q *msgQueue) pop() (cciptypes.Message, bool) {
 	q.lggr.Debug("waiting for the lock")
 
@@ -241,21 +256,26 @@ func (q *msgQueue) pop() (cciptypes.Message, bool) {
 		return cciptypes.Message{}, false
 	}
 
-	msg := q.msgs[0]
-	q.msgs = q.msgs[1:]
+	for i, msg := range q.msgs {
+		if time.Now().UTC().After(msg.availableAt) {
+			q.lggr.Debugw("message popped from the queue",
+				"msgID", msg.msg.Header.MessageID.String(),
+				"sourceChain", msg.msg.Header.SourceChainSelector.String(),
+				"seqNum", msg.msg.Header.SequenceNumber.String(),
+				"enqueuedSince", time.Since(msg.enqueuedAt),
+				"availableSince", time.Since(msg.availableAt),
+			)
+			q.msgs = append(q.msgs[:i], q.msgs[i+1:]...)
+			return msg.msg, true
+		}
+	}
 
-	q.lggr.Debugw("message popped from the queue",
-		"msgID", msg.Header.MessageID.String(),
-		"sourceChain", msg.Header.SourceChainSelector.String(),
-		"seqNum", msg.Header.SequenceNumber.String(),
-	)
-
-	return msg, true
+	return cciptypes.Message{}, false
 }
 
 func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
 	for _, qMsg := range q.msgs {
-		if qMsg.Header.MessageID == msg.Header.MessageID {
+		if qMsg.msg.Header.MessageID == msg.Header.MessageID {
 			q.lggr.Debugw("message already exists in the queue", "msg", msg, "qMsg", qMsg)
 			return true
 		}
