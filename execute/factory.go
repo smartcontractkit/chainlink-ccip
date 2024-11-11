@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -135,6 +136,15 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
 
+	backgroundTokenDataObserver := tokendata.NewBackgroundObserver(
+		logger.Named(p.lggr, "BackgroundObserver"),
+		baseObserver,
+		10,             /* numWorkers */
+		10*time.Minute, /* cacheExpirationInterval */
+		15*time.Minute, /* cacheCleanupInterval */
+		5*time.Second,  /* observeTimeout */
+	)
+
 	costlyMessageObserver := exectypes.NewCostlyMessageObserverWithDefaults(
 		p.lggr,
 		true,
@@ -153,7 +163,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.execCodec,
 			p.msgHasher,
 			p.homeChainReader,
-			baseObserver,
+			backgroundTokenDataObserver,
 			p.estimateProvider,
 			p.lggr,
 			costlyMessageObserver,
