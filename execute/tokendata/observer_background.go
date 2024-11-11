@@ -75,15 +75,19 @@ func (o *backgroundObserver) Observe(
 				return nil, fmt.Errorf("internal error, cache contains not ready token data")
 			}
 
+			lggr := logger.With(o.lggr, "msgID", msg.Header.MessageID.String(),
+				"sourceChain", chainSel.String(), "seqNum", seqNum.String())
+
 			if exists {
 				// token data exist so include them in the results
 				if _, ok := tokenDataResults[chainSel]; !ok { // initialize this chain if not exists
 					tokenDataResults[chainSel] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 				}
+				lggr.Infow("token data found in cache")
 				tokenDataResults[chainSel][seqNum] = tokenData
 			} else {
 				// token data not in cache for this message, enqueue the message
-				lggr := logger.With(o.lggr, "msgID", msg.Header.MessageID.String())
+
 				if ok := o.msgQueue.addJob(msg); ok {
 					lggr.Infow("message added to the queue")
 				} else {
@@ -202,7 +206,11 @@ func newMsgQueue(lggr logger.Logger) *msgQueue {
 }
 
 func (q *msgQueue) addJob(msg cciptypes.Message) bool {
-	lggr := logger.With(q.lggr, "msgID", msg.Header.MessageID.String())
+	lggr := logger.With(
+		q.lggr, "msgID", msg.Header.MessageID.String(),
+		"sourceChain", msg.Header.SourceChainSelector.String(),
+		"seqNum", msg.Header.SequenceNumber.String(),
+	)
 	lggr.Debug("waiting for the lock")
 
 	q.mu.Lock()
@@ -247,11 +255,7 @@ func (q *msgQueue) pop() (cciptypes.Message, bool) {
 
 func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
 	for _, qMsg := range q.msgs {
-		equals := qMsg.Header.MessageID == msg.Header.MessageID &&
-			qMsg.Header.SourceChainSelector == msg.Header.SourceChainSelector &&
-			qMsg.Header.SequenceNumber == msg.Header.SequenceNumber
-
-		if equals {
+		if qMsg.Header.MessageID == msg.Header.MessageID {
 			q.lggr.Debugw("message already exists in the queue", "msg", msg, "qMsg", qMsg)
 			return true
 		}
