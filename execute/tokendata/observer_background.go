@@ -11,9 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
-// todo
-// 1. Add tests
-
 type backgroundObserver struct {
 	lggr              logger.Logger
 	observer          TokenDataObserver
@@ -129,7 +126,7 @@ func (o *backgroundObserver) worker(id int) {
 		case <-o.done:
 			lggr.Info("worker stopped after receiving done signal")
 			return
-		case <-o.msgQueue.newJobSignal():
+		case <-o.msgQueue.newMsgSignalChan:
 			lggr.Debug("new job signal received")
 
 			msg, ok := o.msgQueue.pop()
@@ -220,36 +217,38 @@ func (q *msgQueue) addMsg(msg cciptypes.Message, availableAfter time.Duration) b
 		"seqNum", msg.Header.SequenceNumber.String(),
 		"availableAfter", availableAfter,
 	)
-	lggr.Debug("waiting for the lock")
+	lggr.Debug("waiting for the lock before adding msg")
 
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	lggr.Debug("lock acquired")
-	if q.containsMsg(msg) {
+	q.mu.RLock()
+	containsMsg := q.containsMsg(msg)
+	q.mu.RUnlock()
+	if containsMsg {
 		lggr.Debug("message already exists in the queue")
 		return false
 	}
 
+	q.mu.Lock()
 	q.msgs = append(q.msgs, msgWithInfo{
-		msg:         cciptypes.Message{},
+		msg:         msg,
 		availableAt: time.Now().Add(availableAfter).UTC(),
 		enqueuedAt:  time.Now().UTC(),
 	})
+	lggr.Debugw("message added to the queue, new msg signal sent", "numMsgs", len(q.msgs))
+	q.mu.Unlock()
 
+	lggr.Debugw("sending to new msg signal channel")
 	q.newMsgSignalChan <- struct{}{}
-	lggr.Debug("message added to the queue, new msg signal sent", "numMsgs", len(q.msgs))
 	return true
 }
 
 // pop returns the first available message from the queue
 func (q *msgQueue) pop() (cciptypes.Message, bool) {
-	q.lggr.Debug("waiting for the lock")
+	q.lggr.Debug("waiting for the lock before popping msg")
 
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	q.lggr.Debug("lock acquired")
+	q.lggr.Debug("lock acquired before popping msg")
 
 	if len(q.msgs) == 0 {
 		q.lggr.Debug("no messages in the queue")
@@ -282,10 +281,6 @@ func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
 	}
 
 	return false
-}
-
-func (q *msgQueue) newJobSignal() <-chan struct{} {
-	return q.newMsgSignalChan
 }
 
 type inMemTokenDataCache struct {
