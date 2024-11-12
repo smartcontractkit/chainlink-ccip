@@ -10,6 +10,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -51,7 +52,8 @@ func (w *Processor) ValidateObservation(
 		return fmt.Errorf("validate OffRampNextSeqNums: %w", err)
 	}
 
-	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain); err != nil {
+	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
+		w.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
 		return fmt.Errorf("validate RMNRemoteConfig: %w", err)
 	}
 
@@ -137,9 +139,42 @@ func validateObservedOffRampMaxSeqNums(
 func validateRMNRemoteConfig(
 	observer commontypes.OracleID,
 	supportsDestChain bool,
+	rmnRemoteConfig types.RemoteConfig,
 ) error {
+	if rmnRemoteConfig.IsEmpty() {
+		return nil
+	}
+
 	if !supportsDestChain {
-		return fmt.Errorf("oracle %d does not support dest chain, but has observed a RMNRemoteConfig", observer)
+		return fmt.Errorf("oracle %d does not support dest chain, but has observed an RMNRemoteConfig", observer)
+	}
+
+	if rmnRemoteConfig.ConfigDigest.IsEmpty() {
+		return fmt.Errorf("empty ConfigDigest")
+	}
+
+	if rmnRemoteConfig.RmnReportVersion.IsEmpty() {
+		return fmt.Errorf("empty RmnReportVersion")
+	}
+
+	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.F+1 {
+		return fmt.Errorf("not enough signers to cover F+1 threshold")
+	}
+
+	if len(rmnRemoteConfig.ContractAddress) == 0 {
+		return fmt.Errorf("empty ContractAddress")
+	}
+
+	seenNodeIndexes := mapset.NewSet[uint64]()
+	for _, signer := range rmnRemoteConfig.Signers {
+		if len(signer.OnchainPublicKey) == 0 {
+			return fmt.Errorf("empty signer OnchainPublicKey")
+		}
+
+		if seenNodeIndexes.Contains(signer.NodeIndex) {
+			return fmt.Errorf("duplicate NodeIndex %d", signer.NodeIndex)
+		}
+		seenNodeIndexes.Add(signer.NodeIndex)
 	}
 
 	return nil

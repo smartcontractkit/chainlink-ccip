@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -183,55 +184,160 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 		name              string
 		observer          commontypes.OracleID
 		supportsDestChain bool
-		expectedError     string
+		rmnRemoteConfig   types.RemoteConfig
+		expectedError     bool
 	}{
 		{
-			name:              "Supports dest chain",
+			name:              "is valid",
 			observer:          1,
 			supportsDestChain: true,
-			expectedError:     "",
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
 		},
 		{
-			name:              "Does not support dest chain",
-			observer:          2,
-			supportsDestChain: false,
-			expectedError:     "oracle 2 does not support dest chain, but has observed a RMNRemoteConfig",
+			name:              "does not support destination chain",
+			observer:          1,
+			supportsDestChain: false, // <--
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
 		},
 		{
-			name:              "Zero observer ID supports dest chain",
-			observer:          0,
-			supportsDestChain: true,
-			expectedError:     "",
-		},
-		{
-			name:              "Zero observer ID does not support dest chain",
-			observer:          0,
-			supportsDestChain: false,
-			expectedError:     "oracle 0 does not support dest chain, but has observed a RMNRemoteConfig",
-		},
-		{
-			name:              "Large observer ID supports dest chain",
+			name:              "empty contract address",
 			observer:          1,
 			supportsDestChain: true,
-			expectedError:     "",
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{}, // <--
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
 		},
 		{
-			name:              "Large observer ID does not support dest chain",
+			name:              "empty config digest",
 			observer:          1,
-			supportsDestChain: false,
-			expectedError:     "oracle 1 does not support dest chain, but has observed a RMNRemoteConfig",
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{}, // <---
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "not enough signers to cover F+1 threshold",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1}, // <----
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "empty rmn report version",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "duplicate signers",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 1}, // <---------
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "empty signer onchain public key",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{}, NodeIndex: 0}, // <-----
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain)
-
-			if tt.expectedError == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.expectedError)
+			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain, tt.rmnRemoteConfig)
+			if tt.expectedError {
+				assert.Error(t, err)
+				return
 			}
+			assert.NoError(t, err)
 		})
 	}
 }
