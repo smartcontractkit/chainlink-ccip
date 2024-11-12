@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	mapset "github.com/deckarep/golang-set/v2"
-
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -54,14 +52,6 @@ func (p *processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	return Query{}, nil
 }
 
-func (p *processor) ValidateObservation(
-	prevOutcome Outcome,
-	query Query,
-	ao plugincommon.AttributedObservation[Observation],
-) error {
-	return validateObservedTokenPrices(ao.Observation.FeedTokenPrices)
-}
-
 func (p *processor) Outcome(
 	ctx context.Context,
 	_ Outcome,
@@ -91,21 +81,6 @@ func (p *processor) Outcome(
 }
 
 func (p *processor) Close() error {
-	return nil
-}
-
-func validateObservedTokenPrices(tokenPrices []cciptypes.TokenPrice) error {
-	tokensWithPrice := mapset.NewSet[cciptypes.UnknownEncodedAddress]()
-	for _, t := range tokenPrices {
-		if tokensWithPrice.Contains(t.TokenID) {
-			return fmt.Errorf("duplicate token price for token: %s", t.TokenID)
-		}
-		tokensWithPrice.Add(t.TokenID)
-
-		if t.Price.IsEmpty() {
-			return fmt.Errorf("token price of token %v must not be empty", t.TokenID)
-		}
-	}
 	return nil
 }
 
