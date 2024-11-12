@@ -1,15 +1,14 @@
 package merkleroot
 
 import (
-	"context"
+	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/libocr/commontypes"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -381,77 +380,81 @@ func Test_validateFChain(t *testing.T) {
 
 func Test_validateMerkleRootsState(t *testing.T) {
 	testCases := []struct {
-		name               string
-		reportSeqNums      []plugintypes.SeqNumChain
-		onchainNextSeqNums []cciptypes.SeqNum
-		expValid           bool
-		expErr             bool
+		name                 string
+		onRampNextSeqNum     []plugintypes.SeqNumChain
+		offRampExpNextSeqNum []cciptypes.SeqNum
+		readerErr            error
+		expErr               bool
 	}{
 		{
 			name: "happy path",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
-			expValid:           true,
-			expErr:             false,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			expErr:               false,
 		},
 		{
 			name: "one root is stale",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
-			expValid:           false,
-			expErr:             false,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
+			expErr:               true,
 		},
 		{
 			name: "one root has gap",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
-			expValid:           false,
-			expErr:             false,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			expErr:               true,
 		},
 		{
 			name: "reader returned wrong number of seq nums",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 200, 300},
-			expValid:           false,
-			expErr:             true,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200, 300},
+			expErr:               true,
+		},
+		{
+			name: "reader error",
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+			},
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			readerErr:            fmt.Errorf("reader error"),
+			expErr:               true,
 		},
 	}
 
-	ctx := context.Background()
-	lggr := logger.Test(t)
-
+	ctx := tests.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := reader_mock.NewMockCCIPReader(t)
 			rep := cciptypes.CommitPluginReport{}
-			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
-			for _, snc := range tc.reportSeqNums {
+			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
+			for _, snc := range tc.onRampNextSeqNum {
 				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
 					ChainSel:     snc.ChainSel,
 					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
 				})
 				chains = append(chains, snc.ChainSel)
 			}
-			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainNextSeqNums, nil)
-			valid, err := ValidateMerkleRootsState(ctx, lggr, rep, reader)
+			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
+
+			err := ValidateMerkleRootsState(ctx, rep.MerkleRoots, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }

@@ -156,12 +156,11 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
-	isValid, err := merkleroot.ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
-	if !isValid {
-		return false, nil
-	}
+	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
 	if err != nil {
-		return false, fmt.Errorf("validate merkle roots state: %w", err)
+		p.lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
+			"err", err, "merkleRoots", decodedReport.MerkleRoots)
+		return false, nil
 	}
 
 	p.lggr.Infow("transmitting report",
