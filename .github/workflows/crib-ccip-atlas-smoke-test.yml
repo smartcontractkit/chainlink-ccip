@@ -136,6 +136,6 @@ jobs:
       - name: Destroy CRIB Environment
         id: destroy
         if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true' && steps.check-prereqs-for-running.outputs.should_run == 'true'
-        uses: smartcontractkit/.github/actions/crib-purge-environment@da1c0099f3bab236660ccc10328a29e06950c69f # crib-purge-environment@0.2.0
+        uses: smartcontractkit/.github/actions/crib-purge-environment@142671bc21953c8cc3edbd21848c50b5ec201c2a # crib-purge-environment@0.3.0
         with:
           namespace: ${{ steps.deploy.outputs.devspace-namespace }}
