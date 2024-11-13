@@ -450,7 +450,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain:    newFeeComponents,
@@ -476,7 +476,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents,
@@ -503,7 +503,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents,
@@ -535,7 +535,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents2,
@@ -567,7 +567,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
-					GetAvailableChainsFeeComponents(params.ctx, mock.Anything).
+					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 							destChain: newFeeComponents2,
@@ -641,7 +641,7 @@ func prepareCcipReaderMock(
 
 	if mockChainFee {
 		ccipReader.EXPECT().
-			GetAvailableChainsFeeComponents(ctx, mock.Anything).
+			GetChainsFeeComponents(ctx, mock.Anything).
 			Return(map[ccipocr3.ChainSelector]types.ChainFeeComponents{}).Maybe()
 		ccipReader.EXPECT().
 			GetWrappedNativeTokenPriceUSD(ctx, mock.Anything).

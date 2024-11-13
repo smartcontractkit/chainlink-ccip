@@ -357,7 +357,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 // GetExpectedNextSequenceNumber implements CCIP.
 func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	sourceChainSelector,
+	destChainSelector cciptypes.ChainSelector,
+) (cciptypes.SeqNum, error) {
 	if destChainSelector != r.destChain {
 		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
 	}
@@ -463,7 +465,8 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
+func (r *ccipChainReader) GetChainsFeeComponents(
+	ctx context.Context,
 	chains []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
@@ -471,7 +474,7 @@ func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
 	for _, chain := range chains {
 		chainWriter, ok := r.contractWriters[chain]
 		if !ok {
-			r.lggr.Warnw("contract writer not found", "chain", chain)
+			r.lggr.Errorw("contract writer not found", "chain", chain)
 			continue
 		}
 		feeComponent, err := chainWriter.GetFeeComponents(ctx)
@@ -487,19 +490,14 @@ func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
 func (r *ccipChainReader) GetDestChainFeeComponents(
 	ctx context.Context,
 ) (types.ChainFeeComponents, error) {
-	chainWriter, ok := r.contractWriters[r.destChain]
+	feeComponents := r.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{r.destChain})
+	components, ok := feeComponents[r.destChain]
 	if !ok {
-		r.lggr.Errorw("dest chain contract writer not found", "chain", r.destChain)
-		return types.ChainFeeComponents{}, errors.New("dest chain contract writer not found")
+		r.lggr.Errorw("dest chain components not found", "chain", r.destChain)
+		return types.ChainFeeComponents{}, errors.New("dest chain fee components not found")
 	}
 
-	feeComponents, err := chainWriter.GetFeeComponents(ctx)
-	if err != nil {
-		r.lggr.Errorw("failed to get dest chain fee components", "chain", r.destChain)
-		return types.ChainFeeComponents{}, err
-	}
-
-	return *feeComponents, nil
+	return components, nil
 }
 
 func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
