@@ -114,6 +114,12 @@ deployments:
                 paths:
                   - path: /
                     pathType: Prefix
+        resources:
+          cpu:
+            cores: 4
+          memory:
+            container:
+              max: 10Gi
 
   beholder-register-schema-job:
     namespace: ${DEVSPACE_NAMESPACE}

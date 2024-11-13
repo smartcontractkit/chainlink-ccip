@@ -145,6 +145,13 @@ deployments:
                   securityContext:
                     runAsUser: 65534
                     runAsGroup: 65534
+                  resources:
+                    requests:
+                      memory: "325Mi"
+                      cpu: "6500m"
+                    limits:
+                      memory: "512Mi"
+                      cpu: "8000m"
               restartPolicy: OnFailure
               securityContext:
                 fsGroup: 65534
@@ -184,7 +191,7 @@ deployments:
                   endpoint: 0.0.0.0:4318
           exporters:
             debug:
-              verbosity: detailed
+              verbosity: normal
             otlphttp:
               endpoint: http://deployment-collector:4318
               tls:
@@ -203,6 +210,13 @@ deployments:
               logs:
                 receivers: [otlp]
                 exporters: [debug, otlphttp]
+        resources:
+          requests:
+            memory: "325Mi"
+            cpu: "1500m"
+          limits:
+            memory: "512Mi"
+            cpu: "2000m"
         ingress:
           enabled: true
           ingressClassName: "alb"
@@ -253,7 +267,7 @@ deployments:
                 kafka_sasl_username: ""
                 schema_registry_url: http://redpanda:8081
               debug:
-                verbosity: detailed
+                verbosity: normal
             processors:
               batch:
                 send_batch_size: 512
@@ -286,28 +300,17 @@ deployments:
             service:
               pipelines:
                 logs:
-                  exporters:
-                    - debug
-                    - beholder_kafka
-                  processors:
-                    - batch
-                  receivers:
-                    - otlp
+                  exporters: [debug, beholder_kafka]
+                  processors: [batch]
+                  receivers: [otlp]
                 metrics:
-                  exporters:
-                    - debug
-#                    - otlphttp
-                  processors:
-                    - batch
-                  receivers:
-                    - otlp
+                  exporters: [debug]
+                  processors: [batch]
+                  receivers: [otlp]
                 traces:
-                  exporters:
-                    - debug
-                  processors:
-                    - batch
-                  receivers:
-                    - otlp
+                  exporters: [debug]
+                  processors: [batch]
+                  receivers: [otlp]
               telemetry:
                 metrics:
                   address: 0.0.0.0:8888
@@ -358,6 +361,37 @@ profiles:
               version: null
 
   - name: load-test
+    merge:
+      deployments:
+        beholder-otel-collector-agent:
+          helm:
+            values:
+              config:
+                service:
+                  pipelines:
+                    traces:
+                      receivers: [ otlp ]
+                      exporters: [ otlphttp ]
+                    metrics:
+                      receivers: [ otlp ]
+                      exporters: [ otlphttp ]
+                    logs:
+                      receivers: [ otlp ]
+                      exporters: [ otlphttp ]
+              resources:
+                requests:
+                  memory: "325Mi"
+                  cpu: "1500m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "2000m"
+
+
+        beholder-otel-collector-gateway:
+          helm:
+            values:
+              deployment:
+                replicas: 1
     patches:
       - op: add
         path: vars
