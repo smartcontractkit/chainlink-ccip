@@ -30,12 +30,14 @@ packages:
         interfaces:
             Extended:
             ContractReaderFacade:
-    github.com/smartcontractkit/chainlink-ccip/pkg/contractwriter:
-        interfaces:
-            ContractWriterFacade:
     github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3:
         interfaces:
             ExecutePluginCodec:
+    github.com/smartcontractkit/chainlink-common/pkg/types:
+            interfaces:
+                ChainWriter:
+                    config:
+                        dir: mocks/chainlink_common/
     github.com/smartcontractkit/libocr/networking:
         interfaces:
             PeerGroupFactory:

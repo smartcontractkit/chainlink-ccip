@@ -21,8 +21,8 @@ import (
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
-	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractwriter"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -922,7 +922,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_HappyPath(t *testing.T) {
-	cw := writer_mocks.NewMockContractWriterFacade(t)
+	cw := writer_mocks.NewMockChainWriter(t)
 	cw.EXPECT().GetFeeComponents(mock.Anything).Return(
 		&types.ChainFeeComponents{
 			ExecutionFee:        big.NewInt(1),
@@ -958,7 +958,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
-	cw := writer_mocks.NewMockContractWriterFacade(t)
+	cw := writer_mocks.NewMockChainWriter(t)
 	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
 	// Missing writer for dest chain chainC
 	contractWriters[chainA] = cw
