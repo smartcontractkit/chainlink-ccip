@@ -39,8 +39,8 @@ pullSecrets:
 pipelines:
   ci-e2e-test:
     run: |-
-      run_dependency_pipelines redpanda
-      create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway
+      run_dependency_pipelines redpanda cp-kafka-rest
+      create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway cp-kafka-rest
   load-test:
     run: |-
       run_dependency_pipelines redpanda
@@ -334,6 +334,42 @@ deployments:
           enabled: false
         clusterRoleBinding:
           enabled: false
+
+  cp-kafka-rest:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: confluentinc/cp-kafka-rest:6.1.0
+            env:
+              - name: KAFKA_REST_DEBUG
+                value: "true"
+              - name: KAFKA_REST_HOST_NAME
+                value: "cp-kafka-rest"
+              - name: KAFKA_REST_BOOTSTRAP_SERVERS
+                value: "PLAINTEXT://redpanda:9093"
+              - name: KAFKA_REST_LISTENERS
+                value: "http://0.0.0.0:8082"
+              - name: KAFKA_REST_CLIENT_SECURITY_PROTOCOL
+                value: "PLAINTEXT"
+              - name: KAFKA_REST_SCHEMA_REGISTRY_URL
+                value: "http://redpanda:8081"
+            resources:
+              limits:
+                memory: '400M'
+                cpu: '0.2'
+        service:
+          ports:
+            - port: 8082
+        podSecurityContext:
+          fsGroup: 999
+        securityContext:
+          runAsUser: 999
+          runAsGroup: 999
+          fsGroup: 999
 
 profiles:
   - name: kind
