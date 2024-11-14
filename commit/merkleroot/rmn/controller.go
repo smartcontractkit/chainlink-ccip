@@ -516,7 +516,7 @@ func gotSufficientObservationResponses(
 
 		values := maps.Values(countsPerRoot)
 		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if consensus.LtTwoFPlusOne(homeChainF, values[len(values)-1]) {
+		if consensus.LtFPlusOne(homeChainF, values[len(values)-1]) {
 			return false
 		}
 	}
