@@ -207,10 +207,9 @@ func TestWaitBoostedFee(t *testing.T) {
 			0.7,
 		},
 	}
-	lggr := logger.Test(t)
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			boosted := waitBoostedFee(lggr, tc.sendTimeDiff, tc.fee, tc.relativeBoostPerWaitHour)
+			boosted := waitBoostedFee(tc.sendTimeDiff, tc.fee, tc.relativeBoostPerWaitHour)
 			diff := big.NewInt(0).Sub(boosted, tc.fee)
 			assert.Equal(t, diff, tc.diff)
 		})

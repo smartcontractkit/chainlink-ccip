@@ -311,7 +311,7 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			// message will not be executed (as it will be considered too costly).
 			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
-			feeUSD18 = waitBoostedFee(c.lggr, c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
+			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
 		messageFees[msg.Header.MessageID] = feeUSD18
@@ -327,7 +327,6 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 //
 // wait_boosted_fee(m) = (1 + (now - m.send_time).hours * RELATIVE_BOOST_PER_WAIT_HOUR) * fee(m)
 func waitBoostedFee(
-	lggr logger.Logger,
 	waitTime time.Duration,
 	fee *big.Int,
 	relativeBoostPerWaitHour float64) *big.Int {
