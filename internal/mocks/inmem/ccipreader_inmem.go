@@ -120,7 +120,7 @@ func (r InMemoryCCIPReader) Nonces(
 	return nil, nil
 }
 
-func (r InMemoryCCIPReader) GetAvailableChainsFeeComponents(
+func (r InMemoryCCIPReader) GetChainsFeeComponents(
 	ctx context.Context,
 	chains []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
