@@ -931,7 +931,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 	)
 
 	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
-	// Missing writer fo chainB
+	// Missing writer for chainB
 	contractWriters[chainA] = cw
 	contractWriters[chainC] = cw
 	ccipReader := newCCIPChainReaderInternal(
