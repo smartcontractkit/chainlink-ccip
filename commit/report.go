@@ -127,7 +127,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
-		consensus.Threshold(len(decodedReport.RMNSignatures)) < consensus.FPlus1(int(reportInfo.RemoteF)) {
+		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
 		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, nil
