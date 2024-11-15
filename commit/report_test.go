@@ -91,11 +91,8 @@ func TestPluginReports(t *testing.T) {
 			expErr:        false,
 		},
 		{
-			name: "only chian fee reported without merkle root is still transmitted",
+			name: "only chain fee reported without merkle root is still transmitted",
 			outc: Outcome{
-				MerkleRootOutcome: merkleroot.Outcome{
-					OutcomeType: merkleroot.ReportTransmissionFailed,
-				},
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
