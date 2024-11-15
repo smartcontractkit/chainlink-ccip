@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -208,8 +209,16 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 	nextState := previousOutcome.NextState()
 	switch nextState {
 	case SelectingRangesForReport:
-		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx)
-		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.destChain)
+		cursedChains := w.observer.ObserveCursedChains(ctx, w.destChain)
+		if slices.Contains(cursedChains, w.destChain) {
+			w.lggr.Errorw("destination chain is cursed, nothing to observe", "destChain", w.destChain)
+			return Observation{}, SelectingRangesForReport
+		}
+		if len(cursedChains) > 0 {
+			w.lggr.Warnw("some chains are cursed, ranges are not reported: %v", cursedChains)
+		}
+		offRampNextSeqNums := w.observer.ObserveOffRampNextSeqNums(ctx, cursedChains)
+		onRampLatestSeqNums := w.observer.ObserveLatestOnRampSeqNums(ctx, w.destChain, cursedChains)
 		rmnRemoteCfg := w.observer.ObserveRMNRemoteCfg(ctx, w.destChain)
 
 		return Observation{
@@ -230,7 +239,7 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 		}, nextState
 	case WaitingForReportTransmission:
 		return Observation{
-			OffRampNextSeqNums: w.observer.ObserveOffRampNextSeqNums(ctx),
+			OffRampNextSeqNums: w.observer.ObserveOffRampNextSeqNums(ctx, []cciptypes.ChainSelector{}),
 			FChain:             w.observer.ObserveFChain(),
 		}, nextState
 	default:
@@ -240,17 +249,26 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 }
 
 type Observer interface {
-	// ObserveOffRampNextSeqNums observes the next OffRamp sequence numbers for each source chain
-	ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain
+	// ObserveOffRampNextSeqNums observes the next OffRamp sequence numbers for each source chain excluding cursed.
+	ObserveOffRampNextSeqNums(ctx context.Context, cursedChains []cciptypes.ChainSelector) []plugintypes.SeqNumChain
 
-	// ObserveLatestOnRampSeqNums observes the latest OnRamp sequence numbers for each configured source chain.
-	ObserveLatestOnRampSeqNums(ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain
+	// ObserveLatestOnRampSeqNums observes the latest OnRamp sequence numbers for
+	// each configured source chain excluding cursed..
+	ObserveLatestOnRampSeqNums(
+		ctx context.Context,
+		destChain cciptypes.ChainSelector,
+		cursedChains []cciptypes.ChainSelector,
+	) []plugintypes.SeqNumChain
 
 	// ObserveMerkleRoots computes the merkle roots for the given sequence number ranges
 	ObserveMerkleRoots(ctx context.Context, ranges []plugintypes.ChainRange) []cciptypes.MerkleRootChain
 
 	// ObserveRMNRemoteCfg observes the RMN remote config for the given destination chain
 	ObserveRMNRemoteCfg(ctx context.Context, dstChain cciptypes.ChainSelector) rmntypes.RemoteConfig
+
+	// ObserveCursedChains observes the chains that are cursed.
+	// The results are sorted in ascending order and guaranteed to not contain duplicates.
+	ObserveCursedChains(ctx context.Context, destChain cciptypes.ChainSelector) []cciptypes.ChainSelector
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
@@ -265,7 +283,8 @@ type observerImpl struct {
 }
 
 // ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
-func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
+func (o observerImpl) ObserveOffRampNextSeqNums(
+	ctx context.Context, cursedChains []cciptypes.ChainSelector) []plugintypes.SeqNumChain {
 	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.nodeID)
 	if err != nil {
 		o.lggr.Warnw("call to SupportsDestChain failed", "err", err)
@@ -282,22 +301,25 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
-	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
+	// Exclude the cursed chains from the source chains.
+	chains := mapset.NewSet(sourceChains...).Difference(mapset.NewSet(cursedChains...)).ToSlice()
+
+	sort.Slice(chains, func(i, j int) bool { return chains[i] < chains[j] })
+	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, chains)
 	if err != nil {
 		o.lggr.Warnw("call to NextSeqNum failed", "err", err)
 		return nil
 	}
 
-	if len(offRampNextSeqNums) != len(sourceChains) {
+	if len(offRampNextSeqNums) != len(chains) {
 		o.lggr.Errorf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
-			len(offRampNextSeqNums), len(sourceChains))
+			len(offRampNextSeqNums), len(chains))
 		return nil
 	}
 
-	result := make([]plugintypes.SeqNumChain, len(sourceChains))
-	for i := range sourceChains {
-		result[i] = plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]}
+	result := make([]plugintypes.SeqNumChain, len(chains))
+	for i := range chains {
+		result[i] = plugintypes.SeqNumChain{ChainSel: chains[i], SeqNum: offRampNextSeqNums[i]}
 	}
 
 	return result
@@ -305,8 +327,8 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 
 // ObserveLatestOnRampSeqNums observes the latest onRamp sequence numbers for each configured source chain.
 func (o observerImpl) ObserveLatestOnRampSeqNums(
-	ctx context.Context, destChain cciptypes.ChainSelector) []plugintypes.SeqNumChain {
-
+	ctx context.Context, destChain cciptypes.ChainSelector, cursedChains []cciptypes.ChainSelector,
+) []plugintypes.SeqNumChain {
 	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
@@ -319,7 +341,10 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 		return nil
 	}
 
-	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
+	sourceChains := mapset.NewSet(allSourceChains...).
+		Intersect(supportedChains).
+		Difference(mapset.NewSet(cursedChains...)).ToSlice()
+
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 
 	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, len(sourceChains))
@@ -468,6 +493,43 @@ func (o observerImpl) ObserveRMNRemoteCfg(
 	return rmnRemoteCfg
 }
 
+// ObserveCursedChains observes the cursed chains for the current node.
+// The results are sorted in ascending order and guaranteed to not contain duplicates.
+func (o observerImpl) ObserveCursedChains(
+	ctx context.Context, destChain cciptypes.ChainSelector) []cciptypes.ChainSelector {
+	sourceChains, err := o.chainSupport.KnownSourceChainsSlice()
+	if err != nil {
+		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil
+	}
+
+	wg := sync.WaitGroup{}
+	cursedChains := mapset.NewSet[cciptypes.ChainSelector]() // thread-safe by default
+
+	for _, chain := range append(sourceChains, destChain) {
+		chain := chain
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			isCursed, err := o.ccipReader.IsRMNRemoteCursed(ctx, chain)
+			if err != nil {
+				o.lggr.Errorw("call to IsChainCursed failed", "err", err)
+				return
+			}
+			if isCursed {
+				cursedChains.Add(chain)
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	cursedChainsSlice := cursedChains.ToSlice()
+	sort.Slice(cursedChainsSlice, func(i, j int) bool { return cursedChainsSlice[i] < cursedChainsSlice[j] })
+	return cursedChainsSlice
+}
+
 func (o observerImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
@@ -477,3 +539,6 @@ func (o observerImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	}
 	return fChain
 }
+
+// interface compliance check
+var _ Observer = observerImpl{}

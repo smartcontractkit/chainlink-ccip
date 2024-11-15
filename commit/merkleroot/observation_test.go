@@ -36,7 +36,6 @@ import (
 )
 
 func TestObservation(t *testing.T) {
-	mockObserver := merkleroot.NewMockObserver(t)
 	mockCCIPReader := readerpkg_mock.NewMockCCIPReader(t)
 	chainSupport := common_mock.NewMockChainSupport(t)
 
@@ -46,7 +45,6 @@ func TestObservation(t *testing.T) {
 
 	p := &Processor{
 		lggr:         logger.Test(t),
-		observer:     mockObserver,
 		rmnCrypto:    signatureVerifierAlwaysTrue{},
 		ccipReader:   mockCCIPReader,
 		destChain:    destChain,
@@ -60,7 +58,7 @@ func TestObservation(t *testing.T) {
 		name        string
 		prevOutcome Outcome
 		query       Query
-		setupMocks  func()
+		setupMocks  func() *merkleroot.MockObserver
 		expectedObs Observation
 		expectedErr string
 	}{
@@ -70,13 +68,16 @@ func TestObservation(t *testing.T) {
 				OutcomeType: ReportTransmitted,
 			},
 			query: Query{},
-			setupMocks: func() {
-				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything).Return(
+			setupMocks: func() *merkleroot.MockObserver {
+				mockObserver := merkleroot.NewMockObserver(t)
+				mockObserver.On("ObserveCursedChains", mock.Anything, destChain).Return([]cciptypes.ChainSelector{}, nil)
+				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything, []cciptypes.ChainSelector{}).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}}).Once()
-				mockObserver.On("ObserveLatestOnRampSeqNums", mock.Anything, destChain).Return(
+				mockObserver.On("ObserveLatestOnRampSeqNums", mock.Anything, destChain, []cciptypes.ChainSelector{}).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 15}})
 				mockObserver.On("ObserveRMNRemoteCfg", mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
 				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
+				return mockObserver
 			},
 			expectedObs: Observation{
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 10}},
@@ -84,6 +85,44 @@ func TestObservation(t *testing.T) {
 				RMNRemoteConfig:    rmntypes.RemoteConfig{},
 				FChain:             map[cciptypes.ChainSelector]int{1: 3},
 			},
+		},
+		{
+			name: "SelectingRangesForReportWithCursedChains",
+			prevOutcome: Outcome{
+				OutcomeType: ReportTransmitted,
+			},
+			query: Query{},
+			setupMocks: func() *merkleroot.MockObserver {
+				mockObserver := merkleroot.NewMockObserver(t)
+				mockObserver.On("ObserveCursedChains", mock.Anything, destChain).Return([]cciptypes.ChainSelector{1}, nil)
+				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything, []cciptypes.ChainSelector{1}).Return(
+					[]plugintypes.SeqNumChain{}).Once()
+				mockObserver.On("ObserveLatestOnRampSeqNums", mock.Anything, destChain, []cciptypes.ChainSelector{1}).Return(
+					[]plugintypes.SeqNumChain{})
+				mockObserver.On("ObserveRMNRemoteCfg", mock.Anything, destChain).Return(rmntypes.RemoteConfig{})
+				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
+				return mockObserver
+			},
+			expectedObs: Observation{
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{},
+				OnRampMaxSeqNums:   []plugintypes.SeqNumChain{},
+				RMNRemoteConfig:    rmntypes.RemoteConfig{},
+				FChain:             map[cciptypes.ChainSelector]int{1: 3},
+			},
+		},
+		{
+			name: "SelectingRangesForReportWithCursedDest",
+			prevOutcome: Outcome{
+				OutcomeType: ReportTransmitted,
+			},
+			query: Query{},
+			setupMocks: func() *merkleroot.MockObserver {
+				mockObserver := merkleroot.NewMockObserver(t)
+				mockObserver.On("ObserveCursedChains", mock.Anything, destChain).
+					Return([]cciptypes.ChainSelector{destChain}, nil)
+				return mockObserver
+			},
+			expectedObs: Observation{},
 		},
 		{
 			name: "BuildingReport",
@@ -97,7 +136,8 @@ func TestObservation(t *testing.T) {
 			query: Query{
 				RMNSignatures: &rmn.ReportSignatures{},
 			},
-			setupMocks: func() {
+			setupMocks: func() *merkleroot.MockObserver {
+				mockObserver := merkleroot.NewMockObserver(t)
 				mockObserver.On("ObserveMerkleRoots", mock.Anything, mock.Anything).Return([]cciptypes.MerkleRootChain{
 					{
 						ChainSel:     1,
@@ -106,6 +146,7 @@ func TestObservation(t *testing.T) {
 					}})
 				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
 				mockCCIPReader.On("GetContractAddress", mock.Anything, mock.Anything).Return(offchainAddress, nil)
+				return mockObserver
 			},
 			expectedObs: Observation{
 				MerkleRoots: []cciptypes.MerkleRootChain{
@@ -124,10 +165,12 @@ func TestObservation(t *testing.T) {
 				RMNRemoteCfg: testhelpers.CreateRMNRemoteCfg(),
 			},
 			query: Query{},
-			setupMocks: func() {
-				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything).Return(
+			setupMocks: func() *merkleroot.MockObserver {
+				mockObserver := merkleroot.NewMockObserver(t)
+				mockObserver.On("ObserveOffRampNextSeqNums", mock.Anything, []cciptypes.ChainSelector{}).Return(
 					[]plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 20}}).Once()
 				mockObserver.On("ObserveFChain").Return(map[cciptypes.ChainSelector]int{1: 3})
+				return mockObserver
 			},
 			expectedObs: Observation{
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 20}},
@@ -142,8 +185,9 @@ func TestObservation(t *testing.T) {
 			query: Query{
 				RetryRMNSignatures: true,
 			},
-			setupMocks: func() {
+			setupMocks: func() *merkleroot.MockObserver {
 				// No mocks needed for this case
+				return merkleroot.NewMockObserver(t)
 			},
 			expectedObs: Observation{},
 		},
@@ -151,8 +195,8 @@ func TestObservation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.setupMocks()
-
+			mockObserver := tc.setupMocks()
+			p.observer = mockObserver
 			p.rmnControllerCfgDigest = tc.prevOutcome.RMNRemoteCfg.ConfigDigest // skip rmn controller setup
 			obs, err := p.Observation(ctx, tc.prevOutcome, tc.query)
 
@@ -257,7 +301,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport: chainSupport,
 			}
 
-			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
+			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx, nil))
 		})
 	}
 }

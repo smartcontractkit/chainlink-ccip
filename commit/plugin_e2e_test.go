@@ -781,6 +781,8 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		}
 	}
 
+	ccipReader.EXPECT().IsRMNRemoteCursed(params.ctx, mock.Anything).Return(false, nil).Maybe()
+
 	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
 	for _, chainSel := range chainsWithNewMsgs {
 		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, params.offRampNextSeqNum[chainSel])

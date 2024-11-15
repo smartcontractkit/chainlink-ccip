@@ -27,6 +27,55 @@ func (_m *MockObserver) EXPECT() *MockObserver_Expecter {
 	return &MockObserver_Expecter{mock: &_m.Mock}
 }
 
+// ObserveCursedChains provides a mock function with given fields: ctx, destChain
+func (_m *MockObserver) ObserveCursedChains(ctx context.Context, destChain ccipocr3.ChainSelector) []ccipocr3.ChainSelector {
+	ret := _m.Called(ctx, destChain)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ObserveCursedChains")
+	}
+
+	var r0 []ccipocr3.ChainSelector
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) []ccipocr3.ChainSelector); ok {
+		r0 = rf(ctx, destChain)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]ccipocr3.ChainSelector)
+		}
+	}
+
+	return r0
+}
+
+// MockObserver_ObserveCursedChains_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ObserveCursedChains'
+type MockObserver_ObserveCursedChains_Call struct {
+	*mock.Call
+}
+
+// ObserveCursedChains is a helper method to define mock.On call
+//   - ctx context.Context
+//   - destChain ccipocr3.ChainSelector
+func (_e *MockObserver_Expecter) ObserveCursedChains(ctx interface{}, destChain interface{}) *MockObserver_ObserveCursedChains_Call {
+	return &MockObserver_ObserveCursedChains_Call{Call: _e.mock.On("ObserveCursedChains", ctx, destChain)}
+}
+
+func (_c *MockObserver_ObserveCursedChains_Call) Run(run func(ctx context.Context, destChain ccipocr3.ChainSelector)) *MockObserver_ObserveCursedChains_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockObserver_ObserveCursedChains_Call) Return(_a0 []ccipocr3.ChainSelector) *MockObserver_ObserveCursedChains_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockObserver_ObserveCursedChains_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) []ccipocr3.ChainSelector) *MockObserver_ObserveCursedChains_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ObserveFChain provides a mock function with given fields:
 func (_m *MockObserver) ObserveFChain() map[ccipocr3.ChainSelector]int {
 	ret := _m.Called()
@@ -74,17 +123,17 @@ func (_c *MockObserver_ObserveFChain_Call) RunAndReturn(run func() map[ccipocr3.
 	return _c
 }
 
-// ObserveLatestOnRampSeqNums provides a mock function with given fields: ctx, destChain
-func (_m *MockObserver) ObserveLatestOnRampSeqNums(ctx context.Context, destChain ccipocr3.ChainSelector) []plugintypes.SeqNumChain {
-	ret := _m.Called(ctx, destChain)
+// ObserveLatestOnRampSeqNums provides a mock function with given fields: ctx, destChain, cursedChains
+func (_m *MockObserver) ObserveLatestOnRampSeqNums(ctx context.Context, destChain ccipocr3.ChainSelector, cursedChains []ccipocr3.ChainSelector) []plugintypes.SeqNumChain {
+	ret := _m.Called(ctx, destChain, cursedChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ObserveLatestOnRampSeqNums")
 	}
 
 	var r0 []plugintypes.SeqNumChain
-	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) []plugintypes.SeqNumChain); ok {
-		r0 = rf(ctx, destChain)
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) []plugintypes.SeqNumChain); ok {
+		r0 = rf(ctx, destChain, cursedChains)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]plugintypes.SeqNumChain)
@@ -102,13 +151,14 @@ type MockObserver_ObserveLatestOnRampSeqNums_Call struct {
 // ObserveLatestOnRampSeqNums is a helper method to define mock.On call
 //   - ctx context.Context
 //   - destChain ccipocr3.ChainSelector
-func (_e *MockObserver_Expecter) ObserveLatestOnRampSeqNums(ctx interface{}, destChain interface{}) *MockObserver_ObserveLatestOnRampSeqNums_Call {
-	return &MockObserver_ObserveLatestOnRampSeqNums_Call{Call: _e.mock.On("ObserveLatestOnRampSeqNums", ctx, destChain)}
+//   - cursedChains []ccipocr3.ChainSelector
+func (_e *MockObserver_Expecter) ObserveLatestOnRampSeqNums(ctx interface{}, destChain interface{}, cursedChains interface{}) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+	return &MockObserver_ObserveLatestOnRampSeqNums_Call{Call: _e.mock.On("ObserveLatestOnRampSeqNums", ctx, destChain, cursedChains)}
 }
 
-func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) Run(run func(ctx context.Context, destChain ccipocr3.ChainSelector)) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) Run(run func(ctx context.Context, destChain ccipocr3.ChainSelector, cursedChains []ccipocr3.ChainSelector)) *MockObserver_ObserveLatestOnRampSeqNums_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].([]ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -118,7 +168,7 @@ func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) Return(_a0 []plugintypes
 	return _c
 }
 
-func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) []plugintypes.SeqNumChain) *MockObserver_ObserveLatestOnRampSeqNums_Call {
+func (_c *MockObserver_ObserveLatestOnRampSeqNums_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) []plugintypes.SeqNumChain) *MockObserver_ObserveLatestOnRampSeqNums_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -172,17 +222,17 @@ func (_c *MockObserver_ObserveMerkleRoots_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// ObserveOffRampNextSeqNums provides a mock function with given fields: ctx
-func (_m *MockObserver) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
-	ret := _m.Called(ctx)
+// ObserveOffRampNextSeqNums provides a mock function with given fields: ctx, cursedChains
+func (_m *MockObserver) ObserveOffRampNextSeqNums(ctx context.Context, cursedChains []ccipocr3.ChainSelector) []plugintypes.SeqNumChain {
+	ret := _m.Called(ctx, cursedChains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ObserveOffRampNextSeqNums")
 	}
 
 	var r0 []plugintypes.SeqNumChain
-	if rf, ok := ret.Get(0).(func(context.Context) []plugintypes.SeqNumChain); ok {
-		r0 = rf(ctx)
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) []plugintypes.SeqNumChain); ok {
+		r0 = rf(ctx, cursedChains)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]plugintypes.SeqNumChain)
@@ -199,13 +249,14 @@ type MockObserver_ObserveOffRampNextSeqNums_Call struct {
 
 // ObserveOffRampNextSeqNums is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockObserver_Expecter) ObserveOffRampNextSeqNums(ctx interface{}) *MockObserver_ObserveOffRampNextSeqNums_Call {
-	return &MockObserver_ObserveOffRampNextSeqNums_Call{Call: _e.mock.On("ObserveOffRampNextSeqNums", ctx)}
+//   - cursedChains []ccipocr3.ChainSelector
+func (_e *MockObserver_Expecter) ObserveOffRampNextSeqNums(ctx interface{}, cursedChains interface{}) *MockObserver_ObserveOffRampNextSeqNums_Call {
+	return &MockObserver_ObserveOffRampNextSeqNums_Call{Call: _e.mock.On("ObserveOffRampNextSeqNums", ctx, cursedChains)}
 }
 
-func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) Run(run func(ctx context.Context)) *MockObserver_ObserveOffRampNextSeqNums_Call {
+func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) Run(run func(ctx context.Context, cursedChains []ccipocr3.ChainSelector)) *MockObserver_ObserveOffRampNextSeqNums_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context))
+		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
 	})
 	return _c
 }
@@ -215,7 +266,7 @@ func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) Return(_a0 []plugintypes.
 	return _c
 }
 
-func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) RunAndReturn(run func(context.Context) []plugintypes.SeqNumChain) *MockObserver_ObserveOffRampNextSeqNums_Call {
+func (_c *MockObserver_ObserveOffRampNextSeqNums_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) []plugintypes.SeqNumChain) *MockObserver_ObserveOffRampNextSeqNums_Call {
 	_c.Call.Return(run)
 	return _c
 }

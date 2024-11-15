@@ -88,7 +88,6 @@ func aggregateObservations(aos []plugincommon.AttributedObservation[Observation]
 		for chainSel, f := range obs.FChain {
 			aggObs.FChain[chainSel] = append(aggObs.FChain[chainSel], f)
 		}
-
 	}
 
 	return aggObs
