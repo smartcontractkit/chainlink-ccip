@@ -200,6 +200,57 @@ sso_role_name = outdated-role`), 0o666)
 	AssertEqualIniSections(t, want.Section("default"), got.Section("default"))
 }
 
+func TestSetupAwsProfileMissingRequiredParams(t *testing.T) {
+	t.Parallel()
+
+	type testCase struct {
+		description string
+		params      []string
+	}
+
+	for _, tc := range []testCase{
+		{
+			description: "missing profile",
+			params:      []string{"", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"},
+		},
+		{
+			description: "missing accountId",
+			params:      []string{"test-profile", "", "ap-southeast-1", "test-role-name", "https://sso.start.url"},
+		},
+		{
+			description: "missing region",
+			params:      []string{"test-profile", "12345678909", "", "test-role-name", "https://sso.start.url"},
+		},
+		{
+			description: "missing sso role name",
+			params:      []string{"test-profile", "12345678909", "ap-southeast-1", "", "https://sso.start.url"},
+		},
+		{
+			description: "missing sso start url",
+			params:      []string{"test-profile", "12345678909", "ap-southeast-1", "test-role-name", ""},
+		},
+		{
+			description: "missing all params",
+			params:      []string{"", "", "", "", ""},
+		},
+	} {
+		t.Run(tc.description, func(t *testing.T) {
+			t.Parallel()
+
+			mockedAwsConfig := MockAwsConfigFile([]byte(""), 0o666)
+			defer os.Remove(mockedAwsConfig.Name())
+
+			err := SetupAwsProfile(mockedAwsConfig.Name(), tc.params[0], tc.params[1], tc.params[2], tc.params[3], tc.params[4])
+			assert.ErrorContains(t, err, "missing required parameters")
+			for _, param := range tc.params {
+				if param == "" {
+					assert.ErrorContains(t, err, param)
+				}
+			}
+		})
+	}
+}
+
 func TestGetDecodedECRAuthorizationTokenSingle(t *testing.T) {
 	t.Parallel()
 

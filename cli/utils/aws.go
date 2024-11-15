@@ -22,6 +22,23 @@ func SetupAwsProfile(configPath string, profileName string, accountId string, re
 	ini.PrettyFormat = false
 	ini.PrettyEqual = true
 
+	mandatoryParams := map[string]string{
+		"profileName": profileName,
+		"accountId":   accountId,
+		"region":      region,
+		"ssoRoleName": ssoRoleName,
+		"ssoStartUrl": ssoStartUrl,
+	}
+	missingRequiredParams := []string{}
+	for k, v := range mandatoryParams {
+		if v == "" {
+			missingRequiredParams = append(missingRequiredParams, k)
+		}
+	}
+	if len(missingRequiredParams) > 0 {
+		return fmt.Errorf("missing required parameters: %s", strings.Join(missingRequiredParams, ", "))
+	}
+
 	configFile, err := os.OpenFile(configPath, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return err
