@@ -205,33 +205,33 @@ func TestSetupAwsProfileMissingRequiredParams(t *testing.T) {
 
 	type testCase struct {
 		description string
-		params []string
+		params      []string
 	}
 
 	for _, tc := range []testCase{
 		{
 			description: "missing profile",
-			params: []string{"", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"},
+			params:      []string{"", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"},
 		},
 		{
 			description: "missing accountId",
-			params: []string{"test-profile", "", "ap-southeast-1", "test-role-name", "https://sso.start.url"},
+			params:      []string{"test-profile", "", "ap-southeast-1", "test-role-name", "https://sso.start.url"},
 		},
 		{
 			description: "missing region",
-			params: []string{"test-profile", "12345678909", "", "test-role-name", "https://sso.start.url"},
+			params:      []string{"test-profile", "12345678909", "", "test-role-name", "https://sso.start.url"},
 		},
 		{
 			description: "missing sso role name",
-			params: []string{"test-profile", "12345678909", "ap-southeast-1", "", "https://sso.start.url"},
+			params:      []string{"test-profile", "12345678909", "ap-southeast-1", "", "https://sso.start.url"},
 		},
 		{
 			description: "missing sso start url",
-			params: []string{"test-profile", "12345678909", "ap-southeast-1", "test-role-name", ""},
+			params:      []string{"test-profile", "12345678909", "ap-southeast-1", "test-role-name", ""},
 		},
 		{
 			description: "missing all params",
-			params: []string{"", "", "", "", ""},
+			params:      []string{"", "", "", "", ""},
 		},
 	} {
 		t.Run(tc.description, func(t *testing.T) {
