@@ -438,7 +438,7 @@ func mergeCostlyMessages(
 	for _, ao := range aos {
 		for _, costlyMessage := range ao.Observation.CostlyMessages {
 			counts[costlyMessage]++
-			if counts[costlyMessage] >= int(consensus.FPlus1(fChainDest)) {
+			if consensus.GteFPlusOne(fChainDest, counts[costlyMessage]) {
 				costlyMessages.Add(costlyMessage)
 			}
 		}
