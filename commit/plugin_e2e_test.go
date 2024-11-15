@@ -301,6 +301,22 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					TokenPrices: orderedTokenPrices,
 				},
 			},
+			expTransmittedReports: []ccipocr3.CommitPluginReport{
+				{
+					PriceUpdates: ccipocr3.PriceUpdates{
+						TokenPriceUpdates: []ccipocr3.TokenPrice{
+							{
+								TokenID: arbAddr,
+								Price:   ccipocr3.NewBigInt(arbPrice),
+							},
+							{
+								TokenID: ethAddr,
+								Price:   ccipocr3.NewBigInt(ethPrice),
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			name:        "fresh tokens don't need new updates",
@@ -362,6 +378,18 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					},
 				},
 			},
+			expTransmittedReports: []ccipocr3.CommitPluginReport{
+				{
+					PriceUpdates: ccipocr3.PriceUpdates{
+						TokenPriceUpdates: []ccipocr3.TokenPrice{
+							{
+								TokenID: ethAddr,
+								Price:   ccipocr3.NewBigInt(ethPrice),
+							},
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -419,10 +447,10 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	newFeeComponents2, newNativePrice2, newPackedGasPrice2 := newRandomFees()
 
 	testCases := []struct {
-		name                  string
-		prevOutcome           Outcome
-		expOutcome            Outcome
-		expTransmittedReports []ccipocr3.CommitPluginReport
+		name                    string
+		prevOutcome             Outcome
+		expOutcome              Outcome
+		expTransmittedReportLen int
 
 		mockCCIPReader func(*readerpkg_mock.MockCCIPReader)
 	}{
@@ -448,6 +476,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					},
 				},
 			},
+			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
 					GetChainsFeeComponents(params.ctx, mock.Anything).
@@ -474,6 +503,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
+			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
 					GetChainsFeeComponents(params.ctx, mock.Anything).
@@ -501,6 +531,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
+			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
 					GetChainsFeeComponents(params.ctx, mock.Anything).
@@ -533,6 +564,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					},
 				},
 			},
+			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
 					GetChainsFeeComponents(params.ctx, mock.Anything).
@@ -565,6 +597,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					},
 				},
 			},
+			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
 				m.EXPECT().
 					GetChainsFeeComponents(params.ctx, mock.Anything).
@@ -618,7 +651,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
-			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
+			assert.Len(t, res.Transmitted, tc.expTransmittedReportLen)
 		})
 	}
 }
