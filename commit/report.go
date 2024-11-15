@@ -53,8 +53,10 @@ func (p *Plugin) Reports(
 		"rmnSignatures", outcome.MerkleRootOutcome.RMNReportSignatures,
 	)
 
-	var rep cciptypes.CommitPluginReport
-	var repInfo ReportInfo
+	var (
+		rep     cciptypes.CommitPluginReport
+		repInfo ReportInfo
+	)
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
 		rep = cciptypes.CommitPluginReport{
 			MerkleRoots:   outcome.MerkleRootOutcome.RootsToReport,
