@@ -667,6 +667,30 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}, nil
 }
 
+func (r *ccipChainReader) IsRMNRemoteCursed(
+	ctx context.Context,
+	chainSelector cciptypes.ChainSelector,
+) (bool, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, chainSelector); err != nil {
+		return false, fmt.Errorf("validate extended reader existence: %w", err)
+	}
+
+	var isCursed bool
+	err := r.contractReaders[chainSelector].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameRMNRemote,
+		consts.MethodNameIsCursed,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&isCursed,
+	)
+	if err != nil {
+		return false, fmt.Errorf("get latest value of method name %s: %w", consts.MethodNameIsCursed, err)
+	}
+
+	return isCursed, nil
+}
+
 // discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
 func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
@@ -1241,7 +1265,7 @@ func (r *ccipChainReader) getOnRampStaticConfigs(
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
 				ctx,
 				consts.ContractNameOnRamp,
-				consts.MethodNameOnrampGetStaticConfig,
+				consts.MethodNameOnRampGetStaticConfig,
 				primitives.Unconfirmed,
 				map[string]any{},
 				&resp,

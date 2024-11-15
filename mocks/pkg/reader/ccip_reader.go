@@ -648,6 +648,63 @@ func (_c *MockCCIPReader_GetWrappedNativeTokenPriceUSD_Call) RunAndReturn(run fu
 	return _c
 }
 
+// IsRMNRemoteCursed provides a mock function with given fields: ctx, chainSelector
+func (_m *MockCCIPReader) IsRMNRemoteCursed(ctx context.Context, chainSelector ccipocr3.ChainSelector) (bool, error) {
+	ret := _m.Called(ctx, chainSelector)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsRMNRemoteCursed")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) (bool, error)); ok {
+		return rf(ctx, chainSelector)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector) bool); ok {
+		r0 = rf(ctx, chainSelector)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, chainSelector)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_IsRMNRemoteCursed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsRMNRemoteCursed'
+type MockCCIPReader_IsRMNRemoteCursed_Call struct {
+	*mock.Call
+}
+
+// IsRMNRemoteCursed is a helper method to define mock.On call
+//   - ctx context.Context
+//   - chainSelector ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) IsRMNRemoteCursed(ctx interface{}, chainSelector interface{}) *MockCCIPReader_IsRMNRemoteCursed_Call {
+	return &MockCCIPReader_IsRMNRemoteCursed_Call{Call: _e.mock.On("IsRMNRemoteCursed", ctx, chainSelector)}
+}
+
+func (_c *MockCCIPReader_IsRMNRemoteCursed_Call) Run(run func(ctx context.Context, chainSelector ccipocr3.ChainSelector)) *MockCCIPReader_IsRMNRemoteCursed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_IsRMNRemoteCursed_Call) Return(_a0 bool, _a1 error) *MockCCIPReader_IsRMNRemoteCursed_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_IsRMNRemoteCursed_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector) (bool, error)) *MockCCIPReader_IsRMNRemoteCursed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LinkPriceUSD provides a mock function with given fields: ctx
 func (_m *MockCCIPReader) LinkPriceUSD(ctx context.Context) (ccipocr3.BigInt, error) {
 	ret := _m.Called(ctx)

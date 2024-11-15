@@ -105,6 +105,7 @@ const (
 	// Used by the rmn remote reader.
 	MethodNameGetVersionedConfig    = "GetVersionedConfig"
 	MethodNameGetReportDigestHeader = "GetReportDigestHeader"
+	MethodNameIsCursed              = "IsCursed"
 
 	// RMNProxy.sol methods
 	MethodNameGetARM = "GetARM"

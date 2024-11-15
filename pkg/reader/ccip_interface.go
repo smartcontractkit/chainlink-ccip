@@ -148,6 +148,11 @@ type CCIPReader interface {
 		destChainSelector cciptypes.ChainSelector,
 	) (rmntypes.RemoteConfig, error)
 
+	IsRMNRemoteCursed(
+		ctx context.Context,
+		chainSelector cciptypes.ChainSelector,
+	) (bool, error)
+
 	// DiscoverContracts reads from all available contract readers to discover contract addresses.
 	DiscoverContracts(ctx context.Context) (ContractAddresses, error)
 
