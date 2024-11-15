@@ -151,7 +151,10 @@ var initCmd = &cobra.Command{
 				AwsRegion:            viper.GetString("AWS_REGION"),
 				ChangeDefaultContext: true,
 			}); err != nil {
-				logger.Error("failed to setup kubeconfig", slog.Any("error", err))
+				logger.Error("failed to setup kubeconfig",
+					slog.String("kubeconfig", viper.GetString("KUBECONFIG")),
+					slog.Any("error", err),
+				)
 				os.Exit(1)
 			}
 			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
@@ -281,14 +284,14 @@ func init() {
 
 	// bind to viper (we can safely ignore the errors here, as the flags are guaranteed to exist)
 	_ = viper.BindPFlag("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file"))
-	_ = viper.BindPFlag("AWS_PROFILE", initCmd.Flags().Lookup("aws-profile-name"))
+	_ = viper.BindPFlag("AWS_PROFILE", initCmd.Flags().Lookup("aws-profile"))
 	_ = viper.BindPFlag("AWS_ACCOUNT_ID", initCmd.Flags().Lookup("aws-account-id"))
 	_ = viper.BindPFlag("AWS_REGION", initCmd.Flags().Lookup("aws-region"))
 	_ = viper.BindPFlag("AWS_SSO_ROLE_NAME", initCmd.Flags().Lookup("aws-sso-role-name"))
 	_ = viper.BindPFlag("AWS_SSO_START_URL", initCmd.Flags().Lookup("aws-sso-start-url"))
 	_ = viper.BindPFlag("KUBECONFIG", initCmd.Flags().Lookup("kubeconfig"))
-	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("eks-cluster-name"))
-	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("eks-alias-name"))
+	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("crib-eks-cluster-name"))
+	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("crib-eks-alias-name"))
 	_ = viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
 	_ = viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
 	_ = viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))
