@@ -770,6 +770,21 @@ func (r *ccipChainReader) DiscoverContracts(ctx context.Context) (ContractAddres
 		}
 	}
 
+	// Discover RMNRemote contracts on source chains from OnRamp static config.
+	{
+		staticConfigs, err := r.getOnRampStaticConfigs(ctx, myChains)
+		if errors.Is(err, contractreader.ErrNoBindings) {
+			// ErrNoBindings is an allowable error.
+			r.lggr.Infow("unable to discover RMNRemote contracts, this is expected during initialization", "err", err)
+		} else if err != nil {
+			return nil, fmt.Errorf("get on ramp static configs chains=%v: %w", myChains, err)
+		} else {
+			for chain, cfg := range staticConfigs {
+				resp = resp.Append(consts.ContractNameRMNRemote, chain, cfg.RMNRemote)
+			}
+		}
+	}
+
 	// Read onRamps for Router in DestChainConfig.
 	{
 		destChainConfig, err := r.getOnRampDestChainConfig(ctx, myChains)
@@ -1179,6 +1194,61 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 				"resp", resp)
 			if err != nil {
 				return fmt.Errorf("failed to get onramp dynamic config: %w", err)
+			}
+			mu.Lock()
+			result[chainSel] = resp
+			mu.Unlock()
+
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// See StaticConfig in OnRamp.sol
+type onRampStaticConfig struct {
+	ChainSelector      uint64 `json:"chainSelector"`
+	RMNRemote          []byte `json:"rmnRemote"`
+	NonceManager       []byte `json:"nonceManager"`
+	TokenAdminRegistry []byte `json:"tokenAdminRegistry"`
+}
+
+func (r *ccipChainReader) getOnRampStaticConfigs(
+	ctx context.Context,
+	srcChains []cciptypes.ChainSelector,
+) (map[cciptypes.ChainSelector]onRampStaticConfig, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, srcChains...); err != nil {
+		return nil, err
+	}
+
+	result := make(map[cciptypes.ChainSelector]onRampStaticConfig)
+
+	mu := new(sync.Mutex)
+	eg := new(errgroup.Group)
+	for _, chainSel := range srcChains {
+		// no onramp for the destination chain
+		if chainSel == r.destChain {
+			continue
+		}
+
+		chainSel := chainSel
+		eg.Go(func() error {
+			resp := onRampStaticConfig{}
+			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
+				ctx,
+				consts.ContractNameOnRamp,
+				consts.MethodNameOnrampGetStaticConfig,
+				primitives.Unconfirmed,
+				map[string]any{},
+				&resp,
+			)
+			r.lggr.Debugw("got onramp static config", "chain", chainSel, "resp", resp)
+			if err != nil {
+				return fmt.Errorf("get onramp static config for chain %d: %w", chainSel, err)
 			}
 			mu.Lock()
 			result[chainSel] = resp
