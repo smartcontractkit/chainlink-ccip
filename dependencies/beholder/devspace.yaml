@@ -39,7 +39,7 @@ pullSecrets:
 pipelines:
   ci-e2e-test:
     run: |-
-      run_dependency_pipelines redpanda cp-kafka-rest
+      run_dependency_pipelines redpanda
       create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway cp-kafka-rest
   load-test:
     run: |-
