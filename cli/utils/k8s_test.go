@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	clientgomocks "github.com/smartcontractkit/crib/cli/mocks/external/kubernetes"
+	"github.com/smartcontractkit/crib/cli/utils"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,7 +103,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 		}, nil,
 	)
 
-	setupKubeConfigInput := &SetupKubeConfigInput{
+	setupKubeConfigInput := &utils.SetupKubeConfigInput{
 		EksClient:            mockEksClient,
 		KubeconfigPath:       nonExistingKubeConfig,
 		EksClusterName:       eksClusterName,
@@ -111,7 +113,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 		AwsRegion:            "ap-southeast-1",
 		ChangeDefaultContext: true,
 	}
-	require.NoError(t, SetupKubeConfig(setupKubeConfigInput))
+	require.NoError(t, utils.SetupKubeConfig(setupKubeConfigInput))
 	require.FileExists(t, nonExistingKubeConfig)
 
 	got, err := clientcmd.LoadFromFile(nonExistingKubeConfig)
@@ -214,7 +216,7 @@ users:
 		}, nil,
 	)
 
-	setupKubeConfigInput := &SetupKubeConfigInput{
+	setupKubeConfigInput := &utils.SetupKubeConfigInput{
 		EksClient:            mockEksClient,
 		KubeconfigPath:       mockedKubeConfig.Name(),
 		EksClusterName:       eksClusterName,
@@ -224,7 +226,7 @@ users:
 		AwsRegion:            "ap-southeast-1",
 		ChangeDefaultContext: true,
 	}
-	require.NoError(t, SetupKubeConfig(setupKubeConfigInput))
+	require.NoError(t, utils.SetupKubeConfig(setupKubeConfigInput))
 
 	got, err := clientcmd.LoadFromFile(mockedKubeConfig.Name())
 	require.NoError(t, err)
@@ -276,7 +278,7 @@ func TestCheckK8sAccess(t *testing.T) {
 	t.Parallel()
 
 	// mocking a successful call to CoreV1().Namespaces().List()
-	mockedCoreV1NamespacesWorking := wrappermocks.NewNamespaceInterface(t)
+	mockedCoreV1NamespacesWorking := clientgomocks.NewNamespaceInterface(t)
 	mockedCoreV1NamespacesWorking.EXPECT().
 		List(
 			context.TODO(), metav1.ListOptions{},
@@ -288,17 +290,17 @@ func TestCheckK8sAccess(t *testing.T) {
 			},
 		}, nil)
 
-	mockedCoreV1ClientWorking := wrappermocks.NewCoreV1Interface(t)
+	mockedCoreV1ClientWorking := clientgomocks.NewCoreV1Interface(t)
 	mockedCoreV1ClientWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesWorking)
 
 	// mocking a failed call to CoreV1().Namespaces().List()
-	mockedCoreV1NamespacesNotWorking := wrappermocks.NewNamespaceInterface(t)
+	mockedCoreV1NamespacesNotWorking := clientgomocks.NewNamespaceInterface(t)
 	mockedCoreV1NamespacesNotWorking.EXPECT().
 		List(
 			context.TODO(), metav1.ListOptions{},
 		).Return(nil, fmt.Errorf("some error"))
 
-	mockedCoreV1ClientNotWorking := wrappermocks.NewCoreV1Interface(t)
+	mockedCoreV1ClientNotWorking := clientgomocks.NewCoreV1Interface(t)
 	mockedCoreV1ClientNotWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesNotWorking)
 
 	testCases := []struct {
@@ -323,7 +325,7 @@ func TestCheckK8sAccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := CheckK8sAccess(tt.corev1)
+			err := utils.CheckK8sAccess(tt.corev1)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
 			} else {
@@ -374,7 +376,7 @@ func TestEnsureNamespaceExists(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockNamespaceClient := wrappermocks.NewNamespaceInterface(t)
+			mockNamespaceClient := clientgomocks.NewNamespaceInterface(t)
 			mockNamespaceClient.EXPECT().
 				Get(context.TODO(), tt.namespaceName, metav1.GetOptions{}).
 				Return(&v1.Namespace{}, tt.getErr)
@@ -389,7 +391,7 @@ func TestEnsureNamespaceExists(t *testing.T) {
 					Return(&v1.Namespace{}, tt.createErr)
 			}
 
-			exists, err := EnsureNamespaceExists(context.TODO(), mockNamespaceClient, tt.namespaceName)
+			exists, err := utils.EnsureNamespaceExists(context.TODO(), mockNamespaceClient, tt.namespaceName)
 			assert.Equal(t, tt.expectedExists, exists)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
@@ -432,7 +434,7 @@ func TestWaitForResource(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockResourceClient := wrappermocks.NewResourceInterface(t)
+			mockResourceClient := clientgomocks.NewResourceInterface(t)
 			if tt.resourceFound {
 				mockResourceClient.EXPECT().
 					Get(context.TODO(), resourceName, metav1.GetOptions{}).
@@ -444,7 +446,7 @@ func TestWaitForResource(t *testing.T) {
 			}
 
 			ctx := context.TODO()
-			err := WaitForResource(ctx, mockResourceClient, resourceName, interval, timeout)
+			err := utils.WaitForResource(ctx, mockResourceClient, resourceName, interval, timeout)
 			if tt.expectedErr == "" {
 				assert.NoError(t, err)
 			} else {
