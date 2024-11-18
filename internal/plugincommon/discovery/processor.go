@@ -170,13 +170,12 @@ func aggregateObservations(
 			)
 		}
 
-		if isZero(ao.Observation.Addresses[consts.ContractNameRMNRemote][dest]) {
-			lggr.Warnf("skipping empty RMNRemote address in observation from Oracle %d", ao.OracleID)
-		} else {
-			obs.rmnRemoteAddrs[dest] = append(
-				obs.rmnRemoteAddrs[dest],
-				ao.Observation.Addresses[consts.ContractNameRMNRemote][dest],
-			)
+		for chain, addr := range ao.Observation.Addresses[consts.ContractNameRMNRemote] {
+			if isZero(addr) {
+				lggr.Warnf("skipping empty rmnRemote address chain=%d oracle=%d", chain, ao.OracleID)
+				continue
+			}
+			obs.rmnRemoteAddrs[chain] = append(obs.rmnRemoteAddrs[chain], addr)
 		}
 
 		for chain, addr := range ao.Observation.Addresses[consts.ContractNameRouter] {
