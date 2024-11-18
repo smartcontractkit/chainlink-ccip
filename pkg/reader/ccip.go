@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -21,6 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -276,56 +278,6 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 	return executed, nil
 }
 
-// Temporary struct to properly deserialize cciptypes.Message before we have support for cciptypes.BigInt
-type ccipMessageTokenAmount struct {
-	SourcePoolAddress cciptypes.UnknownAddress
-	DestTokenAddress  cciptypes.UnknownAddress
-	ExtraData         cciptypes.Bytes
-	Amount            *big.Int
-	DestExecData      cciptypes.Bytes
-}
-
-func (t *ccipMessageTokenAmount) ToOnRampToken() cciptypes.RampTokenAmount {
-	return cciptypes.RampTokenAmount{
-		SourcePoolAddress: t.SourcePoolAddress,
-		DestTokenAddress:  t.DestTokenAddress,
-		ExtraData:         t.ExtraData,
-		Amount:            cciptypes.NewBigInt(t.Amount),
-		DestExecData:      t.DestExecData,
-	}
-}
-
-type ccipMessage struct {
-	Header         cciptypes.RampMessageHeader
-	Sender         cciptypes.UnknownAddress
-	Data           cciptypes.Bytes
-	Receiver       cciptypes.UnknownAddress
-	ExtraArgs      cciptypes.Bytes
-	FeeToken       cciptypes.UnknownAddress
-	FeeTokenAmount *big.Int
-	FeeValueJuels  *big.Int
-	TokenAmounts   []ccipMessageTokenAmount
-}
-
-func (m *ccipMessage) ToMessage() cciptypes.Message {
-	tk := make([]cciptypes.RampTokenAmount, len(m.TokenAmounts))
-	for i := range m.TokenAmounts {
-		tk[i] = m.TokenAmounts[i].ToOnRampToken()
-	}
-
-	return cciptypes.Message{
-		Header:         m.Header,
-		Sender:         m.Sender,
-		Data:           m.Data,
-		Receiver:       m.Receiver,
-		ExtraArgs:      m.ExtraArgs,
-		FeeToken:       m.FeeToken,
-		FeeTokenAmount: cciptypes.NewBigInt(m.FeeTokenAmount),
-		FeeValueJuels:  cciptypes.NewBigInt(m.FeeValueJuels),
-		TokenAmounts:   tk,
-	}
-}
-
 func (r *ccipChainReader) MsgsBetweenSeqNums(
 	ctx context.Context, sourceChainSelector cciptypes.ChainSelector, seqNumRange cciptypes.SeqNumRange,
 ) ([]cciptypes.Message, error) {
@@ -340,7 +292,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 
 	type SendRequestedEvent struct {
 		DestChainSelector cciptypes.ChainSelector
-		Message           ccipMessage
+		Message           cciptypes.Message
 	}
 
 	seq, err := r.contractReaders[sourceChainSelector].ExtendedQueryKey(
@@ -392,7 +344,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		}
 
 		msg.Message.Header.OnRamp = onRampAddress
-		msgs = append(msgs, msg.Message.ToMessage())
+		msgs = append(msgs, msg.Message)
 	}
 
 	r.lggr.Infow("decoded messages between sequence numbers", "msgs", msgs,
@@ -405,7 +357,9 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 // GetExpectedNextSequenceNumber implements CCIP.
 func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 	ctx context.Context,
-	sourceChainSelector, destChainSelector cciptypes.ChainSelector) (cciptypes.SeqNum, error) {
+	sourceChainSelector,
+	destChainSelector cciptypes.ChainSelector,
+) (cciptypes.SeqNum, error) {
 	if destChainSelector != r.destChain {
 		return 0, fmt.Errorf("expected destination chain %d, got %d", r.destChain, destChainSelector)
 	}
@@ -476,6 +430,13 @@ func (r *ccipChainReader) Nonces(
 				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 			}
 
+			// TODO: evm only, need to make chain agnostic.
+			// pad the sender slice to 32 bytes from the left
+			sender = slicelib.LeftPadBytes(sender, 32)
+
+			r.lggr.Infow("getting nonce for address",
+				"address", address, "sender", hex.EncodeToString(sender))
+
 			var resp uint64
 			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
 				ctx,
@@ -504,7 +465,8 @@ func (r *ccipChainReader) Nonces(
 	return res, nil
 }
 
-func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
+func (r *ccipChainReader) GetChainsFeeComponents(
+	ctx context.Context,
 	chains []cciptypes.ChainSelector,
 ) map[cciptypes.ChainSelector]types.ChainFeeComponents {
 	feeComponents := make(map[cciptypes.ChainSelector]types.ChainFeeComponents, len(r.contractWriters))
@@ -512,7 +474,7 @@ func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
 	for _, chain := range chains {
 		chainWriter, ok := r.contractWriters[chain]
 		if !ok {
-			r.lggr.Warnw("contract writer not found", "chain", chain)
+			r.lggr.Errorw("contract writer not found", "chain", chain)
 			continue
 		}
 		feeComponent, err := chainWriter.GetFeeComponents(ctx)
@@ -528,19 +490,14 @@ func (r *ccipChainReader) GetAvailableChainsFeeComponents(ctx context.Context,
 func (r *ccipChainReader) GetDestChainFeeComponents(
 	ctx context.Context,
 ) (types.ChainFeeComponents, error) {
-	chainWriter, ok := r.contractWriters[r.destChain]
+	feeComponents := r.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{r.destChain})
+	components, ok := feeComponents[r.destChain]
 	if !ok {
-		r.lggr.Errorw("dest chain contract writer not found", "chain", r.destChain)
-		return types.ChainFeeComponents{}, errors.New("dest chain contract writer not found")
+		r.lggr.Errorw("dest chain components not found", "chain", r.destChain)
+		return types.ChainFeeComponents{}, errors.New("dest chain fee components not found")
 	}
 
-	feeComponents, err := chainWriter.GetFeeComponents(ctx)
-	if err != nil {
-		r.lggr.Errorw("failed to get dest chain fee components", "chain", r.destChain)
-		return types.ChainFeeComponents{}, err
-	}
-
-	return *feeComponents, nil
+	return components, nil
 }
 
 func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(

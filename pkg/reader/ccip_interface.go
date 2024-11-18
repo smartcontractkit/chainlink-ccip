@@ -121,8 +121,10 @@ type CCIPReader interface {
 		addresses []string,
 	) (map[string]uint64, error)
 
-	// GetAvailableChainsFeeComponents Reads all fee components for known chains (chains that have chain writer defined)
-	GetAvailableChainsFeeComponents(ctx context.Context,
+	// GetChainsFeeComponents Returns all fee components for given chains if corresponding
+	// chain writer is available.
+	GetChainsFeeComponents(
+		ctx context.Context,
 		chains []cciptypes.ChainSelector,
 	) map[cciptypes.ChainSelector]types.ChainFeeComponents
 

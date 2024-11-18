@@ -47,3 +47,9 @@ type constantThreshold[T any] uint
 func (ct constantThreshold[T]) Get(_ T) (Threshold, bool) {
 	return Threshold(ct), true
 }
+
+func GteFPlusOne(f, value int) bool { return value >= f+1 }
+
+func LtFPlusOne(f, value int) bool { return value < f+1 }
+
+func LtTwoFPlusOne(f, value int) bool { return value < 2*f+1 }
