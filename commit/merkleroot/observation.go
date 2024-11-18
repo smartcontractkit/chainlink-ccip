@@ -253,7 +253,7 @@ type Observer interface {
 	ObserveOffRampNextSeqNums(ctx context.Context, cursedChains []cciptypes.ChainSelector) []plugintypes.SeqNumChain
 
 	// ObserveLatestOnRampSeqNums observes the latest OnRamp sequence numbers for
-	// each configured source chain excluding cursed..
+	// each configured source chain excluding cursed.
 	ObserveLatestOnRampSeqNums(
 		ctx context.Context,
 		destChain cciptypes.ChainSelector,
@@ -503,10 +503,12 @@ func (o observerImpl) ObserveCursedChains(
 		return nil
 	}
 
+	allChains := append(sourceChains, destChain)
+
 	wg := sync.WaitGroup{}
 	cursedChains := mapset.NewSet[cciptypes.ChainSelector]() // thread-safe by default
 
-	for _, chain := range append(sourceChains, destChain) {
+	for _, chain := range allChains {
 		chain := chain
 		wg.Add(1)
 		go func() {

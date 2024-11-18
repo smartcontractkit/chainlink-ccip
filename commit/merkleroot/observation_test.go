@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -219,9 +221,10 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 	nextSeqNums := []cciptypes.SeqNum{345, 608, 7713}
 
 	testCases := []struct {
-		name      string
-		expResult []plugintypes.SeqNumChain
-		getDeps   func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader)
+		name         string
+		expResult    []plugintypes.SeqNumChain
+		getDeps      func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader)
+		cursedChains []cciptypes.ChainSelector
 	}{
 		{
 			name: "Happy path",
@@ -283,6 +286,25 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			},
 			expResult: nil,
 		},
+		{
+			name: "some chain is cursed",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				require.Greater(t, len(knownSourceChains), 2) // this test assumes at least 2 chains
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				chains := append(knownSourceChains[:1], knownSourceChains[2:]...)
+				seqNums := append(nextSeqNums[:1], nextSeqNums[2:]...)
+				ccipReader.EXPECT().NextSeqNum(mock.Anything, chains).Return(seqNums, nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+			cursedChains: []cciptypes.ChainSelector{knownSourceChains[1]},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -301,7 +323,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport: chainSupport,
 			}
 
-			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx, nil))
+			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx, tc.cursedChains))
 		})
 	}
 }
@@ -530,6 +552,42 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_ObserveCursedChains(t *testing.T) {
+	cs := common_mock.NewMockChainSupport(t)
+	ccipReader := readerpkg_mock.NewMockCCIPReader(t)
+	lggr := logger.Test(t)
+	ctx := tests.Context(t)
+	const numChains = 10
+	chains := make([]cciptypes.ChainSelector, numChains)
+	cursedChains := make([]cciptypes.ChainSelector, 0, numChains)
+
+	for i := 0; i < numChains; i++ {
+		chains[i] = cciptypes.ChainSelector(rand.RandomUint64())
+		if i%2 == 0 {
+			cursedChains = append(cursedChains, chains[i])
+		}
+	}
+
+	sort.Slice(chains, func(i, j int) bool { return chains[i] < chains[j] })
+	sort.Slice(cursedChains, func(i, j int) bool { return cursedChains[i] < cursedChains[j] })
+
+	destChain := chains[0]
+
+	o := observerImpl{
+		lggr:         lggr,
+		chainSupport: cs,
+		ccipReader:   ccipReader,
+	}
+
+	cs.EXPECT().KnownSourceChainsSlice().Return(chains, nil)
+	for _, chain := range chains {
+		ccipReader.EXPECT().IsRMNRemoteCursed(ctx, chain).Return(slices.Contains(cursedChains, chain), nil)
+	}
+
+	resultCursedChains := o.ObserveCursedChains(ctx, destChain)
+	assert.Equal(t, cursedChains, resultCursedChains)
 }
 
 func Test_computeMerkleRoot(t *testing.T) {
