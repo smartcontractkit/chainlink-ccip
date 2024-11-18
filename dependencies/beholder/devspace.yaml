@@ -37,10 +37,6 @@ pullSecrets:
     secret: regcred-beholder
 
 pipelines:
-  ci-e2e-test:
-    run: |-
-      run_dependency_pipelines redpanda
-      create_deployments beholder-otel-collector-agent beholder-otel-collector-gateway cp-kafka-rest
   load-test:
     run: |-
       run_dependency_pipelines redpanda
@@ -56,7 +52,7 @@ pipelines:
   deploy:
     run: |-
       run_dependency_pipelines redpanda
-      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway
+      create_deployments beholder-test-client beholder-otel-collector-agent beholder-otel-collector-gateway cp-kafka-rest
 
 deployments:
   beholder-test-client:
