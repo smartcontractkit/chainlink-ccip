@@ -3,43 +3,20 @@ package utils_test
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
-	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
-	clientgomocks "github.com/smartcontractkit/crib/cli/mocks/external/kubernetes"
+	testingutils "github.com/smartcontractkit/crib/cli/testing/utils"
 	"github.com/smartcontractkit/crib/cli/utils"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
-
-// MockKubeConfigFile is a helper function that returns the path to a tempfile
-// containing the desired content and permissions
-func MockKubeConfigFile(content []byte, perm fs.FileMode) *os.File {
-	tempFile, err := os.CreateTemp("", "config")
-	if err != nil {
-		log.Fatalf("Failed to create temp file: %v", err)
-	}
-
-	if err := os.WriteFile(tempFile.Name(), content, perm); err != nil {
-		log.Fatal(err)
-	}
-
-	return tempFile
-}
 
 // AssertEqualKubeConfigs compares the fields we modify from two clientcmdapi.Config instances
 // TODO: use golang reflect to compare the entire object and recurse into subtypes whilst ignoring
@@ -153,7 +130,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 func TestSetupKubeConfigExistsButDiverges(t *testing.T) {
 	t.Parallel()
 
-	mockedKubeConfig := MockKubeConfigFile([]byte(`apiVersion: v1
+	mockedKubeConfig := testingutils.MockKubeConfigFile([]byte(`apiVersion: v1
 clusters:
 - cluster:
     certificate-authority-data: c29tZXRoaW5n  # base64-encoded string "something"
@@ -272,187 +249,4 @@ users:
 		CurrentContext: eksClusterAlias,
 	}
 	AssertEqualKubeConfigs(t, want, got)
-}
-
-func TestCheckK8sAccess(t *testing.T) {
-	t.Parallel()
-
-	// mocking a successful call to CoreV1().Namespaces().List()
-	mockedCoreV1NamespacesWorking := clientgomocks.NewNamespaceInterface(t)
-	mockedCoreV1NamespacesWorking.EXPECT().
-		List(
-			context.TODO(), metav1.ListOptions{},
-		).Return(
-		&v1.NamespaceList{
-			Items: []v1.Namespace{
-				{ObjectMeta: metav1.ObjectMeta{Name: "some"}},
-				{ObjectMeta: metav1.ObjectMeta{Name: "namespaces"}},
-			},
-		}, nil)
-
-	mockedCoreV1ClientWorking := clientgomocks.NewCoreV1Interface(t)
-	mockedCoreV1ClientWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesWorking)
-
-	// mocking a failed call to CoreV1().Namespaces().List()
-	mockedCoreV1NamespacesNotWorking := clientgomocks.NewNamespaceInterface(t)
-	mockedCoreV1NamespacesNotWorking.EXPECT().
-		List(
-			context.TODO(), metav1.ListOptions{},
-		).Return(nil, fmt.Errorf("some error"))
-
-	mockedCoreV1ClientNotWorking := clientgomocks.NewCoreV1Interface(t)
-	mockedCoreV1ClientNotWorking.EXPECT().Namespaces().Return(mockedCoreV1NamespacesNotWorking)
-
-	testCases := []struct {
-		name        string
-		corev1      corev1.CoreV1Interface
-		listErr     error
-		expectedErr string
-	}{
-		{
-			name:        "Success",
-			corev1:      mockedCoreV1ClientWorking,
-			expectedErr: "",
-		},
-		{
-			name:        "Error",
-			corev1:      mockedCoreV1ClientNotWorking,
-			expectedErr: "some error",
-		},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := utils.CheckK8sAccess(tt.corev1)
-			if tt.expectedErr == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-				assert.Equal(t, tt.expectedErr, err.Error())
-			}
-		})
-	}
-}
-
-func TestEnsureNamespaceExists(t *testing.T) {
-	t.Parallel()
-
-	testCases := []struct {
-		name           string
-		namespaceName  string
-		getErr         error
-		createErr      error
-		expectedExists bool
-		expectedErr    string
-	}{
-		{
-			name:           "NamespaceExists",
-			namespaceName:  "existing-namespace",
-			getErr:         nil,
-			expectedExists: true,
-			expectedErr:    "",
-		},
-		{
-			name:           "NamespaceDoesNotExistAndCreateSucceeds",
-			namespaceName:  "new-namespace",
-			getErr:         fmt.Errorf("not found"),
-			createErr:      nil,
-			expectedExists: true,
-			expectedErr:    "",
-		},
-		{
-			name:           "NamespaceDoesNotExistAndCreateFails",
-			namespaceName:  "new-namespace",
-			getErr:         fmt.Errorf("not found"),
-			createErr:      fmt.Errorf("create error"),
-			expectedExists: false,
-			expectedErr:    "failed to create namespace new-namespace: create error",
-		},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockNamespaceClient := clientgomocks.NewNamespaceInterface(t)
-			mockNamespaceClient.EXPECT().
-				Get(context.TODO(), tt.namespaceName, metav1.GetOptions{}).
-				Return(&v1.Namespace{}, tt.getErr)
-
-			if tt.getErr != nil {
-				mockNamespaceClient.EXPECT().
-					Create(context.TODO(), &v1.Namespace{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: tt.namespaceName,
-						},
-					}, metav1.CreateOptions{}).
-					Return(&v1.Namespace{}, tt.createErr)
-			}
-
-			exists, err := utils.EnsureNamespaceExists(context.TODO(), mockNamespaceClient, tt.namespaceName)
-			assert.Equal(t, tt.expectedExists, exists)
-			if tt.expectedErr == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-				assert.Equal(t, tt.expectedErr, err.Error())
-			}
-		})
-	}
-}
-
-func TestWaitForResource(t *testing.T) {
-	t.Parallel()
-
-	resourceName := "test-resource"
-	interval := 100 * time.Millisecond
-	timeout := 500 * time.Millisecond
-
-	testCases := []struct {
-		name          string
-		getErr        error
-		expectedErr   string
-		resourceFound bool
-	}{
-		{
-			name:          "ResourceFound",
-			getErr:        nil,
-			expectedErr:   "",
-			resourceFound: true,
-		},
-		{
-			name:          "ResourceNotFound",
-			getErr:        fmt.Errorf("not found"),
-			expectedErr:   fmt.Sprintf("timed out waiting for resource %s", resourceName),
-			resourceFound: false,
-		},
-	}
-
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			mockResourceClient := clientgomocks.NewResourceInterface(t)
-			if tt.resourceFound {
-				mockResourceClient.EXPECT().
-					Get(context.TODO(), resourceName, metav1.GetOptions{}).
-					Return(&unstructured.Unstructured{}, tt.getErr).Times(1)
-			} else {
-				mockResourceClient.EXPECT().
-					Get(context.TODO(), resourceName, metav1.GetOptions{}).
-					Return(nil, tt.getErr)
-			}
-
-			ctx := context.TODO()
-			err := utils.WaitForResource(ctx, mockResourceClient, resourceName, interval, timeout)
-			if tt.expectedErr == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.Error(t, err)
-				assert.Equal(t, tt.expectedErr, err.Error())
-			}
-		})
-	}
 }

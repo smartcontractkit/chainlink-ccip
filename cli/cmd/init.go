@@ -15,9 +15,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Allowed values for the "provider" flag
@@ -160,24 +159,20 @@ var initCmd = &cobra.Command{
 			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 		}
 
-		// Test if cluster is reachable by attempting the equivalent of a kubectl get ns
-		kubeconfig, err := clientcmd.BuildConfigFromFlags("", viper.GetString("KUBECONFIG"))
-		if err != nil {
-			logger.Error("failed to initialize kubeconfig", slog.Any("error", err))
-			os.Exit(1)
-		}
-
-		kubeClientset, err := kubernetes.NewForConfig(kubeconfig)
-		if err != nil {
-			logger.Error("failed to initialize kube clientset", slog.Any("error", err))
-			os.Exit(1)
-		}
-
 		switch viper.GetString("PROVIDER") {
 		case "kind":
 			logger.Info("Skipped k8s access check for provider Kind (make sure you run ./cribbit.sh crib-local for now, kind support for the CLI coming soon)")
 		case "aws":
-			if err := utils.CheckK8sAccess(kubeClientset.CoreV1()); err != nil {
+			configFlags := genericclioptions.NewConfigFlags(true)
+			kubeconfig := viper.GetString("KUBECONFIG")
+			configFlags.KubeConfig = &kubeconfig
+			k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+			if err != nil {
+				logger.Error("failed to initialize kube client", slog.Any("error", err))
+				os.Exit(1)
+			}
+
+			if err := k8sClient.CheckAccess(context.TODO()); err != nil {
 				msg := "EKS access not working."
 				if !viper.GetBool("CRIB_CI_ENV") {
 					msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
@@ -191,7 +186,7 @@ var initCmd = &cobra.Command{
 				"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
 			)
 
-			dynamicClient, err := dynamic.NewForConfig(kubeconfig)
+			dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
 			if err != nil {
 				logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
 				os.Exit(1)
@@ -203,7 +198,7 @@ var initCmd = &cobra.Command{
 				Resource: "rolebindings",
 			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 
-			if err := utils.EnsureCribNamespaceReady(context.TODO(), kubeClientset.CoreV1().Namespaces(), rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+			if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
 				logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
 				os.Exit(1)
 			}
