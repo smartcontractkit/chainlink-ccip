@@ -675,20 +675,25 @@ func (r *ccipChainReader) IsRMNRemoteCursed(
 		return false, fmt.Errorf("validate extended reader existence: %w", err)
 	}
 
-	var isCursed bool
+	type retTyp struct {
+		CursedSubjects []byte
+	}
+	var cursedSubjects retTyp
+
 	err := r.contractReaders[chainSelector].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameRMNRemote,
-		consts.MethodNameIsCursed,
+		consts.MethodNameGetCursedSubjects,
 		primitives.Unconfirmed,
 		map[string]any{},
-		&isCursed,
+		&cursedSubjects,
 	)
 	if err != nil {
-		return false, fmt.Errorf("get latest value of method name %s: %w", consts.MethodNameIsCursed, err)
+		return false, fmt.Errorf("get latest value of %s: %w", consts.MethodNameGetCursedSubjects, err)
 	}
 
-	return isCursed, nil
+	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
+	return len(cursedSubjects.CursedSubjects) > 0, nil
 }
 
 // discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
