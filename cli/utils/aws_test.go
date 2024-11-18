@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"context"
@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +95,7 @@ func TestSetupAwsProfileNonExisting(t *testing.T) {
 	mockedAwsConfig := MockAwsConfigFile([]byte(""), 0o666)
 	defer os.Remove(mockedAwsConfig.Name())
 
-	require.NoError(t, SetupAwsProfile(mockedAwsConfig.Name(), "test-profile", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"))
+	require.NoError(t, utils.SetupAwsProfile(mockedAwsConfig.Name(), "test-profile", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"))
 
 	// inspect the new config with the AWS SDK
 	cfg, err := LoadTestAwsConfig(mockedAwsConfig.Name(), "test-profile")
@@ -147,7 +148,7 @@ sso_account_id = 123
 sso_role_name = outdated-role`), 0o666)
 	defer os.Remove(mockedAwsConfig.Name())
 
-	require.NoError(t, SetupAwsProfile(mockedAwsConfig.Name(), "test-profile", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"))
+	require.NoError(t, utils.SetupAwsProfile(mockedAwsConfig.Name(), "test-profile", "12345678909", "ap-southeast-1", "test-role-name", "https://sso.start.url"))
 
 	// inspect the new config with the AWS SDK
 	cfg, err := LoadTestAwsConfig(mockedAwsConfig.Name(), "test-profile")
@@ -240,7 +241,7 @@ func TestSetupAwsProfileMissingRequiredParams(t *testing.T) {
 			mockedAwsConfig := MockAwsConfigFile([]byte(""), 0o666)
 			defer os.Remove(mockedAwsConfig.Name())
 
-			err := SetupAwsProfile(mockedAwsConfig.Name(), tc.params[0], tc.params[1], tc.params[2], tc.params[3], tc.params[4])
+			err := utils.SetupAwsProfile(mockedAwsConfig.Name(), tc.params[0], tc.params[1], tc.params[2], tc.params[3], tc.params[4])
 			assert.ErrorContains(t, err, "missing required parameters")
 			for _, param := range tc.params {
 				if param == "" {
@@ -268,10 +269,10 @@ func TestGetDecodedECRAuthorizationTokenSingle(t *testing.T) {
 		}, nil,
 	)
 
-	want := []*GetDecodedECRAuthorizationTokenOutput{
+	want := []*utils.GetDecodedECRAuthorizationTokenOutput{
 		{Username: "user", Password: "password", RegistryURL: proxyEndpoint},
 	}
-	got, err := GetDecodedECRAuthorizationToken(mockEcrClient)
+	got, err := utils.GetDecodedECRAuthorizationToken(mockEcrClient)
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
@@ -296,11 +297,11 @@ func TestGetDecodedECRAuthorizationTokenMultiple(t *testing.T) {
 		}, nil,
 	)
 
-	want := []*GetDecodedECRAuthorizationTokenOutput{
+	want := []*utils.GetDecodedECRAuthorizationTokenOutput{
 		{Username: "user", Password: "password", RegistryURL: proxyEndpoint1},
 		{Username: "anotheruser", Password: "anotherpassword", RegistryURL: proxyEndpoint2},
 	}
-	got, err := GetDecodedECRAuthorizationToken(mockEcrClient)
+	got, err := utils.GetDecodedECRAuthorizationToken(mockEcrClient)
 	require.NoError(t, err)
 	assert.Equal(t, want, got)
 }
@@ -357,7 +358,7 @@ func TestGetDecodedECRAuthorizationTokenErrors(t *testing.T) {
 		t.Run(scenario.description, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := GetDecodedECRAuthorizationToken(scenario.mockEcrClient)
+			got, err := utils.GetDecodedECRAuthorizationToken(scenario.mockEcrClient)
 			assert.ErrorContains(t, err, scenario.wantError)
 			assert.Nil(t, got)
 		})
@@ -402,7 +403,7 @@ func TestHasValidAwsSession(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
-			valid := HasValidAwsSession(tc.mockStsClient)
+			valid := utils.HasValidAwsSession(tc.mockStsClient)
 			assert.Equal(t, tc.expectedValid, valid)
 		})
 	}
@@ -457,7 +458,7 @@ func TestEnsureValidAwsSession(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			t.Parallel()
 
-			err := EnsureValidAwsSession(tc.mockStsClient, tc.awsConfigFile, tc.awsProfile, tc.shouldTryAwsSso)
+			err := utils.EnsureValidAwsSession(tc.mockStsClient, tc.awsConfigFile, tc.awsProfile, tc.shouldTryAwsSso)
 			if tc.wantError == "" {
 				assert.NoError(t, err)
 			} else {

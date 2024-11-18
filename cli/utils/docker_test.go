@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/docker/api/types/registry"
+	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +68,7 @@ func TestDockerLogin(t *testing.T) {
 		t.Run(scenario.description, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := DockerLogin(scenario.mockDockerCli, scenario.username, scenario.password, scenario.serverAddress)
+			got, err := utils.DockerLogin(scenario.mockDockerCli, scenario.username, scenario.password, scenario.serverAddress)
 			if scenario.wantError == "" {
 				require.NoError(t, err)
 			} else {
