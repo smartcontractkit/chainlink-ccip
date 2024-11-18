@@ -45,10 +45,6 @@ var CCTPDestDomains = map[uint64]uint32{
 	sel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector: 3,
 	sel.ETHEREUM_TESTNET_SEPOLIA_BASE_1.Selector:     6,
 	sel.POLYGON_TESTNET_AMOY.Selector:                7,
-	// Tests
-	sel.GETH_TESTNET.Selector:  100,
-	sel.GETH_DEVNET_2.Selector: 101,
-	sel.GETH_DEVNET_3.Selector: 103,
 }
 
 type usdcMessageReader struct {
@@ -109,9 +105,32 @@ func NewUSDCMessageReader(
 	return usdcMessageReader{
 		lggr:            lggr,
 		contractReaders: contractReaders,
-		cctpDestDomain:  CCTPDestDomains,
+		cctpDestDomain:  AllAvailableDomains(),
 		boundContracts:  boundContracts,
 	}, nil
+}
+
+// FIXME It adds test selectors to the domains
+func AllAvailableDomains() map[uint64]uint32 {
+	chainIDs := make([]uint64, 3+101)
+	chainIDs[0] = 1337
+	chainIDs[1] = 2337
+	chainIDs[2] = 3337
+	for i := 0; i <= 100; i++ {
+		chainIDs[3+i] = 90000000 + uint64(i)
+	}
+
+	destDomains := make(map[uint64]uint32)
+	for k, v := range CCTPDestDomains {
+		destDomains[k] = v
+	}
+
+	for i, chainID := range chainIDs {
+		chainSelector, _ := sel.SelectorFromChainId(chainID)
+		destDomains[chainSelector] = uint32(i + 100)
+	}
+
+	return destDomains
 }
 
 func (u usdcMessageReader) MessageHashes(
@@ -256,6 +275,8 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 //	   destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
 //	   destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
 //	 });
+//
+// Implementation relies on the EVM internals, so entire struct is EVM-specific and can't be reused for other chains
 type SourceTokenDataPayload struct {
 	Nonce        uint64
 	SourceDomain uint32
@@ -269,14 +290,14 @@ func NewSourceTokenDataPayload(nonce uint64, sourceDomain uint32) *SourceTokenDa
 }
 
 func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceTokenDataPayload, error) {
-	if len(extraData) < 12 {
-		return nil, fmt.Errorf("extraData is too short, expected at least 12 bytes")
+	if len(extraData) < 64 {
+		return nil, fmt.Errorf("extraData is too short, expected at least 64 bytes")
 	}
 
-	// Extract the nonce (first 8 bytes)
-	nonce := binary.BigEndian.Uint64(extraData[:8])
-	// Extract the sourceDomain (next 4 bytes)
-	sourceDomain := binary.BigEndian.Uint32(extraData[8:12])
+	// Extract the nonce (first 8 bytes), padded to 32 bytes
+	nonce := binary.BigEndian.Uint64(extraData[24:32])
+	// Extract the sourceDomain (next 4 bytes), padded to 32 bytes
+	sourceDomain := binary.BigEndian.Uint32(extraData[60:64])
 
 	return &SourceTokenDataPayload{
 		Nonce:        nonce,
@@ -285,11 +306,11 @@ func NewSourceTokenDataPayloadFromBytes(extraData cciptypes.Bytes) (*SourceToken
 }
 
 func (s SourceTokenDataPayload) ToBytes() cciptypes.Bytes {
-	nonceBytes := [8]byte{}
-	binary.BigEndian.PutUint64(nonceBytes[:], s.Nonce)
+	nonceBytes := [32]byte{} // padded to 32 bytes
+	binary.BigEndian.PutUint64(nonceBytes[24:32], s.Nonce)
 
-	sourceDomainBytes := [4]byte{}
-	binary.BigEndian.PutUint32(sourceDomainBytes[:], s.SourceDomain)
+	sourceDomainBytes := [32]byte{} // padded to 32 bytes
+	binary.BigEndian.PutUint32(sourceDomainBytes[28:32], s.SourceDomain)
 
 	return append(nonceBytes[:], sourceDomainBytes[:]...)
 }
