@@ -211,7 +211,7 @@ func (w *Processor) getObservation(ctx context.Context, q Query, previousOutcome
 	case SelectingRangesForReport:
 		cursedChains := w.observer.ObserveCursedChains(ctx, w.destChain)
 		if slices.Contains(cursedChains, w.destChain) {
-			w.lggr.Errorw("destination chain is cursed, nothing to observe", "destChain", w.destChain)
+			w.lggr.Warnw("destination chain is cursed, nothing to observe", "destChain", w.destChain)
 			return Observation{}, SelectingRangesForReport
 		}
 		if len(cursedChains) > 0 {
