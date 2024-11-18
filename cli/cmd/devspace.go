@@ -13,9 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // devspaceCmd represents the devspace command
@@ -137,19 +136,16 @@ var ensureNamespaceCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		kubeconfig, err := clientcmd.BuildConfigFromFlags("", viper.GetString("KUBECONFIG"))
+		configFlags := genericclioptions.NewConfigFlags(true)
+		kubeconfig := viper.GetString("KUBECONFIG")
+		configFlags.KubeConfig = &kubeconfig
+		k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
 		if err != nil {
-			logger.Error("failed to initialize kubeconfig", slog.Any("error", err))
+			logger.Error("failed to initialize kube client", slog.Any("error", err))
 			os.Exit(1)
 		}
 
-		kubeClientset, err := kubernetes.NewForConfig(kubeconfig)
-		if err != nil {
-			logger.Error("failed to initialize kube clientset", slog.Any("error", err))
-			os.Exit(1)
-		}
-
-		if err := utils.CheckK8sAccess(kubeClientset.CoreV1()); err != nil {
+		if err := k8sClient.CheckAccess(context.TODO()); err != nil {
 			msg := "k8s access not working."
 			if !viper.GetBool("CRIB_CI_ENV") {
 				msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
@@ -169,7 +165,7 @@ var ensureNamespaceCmd = &cobra.Command{
 			slog.String("kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME")),
 		)
 
-		dynamicClient, err := dynamic.NewForConfig(kubeconfig)
+		dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
 		if err != nil {
 			logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
 			os.Exit(1)
@@ -181,7 +177,7 @@ var ensureNamespaceCmd = &cobra.Command{
 			Resource: "rolebindings",
 		}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 
-		if err := utils.EnsureCribNamespaceReady(context.TODO(), kubeClientset.CoreV1().Namespaces(), rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
 			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
 			os.Exit(1)
 		}

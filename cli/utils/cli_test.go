@@ -1,4 +1,4 @@
-package utils
+package utils_test
 
 import (
 	"context"
@@ -17,14 +17,13 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/go-git/go-git/v5"
+	k8smocks "github.com/smartcontractkit/crib/cli/mocks/external/kubernetes"
+	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestGetGitTopLevelDir(t *testing.T) {
@@ -83,7 +82,7 @@ func TestGetGitTopLevelDir(t *testing.T) {
 				require.NoError(t, os.Mkdir(tc.dir, 0o750))
 			}
 
-			topLevelDir, err := GetGitTopLevelDir(tc.dir)
+			topLevelDir, err := utils.GetGitTopLevelDir(tc.dir)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr, err)
@@ -144,7 +143,7 @@ func TestListFiles(t *testing.T) {
 				require.NoError(t, os.Mkdir(tc.dir, 0o750))
 			}
 
-			files, err := ListFiles(tc.dir)
+			files, err := utils.ListFiles(tc.dir)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.IsType(t, tc.expectedErr, err)
@@ -213,7 +212,7 @@ func TestPromptForInput(t *testing.T) {
 			require.NoError(t, err)
 			w.Close()
 
-			result, err := PromptForInput(tc.key, tc.defaultValue)
+			result, err := utils.PromptForInput(tc.key, tc.defaultValue)
 			assert.Equal(t, tc.expected, result)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
@@ -277,7 +276,7 @@ func TestPresentPrompt(t *testing.T) {
 			require.NoError(t, err)
 			w.Close()
 
-			result := PresentPrompt(tc.prompt, tc.choices)
+			result := utils.PresentPrompt(tc.prompt, tc.choices)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -385,7 +384,7 @@ func TestWriteConfig(t *testing.T) {
 			}
 			tempFile.Close()
 
-			err = WriteConfig(tempFile.Name(), tc.kv)
+			err = utils.WriteConfig(tempFile.Name(), tc.kv)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
@@ -447,7 +446,7 @@ func TestExtractHostFromUrl(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			result, err := ExtractHostFromUrl(tc.input)
+			result, err := utils.ExtractHostFromUrl(tc.input)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.IsType(t, tc.expectedErr, err)
@@ -521,7 +520,7 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 		mockDockerCli            wrappers.DockerCLI
 		mockHelmRegistryClient   wrappers.HelmRegistryAPI
 		chainlinkHelmRegistryUri string
-		wantOutput               *RefreshRegistriesECRCredentialsOutput
+		wantOutput               *utils.RefreshRegistriesECRCredentialsOutput
 	}{
 		{
 			name:                     "SuccessfulRefreshDockerAndHelmRegistries",
@@ -529,8 +528,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            mockDockerCli,
 			mockHelmRegistryClient:   mockHelmRegistryClient,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost,
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
@@ -550,8 +549,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            mockDockerCli,
 			mockHelmRegistryClient:   nil,
 			chainlinkHelmRegistryUri: "",
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
@@ -566,8 +565,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            nil,
 			mockHelmRegistryClient:   mockHelmRegistryClient,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost,
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{
 					{
 						RegistryType: "helm",
 						RegistryHost: strings.TrimPrefix(mockHelmRegistryHost, "oci://"),
@@ -582,8 +581,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            nil,
 			mockHelmRegistryClient:   nil,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost, // shouldn't make a difference, as helmRegistryClient is nil
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{},
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{},
 			},
 		},
 		{
@@ -592,8 +591,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            mockDockerCliFailed,
 			mockHelmRegistryClient:   mockHelmRegistryClient,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost,
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
@@ -613,8 +612,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            mockDockerCli,
 			mockHelmRegistryClient:   mockHelmRegistryClientFailed,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost,
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
@@ -634,8 +633,8 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            mockDockerCliFailed,
 			mockHelmRegistryClient:   mockHelmRegistryClientFailed,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost,
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
-				RegistryLoginAttempts: &[]RegistryLoginAttempt{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
+				RegistryLoginAttempts: &[]utils.RegistryLoginAttempt{
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
@@ -655,9 +654,9 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			mockDockerCli:            mockDockerCli,
 			mockHelmRegistryClient:   mockHelmRegistryClient,
 			chainlinkHelmRegistryUri: mockHelmRegistryHost,
-			wantOutput: &RefreshRegistriesECRCredentialsOutput{
+			wantOutput: &utils.RefreshRegistriesECRCredentialsOutput{
 				ECRGetAuthorizationTokenError: fmt.Errorf("unable to fetch ECR authorization token, %v", mockEcrClientFailedErr),
-				RegistryLoginAttempts:         &[]RegistryLoginAttempt{},
+				RegistryLoginAttempts:         &[]utils.RegistryLoginAttempt{},
 			},
 		},
 	}
@@ -665,7 +664,7 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tc.wantOutput, RefreshRegistriesECRCredentials(tc.mockEcrClient, tc.mockDockerCli, tc.mockHelmRegistryClient, tc.chainlinkHelmRegistryUri))
+			assert.Equal(t, tc.wantOutput, utils.RefreshRegistriesECRCredentials(tc.mockEcrClient, tc.mockDockerCli, tc.mockHelmRegistryClient, tc.chainlinkHelmRegistryUri))
 		})
 	}
 }
@@ -715,7 +714,7 @@ func TestIsValidCribNamespace(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := IsValidCribNamespace(tc.namespace, tc.skipPrefixCheck)
+			err := utils.IsValidCribNamespace(tc.namespace, tc.skipPrefixCheck)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
@@ -733,14 +732,13 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 	defaultsleepBetweenAttempts := 100 * time.Millisecond
 
 	testCases := []struct {
-		name                          string
-		namespace                     string
-		provider                      string
-		waitTimeout                   *time.Duration
-		sleepBetweenAttempts          *time.Duration
-		applyNamespaceClientMockCalls func(*wrappermocks.NamespaceInterface)
-		applyResourceClientMockCalls  func(*wrappermocks.ResourceInterface)
-		expectedErr                   error
+		name                    string
+		namespace               string
+		provider                string
+		waitTimeout             *time.Duration
+		sleepBetweenAttempts    *time.Duration
+		applyK8sClientMockCalls func(*wrappermocks.K8sCLI)
+		expectedErr             error
 	}{
 		{
 			name:                 "NamespaceExistsAWSProvider",
@@ -748,15 +746,13 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
-			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
-					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
-					Return(&v1.Namespace{}, nil)
-			},
-			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(true, nil)
 				m.EXPECT().
-					Get(context.TODO(), "crib-test-crib-poweruser", metav1.GetOptions{}).
-					Return(&unstructured.Unstructured{}, nil)
+					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -766,22 +762,13 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
-			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
-					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
-					Return(nil, errors.New("namespace not found"))
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(false, nil)
 				m.EXPECT().
-					Create(context.TODO(), &v1.Namespace{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "crib-test",
-						},
-					}, metav1.CreateOptions{}).
-					Return(&v1.Namespace{}, nil)
-			},
-			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {
-				m.EXPECT().
-					Get(context.TODO(), "crib-test-crib-poweruser", metav1.GetOptions{}).
-					Return(&unstructured.Unstructured{}, nil)
+					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -791,13 +778,12 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "kind",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
-			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
-					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
-					Return(&v1.Namespace{}, nil)
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(true, nil)
 			},
-			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {},
-			expectedErr:                  nil,
+			expectedErr: nil,
 		},
 		{
 			name:                 "NamespaceCreationFails",
@@ -805,20 +791,12 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
-			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
-					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
-					Return(nil, errors.New("namespace not found"))
-				m.EXPECT().
-					Create(context.TODO(), &v1.Namespace{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "crib-test",
-						},
-					}, metav1.CreateOptions{}).
-					Return(nil, errors.New("failed to create namespace"))
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(false, errors.New("failed to create namespace crib-test: failed to create namespace"))
 			},
-			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {},
-			expectedErr:                  fmt.Errorf("failed to ensure namespace existence: failed to create namespace crib-test: %w", errors.New("failed to create namespace")),
+			expectedErr: fmt.Errorf("failed to ensure namespace existence: failed to create namespace crib-test: %w", errors.New("failed to create namespace")),
 		},
 		{
 			name:                 "RoleBindingCreationFails",
@@ -826,15 +804,13 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 			provider:             "aws",
 			waitTimeout:          &defaultWaitTimeout,
 			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
-			applyNamespaceClientMockCalls: func(m *wrappermocks.NamespaceInterface) {
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
 				m.EXPECT().
-					Get(context.TODO(), "crib-test", metav1.GetOptions{}).
-					Return(&v1.Namespace{}, nil)
-			},
-			applyResourceClientMockCalls: func(m *wrappermocks.ResourceInterface) {
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(false, nil)
 				m.EXPECT().
-					Get(context.TODO(), "crib-test-crib-poweruser", metav1.GetOptions{}).
-					Return(nil, errors.New("role binding not found"))
+					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(errors.New("timed out waiting for resource crib-test-crib-poweruser"))
 			},
 			expectedErr: fmt.Errorf("failed to wait for crib-power-user role binding to be created: %w", errors.New("timed out waiting for resource crib-test-crib-poweruser")),
 		},
@@ -844,13 +820,9 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			mockNamespaceClient := wrappermocks.NewNamespaceInterface(t)
-			mockRolebindingClient := wrappermocks.NewResourceInterface(t)
-
-			tc.applyNamespaceClientMockCalls(mockNamespaceClient)
-			tc.applyResourceClientMockCalls(mockRolebindingClient)
-
-			err := EnsureCribNamespaceReady(context.TODO(), mockNamespaceClient, mockRolebindingClient, tc.namespace, tc.provider, tc.waitTimeout, tc.sleepBetweenAttempts)
+			mockK8sClient := wrappermocks.NewK8sCLI(t)
+			tc.applyK8sClientMockCalls(mockK8sClient)
+			err := utils.EnsureCribNamespaceReady(context.TODO(), mockK8sClient, k8smocks.NewResourceInterface(t), tc.namespace, tc.provider, tc.waitTimeout, tc.sleepBetweenAttempts)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())

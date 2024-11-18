@@ -1,9 +1,10 @@
-package utils
+package utils_test
 
 import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,7 @@ func TestHelmRegistryLogin(t *testing.T) {
 		t.Run(scenario.description, func(t *testing.T) {
 			t.Parallel()
 
-			err := HelmRegistryLogin(scenario.mockHelmRegistryClient, scenario.username, scenario.password, scenario.serverAddress)
+			err := utils.HelmRegistryLogin(scenario.mockHelmRegistryClient, scenario.username, scenario.password, scenario.serverAddress)
 			if scenario.wantError == "" {
 				require.NoError(t, err)
 			} else {
