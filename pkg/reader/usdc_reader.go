@@ -275,6 +275,8 @@ func (u usdcMessageReader) recreateMessageTransmitterEvents(
 //	   destTokenAddress: getRemoteToken(lockOrBurnIn.remoteChainSelector),
 //	   destPoolData: abi.encode(SourceTokenDataPayload({nonce: nonce, sourceDomain: i_localDomainIdentifier}))
 //	 });
+//
+// Implementation relies on the EVM internals, so entire struct is EVM-specific and can't be reused for other chains
 type SourceTokenDataPayload struct {
 	Nonce        uint64
 	SourceDomain uint32
