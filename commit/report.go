@@ -46,6 +46,13 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("decode outcome: %w", err)
 	}
 
+	// Gas prices and token prices do not need to get reported when merkle roots do not exist.
+	if outcome.MerkleRootOutcome.OutcomeType != merkleroot.ReportGenerated {
+		p.lggr.Infow("skipping report generation merkle roots do not exist",
+			"merkleRootProcessorOutcomeType", outcome.MerkleRootOutcome.OutcomeType)
+		return []ocr3types.ReportPlus[[]byte]{}, nil
+	}
+
 	p.lggr.Infow("generating report",
 		"roots", outcome.MerkleRootOutcome.RootsToReport,
 		"tokenPriceUpdates", outcome.TokenPriceOutcome.TokenPrices,
