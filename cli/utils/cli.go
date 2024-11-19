@@ -224,7 +224,7 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 		dockerRegistryHost, err := ExtractHostFromUrl(ecrAuthToken[0].RegistryURL)
 		if err == nil {
 			dockerRegistryLoginAttempt.RegistryHost = dockerRegistryHost
-			if _, loginErr := DockerLogin(dockerCli, ecrAuthToken[0].Username, ecrAuthToken[0].Password, dockerRegistryHost); loginErr != nil {
+			if _, loginErr := dockerCli.Login(ecrAuthToken[0].Username, ecrAuthToken[0].Password, dockerRegistryHost); loginErr != nil {
 				dockerRegistryLoginAttempt.LoginErr = loginErr
 			}
 		} else {

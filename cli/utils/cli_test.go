@@ -14,7 +14,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/docker/api/types/registry"
 	"github.com/go-git/go-git/v5"
 	k8smocks "github.com/smartcontractkit/crib/cli/mocks/external/kubernetes"
@@ -483,23 +482,18 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 			context.TODO(), &ecr.GetAuthorizationTokenInput{},
 		).Return(nil, mockEcrClientFailedErr)
 
-	mockDockerClient := wrappermocks.NewDockerAPI(t)
 	mockDockerCli := wrappermocks.NewDockerCLI(t)
-	mockDockerClient.EXPECT().
-		RegistryLogin(
-			context.TODO(), registry.AuthConfig{Username: "user", Password: "password", ServerAddress: strings.TrimPrefix(mockDockerRegistryHost, "https://")},
-		).Return(registry.AuthenticateOKBody{IdentityToken: "", Status: "Login Succeeded"}, nil)
-	mockDockerCli.EXPECT().Client().Return(mockDockerClient)
-	mockDockerCli.EXPECT().ConfigFile().Return(configfile.New(filepath.Join(t.TempDir(), "config.json"))) // TODO: revisit
+	mockDockerCli.EXPECT().
+		Login(
+			"user", "password", strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+		).Return(&registry.AuthenticateOKBody{IdentityToken: "", Status: "Login Succeeded"}, nil)
 
-	mockDockerClientFailed := wrappermocks.NewDockerAPI(t)
 	mockDockerCliFailed := wrappermocks.NewDockerCLI(t)
 	mockDockerCliFailedErr := errors.New("failed to docker login")
-	mockDockerClientFailed.EXPECT().
-		RegistryLogin(
-			context.TODO(), registry.AuthConfig{Username: "user", Password: "password", ServerAddress: strings.TrimPrefix(mockDockerRegistryHost, "https://")},
-		).Return(registry.AuthenticateOKBody{}, mockDockerCliFailedErr)
-	mockDockerCliFailed.EXPECT().Client().Return(mockDockerClientFailed)
+	mockDockerCliFailed.EXPECT().
+		Login(
+			"user", "password", strings.TrimPrefix(mockDockerRegistryHost, "https://"),
+		).Return(&registry.AuthenticateOKBody{}, mockDockerCliFailedErr)
 
 	mockHelmRegistryClient := wrappermocks.NewHelmRegistryAPI(t)
 	mockHelmRegistryClient.EXPECT().
@@ -596,7 +590,7 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
-						LoginErr:     fmt.Errorf("failed to docker login: %v", mockDockerCliFailedErr),
+						LoginErr:     mockDockerCliFailedErr,
 					},
 					{
 						RegistryType: "helm",
@@ -638,7 +632,7 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 					{
 						RegistryType: "docker",
 						RegistryHost: strings.TrimPrefix(mockDockerRegistryHost, "https://"),
-						LoginErr:     fmt.Errorf("failed to docker login: %v", mockDockerCliFailedErr),
+						LoginErr:     mockDockerCliFailedErr,
 					},
 					{
 						RegistryType: "helm",
