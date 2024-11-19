@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -168,7 +169,7 @@ func Test_getPendingExecutedReports(t *testing.T) {
 }
 
 func TestPlugin_Close(t *testing.T) {
-	p := &Plugin{}
+	p := &Plugin{tokenDataObserver: &tokendata.NoopTokenDataObserver{}}
 	require.NoError(t, p.Close())
 }
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
@@ -56,15 +57,7 @@ func Test_backgroundObserver(t *testing.T) {
 	// call initial Observe and assert that all token data are empty since jobs were just scheduled
 	tokenDataObservations, err := observer.Observe(ctx, msgObservations)
 	require.NoError(t, err)
-	require.Equal(t, len(msgObservations), len(tokenDataObservations))
-	for chain, seqNums := range tokenDataObservations {
-		require.Equal(t, len(msgObservations[chain]), len(seqNums))
-		for _, tokenData := range seqNums {
-			for _, td := range tokenData.TokenData {
-				require.Equal(t, exectypes.TokenData{Supported: true}, td)
-			}
-		}
-	}
+	assertTokenDataEmptyInitially(t, msgObservations, tokenDataObservations)
 
 	// call Observe again until all data are present - the NoOp base observer simply sets ready to true
 	require.Eventually(t, func() bool {
@@ -106,9 +99,24 @@ func Test_backgroundObserver(t *testing.T) {
 		return true
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
-	// Test cache expiration and expiration loop.
+	testCacheExpirationAndShutdown(t, observer.(*backgroundObserver), numMsgsPerChain)
+}
 
-	rawObserver := observer.(*backgroundObserver)
+func assertTokenDataEmptyInitially(t *testing.T,
+	msgObservations exectypes.MessageObservations, tokenDataObservations exectypes.TokenDataObservations) {
+	require.Equal(t, len(msgObservations), len(tokenDataObservations))
+	for chain, seqNums := range tokenDataObservations {
+		require.Equal(t, len(msgObservations[chain]), len(seqNums))
+		for _, tokenData := range seqNums {
+			for _, td := range tokenData.TokenData {
+				require.Equal(t, exectypes.TokenData{Supported: true}, td)
+			}
+		}
+	}
+}
+
+func testCacheExpirationAndShutdown(
+	t *testing.T, rawObserver *backgroundObserver, numMsgsPerChain map[cciptypes.ChainSelector]int) {
 	// keep only len(chains) messages in the cache
 	msgsToKeep := len(numMsgsPerChain)
 	i := 0
@@ -132,10 +140,12 @@ func Test_backgroundObserver(t *testing.T) {
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
 	// graceful shutdown
-	rawObserver.Close()
+	assert.NoError(t, rawObserver.Close())
 }
 
-func generateMsgObservations(numMsgsPerChain map[cciptypes.ChainSelector]int) (exectypes.MessageObservations, map[cciptypes.ChainSelector][]cciptypes.SeqNum) {
+func generateMsgObservations(
+	numMsgsPerChain map[cciptypes.ChainSelector]int,
+) (exectypes.MessageObservations, map[cciptypes.ChainSelector][]cciptypes.SeqNum) {
 	msgObservations := exectypes.MessageObservations{}
 	errorMsgs := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 	for chain, numMsgs := range numMsgsPerChain {

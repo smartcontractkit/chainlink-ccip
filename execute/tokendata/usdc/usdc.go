@@ -83,6 +83,10 @@ func (u *TokenDataObserver) IsTokenSupported(
 	return ok
 }
 
+func (u *TokenDataObserver) Close() error {
+	return nil
+}
+
 func (u *TokenDataObserver) pickOnlyUSDCMessages(
 	messageObservations exectypes.MessageObservations,
 ) map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.RampTokenAmount {

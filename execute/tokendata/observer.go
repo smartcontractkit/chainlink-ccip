@@ -34,6 +34,9 @@ type TokenDataObserver interface {
 
 	// IsTokenSupported returns true if the token is supported by the observer.
 	IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool
+
+	// Close closes the observer and releases any resources.
+	Close() error
 }
 
 // compositeTokenDataObserver is a TokenDataObserver that combines multiple TokenDataObserver behind the same interface.
@@ -147,6 +150,15 @@ func (c *compositeTokenDataObserver) IsTokenSupported(
 	return false
 }
 
+func (c *compositeTokenDataObserver) Close() error {
+	for _, ob := range c.observers {
+		if err := ob.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // initTokenDataObservations initializes the token data observations with empty token data, it asks the child observers
 // whether the token is supported or not. If token is supported and requires additional processing we set its state to
 // isReady=false. If token is noop (doesn't require offchain processing) we initialize it with empty
@@ -229,6 +241,10 @@ func (n *NoopTokenDataObserver) Observe(
 		}
 	}
 	return tokenObservations, nil
+}
+
+func (n *NoopTokenDataObserver) Close() error {
+	return nil
 }
 
 func (n *NoopTokenDataObserver) isError(selector cciptypes.ChainSelector, seq cciptypes.SeqNum, tokenIdx int) bool {

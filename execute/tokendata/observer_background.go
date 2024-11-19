@@ -132,9 +132,10 @@ func (o *backgroundObserver) IsTokenSupported(
 }
 
 // Close stops the background goroutines and cleans up resources.
-func (o *backgroundObserver) Close() {
+func (o *backgroundObserver) Close() error {
 	close(o.done)
 	o.wg.Wait()
+	return nil
 }
 
 // startWorkers starts the worker goroutines that process messages from the queue.
