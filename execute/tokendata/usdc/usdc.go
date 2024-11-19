@@ -3,6 +3,7 @@ package usdc
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"golang.org/x/exp/maps"
 
@@ -208,5 +209,7 @@ func (u *TokenDataObserver) attestationToTokenData(
 }
 
 func sourceTokenIdentifier(chainSelector cciptypes.ChainSelector, sourcePoolAddress string) string {
-	return fmt.Sprintf("%d-%s", chainSelector, sourcePoolAddress)
+	// Lowercase the sourcePoolAddress to make the identifier case-insensitive.
+	// It makes the code immune to the differences between checksum and non-checksum addresses.
+	return fmt.Sprintf("%d-%s", chainSelector, strings.ToLower(sourcePoolAddress))
 }

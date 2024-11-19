@@ -58,7 +58,7 @@ func TestPluginReports(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "token prices reported but no merkle roots so report is empty",
+			name: "token prices reported without merkle root is still transmitted",
 			outc: Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmissionFailed,
@@ -74,10 +74,46 @@ func TestPluginReports(t *testing.T) {
 					},
 				},
 			},
-			expErr: false,
+			expReports: []ccipocr3.CommitPluginReport{
+				{
+					PriceUpdates: ccipocr3.PriceUpdates{
+						TokenPriceUpdates: []ccipocr3.TokenPrice{
+							{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+						},
+						GasPriceUpdates: []ccipocr3.GasPriceChain{
+							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+						},
+					},
+					RMNSignatures: nil,
+				},
+			},
+			expReportInfo: ReportInfo{},
+			expErr:        false,
 		},
 		{
-			name: "token prices reported but no merkle roots so report is empty",
+			name: "only chain fee reported without merkle root is still transmitted",
+			outc: Outcome{
+				ChainFeeOutcome: chainfee.Outcome{
+					GasPrices: []ccipocr3.GasPriceChain{
+						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+					},
+				},
+			},
+			expReports: []ccipocr3.CommitPluginReport{
+				{
+					PriceUpdates: ccipocr3.PriceUpdates{
+						GasPriceUpdates: []ccipocr3.GasPriceChain{
+							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+						},
+					},
+					RMNSignatures: nil,
+				},
+			},
+			expReportInfo: ReportInfo{},
+			expErr:        false,
+		},
+		{
+			name: "token prices reported but no merkle roots so report is not empty",
 			outc: Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportGenerated,

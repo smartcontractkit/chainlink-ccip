@@ -340,12 +340,17 @@ func Test_SourceTokenDataPayload_FromBytes(t *testing.T) {
 		},
 		{
 			name: "empty data but with proper length",
-			data: make([]byte, 12),
+			data: make([]byte, 64),
 			want: NewSourceTokenDataPayload(0, 0),
 		},
 		{
 			name: "data with nonce and source domain",
-			data: []byte{0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2},
+			data: []byte{
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+			},
 			want: NewSourceTokenDataPayload(1, 2),
 		},
 	}
