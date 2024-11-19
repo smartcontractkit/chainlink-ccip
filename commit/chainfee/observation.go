@@ -19,7 +19,7 @@ func (p *processor) Observation(
 	}
 
 	// Get the fee components for all available chains that we can read from
-	feeComponents := p.ccipReader.GetAvailableChainsFeeComponents(ctx, supportedChains.ToSlice())
+	feeComponents := p.ccipReader.GetChainsFeeComponents(ctx, supportedChains.ToSlice())
 	// Get the native token prices for all available chains that we can read from
 	nativeTokenPrices := p.ccipReader.GetWrappedNativeTokenPriceUSD(ctx, supportedChains.ToSlice())
 	// Get the latest chain fee price updates for the source chains

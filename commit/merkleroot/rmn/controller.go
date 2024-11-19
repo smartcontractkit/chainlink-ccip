@@ -179,7 +179,7 @@ func (c *controller) ComputeReportSignatures(
 			return nil, fmt.Errorf("no home F for chain %d", chain)
 		}
 
-		if consensus.Threshold(l.RmnNodes.Cardinality()) < consensus.FPlus1(homeChainF) {
+		if consensus.LtFPlusOne(homeChainF, l.RmnNodes.Cardinality()) {
 			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
 				"chain", chain,
 				"homeF", homeFMap[cciptypes.ChainSelector(chain)],
@@ -312,7 +312,7 @@ func (c *controller) getRmnSignedObservations(
 			if !exist {
 				return nil, fmt.Errorf("no home F for chain %d", sourceChain)
 			}
-			if consensus.Threshold(requestedNodes[sourceChain].Cardinality()) >= consensus.FPlus1(homeChainF) {
+			if consensus.GteFPlusOne(homeChainF, requestedNodes[sourceChain].Cardinality()) {
 				chainsWithEnoughRequests.Add(sourceChain)
 			}
 		}
@@ -516,7 +516,7 @@ func gotSufficientObservationResponses(
 
 		values := maps.Values(countsPerRoot)
 		sort.Slice(values, func(i, j int) bool { return values[i] < values[j] })
-		if consensus.Threshold(values[len(values)-1]) < consensus.FPlus1(homeChainF) {
+		if consensus.LtFPlusOne(homeChainF, values[len(values)-1]) {
 			return false
 		}
 	}
@@ -764,7 +764,7 @@ func selectRoots(
 		var selectedRoot cciptypes.Bytes32
 
 		for root, vote := range votes {
-			if consensus.Threshold(vote) < consensus.FPlus1(homeF) {
+			if consensus.LtFPlusOne(homeF, vote) {
 				continue
 			}
 
@@ -798,7 +798,7 @@ func (c *controller) sendReportSignatureRequest(
 
 	// Send the report signature request to at least #remoteF+1
 	for _, node := range randomShuffle(remoteSigners) {
-		if consensus.Threshold(requestIDs.Cardinality()) >= consensus.FPlus1(remoteF) {
+		if consensus.GteFPlusOne(remoteF, requestIDs.Cardinality()) {
 			break
 		}
 
@@ -827,7 +827,7 @@ func (c *controller) sendReportSignatureRequest(
 		signersRequested.Add(rmntypes.NodeID(node.NodeIndex))
 	}
 
-	if consensus.Threshold(requestIDs.Cardinality()) < consensus.FPlus1(remoteF) {
+	if consensus.LtFPlusOne(remoteF, requestIDs.Cardinality()) {
 		return requestIDs, signersRequested, fmt.Errorf("not able to send to enough report signers")
 	}
 	return requestIDs, signersRequested, nil
@@ -878,7 +878,7 @@ func (c *controller) listenForRmnReportSignatures(
 				reportSigs = append(reportSigs, *reportSig)
 			}
 
-			if consensus.Threshold(len(reportSigs)) >= consensus.FPlus1(remoteF) {
+			if consensus.GteFPlusOne(remoteF, len(reportSigs)) {
 				c.lggr.Infof("got enough RMN report signatures")
 				return sortAndParseReportSigs(reportSigs), nil
 			}
