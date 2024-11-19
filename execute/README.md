@@ -5,7 +5,7 @@ and manages their execution. The data required is spread across source and
 destination chains, so the process takes multiple rounds of consensus before
 any given commit can be executed.
 
-## Commit Plugin Design
+## Execute Plugin Design
 
 The plugin is implemented as a state machine, and moves from state to state
 each round. There are 3 main states:
