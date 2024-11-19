@@ -204,6 +204,7 @@ func merge(
 
 type NoopTokenDataObserver struct {
 	tokenSupported bool
+	errorTokenData map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int
 }
 
 func (n *NoopTokenDataObserver) Observe(
@@ -219,11 +220,42 @@ func (n *NoopTokenDataObserver) Observe(
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i := range message.TokenAmounts {
 				tokenData[i] = exectypes.NewNoopTokenData()
+				if n.isError(selector, seq, i) {
+					tokenData[i].Ready = false
+					tokenData[i].Error = errors.New("some error")
+				}
 			}
 			tokenObservations[selector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}
 	}
 	return tokenObservations, nil
+}
+
+func (n *NoopTokenDataObserver) isError(selector cciptypes.ChainSelector, seq cciptypes.SeqNum, tokenIdx int) bool {
+	if n.errorTokenData[selector] == nil {
+		return false
+	}
+
+	if _, exists := n.errorTokenData[selector]; !exists {
+		return false
+	}
+
+	if _, exists := n.errorTokenData[selector][seq]; !exists {
+		return false
+	}
+
+	tokenIdxs, exists := n.errorTokenData[selector][seq]
+	if !exists {
+		return false
+	}
+
+	for _, idx := range tokenIdxs {
+		if idx == tokenIdx {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (n *NoopTokenDataObserver) IsTokenSupported(_ cciptypes.ChainSelector, _ cciptypes.RampTokenAmount) bool {

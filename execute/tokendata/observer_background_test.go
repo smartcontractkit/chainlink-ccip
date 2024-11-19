@@ -3,6 +3,7 @@ package tokendata
 import (
 	"fmt"
 	rand2 "math/rand"
+	"slices"
 	"testing"
 	"time"
 
@@ -20,7 +21,6 @@ func Test_backgroundObserver(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := mocks.NullLogger
 
-	baseObserver := &NoopTokenDataObserver{tokenSupported: true}
 	numWorkers := 10
 	cacheExpirationInterval := 10 * time.Minute
 	cacheCleanupInterval := 15 * time.Minute
@@ -32,7 +32,18 @@ func Test_backgroundObserver(t *testing.T) {
 		3000: 1 + rand2.Intn(30),
 		4000: 1 + rand2.Intn(40),
 	}
+	// generate the msg observations
+	msgObservations, errorMsgs := generateMsgObservations(numMsgsPerChain)
 
+	errorTokenData := map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int{}
+	for chain, seqNums := range errorMsgs {
+		errorTokenData[chain] = map[cciptypes.SeqNum][]int{}
+		for _, seqNum := range seqNums {
+			errorTokenData[chain][seqNum] = []int{1} // mark only the second token data as error
+		}
+	}
+
+	baseObserver := &NoopTokenDataObserver{tokenSupported: true, errorTokenData: errorTokenData}
 	observer := NewBackgroundObserver(
 		lggr,
 		baseObserver,
@@ -41,9 +52,6 @@ func Test_backgroundObserver(t *testing.T) {
 		cacheCleanupInterval,
 		observeTimeout,
 	)
-
-	// generate the msg observations
-	msgObservations := generateMsgObservations(numMsgsPerChain)
 
 	// call initial Observe and assert that all token data are empty since jobs were just scheduled
 	tokenDataObservations, err := observer.Observe(ctx, msgObservations)
@@ -75,13 +83,22 @@ func Test_backgroundObserver(t *testing.T) {
 			if len(msgObservations[chain]) != len(seqNums) {
 				return false
 			}
+
+			errorMsgsOfChain := errorMsgs[chain]
+
 			for seqNum, tokenData := range seqNums {
-				if len(msgObservations[chain][seqNum].TokenAmounts) != len(tokenData.TokenData) {
-					return false
-				}
-				for _, td := range tokenData.TokenData {
-					if !td.Ready {
+				if slices.Contains(errorMsgsOfChain, seqNum) {
+					if len(msgObservations[chain][seqNum].TokenAmounts) != len(tokenData.TokenData) {
+						t.Errorf("token data should have an error but token data seem ready for the msg")
+					}
+				} else {
+					if len(msgObservations[chain][seqNum].TokenAmounts) != len(tokenData.TokenData) {
 						return false
+					}
+					for _, td := range tokenData.TokenData {
+						if !td.Ready {
+							return false
+						}
 					}
 				}
 			}
@@ -118,8 +135,9 @@ func Test_backgroundObserver(t *testing.T) {
 	rawObserver.Close()
 }
 
-func generateMsgObservations(numMsgsPerChain map[cciptypes.ChainSelector]int) exectypes.MessageObservations {
+func generateMsgObservations(numMsgsPerChain map[cciptypes.ChainSelector]int) (exectypes.MessageObservations, map[cciptypes.ChainSelector][]cciptypes.SeqNum) {
 	msgObservations := exectypes.MessageObservations{}
+	errorMsgs := make(map[cciptypes.ChainSelector][]cciptypes.SeqNum)
 	for chain, numMsgs := range numMsgsPerChain {
 		msgObservations[chain] = make(map[cciptypes.SeqNum]cciptypes.Message, numMsgs)
 		for i := 0; i < numMsgs; i++ {
@@ -140,12 +158,26 @@ func generateMsgObservations(numMsgsPerChain map[cciptypes.ChainSelector]int) ex
 						DestTokenAddress:  rand.RandomBytes(32),
 						ExtraData:         rand.RandomBytes(32),
 						Amount:            cciptypes.NewBigIntFromInt64(123),
-						DestExecData:      nil,
+					},
+					{
+						SourcePoolAddress: rand.RandomBytes(32),
+						DestTokenAddress:  rand.RandomBytes(32),
+						ExtraData:         rand.RandomBytes(32),
+						Amount:            cciptypes.NewBigIntFromInt64(123),
 					},
 				},
+			}
+
+			// 10% chance of this msg token data to observer to return an error
+			isTokenDataError := rand2.Intn(10) == 0
+			if isTokenDataError {
+				if _, exists := errorMsgs[chain]; !exists {
+					errorMsgs[chain] = []cciptypes.SeqNum{}
+				}
+				errorMsgs[chain] = append(errorMsgs[chain], seqNum)
 			}
 		}
 	}
 
-	return msgObservations
+	return msgObservations, errorMsgs
 }
