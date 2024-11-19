@@ -16,7 +16,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-//nolint:gocyclo // this is a test
 func Test_backgroundObserver(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := mocks.NullLogger
@@ -27,7 +26,7 @@ func Test_backgroundObserver(t *testing.T) {
 	cacheCleanupInterval := 15 * time.Minute
 	observeTimeout := time.Second
 
-	msgsPerChain := map[cciptypes.ChainSelector]int{
+	numMsgsPerChain := map[cciptypes.ChainSelector]int{
 		1000: 1 + rand2.Intn(10),
 		2000: 1 + rand2.Intn(20),
 		3000: 1 + rand2.Intn(30),
@@ -44,33 +43,7 @@ func Test_backgroundObserver(t *testing.T) {
 	)
 
 	// generate the msg observations
-	msgObservations := exectypes.MessageObservations{}
-	for chain, numMsgs := range msgsPerChain {
-		msgObservations[chain] = make(map[cciptypes.SeqNum]cciptypes.Message, numMsgs)
-		for i := 0; i < numMsgs; i++ {
-			seqNum := cciptypes.SeqNum(i)
-			msgIDStr := fmt.Sprintf("%d-%d", chain, i)
-			msgID := cciptypes.Bytes32{}
-			copy(msgID[:], msgIDStr)
-
-			msgObservations[chain][seqNum] = cciptypes.Message{
-				Header: cciptypes.RampMessageHeader{
-					SequenceNumber:      cciptypes.SeqNum(i),
-					SourceChainSelector: chain,
-					MessageID:           msgID,
-				},
-				TokenAmounts: []cciptypes.RampTokenAmount{
-					{
-						SourcePoolAddress: rand.RandomBytes(32),
-						DestTokenAddress:  rand.RandomBytes(32),
-						ExtraData:         rand.RandomBytes(32),
-						Amount:            cciptypes.NewBigIntFromInt64(123),
-						DestExecData:      nil,
-					},
-				},
-			}
-		}
-	}
+	msgObservations := generateMsgObservations(numMsgsPerChain)
 
 	// call initial Observe and assert that all token data are empty since jobs were just scheduled
 	tokenDataObservations, err := observer.Observe(ctx, msgObservations)
@@ -116,11 +89,11 @@ func Test_backgroundObserver(t *testing.T) {
 		return true
 	}, tests.WaitTimeout(t), 50*time.Millisecond)
 
-	// Test cache ecpiration and expiration loop.
+	// Test cache expiration and expiration loop.
 
 	rawObserver := observer.(*backgroundObserver)
 	// keep only len(chains) messages in the cache
-	msgsToKeep := len(msgsPerChain)
+	msgsToKeep := len(numMsgsPerChain)
 	i := 0
 	rawObserver.cachedTokenData.mu.Lock()
 	for msgID := range rawObserver.cachedTokenData.inMemTokenData {
@@ -143,4 +116,36 @@ func Test_backgroundObserver(t *testing.T) {
 
 	// graceful shutdown
 	rawObserver.Close()
+}
+
+func generateMsgObservations(numMsgsPerChain map[cciptypes.ChainSelector]int) exectypes.MessageObservations {
+	msgObservations := exectypes.MessageObservations{}
+	for chain, numMsgs := range numMsgsPerChain {
+		msgObservations[chain] = make(map[cciptypes.SeqNum]cciptypes.Message, numMsgs)
+		for i := 0; i < numMsgs; i++ {
+			seqNum := cciptypes.SeqNum(i)
+			msgIDStr := fmt.Sprintf("%d-%d", chain, i)
+			msgID := cciptypes.Bytes32{}
+			copy(msgID[:], msgIDStr)
+
+			msgObservations[chain][seqNum] = cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					SequenceNumber:      cciptypes.SeqNum(i),
+					SourceChainSelector: chain,
+					MessageID:           msgID,
+				},
+				TokenAmounts: []cciptypes.RampTokenAmount{
+					{
+						SourcePoolAddress: rand.RandomBytes(32),
+						DestTokenAddress:  rand.RandomBytes(32),
+						ExtraData:         rand.RandomBytes(32),
+						Amount:            cciptypes.NewBigIntFromInt64(123),
+						DestExecData:      nil,
+					},
+				},
+			}
+		}
+	}
+
+	return msgObservations
 }

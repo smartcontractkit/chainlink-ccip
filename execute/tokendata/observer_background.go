@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -224,6 +225,7 @@ func (o *backgroundObserver) worker(id int) {
 type msgQueue struct {
 	lggr             logger.Logger
 	msgs             []msgWithInfo
+	msgIDs           mapset.Set[cciptypes.Bytes32]
 	mu               *sync.RWMutex
 	newMsgSignalChan chan struct{}
 }
@@ -240,6 +242,7 @@ func newMsgQueue(lggr logger.Logger) *msgQueue {
 	return &msgQueue{
 		lggr:             lggr,
 		msgs:             make([]msgWithInfo, 0),
+		msgIDs:           mapset.NewSet[cciptypes.Bytes32](),
 		mu:               &sync.RWMutex{},
 		newMsgSignalChan: make(chan struct{}),
 	}
@@ -255,7 +258,7 @@ func (q *msgQueue) enqueue(msg cciptypes.Message, availableAfter time.Duration) 
 	)
 	lggr.Debug("waiting for the lock before adding msg")
 
-	containsMsg := q.containsMsg(msg)
+	containsMsg := q.containsMsg(msg.Header.MessageID)
 	if containsMsg {
 		lggr.Debug("message already exists in the queue")
 		return false
@@ -267,6 +270,7 @@ func (q *msgQueue) enqueue(msg cciptypes.Message, availableAfter time.Duration) 
 		availableAt: time.Now().Add(availableAfter).UTC(),
 		enqueuedAt:  time.Now().UTC(),
 	})
+	q.msgIDs.Add(msg.Header.MessageID)
 	lggr.Debugw("message added to the queue, new msg signal sent", "numMsgs", len(q.msgs))
 	q.mu.Unlock()
 
@@ -298,6 +302,7 @@ func (q *msgQueue) dequeue() (cciptypes.Message, bool) {
 				"enqueuedSince", time.Since(msg.enqueuedAt),
 				"availableSince", time.Since(msg.availableAt),
 			)
+			q.msgIDs.Remove(msg.msg.Header.MessageID)
 			q.msgs = append(q.msgs[:i], q.msgs[i+1:]...)
 			return msg.msg, true
 		}
@@ -307,15 +312,14 @@ func (q *msgQueue) dequeue() (cciptypes.Message, bool) {
 }
 
 // containsMsg returns true if the message is already in the queue
-func (q *msgQueue) containsMsg(msg cciptypes.Message) bool {
+func (q *msgQueue) containsMsg(msgID cciptypes.Bytes32) bool {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 
-	for _, qMsg := range q.msgs {
-		if qMsg.msg.Header.MessageID == msg.Header.MessageID {
-			q.lggr.Debugw("message already exists in the queue", "msg", msg, "qMsg", qMsg)
-			return true
-		}
+	contains := q.msgIDs.Contains(msgID)
+	if contains {
+		q.lggr.Debugw("message already exists in the queue", "msgID", msgID.String())
+		return true
 	}
 
 	return false
