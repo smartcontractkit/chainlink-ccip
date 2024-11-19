@@ -57,17 +57,17 @@ func (p *Plugin) Reports(
 		rep     cciptypes.CommitPluginReport
 		repInfo ReportInfo
 	)
-	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
-		rep = cciptypes.CommitPluginReport{
-			MerkleRoots:   outcome.MerkleRootOutcome.RootsToReport,
-			RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
-		}
-		repInfo = ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F}
+	rep = cciptypes.CommitPluginReport{
+		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
+		PriceUpdates: cciptypes.PriceUpdates{
+			TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
+			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
+		},
+		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
 	}
 
-	rep.PriceUpdates = cciptypes.PriceUpdates{
-		TokenPriceUpdates: outcome.TokenPriceOutcome.TokenPrices,
-		GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
+	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
+		repInfo = ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F}
 	}
 
 	if rep.IsEmpty() {
