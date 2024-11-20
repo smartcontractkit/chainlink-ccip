@@ -285,27 +285,24 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, o.chainSupport.DestChain(), allSourceChains)
 	if err != nil {
-		o.lggr.Errorw("failed to get rmn curse info", "err", err, "sourceChains", allSourceChains)
+		o.lggr.Errorw("nothing to observe: rmn read error",
+			"err", err,
+			"curseInfo", curseInfo,
+			"sourceChains", allSourceChains,
+		)
 		return nil
 	}
-
 	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
-		o.lggr.Warnw("nothing to observe, chain is cursed", "curseInfo", curseInfo)
+		o.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
 		return nil
 	}
 
-	sourceChains := make([]cciptypes.ChainSelector, 0, len(allSourceChains))
-	for _, ch := range allSourceChains {
-		if !curseInfo.CursedSourceChains[ch] {
-			sourceChains = append(sourceChains, ch)
-		}
-	}
-	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
-
+	sourceChains := curseInfo.NonCursedSourceChains(allSourceChains)
 	if len(sourceChains) == 0 {
-		o.lggr.Warnw("nothing to observe from the offramp, no active source chains exist",
+		o.lggr.Warnw(
+			"nothing to observe from the offramp, no active source chains exist",
 			"curseInfo", curseInfo)
 		return nil
 	}
