@@ -1,16 +1,16 @@
 package merkleroot
 
 import (
-	"context"
+	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -183,55 +183,160 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 		name              string
 		observer          commontypes.OracleID
 		supportsDestChain bool
-		expectedError     string
+		rmnRemoteConfig   types.RemoteConfig
+		expectedError     bool
 	}{
 		{
-			name:              "Supports dest chain",
+			name:              "is valid",
 			observer:          1,
 			supportsDestChain: true,
-			expectedError:     "",
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
 		},
 		{
-			name:              "Does not support dest chain",
-			observer:          2,
-			supportsDestChain: false,
-			expectedError:     "oracle 2 does not support dest chain, but has observed a RMNRemoteConfig",
+			name:              "does not support destination chain",
+			observer:          1,
+			supportsDestChain: false, // <--
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
 		},
 		{
-			name:              "Zero observer ID supports dest chain",
-			observer:          0,
-			supportsDestChain: true,
-			expectedError:     "",
-		},
-		{
-			name:              "Zero observer ID does not support dest chain",
-			observer:          0,
-			supportsDestChain: false,
-			expectedError:     "oracle 0 does not support dest chain, but has observed a RMNRemoteConfig",
-		},
-		{
-			name:              "Large observer ID supports dest chain",
+			name:              "empty contract address",
 			observer:          1,
 			supportsDestChain: true,
-			expectedError:     "",
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{}, // <--
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
 		},
 		{
-			name:              "Large observer ID does not support dest chain",
+			name:              "empty config digest",
 			observer:          1,
-			supportsDestChain: false,
-			expectedError:     "oracle 1 does not support dest chain, but has observed a RMNRemoteConfig",
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{}, // <---
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "not enough signers to cover F+1 threshold",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1}, // <----
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "empty rmn report version",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "duplicate signers",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{0, 0, 1}, NodeIndex: 0},
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 1}, // <---------
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
+		},
+		{
+			name:              "empty signer onchain public key",
+			observer:          1,
+			supportsDestChain: true,
+			rmnRemoteConfig: types.RemoteConfig{
+				ContractAddress: []byte{1, 2, 3},
+				ConfigDigest:    cciptypes.Bytes32{1, 2, 3},
+				Signers: []types.RemoteSignerInfo{
+					{OnchainPublicKey: []byte{}, NodeIndex: 0}, // <-----
+					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
+					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
+				},
+				F:                1,
+				ConfigVersion:    1,
+				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
+			},
+			expectedError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain)
-
-			if tt.expectedError == "" {
-				assert.NoError(t, err)
-			} else {
-				assert.EqualError(t, err, tt.expectedError)
+			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain, tt.rmnRemoteConfig)
+			if tt.expectedError {
+				assert.Error(t, err)
+				return
 			}
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -275,77 +380,81 @@ func Test_validateFChain(t *testing.T) {
 
 func Test_validateMerkleRootsState(t *testing.T) {
 	testCases := []struct {
-		name               string
-		reportSeqNums      []plugintypes.SeqNumChain
-		onchainNextSeqNums []cciptypes.SeqNum
-		expValid           bool
-		expErr             bool
+		name                 string
+		onRampNextSeqNum     []plugintypes.SeqNumChain
+		offRampExpNextSeqNum []cciptypes.SeqNum
+		readerErr            error
+		expErr               bool
 	}{
 		{
 			name: "happy path",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
-			expValid:           true,
-			expErr:             false,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			expErr:               false,
 		},
 		{
 			name: "one root is stale",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
-			expValid:           false,
-			expErr:             false,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
+			expErr:               true,
 		},
 		{
 			name: "one root has gap",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 200},
-			expValid:           false,
-			expErr:             false,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			expErr:               true,
 		},
 		{
 			name: "reader returned wrong number of seq nums",
-			reportSeqNums: []plugintypes.SeqNumChain{
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			onchainNextSeqNums: []cciptypes.SeqNum{100, 200, 300},
-			expValid:           false,
-			expErr:             true,
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200, 300},
+			expErr:               true,
+		},
+		{
+			name: "reader error",
+			onRampNextSeqNum: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(10, 100),
+				plugintypes.NewSeqNumChain(20, 200),
+			},
+			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			readerErr:            fmt.Errorf("reader error"),
+			expErr:               true,
 		},
 	}
 
-	ctx := context.Background()
-	lggr := logger.Test(t)
-
+	ctx := tests.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			reader := reader_mock.NewMockCCIPReader(t)
 			rep := cciptypes.CommitPluginReport{}
-			chains := make([]cciptypes.ChainSelector, 0, len(tc.reportSeqNums))
-			for _, snc := range tc.reportSeqNums {
+			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
+			for _, snc := range tc.onRampNextSeqNum {
 				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
 					ChainSel:     snc.ChainSel,
 					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
 				})
 				chains = append(chains, snc.ChainSel)
 			}
-			reader.On("NextSeqNum", ctx, chains).Return(tc.onchainNextSeqNums, nil)
-			valid, err := ValidateMerkleRootsState(ctx, lggr, rep, reader)
+			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
+
+			err := ValidateMerkleRootsState(ctx, rep.MerkleRoots, reader)
 			if tc.expErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.expValid, valid)
 		})
 	}
 }

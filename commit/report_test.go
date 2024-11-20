@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
@@ -55,7 +58,7 @@ func TestPluginReports(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "token prices reported but no merkle roots so report is empty",
+			name: "token prices reported without merkle root is still transmitted",
 			outc: Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmissionFailed,
@@ -71,10 +74,46 @@ func TestPluginReports(t *testing.T) {
 					},
 				},
 			},
-			expErr: false,
+			expReports: []ccipocr3.CommitPluginReport{
+				{
+					PriceUpdates: ccipocr3.PriceUpdates{
+						TokenPriceUpdates: []ccipocr3.TokenPrice{
+							{TokenID: "a", Price: ccipocr3.NewBigIntFromInt64(123)},
+						},
+						GasPriceUpdates: []ccipocr3.GasPriceChain{
+							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+						},
+					},
+					RMNSignatures: nil,
+				},
+			},
+			expReportInfo: ReportInfo{},
+			expErr:        false,
 		},
 		{
-			name: "token prices reported but no merkle roots so report is empty",
+			name: "only chain fee reported without merkle root is still transmitted",
+			outc: Outcome{
+				ChainFeeOutcome: chainfee.Outcome{
+					GasPrices: []ccipocr3.GasPriceChain{
+						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+					},
+				},
+			},
+			expReports: []ccipocr3.CommitPluginReport{
+				{
+					PriceUpdates: ccipocr3.PriceUpdates{
+						GasPriceUpdates: []ccipocr3.GasPriceChain{
+							{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
+						},
+					},
+					RMNSignatures: nil,
+				},
+			},
+			expReportInfo: ReportInfo{},
+			expErr:        false,
+		},
+		{
+			name: "token prices reported but no merkle roots so report is not empty",
 			outc: Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportGenerated,
@@ -130,10 +169,14 @@ func TestPluginReports(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			cs := plugincommon.NewMockChainSupport(t)
 			p := Plugin{
-				lggr:        lggr,
-				reportCodec: reportCodec,
+				lggr:            lggr,
+				reportCodec:     reportCodec,
+				oracleIDToP2PID: map[commontypes.OracleID]libocrtypes.PeerID{1: {1}},
+				chainSupport:    cs,
 			}
+			cs.EXPECT().SupportsDestChain(commontypes.OracleID(1)).Return(true, nil).Maybe()
 
 			outcomeBytes, err := tc.outc.Encode()
 			require.NoError(t, err)

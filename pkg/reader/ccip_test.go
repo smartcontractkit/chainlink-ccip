@@ -21,6 +21,7 @@ import (
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -918,6 +919,61 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	price, err := ccipReader.getFeeQuoterTokenPriceUSD(ctx, []byte{0x3, 0x4})
 	assert.NoError(t, err)
 	assert.Equal(t, cciptypes.NewBigIntFromInt64(145), price)
+}
+
+func TestCCIPFeeComponents_HappyPath(t *testing.T) {
+	cw := writer_mocks.NewMockChainWriter(t)
+	cw.EXPECT().GetFeeComponents(mock.Anything).Return(
+		&types.ChainFeeComponents{
+			ExecutionFee:        big.NewInt(1),
+			DataAvailabilityFee: big.NewInt(2),
+		}, nil,
+	)
+
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	// Missing writer for chainB
+	contractWriters[chainA] = cw
+	contractWriters[chainC] = cw
+	ccipReader := newCCIPChainReaderInternal(
+		tests.Context(t),
+		logger.Test(t),
+		nil,
+		contractWriters,
+		chainC,
+		[]byte{0x3},
+	)
+
+	ctx := context.Background()
+	feeComponents := ccipReader.GetChainsFeeComponents(ctx, []cciptypes.ChainSelector{chainA, chainB, chainC})
+	assert.Len(t, feeComponents, 2)
+	assert.Equal(t, big.NewInt(1), feeComponents[chainA].ExecutionFee)
+	assert.Equal(t, big.NewInt(2), feeComponents[chainA].DataAvailabilityFee)
+	assert.Equal(t, big.NewInt(1), feeComponents[chainC].ExecutionFee)
+	assert.Equal(t, big.NewInt(2), feeComponents[chainC].DataAvailabilityFee)
+
+	destChainFeeComponent, err := ccipReader.GetDestChainFeeComponents(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, big.NewInt(1), destChainFeeComponent.ExecutionFee)
+	assert.Equal(t, big.NewInt(2), destChainFeeComponent.DataAvailabilityFee)
+}
+
+func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
+	cw := writer_mocks.NewMockChainWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	// Missing writer for dest chain chainC
+	contractWriters[chainA] = cw
+	ccipReader := newCCIPChainReaderInternal(
+		tests.Context(t),
+		logger.Test(t),
+		nil,
+		contractWriters,
+		chainC,
+		[]byte{0x3},
+	)
+
+	ctx := context.Background()
+	_, err := ccipReader.GetDestChainFeeComponents(ctx)
+	require.Error(t, err)
 }
 
 func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {

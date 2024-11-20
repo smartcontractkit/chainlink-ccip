@@ -37,12 +37,10 @@ func CreateRMNRemoteCfg() rmntypes.RemoteConfig {
 		ContractAddress: rand.RandomBytes(20),
 		ConfigDigest:    rand.RandomBytes32(),
 		Signers: []rmntypes.RemoteSignerInfo{
-			{
-				OnchainPublicKey: rand.RandomBytes(20),
-				NodeIndex:        rand.RandomUint64(),
-			},
+			{OnchainPublicKey: append(rand.RandomBytes(20), byte(1)), NodeIndex: 1},
+			{OnchainPublicKey: append(rand.RandomBytes(20), byte(2)), NodeIndex: 2},
 		},
-		F:                rand.RandomUint64(),
+		F:                1,
 		ConfigVersion:    rand.RandomUint32(),
 		RmnReportVersion: rand.RandomReportVersion(),
 	}

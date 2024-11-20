@@ -215,55 +215,6 @@ func (_c *MockCCIPReader_ExecutedMessageRanges_Call) RunAndReturn(run func(conte
 	return _c
 }
 
-// GetAvailableChainsFeeComponents provides a mock function with given fields: ctx, chains
-func (_m *MockCCIPReader) GetAvailableChainsFeeComponents(ctx context.Context, chains []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]types.ChainFeeComponents {
-	ret := _m.Called(ctx, chains)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAvailableChainsFeeComponents")
-	}
-
-	var r0 map[ccipocr3.ChainSelector]types.ChainFeeComponents
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]types.ChainFeeComponents); ok {
-		r0 = rf(ctx, chains)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]types.ChainFeeComponents)
-		}
-	}
-
-	return r0
-}
-
-// MockCCIPReader_GetAvailableChainsFeeComponents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAvailableChainsFeeComponents'
-type MockCCIPReader_GetAvailableChainsFeeComponents_Call struct {
-	*mock.Call
-}
-
-// GetAvailableChainsFeeComponents is a helper method to define mock.On call
-//   - ctx context.Context
-//   - chains []ccipocr3.ChainSelector
-func (_e *MockCCIPReader_Expecter) GetAvailableChainsFeeComponents(ctx interface{}, chains interface{}) *MockCCIPReader_GetAvailableChainsFeeComponents_Call {
-	return &MockCCIPReader_GetAvailableChainsFeeComponents_Call{Call: _e.mock.On("GetAvailableChainsFeeComponents", ctx, chains)}
-}
-
-func (_c *MockCCIPReader_GetAvailableChainsFeeComponents_Call) Run(run func(ctx context.Context, chains []ccipocr3.ChainSelector)) *MockCCIPReader_GetAvailableChainsFeeComponents_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
-	})
-	return _c
-}
-
-func (_c *MockCCIPReader_GetAvailableChainsFeeComponents_Call) Return(_a0 map[ccipocr3.ChainSelector]types.ChainFeeComponents) *MockCCIPReader_GetAvailableChainsFeeComponents_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *MockCCIPReader_GetAvailableChainsFeeComponents_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]types.ChainFeeComponents) *MockCCIPReader_GetAvailableChainsFeeComponents_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetChainFeePriceUpdate provides a mock function with given fields: ctx, selectors
 func (_m *MockCCIPReader) GetChainFeePriceUpdate(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig {
 	ret := _m.Called(ctx, selectors)
@@ -309,6 +260,55 @@ func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) Return(_a0 map[ccipocr3.Ch
 }
 
 func (_c *MockCCIPReader_GetChainFeePriceUpdate_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]internalplugintypes.TimestampedBig) *MockCCIPReader_GetChainFeePriceUpdate_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetChainsFeeComponents provides a mock function with given fields: ctx, chains
+func (_m *MockCCIPReader) GetChainsFeeComponents(ctx context.Context, chains []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]types.ChainFeeComponents {
+	ret := _m.Called(ctx, chains)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetChainsFeeComponents")
+	}
+
+	var r0 map[ccipocr3.ChainSelector]types.ChainFeeComponents
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]types.ChainFeeComponents); ok {
+		r0 = rf(ctx, chains)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]types.ChainFeeComponents)
+		}
+	}
+
+	return r0
+}
+
+// MockCCIPReader_GetChainsFeeComponents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetChainsFeeComponents'
+type MockCCIPReader_GetChainsFeeComponents_Call struct {
+	*mock.Call
+}
+
+// GetChainsFeeComponents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - chains []ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) GetChainsFeeComponents(ctx interface{}, chains interface{}) *MockCCIPReader_GetChainsFeeComponents_Call {
+	return &MockCCIPReader_GetChainsFeeComponents_Call{Call: _e.mock.On("GetChainsFeeComponents", ctx, chains)}
+}
+
+func (_c *MockCCIPReader_GetChainsFeeComponents_Call) Run(run func(ctx context.Context, chains []ccipocr3.ChainSelector)) *MockCCIPReader_GetChainsFeeComponents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetChainsFeeComponents_Call) Return(_a0 map[ccipocr3.ChainSelector]types.ChainFeeComponents) *MockCCIPReader_GetChainsFeeComponents_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetChainsFeeComponents_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]types.ChainFeeComponents) *MockCCIPReader_GetChainsFeeComponents_Call {
 	_c.Call.Return(run)
 	return _c
 }
