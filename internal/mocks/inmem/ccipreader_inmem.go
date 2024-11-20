@@ -160,6 +160,18 @@ func (r InMemoryCCIPReader) GetRMNRemoteConfig(
 	return rmntypes.RemoteConfig{}, nil
 }
 
+func (r InMemoryCCIPReader) GetRmnCurseInfo(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (*rmntypes.CurseInfo, error) {
+	return &rmntypes.CurseInfo{
+		CursedSourceChains: map[cciptypes.ChainSelector]bool{},
+		CursedDestination:  false,
+		GlobalCurse:        false,
+	}, nil
+}
+
 func (r InMemoryCCIPReader) LinkPriceUSD(ctx context.Context) (cciptypes.BigInt, error) {
 	return cciptypes.NewBigIntFromInt64(100), nil
 }

@@ -56,3 +56,13 @@ type RemoteSignerInfo struct {
 	// The index of the node in the RMN config
 	NodeIndex uint64 `json:"nodeIndex"`
 }
+
+// CurseInfo contains information about cursing/pausing of some rmn remote contract.
+type CurseInfo struct {
+	// CursedSourceChains contains the cursed source chains.
+	CursedSourceChains map[cciptypes.ChainSelector]bool
+	// CursedDestination indicates that the destination chain is cursed.
+	CursedDestination bool
+	// GlobalCurse indicates that the whole CCIP should be paused.
+	GlobalCurse bool
+}

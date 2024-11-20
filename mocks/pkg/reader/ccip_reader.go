@@ -599,6 +599,66 @@ func (_c *MockCCIPReader_GetRMNRemoteConfig_Call) RunAndReturn(run func(context.
 	return _c
 }
 
+// GetRmnCurseInfo provides a mock function with given fields: ctx, destChainSelector, sourceChainSelectors
+func (_m *MockCCIPReader) GetRmnCurseInfo(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector) (*rmntypes.CurseInfo, error) {
+	ret := _m.Called(ctx, destChainSelector, sourceChainSelectors)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRmnCurseInfo")
+	}
+
+	var r0 *rmntypes.CurseInfo
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (*rmntypes.CurseInfo, error)); ok {
+		return rf(ctx, destChainSelector, sourceChainSelectors)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) *rmntypes.CurseInfo); ok {
+		r0 = rf(ctx, destChainSelector, sourceChainSelectors)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*rmntypes.CurseInfo)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) error); ok {
+		r1 = rf(ctx, destChainSelector, sourceChainSelectors)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_GetRmnCurseInfo_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRmnCurseInfo'
+type MockCCIPReader_GetRmnCurseInfo_Call struct {
+	*mock.Call
+}
+
+// GetRmnCurseInfo is a helper method to define mock.On call
+//   - ctx context.Context
+//   - destChainSelector ccipocr3.ChainSelector
+//   - sourceChainSelectors []ccipocr3.ChainSelector
+func (_e *MockCCIPReader_Expecter) GetRmnCurseInfo(ctx interface{}, destChainSelector interface{}, sourceChainSelectors interface{}) *MockCCIPReader_GetRmnCurseInfo_Call {
+	return &MockCCIPReader_GetRmnCurseInfo_Call{Call: _e.mock.On("GetRmnCurseInfo", ctx, destChainSelector, sourceChainSelectors)}
+}
+
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Run(run func(ctx context.Context, destChainSelector ccipocr3.ChainSelector, sourceChainSelectors []ccipocr3.ChainSelector)) *MockCCIPReader_GetRmnCurseInfo_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(ccipocr3.ChainSelector), args[2].([]ccipocr3.ChainSelector))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) Return(_a0 *rmntypes.CurseInfo, _a1 error) *MockCCIPReader_GetRmnCurseInfo_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetRmnCurseInfo_Call) RunAndReturn(run func(context.Context, ccipocr3.ChainSelector, []ccipocr3.ChainSelector) (*rmntypes.CurseInfo, error)) *MockCCIPReader_GetRmnCurseInfo_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetWrappedNativeTokenPriceUSD provides a mock function with given fields: ctx, selectors
 func (_m *MockCCIPReader) GetWrappedNativeTokenPriceUSD(ctx context.Context, selectors []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.BigInt {
 	ret := _m.Called(ctx, selectors)

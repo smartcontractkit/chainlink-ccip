@@ -667,6 +667,16 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 	}, nil
 }
 
+// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
+// from the destination chain RMN remote contract.
+func (r *ccipChainReader) GetRmnCurseInfo(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (*rmntypes.CurseInfo, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 // discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
 func (r *ccipChainReader) discoverOffRampContracts(
 	ctx context.Context,
