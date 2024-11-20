@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -22,7 +23,7 @@ type ExecReportBuilder interface {
 func NewBuilder(
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
-	encoder cciptypes.ExecutePluginCodec,
+	encoder types.Codec,
 	estimateProvider gas.EstimateProvider,
 	nonces map[cciptypes.ChainSelector]map[string]uint64,
 	destChainSelector cciptypes.ChainSelector,
@@ -61,7 +62,7 @@ type execReportBuilder struct {
 	lggr logger.Logger
 
 	// Providers
-	encoder          cciptypes.ExecutePluginCodec
+	encoder          types.Codec
 	hasher           cciptypes.MessageHasher
 	estimateProvider gas.EstimateProvider
 	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64

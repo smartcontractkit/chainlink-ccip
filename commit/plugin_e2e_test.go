@@ -212,7 +212,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var reportCodec ccipocr3.CommitPluginCodec
+			var reportCodec types.Codec
 			for i := range oracleIDs {
 				paramsCp := params
 				paramsCp.enableDiscovery = tc.enableDiscovery
@@ -248,7 +248,8 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
-				decoded, err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report)
+				decoded := ccipocr3.CommitPluginReport{}
+				err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report, decoded, typeName)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expTransmittedReports[i], decoded)
 			}
@@ -395,7 +396,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var reportCodec ccipocr3.CommitPluginCodec
+			var reportCodec types.Codec
 			for i := range oracleIDs {
 				paramsCp := params
 				paramsCp.reportingCfg.OracleID = oracleIDs[i]
@@ -421,7 +422,8 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
-				decoded, err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report)
+				decoded := ccipocr3.CommitPluginReport{}
+				err = reportCodec.Decode(params.ctx, res.Transmitted[i].Report, decoded, typeName)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expTransmittedReports[i], decoded)
 			}
@@ -717,7 +719,7 @@ type nodeSetup struct {
 	node        *Plugin
 	ccipReader  *readerpkg_mock.MockCCIPReader
 	priceReader *readerpkg_mock.MockPriceReader
-	reportCodec *mocks.CommitPluginJSONReportCodec
+	reportCodec types.Codec
 	msgHasher   *mocks.MessageHasher
 }
 
@@ -741,7 +743,7 @@ type SetupNodeParams struct {
 func setupNode(params SetupNodeParams) nodeSetup {
 	ccipReader := readerpkg_mock.NewMockCCIPReader(params.t)
 	tokenPricesReader := readerpkg_mock.NewMockPriceReader(params.t)
-	reportCodec := mocks.NewCommitPluginJSONReportCodec()
+	reportCodec := &mocks.ExampleStructJSONCodec{}
 	msgHasher := mocks.NewMessageHasher()
 	homeChainReader := reader_mock.NewMockHomeChain(params.t)
 	rmnHomeReader := readerpkg_mock.NewMockRMNHome(params.t)

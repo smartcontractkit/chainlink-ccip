@@ -165,7 +165,7 @@ func TestPluginReports(t *testing.T) {
 
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
-	reportCodec := mocks.NewCommitPluginJSONReportCodec()
+	reportCodec := mocks.ExampleStructJSONCodec{}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -190,7 +190,7 @@ func TestPluginReports(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, reports, len(tc.expReports))
 			for i, report := range reports {
-				expEncodedReport, err := reportCodec.Encode(ctx, tc.expReports[i])
+				expEncodedReport, err := reportCodec.Encode(ctx, tc.expReports[i], typeName)
 				require.NoError(t, err)
 				require.Equal(t, expEncodedReport, []byte(report.ReportWithInfo.Report))
 

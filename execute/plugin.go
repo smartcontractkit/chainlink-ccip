@@ -15,6 +15,7 @@ import (
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	chainlinktypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
@@ -34,6 +35,9 @@ import (
 // maxReportSizeBytes that should be returned as an execution report payload.
 const maxReportSizeBytes = 250_000
 
+// typeName is the codec type
+const typeName = "executePlugin"
+
 const (
 	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	transmissionDelayMultiplier = 3 * time.Second
@@ -48,7 +52,7 @@ type Plugin struct {
 
 	// providers
 	ccipReader   readerpkg.CCIPReader
-	reportCodec  cciptypes.ExecutePluginCodec
+	reportCodec  chainlinktypes.Codec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 	discovery    *discovery.ContractDiscoveryProcessor
@@ -71,7 +75,7 @@ func NewPlugin(
 	destChain cciptypes.ChainSelector,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader readerpkg.CCIPReader,
-	reportCodec cciptypes.ExecutePluginCodec,
+	reportCodec chainlinktypes.Codec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,
@@ -265,7 +269,7 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
+	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report, typeName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
 	}
@@ -303,7 +307,8 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	decodedReport := cciptypes.ExecutePluginReport{}
+	err := p.reportCodec.Decode(ctx, r.Report, decodedReport, typeName)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
@@ -343,7 +348,8 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	decodedReport := cciptypes.ExecutePluginReport{}
+	err = p.reportCodec.Decode(ctx, r.Report, decodedReport, typeName)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}

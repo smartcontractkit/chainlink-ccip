@@ -56,7 +56,7 @@ type PluginFactory struct {
 	lggr             logger.Logger
 	donID            plugintypes.DonID
 	ocrConfig        reader.OCR3ConfigWithMeta
-	execCodec        cciptypes.ExecutePluginCodec
+	execCodec        types.Codec
 	msgHasher        cciptypes.MessageHasher
 	homeChainReader  reader.HomeChain
 	estimateProvider gas.EstimateProvider
@@ -69,7 +69,7 @@ func NewPluginFactory(
 	lggr logger.Logger,
 	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
-	execCodec cciptypes.ExecutePluginCodec,
+	execCodec types.Codec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	tokenDataEncoder cciptypes.TokenDataEncoder,

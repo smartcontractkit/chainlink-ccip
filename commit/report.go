@@ -16,6 +16,9 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+// typeName is the codec type
+const typeName = "commitPlugin"
+
 const (
 	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	transmissionDelayMultiplier = 3 * time.Second
@@ -75,7 +78,7 @@ func (p *Plugin) Reports(
 		return []ocr3types.ReportPlus[[]byte]{}, nil
 	}
 
-	encodedReport, err := p.reportCodec.Encode(ctx, rep)
+	encodedReport, err := p.reportCodec.Encode(ctx, rep, typeName)
 	if err != nil {
 		return nil, fmt.Errorf("encode commit plugin report: %w", err)
 	}
@@ -110,7 +113,9 @@ func (p *Plugin) Reports(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+
+	decodedReport := cciptypes.CommitPluginReport{}
+	err := p.reportCodec.Decode(ctx, r.Report, decodedReport, typeName)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
@@ -152,7 +157,8 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	decodedReport := cciptypes.CommitPluginReport{}
+	err = p.reportCodec.Decode(ctx, r.Report, decodedReport, typeName)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}

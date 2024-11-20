@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -436,7 +437,7 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 
 func Test_Builder_Build(t *testing.T) {
 	hasher := mocks.NewMessageHasher()
-	codec := mocks.NewExecutePluginJSONReportCodec()
+	codec := mocks.ExampleStructJSONCodec{}
 	lggr := logger.Test(t)
 	sender, err := cciptypes.NewUnknownAddressFromHex(randomAddress())
 	require.NoError(t, err)
@@ -814,7 +815,7 @@ func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecuteP
 
 func Test_execReportBuilder_verifyReport(t *testing.T) {
 	type fields struct {
-		encoder            cciptypes.ExecutePluginCodec
+		encoder            types.Codec
 		estimateProvider   gas.EstimateProvider
 		maxReportSizeBytes uint64
 		maxGas             uint64
@@ -926,7 +927,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				encoder: badCodec{},
+				encoder: mocks.ExampleStructJSONCodec{},
 			},
 			expectedError: "unable to encode report",
 			expectedLog:   "unable to encode report",
@@ -939,11 +940,11 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			t.Parallel()
 
 			// Select token data reader mock.
-			var resolvedEncoder cciptypes.ExecutePluginCodec
+			var resolvedEncoder types.Codec
 			if tt.fields.encoder != nil {
 				resolvedEncoder = tt.fields.encoder
 			} else {
-				resolvedEncoder = mocks.NewExecutePluginJSONReportCodec()
+				resolvedEncoder = mocks.ExampleStructJSONCodec{}
 			}
 
 			ep := tt.fields.estimateProvider

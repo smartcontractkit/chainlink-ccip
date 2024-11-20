@@ -427,9 +427,9 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	ctx := tests.Context(t)
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Encode", mock.Anything, mock.Anything).
-		Return(nil, fmt.Errorf("test error"))
+	codec :=
+		codec.On("Encode", mock.Anything, mock.Anything).
+			Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec}
 	report, err := exectypes.NewOutcome(exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}).Encode()
 	require.NoError(t, err)

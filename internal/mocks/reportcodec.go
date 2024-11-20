@@ -3,38 +3,50 @@ package mocks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
-type CommitPluginJSONReportCodec struct{}
+var _ types.RemoteCodec = &ExampleStructJSONCodec{}
 
-func NewCommitPluginJSONReportCodec() *CommitPluginJSONReportCodec {
-	return &CommitPluginJSONReportCodec{}
+type ExampleStructJSONCodec struct{}
+
+type OnChainStruct struct {
+	Aa int64
+	Bb string
+	Cc bool
+	Dd string
+	Ee int64
+	Ff string
 }
 
-func (c CommitPluginJSONReportCodec) Encode(ctx context.Context, report cciptypes.CommitPluginReport) ([]byte, error) {
-	return json.Marshal(report)
+func (ExampleStructJSONCodec) Encode(_ context.Context, item any, _ string) ([]byte, error) {
+	return json.Marshal(item)
 }
 
-func (c CommitPluginJSONReportCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.CommitPluginReport, error) {
-	report := cciptypes.CommitPluginReport{}
-	err := json.Unmarshal(bytes, &report)
-	return report, err
+func (ExampleStructJSONCodec) GetMaxEncodingSize(_ context.Context, n int, _ string) (int, error) {
+	// not used in the example, and not really valid for json.
+	return math.MaxInt32, nil
 }
 
-type ExecutePluginJSONReportCodec struct{}
-
-func NewExecutePluginJSONReportCodec() *ExecutePluginJSONReportCodec {
-	return &ExecutePluginJSONReportCodec{}
+func (ExampleStructJSONCodec) Decode(_ context.Context, raw []byte, into any, _ string) error {
+	err := json.Unmarshal(raw, into)
+	if err != nil {
+		return fmt.Errorf("%w: %s", types.ErrInvalidType, err)
+	}
+	return nil
 }
 
-func (c ExecutePluginJSONReportCodec) Encode(_ context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
-	return json.Marshal(report)
+func (ExampleStructJSONCodec) GetMaxDecodingSize(ctx context.Context, n int, _ string) (int, error) {
+	// not used in the example, and not really valid for json.
+	return math.MaxInt32, nil
 }
 
-func (c ExecutePluginJSONReportCodec) Decode(_ context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
-	report := cciptypes.ExecutePluginReport{}
-	err := json.Unmarshal(bytes, &report)
-	return report, err
+func (ExampleStructJSONCodec) CreateType(_ string, _ bool) (any, error) {
+	// parameters here are unused in the example, but can be used to determine what type to expect.
+	// this allows remote execution to know how to decode the incoming message
+	// and for [codec.NewModifierCodec] to know what type to expect for intermediate phases.
+	return &OnChainStruct{}, nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
+	chainlinktypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -41,7 +42,7 @@ type Plugin struct {
 	offchainCfg         pluginconfig.CommitOffchainConfig
 	ccipReader          readerpkg.CCIPReader
 	tokenPricesReader   readerpkg.PriceReader
-	reportCodec         cciptypes.CommitPluginCodec
+	reportCodec         chainlinktypes.Codec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
 	rmnHomeReader       readerpkg.RMNHome
@@ -63,7 +64,7 @@ func NewPlugin(
 	destChain cciptypes.ChainSelector,
 	ccipReader readerpkg.CCIPReader,
 	tokenPricesReader readerpkg.PriceReader,
-	reportCodec cciptypes.CommitPluginCodec,
+	reportCodec chainlinktypes.Codec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,

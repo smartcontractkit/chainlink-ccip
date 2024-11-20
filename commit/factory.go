@@ -92,7 +92,7 @@ type PluginFactory struct {
 	lggr              logger.Logger
 	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
-	commitCodec       cciptypes.CommitPluginCodec
+	commitCodec       types.Codec
 	msgHasher         cciptypes.MessageHasher
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
@@ -108,7 +108,7 @@ func NewPluginFactory(
 	lggr logger.Logger,
 	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
-	commitCodec cciptypes.CommitPluginCodec,
+	commitCodec types.Codec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	homeChainSelector cciptypes.ChainSelector,
