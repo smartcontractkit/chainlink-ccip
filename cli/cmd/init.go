@@ -209,7 +209,7 @@ var initCmd = &cobra.Command{
 		var helmRegistryClient wrappers.HelmRegistryAPI
 
 		if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-			dockerCli, err = utils.InitializeDockerCLI()
+			dockerCli, err = wrappers.NewDockerCli()
 			if err != nil {
 				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
 				os.Exit(1)

@@ -23,3 +23,20 @@ packages:
       outpkg: "kubernetes"
     interfaces:
       ResourceInterface:
+
+  github.com/docker/cli/cli/command:
+    config:
+      dir: "mocks/external/docker"
+      outpkg: "docker"
+    interfaces:
+      Cli:
+        config:
+          mockname: "DockerCli"
+          filename: "docker_cli.go"
+
+  github.com/docker/docker/client:
+    config:
+      dir: "mocks/external/docker"
+      outpkg: "docker"
+    interfaces:
+      APIClient:

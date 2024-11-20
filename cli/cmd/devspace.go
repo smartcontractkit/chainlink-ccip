@@ -97,7 +97,7 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 		var helmRegistryClient wrappers.HelmRegistryAPI
 
 		logger.Info("refreshing ECR credentials for docker")
-		dockerCli, err = utils.InitializeDockerCLI()
+		dockerCli, err = wrappers.NewDockerCli()
 		if err != nil {
 			logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
 			os.Exit(1)
