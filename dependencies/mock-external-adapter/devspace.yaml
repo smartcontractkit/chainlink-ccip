@@ -1,0 +1,59 @@
+version: v2beta1
+name: mock-external-adapter
+
+vars:
+  DEVSPACE_MOCK_EXTERNAL_ADAPTER_IMAGE:
+    source: env
+    default: "localhost:5001/kiab-mock-external-adapter"
+
+require:
+  devspace: ">= 6.0"
+
+images:
+  external-adapter:
+    image: ${DEVSPACE_MOCK_EXTERNAL_ADAPTER_IMAGE}
+    tags:
+      - ${devspace.namespace}-${devspace.timestamp}
+    custom:
+      command: |-
+        DIR="${CHAINLINK_REPO_DIR}/core/scripts/keystone/src/external-adapter/"
+        image=${runtime.images.external-adapter}
+        (
+          if [ ! -d "$DIR" ]; then
+            echo "Error: Directory $DIR does not exist."
+            exit 1
+          fi
+          cd "$DIR" && \
+            nix develop --impure -c \
+            bash -c "IMAGE=$image goreleaser release --nightly --clean --split"
+        )
+
+deployments:
+  external-adapter:
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      chart:
+        name: component-chart
+        repo: https://charts.devspace.sh
+      values:
+        containers:
+          - image: ${runtime.images.external-adapter}
+        service:
+          name: external-adapter
+          type: ClusterIP
+          ports:
+            - name: btc-usd-price
+              port: 4001
+              targetPort: 4001
+            - name: link-usd-price
+              port: 4002
+              targetPort: 4002
+            - name: native-usd-price
+              port: 4003
+              targetPort: 4003
+        podSecurityContext:
+          fsGroup: 1001
+        securityContext:
+          runAsUser: 1001
+          runAsGroup: 1001
+          fsGroup: 1001

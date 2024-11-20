@@ -64,6 +64,18 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 	Short: "Refresh ECR credentials for docker and helm registry",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		skipDocker := viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN")
+		skipHelm := viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN")
+
+		if viper.GetBool("docker") && skipDocker {
+			logger.Info("Skipping Docker ECR login")
+			if skipHelm {
+				logger.Info("Skipping Helm Registry ECR login. Reason: Helm login dependency on Docker login is skipped")
+			}
+
+			return
+		}
+
 		awsSdkConfig, err := config.LoadDefaultConfig(
 			context.TODO(),
 			config.WithSharedConfigFiles([]string{viper.GetString("AWS_CONFIG_FILE")}),
@@ -84,18 +96,14 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 		var dockerCli wrappers.DockerCLI
 		var helmRegistryClient wrappers.HelmRegistryAPI
 
-		if viper.GetBool("docker") && !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-			logger.Info("refreshing ECR credentials for docker")
-			dockerCli, err = utils.InitializeDockerCLI()
-			if err != nil {
-				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
-				os.Exit(1)
-			}
-		} else {
-			logger.Info("Skipping Docker ECR login")
+		logger.Info("refreshing ECR credentials for docker")
+		dockerCli, err = utils.InitializeDockerCLI()
+		if err != nil {
+			logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+			os.Exit(1)
 		}
 
-		if viper.GetBool("helm") && !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
+		if viper.GetBool("helm") && !skipHelm {
 			logger.Info("refreshing ECR credentials for helm registry")
 			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
 			if err != nil {
@@ -210,15 +218,8 @@ var checkEnvVarsCmd = &cobra.Command{
 			"DEVSPACE_K8S_POD_WAIT_TIMEOUT",
 		}
 
-		switch product {
-		case "core":
-			requiredEnvVars = append(requiredEnvVars, "CHAINLINK_CLUSTER_HELM_CHART_URI")
-		case "ccip":
-			requiredEnvVars = append(requiredEnvVars, "CHAINLINK_HELM_REGISTRY_URI")
-		}
-
 		if viper.GetString("DEVSPACE_PROFILE") == "keystone" {
-			requiredEnvVars = append(requiredEnvVars, "KEYSTONE_ETH_WS_URL", "KEYSTONE_ETH_HTTP_URL", "KEYSTONE_ACCOUNT_KEY")
+			requiredEnvVars = append(requiredEnvVars, "KEYSTONE_ETH_WS_URL")
 		}
 
 		missingEnvVars := []string{}

@@ -31,16 +31,7 @@ vars:
 # Common commands applicable to all workloads deployed in Remote Devspace namespace
 commands:
   ingress-hosts:
-    command: |-
-      jsonpath=""
-      if [[ "$PROVIDER" == "kind" ]]; then
-        jsonpath="{range .items[*].spec.rules[*]}{'http://'}{.host}{'\n'}{end}"
-      else
-        jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
-      fi
-
-      kubectl get ingress -n ${DEVSPACE_NAMESPACE} -o=jsonpath="$jsonpath"
-
+    command: ./${SCRIPTS_DIR}/ingress_check.sh --print-hostnames
     description: List Kubernetes ingress hostnames in the namespace.
   connect:
     command: |-

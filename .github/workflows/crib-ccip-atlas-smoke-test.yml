@@ -55,6 +55,8 @@ jobs:
   run-crib-ccip-atlas-smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      CHAINLINK_HELM_REGISTRY_URI: oci://${{secrets.AWS_ACCOUNT_ID_PROD}}.dkr.ecr.${{secrets.AWS_REGION}}.amazonaws.com/infra-charts
     permissions:
       id-token: write
       contents: read
@@ -68,6 +70,14 @@ jobs:
             should_run=false
           fi
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+      - name: Setup gobin for nix # This will be included in crib-deploy-environment@4.1.0
+        run: |
+          GOBIN="$HOME/.nix-go/bin"
+          echo "GOBIN=$GOBIN" >> $GITHUB_ENV
+          mkdir -p "$GOBIN"
+          echo "PATH=$GOBIN:$PATH" >> $GITHUB_ENV
+
       - name: Deploy and validate CRIB Environment for CCIP
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy

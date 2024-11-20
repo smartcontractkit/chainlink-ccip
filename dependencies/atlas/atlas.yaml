@@ -137,6 +137,28 @@ profiles:
               name: network-2
               path: ${CHAINLINK_CODE_DIR}/infra-charts/crib-atlas-core
               version: null
+  - name: git-charts
+    merge:
+      deployments:
+        atlas-infra:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: crib-atlas-infra
+              revision: 9c1de84e27f668e0d220f8050a3705f2dfa2e655
+        atlas-network-1:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: crib-atlas-core
+              revision: 292a560b02d326deb356b77561588206cdf88ef3
+        atlas-network-2:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: crib-atlas-core
+              revision: fdd2426888f483956e11968f3355e27d24e6e571
+
   - name: kind
     merge:
       deployments:

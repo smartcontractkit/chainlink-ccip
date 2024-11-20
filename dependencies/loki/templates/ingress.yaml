@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $.Release.Name }}
+  labels:
+    app: {{ $.Release.Name }}
+    release: {{ $.Release.Name }}
+    {{- range $key, $value := $.Values.labels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    {{- if .Values.ingress.extra_annotations }}
+    {{- range $key, $value := .Values.ingress.extra_annotations }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+    {{- end }}
+spec:
+  ingressClassName: "nginx"
+  rules:
+    - host: {{ .Values.ingress.host.host }}
+      http:
+        paths:
+          - path: "/"
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.ingress.host.http.paths.backend.service.name }}
+                port:
+                  number: {{ .Values.ingress.host.http.paths.backend.service.port.number }}

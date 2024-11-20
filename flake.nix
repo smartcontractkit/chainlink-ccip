@@ -11,7 +11,10 @@
       let
         pkgs = import nixpkgs { inherit system; overlays = [ ]; };
       in {
-        devShells.default = import ./shell.nix { inherit pkgs; };
+        devShells = {
+          default = import ./shell.nix { inherit pkgs; keystone = false; };
+          keystone = import ./shell.nix { inherit pkgs; keystone = true; };
+        };
         formatter = pkgs.nixpkgs-fmt;
       });
 }

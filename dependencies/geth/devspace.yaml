@@ -179,6 +179,8 @@ profiles:
         geth:
           helm:
             values:
+              networkPolicies:
+                enabled: true
               resources:
                 requests:
                   cpu: 50m
@@ -197,3 +199,12 @@ profiles:
                 enabled: true
                 storageClassName: gp3
                 capacity: 4Gi
+  - name: git-charts
+    merge:
+      deployments:
+        geth:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: crib-geth
+              revision: 9c1de84e27f668e0d220f8050a3705f2dfa2e655

@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, keystone ? false }:
 with pkgs;
 let
   go = go_1_22;
@@ -6,9 +6,16 @@ let
   nodePackages = pkgs.nodePackages.override { inherit nodejs; };
 
   mkShell' = mkShell.override {
-    # The current nix default sdk for macOS fails to compile go projects, so we use a newer one for now.
+    # The current nix default SDK for macOS fails to compile Go projects, so we use a newer one for now.
     stdenv = if stdenv.isDarwin then overrideSDK stdenv "11.0" else stdenv;
   };
+
+  # Custom derivation to include only logcli from loki using runCommand
+  logcli = pkgs.runCommand "logcli" { buildInputs = [ grafana-loki ]; } ''
+    mkdir -p $out/bin
+    cp ${grafana-loki}/bin/logcli $out/bin/
+  '';
+
 in
 mkShell' {
   nativeBuildInputs = [
@@ -20,7 +27,8 @@ mkShell' {
 
     go-mockery
 
-    # tooling
+    # Tooling
+    actionlint
     gotools
     gopls
     delve
@@ -28,10 +36,16 @@ mkShell' {
     github-cli
     jq
     gomplate
-
+    go-task
+    yamllint
+    shfmt
+    shellcheck
     kind
 
-    # deployment
+    # Include only logcli instead of the full loki package
+    logcli
+
+    # Deployment
     awscli2
     devspace
     kubectl
@@ -40,13 +54,13 @@ mkShell' {
 
     # gofuzz
   ] ++ lib.optionals stdenv.isLinux [
-    # some dependencies needed for node-gyp on pnpm install
+    # Some dependencies needed for node-gyp on pnpm install
     pkg-config
     libudev-zero
     libusb1
   ];
+  
   GOROOT = "${go}/share/go";
-
   shellHook = ''
     # Some useful custom aliases
     alias k=kubectl
@@ -61,18 +75,21 @@ mkShell' {
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
     export PATH=$PATH:$repo_root/scripts
 
-    # install changesets (no nix package available atm)
-    pnpm install
+    ${lib.optionalString (!keystone) ''
+      # Install changesets (no nix package available at the moment)
+      pnpm install
 
-    # build crib CLI and make it available in PATH
-    echo -n "Building crib CLI... "
-    (cd $repo_root/cli && go build -o ./dist/crib .) && echo "Done." || { echo "Failed to build crib CLI. Please post this error message to #project-crib." >&2; exit 1; }
-    export PATH=$PATH:$repo_root/cli/dist
+      # Set up crib CLI using task
+      task setup
 
-    # crib init will make sure everything else is set up prior to running any devspace commands
-    crib init --write-config || exit $?
+      # Sourcing the .env file as the last step
+      if [ -f ".env" ]; then
+        export $(grep -v '^#' .env | xargs)
+      fi
+    ''}
 
-    # sourcing the .env file as the last step
-    [ -f ".env" ] && export $(cat .env | grep -v ^# | xargs)
+    ${lib.optionalString keystone ''
+      echo "Welcome to crib, build the crib CLI via \"task build\". It'll be available as \"crib\" in either your \$(go env GOBIN)' or \$(go env GOPATH)/bin directory, depending on if your GOBIN is set."
+    ''}
   '';
 }

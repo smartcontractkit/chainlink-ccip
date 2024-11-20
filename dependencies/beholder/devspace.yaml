@@ -436,3 +436,13 @@ profiles:
             default: ""
           LOKI_URL:
             default: ""
+
+  - name: git-charts
+    merge:
+      deployments:
+        beholder-test-client:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: beholder-test-client
+              revision: 9c1de84e27f668e0d220f8050a3705f2dfa2e655
