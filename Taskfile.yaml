@@ -32,6 +32,7 @@ tasks:
   setup:
     desc: Sets up the crib CLI in the current environment
     deps: [build]
+    dir: '{{.USER_WORKING_DIR}}'
     vars:
       REPO_ROOT:
         sh: git rev-parse --show-toplevel

@@ -73,7 +73,7 @@ mkShell' {
 
     # Find the root of the git repository
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
-    export PATH=$PATH:$repo_root/scripts
+    export PATH=$PATH:$repo_root/scripts:$GOBIN
 
     ${lib.optionalString (!keystone) ''
       # Install changesets (no nix package available at the moment)
