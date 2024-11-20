@@ -66,3 +66,23 @@ type CurseInfo struct {
 	// GlobalCurse indicates that the whole CCIP should be paused.
 	GlobalCurse bool
 }
+
+// LegacyCurseSubject Defined as a const in RMNRemote.sol
+//
+//	An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue
+//	with a remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract
+//	is deployed, relying on isCursed().
+var LegacyCurseSubject = [16]byte{
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+}
+
+// GlobalCurseSubject Defined as a const in RMNRemote.sol
+//
+// An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject
+// for issues affecting all of CCIP chains, or pertaining to the chain that this contract is deployed on, instead of
+// using the local chain selector as a subject.
+var GlobalCurseSubject = [16]byte{
+	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+}
