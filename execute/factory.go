@@ -46,7 +46,9 @@ const (
 	// check factory_test for the calculation
 	maxReportLength = ocr3types.MaxMaxReportLength
 
-	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
+	// maxReportCount controls how many OCR3 reports can be returned. Note that
+	// the actual exec report type (ExecutePluginReport) may contain multiple
+	// per-source-chain reports. These are not limited by this value.
 	maxReportCount = 1
 )
 

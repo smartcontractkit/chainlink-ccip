@@ -73,7 +73,9 @@ Contracts: 274962
 func TestObservationSize(t *testing.T) {
 	t.Skip("This test is for estimating message sizes, not for running in CI")
 	maxCommitReports := 100
-	maxMessages := 150
+	maxMessages := 1100
+	msgDataSize := 1000 // could be much larger than this?
+	tokenDataSize := 0  // fixed size for CCTP?
 
 	var addr [20]byte
 
@@ -105,7 +107,7 @@ func TestObservationSize(t *testing.T) {
 		if nil == msgObs[idx] {
 			msgObs[idx] = make(map[ccipocr3.SeqNum]ccipocr3.Message)
 		}
-		var data [1000]byte     // could be much larger than this
+		data := make([]byte, msgDataSize, msgDataSize)
 		var extraArgs [100]byte // this is too large?
 		msgObs[idx][bigSeqNum+ccipocr3.SeqNum(i)] = ccipocr3.Message{
 			Header:         ccipocr3.RampMessageHeader{},
@@ -135,7 +137,7 @@ func TestObservationSize(t *testing.T) {
 		if nil == tokenDataObs[idx] {
 			tokenDataObs[idx] = make(map[ccipocr3.SeqNum]exectypes.MessageTokenData)
 		}
-		var data [250]byte // this could be more accurate
+		data := make([]byte, tokenDataSize, tokenDataSize)
 		tokenDataObs[idx][bigSeqNum+ccipocr3.SeqNum(i)] = exectypes.MessageTokenData{
 			TokenData: []exectypes.TokenData{
 				{
