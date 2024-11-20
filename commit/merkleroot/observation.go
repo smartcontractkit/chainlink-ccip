@@ -264,7 +264,9 @@ type observerImpl struct {
 	msgHasher    cciptypes.MessageHasher
 }
 
-// ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp
+// ObserveOffRampNextSeqNums observes the next sequence numbers for each source chain from the OffRamp.
+// If the destination chain is cursed it returns nil.
+// If some source chain is cursed, it is not included in the results.
 func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintypes.SeqNumChain {
 	supportsDestChain, err := o.chainSupport.SupportsDestChain(o.nodeID)
 	if err != nil {
@@ -273,16 +275,40 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	}
 
 	if !supportsDestChain {
+		o.lggr.Debugw("cannot observe off ramp seq nums since destination chain is not supported")
 		return nil
 	}
 
-	sourceChains, err := o.chainSupport.KnownSourceChainsSlice()
+	allSourceChains, err := o.chainSupport.KnownSourceChainsSlice()
 	if err != nil {
 		o.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
 		return nil
 	}
 
+	curseInfo, err := o.ccipReader.GetRmnCurseInfo(ctx, allSourceChains)
+	if err != nil {
+		o.lggr.Errorw("failed to get rmn curse info", "err", err)
+		return nil
+	}
+
+	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
+		o.lggr.Warnw("nothing to observe, chain is cursed", "curseInfo", curseInfo)
+		return nil
+	}
+
+	sourceChains := make([]cciptypes.ChainSelector, 0, len(allSourceChains))
+	for _, ch := range allSourceChains {
+		if !curseInfo.CursedSourceChains[ch] {
+			sourceChains = append(sourceChains, ch)
+		}
+	}
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
+
+	if len(sourceChains) == 0 {
+		o.lggr.Debugw("nothing to observe from the offramp, no active source chains exist")
+		return nil
+	}
+
 	offRampNextSeqNums, err := o.ccipReader.NextSeqNum(ctx, sourceChains)
 	if err != nil {
 		o.lggr.Warnw("call to NextSeqNum failed", "err", err)

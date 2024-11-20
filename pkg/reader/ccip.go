@@ -671,7 +671,6 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(
 	ctx context.Context,
-	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
 ) (*rmntypes.CurseInfo, error) {
 	return nil, fmt.Errorf("not implemented")
