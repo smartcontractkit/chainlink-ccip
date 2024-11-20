@@ -57,28 +57,28 @@ type RemoteSignerInfo struct {
 	NodeIndex uint64 `json:"nodeIndex"`
 }
 
-// CurseInfo contains information about cursing/pausing of some rmn remote contract.
+// CurseInfo contains cursing information that are fetched from the rmn remote contract.
 type CurseInfo struct {
 	// CursedSourceChains contains the cursed source chains.
 	CursedSourceChains map[cciptypes.ChainSelector]bool
 	// CursedDestination indicates that the destination chain is cursed.
 	CursedDestination bool
-	// GlobalCurse indicates that the whole CCIP should be paused.
+	// GlobalCurse indicates that all chains are cursed.
 	GlobalCurse bool
 }
 
 // LegacyCurseSubject Defined as a const in RMNRemote.sol
-//
-//	An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue
-//	with a remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract
-//	is deployed, relying on isCursed().
+// Docs of RMNRemote:
+// An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue
+// with a remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract
+// is deployed, relying on isCursed().
 var LegacyCurseSubject = [16]byte{
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 }
 
 // GlobalCurseSubject Defined as a const in RMNRemote.sol
-//
+// Docs of RMNRemote:
 // An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject
 // for issues affecting all of CCIP chains, or pertaining to the chain that this contract is deployed on, instead of
 // using the local chain selector as a subject.

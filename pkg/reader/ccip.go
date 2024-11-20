@@ -700,7 +700,7 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	cursedSubjectsSet := mapset.NewSet(cursedSubjects.CursedSubjects...)
 
 	curseInfo := &rmntypes.CurseInfo{
-		CursedSourceChains: make(map[cciptypes.ChainSelector]bool),
+		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
 		CursedDestination: cursedSubjectsSet.Contains(rmntypes.LegacyCurseSubject) ||
 			cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
 		GlobalCurse: cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
