@@ -35,16 +35,20 @@ const (
 	maxQueryLength = 0
 
 	// maxObservationLength is set to the maximum size of an observation
-	// check factory_test for the calculation
-	maxObservationLength = ocr3types.MaxMaxObservationLength
+	// check factory_test for the calculation. It is limited to about 10%
+	// of the maximum allowable value because we expect many concurrent
+	// plugin instances and don't want to saturate the network.
+	maxObservationLength = 100000
 
 	// maxOutcomeLength is set to the maximum size of an outcome
-	// check factory_test for the calculation
+	// check factory_test for the calculation. This is not limited because
+	// these are not sent over the network.
 	maxOutcomeLength = ocr3types.MaxMaxOutcomeLength
 
-	// maxReportLength is set to an estimate of a maximum report size
-	// check factory_test for the calculation
-	maxReportLength = ocr3types.MaxMaxReportLength
+	// maxReportLength is set to an estimate of a maximum report size.
+	// This can be tuned over time, it may be more efficient to have
+	// smaller reports.
+	maxReportLength = 1024 * 1024 // allowing large reports for now
 
 	// maxReportCount controls how many OCR3 reports can be returned. Note that
 	// the actual exec report type (ExecutePluginReport) may contain multiple
