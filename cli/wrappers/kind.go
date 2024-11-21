@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"slices"
 
 	containertypes "github.com/docker/docker/api/types/container"
@@ -93,6 +95,15 @@ func NewKindCluster(name string, config *v1alpha4.Cluster, dockerCli DockerCLI, 
 	if provider == nil {
 		// TODO: cluster.ProviderWithLogger(logger)
 		provider = cluster.NewProvider(cluster.ProviderWithDocker())
+	}
+
+	if kubeconfigPath == "" {
+		val, found := os.LookupEnv("KUBECONFIG")
+		kubeconfigPath = val
+		if !found {
+			userHomeDir, _ := os.UserHomeDir()
+			kubeconfigPath = filepath.Join(userHomeDir, ".kube", "config")
+		}
 	}
 
 	if registryName == "" {
