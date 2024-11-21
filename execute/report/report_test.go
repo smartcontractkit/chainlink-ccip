@@ -805,12 +805,20 @@ func Test_Builder_Build(t *testing.T) {
 
 type badCodec struct{}
 
-func (bc badCodec) Encode(ctx context.Context, report cciptypes.ExecutePluginReport) ([]byte, error) {
+func (bc badCodec) Encode(ctx context.Context, item any, itemType string) ([]byte, error) {
 	return nil, fmt.Errorf("bad codec")
 }
 
-func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecutePluginReport, error) {
-	return cciptypes.ExecutePluginReport{}, fmt.Errorf("bad codec")
+func (bc badCodec) Decode(ctx context.Context, raw []byte, into any, itemType string) error {
+	return fmt.Errorf("bad codec")
+}
+
+func (bc badCodec) GetMaxEncodingSize(ctx context.Context, n int, itemType string) (int, error) {
+	panic("not implemented")
+}
+
+func (bc badCodec) GetMaxDecodingSize(ctx context.Context, n int, itemType string) (int, error) {
+	panic("not implemented")
 }
 
 func Test_execReportBuilder_verifyReport(t *testing.T) {
@@ -927,7 +935,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				},
 			},
 			fields: fields{
-				encoder: mocks.ExampleStructJSONCodec{},
+				encoder: badCodec{},
 			},
 			expectedError: "unable to encode report",
 			expectedLog:   "unable to encode report",
