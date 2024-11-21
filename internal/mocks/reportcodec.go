@@ -34,7 +34,7 @@ func (ExampleStructJSONCodec) GetMaxEncodingSize(_ context.Context, n int, _ str
 func (ExampleStructJSONCodec) Decode(_ context.Context, raw []byte, into any, _ string) error {
 	err := json.Unmarshal(raw, into)
 	if err != nil {
-		return fmt.Errorf("%w: %s", types.ErrInvalidType, err)
+		return fmt.Errorf("%w: %w", types.ErrInvalidType, err)
 	}
 	return nil
 }
