@@ -107,7 +107,7 @@ func TestObservationSize(t *testing.T) {
 		if nil == msgObs[idx] {
 			msgObs[idx] = make(map[ccipocr3.SeqNum]ccipocr3.Message)
 		}
-		data := make([]byte, msgDataSize, msgDataSize)
+		data := make([]byte, msgDataSize)
 		var extraArgs [100]byte // this is too large?
 		msgObs[idx][bigSeqNum+ccipocr3.SeqNum(i)] = ccipocr3.Message{
 			Header:         ccipocr3.RampMessageHeader{},
@@ -137,7 +137,7 @@ func TestObservationSize(t *testing.T) {
 		if nil == tokenDataObs[idx] {
 			tokenDataObs[idx] = make(map[ccipocr3.SeqNum]exectypes.MessageTokenData)
 		}
-		data := make([]byte, tokenDataSize, tokenDataSize)
+		data := make([]byte, tokenDataSize)
 		tokenDataObs[idx][bigSeqNum+ccipocr3.SeqNum(i)] = exectypes.MessageTokenData{
 			TokenData: []exectypes.TokenData{
 				{
