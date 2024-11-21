@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
@@ -29,7 +30,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
-	codec_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
@@ -427,9 +427,7 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	ctx := tests.Context(t)
-	codec :=
-		codec.On("Encode", mock.Anything, mock.Anything).
-			Return(nil, fmt.Errorf("test error"))
+	codec := mocks.ExampleStructJSONCodec{}
 	p := &Plugin{reportCodec: codec}
 	report, err := exectypes.NewOutcome(exectypes.Unknown, nil, cciptypes.ExecutePluginReport{}).Encode()
 	require.NoError(t, err)
@@ -440,9 +438,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Decode", mock.Anything, mock.Anything).
-		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
+	codec := mocks.ExampleStructJSONCodec{}
 	p := &Plugin{
 		reportCodec: codec,
 		lggr:        logger.Test(t),
@@ -455,9 +451,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Decode", mock.Anything, mock.Anything).
-		Return(cciptypes.ExecutePluginReport{}, nil)
+	codec := mocks.ExampleStructJSONCodec{}
 	p := &Plugin{
 		lggr:        logger.Test(t),
 		reportCodec: codec,
@@ -470,13 +464,7 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Decode", mock.Anything, mock.Anything).
-		Return(cciptypes.ExecutePluginReport{
-			ChainReports: []cciptypes.ExecutePluginReportSingleChain{
-				{},
-			},
-		}, nil)
+	codec := mocks.ExampleStructJSONCodec{}
 	p := &Plugin{
 		lggr:        logger.Test(t),
 		reportCodec: codec,
@@ -542,9 +530,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 				ConfigDigest: digest,
 			},
 		}, nil)
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Decode", mock.Anything, mock.Anything).
-		Return(cciptypes.ExecutePluginReport{}, fmt.Errorf("test error"))
+	codec := mocks.ExampleStructJSONCodec{}
 
 	p := &Plugin{
 		donID:        donID,
@@ -576,9 +562,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 				ConfigDigest: digest,
 			},
 		}, nil)
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Decode", mock.Anything, mock.Anything).
-		Return(cciptypes.ExecutePluginReport{}, nil)
+	codec := mocks.ExampleStructJSONCodec{}
 
 	p := &Plugin{
 		donID:        donID,

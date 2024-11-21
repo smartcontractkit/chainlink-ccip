@@ -282,6 +282,7 @@ func (b *execReportBuilder) verifyReport(
 		cciptypes.ExecutePluginReport{
 			ChainReports: []cciptypes.ExecutePluginReportSingleChain{execReport},
 		},
+		"exec-report",
 	)
 	if err != nil {
 		b.lggr.Errorw("unable to encode report", "err", err, "report", execReport)

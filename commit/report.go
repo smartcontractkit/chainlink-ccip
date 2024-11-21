@@ -115,7 +115,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 ) (bool, error) {
 
 	decodedReport := cciptypes.CommitPluginReport{}
-	err := p.reportCodec.Decode(ctx, r.Report, decodedReport, typeName)
+	err := p.reportCodec.Decode(ctx, r.Report, &decodedReport, typeName)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
@@ -158,7 +158,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	decodedReport := cciptypes.CommitPluginReport{}
-	err = p.reportCodec.Decode(ctx, r.Report, decodedReport, typeName)
+	err = p.reportCodec.Decode(ctx, r.Report, &decodedReport, typeName)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
