@@ -249,7 +249,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			assert.Len(t, res.Transmitted, len(tc.expTransmittedReports))
 			for i := range res.Transmitted {
 				decoded := ccipocr3.CommitPluginReport{}
-				err := reportCodec.Decode(params.ctx, res.Transmitted[i].Report, decoded, typeName)
+				err = reportCodec.Decode(params.ctx, res.Transmitted[i].Report, &decoded, typeName)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expTransmittedReports[i], decoded)
 			}
