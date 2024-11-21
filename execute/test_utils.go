@@ -290,7 +290,7 @@ func (it *IntTest) newNode(
 	id int,
 	N int,
 ) nodeSetup {
-	reportCodec := mocks.NewExecutePluginJSONReportCodec()
+	reportCodec := mocks.ExampleStructJSONCodec{}
 	b := make([]byte, 32)
 	_, _ = crand.Read(b)
 	rCfg := ocr3types.ReportingPluginConfig{
@@ -426,7 +426,7 @@ func makeMsg(
 
 type nodeSetup struct {
 	node        *Plugin
-	reportCodec cciptypes.ExecutePluginCodec
+	reportCodec types.Codec
 	msgHasher   cciptypes.MessageHasher
 }
 
