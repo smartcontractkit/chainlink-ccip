@@ -7,13 +7,12 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -24,6 +23,37 @@ import (
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+)
+
+const (
+	// Estimated maximum number of source chains the system will support.
+	// This value should be adjusted as we approach supporting that number of chains.
+	// Its primary purpose is to assist in defining the limits below.
+	estimatedMaxNumberOfSourceChains = 900
+
+	// maxQueryLength is set to disable queries because they are not used.
+	maxQueryLength = 0
+
+	// maxObservationLength is set to the maximum size of an observation
+	// check factory_test for the calculation. It is limited to about 10%
+	// of the maximum allowable value because we expect many concurrent
+	// plugin instances and don't want to saturate the network.
+	maxObservationLength = 100000
+
+	// maxOutcomeLength is set to the maximum size of an outcome
+	// check factory_test for the calculation. This is not limited because
+	// these are not sent over the network.
+	maxOutcomeLength = ocr3types.MaxMaxOutcomeLength
+
+	// maxReportLength is set to an estimate of a maximum report size.
+	// This can be tuned over time, it may be more efficient to have
+	// smaller reports.
+	maxReportLength = 1024 * 1024 // allowing large reports for now
+
+	// maxReportCount controls how many OCR3 reports can be returned. Note that
+	// the actual exec report type (ExecutePluginReport) may contain multiple
+	// per-source-chain reports. These are not limited by this value.
+	maxReportCount = 1
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -161,11 +191,11 @@ func (p PluginFactory) NewReportingPlugin(
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{
 				// No query for this execute implementation.
-				MaxQueryLength:       0,
-				MaxObservationLength: 20_000,             // 20kB
-				MaxOutcomeLength:     20_000,             // 20kB
-				MaxReportLength:      maxReportSizeBytes, // 250kB
-				MaxReportCount:       10,
+				MaxQueryLength:       maxQueryLength,
+				MaxObservationLength: maxObservationLength,
+				MaxOutcomeLength:     maxOutcomeLength,
+				MaxReportLength:      maxReportLength,
+				MaxReportCount:       maxReportCount,
 			},
 		}, nil
 }

@@ -32,9 +32,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-// maxReportSizeBytes that should be returned as an execution report payload.
-const maxReportSizeBytes = 250_000
-
 // typeName is the codec type
 const typeName = "executePlugin"
 
