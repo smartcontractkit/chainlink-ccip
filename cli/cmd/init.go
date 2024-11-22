@@ -144,7 +144,7 @@ var initCmd = &cobra.Command{
 		}
 
 		var k8sClient wrappers.K8sCLI
-		if !viper.GetBool("CRIB_CI_ENV") && viper.GetString("PROVIDER") == "aws" {
+		if !viper.GetBool("CRIB_CI_ENV") {
 			if err := utils.SetupKubeConfig(&utils.SetupKubeConfigInput{
 				EksClient:            wrappers.NewEKSClientWrapper(awsSdkConfig),
 				KubeconfigPath:       viper.GetString("KUBECONFIG"),
@@ -161,20 +161,11 @@ var initCmd = &cobra.Command{
 				)
 				os.Exit(1)
 			}
-
-			configFlags := genericclioptions.NewConfigFlags(true)
-			kubeconfig := viper.GetString("KUBECONFIG")
-			configFlags.KubeConfig = &kubeconfig
-			k8sClient, err = wrappers.NewK8sClient(configFlags, nil)
-			if err != nil {
-				logger.Error("failed to initialize kube client", slog.Any("error", err))
-				os.Exit(1)
-			}
-			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 		}
 
 		var dockerCli wrappers.DockerCLI
-		if viper.GetString("PROVIDER") == "kind" {
+		switch viper.GetString("PROVIDER") {
+		case "kind":
 			dockerCli, err = wrappers.NewDockerCli()
 			if err != nil {
 				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
@@ -189,6 +180,16 @@ var initCmd = &cobra.Command{
 			}
 			k8sClient = kindCluster.K8sClient()
 			logger.Info("kind cluster ready", slog.String("name", kindCluster.Name()), slog.Duration("elapsed", time.Since(start)))
+		case "aws":
+			configFlags := genericclioptions.NewConfigFlags(true)
+			kubeconfig := viper.GetString("KUBECONFIG")
+			configFlags.KubeConfig = &kubeconfig
+			k8sClient, err = wrappers.NewK8sClient(configFlags, nil)
+			if err != nil {
+				logger.Error("failed to initialize kube client", slog.Any("error", err))
+				os.Exit(1)
+			}
+			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 		}
 
 		if err := k8sClient.CheckAccess(context.TODO()); err != nil {
