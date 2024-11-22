@@ -77,12 +77,11 @@ jobs:
       - name: Deploy and validate CRIB Environment for Core
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@9d85c9fdff30d72044b11348e6bb9212c745c0f8 # crib-deploy-environment@3.0.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@9aecf3cc78d9806de33263d24389924d95c445d8 # crib-deploy-environment@5.0.0
         with:
-          api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
+          aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}
           aws-role-arn: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
-          ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           command: "core"
@@ -92,6 +91,7 @@ jobs:
           crib-repo-ref: ${{ github.ref }}
           chainlink-team: releng
           chainlink-product: crib
+          k8s-api-endpoint: ${{ secrets.K8S_API_ENDPOINT_STAGE }}
 
       - name: Destroy CRIB Environment
         id: destroy
