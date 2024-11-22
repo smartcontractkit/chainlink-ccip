@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+# Deprecation message
+echo "WARNING: cribbit.sh is deprecated and will be removed in future releases."
+echo "All of its functionality is already available in the new crib CLI, which is automatically invoked when acquiring a nix shell."
+echo "Documentation update is in progress. For assistance, feel free to reach out to us in #project-crib slack channel."
+echo ""
+
 #############################
 #                __________
 #               < CRIBbit! >
@@ -65,9 +71,12 @@ if [[ $CRIB_CI_ENV != "true" ]]; then
 
 	##
 	# Deploy Kind cluster
-	# Now, done by crib init. Keeping this for backwards compatibility.
 	##
 	if [ "$PROVIDER" = "kind" ]; then
+		# Execute the crib init command to deploy the Kind cluster
+		crib init --provider kind --write-config
+
+		echo "Configured sucessfully"
 		export SETUP_EKS_CONFIG=false
 	fi
 fi
