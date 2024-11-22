@@ -38,6 +38,9 @@ packages:
                 ChainWriter:
                     config:
                         dir: mocks/chainlink_common/
+                Codec:
+                    config:
+                        dir: mocks/chainlink_common/
     github.com/smartcontractkit/libocr/networking:
         interfaces:
             PeerGroupFactory:
