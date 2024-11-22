@@ -11,3 +11,13 @@ deployments:
       chart:
         name: ingress-nginx
         repo: https://kubernetes.github.io/ingress-nginx
+
+hooks:
+  - wait:
+      running: true
+      terminatedWithCode: 0
+      timeout: 600
+    container:
+      labelSelector:
+        app.kubernetes.io/component: controller
+    events: ["after:deploy:ingress-controller"]

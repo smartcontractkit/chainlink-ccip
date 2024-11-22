@@ -40,14 +40,15 @@ type KindCluster struct {
 	dockerCli      DockerCLI
 	k8sClient      K8sCLI
 	provider       KindProvider
-	kubeconfigPath string
+	kubeconfig     KubeConfigInterface
 	registryConfig *registryConfig
 }
 
 const (
-	DefaultClusterName  = "crib-cluster"
-	DefaultRegistryName = "kind-registry"
-	DefaultRegistryPort = "5001"
+	DefaultClusterName   = "crib-cluster"
+	DefaultRegistryName  = "kind-registry"
+	DefaultRegistryPort  = "5001"
+	DefaultNamespaceName = "crib-local"
 )
 
 var DefaultClusterConfig = &v1alpha4.Cluster{
@@ -105,6 +106,7 @@ func NewKindCluster(name string, config *v1alpha4.Cluster, dockerCli DockerCLI, 
 			kubeconfigPath = filepath.Join(userHomeDir, ".kube", "config")
 		}
 	}
+	kubeconfig := NewKubeConfig(kubeconfigPath)
 
 	if registryName == "" {
 		registryName = DefaultRegistryName
@@ -134,11 +136,11 @@ func NewKindCluster(name string, config *v1alpha4.Cluster, dockerCli DockerCLI, 
 	}
 
 	return &KindCluster{
-		name:           name,
-		config:         config,
-		dockerCli:      dockerCli,
-		provider:       provider,
-		kubeconfigPath: kubeconfigPath,
+		name:       name,
+		config:     config,
+		dockerCli:  dockerCli,
+		provider:   provider,
+		kubeconfig: kubeconfig,
 		registryConfig: &registryConfig{
 			containerName:   registryName,
 			containerConfig: registryContainerConfig,
@@ -150,7 +152,11 @@ func NewKindCluster(name string, config *v1alpha4.Cluster, dockerCli DockerCLI, 
 // CreateOrReuse creates a new kind cluster or reuses an existing one if available
 // It also sets up a local docker registry and configures the cluster to use it
 // You don't need to pass k8sClient normally, but it's useful for testing
-func (k *KindCluster) CreateOrReuse(k8sClient K8sCLI) error {
+func (k *KindCluster) CreateOrReuse(namespace string, k8sClient K8sCLI) error {
+	if namespace == "" {
+		namespace = DefaultNamespaceName
+	}
+
 	registryAlreadyRunning, err := k.createDockerRegistry(false)
 	if err != nil {
 		return err
@@ -166,21 +172,21 @@ func (k *KindCluster) CreateOrReuse(k8sClient K8sCLI) error {
 			return err
 		}
 	} else {
-		if err := k.provider.Create(k.name, cluster.CreateWithKubeconfigPath(k.kubeconfigPath), cluster.CreateWithV1Alpha4Config(k.config)); err != nil {
+		if err := k.provider.Create(k.name, cluster.CreateWithKubeconfigPath(k.kubeconfig.Path()), cluster.CreateWithV1Alpha4Config(k.config)); err != nil {
 			return err
 		}
 	}
 
-	kindContext := fmt.Sprintf("kind-%s", k.name)
-	if err := k.configureKubectlContext(); err != nil {
+	if err := k.configureKubectlContext(namespace); err != nil {
 		return err
 	}
-	slog.Info("kubeconfig updated for kind", slog.String("context", kindContext), slog.String("kubeconfig", k.kubeconfigPath))
+	slog.Info("kubeconfig updated for kind", slog.String("context", k.kubeconfig.CurrentContext()), slog.String("namespace", namespace), slog.String("kubeconfig", k.kubeconfig.Path()))
 
 	if k8sClient == nil {
 		// instantiate k8sClient after the cluster is in place
 		k8sConfigFlags := genericclioptions.NewConfigFlags(true)
-		k8sConfigFlags.KubeConfig = &k.kubeconfigPath
+		kubeconfigPath := k.kubeconfig.Path()
+		k8sConfigFlags.KubeConfig = &kubeconfigPath
 		k8sClient, err = NewK8sClient(k8sConfigFlags, nil)
 		if err != nil {
 			return err
@@ -216,7 +222,7 @@ func (k *KindCluster) Delete() error {
 		return err
 	}
 	slog.Info("docker registry deleted", slog.String("name", k.registryConfig.containerName))
-	return k.provider.Delete(k.name, k.kubeconfigPath)
+	return k.provider.Delete(k.name, k.kubeconfig.Path())
 }
 
 func (k *KindCluster) Name() string {
@@ -225,6 +231,12 @@ func (k *KindCluster) Name() string {
 
 func (k *KindCluster) K8sClient() K8sCLI {
 	return k.k8sClient
+}
+
+// SetKubeConfig sets the kubeconfig for the cluster
+// useful for testing, no need to call this normally
+func (k *KindCluster) SetKubeConfig(kubeconfig KubeConfigInterface) {
+	k.kubeconfig = kubeconfig
 }
 
 func (k *KindCluster) createDockerRegistry(forceRecreate bool) (bool, error) {
@@ -290,8 +302,33 @@ func (k *KindCluster) ensureNodeRunning(node nodes.Node) error {
 	return nil
 }
 
-func (k *KindCluster) configureKubectlContext() error {
-	return k.provider.ExportKubeConfig(k.name, k.kubeconfigPath, false)
+// configureKubectlContext calls kind's provider.ExportKubeConfig to update the kubeconfig file
+// creating/updating the context to use the specified namespace
+func (k *KindCluster) configureKubectlContext(namespace string) error {
+	if err := k.provider.ExportKubeConfig(k.name, k.kubeconfig.Path(), false); err != nil {
+		return fmt.Errorf("failed to export kubeconfig for cluster %s: %w", k.name, err)
+	}
+
+	if err := k.kubeconfig.LoadConfig(); err != nil {
+		return fmt.Errorf("failed to read kubeconfig file %s for cluster %s: %w", k.kubeconfig.Path(), k.name, err)
+	}
+
+	if k.kubeconfig.CurrentContext() == "" {
+		return fmt.Errorf("no current context found in kubeconfig file %s for cluster %s", k.kubeconfig.Path(), k.name)
+	}
+
+	if _, ok := k.kubeconfig.Contexts()[k.kubeconfig.CurrentContext()]; !ok {
+		return fmt.Errorf("no context %s found in kubeconfig file %s for cluster %s", k.kubeconfig.CurrentContext(), k.kubeconfig.Path(), k.name)
+	}
+
+	if k.kubeconfig.Contexts()[k.kubeconfig.CurrentContext()].Namespace != namespace {
+		err := k.kubeconfig.SetNamespaceForContext(k.kubeconfig.CurrentContext(), namespace)
+		if err != nil {
+			return fmt.Errorf("failed to set namespace for context %s in kubeconfig file %s for cluster %s: %w", k.kubeconfig.CurrentContext(), k.kubeconfig.Path(), k.name, err)
+		}
+	}
+
+	return nil
 }
 
 func (k *KindCluster) configureRegistryOnNodes() error {
@@ -313,9 +350,9 @@ func (k *KindCluster) configureRegistryOnNodes() error {
 				if err := node.Command("mkdir", "-p", registryCertsDir).Run(); err != nil {
 					return err
 				}
-				hostsTomlContent := fmt.Sprintf("[host.\"http://%s:%s\"]\n", k.registryConfig.containerName, port.Port())
+				hostsTomlContent := fmt.Sprintf("[host.\"http://%s:%s\"]", k.registryConfig.containerName, port.Port())
 				hostsTomlPathInsideNode := fmt.Sprintf("%s/hosts.toml", registryCertsDir)
-				if err := node.Command("echo", hostsTomlContent, ">", hostsTomlPathInsideNode).Run(); err != nil {
+				if err := node.Command("sh", "-c", fmt.Sprintf("echo '%s' > %s", hostsTomlContent, hostsTomlPathInsideNode)).Run(); err != nil {
 					return err
 				}
 			}

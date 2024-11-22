@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	crk8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -173,4 +174,67 @@ func (k *K8sClient) ApplyConfigMap(ctx context.Context, configMap *corev1api.Con
 		return false, fmt.Errorf("failed to create configmap %s in namespace %s: %w", configMap.Name, configMap.Namespace, errCreate)
 	}
 	return false, nil
+}
+
+// KubeConfigInterface is an interface for a k8s.io/client-go/tools/clientcmd/api.Config
+// to allow for mocking in tests.
+type KubeConfigInterface interface {
+	Contexts() map[string]*api.Context
+	CurrentContext() string
+	LoadConfig() error
+	Path() string
+	SetNamespaceForContext(context string, namespace string) error
+}
+
+// KubeConfig is a wrapper around a k8s.io/client-go/tools/clientcmd/api.Config
+type KubeConfig struct {
+	path   string
+	config *api.Config
+}
+
+func NewKubeConfig(path string) *KubeConfig {
+	return &KubeConfig{
+		path: path,
+	}
+}
+
+// LoadConfig reads the kubeconfig from disk.
+func (k *KubeConfig) LoadConfig() error {
+	config, err := clientcmd.LoadFromFile(k.path)
+	if err != nil {
+		return err
+	}
+	k.config = config
+	return nil
+}
+
+// Contexts returns the contexts in the kubeconfig.
+func (k *KubeConfig) Contexts() map[string]*api.Context {
+	return k.config.Contexts
+}
+
+// CurrentContext returns the current context in the kubeconfig.
+func (k *KubeConfig) CurrentContext() string {
+	return k.config.CurrentContext
+}
+
+// Path returns the path to the kubeconfig.
+func (k *KubeConfig) Path() string {
+	return k.path
+}
+
+// SetNamespaceForContext sets the namespace for a context in the kubeconfig.
+func (k *KubeConfig) SetNamespaceForContext(context string, namespace string) error {
+	if _, ok := k.config.Contexts[context]; !ok {
+		return fmt.Errorf("context %s not found", context)
+	}
+	k.config.Contexts[context].Namespace = namespace
+	return k.flush()
+}
+
+// flush writes the kubeconfig to disk.
+func (k *KubeConfig) flush() error {
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = k.path
+	return clientcmd.ModifyConfig(pathOptions, *k.config, true)
 }

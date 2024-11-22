@@ -72,12 +72,14 @@ func ListFiles(dirPath string) ([]string, error) {
 
 func PromptForInput(key string, defaultValue string) (string, error) {
 	userInput := ""
-	prompt := fmt.Sprintf("Please enter a value for %s: ", key)
+	prompt := fmt.Sprintf("Please enter a value for %s", key)
 	if defaultValue != "" {
 		prompt = fmt.Sprintf("%s (default is '%s')", prompt, defaultValue)
 	}
+	prompt = fmt.Sprintf("%s: ", prompt)
 	fmt.Print(prompt)
 	_, err := fmt.Scanln(&userInput)
+	userInput = strings.Trim(userInput, " ")
 	if userInput == "" {
 		return defaultValue, nil
 	}
@@ -250,7 +252,11 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 	return output
 }
 
-func IsValidCribNamespace(namespace string, skipPrefixCheck bool) error {
+func IsValidCribNamespace(namespace string, provider string, skipPrefixCheck bool) error {
+	if provider == "kind" && namespace != "crib-local" {
+		return fmt.Errorf("DEVSPACE_NAMESPACE must be set to 'crib-local' when using kind provider")
+	}
+
 	if !skipPrefixCheck && !strings.HasPrefix(namespace, "crib-") {
 		return fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
 	}

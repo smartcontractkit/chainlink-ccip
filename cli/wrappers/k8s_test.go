@@ -18,8 +18,10 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
 func TestNewK8sClient(t *testing.T) {
@@ -357,6 +359,125 @@ func TestK8sClient_ApplyConfigMap(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestKubeConfig_Contexts(t *testing.T) {
+	t.Parallel()
+
+	kubeConfigContent := testingutils.MockKubeConfigFile([]byte(`apiVersion: v1
+clusters:
+- cluster:
+    server: https://some.endpoint
+  name: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+- cluster:
+    server: https://other.endpoint
+  name: arn:aws:eks:ap-southeast-1:123456789000:cluster/some-other-cluster
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+  name: context-some-cluster
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+    namespace: crib-test
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+  name: context-some-other-cluster
+current-context: context-some-cluster
+kind: Config`), 0o600)
+	kubeConfigFile := kubeConfigContent.Name()
+	defer os.Remove(kubeConfigFile)
+
+	kubeConfig := wrappers.NewKubeConfig(kubeConfigFile)
+	require.NoError(t, kubeConfig.LoadConfig())
+	assert.Equal(t, map[string]*api.Context{
+		"context-some-cluster": {
+			LocationOfOrigin: kubeConfigFile,
+			Extensions:       map[string]runtime.Object{},
+			Cluster:          "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+			AuthInfo:         "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+		},
+		"context-some-other-cluster": {
+			LocationOfOrigin: kubeConfigFile,
+			Extensions:       map[string]runtime.Object{},
+			Cluster:          "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+			Namespace:        "crib-test",
+			AuthInfo:         "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+		},
+	}, kubeConfig.Contexts())
+
+	assert.Equal(t, "context-some-cluster", kubeConfig.CurrentContext())
+}
+
+func TestKubeConfig_Path(t *testing.T) {
+	t.Parallel()
+
+	file, err := os.CreateTemp(t.TempDir(), "kubeconfig")
+	require.NoError(t, err)
+
+	kubeConfig := wrappers.NewKubeConfig(file.Name())
+	assert.Equal(t, file.Name(), kubeConfig.Path())
+}
+
+func TestKubeConfig_SetNamespaceForContext(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test-namespace"
+	kubeConfigContent := testingutils.MockKubeConfigFile([]byte(`apiVersion: v1
+clusters:
+- cluster:
+    server: https://some.endpoint
+  name: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+- cluster:
+    server: https://other.endpoint
+  name: arn:aws:eks:ap-southeast-1:123456789000:cluster/some-other-cluster
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+  name: context-some-cluster
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+    namespace: crib-test
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+  name: context-some-other-cluster
+current-context: context-some-cluster
+kind: Config`), 0o600)
+	kubeConfigFile := kubeConfigContent.Name()
+	t.Cleanup(func() { os.Remove(kubeConfigFile) })
+
+	testCases := []struct {
+		name        string
+		context     string
+		expectedErr string
+	}{
+		{
+			name:        "ContextExists",
+			context:     "context-some-cluster",
+			expectedErr: "",
+		},
+		{
+			name:        "ContextDoesNotExist",
+			context:     "non-existing",
+			expectedErr: "context non-existing not found",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			kubeConfig := wrappers.NewKubeConfig(kubeConfigFile)
+			require.NoError(t, kubeConfig.LoadConfig())
+
+			err := kubeConfig.SetNamespaceForContext(tt.context, namespace)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, namespace, kubeConfig.Contexts()[tt.context].Namespace)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
 			}
 		})
 	}

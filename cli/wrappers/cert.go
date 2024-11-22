@@ -17,11 +17,21 @@ import (
 	crk8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type Mkcert struct {
-	CertPath string
-	KeyPath  string
+// MkcertCLI defines the methods to interact with the mkcert CLI.
+type MkcertCLI interface {
+	Install() error
+	CARoot() (string, error)
+	Certificate() string
+	Key() string
 }
 
+// Mkcert represents the result of running the mkcert install command (i.e. the paths to the generated cert and key files).
+type Mkcert struct {
+	certPath string
+	keyPath  string
+}
+
+// Install runs the mkcert install command to install the CA root certificate and key.
 func (m *Mkcert) Install() error {
 	if err := exec.Command("mkcert", "-install").Run(); err != nil {
 		return fmt.Errorf("failed to install mkcert: %w", err)
@@ -31,12 +41,13 @@ func (m *Mkcert) Install() error {
 		return err
 	}
 
-	m.CertPath = filepath.Join(caRoot, "rootCA.pem")
-	m.KeyPath = filepath.Join(caRoot, "rootCA-key.pem")
+	m.certPath = filepath.Join(caRoot, "rootCA.pem")
+	m.keyPath = filepath.Join(caRoot, "rootCA-key.pem")
 
 	return nil
 }
 
+// CARoot returns the path to the mkcert CA root.
 func (m *Mkcert) CARoot() (string, error) {
 	caRootBytes, err := exec.Command("mkcert", "-CAROOT").Output()
 	if err != nil {
@@ -45,13 +56,24 @@ func (m *Mkcert) CARoot() (string, error) {
 	return string(bytes.Trim(caRootBytes, "\n")), nil
 }
 
+// Certificate returns the path to the mkcert certificate.
+func (m *Mkcert) Certificate() string {
+	return m.certPath
+}
+
+// Key returns the path to the mkcert key.
+func (m *Mkcert) Key() string {
+	return m.keyPath
+}
+
 type CACert struct {
 	crk8sClient crk8sclient.Client
+	mkcert      MkcertCLI
 }
 
 // NewCACert creates a new CACert instance whose purpose is to interact with
 // kubernetes through a controller-runtime client instance in order to manage cert-manager resources.
-func NewCACert(k8sClient K8sCLI) (*CACert, error) {
+func NewCACert(k8sClient K8sCLI, mkcert MkcertCLI) (*CACert, error) {
 	err := certmanagerv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add cert-manager to scheme: %w", err)
@@ -64,6 +86,7 @@ func NewCACert(k8sClient K8sCLI) (*CACert, error) {
 
 	return &CACert{
 		crk8sClient: crk8sClient,
+		mkcert:      mkcert,
 	}, nil
 }
 
@@ -75,21 +98,20 @@ func (c *CACert) EnsureCertManagerSecret(ctx context.Context, secretName, secret
 	if err == nil || k8serrors.IsAlreadyExists(err) {
 		return true, nil
 	}
-	if err != nil && !k8serrors.IsNotFound(err) {
+	if !k8serrors.IsNotFound(err) {
 		return false, fmt.Errorf("failed to get secret: %w", err)
 	}
 
-	newCert := &Mkcert{}
-	if err := newCert.Install(); err != nil {
+	if err := c.mkcert.Install(); err != nil {
 		return false, err
 	}
 
-	certPathBytes, err := os.ReadFile(newCert.CertPath)
+	certPathBytes, err := os.ReadFile(c.mkcert.Certificate())
 	if err != nil {
 		return false, fmt.Errorf("failed to read cert file: %w", err)
 	}
 
-	keyPathBytes, err := os.ReadFile(newCert.KeyPath)
+	keyPathBytes, err := os.ReadFile(c.mkcert.Key())
 	if err != nil {
 		return false, fmt.Errorf("failed to read key file: %w", err)
 	}

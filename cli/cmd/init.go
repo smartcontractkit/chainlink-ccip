@@ -55,11 +55,14 @@ var initCmd = &cobra.Command{
 		}
 
 		if !slices.Contains(supportedProviders, viper.GetString("PROVIDER")) {
-			logger.Error("unsupported provider", "supportedProviders", supportedProviders)
+			logger.Error("unsupported provider",
+				slog.String("input", viper.GetString("PROVIDER")),
+				slog.Any("supportedProviders", supportedProviders),
+			)
 			os.Exit(1)
 		}
 
-		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
+		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
 			logger.Error("invalid namespace for CRIB", slog.Any("error", err))
 			os.Exit(1)
 		}
@@ -181,7 +184,7 @@ var initCmd = &cobra.Command{
 			// TODO: allow setting clustername and config, for now using the defaults
 			start := time.Now()
 			kindCluster := wrappers.NewKindCluster("", nil, dockerCli, nil, viper.GetString("KUBECONFIG"), "", nil, nil)
-			if err := kindCluster.CreateOrReuse(nil); err != nil {
+			if err := kindCluster.CreateOrReuse("", nil); err != nil {
 				logger.Error("failed to spin up kind cluster", slog.Any("error", err))
 			}
 			k8sClient = kindCluster.K8sClient()

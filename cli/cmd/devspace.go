@@ -139,7 +139,7 @@ var ensureNamespaceCmd = &cobra.Command{
 	Use:   "ensure-namespace",
 	Short: "Ensure the k8s namespace exists and - when PROVIDER=aws - the kyverno-generated power user rolebinding is in place",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
+		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
 			logger.Error("invalid namespace for CRIB", slog.Any("error", err))
 			os.Exit(1)
 		}
@@ -173,17 +173,20 @@ var ensureNamespaceCmd = &cobra.Command{
 			slog.String("kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME")),
 		)
 
-		dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
-		if err != nil {
-			logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
-			os.Exit(1)
-		}
+		var rolebindingClient dynamic.ResourceInterface
+		if viper.GetString("PROVIDER") == "aws" {
+			dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
+			if err != nil {
+				logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
+				os.Exit(1)
+			}
 
-		rolebindingClient := dynamicClient.Resource(schema.GroupVersionResource{
-			Group:    "rbac.authorization.k8s.io",
-			Version:  "v1",
-			Resource: "rolebindings",
-		}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
+			rolebindingClient = dynamicClient.Resource(schema.GroupVersionResource{
+				Group:    "rbac.authorization.k8s.io",
+				Version:  "v1",
+				Resource: "rolebindings",
+			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
+		}
 
 		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
 			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
@@ -264,12 +267,13 @@ var configureCertProvisioningCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		caCert, err := wrappers.NewCACert(k8sClient)
+		caCert, err := wrappers.NewCACert(k8sClient, &wrappers.Mkcert{})
 		if err != nil {
 			logger.Error("failed to initialize CA cert", slog.Any("error", err))
 			os.Exit(1)
 		}
 
+		//nolint: gosec
 		secretName := "mkcert-ca-key-pair"
 		secretNamespace := "cert-manager"
 		alreadyExistingSecret, err := caCert.EnsureCertManagerSecret(context.TODO(), secretName, secretNamespace)

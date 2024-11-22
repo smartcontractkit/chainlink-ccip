@@ -86,7 +86,7 @@ func SetupKeystoneKindCrib(ctx context.Context, config StartCmdConfig) error {
 		}
 	}
 
-	if err := kindCluster.CreateOrReuse(nil); err != nil {
+	if err := kindCluster.CreateOrReuse("", nil); err != nil {
 		return fmt.Errorf("failed to setup kind cluster: %w", err)
 	}
 

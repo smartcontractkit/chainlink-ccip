@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	kindmocks "github.com/smartcontractkit/crib/cli/mocks/external/kind"
+	testingutils "github.com/smartcontractkit/crib/cli/testing/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/kind/pkg/apis/config/v1alpha4"
 	"sigs.k8s.io/kind/pkg/cluster/nodes"
 )
@@ -26,6 +29,7 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 
 	clusterName := "test-cluster"
 	registryName := "test-registry"
+	namespaceName := "test-namespace"
 	registryContainerConfig := &containertypes.Config{
 		Image: "someregistry:sometag",
 	}
@@ -40,11 +44,35 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 		NetworkMode: "bridge",
 	}
 
+	kubeConfigContent := testingutils.MockKubeConfigFile([]byte(`apiVersion: v1
+clusters:
+- cluster:
+    server: https://some.endpoint
+  name: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+- cluster:
+    server: https://other.endpoint
+  name: arn:aws:eks:ap-southeast-1:123456789000:cluster/some-other-cluster
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+  name: context-some-cluster
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+    namespace: crib-test
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+  name: context-some-other-cluster
+current-context: context-some-cluster
+kind: Config`), 0o600)
+	kubeConfigFile := kubeConfigContent.Name()
+	t.Cleanup(func() { os.Remove(kubeConfigFile) })
+
 	testCases := []struct {
 		name                       string
 		applyKindProviderMockCalls func(m *wrappermocks.KindProvider)
 		applyDockerCLIMockCalls    func(m *wrappermocks.DockerCLI)
 		applyK8sCLIMockCalls       func(m *wrappermocks.K8sCLI)
+		applyKubeConfigMockCalls   func(m *wrappermocks.KubeConfigInterface)
 		expectedErr                string
 	}{
 		{
@@ -57,7 +85,7 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 
 				kindNode := kindmocks.NewKindNode(t)
 				kindNode.EXPECT().Command("mkdir", "-p", "/etc/containerd/certs.d/localhost:5001").Return(kindExecCmd1)
-				kindNode.EXPECT().Command("echo", "[host.\"http://test-registry:5000\"]\n", ">", "/etc/containerd/certs.d/localhost:5001/hosts.toml").Return(kindExecCmd2)
+				kindNode.EXPECT().Command("sh", "-c", `echo '[host."http://test-registry:5000"]' > /etc/containerd/certs.d/localhost:5001/hosts.toml`).Return(kindExecCmd2)
 
 				m.EXPECT().List().Return([]string{}, nil)
 				m.EXPECT().Create(
@@ -89,6 +117,29 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 						},
 					}).Return(false, nil)
 			},
+			applyKubeConfigMockCalls: func(m *wrappermocks.KubeConfigInterface) {
+				m.EXPECT().Path().Return(kubeConfigFile)
+				m.EXPECT().LoadConfig().Return(nil)
+				// NOTE: here the kubeconfig is updated
+				kindContext := fmt.Sprintf("kind-%s", clusterName)
+				m.EXPECT().CurrentContext().Return(kindContext)
+				m.EXPECT().Contexts().Return(map[string]*api.Context{
+					"context-some-cluster": {
+						Cluster:  "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+						AuthInfo: "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+					},
+					"context-some-other-cluster": {
+						Cluster:   "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+						Namespace: "crib-test",
+						AuthInfo:  "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+					},
+					kindContext: { // NOTE: in the new kind context, cluster and user have the same name as the cluster as per kind convention
+						Cluster:  kindContext,
+						AuthInfo: kindContext,
+					},
+				})
+				m.EXPECT().SetNamespaceForContext(kindContext, namespaceName).Return(nil)
+			},
 			expectedErr: "",
 		},
 		{
@@ -103,13 +154,13 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 				kindNodeControlPlane.EXPECT().Role().Return("control-plane", nil)
 				kindNodeControlPlane.EXPECT().String().Return(fmt.Sprintf("%s-%s", clusterName, "control-plane"))
 				kindNodeControlPlane.EXPECT().Command("mkdir", "-p", "/etc/containerd/certs.d/localhost:5001").Return(kindExecCmd1)
-				kindNodeControlPlane.EXPECT().Command("echo", "[host.\"http://test-registry:5000\"]\n", ">", "/etc/containerd/certs.d/localhost:5001/hosts.toml").Return(kindExecCmd2)
+				kindNodeControlPlane.EXPECT().Command("sh", "-c", `echo '[host."http://test-registry:5000"]' > /etc/containerd/certs.d/localhost:5001/hosts.toml`).Return(kindExecCmd2)
 
 				kindNodeWorker := kindmocks.NewKindNode(t)
 				kindNodeWorker.EXPECT().Role().Return("worker", nil)
 				kindNodeWorker.EXPECT().String().Return(fmt.Sprintf("%s-%s", clusterName, "worker"))
 				kindNodeWorker.EXPECT().Command("mkdir", "-p", "/etc/containerd/certs.d/localhost:5001").Return(kindExecCmd1)
-				kindNodeWorker.EXPECT().Command("echo", "[host.\"http://test-registry:5000\"]\n", ">", "/etc/containerd/certs.d/localhost:5001/hosts.toml").Return(kindExecCmd2)
+				kindNodeWorker.EXPECT().Command("sh", "-c", `echo '[host."http://test-registry:5000"]' > /etc/containerd/certs.d/localhost:5001/hosts.toml`).Return(kindExecCmd2)
 
 				m.EXPECT().List().Return([]string{clusterName}, nil)
 				m.EXPECT().ListNodes(clusterName).Return([]nodes.Node{kindNodeControlPlane, kindNodeWorker}, nil)
@@ -145,6 +196,29 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 						},
 					}).Return(false, nil)
 			},
+			applyKubeConfigMockCalls: func(m *wrappermocks.KubeConfigInterface) {
+				m.EXPECT().Path().Return(kubeConfigFile)
+				m.EXPECT().LoadConfig().Return(nil)
+				// NOTE: here the kubeconfig is updated
+				kindContext := fmt.Sprintf("kind-%s", clusterName)
+				m.EXPECT().CurrentContext().Return(kindContext)
+				m.EXPECT().Contexts().Return(map[string]*api.Context{
+					"context-some-cluster": {
+						Cluster:  "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+						AuthInfo: "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+					},
+					"context-some-other-cluster": {
+						Cluster:   "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+						Namespace: "crib-test",
+						AuthInfo:  "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+					},
+					kindContext: { // NOTE: in the new kind context, cluster and user have the same name as the cluster as per kind convention
+						Cluster:  kindContext,
+						AuthInfo: kindContext,
+					},
+				})
+				m.EXPECT().SetNamespaceForContext(kindContext, namespaceName).Return(nil)
+			},
 			expectedErr: "",
 		},
 		{
@@ -161,7 +235,9 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 						context.Background(), registryContainerConfig, registryContainerHostConfig, &network.NetworkingConfig{}, registryName, false, mock.Anything,
 					).Return(false, nil)
 			},
-			applyK8sCLIMockCalls: func(m *wrappermocks.K8sCLI) {
+			applyK8sCLIMockCalls: func(m *wrappermocks.K8sCLI) {},
+			applyKubeConfigMockCalls: func(m *wrappermocks.KubeConfigInterface) {
+				m.EXPECT().Path().Return(kubeConfigFile)
 			},
 			expectedErr: "error creating cluster",
 		},
@@ -188,9 +264,9 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 						context.Background(), mock.Anything, mock.Anything, mock.Anything, fmt.Sprintf("%s-control-plane", clusterName), false, mock.Anything,
 					).Return(false, errors.New("error running container"))
 			},
-			applyK8sCLIMockCalls: func(m *wrappermocks.K8sCLI) {
-			},
-			expectedErr: "error running container",
+			applyK8sCLIMockCalls:     func(m *wrappermocks.K8sCLI) {},
+			applyKubeConfigMockCalls: func(m *wrappermocks.KubeConfigInterface) {},
+			expectedErr:              "error running container",
 		},
 		{
 			name: "FailsToCreateRegistry",
@@ -202,9 +278,9 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 						context.Background(), registryContainerConfig, registryContainerHostConfig, &network.NetworkingConfig{}, registryName, false, mock.Anything,
 					).Return(false, errors.New("error creating registry"))
 			},
-			applyK8sCLIMockCalls: func(m *wrappermocks.K8sCLI) {
-			},
-			expectedErr: "error creating registry",
+			applyK8sCLIMockCalls:     func(m *wrappermocks.K8sCLI) {},
+			applyKubeConfigMockCalls: func(m *wrappermocks.KubeConfigInterface) {},
+			expectedErr:              "error creating registry",
 		},
 	}
 	for _, tt := range testCases {
@@ -217,9 +293,13 @@ func TestNewKindCluster_CreateOrReuse(t *testing.T) {
 			tt.applyDockerCLIMockCalls(mockDockerCLI)
 			mockK8sCLI := wrappermocks.NewK8sCLI(t)
 			tt.applyK8sCLIMockCalls(mockK8sCLI)
+			mockKubeConfig := wrappermocks.NewKubeConfigInterface(t)
+			tt.applyKubeConfigMockCalls(mockKubeConfig)
 
-			kindCluster := wrappers.NewKindCluster(clusterName, &v1alpha4.Cluster{}, mockDockerCLI, mockKindProvider, string(mock.AnythingOfType("string")), registryName, registryContainerConfig, registryContainerHostConfig)
-			err := kindCluster.CreateOrReuse(mockK8sCLI)
+			kindCluster := wrappers.NewKindCluster(clusterName, &v1alpha4.Cluster{}, mockDockerCLI, mockKindProvider, kubeConfigFile, registryName, registryContainerConfig, registryContainerHostConfig)
+			kindCluster.SetKubeConfig(mockKubeConfig)
+
+			err := kindCluster.CreateOrReuse(namespaceName, mockK8sCLI)
 			if tt.expectedErr == "" {
 				require.NoError(t, err)
 			} else {

@@ -2,6 +2,8 @@ package wrappers_test
 
 import (
 	"context"
+	"errors"
+	"os"
 	"testing"
 
 	certmanagerv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
@@ -23,7 +25,9 @@ func TestNewCACert(t *testing.T) {
 	mockK8sClient := wrappermocks.NewK8sCLI(t)
 	mockK8sClient.EXPECT().ControllerRuntimeClient(mock.Anything).Return(mockCrk8sClient, nil)
 
-	caCert, err := wrappers.NewCACert(mockK8sClient)
+	mockMkcert := wrappermocks.NewMkcertCLI(t)
+
+	caCert, err := wrappers.NewCACert(mockK8sClient, mockMkcert)
 	require.NoError(t, err)
 	assert.NotNil(t, caCert)
 }
@@ -33,9 +37,16 @@ func TestCACert_EnsureCertManagerSecret(t *testing.T) {
 	secretName := "test-secret"
 	secretNamespace := "default"
 
+	certFile, err := os.CreateTemp(t.TempDir(), "cert")
+	require.NoError(t, err)
+
+	keyFile, err := os.CreateTemp(t.TempDir(), "key")
+	require.NoError(t, err)
+
 	testCases := []struct {
 		name                      string
 		applyCrk8sClientMockCalls func(m *k8smocks.ControllerRuntimeClient)
+		applyMkcertCLIMockCalls   func(m *wrappermocks.MkcertCLI)
 		expectedErr               string
 		expectedExists            bool
 	}{
@@ -44,6 +55,11 @@ func TestCACert_EnsureCertManagerSecret(t *testing.T) {
 			applyCrk8sClientMockCalls: func(m *k8smocks.ControllerRuntimeClient) {
 				m.EXPECT().Get(context.TODO(), types.NamespacedName{Namespace: secretNamespace, Name: secretName}, &corev1.Secret{}).Return(k8serrors.NewNotFound(corev1.Resource("secrets"), "test-secret"))
 				m.EXPECT().Create(context.TODO(), mock.Anything).Return(nil)
+			},
+			applyMkcertCLIMockCalls: func(m *wrappermocks.MkcertCLI) {
+				m.EXPECT().Install().Return(nil)
+				m.EXPECT().Certificate().Return(certFile.Name())
+				m.EXPECT().Key().Return(keyFile.Name())
 			},
 			expectedErr:    "",
 			expectedExists: false,
@@ -54,6 +70,11 @@ func TestCACert_EnsureCertManagerSecret(t *testing.T) {
 				m.EXPECT().Get(context.TODO(), types.NamespacedName{Namespace: secretNamespace, Name: secretName}, &corev1.Secret{}).Return(k8serrors.NewNotFound(corev1.Resource("secrets"), "test-secret"))
 				m.EXPECT().Create(context.TODO(), mock.Anything).Return(k8serrors.NewServiceUnavailable("failed creating secret"))
 			},
+			applyMkcertCLIMockCalls: func(m *wrappermocks.MkcertCLI) {
+				m.EXPECT().Install().Return(nil)
+				m.EXPECT().Certificate().Return(certFile.Name())
+				m.EXPECT().Key().Return(keyFile.Name())
+			},
 			expectedErr:    "failed creating secret",
 			expectedExists: false,
 		},
@@ -62,15 +83,28 @@ func TestCACert_EnsureCertManagerSecret(t *testing.T) {
 			applyCrk8sClientMockCalls: func(m *k8smocks.ControllerRuntimeClient) {
 				m.EXPECT().Get(context.TODO(), types.NamespacedName{Namespace: secretNamespace, Name: secretName}, &corev1.Secret{}).Return(k8serrors.NewAlreadyExists(corev1.Resource("secrets"), "test-secret"))
 			},
-			expectedErr:    "",
-			expectedExists: true,
+			applyMkcertCLIMockCalls: func(m *wrappermocks.MkcertCLI) {},
+			expectedErr:             "",
+			expectedExists:          true,
 		},
 		{
 			name: "GetSecretError",
 			applyCrk8sClientMockCalls: func(m *k8smocks.ControllerRuntimeClient) {
 				m.EXPECT().Get(context.TODO(), types.NamespacedName{Namespace: secretNamespace, Name: secretName}, &corev1.Secret{}).Return(k8serrors.NewServiceUnavailable("get secret error"))
 			},
-			expectedErr:    "get secret error",
+			applyMkcertCLIMockCalls: func(m *wrappermocks.MkcertCLI) {},
+			expectedErr:             "get secret error",
+			expectedExists:          false,
+		},
+		{
+			name: "MkcertInstallError",
+			applyCrk8sClientMockCalls: func(m *k8smocks.ControllerRuntimeClient) {
+				m.EXPECT().Get(context.TODO(), types.NamespacedName{Namespace: secretNamespace, Name: secretName}, &corev1.Secret{}).Return(k8serrors.NewNotFound(corev1.Resource("secrets"), "test-secret"))
+			},
+			applyMkcertCLIMockCalls: func(m *wrappermocks.MkcertCLI) {
+				m.EXPECT().Install().Return(errors.New("mkcert install error"))
+			},
+			expectedErr:    "mkcert install error",
 			expectedExists: false,
 		},
 	}
@@ -83,7 +117,10 @@ func TestCACert_EnsureCertManagerSecret(t *testing.T) {
 			mockK8sClient := wrappermocks.NewK8sCLI(t)
 			mockK8sClient.EXPECT().ControllerRuntimeClient(mock.Anything).Return(mockCrk8sClient, nil)
 
-			caCert, err := wrappers.NewCACert(mockK8sClient)
+			mockMkcert := wrappermocks.NewMkcertCLI(t)
+			tt.applyMkcertCLIMockCalls(mockMkcert)
+
+			caCert, err := wrappers.NewCACert(mockK8sClient, mockMkcert)
 			require.NoError(t, err)
 			require.NotNil(t, caCert)
 
@@ -152,7 +189,9 @@ func TestCACert_EnsureCAClusterIssuer(t *testing.T) {
 			mockK8sClient := wrappermocks.NewK8sCLI(t)
 			mockK8sClient.EXPECT().ControllerRuntimeClient(mock.Anything).Return(mockCrk8sClient, nil)
 
-			caCert, err := wrappers.NewCACert(mockK8sClient)
+			mockMkcert := wrappermocks.NewMkcertCLI(t)
+
+			caCert, err := wrappers.NewCACert(mockK8sClient, mockMkcert)
 			require.NoError(t, err)
 			require.NotNil(t, caCert)
 
@@ -165,21 +204,4 @@ func TestCACert_EnsureCAClusterIssuer(t *testing.T) {
 			}
 		})
 	}
-}
-
-// nolint: paralleltest,nolintlint
-func TestMkcertInstall(t *testing.T) {
-	m := wrappers.Mkcert{}
-	err := m.Install()
-	assert.NoError(t, err)
-	assert.FileExists(t, m.CertPath)
-	assert.FileExists(t, m.KeyPath)
-}
-
-// nolint: paralleltest,nolintlint
-func TestMkcertCaRoot(t *testing.T) {
-	m := wrappers.Mkcert{}
-	caRoot, err := m.CARoot()
-	assert.NoError(t, err)
-	assert.DirExists(t, caRoot)
 }
