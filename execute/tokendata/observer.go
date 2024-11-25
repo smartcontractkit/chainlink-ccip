@@ -245,10 +245,10 @@ func (n *NoopTokenDataObserver) Observe(
 		for seq, message := range obs {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i := range message.TokenAmounts {
-				tokenData[i] = exectypes.NewNoopTokenData()
 				if n.isError(selector, seq, i) {
-					tokenData[i].Ready = false
-					tokenData[i].Error = errors.New("some error")
+					tokenData[i] = exectypes.NewErrorTokenData(errors.New("some error"))
+				} else {
+					tokenData[i] = exectypes.NewNoopTokenData()
 				}
 			}
 			tokenObservations[selector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
