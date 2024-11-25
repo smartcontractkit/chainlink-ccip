@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -126,6 +127,11 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
+	if err := cursingValidation(ctx, p.ccipReader, decodedReport.MerkleRoots); err != nil {
+		p.lggr.Errorw("report not accepted due to cursing", "err", err)
+		return false, nil
+	}
+
 	var reportInfo ReportInfo
 	if err := reportInfo.Decode(r.Info); err != nil {
 		return false, fmt.Errorf("decode report info: %w", err)
@@ -176,6 +182,42 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 	return true, nil
+}
+
+// cursingValidation will make one contract call to get rmn curse info.
+// If destination is cursed or some source chain is cursed it returns error.
+func cursingValidation(
+	ctx context.Context,
+	ccipReader ccipreader.CCIPReader,
+	merkleRoots []cciptypes.MerkleRootChain,
+) error {
+	// If merkleRoots are empty we still want to transmit chain fee and token prices.
+	// So the report is considered valid.
+	if len(merkleRoots) == 0 {
+		return nil
+	}
+
+	sourceChains := make([]cciptypes.ChainSelector, 0, len(merkleRoots))
+	for _, mr := range merkleRoots {
+		sourceChains = append(sourceChains, mr.ChainSel)
+	}
+
+	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, sourceChains)
+	if err != nil {
+		return fmt.Errorf("get rmn curse info sourceChains=%v: %w", sourceChains, err)
+	}
+
+	if curseInfo.CursedDestination || curseInfo.GlobalCurse {
+		return fmt.Errorf("destination chain is cursed: %v", curseInfo)
+	}
+
+	for sourceChain, isCursed := range curseInfo.CursedSourceChains {
+		if isCursed {
+			return fmt.Errorf("source chain %d is cursed", sourceChain)
+		}
+	}
+
+	return nil
 }
 
 func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {

@@ -688,6 +688,7 @@ func prepareCcipReaderMock(
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{}, nil).Maybe()
+	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&rmntypes.CurseInfo{}, nil).Maybe()
 
 	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()
