@@ -43,7 +43,7 @@ jobs:
         id: get_chainlink_sha
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            core_ref=$(echo "${{ steps.fetch_pr_data.outputs.result }}" | grep -oP '`core ref: \K[a-f0-9]{40}`')
+            core_ref=echo "${{ steps.fetch_pr_data.outputs.result }}" | grep -oP '`core ref: \K[a-f0-9]{40}`'
             if [ -n "$core_ref" ]; then
               echo "Using chainlink repository commit hash override: $core_ref"
               echo "::set-output name=ref::$core_ref"
