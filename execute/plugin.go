@@ -16,12 +16,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-
+	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -53,7 +53,7 @@ type Plugin struct {
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
-	costlyMessageObserver exectypes.CostlyMessageObserver
+	costlyMessageObserver costlymessages.Observer
 	estimateProvider      gas.EstimateProvider
 	lggr                  logger.Logger
 
@@ -74,7 +74,7 @@ func NewPlugin(
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
-	costlyMessageObserver exectypes.CostlyMessageObserver,
+	costlyMessageObserver costlymessages.Observer,
 ) *Plugin {
 	lggr = logger.Named(lggr, "ExecutePlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)

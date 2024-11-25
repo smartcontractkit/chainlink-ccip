@@ -1,4 +1,4 @@
-package exectypes
+package costlymessages
 
 import (
 	"context"
@@ -23,8 +23,8 @@ const (
 	daMultiplierBase          = 10_000  // DA multiplier is in multiples of 0.0001, i.e. 1/daMultiplierBase
 )
 
-// CostlyMessageObserver observes messages that are too costly to execute.
-type CostlyMessageObserver interface {
+// Observer observes messages that are too costly to execute.
+type Observer interface {
 	// Observe takes a set of messages and returns a slice of message IDs that are too costly to execute.
 	// Also takes in a map from message ID to the message's timestamp, needed to calculate fee boosting.
 	Observe(
@@ -34,18 +34,18 @@ type CostlyMessageObserver interface {
 	) ([]cciptypes.Bytes32, error)
 }
 
-// NewCostlyMessageObserverWithDefaults creates a new CostlyMessageObserver with default calculators.
+// NewObserverWithDefaults creates a new Observer with default calculators.
 // The default calculators are:
 // - CCIPMessageFeeUSD18Calculator
 // - CCIPMessageExecCostUSD18Calculator
-func NewCostlyMessageObserverWithDefaults(
+func NewObserverWithDefaults(
 	lggr logger.Logger,
 	enabled bool,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 	estimateProvider gas.EstimateProvider,
-) CostlyMessageObserver {
-	return NewCostlyMessageObserver(
+) Observer {
+	return NewObserver(
 		lggr,
 		enabled,
 		NewCCIPMessageFeeUSD18Calculator(
@@ -62,15 +62,15 @@ func NewCostlyMessageObserverWithDefaults(
 	)
 }
 
-// NewCostlyMessageObserver allows to specific feeCalculator and execCostCalculator.
+// NewObserver allows to specific feeCalculator and execCostCalculator.
 // Therefore, it's very convenient for testing.
-func NewCostlyMessageObserver(
+func NewObserver(
 	lggr logger.Logger,
 	enabled bool,
 	feeCalculator MessageFeeE18USDCalculator,
 	execCostCalculator MessageExecCostUSD18Calculator,
-) CostlyMessageObserver {
-	return &CCIPCostlyMessageObserver{
+) Observer {
+	return &observer{
 		lggr:               lggr,
 		enabled:            enabled,
 		feeCalculator:      feeCalculator,
@@ -78,7 +78,7 @@ func NewCostlyMessageObserver(
 	}
 }
 
-type CCIPCostlyMessageObserver struct {
+type observer struct {
 	lggr               logger.Logger
 	enabled            bool
 	feeCalculator      MessageFeeE18USDCalculator
@@ -88,13 +88,13 @@ type CCIPCostlyMessageObserver struct {
 // Observe returns a slice of message IDs that are too costly to execute.
 // It calculates the fee and execution cost of each message. The messages are considered too costly if the fee is less
 // than the execution cost.
-func (o *CCIPCostlyMessageObserver) Observe(
+func (o *observer) Observe(
 	ctx context.Context,
 	messages []cciptypes.Message,
 	messageTimestamps map[cciptypes.Bytes32]time.Time,
 ) ([]cciptypes.Bytes32, error) {
 	if !o.enabled {
-		o.lggr.Infof("CostlyMessageObserver is disabled")
+		o.lggr.Infof("Observer is disabled")
 		return nil, nil
 	}
 
@@ -128,7 +128,7 @@ func (o *CCIPCostlyMessageObserver) Observe(
 	return costlyMessages, nil
 }
 
-var _ CostlyMessageObserver = &CCIPCostlyMessageObserver{}
+var _ Observer = &observer{}
 
 // MessageFeeE18USDCalculator Calculates the fees (paid at source) of a set of messages in USD18s.
 type MessageFeeE18USDCalculator interface {
