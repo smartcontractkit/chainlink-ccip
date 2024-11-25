@@ -361,7 +361,7 @@ func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
 }
 
 func (p *Plugin) Close() error {
-	return nil
+	return p.tokenDataObserver.Close()
 }
 
 func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {

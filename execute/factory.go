@@ -155,7 +155,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		p.lggr,
+		logger.Named(p.lggr, "BaseCompositeObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
