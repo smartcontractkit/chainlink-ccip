@@ -187,6 +187,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums, nil)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&rmntypes.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
@@ -235,6 +236,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				// return a smaller slice, should trigger validation condition
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums[1:], nil)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&rmntypes.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
 			expResult: nil,
