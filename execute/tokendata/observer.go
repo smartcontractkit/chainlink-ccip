@@ -68,7 +68,21 @@ func NewConfigBasedCompositeObservers(
 			if err != nil {
 				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
-			observers[i] = observer
+
+			if c.USDCCCTPObserverConfig.NumWorkers == 0 {
+				lggr.Info("Using foreground observer for USDC/CCTP")
+				observers[i] = observer
+			} else {
+				lggr.Info("Using background observer for USDC/CCTP")
+				observers[i] = NewBackgroundObserver(
+					logger.Named(lggr, "BackgroundObserver"),
+					observer,
+					c.USDCCCTPObserverConfig.NumWorkers,
+					c.USDCCCTPObserverConfig.CacheExpirationInterval.Duration(),
+					c.USDCCCTPObserverConfig.CacheCleanupInterval.Duration(),
+					c.USDCCCTPObserverConfig.ObserveTimeout.Duration(),
+				)
+			}
 		default:
 			return nil, errors.New("unsupported token data observer")
 		}

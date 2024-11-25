@@ -73,7 +73,11 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 							  },
 							  "attestationAPI": "http://localhost:8080",
 							  "attestationAPITimeout": "1s",
-							  "attestationAPIInterval": "500ms"
+							  "attestationAPIInterval": "500ms",
+							  "numWorkers": 10,
+							  "cacheExpirationInterval": "5s",
+							  "cacheCleanupInterval": "6s",	
+							  "observeTimeout": "7s"		
 							}
 				  	],`,
 			want: []TokenDataObserverConfig{
@@ -87,9 +91,13 @@ func Test_TokenDataObserver_Unmarshall(t *testing.T) {
 								SourceMessageTransmitterAddr: "0xefg",
 							},
 						},
-						AttestationAPI:         "http://localhost:8080",
-						AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-						AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+						AttestationAPI:          "http://localhost:8080",
+						AttestationAPITimeout:   commonconfig.MustNewDuration(time.Second),
+						AttestationAPIInterval:  commonconfig.MustNewDuration(500 * time.Millisecond),
+						NumWorkers:              10,
+						CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+						CacheCleanupInterval:    commonconfig.MustNewDuration(6 * time.Second),
+						ObserveTimeout:          commonconfig.MustNewDuration(7 * time.Second),
 					},
 				},
 			},
@@ -176,9 +184,13 @@ func Test_TokenDataObserver_Validation(t *testing.T) {
 					SourceMessageTransmitterAddr: "0xefg",
 				},
 			},
-			AttestationAPI:         "http://localhost:8080",
-			AttestationAPITimeout:  commonconfig.MustNewDuration(time.Second),
-			AttestationAPIInterval: commonconfig.MustNewDuration(500 * time.Millisecond),
+			AttestationAPI:          "http://localhost:8080",
+			AttestationAPITimeout:   commonconfig.MustNewDuration(time.Second),
+			AttestationAPIInterval:  commonconfig.MustNewDuration(500 * time.Millisecond),
+			NumWorkers:              10,
+			CacheExpirationInterval: commonconfig.MustNewDuration(5 * time.Second),
+			CacheCleanupInterval:    commonconfig.MustNewDuration(5 * time.Second),
+			ObserveTimeout:          commonconfig.MustNewDuration(5 * time.Second),
 		}
 	}
 

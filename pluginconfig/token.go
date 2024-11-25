@@ -2,6 +2,7 @@ package pluginconfig
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -83,6 +84,15 @@ type USDCCCTPObserverConfig struct {
 	// AttestationAPIInterval defines the rate in requests per second that the attestation API can be called.
 	// Default set according to the APIs documentated 10 requests per second rate limit.
 	AttestationAPIInterval *commonconfig.Duration `json:"attestationAPIInterval"`
+
+	// NumWorkers is the number of concurrent workers.
+	NumWorkers int `json:"numWorkers"`
+	// CacheExpirationInterval is the interval after which the cached token data will expire.
+	CacheExpirationInterval *commonconfig.Duration `json:"cacheExpirationInterval"`
+	// CacheCleanupInterval is the interval after which the cache expired data will be cleaned up.
+	CacheCleanupInterval *commonconfig.Duration `json:"cacheCleanupInterval"`
+	// ObserveTimeout is the timeout for the actual synchronous Observe calls.
+	ObserveTimeout *commonconfig.Duration `json:"observeTimeout"`
 }
 
 func (p *USDCCCTPObserverConfig) Validate() error {
@@ -105,6 +115,27 @@ func (p *USDCCCTPObserverConfig) Validate() error {
 			return err
 		}
 	}
+
+	if err := p.validateBackgroundWorkerConfig(); err != nil {
+		return fmt.Errorf("background worker config validation failed: %w", err)
+	}
+
+	return nil
+}
+
+func (p *USDCCCTPObserverConfig) validateBackgroundWorkerConfig() error {
+	if p.NumWorkers == 0 {
+		return errors.New("NumWorkers not set")
+	}
+	if p.CacheExpirationInterval == nil || p.CacheExpirationInterval.Duration() == 0 {
+		return errors.New("CacheExpirationInterval not set")
+	}
+	if p.CacheCleanupInterval == nil || p.CacheCleanupInterval.Duration() == 0 {
+		return errors.New("CacheCleanupInterval not set")
+	}
+	if p.ObserveTimeout == nil || p.ObserveTimeout.Duration() == 0 {
+		return errors.New("ObserveTimeout not set")
+	}
 	return nil
 }
 
@@ -118,6 +149,26 @@ func (p *USDCCCTPObserverConfig) setDefaults() {
 	// 10 requests per second rate limit.
 	if p.AttestationAPIInterval == nil {
 		p.AttestationAPIInterval = commonconfig.MustNewDuration(100 * time.Millisecond)
+	}
+
+	// Default to 10 workers if NumWorkers is not set
+	if p.NumWorkers == 0 {
+		p.NumWorkers = 10
+	}
+
+	// Default to 10 minutes if CacheExpirationInterval is not set
+	if p.CacheExpirationInterval == nil {
+		p.CacheExpirationInterval = commonconfig.MustNewDuration(10 * time.Minute)
+	}
+
+	// Default to 15 minutes if CacheCleanupInterval is not set
+	if p.CacheCleanupInterval == nil {
+		p.CacheCleanupInterval = commonconfig.MustNewDuration(15 * time.Minute)
+	}
+
+	// Default to 5 seconds if ObserveTimeout is not set
+	if p.ObserveTimeout == nil {
+		p.ObserveTimeout = commonconfig.MustNewDuration(5 * time.Second)
 	}
 }
 
