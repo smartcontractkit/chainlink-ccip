@@ -189,26 +189,22 @@ func (o *backgroundObserver) worker(id int) {
 			cancel()
 
 			if err != nil {
-				lggr.Errorw("message observation failed, message pushed again to the queue", "err", err)
-				o.msgQueue.enqueue(msg, o.reprocessInterval)
+				lggr.Errorw("message observation failed", "err", err)
 				continue
 			}
 
 			if _, chainExists := tokenData[msg.Header.SourceChainSelector]; !chainExists {
 				lggr.Errorw("underlying observer did not return token data for the chain")
-				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
 			if _, seqExists := tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber]; !seqExists {
 				lggr.Errorw("underlying observer did not return token data for the sequence number")
-				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
 			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].SupportedAreReady() {
 				lggr.Infow("token data not ready by the underlying observer, message pushed again to the queue")
-				o.msgQueue.enqueue(msg, o.reprocessInterval)
 				continue
 			}
 
