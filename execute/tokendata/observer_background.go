@@ -204,7 +204,7 @@ func (o *backgroundObserver) worker(id int) {
 			}
 
 			if !tokenData[msg.Header.SourceChainSelector][msg.Header.SequenceNumber].SupportedAreReady() {
-				lggr.Infow("token data not ready by the underlying observer, message pushed again to the queue")
+				lggr.Infow("token data not ready by the underlying observer")
 				continue
 			}
 
