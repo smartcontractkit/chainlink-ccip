@@ -7,15 +7,16 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -89,7 +90,7 @@ type PluginFactory struct {
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
 	homeChainReader  reader.HomeChain
-	estimateProvider gas.EstimateProvider
+	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
@@ -103,7 +104,7 @@ func NewPluginFactory(
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	tokenDataEncoder cciptypes.TokenDataEncoder,
-	estimateProvider gas.EstimateProvider,
+	estimateProvider cciptypes.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
 ) *PluginFactory {

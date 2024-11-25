@@ -28,7 +28,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -42,6 +41,7 @@ import (
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/costcalculator"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -61,8 +61,8 @@ type IntTest struct {
 	server              *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
 	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
-	feeCalculator       *costlymessages.CCIPMessageFeeUSD18Calculator
-	execCostCalculator  *costlymessages.StaticMessageExecCostUSD18Calculator
+	feeCalculator       *costcalculator.CCIPMessageFeeUSD18Calculator
+	execCostCalculator  *costcalculator.StaticMessageExecCostUSD18Calculator
 }
 
 func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
@@ -128,13 +128,13 @@ func (it *IntTest) WithCustomFeeBoosting(
 	now func() time.Time,
 	messageCost map[cciptypes.Bytes32]plugintypes.USD18,
 ) {
-	it.feeCalculator = costlymessages.NewCCIPMessageFeeUSD18Calculator(
+	it.feeCalculator = costcalculator.NewCCIPMessageFeeUSD18Calculator(
 		logger.Test(it.t),
 		it.ccipReader,
 		relativeBoostPerWaitHour,
 		now,
 	)
-	it.execCostCalculator = costlymessages.NewStaticMessageExecCostUSD18Calculator(messageCost)
+	it.execCostCalculator = costcalculator.NewStaticMessageExecCostUSD18Calculator(messageCost)
 }
 
 func (it *IntTest) WithUSDC(
@@ -224,18 +224,18 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	)
 	require.NoError(it.t, err)
 
-	var feeCalculator costlymessages.MessageFeeE18USDCalculator
+	var feeCalculator costcalculator.MessageFeeE18USDCalculator
 	if it.feeCalculator != nil {
 		feeCalculator = it.feeCalculator
 	} else {
-		feeCalculator = costlymessages.NewZeroMessageFeeUSD18Calculator()
+		feeCalculator = costcalculator.NewZeroMessageFeeUSD18Calculator()
 	}
 
-	var execCostCalculator costlymessages.MessageExecCostUSD18Calculator
+	var execCostCalculator costcalculator.MessageExecCostUSD18Calculator
 	if it.execCostCalculator != nil {
 		execCostCalculator = it.execCostCalculator
 	} else {
-		execCostCalculator = costlymessages.NewZeroMessageExecCostUSD18Calculator()
+		execCostCalculator = costcalculator.NewZeroMessageExecCostUSD18Calculator()
 	}
 
 	costlyMessageObserver := costlymessages.NewObserver(
@@ -284,7 +284,7 @@ func (it *IntTest) UpdateExecutionCost(id cciptypes.Bytes32, val int64) {
 func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
-	ep gas.EstimateProvider,
+	ep cciptypes.EstimateProvider,
 	tokenDataObserver tokendata.TokenDataObserver,
 	costlyMessageObserver costlymessages.Observer,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
