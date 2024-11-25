@@ -391,6 +391,55 @@ func (_c *K8sCLI_EnsureNamespaceExists_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// LabelNamespace provides a mock function with given fields: ctx, namespace, key, value
+func (_m *K8sCLI) LabelNamespace(ctx context.Context, namespace string, key string, value string) error {
+	ret := _m.Called(ctx, namespace, key, value)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LabelNamespace")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
+		r0 = rf(ctx, namespace, key, value)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// K8sCLI_LabelNamespace_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LabelNamespace'
+type K8sCLI_LabelNamespace_Call struct {
+	*mock.Call
+}
+
+// LabelNamespace is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - key string
+//   - value string
+func (_e *K8sCLI_Expecter) LabelNamespace(ctx interface{}, namespace interface{}, key interface{}, value interface{}) *K8sCLI_LabelNamespace_Call {
+	return &K8sCLI_LabelNamespace_Call{Call: _e.mock.On("LabelNamespace", ctx, namespace, key, value)}
+}
+
+func (_c *K8sCLI_LabelNamespace_Call) Run(run func(ctx context.Context, namespace string, key string, value string)) *K8sCLI_LabelNamespace_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+	})
+	return _c
+}
+
+func (_c *K8sCLI_LabelNamespace_Call) Return(_a0 error) *K8sCLI_LabelNamespace_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *K8sCLI_LabelNamespace_Call) RunAndReturn(run func(context.Context, string, string, string) error) *K8sCLI_LabelNamespace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RestConfig provides a mock function with given fields:
 func (_m *K8sCLI) RestConfig() *rest.Config {
 	ret := _m.Called()

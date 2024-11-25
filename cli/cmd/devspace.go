@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/go-git/go-git/v5"
@@ -15,6 +16,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
+)
+
+const (
+	CleanupLabelKey   = "cleanup.kyverno.io/ttl"
+	CleanupLabelValue = "72h"
 )
 
 // devspaceCmd represents the devspace command
@@ -334,6 +340,63 @@ var purgeKindCmd = &cobra.Command{
 	},
 }
 
+// labelNamespaceCmd represents the devspace label-namespace subcommand
+var labelNamespaceCmd = &cobra.Command{
+	Use:   "label-namespace [key] [value]",
+	Short: "Add/update a label to the namespace",
+	Long:  fmt.Sprintf("Add/update a label to the namespace. Values for known keys are validated.\nIf only the key is provided and it's %s, the value will default to '%s'. ", CleanupLabelKey, CleanupLabelValue),
+	Args:  cobra.MatchAll(cobra.MinimumNArgs(1), cobra.MaximumNArgs(2)),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		if viper.GetString("PROVIDER") != "aws" {
+			logger.Error("this action can only be ran when provider is aws", slog.String("provider", viper.GetString("PROVIDER")))
+			os.Exit(1)
+		}
+
+		if viper.GetString("DEVSPACE_NAMESPACE") == "" {
+			logger.Error("DEVSPACE_NAMESPACE must be set")
+			os.Exit(1)
+		}
+
+		if len(args) == 2 {
+			// attempts to validate values for known label keys
+			switch args[0] {
+			case CleanupLabelKey:
+				// validation according to https://kyverno.io/docs/writing-policies/cleanup/#cleanup-label
+				_, err := time.ParseDuration(args[1])
+				if err != nil {
+					_, err := time.Parse(time.RFC3339, args[1])
+					if err != nil {
+						logger.Error("invalid time format, expected ISO 8601 date or a duration e.g. 72h", slog.String("input", args[1]))
+						os.Exit(1)
+					}
+				}
+			}
+		}
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings(), "args", args)
+
+		if args[0] == CleanupLabelKey && len(args) == 1 {
+			args = append(args, CleanupLabelValue)
+		}
+
+		configFlags := genericclioptions.NewConfigFlags(true)
+		kubeconfig := viper.GetString("KUBECONFIG")
+		configFlags.KubeConfig = &kubeconfig
+		k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+		if err != nil {
+			logger.Error("failed to initialize kube client", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		if err := k8sClient.LabelNamespace(context.TODO(), viper.GetString("DEVSPACE_NAMESPACE"), args[0], args[1]); err != nil {
+			logger.Error("failed to label namespace", slog.Any("error", err))
+			os.Exit(1)
+		}
+		logger.Info("namespace labeled", slog.String("namespace", viper.GetString("DEVSPACE_NAMESPACE")), slog.String("label_key", args[0]), slog.String("label_value", args[1]))
+	},
+}
+
 //nolint:gochecknoinits
 func init() {
 	rootCmd.AddCommand(devspaceCmd)
@@ -351,4 +414,6 @@ func init() {
 	devspaceCmd.AddCommand(checkEnvVarsCmd)
 	devspaceCmd.AddCommand(configureCertProvisioningCmd)
 	devspaceCmd.AddCommand(purgeKindCmd)
+
+	devspaceCmd.AddCommand(labelNamespaceCmd)
 }

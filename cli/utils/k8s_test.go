@@ -3,17 +3,24 @@ package utils_test
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
+	k8smocks "github.com/smartcontractkit/crib/cli/mocks/external/kubernetes"
 	testingutils "github.com/smartcontractkit/crib/cli/testing/utils"
 	"github.com/smartcontractkit/crib/cli/utils"
+	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -249,4 +256,77 @@ users:
 		CurrentContext: eksClusterAlias,
 	}
 	AssertEqualKubeConfigs(t, want, got)
+}
+
+func TestLabelNamespace(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test-namespace"
+	labelKey := "test-key"
+	labelValue := "test-value"
+
+	tests := []struct {
+		name                     string
+		namespace                string
+		labelKey                 string
+		labelValue               string
+		applyNamespacesMockCalls func(m *k8smocks.NamespaceInterface)
+		expectErr                string
+	}{
+		{
+			name: "Success",
+			applyNamespacesMockCalls: func(m *k8smocks.NamespaceInterface) {
+				m.EXPECT().
+					Patch(
+						context.TODO(),
+						namespace,
+						types.MergePatchType,
+						[]byte(`{"metadata":{"labels":{"test-key":"test-value"}}}`),
+						metav1.PatchOptions{},
+					).Return(&v1.Namespace{}, nil).Times(1)
+			},
+			expectErr: "",
+		},
+		{
+			name: "Error",
+			applyNamespacesMockCalls: func(m *k8smocks.NamespaceInterface) {
+				m.EXPECT().
+					Patch(
+						context.TODO(),
+						namespace,
+						types.MergePatchType,
+						[]byte(`{"metadata":{"labels":{"test-key":"test-value"}}}`),
+						metav1.PatchOptions{},
+					).Return(nil, fmt.Errorf("some error")).Times(1)
+			},
+			expectErr: "some error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockNamespaces := k8smocks.NewNamespaceInterface(t)
+			tt.applyNamespacesMockCalls(mockNamespaces)
+
+			mockCoreV1 := k8smocks.NewCoreV1Interface(t)
+			mockCoreV1.EXPECT().Namespaces().Return(mockNamespaces)
+
+			mockClientset := wrappermocks.NewK8sClientset(t)
+			mockClientset.EXPECT().CoreV1().Return(mockCoreV1)
+
+			configFlags := &genericclioptions.ConfigFlags{}
+			k8sClient, err := wrappers.NewK8sClient(configFlags, mockClientset)
+			require.NoError(t, err)
+
+			err = k8sClient.LabelNamespace(context.TODO(), namespace, labelKey, labelValue)
+			if tt.expectErr != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectErr, err.Error())
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
