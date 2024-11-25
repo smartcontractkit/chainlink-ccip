@@ -49,7 +49,7 @@ type Plugin struct {
 
 	// providers
 	ccipReader   readerpkg.CCIPReader
-	reportCodec  chainlinktypes.Codec
+	reportCodec  chainlinktypes.RemoteCodec
 	msgHasher    cciptypes.MessageHasher
 	homeChain    reader.HomeChain
 	discovery    *discovery.ContractDiscoveryProcessor
@@ -72,7 +72,7 @@ func NewPlugin(
 	destChain cciptypes.ChainSelector,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	ccipReader readerpkg.CCIPReader,
-	reportCodec chainlinktypes.Codec,
+	reportCodec chainlinktypes.RemoteCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,

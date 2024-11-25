@@ -42,7 +42,7 @@ type Plugin struct {
 	offchainCfg         pluginconfig.CommitOffchainConfig
 	ccipReader          readerpkg.CCIPReader
 	tokenPricesReader   readerpkg.PriceReader
-	reportCodec         chainlinktypes.Codec
+	reportCodec         chainlinktypes.RemoteCodec
 	lggr                logger.Logger
 	homeChain           reader.HomeChain
 	rmnHomeReader       readerpkg.RMNHome
@@ -64,7 +64,7 @@ func NewPlugin(
 	destChain cciptypes.ChainSelector,
 	ccipReader readerpkg.CCIPReader,
 	tokenPricesReader readerpkg.PriceReader,
-	reportCodec chainlinktypes.Codec,
+	reportCodec chainlinktypes.RemoteCodec,
 	msgHasher cciptypes.MessageHasher,
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
