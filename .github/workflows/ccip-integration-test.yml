@@ -43,10 +43,14 @@ jobs:
         id: get_chainlink_sha
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment=$(echo "${{ steps.fetch_pr_data.outputs.result }}" | tr -d '"')
-            echo $comment
-            core_ref="$(echo "$comment" | grep -oP 'core ref: \K\S+' || true)"
-            echo "::set-output name=ref::$core_ref"
+            core_ref=$(echo "${{ steps.fetch_pr_data.outputs.result }}" | grep -oP '`core ref: \K0x[0-9a-fA-F]+`')
+            if [ -n "$core_ref" ]; then
+              echo "Using chainlink repository commit hash override: $core_ref"
+              echo "::set-output name=ref::$core_ref"
+            else
+              echo "No valid core ref override found. Defaulting to 'develop'."
+              echo "::set-output name=ref::develop"
+            fi
           else
             echo "::set-output name=ref::develop"
           fi
