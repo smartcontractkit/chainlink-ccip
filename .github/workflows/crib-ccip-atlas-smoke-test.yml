@@ -81,11 +81,12 @@ jobs:
       - name: Deploy and validate CRIB Environment for CCIP
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@69977245c16440ad11c6e6486348aae971e655ca # crib-deploy-environment@6.0.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@9d85c9fdff30d72044b11348e6bb9212c745c0f8 # crib-deploy-environment@3.0.0
         with:
+          api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
           aws-region: ${{ secrets.AWS_REGION }}
           aws-role-arn: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
-          aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
+          ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           command: "ccip-atlas"
@@ -97,7 +98,6 @@ jobs:
           crib-repo-ref: ${{ github.ref }}
           chainlink-team: releng
           chainlink-product: crib
-          k8s-api-endpoint: ${{ secrets.K8S_API_ENDPOINT_STAGE }}
 
       - name: Assume role capable of fetching data from s3
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
