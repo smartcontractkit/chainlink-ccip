@@ -385,5 +385,6 @@ func PurgeKindCluster() error {
 	if err := kindCluster.Delete(); err != nil {
 		return fmt.Errorf("failed to purge kind cluster: %w", err)
 	}
+	slog.Info("kind cluster deleted")
 	return nil
 }
