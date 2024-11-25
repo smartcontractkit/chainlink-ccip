@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
@@ -15,6 +16,38 @@ import (
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
+
+func (p *Plugin) getCurseState(
+	ctx context.Context,
+) (*reader.CurseInfo, error) {
+	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
+	if err != nil {
+		p.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+	}
+
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), allSourceChains)
+	if err != nil {
+		p.lggr.Errorw("nothing to observe: rmn read error",
+			"err", err,
+			"curseInfo", curseInfo,
+			"sourceChains", allSourceChains,
+		)
+		return nil
+	}
+	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
+		o.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
+		return nil
+	}
+
+	sourceChains := curseInfo.NonCursedSourceChains(allSourceChains)
+	if len(sourceChains) == 0 {
+		p.lggr.Warnw(
+			"nothing to observe from the offramp, no active source chains exist",
+			"curseInfo", curseInfo)
+		return nil
+	}
+}
 
 // Observation collects data across two phases which happen in separate rounds.
 // These phases happen continuously so that except for the first round, every
@@ -57,6 +90,8 @@ func (p *Plugin) Observation(
 	observation := exectypes.Observation{
 		Contracts: discoveryObs,
 	}
+
+	//
 
 	state := previousOutcome.State.Next()
 	p.lggr.Debugw("Execute plugin performing observation", "state", state)
