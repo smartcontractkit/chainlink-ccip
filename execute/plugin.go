@@ -305,6 +305,11 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
 	}
 
+	if err := p.cursingValidation(ctx, decodedReport.ChainReports); err != nil {
+		p.lggr.Errorw("report not accepted due to cursing", "err", err)
+		return false, nil
+	}
+
 	p.lggr.Infow("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
 	if len(decodedReport.ChainReports) == 0 {
 		p.lggr.Info("skipping empty report")
@@ -349,6 +354,56 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 	p.lggr.Infow("transmitting report", "reports", decodedReport.ChainReports)
 	return true, nil
+}
+
+// cursingValidation will make one contract call to get rmn curse info.
+// If destination is cursed or some source chain is cursed it returns error.
+func (p *Plugin) cursingValidation(
+	ctx context.Context,
+	chainReport []cciptypes.ExecutePluginReportSingleChain,
+) error {
+	// No error is returned in case there are other things for the report.
+	if len(chainReport) == 0 {
+		return nil
+	}
+
+	sourceChains := make([]cciptypes.ChainSelector, 0, len(chainReport))
+	for _, cr := range chainReport {
+		sourceChains = append(sourceChains, cr.SourceChainSelector)
+	}
+
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), sourceChains)
+	if err != nil {
+		p.lggr.Errorw(
+			"report not accepted due to curse checking error",
+			"err", err,
+		)
+		return fmt.Errorf("report not accepted due to curse checking error: %w", err)
+	}
+	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
+		p.lggr.Warnw(
+			"report not accepted due to RMN curse",
+			"err", err,
+			"curseInfo", curseInfo,
+		)
+		return fmt.Errorf("report not accepted due to RMN curse: %w", err)
+	}
+	filtered := curseInfo.NonCursedSourceChains(sourceChains)
+	if len(filtered) != len(sourceChains) {
+		var cursedSources []cciptypes.ChainSelector
+		for cs, isCursed := range curseInfo.CursedSourceChains {
+			if isCursed {
+				cursedSources = append(cursedSources, cs)
+			}
+		}
+
+		p.lggr.Errorw("report not accepted due to cursing, source chains were cursed during report generation",
+			"cursedSourceChains", cursedSources,
+		)
+		return fmt.Errorf(
+			"report not accepted due to cursing, source chains were cursed during report generation")
+	}
+	return nil
 }
 
 func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {

@@ -17,38 +17,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func (p *Plugin) getCurseState(
-	ctx context.Context,
-) (*reader.CurseInfo, error) {
-	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
-	if err != nil {
-		p.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
-		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
-	}
-
-	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), allSourceChains)
-	if err != nil {
-		p.lggr.Errorw("nothing to observe: rmn read error",
-			"err", err,
-			"curseInfo", curseInfo,
-			"sourceChains", allSourceChains,
-		)
-		return nil
-	}
-	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
-		o.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", curseInfo)
-		return nil
-	}
-
-	sourceChains := curseInfo.NonCursedSourceChains(allSourceChains)
-	if len(sourceChains) == 0 {
-		p.lggr.Warnw(
-			"nothing to observe from the offramp, no active source chains exist",
-			"curseInfo", curseInfo)
-		return nil
-	}
-}
-
 // Observation collects data across two phases which happen in separate rounds.
 // These phases happen continuously so that except for the first round, every
 // subsequent round can have a new execution report.
@@ -91,8 +59,6 @@ func (p *Plugin) Observation(
 		Contracts: discoveryObs,
 	}
 
-	//
-
 	state := previousOutcome.State.Next()
 	p.lggr.Debugw("Execute plugin performing observation", "state", state)
 	switch state {
@@ -117,6 +83,25 @@ func (p *Plugin) Observation(
 	return observation.Encode()
 }
 
+func (p *Plugin) getCurseInfo(ctx context.Context) (*reader.CurseInfo, error) {
+	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
+	if err != nil {
+		p.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+	}
+
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), allSourceChains)
+	if err != nil {
+		p.lggr.Errorw("nothing to observe: rmn read error",
+			"err", err,
+			"sourceChains", allSourceChains,
+		)
+		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+	}
+
+	return curseInfo, nil
+}
+
 // getCommitReportsObservations implements phase1 of the execute plugin state machine. It fetches commit reports from
 // the destination chain and determines which messages are ready to be executed. These are added to the provided
 // observation object.
@@ -132,19 +117,40 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
-	if supportsDest {
-		groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, p.lggr)
-		if err != nil {
-			return exectypes.Observation{}, err
-		}
 
-		observation.CommitReports = groupedCommits
-
-		// TODO: truncate grouped to a maximum observation size?
+	// No observation for non-dest readers.
+	if !supportsDest {
 		return observation, nil
 	}
 
-	// No observation for non-dest readers.
+	// Get curse information from the destination chain.
+	ci, err := p.getCurseInfo(ctx)
+	if err != nil {
+		// If we can't get curse info, we can't proceed.
+		// But we still need to return discovery data.
+		return observation, err
+	}
+	if ci.GlobalCurse || ci.CursedDestination {
+		p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
+		return observation, nil
+	}
+
+	// Get pending exec reports.
+	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, p.lggr)
+	if err != nil {
+		return exectypes.Observation{}, err
+	}
+
+	// Remove cursed observations.
+	for chainSelector, isCursed := range ci.CursedSourceChains {
+		if isCursed {
+			delete(groupedCommits, chainSelector)
+		}
+	}
+
+	observation.CommitReports = groupedCommits
+
+	// TODO: truncate grouped to a maximum observation size?
 	return observation, nil
 }
 
@@ -177,6 +183,27 @@ func (p *Plugin) getMessagesObservation(
 		commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
 		for _, report := range previousOutcome.PendingCommitReports {
 			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
+		}
+
+		// Remove cursed commit reports.
+		{
+			ci, err := p.getCurseInfo(ctx)
+			if err != nil {
+				// If we can't get curse info, we can't proceed.
+				// But we still need to return discovery data.
+				return observation, err
+			}
+			if ci.GlobalCurse || ci.CursedDestination {
+				p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
+				return observation, nil
+			}
+
+			// Remove cursed commit reports.
+			for chainSelector, isCursed := range ci.CursedSourceChains {
+				if isCursed {
+					delete(commitReportCache, chainSelector)
+				}
+			}
 		}
 
 		for srcChain, reports := range commitReportCache {
@@ -252,6 +279,27 @@ func (p *Plugin) getFilterObservation(
 		for _, msg := range commitReport.Messages {
 			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.destChain))
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
+		}
+	}
+
+	// Remove cursed requests.
+	{
+		ci, err := p.getCurseInfo(ctx)
+		if err != nil {
+			// If we can't get curse info, we can't proceed.
+			// But we still need to return discovery data.
+			return observation, err
+		}
+		if ci.GlobalCurse || ci.CursedDestination {
+			p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
+			return observation, nil
+		}
+
+		// Remove cursed requests.
+		for chainSelector, isCursed := range ci.CursedSourceChains {
+			if isCursed {
+				delete(nonceRequestArgs, chainSelector)
+			}
 		}
 	}
 
