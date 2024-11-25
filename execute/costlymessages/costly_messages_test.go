@@ -1,4 +1,4 @@
-package exectypes
+package costlymessages
 
 import (
 	"context"
@@ -93,7 +93,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			ctx := context.Background()
 			feeCalculator := NewStaticMessageFeeUSD18Calculator(tt.messageFees)
 			execCostCalculator := NewStaticMessageExecCostUSD18Calculator(tt.messageCosts)
-			observer := &CCIPCostlyMessageObserver{
+			observer := &observer{
 				lggr:               logger.Test(t),
 				enabled:            true,
 				feeCalculator:      feeCalculator,
