@@ -428,7 +428,7 @@ func TestPlugin_Reports_UnableToParse(t *testing.T) {
 
 func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 	ctx := tests.Context(t)
-	codec := codec_mock.NewMockCodec(t)
+	codec := codec_mock.NewMockRemoteCodec(t)
 	codec.On("Encode", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, fmt.Errorf("test error"))
 	p := &Plugin{reportCodec: codec}
@@ -441,7 +441,7 @@ func TestPlugin_Reports_UnableToEncode(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
-	codec := codec_mock.NewMockCodec(t)
+	codec := codec_mock.NewMockRemoteCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fmt.Errorf("test error"))
 	p := &Plugin{
@@ -456,7 +456,7 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
-	codec := codec_mock.NewMockCodec(t)
+	codec := codec_mock.NewMockRemoteCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 	p := &Plugin{
@@ -471,7 +471,7 @@ func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 }
 
 func TestPlugin_ShouldAcceptAttestedReport_ShouldAccept(t *testing.T) {
-	codec := codec_mock.NewMockCodec(t)
+	codec := codec_mock.NewMockRemoteCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		dest := args.Get(2).(*cciptypes.ExecutePluginReport)
 		*dest = cciptypes.ExecutePluginReport{
@@ -546,7 +546,7 @@ func TestPlugin_ShouldTransmitAcceptReport_DecodeFailure(t *testing.T) {
 				ConfigDigest: digest,
 			},
 		}, nil)
-	codec := codec_mock.NewMockCodec(t)
+	codec := codec_mock.NewMockRemoteCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(fmt.Errorf("test error"))
 
@@ -580,7 +580,7 @@ func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
 				ConfigDigest: digest,
 			},
 		}, nil)
-	codec := codec_mock.NewMockCodec(t)
+	codec := codec_mock.NewMockRemoteCodec(t)
 	codec.On("Decode", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	p := &Plugin{

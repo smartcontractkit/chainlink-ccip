@@ -38,7 +38,7 @@ packages:
                 ChainWriter:
                     config:
                         dir: mocks/chainlink_common/
-                Codec:
+                RemoteCodec:
                     config:
                         dir: mocks/chainlink_common/
     github.com/smartcontractkit/libocr/networking:
