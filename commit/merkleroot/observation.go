@@ -305,7 +305,8 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 
 	if len(sourceChains) == 0 {
-		o.lggr.Debugw("nothing to observe from the offramp, no active source chains exist")
+		o.lggr.Warnw("nothing to observe from the offramp, no active source chains exist",
+			"curseInfo", curseInfo)
 		return nil
 	}
 

@@ -185,6 +185,8 @@ func cursingValidation(
 	ccipReader ccipreader.CCIPReader,
 	merkleRoots []cciptypes.MerkleRootChain,
 ) error {
+	// If merkleRoots are empty we still want to transmit chain fee and token prices.
+	// So the report is considered valid.
 	if len(merkleRoots) == 0 {
 		return nil
 	}
