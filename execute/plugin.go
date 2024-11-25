@@ -31,9 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-// maxReportSizeBytes that should be returned as an execution report payload.
-const maxReportSizeBytes = 250_000
-
 const (
 	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	transmissionDelayMultiplier = 3 * time.Second

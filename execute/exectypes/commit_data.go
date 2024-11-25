@@ -18,12 +18,16 @@ type CommitData struct {
 	MerkleRoot cciptypes.Bytes32 `json:"merkleRoot"`
 	// SequenceNumberRange of the messages that are in this commit report.
 	SequenceNumberRange cciptypes.SeqNumRange `json:"sequenceNumberRange"`
+	// ExecutedMessages are the messages in this report that have already been executed.
+	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
+
+	/////////////////////////////////////////////////////////////////////
+	// Fields below here are not always present.                       //
+	// They are present only in outcomes and Filtered pending reports. //
+	/////////////////////////////////////////////////////////////////////
 
 	// Messages that are part of the commit report.
 	Messages []cciptypes.Message `json:"messages"`
-
-	// ExecutedMessages are the messages in this report that have already been executed.
-	ExecutedMessages []cciptypes.SeqNum `json:"executedMessages"`
 
 	// CostlyMessages are the message IDs of messages that cost more to execute than was paid to execute them (i.e.
 	// source fee < execution cost). These messages will not be executed in the current round, but may be executed in
