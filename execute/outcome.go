@@ -85,6 +85,8 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("unable to get outcome: %w", err)
 	}
 
+	// This may happen if there is nothing to observe, or during startup when the contracts have
+	// been discovered. In the latter case, getCommitReportsOutcome will return an empty outcome.
 	if outcome.IsEmpty() {
 		p.lggr.Warnw(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
@@ -165,7 +167,7 @@ func (p *Plugin) getFilterOutcome(
 		p.estimateProvider,
 		observation.Nonces,
 		p.destChain,
-		uint64(maxReportSizeBytes),
+		uint64(maxReportLength),
 		p.offchainCfg.BatchGasLimit,
 	)
 	outcomeReports, commitReports, err := selectReport(
