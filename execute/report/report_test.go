@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
+	ccipocr3mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -746,7 +746,7 @@ func Test_Builder_Build(t *testing.T) {
 			// look for error in Add or Build
 			foundError := false
 
-			ep := gasmock.NewMockEstimateProvider(t)
+			ep := ccipocr3mock.NewMockEstimateProvider(t)
 			ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 			ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
@@ -863,7 +863,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				maxGas:             1000000,
 				estimateProvider: func() cciptypes.EstimateProvider {
 					// values taken from evm.EstimateProvider
-					mockep := gasmock.NewMockEstimateProvider(t)
+					mockep := ccipocr3mock.NewMockEstimateProvider(t)
 					mockep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(119920)).Times(4)
 					mockep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(2560)).Times(1)
 					return mockep
@@ -947,7 +947,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 
 			ep := tt.fields.estimateProvider
 			if ep == nil {
-				mockep := gasmock.NewMockEstimateProvider(t)
+				mockep := ccipocr3mock.NewMockEstimateProvider(t)
 				mockep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 				mockep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 				ep = mockep
@@ -1171,7 +1171,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			t.Parallel()
 			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 
-			ep := gasmock.NewMockEstimateProvider(t)
+			ep := ccipocr3mock.NewMockEstimateProvider(t)
 			ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 			ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 

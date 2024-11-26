@@ -17,8 +17,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	ccipocr3_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 )
 
 var (
@@ -453,7 +453,7 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				mockReader.EXPECT().GetMedianDataAvailabilityGasConfig(ctx).Return(tt.daGasConfig, nil)
 			}
 
-			ep := gasmock.NewMockEstimateProvider(t)
+			ep := ccipocr3_mock.NewMockEstimateProvider(t)
 			if !tt.wantErr {
 				for _, messageGas := range tt.messageGases {
 					ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(messageGas).Once()

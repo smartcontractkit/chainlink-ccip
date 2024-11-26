@@ -37,8 +37,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	ccipocr3mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/costcalculator"
@@ -245,7 +245,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		execCostCalculator,
 	)
 
-	ep := gasmock.NewMockEstimateProvider(it.t)
+	ep := ccipocr3mock.NewMockEstimateProvider(it.t)
 	ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 	ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
