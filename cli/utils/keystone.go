@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/smartcontractkit/crib/cli/wrappers"
 )
 
 type StartCmdConfig struct {
@@ -67,19 +69,24 @@ func SetupKeystoneKindCrib(ctx context.Context, config StartCmdConfig) error {
 
 	env := getStartCmdEnvVars(config)
 
+	dockerCli, err := wrappers.NewDockerCli()
+	if err != nil {
+		return fmt.Errorf("failed to initialize Docker CLI: %w", err)
+	}
+	// NOTE: because this subcommand doesn't load the config through viper, it relies on the bare environment variables + defaults
+	kindCluster := wrappers.NewKindCluster("", nil, dockerCli, nil, "", "", nil, nil)
+
 	if config.Clean {
 		slog.Info("purging kind cluster")
 		// NOTE: This uses a different set of envionment variables compared to the PurgeKindCluster function
 		// This is because the PurgeKindCluster function is meant to be used as a standalone function
 		// and shouldn't depend on the environment variables set by the StartCmdConfig
-		err = executeCommand(ctx, filepath.Join(gitRoot, "scripts"), env, "./manage_kind.sh", "purge")
-		if err != nil {
+		if err := kindCluster.Delete(); err != nil {
 			return fmt.Errorf("failed to purge kind cluster: %w", err)
 		}
 	}
 
-	err = executeCommand(ctx, filepath.Join(gitRoot, "scripts"), env, "./manage_kind.sh")
-	if err != nil {
+	if err := kindCluster.CreateOrReuse("", nil); err != nil {
 		return fmt.Errorf("failed to setup kind cluster: %w", err)
 	}
 
@@ -368,16 +375,16 @@ func executeCommand(
 }
 
 func PurgeKindCluster() error {
-	ctx := context.TODO()
-	err, gitRoot := gitRoot()
+	dockerCli, err := wrappers.NewDockerCli()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize Docker CLI: %w", err)
 	}
-	env := getBaseEnvVars()
 
-	err = executeCommand(ctx, filepath.Join(gitRoot, "scripts"), env, "./manage_kind.sh", "purge")
-	if err != nil {
+	// NOTE: because this subcommand doesn't load the config through viper, it relies on the bare environment variables + defaults
+	kindCluster := wrappers.NewKindCluster("", nil, dockerCli, nil, "", "", nil, nil)
+	if err := kindCluster.Delete(); err != nil {
 		return fmt.Errorf("failed to purge kind cluster: %w", err)
 	}
+	slog.Info("kind cluster deleted")
 	return nil
 }

@@ -1,0 +1,13 @@
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      create_deployments prometheus-crds
+
+deployments:
+  prometheus-crds:
+    helm:
+      chart:
+        name: prometheus-operator-crds
+        repo: https://prometheus-community.github.io/helm-charts

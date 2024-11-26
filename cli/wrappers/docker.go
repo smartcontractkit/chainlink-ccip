@@ -99,8 +99,7 @@ func (c *DockerCli) RunContainer(ctx context.Context, config *container.Config, 
 		if !forceRecreate {
 			return alreadyRunning, nil
 		}
-		err := c.DeleteContainer(ctx, containerName, container.RemoveOptions{Force: true}, nil)
-		if err != nil {
+		if err := c.DeleteContainer(ctx, containerName, container.RemoveOptions{Force: true}, nil); err != nil {
 			return alreadyRunning, fmt.Errorf("failed to delete container: %w", err)
 		}
 	}

@@ -18,15 +18,12 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/clientcmd/api"
 )
 
-// CheckAccess(ctx context.Context) error
-// EnsureNamespaceExists(ctx context.Context, name string) (bool, error)
-// WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error
-
-// NewK8sClient(configFlags *genericclioptions.ConfigFlags)
 func TestNewK8sClient(t *testing.T) {
 	t.Parallel()
 
@@ -266,6 +263,221 @@ func TestK8sClient_WaitForResource(t *testing.T) {
 			} else {
 				assert.Error(t, err)
 				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestK8sClient_ApplyConfigMap(t *testing.T) {
+	t.Parallel()
+
+	name := "test-configmap"
+	namespace := "test-namespace"
+	configMap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string]string{
+			"key": "value",
+		},
+	}
+
+	testCases := []struct {
+		name                     string
+		applyConfigMapsMockCalls func(*k8smocks.ConfigMapInterface)
+		expectedExists           bool
+		expectedErr              string
+	}{
+		{
+			name: "ConfigMapExists",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, nil)
+				m.EXPECT().Update(context.TODO(), configMap, metav1.UpdateOptions{}).Return(&v1.ConfigMap{}, nil)
+			},
+			expectedExists: true,
+			expectedErr:    "",
+		},
+		{
+			name: "ConfigMapWithK8sError",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewAlreadyExists(v1.Resource("configmap"), name))
+				m.EXPECT().Update(context.TODO(), configMap, metav1.UpdateOptions{}).Return(&v1.ConfigMap{}, errors.New("update error"))
+			},
+			expectedExists: true,
+			expectedErr:    "failed to update configmap test-configmap in namespace test-namespace: update error",
+		},
+		{
+			name: "ConfigMapDoesNotExistAndCreateSucceeds",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewNotFound(v1.Resource("configmap"), name))
+				m.EXPECT().Create(context.TODO(), configMap, metav1.CreateOptions{}).Return(&v1.ConfigMap{}, nil)
+			},
+			expectedExists: false,
+			expectedErr:    "",
+		},
+		{
+			name: "ConfigMapDoesNotExistAndCreateFails",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewNotFound(v1.Resource("configmap"), name))
+				m.EXPECT().Create(context.TODO(), configMap, metav1.CreateOptions{}).Return(&v1.ConfigMap{}, k8serrors.NewServiceUnavailable("server says no"))
+			},
+			expectedExists: false,
+			expectedErr:    "failed to create configmap test-configmap in namespace test-namespace: server says no",
+		},
+		{
+			name: "GetConfigMapError",
+			applyConfigMapsMockCalls: func(m *k8smocks.ConfigMapInterface) {
+				m.EXPECT().Get(context.TODO(), name, metav1.GetOptions{}).Return(&v1.ConfigMap{}, errors.New("get error"))
+			},
+			expectedExists: false,
+			expectedErr:    "failed to get configmap test-configmap in namespace test-namespace: get error",
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockConfigMaps := k8smocks.NewConfigMapInterface(t)
+			tt.applyConfigMapsMockCalls(mockConfigMaps)
+
+			mockCoreV1 := k8smocks.NewCoreV1Interface(t)
+			mockCoreV1.EXPECT().ConfigMaps(namespace).Return(mockConfigMaps)
+
+			mockClientset := wrappermocks.NewK8sClientset(t)
+			mockClientset.EXPECT().CoreV1().Return(mockCoreV1)
+
+			configFlags := &genericclioptions.ConfigFlags{}
+			k8sClient, err := wrappers.NewK8sClient(configFlags, mockClientset)
+			require.NoError(t, err)
+
+			exists, err := k8sClient.ApplyConfigMap(context.TODO(), configMap)
+			assert.Equal(t, tt.expectedExists, exists)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Equal(t, tt.expectedErr, err.Error())
+			}
+		})
+	}
+}
+
+func TestKubeConfig_Contexts(t *testing.T) {
+	t.Parallel()
+
+	kubeConfigContent := testingutils.MockKubeConfigFile([]byte(`apiVersion: v1
+clusters:
+- cluster:
+    server: https://some.endpoint
+  name: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+- cluster:
+    server: https://other.endpoint
+  name: arn:aws:eks:ap-southeast-1:123456789000:cluster/some-other-cluster
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+  name: context-some-cluster
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+    namespace: crib-test
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+  name: context-some-other-cluster
+current-context: context-some-cluster
+kind: Config`), 0o600)
+	kubeConfigFile := kubeConfigContent.Name()
+	defer os.Remove(kubeConfigFile)
+
+	kubeConfig := wrappers.NewKubeConfig(kubeConfigFile)
+	require.NoError(t, kubeConfig.LoadConfig())
+	assert.Equal(t, map[string]*api.Context{
+		"context-some-cluster": {
+			LocationOfOrigin: kubeConfigFile,
+			Extensions:       map[string]runtime.Object{},
+			Cluster:          "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+			AuthInfo:         "arn:aws:eks:us-east-1:123456789000:cluster/some-cluster",
+		},
+		"context-some-other-cluster": {
+			LocationOfOrigin: kubeConfigFile,
+			Extensions:       map[string]runtime.Object{},
+			Cluster:          "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+			Namespace:        "crib-test",
+			AuthInfo:         "arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster",
+		},
+	}, kubeConfig.Contexts())
+
+	assert.Equal(t, "context-some-cluster", kubeConfig.CurrentContext())
+}
+
+func TestKubeConfig_Path(t *testing.T) {
+	t.Parallel()
+
+	file, err := os.CreateTemp(t.TempDir(), "kubeconfig")
+	require.NoError(t, err)
+
+	kubeConfig := wrappers.NewKubeConfig(file.Name())
+	assert.Equal(t, file.Name(), kubeConfig.Path())
+}
+
+func TestKubeConfig_SetNamespaceForContext(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test-namespace"
+	kubeConfigContent := testingutils.MockKubeConfigFile([]byte(`apiVersion: v1
+clusters:
+- cluster:
+    server: https://some.endpoint
+  name: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+- cluster:
+    server: https://other.endpoint
+  name: arn:aws:eks:ap-southeast-1:123456789000:cluster/some-other-cluster
+contexts:
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-cluster
+  name: context-some-cluster
+- context:
+    cluster: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+    namespace: crib-test
+    user: arn:aws:eks:us-east-1:123456789000:cluster/some-other-cluster
+  name: context-some-other-cluster
+current-context: context-some-cluster
+kind: Config`), 0o600)
+	kubeConfigFile := kubeConfigContent.Name()
+	t.Cleanup(func() { os.Remove(kubeConfigFile) })
+
+	testCases := []struct {
+		name        string
+		context     string
+		expectedErr string
+	}{
+		{
+			name:        "ContextExists",
+			context:     "context-some-cluster",
+			expectedErr: "",
+		},
+		{
+			name:        "ContextDoesNotExist",
+			context:     "non-existing",
+			expectedErr: "context non-existing not found",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			kubeConfig := wrappers.NewKubeConfig(kubeConfigFile)
+			require.NoError(t, kubeConfig.LoadConfig())
+
+			err := kubeConfig.SetNamespaceForContext(tt.context, namespace)
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, namespace, kubeConfig.Contexts()[tt.context].Namespace)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
 			}
 		})
 	}

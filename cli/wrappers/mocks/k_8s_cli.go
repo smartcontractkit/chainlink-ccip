@@ -3,9 +3,10 @@
 package mocks
 
 import (
-	context "context"
-
 	api "k8s.io/client-go/tools/clientcmd/api"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
+
+	context "context"
 
 	dynamic "k8s.io/client-go/dynamic"
 
@@ -14,6 +15,8 @@ import (
 	rest "k8s.io/client-go/rest"
 
 	time "time"
+
+	v1 "k8s.io/api/core/v1"
 
 	wrappers "github.com/smartcontractkit/crib/cli/wrappers"
 )
@@ -29,6 +32,63 @@ type K8sCLI_Expecter struct {
 
 func (_m *K8sCLI) EXPECT() *K8sCLI_Expecter {
 	return &K8sCLI_Expecter{mock: &_m.Mock}
+}
+
+// ApplyConfigMap provides a mock function with given fields: ctx, configMap
+func (_m *K8sCLI) ApplyConfigMap(ctx context.Context, configMap *v1.ConfigMap) (bool, error) {
+	ret := _m.Called(ctx, configMap)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ApplyConfigMap")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.ConfigMap) (bool, error)); ok {
+		return rf(ctx, configMap)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *v1.ConfigMap) bool); ok {
+		r0 = rf(ctx, configMap)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *v1.ConfigMap) error); ok {
+		r1 = rf(ctx, configMap)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// K8sCLI_ApplyConfigMap_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ApplyConfigMap'
+type K8sCLI_ApplyConfigMap_Call struct {
+	*mock.Call
+}
+
+// ApplyConfigMap is a helper method to define mock.On call
+//   - ctx context.Context
+//   - configMap *v1.ConfigMap
+func (_e *K8sCLI_Expecter) ApplyConfigMap(ctx interface{}, configMap interface{}) *K8sCLI_ApplyConfigMap_Call {
+	return &K8sCLI_ApplyConfigMap_Call{Call: _e.mock.On("ApplyConfigMap", ctx, configMap)}
+}
+
+func (_c *K8sCLI_ApplyConfigMap_Call) Run(run func(ctx context.Context, configMap *v1.ConfigMap)) *K8sCLI_ApplyConfigMap_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*v1.ConfigMap))
+	})
+	return _c
+}
+
+func (_c *K8sCLI_ApplyConfigMap_Call) Return(_a0 bool, _a1 error) *K8sCLI_ApplyConfigMap_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *K8sCLI_ApplyConfigMap_Call) RunAndReturn(run func(context.Context, *v1.ConfigMap) (bool, error)) *K8sCLI_ApplyConfigMap_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // CheckAccess provides a mock function with given fields: ctx
@@ -167,6 +227,64 @@ func (_c *K8sCLI_Clientset_Call) Return(_a0 wrappers.K8sClientset) *K8sCLI_Clien
 }
 
 func (_c *K8sCLI_Clientset_Call) RunAndReturn(run func() wrappers.K8sClientset) *K8sCLI_Clientset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ControllerRuntimeClient provides a mock function with given fields: opts
+func (_m *K8sCLI) ControllerRuntimeClient(opts client.Options) (client.Client, error) {
+	ret := _m.Called(opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ControllerRuntimeClient")
+	}
+
+	var r0 client.Client
+	var r1 error
+	if rf, ok := ret.Get(0).(func(client.Options) (client.Client, error)); ok {
+		return rf(opts)
+	}
+	if rf, ok := ret.Get(0).(func(client.Options) client.Client); ok {
+		r0 = rf(opts)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(client.Client)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(client.Options) error); ok {
+		r1 = rf(opts)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// K8sCLI_ControllerRuntimeClient_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ControllerRuntimeClient'
+type K8sCLI_ControllerRuntimeClient_Call struct {
+	*mock.Call
+}
+
+// ControllerRuntimeClient is a helper method to define mock.On call
+//   - opts client.Options
+func (_e *K8sCLI_Expecter) ControllerRuntimeClient(opts interface{}) *K8sCLI_ControllerRuntimeClient_Call {
+	return &K8sCLI_ControllerRuntimeClient_Call{Call: _e.mock.On("ControllerRuntimeClient", opts)}
+}
+
+func (_c *K8sCLI_ControllerRuntimeClient_Call) Run(run func(opts client.Options)) *K8sCLI_ControllerRuntimeClient_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(client.Options))
+	})
+	return _c
+}
+
+func (_c *K8sCLI_ControllerRuntimeClient_Call) Return(_a0 client.Client, _a1 error) *K8sCLI_ControllerRuntimeClient_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *K8sCLI_ControllerRuntimeClient_Call) RunAndReturn(run func(client.Options) (client.Client, error)) *K8sCLI_ControllerRuntimeClient_Call {
 	_c.Call.Return(run)
 	return _c
 }

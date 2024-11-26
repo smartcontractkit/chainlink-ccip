@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/smartcontractkit/crib/cli/utils"
@@ -54,11 +55,14 @@ var initCmd = &cobra.Command{
 		}
 
 		if !slices.Contains(supportedProviders, viper.GetString("PROVIDER")) {
-			logger.Error("unsupported provider", "supportedProviders", supportedProviders)
+			logger.Error("unsupported provider",
+				slog.String("input", viper.GetString("PROVIDER")),
+				slog.Any("supportedProviders", supportedProviders),
+			)
 			os.Exit(1)
 		}
 
-		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
+		if err := utils.IsValidCribNamespace(viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), viper.GetBool("CRIB_IGNORE_NAMESPACE_PREFIX")); err != nil {
 			logger.Error("invalid namespace for CRIB", slog.Any("error", err))
 			os.Exit(1)
 		}
@@ -139,6 +143,7 @@ var initCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		var k8sClient wrappers.K8sCLI
 		if !viper.GetBool("CRIB_CI_ENV") {
 			if err := utils.SetupKubeConfig(&utils.SetupKubeConfigInput{
 				EksClient:            wrappers.NewEKSClientWrapper(awsSdkConfig),
@@ -156,57 +161,71 @@ var initCmd = &cobra.Command{
 				)
 				os.Exit(1)
 			}
-			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
 		}
 
+		var dockerCli wrappers.DockerCLI
 		switch viper.GetString("PROVIDER") {
 		case "kind":
-			logger.Info("Skipped k8s access check for provider Kind (make sure you run ./cribbit.sh crib-local for now, kind support for the CLI coming soon)")
+			dockerCli, err = wrappers.NewDockerCli()
+			if err != nil {
+				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+				os.Exit(1)
+			}
+
+			// TODO: allow setting clustername and config, for now using the defaults
+			start := time.Now()
+			kindCluster := wrappers.NewKindCluster("", nil, dockerCli, nil, viper.GetString("KUBECONFIG"), "", nil, nil)
+			if err := kindCluster.CreateOrReuse("", nil); err != nil {
+				logger.Error("failed to spin up kind cluster", slog.Any("error", err))
+			}
+			k8sClient = kindCluster.K8sClient()
+			logger.Info("kind cluster ready", slog.String("name", kindCluster.Name()), slog.Duration("elapsed", time.Since(start)))
 		case "aws":
 			configFlags := genericclioptions.NewConfigFlags(true)
 			kubeconfig := viper.GetString("KUBECONFIG")
 			configFlags.KubeConfig = &kubeconfig
-			k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+			k8sClient, err = wrappers.NewK8sClient(configFlags, nil)
 			if err != nil {
 				logger.Error("failed to initialize kube client", slog.Any("error", err))
 				os.Exit(1)
 			}
+			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
+		}
 
-			if err := k8sClient.CheckAccess(context.TODO()); err != nil {
-				msg := "EKS access not working."
-				if !viper.GetBool("CRIB_CI_ENV") {
-					msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
-				}
-				logger.Error(msg, slog.Any("error", err))
-				os.Exit(1)
+		if err := k8sClient.CheckAccess(context.TODO()); err != nil {
+			msg := "k8s access not working."
+			if !viper.GetBool("CRIB_CI_ENV") && viper.GetString("PROVIDER") == "aws" {
+				msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
 			}
+			logger.Error(msg, slog.Any("error", err))
+			os.Exit(1)
+		}
 
-			logger.Info("EKS access working",
-				"kubeconfig", viper.GetString("KUBECONFIG"),
-				"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
-			)
+		logger.Info("k8s access working",
+			"kubeconfig", viper.GetString("KUBECONFIG"),
+			"kubecontext", k8sClient.CurrentContext(),
+		)
 
+		var rolebindingClient dynamic.ResourceInterface
+		if viper.GetString("PROVIDER") == "aws" {
 			dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
 			if err != nil {
 				logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
 				os.Exit(1)
 			}
 
-			rolebindingClient := dynamicClient.Resource(schema.GroupVersionResource{
+			rolebindingClient = dynamicClient.Resource(schema.GroupVersionResource{
 				Group:    "rbac.authorization.k8s.io",
 				Version:  "v1",
 				Resource: "rolebindings",
 			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
-
-			if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
-				logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
-				os.Exit(1)
-			}
-			logger.Info("k8s namespace ready", slog.String("name", viper.GetString("DEVSPACE_NAMESPACE")))
 		}
 
-		var dockerCli wrappers.DockerCLI
-		var helmRegistryClient wrappers.HelmRegistryAPI
+		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
+			os.Exit(1)
+		}
+		logger.Info("k8s namespace ready", slog.String("name", viper.GetString("DEVSPACE_NAMESPACE")))
 
 		if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
 			dockerCli, err = wrappers.NewDockerCli()
@@ -218,6 +237,7 @@ var initCmd = &cobra.Command{
 			logger.Info("Skipping Docker ECR login")
 		}
 
+		var helmRegistryClient wrappers.HelmRegistryAPI
 		if !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
 			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
 			if err != nil {

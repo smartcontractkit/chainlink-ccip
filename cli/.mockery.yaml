@@ -16,6 +16,7 @@ packages:
     interfaces:
       CoreV1Interface:
       NamespaceInterface:
+      ConfigMapInterface:
 
   k8s.io/client-go/dynamic:
     config:
@@ -40,3 +41,33 @@ packages:
       outpkg: "docker"
     interfaces:
       APIClient:
+
+  sigs.k8s.io/controller-runtime/pkg/client:
+    config:
+      dir: "mocks/external/kubernetes"
+      outpkg: "kubernetes"
+    interfaces:
+      Client:
+        config:
+          mockname: "ControllerRuntimeClient"
+          filename: "controller_runtime_client.go"
+
+  sigs.k8s.io/kind/pkg/cluster/nodes:
+    config:
+      dir: "mocks/external/kind"
+      outpkg: "kind"
+    interfaces:
+      Node:
+        config:
+          mockname: "KindNode"
+          filename: "kind_node.go"
+
+  sigs.k8s.io/kind/pkg/exec:
+    config:
+      dir: "mocks/external/kind"
+      outpkg: "kind"
+    interfaces:
+      Cmd:
+        config:
+          mockname: "KindExecCmd"
+          filename: "kind_exec_cmd.go"

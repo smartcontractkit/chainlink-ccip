@@ -669,38 +669,58 @@ func TestIsValidCribNamespace(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
+		provider        string
 		skipPrefixCheck bool
 		expectedErr     error
 	}{
 		{
 			name:            "ValidNamespaceWithPrefix",
 			namespace:       "crib-validnamespace",
+			provider:        "aws",
 			skipPrefixCheck: false,
 			expectedErr:     nil,
 		},
 		{
 			name:            "InvalidNamespaceWithoutPrefix",
 			namespace:       "invalidnamespace",
+			provider:        "aws",
 			skipPrefixCheck: false,
 			expectedErr:     fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix"),
 		},
 		{
 			name:            "ValidNamespaceWithoutPrefixButSkipCheck",
 			namespace:       "validnamespace",
+			provider:        "aws",
 			skipPrefixCheck: true,
 			expectedErr:     nil,
 		},
 		{
 			name:            "EmptyNamespaceWithPrefixCheck",
 			namespace:       "",
+			provider:        "aws",
 			skipPrefixCheck: false,
 			expectedErr:     fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix"),
 		},
 		{
 			name:            "EmptyNamespaceWithoutPrefixCheck",
 			namespace:       "",
+			provider:        "aws",
 			skipPrefixCheck: true,
 			expectedErr:     nil,
+		},
+		{
+			name:            "ValidNamespaceForKindProvider",
+			namespace:       "crib-local",
+			provider:        "kind",
+			skipPrefixCheck: false,
+			expectedErr:     nil,
+		},
+		{
+			name:            "InvalidNamespaceForKindProvider",
+			namespace:       "crib-somethingelse",
+			provider:        "kind",
+			skipPrefixCheck: false,
+			expectedErr:     fmt.Errorf("DEVSPACE_NAMESPACE must be set to 'crib-local' when using kind provider"),
 		},
 	}
 
@@ -708,7 +728,7 @@ func TestIsValidCribNamespace(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := utils.IsValidCribNamespace(tc.namespace, tc.skipPrefixCheck)
+			err := utils.IsValidCribNamespace(tc.namespace, tc.provider, tc.skipPrefixCheck)
 			if tc.expectedErr != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())

@@ -6,7 +6,7 @@ commands:
   purge-kind:
     command: |-
       if [[ ${PROVIDER} == "kind" ]]; then
-        ${SCRIPTS_DIR}/manage_kind.sh purge
+        crib devspace purge-kind
       else
         echo "This command should be executed only when using Kind provider locally"
       fi

@@ -75,6 +75,9 @@ pipelines:
 
   kind-dependencies:
     run: |-
+      run_dependency_pipelines prometheus-crds
+      run_dependency_pipelines ingress-controller
+      run_dependency_pipelines cert-manager
       run_dependency_pipelines loki
       run_dependency_pipelines promtail
       run_dependency_pipelines grafana
@@ -393,6 +396,18 @@ profiles:
       - op: add
         path: dependencies
         value:
+          prometheus-crds:
+            path: ${DEPENDENCIES_DIR}/prometheus-crds
+            namespace: prometheus-crds
+            overwriteVars: true
+          ingress-controller:
+            path: ${DEPENDENCIES_DIR}/ingress-controller
+            namespace: ingress-nginx
+            overwriteVars: true
+          cert-manager:
+            path: ${DEPENDENCIES_DIR}/cert-manager
+            namespace: cert-manager
+            overwriteVars: true
           grafana:
             path: ${DEPENDENCIES_DIR}/grafana
             namespace: ${DEVSPACE_NAMESPACE}
