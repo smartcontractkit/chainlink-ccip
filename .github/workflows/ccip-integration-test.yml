@@ -43,7 +43,7 @@ jobs:
         id: get_chainlink_sha
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment="${{ steps.fetch_pr_data.outputs.result }}"
+            comment=$(echo "${{ steps.fetch_pr_data.outputs.result }}" | tr -d '"')
             echo $comment
             core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
             echo "::set-output name=ref::$core_ref"
