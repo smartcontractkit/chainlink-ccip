@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
@@ -665,6 +667,59 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
+}
+
+// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
+// from the destination chain RMN remote contract.
+func (r *ccipChainReader) GetRmnCurseInfo(
+	ctx context.Context,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (*rmntypes.CurseInfo, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return nil, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+
+	type retTyp struct {
+		CursedSubjects [][16]byte
+	}
+	var cursedSubjects retTyp
+
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameRMNRemote,
+		consts.MethodNameGetCursedSubjects,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&cursedSubjects,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get latest value of %s: %w", consts.MethodNameGetCursedSubjects, err)
+	}
+
+	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
+	cursedSubjectsSet := mapset.NewSet(cursedSubjects.CursedSubjects...)
+
+	curseInfo := &rmntypes.CurseInfo{
+		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
+		CursedDestination: cursedSubjectsSet.Contains(rmntypes.LegacyCurseSubject) ||
+			cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
+		GlobalCurse: cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
+	}
+
+	for _, ch := range sourceChainSelectors {
+		chainSelB16 := chainSelectorToBytes16(ch)
+		r.lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
+		curseInfo.CursedSourceChains[ch] = cursedSubjectsSet.Contains(chainSelB16)
+	}
+
+	return curseInfo, nil
+}
+
+func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
+	var result [16]byte
+	// Convert the uint64 to bytes and place it in the last 8 bytes of the array
+	binary.BigEndian.PutUint64(result[8:], uint64(chainSel))
+	return result
 }
 
 // discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
