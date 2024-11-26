@@ -3,16 +3,40 @@ mockname: "{{ .InterfaceName }}"
 outpkg: mocks
 filename: "{{ .InterfaceName | snakecase }}.go"
 with-expecter: true
+
 packages:
-    github.com/smartcontractkit/crib/cli/wrappers:
-        interfaces:
-            DockerAPI:
-            DockerCLI:
-            ECRAPI:
-            EKSAPI:
-            HelmRegistryAPI:
-            STSAPI:
-    k8s.io/client-go/kubernetes/typed/core/v1:
-        interfaces:
-            CoreV1Interface:
-            NamespaceInterface:
+  github.com/smartcontractkit/crib/cli/wrappers:
+    config:
+      all: true
+
+  k8s.io/client-go/kubernetes/typed/core/v1:
+    config:
+      dir: "mocks/external/kubernetes"
+      outpkg: "kubernetes"
+    interfaces:
+      CoreV1Interface:
+      NamespaceInterface:
+
+  k8s.io/client-go/dynamic:
+    config:
+      dir: "mocks/external/kubernetes"
+      outpkg: "kubernetes"
+    interfaces:
+      ResourceInterface:
+
+  github.com/docker/cli/cli/command:
+    config:
+      dir: "mocks/external/docker"
+      outpkg: "docker"
+    interfaces:
+      Cli:
+        config:
+          mockname: "DockerCli"
+          filename: "docker_cli.go"
+
+  github.com/docker/docker/client:
+    config:
+      dir: "mocks/external/docker"
+      outpkg: "docker"
+    interfaces:
+      APIClient:

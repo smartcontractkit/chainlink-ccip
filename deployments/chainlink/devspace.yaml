@@ -23,6 +23,7 @@ vars:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
 
+
 imports:
   - path: ${IMPORTS_DIR}/lib-common
   - path: ${IMPORTS_DIR}/lib-aws
@@ -67,6 +68,11 @@ pipelines:
       run_dependency_pipelines donut-cluster
       run_pipelines ingress-check
 
+  keystone:
+    run: |-
+      run_dependency_pipelines crib-chainlink-cluster geth mock-external-adapter
+      run_pipelines ingress-check
+
   kind-dependencies:
     run: |-
       run_dependency_pipelines loki
@@ -82,6 +88,13 @@ pipelines:
     run: |-
       run_pipelines kind-dependencies
       run_pipelines ccip
+
+  keystone-kind:
+    flags:
+      - name: skip_provision
+    run: |-
+      run_pipelines kind-dependencies
+      run_pipelines keystone
 
   ccip-atlas:
     run: |-
@@ -183,23 +196,55 @@ profiles:
         path: dependencies.geth.profiles
         value:
           - local-dev-simulated-core-ocr1
+
+  - name: keystone-kind
+    parents:
+      - profile: keystone
+      - profile: kind-dependencies
+    patches:
+      - op: add
+        path: dependencies.crib-chainlink-cluster.profiles
+        value: kind
+      - op: replace
+        path: dependencies.crib-chainlink-cluster.pipeline
+        value: keystone-kind
+      - op: replace
+        path: dependencies.geth.profiles
+        value:
+          - kind
+      - op: replace
+        path: dependencies.mockserver.profiles
+        value:
+          - kind
+
+  - name: keystone-kind-git-charts
+    parents:
+      - profile: keystone-kind
+    patches:
+      - op: add
+        path: dependencies.crib-chainlink-cluster.profiles
+        value: git-charts
+      - op: add
+        path: dependencies.geth.profiles
+        value: git-charts
+
   - name: keystone
     parents:
-      - profile: core-no-geth
+      - profile: core
     patches:
       - op: add
         path: vars
         value:
-          # For keystone provisioning
-          # The websocket of the blockchain node to connect each CL node to. Needs to be Sepolia endpoint.
-          KEYSTONE_ETH_WS_URL:
-            source: env
-          # The http endpoint of the blockchain node to connect each CL node to. Needs to be Sepolia endpoint.
-          KEYSTONE_ETH_HTTP_URL:
-            source: env
           # A private key that contains sepolia ETH to use for contract deployment and funding transmitters.
           KEYSTONE_ACCOUNT_KEY:
             source: env
+      - op: add
+        path: dependencies
+        value:
+          mock-external-adapter:
+            path: ${DEPENDENCIES_DIR}/mock-external-adapter
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
       - op: replace
         path: dependencies.crib-chainlink-cluster.profiles
         value:
@@ -463,15 +508,8 @@ profiles:
         value:
           beholder:
             path: ${DEPENDENCIES_DIR}/beholder
-#            overwriteVars: true
+            #            overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
-  - name: beholder-ci-e2e-test
-    parents:
-      - profile: beholder
-    patches:
-      - op: add
-        path: dependencies.beholder.pipeline
-        value: ci-e2e-test
   - name: beholder-load-test
     parents:
       - profile: beholder
@@ -525,8 +563,16 @@ commands:
     description: Run the Core pipeline with external network.
     appendArgs: true
   keystone:
-    command: devspace run-pipeline core-no-geth -p keystone
+    command: devspace run-pipeline keystone -p keystone
     description: Run the Core pipeline with Keystone.
+    appendArgs: true
+  keystone-kind-git-charts:
+    command: devspace run-pipeline keystone-kind -p keystone-kind-git-charts
+    description: Run the Core pipeline with Keystone for Kind using git charts
+    appendArgs: true
+  keystone-kind:
+    command: devspace run-pipeline keystone-kind -p keystone-kind
+    description: Run the Core pipeline with Keystone for Kind.
     appendArgs: true
   ccip:
     command: devspace run-pipeline ccip -p ccip
@@ -571,10 +617,6 @@ commands:
   beholder:
     command: devspace run-pipeline beholder -p beholder
     description: Run the Beholder pipeline.
-    appendArgs: true
-  beholder-ci-e2e-test:
-    command: devspace run-pipeline beholder -p beholder-ci-e2e-test
-    description: Run the Beholder pipeline for CI E2E test.
     appendArgs: true
   beholder-load-test:
     command: devspace run-pipeline beholder -p beholder-load-test

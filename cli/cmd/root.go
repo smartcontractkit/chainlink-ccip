@@ -28,6 +28,11 @@ CRIB is tooling that enables CLL developers to quickly spin up ephemeral develop
 and/or testing environments that closely mimic a product’s staging environment with 
 all the required Chainlink dependencies.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		initLogger()
+		// keystone is its own command and doesn't require a product directory
+		if cmd.Name() == "keystone" || cmd.Parent().Name() == "keystone" || cmd.Name() == "git-charts" {
+			return
+		}
 		isChildOfDevspaceCmd := false
 		if cmd.Parent() != nil && cmd.Parent().Name() == "devspace" {
 			isChildOfDevspaceCmd = true
@@ -37,7 +42,6 @@ all the required Chainlink dependencies.`,
 			ensureRunningInAProductDir()
 		}
 		initConfig(isChildOfDevspaceCmd)
-		initLogger()
 	},
 }
 

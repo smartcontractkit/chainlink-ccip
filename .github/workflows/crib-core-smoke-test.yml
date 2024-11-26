@@ -51,6 +51,8 @@ jobs:
   run-crib-core-smoke-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      CHAINLINK_HELM_REGISTRY_URI: oci://${{secrets.AWS_ACCOUNT_ID_PROD}}.dkr.ecr.${{secrets.AWS_REGION}}.amazonaws.com/infra-charts
     permissions:
       id-token: write
       contents: read
@@ -64,16 +66,22 @@ jobs:
             should_run=false
           fi
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
+
+      - name: Setup gobin for nix # This will be included in crib-deploy-environment@4.1.0
+        run: |
+          GOBIN="$HOME/.nix-go/bin"
+          echo "GOBIN=$GOBIN" >> $GITHUB_ENV
+          mkdir -p "$GOBIN"
+          echo "PATH=$GOBIN:$PATH" >> $GITHUB_ENV
+
       - name: Deploy and validate CRIB Environment for Core
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@9d85c9fdff30d72044b11348e6bb9212c745c0f8 # crib-deploy-environment@3.0.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@69977245c16440ad11c6e6486348aae971e655ca # crib-deploy-environment@6.0.0
         with:
-          api-gateway-host: ${{ secrets.AWS_API_GW_HOST_K8S_STAGE }}
+          aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}
           aws-role-arn: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
-          ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
           k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
           command: "core"
@@ -83,10 +91,11 @@ jobs:
           crib-repo-ref: ${{ github.ref }}
           chainlink-team: releng
           chainlink-product: crib
+          k8s-api-endpoint: ${{ secrets.K8S_API_ENDPOINT_STAGE }}
 
       - name: Destroy CRIB Environment
         id: destroy
         if: always() && steps.deploy.outputs.devspace-namespace != '' && inputs.debug != 'true' && steps.check-prereqs-for-running.outputs.should_run == 'true'
-        uses: smartcontractkit/.github/actions/crib-purge-environment@da1c0099f3bab236660ccc10328a29e06950c69f # crib-purge-environment@0.2.0
+        uses: smartcontractkit/.github/actions/crib-purge-environment@142671bc21953c8cc3edbd21848c50b5ec201c2a # crib-purge-environment@0.3.0
         with:
           namespace: ${{ steps.deploy.outputs.devspace-namespace }}

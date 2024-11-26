@@ -20,6 +20,39 @@ timeout=$((60 * 2))         # 2 minutes
 elapsed=0                   # Track the elapsed time
 namespace=${DEVSPACE_NAMESPACE}
 
+print_hostnames=false
+
+# Parse arguments
+for arg in "$@"; do
+	case $arg in
+	--print-hostnames)
+		print_hostnames=true
+		shift
+		;;
+	*) ;;
+	esac
+done
+
+print_ingress_hostnames() {
+	echo "#############################################################"
+	echo "###    Ingress hostnames"
+	echo "#############################################################"
+
+	jsonpath=""
+	if [[ $PROVIDER == "kind" ]]; then
+		jsonpath="{range .items[*].spec.rules[*]}{'http://'}{.host}{'\n'}{end}"
+	else
+		jsonpath="{range .items[*].spec.rules[*]}{'https://'}{.host}{'\n'}{end}"
+	fi
+
+	kubectl get ingress -n "${DEVSPACE_NAMESPACE}" -o=jsonpath="$jsonpath"
+}
+
+if $print_hostnames; then
+	print_ingress_hostnames
+	exit 0
+fi
+
 # Function to check if a hostname can be resolved
 check_hostname_resolution() {
 	local hostname="$1"
@@ -137,9 +170,6 @@ for INGRESS_NAME in "${ingresses[@]}"; do
 	fi
 done
 
-echo "#############################################################"
-echo "###    Ingress hostnames"
-echo "#############################################################"
-devspace run ingress-hosts
+print_ingress_hostnames
 
 exit 0

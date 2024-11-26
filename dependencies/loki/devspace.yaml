@@ -36,6 +36,18 @@ deployments:
           name: loki
           ports:
             - port: 3100
+        ingress:
+          name: loki-ingress
+          ingressClassName: nginx
+          rules:
+            - host: loki.localhost
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: loki
+                      port: 3100
         podSecurityContext:
           fsGroup: 999
         securityContext:

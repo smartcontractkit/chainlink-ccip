@@ -19,3 +19,21 @@ tasks:
     vars:
       SHELLCHECK_OPTS: -e SC1004
     cmd: find . -type f -name "*.sh" -exec shfmt -w {} \;
+
+  build:
+    desc: Builds the crib CLI
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: go build -o $GOBIN/crib ./cli/.
+
+  setup:
+    desc: Sets up the crib CLI in the current environment
+    deps: [build]
+    dir: '{{.USER_WORKING_DIR}}'
+    vars:
+      REPO_ROOT:
+        sh: git rev-parse --show-toplevel
+    cmd: crib init --write-config

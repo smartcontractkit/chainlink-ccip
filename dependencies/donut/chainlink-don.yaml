@@ -7,7 +7,7 @@ require:
 
 vars:
   # helm
-  HELM_REGISTRY_URI:
+  CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
   # local
@@ -87,7 +87,7 @@ deployments:
     helm:
       displayOutput: true
       chart:
-        name: ${HELM_REGISTRY_URI}/chainlink-cluster
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
         version: "2.1.5"
       valuesFiles: []
       values: {}
@@ -218,3 +218,12 @@ profiles:
             path: ${DEPENDENCIES_DIR}/job-distributor
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: git-charts
+    merge:
+      deployments:
+        chainlink-don:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: chainlink-cluster
+              revision: a1928889c2b94f5e8e0849dee7727480d6b49cce

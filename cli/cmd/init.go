@@ -15,9 +15,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // Allowed values for the "provider" flag
@@ -151,30 +150,29 @@ var initCmd = &cobra.Command{
 				AwsRegion:            viper.GetString("AWS_REGION"),
 				ChangeDefaultContext: true,
 			}); err != nil {
-				logger.Error("failed to setup kubeconfig", slog.Any("error", err))
+				logger.Error("failed to setup kubeconfig",
+					slog.String("kubeconfig", viper.GetString("KUBECONFIG")),
+					slog.Any("error", err),
+				)
 				os.Exit(1)
 			}
 			logger.Info("kubeconfig setup complete", "kubeconfig", viper.GetString("KUBECONFIG"))
-		}
-
-		// Test if cluster is reachable by attempting the equivalent of a kubectl get ns
-		kubeconfig, err := clientcmd.BuildConfigFromFlags("", viper.GetString("KUBECONFIG"))
-		if err != nil {
-			logger.Error("failed to initialize kubeconfig", slog.Any("error", err))
-			os.Exit(1)
-		}
-
-		kubeClientset, err := kubernetes.NewForConfig(kubeconfig)
-		if err != nil {
-			logger.Error("failed to initialize kube clientset", slog.Any("error", err))
-			os.Exit(1)
 		}
 
 		switch viper.GetString("PROVIDER") {
 		case "kind":
 			logger.Info("Skipped k8s access check for provider Kind (make sure you run ./cribbit.sh crib-local for now, kind support for the CLI coming soon)")
 		case "aws":
-			if err := utils.CheckK8sAccess(kubeClientset.CoreV1()); err != nil {
+			configFlags := genericclioptions.NewConfigFlags(true)
+			kubeconfig := viper.GetString("KUBECONFIG")
+			configFlags.KubeConfig = &kubeconfig
+			k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+			if err != nil {
+				logger.Error("failed to initialize kube client", slog.Any("error", err))
+				os.Exit(1)
+			}
+
+			if err := k8sClient.CheckAccess(context.TODO()); err != nil {
 				msg := "EKS access not working."
 				if !viper.GetBool("CRIB_CI_ENV") {
 					msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
@@ -188,7 +186,7 @@ var initCmd = &cobra.Command{
 				"kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME"),
 			)
 
-			dynamicClient, err := dynamic.NewForConfig(kubeconfig)
+			dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
 			if err != nil {
 				logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
 				os.Exit(1)
@@ -200,7 +198,7 @@ var initCmd = &cobra.Command{
 				Resource: "rolebindings",
 			}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 
-			if err := utils.EnsureCribNamespaceReady(context.TODO(), kubeClientset.CoreV1().Namespaces(), rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+			if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
 				logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
 				os.Exit(1)
 			}
@@ -211,7 +209,7 @@ var initCmd = &cobra.Command{
 		var helmRegistryClient wrappers.HelmRegistryAPI
 
 		if !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-			dockerCli, err = utils.InitializeDockerCLI()
+			dockerCli, err = wrappers.NewDockerCli()
 			if err != nil {
 				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
 				os.Exit(1)
@@ -281,14 +279,14 @@ func init() {
 
 	// bind to viper (we can safely ignore the errors here, as the flags are guaranteed to exist)
 	_ = viper.BindPFlag("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file"))
-	_ = viper.BindPFlag("AWS_PROFILE", initCmd.Flags().Lookup("aws-profile-name"))
+	_ = viper.BindPFlag("AWS_PROFILE", initCmd.Flags().Lookup("aws-profile"))
 	_ = viper.BindPFlag("AWS_ACCOUNT_ID", initCmd.Flags().Lookup("aws-account-id"))
 	_ = viper.BindPFlag("AWS_REGION", initCmd.Flags().Lookup("aws-region"))
 	_ = viper.BindPFlag("AWS_SSO_ROLE_NAME", initCmd.Flags().Lookup("aws-sso-role-name"))
 	_ = viper.BindPFlag("AWS_SSO_START_URL", initCmd.Flags().Lookup("aws-sso-start-url"))
 	_ = viper.BindPFlag("KUBECONFIG", initCmd.Flags().Lookup("kubeconfig"))
-	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("eks-cluster-name"))
-	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("eks-alias-name"))
+	_ = viper.BindPFlag("CRIB_EKS_CLUSTER_NAME", initCmd.Flags().Lookup("crib-eks-cluster-name"))
+	_ = viper.BindPFlag("CRIB_EKS_ALIAS_NAME", initCmd.Flags().Lookup("crib-eks-alias-name"))
 	_ = viper.BindPFlag("DEVSPACE_NAMESPACE", initCmd.Flags().Lookup("devspace-namespace"))
 	_ = viper.BindPFlag("WRITE_CONFIG", initCmd.Flags().Lookup("write-config"))
 	_ = viper.BindPFlag("PROVIDER", initCmd.Flags().Lookup("provider"))

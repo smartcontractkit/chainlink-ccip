@@ -7,7 +7,7 @@ require:
 
 vars:
   # helm
-  HELM_REGISTRY_URI:
+  CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
   # local
@@ -33,7 +33,7 @@ deployments:
     helm:
       displayOutput: true
       chart:
-        name: ${HELM_REGISTRY_URI}/generic-job
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/generic-job
         version: "0.1.20"
       valuesFiles: []
       values: {}
@@ -55,3 +55,13 @@ profiles:
       - op: add
         path: deployments.chainlink-config-ccip.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/generic-job/chainlink-config-keystone.base.yaml
+  # git-charts
+  - name: git-charts
+    merge:
+      deployments:
+        chainlink-config-keystone:
+          helm:
+            chart:
+              git: https://github.com/smartcontractkit/infra-charts
+              subPath: generic-job
+              revision: 98632ba00d3a5e9fc29ce68b069fd1c104a9f2d6

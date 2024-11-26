@@ -13,9 +13,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // devspaceCmd represents the devspace command
@@ -65,6 +64,18 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 	Short: "Refresh ECR credentials for docker and helm registry",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		skipDocker := viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN")
+		skipHelm := viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN")
+
+		if viper.GetBool("docker") && skipDocker {
+			logger.Info("Skipping Docker ECR login")
+			if skipHelm {
+				logger.Info("Skipping Helm Registry ECR login. Reason: Helm login dependency on Docker login is skipped")
+			}
+
+			return
+		}
+
 		awsSdkConfig, err := config.LoadDefaultConfig(
 			context.TODO(),
 			config.WithSharedConfigFiles([]string{viper.GetString("AWS_CONFIG_FILE")}),
@@ -85,18 +96,14 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 		var dockerCli wrappers.DockerCLI
 		var helmRegistryClient wrappers.HelmRegistryAPI
 
-		if viper.GetBool("docker") && !viper.GetBool("CRIB_SKIP_DOCKER_ECR_LOGIN") {
-			logger.Info("refreshing ECR credentials for docker")
-			dockerCli, err = utils.InitializeDockerCLI()
-			if err != nil {
-				logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
-				os.Exit(1)
-			}
-		} else {
-			logger.Info("Skipping Docker ECR login")
+		logger.Info("refreshing ECR credentials for docker")
+		dockerCli, err = wrappers.NewDockerCli()
+		if err != nil {
+			logger.Error("failed to initialize Docker CLI", slog.Any("error", err))
+			os.Exit(1)
 		}
 
-		if viper.GetBool("helm") && !viper.GetBool("CRIB_SKIP_HELM_ECR_LOGIN") {
+		if viper.GetBool("helm") && !skipHelm {
 			logger.Info("refreshing ECR credentials for helm registry")
 			helmRegistryClient, err = utils.InitializeHelmRegistryClient(nil)
 			if err != nil {
@@ -137,19 +144,16 @@ var ensureNamespaceCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		kubeconfig, err := clientcmd.BuildConfigFromFlags("", viper.GetString("KUBECONFIG"))
+		configFlags := genericclioptions.NewConfigFlags(true)
+		kubeconfig := viper.GetString("KUBECONFIG")
+		configFlags.KubeConfig = &kubeconfig
+		k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
 		if err != nil {
-			logger.Error("failed to initialize kubeconfig", slog.Any("error", err))
+			logger.Error("failed to initialize kube client", slog.Any("error", err))
 			os.Exit(1)
 		}
 
-		kubeClientset, err := kubernetes.NewForConfig(kubeconfig)
-		if err != nil {
-			logger.Error("failed to initialize kube clientset", slog.Any("error", err))
-			os.Exit(1)
-		}
-
-		if err := utils.CheckK8sAccess(kubeClientset.CoreV1()); err != nil {
+		if err := k8sClient.CheckAccess(context.TODO()); err != nil {
 			msg := "k8s access not working."
 			if !viper.GetBool("CRIB_CI_ENV") {
 				msg = fmt.Sprintf("%s Make sure you're connected to the VPN and try again.", msg)
@@ -169,7 +173,7 @@ var ensureNamespaceCmd = &cobra.Command{
 			slog.String("kubecontext", viper.GetString("CRIB_EKS_ALIAS_NAME")),
 		)
 
-		dynamicClient, err := dynamic.NewForConfig(kubeconfig)
+		dynamicClient, err := dynamic.NewForConfig(k8sClient.RestConfig())
 		if err != nil {
 			logger.Error("failed to initialize kube dynamic client", slog.Any("error", err))
 			os.Exit(1)
@@ -181,7 +185,7 @@ var ensureNamespaceCmd = &cobra.Command{
 			Resource: "rolebindings",
 		}).Namespace(viper.GetString("DEVSPACE_NAMESPACE"))
 
-		if err := utils.EnsureCribNamespaceReady(context.TODO(), kubeClientset.CoreV1().Namespaces(), rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
+		if err := utils.EnsureCribNamespaceReady(context.TODO(), k8sClient, rolebindingClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER"), nil, nil); err != nil {
 			logger.Error("failed to ensure crib namespace ready", slog.Any("error", err))
 			os.Exit(1)
 		}
@@ -214,15 +218,8 @@ var checkEnvVarsCmd = &cobra.Command{
 			"DEVSPACE_K8S_POD_WAIT_TIMEOUT",
 		}
 
-		switch product {
-		case "core":
-			requiredEnvVars = append(requiredEnvVars, "CHAINLINK_CLUSTER_HELM_CHART_URI")
-		case "ccip":
-			requiredEnvVars = append(requiredEnvVars, "CHAINLINK_HELM_REGISTRY_URI")
-		}
-
 		if viper.GetString("DEVSPACE_PROFILE") == "keystone" {
-			requiredEnvVars = append(requiredEnvVars, "KEYSTONE_ETH_WS_URL", "KEYSTONE_ETH_HTTP_URL", "KEYSTONE_ACCOUNT_KEY")
+			requiredEnvVars = append(requiredEnvVars, "KEYSTONE_ETH_WS_URL")
 		}
 
 		missingEnvVars := []string{}
