@@ -41,8 +41,8 @@ jobs:
             return pr.data.body;
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
-        run: >
-          default=develop
+        run: |
+          default="develop"
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             comment='${{ steps.fetch_pr_data.outputs.result }}'
             echo $comment
