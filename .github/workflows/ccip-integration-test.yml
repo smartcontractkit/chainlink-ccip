@@ -41,7 +41,7 @@ jobs:
             return pr.data.body;
       - name: Get the chainlink commit sha from PR description, if applicable
         id: get_chainlink_sha
-        run: |
+        run: >
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             comment=$(cat << 'EOF'
               ${{ steps.fetch_pr_data.outputs.result }}
