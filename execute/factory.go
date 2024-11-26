@@ -38,7 +38,7 @@ const (
 	// check factory_test for the calculation. It is limited to about 10%
 	// of the maximum allowable value because we expect many concurrent
 	// plugin instances and don't want to saturate the network.
-	maxObservationLength = 100000
+	maxObservationLength = ocr3types.MaxMaxObservationLength
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation. This is not limited because
