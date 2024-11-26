@@ -46,7 +46,12 @@ jobs:
             comment='${{ steps.fetch_pr_data.outputs.result }}'
             echo $comment
             core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
-            echo "::set-output name=ref::$core_ref"
+            if [ -n "$core_ref" ]; then
+              echo "Overriding chainlink repository commit hash with: with $core_ref"
+              echo "::set-output name=ref::$core_ref"
+            else
+              echo "::set-output name=ref::develop"
+            fi
           else
             echo "::set-output name=ref::develop"
           fi
