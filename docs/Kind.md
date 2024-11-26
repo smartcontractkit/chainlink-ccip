@@ -48,24 +48,16 @@ Additionally, if you are deploying **CCIP** or **Atlas**, you will need to pull 
 
 2. Execute `nix develop` to set up the development environment with all necessary tools and enter the `Nix` shell.
 
-3. Create or update the .env file in the deployments/chainlink directory by copying from the example:
-   
-   ```bash
-    cp deployments/chainlink/.env.example deployments/chainlink/.env
-   ```
+This will run `crib init --write-config`, which will ensure a `.env` file is created with the necessary values in order to run devspace.
+If you don't have a `.env` file already, it'll offer to copy the `.env.example` one as a starting point (recommended).
+
+3. Now, you may be prompted to provide values for `PROVIDER` and `DEVSPACE_NAMESPACE`. Enter `kind` and `crib-local` respectively. This only happens at the first run, as these values will be stored inside the `.env` file and reused for subsequent runs.
+
+Limiting to the `crib-local` namespace name helps avoiding the need to update the local hosts file for ingress each time, which requires admin privileges.
+
 4. Note that the `CHAINLINK_CODE_DIR=../../..` environment variable should be the parent directory that contains the [chainlink](https://github.com/smartcontractkit/chainlink) directory. For running CRIB locally, Docker images need to be built and pushed to the local registry. Please make sure you have a fresh version of the [chainlink](https://github.com/smartcontractkit/chainlink) repo.
-5. Run `cribbit.sh` Script:
-   
-   Change to the `deployments/chainlink` directory and run `./cribbit.sh` with your namespace name to configure the provider and credentials. This script can be run multiple times; it's idempotent.
-   ```bash
-   cd deployments/chainlink
-   ./cribbit.sh crib-local
-   ```
-   You will then be prompted to choose a provider. Since we are deploying locally using Kind, type kind and press Enter.
 
-   - If the provider type is kind, the crib-local namespace will be auto-selected. This approach helps avoid the need to update the local hosts file for ingress each time, which requires admin privileges.
-
-6. Deploy CRIB:
+5. Deploy CRIB:
    Depending on what you want to deploy, execute one of the following commands:
    - For Core Deployment:
    ```bash
@@ -94,4 +86,4 @@ To remove the entire Kind environment and delete everything, including the local
 devspace run purge-kind
 ```
 
-This command will not affect your local Docker images or configuration files. To deploy a new Kind cluster, simply execute ./cribbit.sh again and select kind as the provider.
+This command will not affect your local Docker images or configuration files. To deploy a new Kind cluster, simply execute `crib init` again, or exit and re-enter the nix shell (which runs it automatically).
