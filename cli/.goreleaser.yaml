@@ -3,12 +3,6 @@ version: 2
 
 project_name: crib
 
-monorepo:
-  # tag format imposed by changesets on monorepos.
-  # see: https://github.com/changesets/changesets/blob/main/docs/command-line-options.md#tag
-  # tag_prefix: cli@
-  dir: cli
-
 before:
   hooks:
     # You may remove this if you don't use go modules.
@@ -18,16 +12,26 @@ before:
 
 # See https://goreleaser.com/customization/build/
 builds:
-  - binary: crib
+  - id: "cli"
+    binary: crib
     env:
       - CGO_ENABLED=0
-    main: ./cli
+    main: .
     goarch:
       - arm64
       - amd64
     goos:
       - linux
       - darwin
+    # Add custom naming for snapshots
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version=snapshot-{{.ShortCommit}}
+      - -X main.commit={{.FullCommit}}
+      - -X main.date={{.CommitDate}}
 
 checksum:
   name_template: checksums.txt
@@ -38,12 +42,7 @@ release:
     name: crib
   prerelease: auto
 
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-
+snapshot:
+  name_template: "snapshot-{{.ShortCommit}}"
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
