@@ -25,13 +25,13 @@ deployments:
         podSecurityContext:
           fsGroup: 999
         securityContext:
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: false
-            runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
         rageproxy:
           image:
             repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/rageproxy
