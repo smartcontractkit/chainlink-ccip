@@ -6,6 +6,7 @@ import (
 	"time"
 
 	corev1api "k8s.io/api/core/v1"
+	networkingv1api "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -13,6 +14,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
+	networkingv1typed "k8s.io/client-go/kubernetes/typed/networking/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -30,10 +32,13 @@ type K8sCLI interface {
 	WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error
 	ApplyConfigMap(ctx context.Context, configMap *corev1api.ConfigMap) (bool, error)
 	LabelNamespace(ctx context.Context, namespace, key, value string) error
+	ListIngresses(ctx context.Context, namespace string) (*networkingv1api.IngressList, error)
+	GetIngress(ctx context.Context, namespace string, name string) (*networkingv1api.Ingress, error)
 }
 
 type K8sClientset interface {
 	CoreV1() corev1typed.CoreV1Interface
+	NetworkingV1() networkingv1typed.NetworkingV1Interface
 }
 
 type K8sClient struct {
@@ -190,6 +195,16 @@ func (k *K8sClient) LabelNamespace(ctx context.Context, namespace, key, value st
 		metav1.PatchOptions{},
 	)
 	return err
+}
+
+// ListIngresses lists all Ingress resources in a namespace.
+func (k *K8sClient) ListIngresses(ctx context.Context, namespace string) (*networkingv1api.IngressList, error) {
+	return k.clientset.NetworkingV1().Ingresses(namespace).List(ctx, metav1.ListOptions{})
+}
+
+// GetIngress retrieves an Ingress resource in a namespace by name.
+func (k *K8sClient) GetIngress(ctx context.Context, namespace string, name string) (*networkingv1api.Ingress, error) {
+	return k.clientset.NetworkingV1().Ingresses(namespace).Get(ctx, name, metav1.GetOptions{})
 }
 
 // KubeConfigInterface is an interface for a k8s.io/client-go/tools/clientcmd/api.Config

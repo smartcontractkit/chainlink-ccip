@@ -18,6 +18,14 @@ packages:
       NamespaceInterface:
       ConfigMapInterface:
 
+  k8s.io/client-go/kubernetes/typed/networking/v1:
+    config:
+      dir: "mocks/external/kubernetes"
+      outpkg: "kubernetes"
+    interfaces:
+      NetworkingV1Interface:
+      IngressInterface:
+
   k8s.io/client-go/dynamic:
     config:
       dir: "mocks/external/kubernetes"

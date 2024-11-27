@@ -31,7 +31,7 @@ vars:
 # Common commands applicable to all workloads deployed in Remote Devspace namespace
 commands:
   ingress-hosts:
-    command: ./${SCRIPTS_DIR}/ingress_check.sh --print-hostnames
+    command: crib devspace print-ingress-hosts
     description: List Kubernetes ingress hostnames in the namespace.
   connect:
     command: |-
