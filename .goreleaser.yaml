@@ -1,12 +1,12 @@
 # Make sure to check the documentation at https://goreleaser.com
 version: 2
 
-project_name: cli
+project_name: crib
 
 monorepo:
   # tag format imposed by changesets on monorepos.
   # see: https://github.com/changesets/changesets/blob/main/docs/command-line-options.md#tag
-  tag_prefix: cli@
+  # tag_prefix: cli@
   dir: cli
 
 before:
@@ -21,7 +21,7 @@ builds:
   - binary: crib
     env:
       - CGO_ENABLED=0
-    main: ./cmd
+    main: ./cli
     goarch:
       - arm64
       - amd64
