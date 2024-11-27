@@ -33,6 +33,12 @@ builds:
       - -X main.commit={{.FullCommit}}
       - -X main.date={{.CommitDate}}
 
+archives:
+  - format: binary
+    name_template: "{{ .Binary }}-{{ .Os }}-{{ .Arch }}"
+    builds:
+      - cli
+
 checksum:
   name_template: checksums.txt
 
@@ -42,5 +48,11 @@ release:
     name: crib
   prerelease: auto
 
+changelog:
+  disable: true
+
+# Disable source tarballs from being posted to release assets.
+source:
+  enabled: false
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
