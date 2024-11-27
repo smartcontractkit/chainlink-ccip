@@ -1426,7 +1426,9 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 }
 
 func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
-
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return 0, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
 	var latestSeqNr uint64
 	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 		ctx,
