@@ -177,6 +177,7 @@ var initCmd = &cobra.Command{
 			kindCluster := wrappers.NewKindCluster("", nil, dockerCli, nil, viper.GetString("KUBECONFIG"), "", nil, nil)
 			if err := kindCluster.CreateOrReuse("", nil); err != nil {
 				logger.Error("failed to spin up kind cluster", slog.Any("error", err))
+				os.Exit(1)
 			}
 			k8sClient = kindCluster.K8sClient()
 			logger.Info("kind cluster ready", slog.String("name", kindCluster.Name()), slog.Duration("elapsed", time.Since(start)))
