@@ -67,17 +67,10 @@ jobs:
           fi
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
 
-      - name: Setup gobin for nix # This will be included in crib-deploy-environment@4.1.0
-        run: |
-          GOBIN="$HOME/.nix-go/bin"
-          echo "GOBIN=$GOBIN" >> $GITHUB_ENV
-          mkdir -p "$GOBIN"
-          echo "PATH=$GOBIN:$PATH" >> $GITHUB_ENV
-
       - name: Deploy and validate CRIB Environment for Core
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@90997b882963f46e146a54456019c8cb8ec87abf # crib-deploy-environment@6.2.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@656a169b769c56cdc6da532a7e1c9b4619e028f7 # crib-deploy-environment@6.3.0
         with:
           aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}
