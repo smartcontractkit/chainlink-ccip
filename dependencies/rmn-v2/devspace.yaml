@@ -1,0 +1,89 @@
+---
+version: v2beta1
+
+pipelines:
+  deploy:
+    run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        ensure_pull_secrets --all
+      fi
+
+      create_deployments rmn-v2
+
+deployments:
+  rmn-v2:
+    updateImageTags: false
+    namespace: ${DEVSPACE_NAMESPACE}
+    helm:
+      upgradeArgs: ["--timeout", "10m"]
+      displayOutput: true
+      chart:
+        name: ${CHAINLINK_HELM_REGISTRY_URI}/ccip-rmn-v2
+        version: "0.1.0"
+      values:
+        enable_local: false
+        podSecurityContext:
+          fsGroup: 999
+        securityContext:
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+        rageproxy:
+          image:
+            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/rageproxy
+            tag: "master-f461a9e"
+        rmn:
+          image:
+            repository: 804282218731.dkr.ecr.us-west-2.amazonaws.com/afn2proxy
+            tag: "master-f461a9e"
+profiles:
+  - name: local-charts-and-image-kind
+    merge:
+      deployments:
+        rmn-v2:
+          helm:
+            chart:
+              name: rmn-v2
+              path: ${CHAINLINK_CODE_DIR}/ccip-rmn-v2
+              version: null
+            values:
+              enable_local: true
+              rageproxy:
+                imagePullPolicy: Never
+                image:
+                  repository: rageproxy
+                  tag: "latest"
+              rmn:
+                imagePullPolicy: Never
+                image:
+                  repository: afn2proxy
+                  tag: "latest"
+  - name: local-charts
+    merge:
+      deployments:
+        rmn-v2:
+          helm:
+            chart:
+              name: rmn-v2
+              path: ${CHAINLINK_CODE_DIR}/ccip-rmn-v2
+              version: null
+  - name: kind
+    activation:
+      - vars:
+          PROVIDER: "kind"
+    merge:
+      pullSecrets:
+        regcred-prod-ecr:
+          registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
+          secret: regcred-prod-ecr
+      deployments:
+        rmn-v2:
+          helm:
+            values:
+              enable_local: true
+              imagePullSecrets:
+                - name: regcred-prod-ecr
