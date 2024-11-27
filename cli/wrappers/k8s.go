@@ -8,6 +8,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -28,6 +29,7 @@ type K8sCLI interface {
 	EnsureNamespaceExists(ctx context.Context, name string) (bool, error)
 	WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error
 	ApplyConfigMap(ctx context.Context, configMap *corev1api.ConfigMap) (bool, error)
+	LabelNamespace(ctx context.Context, namespace, key, value string) error
 }
 
 type K8sClientset interface {
@@ -174,6 +176,20 @@ func (k *K8sClient) ApplyConfigMap(ctx context.Context, configMap *corev1api.Con
 		return false, fmt.Errorf("failed to create configmap %s in namespace %s: %w", configMap.Name, configMap.Namespace, errCreate)
 	}
 	return false, nil
+}
+
+// LabelNamespace applies a label update to a namespace using PATCH.
+func (k *K8sClient) LabelNamespace(ctx context.Context, namespace, key, value string) error {
+	patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value)
+
+	_, err := k.clientset.CoreV1().Namespaces().Patch(
+		ctx,
+		namespace,
+		types.MergePatchType,
+		[]byte(patch),
+		metav1.PatchOptions{},
+	)
+	return err
 }
 
 // KubeConfigInterface is an interface for a k8s.io/client-go/tools/clientcmd/api.Config
