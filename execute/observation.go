@@ -167,6 +167,7 @@ func (p *Plugin) getMessagesObservation(
 						messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 					}
 					messageObs[srcChain][msg.Header.SequenceNumber] = msg
+					// TODO: Check map encoding size and stop when it's more than max observation size.
 				}
 			}
 		}
@@ -192,6 +193,15 @@ func (p *Plugin) getMessagesObservation(
 	observation.Messages = messageObs
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
+
+	encodedObs, err := observation.Encode()
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err)
+	}
+
+	if len(encodedObs) >= maxObservationLength {
+		return exectypes.Observation{}, fmt.Errorf("observation size exceeds")
+	}
 
 	return observation, nil
 }
