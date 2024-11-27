@@ -2,37 +2,15 @@ name: push-tag-release
 
 on:
   push:
-    # tag format imposed by changesets on monorepos.
-    # see: https://github.com/changesets/changesets/blob/main/docs/command-line-options.md#tag
     tags:
-      - '*@*'
+      - v*
 
 jobs:
-  extract-package-from-tag:
-    runs-on: ubuntu-latest
-    outputs:
-      package_name: ${{ steps.extract-package-from-tag.outputs.package_name }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Extract Package Name from Tag
-        id: extract-package-from-tag
-        run: |
-          TAG_REF="${GITHUB_REF#refs/tags/}"
-          PACKAGE_NAME=$(echo "$TAG_REF" | cut -d'@' -f1)
-          echo "Tag Reference: $TAG_REF"
-          echo "Package Name: $PACKAGE_NAME"
-
-          echo "package_name=$PACKAGE_NAME" >> "$GITHUB_OUTPUT"
-
   ci-lint:
-    needs: [extract-package-from-tag]
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ needs.extract-package-from-tag.outputs.package_name }}
+        working-directory: cli
     permissions:
       id-token: write
       contents: read
@@ -42,19 +20,18 @@ jobs:
         uses: smartcontractkit/.github/actions/ci-lint-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # ci-lint-go@0.2.4
         with:
           # grafana inputs
-          metrics-job-name: ci-lint (${{ needs.extract-package-from-tag.outputs.package_name }})
+          metrics-job-name: ci-lint (cli)
           gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          go-directory: ./${{ needs.extract-package-from-tag.outputs.package_name }}
-          go-version-file: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.mod
+          go-directory: ./cli
+          go-version-file: ./cli/go.mod
 
   ci-test:
-    needs: [extract-package-from-tag]
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ${{ needs.extract-package-from-tag.outputs.package_name }}
+        working-directory: cli
     permissions:
       id-token: write
       contents: read
@@ -64,18 +41,19 @@ jobs:
         uses: smartcontractkit/.github/actions/ci-test-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # ci-test-go@0.1.5
         with:
           # grafana inputs
-          metrics-job-name: ci-test (${{ needs.extract-package-from-tag.outputs.package_name }})
+          metrics-job-name: ci-test (cli)
           gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
           gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
           gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
-          go-version-file: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.mod
-          go-cache-dep-path: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.sum
-          go-test-cmd: "go test ./${{ needs.extract-package-from-tag.outputs.package_name }}/..."
+          go-version-file: ./cli/go.mod
+          go-cache-dep-path: ./cli/go.sum
+          go-test-cmd: "go test ./cli/..."
 
   cicd-publish-release:
-    needs: [extract-package-from-tag, ci-lint, ci-test]
-    if: ${{ success() && needs.extract-package-from-tag.outputs.package_name }}
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
     permissions:
       id-token: write
       contents: write
@@ -85,17 +63,6 @@ jobs:
         uses: smartcontractkit/.github/actions/cicd-build-publish-artifacts-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # cicd-build-publish-artifacts-go@0.2.4
         with:
           # general inputs
-          app-name: ${{ needs.extract-package-from-tag.outputs.package_name }}
-          publish: "true"
-          # grafana inputs
-          metrics-job-name: cicd-publish-release
-          gc-basic-auth: ${{ secrets.GRAFANA_INTERNAL_BASIC_AUTH }}
-          gc-host: ${{ secrets.GRAFANA_INTERNAL_HOST }}
-          gc-org-id: ${{ secrets.GRAFANA_INTERNAL_TENANT_ID }}
+          app-name: crib # cli
           # goreleaser inputs
-          goreleaser-dist: goreleaser-pro
           goreleaser-version: '~> v2'
-          goreleaser-key: ${{ secrets.GORELEASER_KEY }}
-          goreleaser-args: "-f ./${{ needs.extract-package-from-tag.outputs.package_name }}/.goreleaser.yaml"
-          go-version-file: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.mod
-          go-cache-dep-path: ./${{ needs.extract-package-from-tag.outputs.package_name }}/go.sum
