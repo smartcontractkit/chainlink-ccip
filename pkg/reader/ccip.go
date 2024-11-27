@@ -1425,5 +1425,24 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 	return daConfig, nil
 }
 
+func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+
+	var latestSeqNr uint64
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameGetLatestPriceSequenceNumber,
+		primitives.Finalized,
+		map[string]any{},
+		&latestSeqNr,
+	)
+
+	if err != nil {
+		return 0, fmt.Errorf("get latest price sequence number: %w", err)
+	}
+
+	return latestSeqNr, nil
+}
+
 // Interface compliance check
 var _ CCIPReader = (*ccipChainReader)(nil)

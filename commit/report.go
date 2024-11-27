@@ -109,8 +109,18 @@ func (p *Plugin) Reports(
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	// first check seqNr is stale or not
+	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest price seq nr: %w", err)
+	}
+	if seqNr < latestSeqNr {
+		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
+		return false, nil
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
