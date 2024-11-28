@@ -35,9 +35,12 @@ const (
 	maxQueryLength = 0
 
 	// maxObservationLength is set to the maximum size of an observation
-	// check factory_test for the calculation. It is limited to about 10%
-	// of the maximum allowable value because we expect many concurrent
-	// plugin instances and don't want to saturate the network.
+	// check factory_test for the calculation.
+	// this is being set to the max maximum observation length due to
+	// the observations being so large at the moment, especially when
+	// commit reports have many messages.
+	// in order to meaningfully decrease this we need to drastically optimise
+	// our observation sizes.
 	maxObservationLength = ocr3types.MaxMaxObservationLength
 
 	// maxOutcomeLength is set to the maximum size of an outcome
