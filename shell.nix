@@ -79,6 +79,14 @@ mkShell' {
       # Install changesets (no nix package available at the moment)
       pnpm install
 
+      if [ "$CRIB_CI_ENV" = "true" ]; then
+        # in CI, download the latest CLI
+        task fetch-latest-cli
+      else
+        # in local, build the CLI from source
+        task build
+      fi
+
       # Set up crib CLI using task
       task setup
 

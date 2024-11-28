@@ -1,10 +1,10 @@
 {
-  "name": "crib",
-  "version": "0.0.1",
+  "name": "@chainlink/crib",
+  "version": "0.1.0",
   "description": "CRIB stands for 'Chainlink Running-in-a-Box'",
   "private": true,
   "engines": {
-    "node": "~18"
+    "node": "~20"
   },
   "scripts": {
     "ci:changeset:publish": "pnpm changeset publish",
