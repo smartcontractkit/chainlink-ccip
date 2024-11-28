@@ -154,8 +154,16 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest price seq nr: %w", err)
+	}
+	if seqNr < latestSeqNr {
+		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
+		return false, nil
+	}
 	// we only transmit reports if we are the "active" instance.
 	// we can check this by reading the OCR configs from the home chain.
 	isCandidate, err := p.isCandidateInstance(ctx)
