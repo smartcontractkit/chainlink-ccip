@@ -29,9 +29,34 @@ tasks:
         sh: echo ${GOBIN:-$(go env GOPATH)/bin}
     cmd: go build -o $GOBIN/crib ./cli/.
 
+  fetch-latest-cli:
+    desc: Downloads the latest crib release from GitHub
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: |
+      checksums=$(mktemp)
+      gh release download --repo smartcontractkit/crib --pattern "checksums.txt" --clobber -O $checksums
+
+      if [ -f $GOBIN/crib ]; then
+        expected_checksum=$(grep "crib-{{OS}}-{{ARCH}}" "$checksums" | cut -d ' ' -f 1)
+        actual_checksum=$(sha256sum $GOBIN/crib | cut -d ' ' -f 1)
+        if [ "$expected_checksum" = "$actual_checksum" ]; then
+          chmod +x $GOBIN/crib
+          echo "Current crib binary is up to date"
+          rm -f $checksums
+          exit 0
+        fi
+      fi
+
+      gh release download --repo smartcontractkit/crib --pattern "crib-{{OS}}-{{ARCH}}" --clobber -O $GOBIN/crib
+      chmod +x $GOBIN/crib
+      rm -f $checksums
+
   setup:
     desc: Sets up the crib CLI in the current environment
-    deps: [build]
     dir: '{{.USER_WORKING_DIR}}'
     vars:
       REPO_ROOT:
