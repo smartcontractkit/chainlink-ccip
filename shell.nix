@@ -62,6 +62,9 @@ mkShell' {
   
   GOROOT = "${go}/share/go";
   shellHook = ''
+    # Exit on unhandled errors
+    set -e
+
     # Some useful custom aliases
     alias k=kubectl
     alias kgp="kubectl get pod"
