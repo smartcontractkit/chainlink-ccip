@@ -48,6 +48,12 @@ import (
 	plugintypes2 "github.com/smartcontractkit/chainlink-ccip/plugintypes"
 )
 
+var (
+	chainA = cciptypes.ChainSelector(1)
+	chainB = cciptypes.ChainSelector(2)
+	chainC = cciptypes.ChainSelector(3)
+)
+
 type IntTest struct {
 	t *testing.T
 

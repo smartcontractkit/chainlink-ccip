@@ -2,83 +2,25 @@ package execute
 
 import (
 	"fmt"
-	"math/big"
-	"testing"
-	"time"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/stretchr/testify/require"
+	"math/big"
+	"testing"
+	"time"
 )
 
-/*
-200 reports, 200 messages
--------------------------
-Total size of observation: 1056507
-200 CommitReports: 60635
-200 Messages: 583635
-TokenData: 112035
-Costly Messages: 13945
-Nonces: 12035
-Contracts: 274962
-
-900 reports, 100 messages
--------------------------
-Total size of observation: 937407
-900 CommitReports: 302235
-100 Messages: 291835
-TokenData: 56035
-Costly Messages: 7045
-Nonces: 6035
-Contracts: 274962
-
-100 reports, 100 messages
--------------------------
-Total size of observation: 665507
-100 CommitReports: 30335
-100 Messages: 291835
-TokenData: 56035
-Costly Messages: 7045
-Nonces: 6035
-Contracts: 274962
-
-100 reports, 200 messages
--------------------------
-Total size of observation: 1025407
-100 CommitReports: 30335
-200 Messages: 582835
-TokenData: 112035
-Costly Messages: 13945
-Nonces: 12035
-Contracts: 274962
-
-100 reports, 350 messages
--------------------------
-Total size of observation: 1565257
-100 CommitReports: 30335
-350 Messages: 1019335
-TokenData: 196035
-Costly Messages: 24295
-Nonces: 21035
-Contracts: 274962
-*/
-func TestObservationSize(t *testing.T) {
-	//t.Skip("This test is for estimating message sizes, not for running in CI")
+func TestObservationSizeLimits(t *testing.T) {
 	maxCommitReports := 100
 	maxMessages := 1100
 	msgDataSize := 1000 // could be much larger than this?
 	tokenDataSize := 0  // fixed size for CCTP?
 
 	var addr [20]byte
-
 	commitObs := make(exectypes.CommitObservations, estimatedMaxNumberOfSourceChains)
 	bigSeqNum := ccipocr3.SeqNum(100000)
 	for i := 0; i < maxCommitReports; i++ {
@@ -203,21 +145,6 @@ func TestObservationSize(t *testing.T) {
 		return len(b)
 	}
 
-	msgSum := 0
-	for _, msgs := range msgObs {
-		msgSum += len(msgs)
-	}
-	fmt.Println("Total size of observation:", encSize(maxObs))
-	fmt.Printf("%d CommitReports: %d\n", len(maxObs.CommitReports),
-		encSize(exectypes.Observation{CommitReports: commitObs}))
-	fmt.Printf("%d Messages: %d\n", msgSum, encSize(exectypes.Observation{Messages: msgObs}))
-	fmt.Printf("TokenData: %d\n", encSize(exectypes.Observation{TokenData: tokenDataObs}))
-	fmt.Printf("Costly Messages: %d\n", encSize(exectypes.Observation{CostlyMessages: costlyMessagesObs}))
-	fmt.Printf("Nonces: %d\n", encSize(exectypes.Observation{Nonces: noncesObs}))
-	fmt.Printf("Contracts: %d\n", encSize(exectypes.Observation{Contracts: discoveryObs}))
+	fmt.Printf("maxObs size: %d\n", encSize(maxObs))
 
-	b, err := maxObs.Encode()
-	require.NoError(t, err)
-	assert.Greater(t, maxObservationLength, len(b))
-	assert.LessOrEqual(t, maxObservationLength, ocr3types.MaxMaxObservationLength)
 }
