@@ -187,5 +187,9 @@ func (r InMemoryCCIPReader) GetMedianDataAvailabilityGasConfig(
 	return cciptypes.DataAvailabilityGasConfig{}, nil
 }
 
+func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
+
 // Interface compatibility check.
 var _ reader.CCIPReader = InMemoryCCIPReader{}

@@ -109,8 +109,13 @@ func (p *Plugin) Reports(
 }
 
 func (p *Plugin) ShouldAcceptAttestedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	latestOnchainSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest price seq nr: %w", err)
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
@@ -119,6 +124,16 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	isEmpty := decodedReport.IsEmpty()
 	if isEmpty {
 		p.lggr.Infow("skipping empty report")
+		return false, nil
+	}
+
+	p.lggr.Infow("ShouldAcceptAttestedReport",
+		"seqNr", seqNr,
+		"latestOnchainSeqNr", latestOnchainSeqNr,
+		"decodedReport", decodedReport,
+	)
+	if seqNr < latestOnchainSeqNr && len(decodedReport.MerkleRoots) == 0 {
+		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestOnchainSeqNr)
 		return false, nil
 	}
 
@@ -144,7 +159,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
 	// we only transmit reports if we are the "active" instance.
 	// we can check this by reading the OCR configs from the home chain.
@@ -158,9 +173,31 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
+	latestOnchainSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest price seq nr: %w", err)
+	}
+
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	isEmpty := decodedReport.IsEmpty()
+	if isEmpty {
+		p.lggr.Infow("skipping empty report")
+		return false, nil
+	}
+
+	p.lggr.Infow("ShouldTransmitAcceptedReport",
+		"seqNr", seqNr,
+		"latestOnchainSeqNr", latestOnchainSeqNr,
+		"decodedReport", decodedReport,
+	)
+
+	if seqNr < latestOnchainSeqNr && len(decodedReport.MerkleRoots) == 0 {
+		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestOnchainSeqNr", latestOnchainSeqNr)
+		return false, nil
 	}
 
 	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
