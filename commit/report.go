@@ -127,6 +127,11 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
+	p.lggr.Infow("ShouldAcceptAttestedReport",
+		"seqNr", seqNr,
+		"latestOnchainSeqNr", latestOnchainSeqNr,
+		"decodedReport", decodedReport,
+	)
 	if seqNr < latestOnchainSeqNr && len(decodedReport.MerkleRoots) == 0 {
 		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestOnchainSeqNr)
 		return false, nil
@@ -183,6 +188,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		p.lggr.Infow("skipping empty report")
 		return false, nil
 	}
+
+	p.lggr.Infow("ShouldTransmitAcceptedReport",
+		"seqNr", seqNr,
+		"latestOnchainSeqNr", latestOnchainSeqNr,
+		"decodedReport", decodedReport,
+	)
 
 	if seqNr < latestOnchainSeqNr && len(decodedReport.MerkleRoots) == 0 {
 		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestOnchainSeqNr", latestOnchainSeqNr)
