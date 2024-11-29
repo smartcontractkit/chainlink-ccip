@@ -19,15 +19,20 @@ func TestObservationSizeLimits(t *testing.T) {
 	maxMessages := 1100
 	msgDataSize := 1000 // could be much larger than this?
 	tokenDataSize := 0  // fixed size for CCTP?
+	nChains := 1
+
+	prevOutcome := exectypes.Outcome{
+		State: exectypes.GetMessages,
+	}
 
 	var addr [20]byte
-	commitObs := make(exectypes.CommitObservations, estimatedMaxNumberOfSourceChains)
+	commitObs := make(exectypes.CommitObservations, nChains)
 	bigSeqNum := ccipocr3.SeqNum(100000)
 	for i := 0; i < maxCommitReports; i++ {
-		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
+		//idx := ccipocr3.ChainSelector(i % nChains)
 		seqNum := bigSeqNum + ccipocr3.SeqNum(i)
-		commitObs[idx] = append(commitObs[idx], exectypes.CommitData{
-			SourceChain: ccipocr3.ChainSelector(123456),
+		commitObs[chainA] = append(commitObs[chainA], exectypes.CommitData{
+			SourceChain: chainA,
 			Timestamp:   time.UnixMilli(1732035256660),
 			BlockNum:    uint64(302173055),
 			//MerkleRoot cciptypes.Bytes32 `json:"merkleRoot"`
@@ -43,9 +48,11 @@ func TestObservationSizeLimits(t *testing.T) {
 		})
 	}
 
-	msgObs := make(exectypes.MessageObservations, estimatedMaxNumberOfSourceChains)
+	prevOutcome.PendingCommitReports = commitObs[chainA]
+
+	msgObs := make(exectypes.MessageObservations, nChains)
 	for i := 0; i < maxMessages; i++ {
-		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains % maxCommitReports)
+		idx := ccipocr3.ChainSelector(i % nChains % maxCommitReports)
 		if nil == msgObs[idx] {
 			msgObs[idx] = make(map[ccipocr3.SeqNum]ccipocr3.Message)
 		}
@@ -73,9 +80,9 @@ func TestObservationSizeLimits(t *testing.T) {
 	}
 
 	// This could be bigger, since each message could send multiple tokens.
-	tokenDataObs := make(exectypes.TokenDataObservations, estimatedMaxNumberOfSourceChains)
+	tokenDataObs := make(exectypes.TokenDataObservations, nChains)
 	for i := 0; i < maxMessages; i++ {
-		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
+		idx := ccipocr3.ChainSelector(i % nChains)
 		if nil == tokenDataObs[idx] {
 			tokenDataObs[idx] = make(map[ccipocr3.SeqNum]exectypes.MessageTokenData)
 		}
@@ -95,7 +102,7 @@ func TestObservationSizeLimits(t *testing.T) {
 	// separate sender for each message
 	noncesObs := make(exectypes.NonceObservations, maxMessages)
 	for i := 0; i < maxMessages; i++ {
-		idx := ccipocr3.ChainSelector(i % estimatedMaxNumberOfSourceChains)
+		idx := ccipocr3.ChainSelector(i % nChains)
 		if nil == noncesObs[idx] {
 			noncesObs[idx] = make(map[string]uint64)
 		}
@@ -113,14 +120,14 @@ func TestObservationSizeLimits(t *testing.T) {
 		//consts.ContractNameRMNHome, // I don't think we look this one up
 	}
 	discoveryObs := dt.Observation{
-		FChain:    make(map[ccipocr3.ChainSelector]int, estimatedMaxNumberOfSourceChains),
+		FChain:    make(map[ccipocr3.ChainSelector]int, nChains),
 		Addresses: make(reader.ContractAddresses, len(contracts)),
 	}
 	set := func(contract string) {
 		//type ContractAddresses map[string]map[cciptypes.ChainSelector]cciptypes.UnknownAddress
 		discoveryObs.Addresses[contract] =
-			make(map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress, estimatedMaxNumberOfSourceChains)
-		for i := 0; i < estimatedMaxNumberOfSourceChains; i++ {
+			make(map[ccipocr3.ChainSelector]ccipocr3.UnknownAddress, nChains)
+		for i := 0; i < nChains; i++ {
 			discoveryObs.Addresses[contract][ccipocr3.ChainSelector(i)] = addr[:]
 		}
 	}
