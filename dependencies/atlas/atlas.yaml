@@ -45,6 +45,7 @@ pipelines:
     run: |-
       run_pipelines atlas-infra
       run_pipelines atlas-network-1 atlas-network-2
+      kubectl rollout status deployment -l app=atlas
 
   atlas-infra:
     run: |-
