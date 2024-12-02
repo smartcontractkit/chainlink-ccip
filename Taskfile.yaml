@@ -29,16 +29,25 @@ tasks:
         sh: echo ${GOBIN:-$(go env GOPATH)/bin}
     cmd: go build -o $GOBIN/crib ./cli/.
 
-  fetch-latest-cli:
-    desc: Downloads the latest crib release from GitHub
+  fetch-cli:
+    desc: Downloads the crib binary from the corresponding tag-based release in GitHub when applicable, otherwise uses latest
     env:
       GOPATH:
         sh: go env GOPATH
       GOBIN:
         sh: echo ${GOBIN:-$(go env GOPATH)/bin}
     cmd: |
+      # if on a tagged ref, uses the corresponding release instead of latest
+      CLI_RELEASE=$(git tag --points-at HEAD | tail -n 1)
+
+      if [ -n "$CLI_RELEASE" ]; then
+        echo "Fetching crib CLI binary from release $CLI_RELEASE"
+      else
+        echo "Fetching crib CLI binary from latest release"
+      fi
+
       checksums=$(mktemp)
-      gh release download --repo smartcontractkit/crib --pattern "checksums.txt" --clobber -O $checksums
+      gh release download $CLI_RELEASE --repo smartcontractkit/crib --pattern "checksums.txt" --clobber -O $checksums
 
       if [ -f $GOBIN/crib ]; then
         expected_checksum=$(grep "crib-{{OS}}-{{ARCH}}" "$checksums" | cut -d ' ' -f 1)
@@ -51,7 +60,7 @@ tasks:
         fi
       fi
 
-      gh release download --repo smartcontractkit/crib --pattern "crib-{{OS}}-{{ARCH}}" --clobber -O $GOBIN/crib
+      gh release download $CLI_RELEASE --repo smartcontractkit/crib --pattern "crib-{{OS}}-{{ARCH}}" --clobber -O $GOBIN/crib
       chmod +x $GOBIN/crib
       rm -f $checksums
 

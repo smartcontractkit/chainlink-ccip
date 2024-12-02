@@ -83,8 +83,8 @@ mkShell' {
       pnpm install
 
       if [ "$CRIB_CI_ENV" = "true" ]; then
-        # in CI, download the latest CLI
-        task fetch-latest-cli
+        # in CI, download the CLI from the corresponding GH release
+        task fetch-cli
       else
         # in local, build the CLI from source
         task build
