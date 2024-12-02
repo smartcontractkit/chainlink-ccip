@@ -14,7 +14,7 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 // and sequence number.
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
-// flatten nested maps into a slice of messages.
+// Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
 	var results []cciptypes.Message
 	for _, msgs := range mo {
