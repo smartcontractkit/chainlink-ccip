@@ -459,11 +459,16 @@ func TestPlugin_ShouldAcceptAttestedReport_DoesNotDecode(t *testing.T) {
 
 func TestPlugin_ShouldAcceptAttestedReport_NoReports(t *testing.T) {
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.On("Decode", mock.Anything, mock.Anything).
+	codec.EXPECT().Decode(mock.Anything, mock.Anything).
 		Return(cciptypes.ExecutePluginReport{}, nil)
+
+	mockChainSupport := plugincommon_mock.NewMockChainSupport(t)
+	mockChainSupport.EXPECT().DestChain().Return(1)
+
 	p := &Plugin{
-		lggr:        logger.Test(t),
-		reportCodec: codec,
+		lggr:         logger.Test(t),
+		chainSupport: mockChainSupport,
+		reportCodec:  codec,
 	}
 	result, err := p.ShouldAcceptAttestedReport(context.Background(), 0, ocr3types.ReportWithInfo[[]byte]{
 		Report: []byte("empty report"), // faked out, see mock above
