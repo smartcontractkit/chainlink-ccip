@@ -1,7 +1,7 @@
 TEST_COUNT ?= 10
 COVERAGE_FILE ?= coverage.out
 
-# Detect the system architecture
+# Detect the system architecture test
 ARCH := $(shell uname -m)
 
 # Find 'protoc' download URL based on the architecture
