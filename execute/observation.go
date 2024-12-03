@@ -167,29 +167,6 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
-func (p *Plugin) filterCursed(
-	ctx context.Context, commitReports map[cciptypes.ChainSelector][]exectypes.CommitData,
-) (map[cciptypes.ChainSelector][]exectypes.CommitData, error) {
-	ci, err := p.getCurseInfo(ctx)
-	if err != nil {
-		// If we can't get curse info, we can't proceed.
-		// But we still need to return discovery data.
-		return nil, err
-	}
-	if ci.GlobalCurse || ci.CursedDestination {
-		p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
-		return nil, nil
-	}
-
-	// Remove cursed commit reports.
-	for chainSelector, isCursed := range ci.CursedSourceChains {
-		if isCursed {
-			delete(commitReports, chainSelector)
-		}
-	}
-	return commitReports, nil
-}
-
 func readAllMessages(
 	ctx context.Context, ccipReader reader.CCIPReader, commitObs exectypes.CommitObservations,
 ) (exectypes.MessageObservations, error) {
@@ -234,16 +211,9 @@ func (p *Plugin) getMessagesObservation(
 		// This is expected after a cold start.
 		return observation, nil
 	}
-	commitReportCache := regroup(previousOutcome.PendingCommitReports)
 
-	// Remove cursed commit reports.
-	commitReportCache, err := p.filterCursed(ctx, commitReportCache)
-	if err != nil {
-		return exectypes.Observation{}, err
-	}
-	if len(commitReportCache) == 0 {
-		return observation, nil
-	}
+	// group reports by chain selector.
+	commitReportCache := regroup(previousOutcome.PendingCommitReports)
 
 	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
 	if err != nil {
@@ -282,10 +252,17 @@ func (p *Plugin) getFilterObservation(
 	//          This phase also determines which messages are too costly to execute.
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
-
-	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+	}
+	// No observation for non-dest readers.
+	if !supportsDest {
+		return observation, nil
+	}
 
 	// Collect unique senders.
+	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
 	for _, commitReport := range previousOutcome.PendingCommitReports {
 		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
 			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
@@ -294,27 +271,6 @@ func (p *Plugin) getFilterObservation(
 		for _, msg := range commitReport.Messages {
 			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(p.destChain))
 			nonceRequestArgs[commitReport.SourceChain][sender] = struct{}{}
-		}
-	}
-
-	// Remove cursed requests.
-	{
-		ci, err := p.getCurseInfo(ctx)
-		if err != nil {
-			// If we can't get curse info, we can't proceed.
-			// But we still need to return discovery data.
-			return observation, err
-		}
-		if ci.GlobalCurse || ci.CursedDestination {
-			p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
-			return observation, nil
-		}
-
-		// Remove cursed requests.
-		for chainSelector, isCursed := range ci.CursedSourceChains {
-			if isCursed {
-				delete(nonceRequestArgs, chainSelector)
-			}
 		}
 	}
 
@@ -329,6 +285,10 @@ func (p *Plugin) getFilterObservation(
 		}
 		nonceObservations[srcChain] = nonces
 	}
+
+	// Note: it is technically possible to check for curses at this point. If a curse
+	// occurred after the GetMessages observations checking now could possibly recover a report.
+	// It would only work for ordered messages.
 
 	observation.Nonces = nonceObservations
 
