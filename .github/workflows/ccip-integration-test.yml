@@ -44,8 +44,11 @@ jobs:
         run: |
           default="develop"
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment='${{ steps.fetch_pr_data.outputs.result }}'
-            echo $comment
+          comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
+          ${{ steps.fetch_pr_data.outputs.result }}
+          GREAT_PR_DESCRIPTION_HERE
+          )
+            echo "$comment"
             core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
             if [ -n "$core_ref" ]; then
               echo "Overriding chainlink repository commit hash with: $core_ref"
@@ -99,7 +102,7 @@ jobs:
       - name: Run ccip ocr3 initial deploy integration test
         run: |
           cd $GITHUB_WORKSPACE/chainlink/deployment
-          go test -v -run '^TestInitialDeploy$' -timeout 6m ./ccip/changeset
+          go test -v -run '^TestAddLanesWithTestRouter$' -timeout 6m ./ccip/changeset
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Integration test failed"
