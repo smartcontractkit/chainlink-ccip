@@ -599,6 +599,140 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	})
 }
 
+func Test_controller_validateSignedObservationResponse(t *testing.T) {
+	configDigest123 := [32]byte{1, 2, 3}
+
+	testCases := []struct {
+		name                      string
+		signedObservationResponse *rmnpb.SignedObservation
+		rmnNodeID                 rmntypes.NodeID
+		lurs                      map[uint64]updateRequestWithMeta
+		destChain                 *rmnpb.LaneDest
+		homeConfigDigest          [32]byte
+		rmnNodesInfo              []rmntypes.HomeNodeInfo
+		expErrContains            string
+	}{
+		{
+			name: "single valid observation",
+			signedObservationResponse: &rmnpb.SignedObservation{
+				Observation: &rmnpb.Observation{
+					RmnHomeContractConfigDigest: configDigest123[:],
+					LaneDest:                    &rmnpb.LaneDest{DestChainSelector: 1},
+					FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+						{
+							LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 2},
+							Root:           []byte{1, 2, 33},
+							ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 1, MaxMsgNr: 2},
+						},
+					},
+					Timestamp: uint64(time.Now().Unix()),
+				},
+				Signature: []byte{10, 20, 30},
+			},
+			rmnNodeID: 20,
+			lurs: map[uint64]updateRequestWithMeta{
+				2: {
+					Data: &rmnpb.FixedDestLaneUpdateRequest{
+						LaneSource: &rmnpb.LaneSource{SourceChainSelector: 2},
+						ClosedInterval: &rmnpb.ClosedInterval{
+							MinMsgNr: 1,
+							MaxMsgNr: 2,
+						},
+					},
+					RmnNodes: mapset.NewSet(rmntypes.NodeID(20)),
+				},
+			},
+			destChain:        &rmnpb.LaneDest{DestChainSelector: 1},
+			homeConfigDigest: configDigest123,
+			rmnNodesInfo: []rmntypes.HomeNodeInfo{
+				{
+					ID:                    20,
+					SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(2)),
+					OffchainPublicKey:     &ed25519.PublicKey{},
+				},
+			},
+		},
+		{
+			name: "duplicate valid source lane updates should be rejected",
+			signedObservationResponse: &rmnpb.SignedObservation{
+				Observation: &rmnpb.Observation{
+					RmnHomeContractConfigDigest: configDigest123[:],
+					LaneDest:                    &rmnpb.LaneDest{DestChainSelector: 1},
+					FixedDestLaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+						{
+							LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 2},
+							Root:           []byte{1, 2, 33},
+							ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 1, MaxMsgNr: 2},
+						},
+						{
+							LaneSource:     &rmnpb.LaneSource{SourceChainSelector: 2},
+							Root:           []byte{1, 2, 33},
+							ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 1, MaxMsgNr: 2},
+						},
+					},
+					Timestamp: uint64(time.Now().Unix()),
+				},
+			},
+			rmnNodeID: 20,
+			lurs: map[uint64]updateRequestWithMeta{
+				2: {
+					Data: &rmnpb.FixedDestLaneUpdateRequest{
+						LaneSource: &rmnpb.LaneSource{SourceChainSelector: 2},
+						ClosedInterval: &rmnpb.ClosedInterval{
+							MinMsgNr: 1,
+							MaxMsgNr: 2,
+						},
+					},
+					RmnNodes: mapset.NewSet(rmntypes.NodeID(20)),
+				},
+			},
+			destChain:        &rmnpb.LaneDest{DestChainSelector: 1},
+			homeConfigDigest: configDigest123,
+			rmnNodesInfo: []rmntypes.HomeNodeInfo{
+				{
+					ID:                    20,
+					SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(2)),
+				},
+			},
+			expErrContains: "duplicate source chain 2",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+
+			rmnHomeReaderMock := readerpkg_mock.NewMockRMNHome(t)
+			rmnHomeReaderMock.EXPECT().GetRMNNodesInfo(cciptypes.Bytes32(tc.homeConfigDigest)).
+				Return(tc.rmnNodesInfo, nil)
+
+			cl := &controller{
+				lggr:            lggr,
+				ed25519Verifier: signatureVerifierAlwaysTrue{},
+				rmnCrypto:       signatureVerifierAlwaysTrue{},
+				rmnHomeReader:   rmnHomeReaderMock,
+			}
+
+			err := cl.validateSignedObservationResponse(
+				&rmnpb.Response{
+					RequestId: 0,
+					Response:  &rmnpb.Response_SignedObservation{SignedObservation: tc.signedObservationResponse},
+				},
+				tc.rmnNodeID,
+				tc.lurs,
+				tc.destChain,
+				tc.homeConfigDigest,
+			)
+			if tc.expErrContains != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.expErrContains)
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
+}
+
 func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockPeerClient,
 	homeF int,
