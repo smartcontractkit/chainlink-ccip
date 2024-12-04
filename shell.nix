@@ -102,5 +102,8 @@ mkShell' {
     ${lib.optionalString keystone ''
       echo "Welcome to crib, build the crib CLI via \"task build\". It'll be available as \"crib\" in either your \$(go env GOBIN)' or \$(go env GOPATH)/bin directory, depending on if your GOBIN is set."
     ''}
+
+    # Prevent errors from exiting the shell from this point on
+    set +e
   '';
 }
