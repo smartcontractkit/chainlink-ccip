@@ -11,20 +11,24 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// IsReportCursed helps make sure logs and errors are consistent in commit and execute plugins.
+// IsReportCursed fetches RMN CursesInfo from the destination and compares it
+// to the reportSourceChains. If any source (or destination) are cursed, a nice
+// warning is logged and true is returned.
+//
+// Used by commit and execute plugins to ensure consistent logs and errors.
 func IsReportCursed(
 	ctx context.Context,
 	lggr logger.Logger,
 	ccipReader reader.CCIPReader,
 	destChain ccipocr3.ChainSelector,
-	touchedChains []ccipocr3.ChainSelector,
+	reportSourceChains []ccipocr3.ChainSelector,
 ) (bool, error) {
 	// No error is returned in case there are other things for the report.
-	if len(touchedChains) == 0 {
+	if len(reportSourceChains) == 0 {
 		return false, nil
 	}
 
-	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, destChain, touchedChains)
+	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, destChain, reportSourceChains)
 	if err != nil {
 		return false, fmt.Errorf("error while fetching curse info: %w", err)
 	}
@@ -35,8 +39,8 @@ func IsReportCursed(
 		)
 		return true, nil
 	}
-	filtered := curseInfo.NonCursedSourceChains(touchedChains)
-	if len(filtered) != len(touchedChains) {
+	filtered := curseInfo.NonCursedSourceChains(reportSourceChains)
+	if len(filtered) != len(reportSourceChains) {
 		var cursedSources []cciptypes.ChainSelector
 		for cs, isCursed := range curseInfo.CursedSourceChains {
 			if isCursed {
