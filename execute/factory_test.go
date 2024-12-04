@@ -71,7 +71,7 @@ Nonces: 21035
 Contracts: 274962
 */
 func TestObservationSize(t *testing.T) {
-	//t.Skip("This test is for estimating message sizes, not for running in CI")
+	t.Skip("This test is for estimating message sizes, not for running in CI")
 	maxCommitReports := 100
 	maxMessages := 1100
 	msgDataSize := 1000 // could be much larger than this?

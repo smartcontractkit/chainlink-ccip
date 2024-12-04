@@ -206,6 +206,9 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err)
 	}
 
+	p.lggr.Infow("encoded observation",
+		"size", len(encodedObs),
+	)
 	if len(encodedObs) >= maxObservationLength {
 		return exectypes.Observation{}, fmt.Errorf(
 			"observation size exceeds maximum size, current size: %d",

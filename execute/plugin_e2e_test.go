@@ -1,8 +1,11 @@
 package execute
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +33,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -76,7 +79,7 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	tm := timeMachine{now: messageTimestamp}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, messageTimestamp)
+	intTest.WithMessages(messages, 1000, messageTimestamp, 1)
 	intTest.WithCustomFeeBoosting(1.0, tm.Now, map[cciptypes.Bytes32]plugintypes.USD18{
 		messages[0].Header.MessageID: plugintypes.NewUSD18(40000),
 		messages[1].Header.MessageID: plugintypes.NewUSD18(200000),
@@ -138,8 +141,14 @@ func TestExceedSizeObservation(t *testing.T) {
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)
 
+	// 1 msg * 1 byte -> 879  | 2 msg * 1 byte -> 1311 | 3 msg * 1 byte -> 1743
+	// 3 msg * 2 bytes -> 882 | 3 msg * 2 byte -> 1319 | 3 msg * 2 byte -> 1755
+	// 10 -> 897
+	// 50 -> 977
+	// 100 -> 1077
+	// 1000 -> 2877
 	msgDataSize := 1000
-	maxMessages := 431 // Currently 431 is the max with this setup
+	maxMessages := 100 // Currently 431 is the max with msgDataSize = 1000
 	startSeqNr := cciptypes.SeqNum(100)
 
 	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
@@ -156,7 +165,7 @@ func TestExceedSizeObservation(t *testing.T) {
 	}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 2)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -169,19 +178,54 @@ func TestExceedSizeObservation(t *testing.T) {
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.PendingCommitReports, 2)
 	//require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.PendingCommitReports, 2)
 
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	outcome = runner.MustRunRound(ctx, t)
-	require.Len(t, outcome.Report.ChainReports, 1)
+	require.Len(t, outcome.Report.ChainReports, 2)
 	//sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	//require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+}
+
+// Output from this function
+// RampMessageHeader size 112
+// Message size 224
+// Observation size 64
+func TestSize(t *testing.T) {
+	sz := SizeOfType(reflect.TypeOf(cciptypes.RampMessageHeader{}))
+	fmt.Printf("RampMessageHeader size %d\n", sz)
+
+	sz = SizeOfType(reflect.TypeOf(cciptypes.Message{}))
+	fmt.Printf("Message size %d\n", sz)
+
+	sz = SizeOfType(reflect.TypeOf(exectypes.Observation{}))
+	fmt.Printf("Observation size %d\n", sz)
+}
+
+// SizeOfType calculates the size in bytes of a given type using reflection.
+func SizeOfType(t reflect.Type) uintptr {
+	switch t.Kind() {
+	case reflect.Array:
+		return uintptr(t.Len()) * SizeOfType(t.Elem())
+	case reflect.Slice, reflect.String:
+		return unsafe.Sizeof(uintptr(0)) + unsafe.Sizeof(uintptr(0))
+	case reflect.Struct:
+		var size uintptr
+		for i := 0; i < t.NumField(); i++ {
+			size += SizeOfType(t.Field(i).Type)
+		}
+		return size
+	case reflect.Ptr, reflect.Uintptr:
+		return unsafe.Sizeof(uintptr(0))
+	default:
+		return t.Size()
+	}
 }
