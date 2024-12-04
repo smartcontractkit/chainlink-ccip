@@ -7,10 +7,9 @@ pipelines:
 
 deployments:
   ingress-controller:
-    helm:
-      chart:
-        name: ingress-nginx
-        repo: https://kubernetes.github.io/ingress-nginx
+    kubectl:
+      manifests:
+        - https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
 
 hooks:
   - wait:
@@ -20,4 +19,6 @@ hooks:
     container:
       labelSelector:
         app.kubernetes.io/component: controller
+        app.kubernetes.io/instance: ingress-nginx
+        app.kubernetes.io/name: ingress-nginx
     events: ["after:deploy:ingress-controller"]
