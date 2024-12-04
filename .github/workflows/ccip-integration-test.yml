@@ -44,7 +44,10 @@ jobs:
         run: |
           default="develop"
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment='${{ steps.fetch_pr_data.outputs.result }}'
+          comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
+          ${{ steps.fetch_pr_data.outputs.result }}
+          GREAT_PR_DESCRIPTION_HERE
+          )
             echo $comment
             core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
             if [ -n "$core_ref" ]; then
