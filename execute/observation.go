@@ -128,7 +128,8 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		// If we can't get curse info, we can't proceed.
 		// But we still need to return discovery data.
-		return observation, err
+		// The error is logged by getCurseInfo.
+		return observation, nil
 	}
 	if ci.GlobalCurse || ci.CursedDestination {
 		p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
