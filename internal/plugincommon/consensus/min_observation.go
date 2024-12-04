@@ -32,14 +32,14 @@ type minObservation[T any] struct {
 
 // NewMinObservation constructs a concrete MinObservation object. The
 // supplied idFunc is used to generate a uniqueID for the type being observed.
-func NewMinObservation[T any](min Threshold, idFunc func(T) [32]byte) MinObservation[T] {
+func NewMinObservation[T any](minThreshold Threshold, idFunc func(T) [32]byte) MinObservation[T] {
 	if idFunc == nil {
 		idFunc = func(data T) [32]byte {
 			return sha3.Sum256([]byte(fmt.Sprintf("%v", data)))
 		}
 	}
 	return &minObservation[T]{
-		minObservation: min,
+		minObservation: minThreshold,
 		cache:          make(map[cciptypes.Bytes32]*counter[T]),
 		idFunc:         idFunc,
 	}
