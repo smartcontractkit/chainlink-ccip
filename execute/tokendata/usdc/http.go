@@ -193,7 +193,9 @@ func (h *httpClient) callAPI(ctx context.Context, url url.URL) (cciptypes.Bytes,
 	req.Header.Add("accept", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
+		if ctx.Err() != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, http.StatusRequestTimeout, ErrTimeout
+		} else if errors.Is(err, ErrTimeout) {
 			return nil, http.StatusRequestTimeout, ErrTimeout
 		}
 		// On error, res is nil in most cases, do not read res.StatusCode, return BadRequest
