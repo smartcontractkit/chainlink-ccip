@@ -399,6 +399,12 @@ func withFeeValueJuels(fee int64) msgOption {
 	}
 }
 
+func withData(data []byte) msgOption {
+	return func(m *cciptypes.Message) {
+		m.Data = data
+	}
+}
+
 func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	return func(m *cciptypes.Message) {
 		m.TokenAmounts = tokenAmounts

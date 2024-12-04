@@ -80,6 +80,16 @@ func validateObservedSequenceNumbers(
 
 var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
+func executedMessages(reports []exectypes.CommitData) map[cciptypes.SeqNum]struct{} {
+	executed := make(map[cciptypes.SeqNum]struct{})
+	for _, report := range reports {
+		for _, seqNum := range report.ExecutedMessages {
+			executed[seqNum] = struct{}{}
+		}
+	}
+	return executed
+}
+
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
 // Note: reports need all messages to create a proof even if some are already executed.

@@ -154,6 +154,8 @@ func (p *Plugin) getMessagesObservation(
 				return exectypes.Observation{}, err
 			}
 
+			//executedSeqNrs := executedMessages(reports)
+
 			// Read messages for each range.
 			for _, seqRange := range ranges {
 				// TODO: check if srcChain is supported.
@@ -166,6 +168,11 @@ func (p *Plugin) getMessagesObservation(
 					if _, ok := messageObs[srcChain]; !ok {
 						messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 					}
+
+					//if _, ok := executedSeqNrs[msg.Header.SequenceNumber]; ok {
+					//	// already executed, don't add
+					//	continue
+					//}
 					messageObs[srcChain][msg.Header.SequenceNumber] = msg
 					// TODO: Check map encoding size and stop when it's more than max observation size.
 				}
@@ -200,7 +207,10 @@ func (p *Plugin) getMessagesObservation(
 	}
 
 	if len(encodedObs) >= maxObservationLength {
-		return exectypes.Observation{}, fmt.Errorf("observation size exceeds")
+		return exectypes.Observation{}, fmt.Errorf(
+			"observation size exceeds maximum size, current size: %d",
+			len(encodedObs),
+		)
 	}
 
 	return observation, nil
