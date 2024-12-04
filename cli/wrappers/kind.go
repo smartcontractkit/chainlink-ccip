@@ -62,8 +62,8 @@ config_path = "/etc/containerd/certs.d"`,
 			KubeadmConfigPatches: []string{
 				`kind: InitConfiguration
 nodeRegistration:
-kubeletExtraArgs:
-node-labels: "ingress-ready=true"`,
+  kubeletExtraArgs:
+    node-labels: "ingress-ready=true"`,
 			},
 			ExtraPortMappings: []v1alpha4.PortMapping{
 				{
