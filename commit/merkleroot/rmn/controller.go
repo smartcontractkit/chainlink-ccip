@@ -554,11 +554,18 @@ func (c *controller) validateSignedObservationResponse(
 			signedObs.Observation.RmnHomeContractConfigDigest)
 	}
 
+	seenSourceChainSelectors := mapset.NewSet[uint64]()
+
 	for _, signedObsLu := range signedObs.Observation.FixedDestLaneUpdates {
 		updateReq, exists := lurs[signedObsLu.LaneSource.SourceChainSelector]
 		if !exists {
 			return fmt.Errorf("unexpected source chain selector %d", signedObsLu.LaneSource.SourceChainSelector)
 		}
+
+		if seenSourceChainSelectors.Contains(signedObsLu.LaneSource.SourceChainSelector) {
+			return fmt.Errorf("duplicate source chain %d", signedObsLu.LaneSource.SourceChainSelector)
+		}
+		seenSourceChainSelectors.Add(signedObsLu.LaneSource.SourceChainSelector)
 
 		if !updateReq.RmnNodes.Contains(rmnNodeID) {
 			return fmt.Errorf("rmn node %d not expected to read chain %d",

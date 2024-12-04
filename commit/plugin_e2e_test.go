@@ -43,6 +43,7 @@ import (
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -686,7 +687,8 @@ func prepareCcipReaderMock(
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{}, nil).Maybe()
-	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&rmntypes.CurseInfo{}, nil).Maybe()
+	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+		Return(&reader2.CurseInfo{}, nil).Maybe()
 
 	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()

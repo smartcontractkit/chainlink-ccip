@@ -24,6 +24,51 @@ func (_m *MockChainSupport) EXPECT() *MockChainSupport_Expecter {
 	return &MockChainSupport_Expecter{mock: &_m.Mock}
 }
 
+// DestChain provides a mock function with given fields:
+func (_m *MockChainSupport) DestChain() ccipocr3.ChainSelector {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for DestChain")
+	}
+
+	var r0 ccipocr3.ChainSelector
+	if rf, ok := ret.Get(0).(func() ccipocr3.ChainSelector); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(ccipocr3.ChainSelector)
+	}
+
+	return r0
+}
+
+// MockChainSupport_DestChain_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DestChain'
+type MockChainSupport_DestChain_Call struct {
+	*mock.Call
+}
+
+// DestChain is a helper method to define mock.On call
+func (_e *MockChainSupport_Expecter) DestChain() *MockChainSupport_DestChain_Call {
+	return &MockChainSupport_DestChain_Call{Call: _e.mock.On("DestChain")}
+}
+
+func (_c *MockChainSupport_DestChain_Call) Run(run func()) *MockChainSupport_DestChain_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockChainSupport_DestChain_Call) Return(_a0 ccipocr3.ChainSelector) *MockChainSupport_DestChain_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockChainSupport_DestChain_Call) RunAndReturn(run func() ccipocr3.ChainSelector) *MockChainSupport_DestChain_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // KnownSourceChainsSlice provides a mock function with given fields:
 func (_m *MockChainSupport) KnownSourceChainsSlice() ([]ccipocr3.ChainSelector, error) {
 	ret := _m.Called()

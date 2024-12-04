@@ -102,7 +102,7 @@ func NewPlugin(
 			reportingCfg.F,
 			oracleIDToP2pID,
 		),
-		chainSupport: plugincommon.NewCCIPChainSupport(
+		chainSupport: plugincommon.NewChainSupport(
 			lggr,
 			homeChain,
 			oracleIDToP2pID,

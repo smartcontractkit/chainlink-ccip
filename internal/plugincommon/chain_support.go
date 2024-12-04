@@ -19,6 +19,9 @@ import (
 // ChainSupport contains functions that enable an oracle to determine which chains are accessible by itself and
 // other oracles
 type ChainSupport interface {
+	// DestChain returns the destination chain.
+	DestChain() cciptypes.ChainSelector
+
 	// SupportedChains returns the set of chains that the given Oracle is configured to access
 	SupportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error)
 
@@ -29,7 +32,7 @@ type ChainSupport interface {
 	KnownSourceChainsSlice() ([]cciptypes.ChainSelector, error)
 }
 
-type CCIPChainSupport struct {
+type ccipChainSupport struct {
 	lggr            logger.Logger
 	homeChain       reader.HomeChain
 	oracleIDToP2PID map[commontypes.OracleID]libocrtypes.PeerID
@@ -37,14 +40,14 @@ type CCIPChainSupport struct {
 	destChain       cciptypes.ChainSelector
 }
 
-func NewCCIPChainSupport(
+func NewChainSupport(
 	lggr logger.Logger,
 	homeChain reader.HomeChain,
 	oracleIDToP2PID map[commontypes.OracleID]libocrtypes.PeerID,
 	nodeID commontypes.OracleID,
 	destChain cciptypes.ChainSelector,
-) CCIPChainSupport {
-	return CCIPChainSupport{
+) ChainSupport {
+	return ccipChainSupport{
 		lggr:            lggr,
 		homeChain:       homeChain,
 		oracleIDToP2PID: oracleIDToP2PID,
@@ -53,7 +56,11 @@ func NewCCIPChainSupport(
 	}
 }
 
-func (c CCIPChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, error) {
+func (c ccipChainSupport) DestChain() cciptypes.ChainSelector {
+	return c.destChain
+}
+
+func (c ccipChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, error) {
 	allChainsSet, err := c.homeChain.GetKnownCCIPChains()
 	if err != nil {
 		c.lggr.Errorw("error getting known chains", "err", err)
@@ -69,7 +76,7 @@ func (c CCIPChainSupport) KnownSourceChainsSlice() ([]cciptypes.ChainSelector, e
 }
 
 // SupportedChains returns the set of chains that the given Oracle is configured to access
-func (c CCIPChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
+func (c ccipChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {
 	p2pID, exists := c.oracleIDToP2PID[oracleID]
 	if !exists {
 		return nil, fmt.Errorf("oracle ID %d not found in oracleIDToP2PID", c.nodeID)
@@ -84,7 +91,7 @@ func (c CCIPChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset
 }
 
 // SupportsDestChain returns true if the given oracle supports the dest chain, returns false otherwise
-func (c CCIPChainSupport) SupportsDestChain(oracle commontypes.OracleID) (bool, error) {
+func (c ccipChainSupport) SupportsDestChain(oracle commontypes.OracleID) (bool, error) {
 	destChainConfig, err := c.homeChain.GetChainConfig(c.destChain)
 	if err != nil {
 		return false, fmt.Errorf("get chain config: %w", err)
@@ -99,4 +106,4 @@ func (c CCIPChainSupport) SupportsDestChain(oracle commontypes.OracleID) (bool, 
 }
 
 // Interface compliance check
-var _ ChainSupport = (*CCIPChainSupport)(nil)
+var _ ChainSupport = (*ccipChainSupport)(nil)

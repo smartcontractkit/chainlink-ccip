@@ -27,7 +27,7 @@ const (
 func TestCCIPChainSupport_KnownSourceChainsSlice(t *testing.T) {
 	lggr := logger.Test(t)
 	homeChainReader := reader.NewMockHomeChain(t)
-	cs := &CCIPChainSupport{
+	cs := &ccipChainSupport{
 		lggr:      lggr,
 		homeChain: homeChainReader,
 		destChain: dstChain,
@@ -51,7 +51,7 @@ func TestCCIPChainSupport_KnownSourceChainsSlice(t *testing.T) {
 func TestCCIPChainSupport_SupportedChains(t *testing.T) {
 	lggr := logger.Test(t)
 	homeChainReader := reader.NewMockHomeChain(t)
-	cs := &CCIPChainSupport{
+	cs := &ccipChainSupport{
 		lggr:            lggr,
 		homeChain:       homeChainReader,
 		oracleIDToP2PID: map[commontypes.OracleID]types.PeerID{1: [32]byte{1}},
@@ -81,7 +81,7 @@ func TestCCIPChainSupport_SupportedChains(t *testing.T) {
 func TestCCIPChainSupport_SupportsDestChain(t *testing.T) {
 	lggr := logger.Test(t)
 	homeChainReader := reader.NewMockHomeChain(t)
-	cs := &CCIPChainSupport{
+	cs := &ccipChainSupport{
 		lggr:            lggr,
 		homeChain:       homeChainReader,
 		destChain:       dstChain,

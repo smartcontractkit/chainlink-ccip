@@ -31,6 +31,7 @@ import (
 	common_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -184,10 +185,11 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums, nil)
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&rmntypes.CurseInfo{}, nil)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).Return(&reader.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
 			expResult: []plugintypes.SeqNumChain{
@@ -232,11 +234,13 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				// return a smaller slice, should trigger validation condition
 				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums[1:], nil)
-				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything).Return(&rmntypes.CurseInfo{}, nil)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+					Return(&reader.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
 			expResult: nil,

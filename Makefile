@@ -36,7 +36,7 @@ clean-generate: ensure_go_version
 	rm -rf ./commit/merkleroot/rmn/rmnpb/*
 	rm -rf ./mocks/
 
-test: ensure_go_version
+test:
 	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) \
 		`go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks|chainlink-ccip/commit/merkleroot/rmn/rmnpb'`
 

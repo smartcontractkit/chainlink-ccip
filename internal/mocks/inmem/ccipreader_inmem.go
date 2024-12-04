@@ -162,9 +162,10 @@ func (r InMemoryCCIPReader) GetRMNRemoteConfig(
 
 func (r InMemoryCCIPReader) GetRmnCurseInfo(
 	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
-) (*rmntypes.CurseInfo, error) {
-	return &rmntypes.CurseInfo{
+) (*reader.CurseInfo, error) {
+	return &reader.CurseInfo{
 		CursedSourceChains: map[cciptypes.ChainSelector]bool{},
 		CursedDestination:  false,
 		GlobalCurse:        false,

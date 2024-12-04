@@ -152,8 +152,9 @@ type CCIPReader interface {
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
 	GetRmnCurseInfo(
 		ctx context.Context,
+		destChainSelector cciptypes.ChainSelector,
 		sourceChainSelectors []cciptypes.ChainSelector,
-	) (*rmntypes.CurseInfo, error)
+	) (*CurseInfo, error)
 
 	// DiscoverContracts reads from all available contract readers to discover contract addresses.
 	DiscoverContracts(ctx context.Context) (ContractAddresses, error)

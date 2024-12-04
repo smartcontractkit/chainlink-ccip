@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"golang.org/x/exp/maps"
+
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	ccipreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -122,11 +122,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	if err := cursingValidation(ctx, p.ccipReader, decodedReport.MerkleRoots); err != nil {
+	// Check if anything was cursed while building the report
+	if err := p.cursingValidation(ctx, decodedReport.MerkleRoots); err != nil {
 		p.lggr.Errorw("report not accepted due to cursing", "err", err)
 		return false, nil
 	}
 
+	// Build final report
 	var reportInfo ReportInfo
 	if err := reportInfo.Decode(r.Info); err != nil {
 		return false, fmt.Errorf("decode report info: %w", err)
@@ -180,13 +182,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 
 // cursingValidation will make one contract call to get rmn curse info.
 // If destination is cursed or some source chain is cursed it returns error.
-func cursingValidation(
+func (p *Plugin) cursingValidation(
 	ctx context.Context,
-	ccipReader ccipreader.CCIPReader,
 	merkleRoots []cciptypes.MerkleRootChain,
 ) error {
 	// If merkleRoots are empty we still want to transmit chain fee and token prices.
-	// So the report is considered valid.
+	// No error is returned so the report is considered valid.
 	if len(merkleRoots) == 0 {
 		return nil
 	}
@@ -196,21 +197,37 @@ func cursingValidation(
 		sourceChains = append(sourceChains, mr.ChainSel)
 	}
 
-	curseInfo, err := ccipReader.GetRmnCurseInfo(ctx, sourceChains)
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
-		return fmt.Errorf("get rmn curse info sourceChains=%v: %w", sourceChains, err)
+		p.lggr.Errorw(
+			"report not accepted due to curse checking error",
+			"err", err,
+		)
+		return fmt.Errorf("report not accepted due to curse checking error: %w", err)
 	}
-
-	if curseInfo.CursedDestination || curseInfo.GlobalCurse {
-		return fmt.Errorf("destination chain is cursed: %v", curseInfo)
+	if curseInfo.GlobalCurse || curseInfo.CursedDestination {
+		p.lggr.Warnw(
+			"report not accepted due to RMN curse",
+			"err", err,
+			"curseInfo", curseInfo,
+		)
+		return fmt.Errorf("report not accepted due to RMN curse: %w", err)
 	}
-
-	for sourceChain, isCursed := range curseInfo.CursedSourceChains {
-		if isCursed {
-			return fmt.Errorf("source chain %d is cursed", sourceChain)
+	filtered := curseInfo.NonCursedSourceChains(sourceChains)
+	if len(filtered) != len(sourceChains) {
+		var cursedSources []cciptypes.ChainSelector
+		for cs, isCursed := range curseInfo.CursedSourceChains {
+			if isCursed {
+				cursedSources = append(cursedSources, cs)
+			}
 		}
-	}
 
+		p.lggr.Errorw("report not accepted due to cursing, source chains were cursed during report generation",
+			"cursedSourceChains", cursedSources,
+		)
+		return fmt.Errorf(
+			"report not accepted due to cursing, source chains were cursed during report generation")
+	}
 	return nil
 }
 
