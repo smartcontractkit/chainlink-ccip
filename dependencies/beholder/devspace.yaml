@@ -84,6 +84,8 @@ deployments:
         metadata:
           name: beholder-load-tester
         spec:
+          completions: 6  # Total number of pods to complete
+          parallelism: 6  # Number of pods to run simultaneously
           template:
             metadata:
               labels:
@@ -91,7 +93,7 @@ deployments:
             spec:
               containers:
                 - name: beholder-load-tester
-                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:d5e76e1a2e58e2316356da02af34b0dbd7ca5222
+                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:dad4b9407cccfd0580e98f94f1e7f352808ff173
                   imagePullPolicy: Always
                   env:
                     - name: OTEL_COLLECTOR_GRPC_ENDPOINT
@@ -104,6 +106,20 @@ deployments:
                       value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
                     - name: OTEL_EMITTER_EXPORT_TIMEOUT 
                       value: "${OTEL_EMITTER_EXPORT_TIMEOUT}"
+                    - name: OTEL_EMITTER_EXPORT_INTERVAL
+                      value: "${OTEL_EMITTER_EXPORT_INTERVAL}"
+                    - name: OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE  
+                      value: "${OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE}"
+                    - name: OTEL_EMITTER_MAX_QUEUE_SIZE
+                      value: "${OTEL_EMITTER_MAX_QUEUE_SIZE}"
+                    - name: OTEL_LOG_EXPORT_TIMEOUT
+                      value: "${OTEL_LOG_EXPORT_TIMEOUT}"
+                    - name: OTEL_LOG_EXPORT_INTERVAL 
+                      value: "${OTE_LOG_EXPORT_INTERVAL}"
+                    - name: OTEL_LOG_EXPORT_MAX_BATCH_SIZE
+                      value: "${OTEL_LOG_EXPORT_MAX_BATCH_SIZE}"
+                    - name: OTEL_LOG_MAX_QUEUE_SIZE
+                      value: "${OTEL-LOG_MAX_QUEUE_SIZE}"
                     - name: METRICS_ENABLED
                       value: "${METRICS_ENABLED}"
                     - name: METRICS_NUMBER
@@ -145,16 +161,15 @@ deployments:
                     runAsGroup: 65534
                   resources:
                     requests:
-                      memory: "256Mi"
-                      cpu: "5000m"
+                      memory: "2048Mi"
+                      cpu: "1500m"
                     limits:
-                      memory: "256Mi"
-                      cpu: "5000m"
+                      memory: "2048Mi"
+                      cpu: "1500m"
               restartPolicy: OnFailure
               securityContext:
                 fsGroup: 65534
           backoffLimit: 4  # Number of retries before considering the job as failed
-
 
   beholder-otel-collector-agent:
     updateImageTags: false
@@ -444,6 +459,20 @@ profiles:
             default: "1.0"
           OTEL_EMITTER_EXPORT_TIMEOUT:
             default: "5s"
+          OTEL_EMITTER_EXPORT_INTERVAL:
+            default: "1s"
+          OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE:
+            default: "512"
+          OTEL_EMITTER_MAX_QUEUE_SIZE:
+            default: "2048"
+          OTEL_LOG_EXPORT_TIMEOUT:
+            default: "30s"
+          OTEL_LOG_EXPORT_INTERVAL:
+            default: "1s"
+          OTEL_LOG_EXPORT_MAX_BATCH_SIZE:
+            default: "512"
+          OTEL_LOG_MAX_QUEUE_SIZE:
+            default: "2048"
           METRICS_ENABLED:
             default: "true"
           METRICS_NUMBER:
