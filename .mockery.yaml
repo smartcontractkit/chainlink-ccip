@@ -35,7 +35,7 @@ packages:
             ExecutePluginCodec:
     github.com/smartcontractkit/chainlink-common/pkg/types:
             interfaces:
-                ChainWriter:
+                ContractWriter:
                     config:
                         dir: mocks/chainlink_common/
     github.com/smartcontractkit/libocr/networking:
