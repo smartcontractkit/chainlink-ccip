@@ -460,7 +460,10 @@ func TestExtractHostFromUrl(t *testing.T) {
 func TestRefreshRegistriesECRCredentials(t *testing.T) {
 	t.Parallel()
 
-	mockDockerRegistryHost := "https://012345678910.dkr.ecr.us-east-1.amazonaws.com"
+	mockDockerRegistryHost := "012345678910.dkr.ecr.us-east-1.amazonaws.com"
+	mockDockerRegistries := map[string]string{
+		"mocked-env": mockDockerRegistryHost,
+	}
 	mockHelmRegistryHost := "oci://chainlink-helm-registry.com"
 	ecrAuthToken := base64.StdEncoding.EncodeToString([]byte("user:password"))
 
@@ -658,7 +661,7 @@ func TestRefreshRegistriesECRCredentials(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tc.wantOutput, utils.RefreshRegistriesECRCredentials(tc.mockEcrClient, tc.mockDockerCli, tc.mockHelmRegistryClient, tc.chainlinkHelmRegistryUri))
+			assert.Equal(t, tc.wantOutput, utils.RefreshRegistriesECRCredentials(tc.mockEcrClient, tc.mockDockerCli, tc.mockHelmRegistryClient, tc.chainlinkHelmRegistryUri, mockDockerRegistries))
 		})
 	}
 }

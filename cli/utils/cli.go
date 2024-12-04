@@ -196,7 +196,9 @@ func ExtractHostFromUrl(input string) (string, error) {
 	return parsedUrl.Host, nil
 }
 
-func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappers.DockerCLI, helmRegistryClient wrappers.HelmRegistryAPI, chainlinkHelmRegistryUri string) *RefreshRegistriesECRCredentialsOutput {
+func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappers.DockerCLI,
+	helmRegistryClient wrappers.HelmRegistryAPI, chainlinkHelmRegistryUri string, chainlinkDockerRegistriesMap map[string]string,
+) *RefreshRegistriesECRCredentialsOutput {
 	registryLoginAttempts := []RegistryLoginAttempt{}
 	output := &RefreshRegistriesECRCredentialsOutput{
 		RegistryLoginAttempts:         &registryLoginAttempts,
@@ -222,17 +224,19 @@ func RefreshRegistriesECRCredentials(ecrClient wrappers.ECRAPI, dockerCli wrappe
 	}
 
 	if dockerCli != nil {
-		dockerRegistryLoginAttempt := RegistryLoginAttempt{RegistryType: "docker"}
-		dockerRegistryHost, err := ExtractHostFromUrl(ecrAuthToken[0].RegistryURL)
-		if err == nil {
-			dockerRegistryLoginAttempt.RegistryHost = dockerRegistryHost
-			if _, loginErr := dockerCli.Login(ecrAuthToken[0].Username, ecrAuthToken[0].Password, dockerRegistryHost); loginErr != nil {
-				dockerRegistryLoginAttempt.LoginErr = loginErr
+		for env, dockerRegistryHost := range chainlinkDockerRegistriesMap {
+			dockerRegistryLoginAttempt := RegistryLoginAttempt{RegistryType: "docker"}
+			slog.Info("login to docker registry", "env", env)
+			if err == nil {
+				dockerRegistryLoginAttempt.RegistryHost = dockerRegistryHost
+				if _, loginErr := dockerCli.Login(ecrAuthToken[0].Username, ecrAuthToken[0].Password, dockerRegistryHost); loginErr != nil {
+					dockerRegistryLoginAttempt.LoginErr = loginErr
+				}
+			} else {
+				dockerRegistryLoginAttempt.LoginErr = err
 			}
-		} else {
-			dockerRegistryLoginAttempt.LoginErr = err
+			registryLoginAttempts = append(registryLoginAttempts, dockerRegistryLoginAttempt)
 		}
-		registryLoginAttempts = append(registryLoginAttempts, dockerRegistryLoginAttempt)
 	}
 
 	if helmRegistryClient != nil {
@@ -261,6 +265,21 @@ func IsValidCribNamespace(namespace string, provider string, skipPrefixCheck boo
 		return fmt.Errorf("DEVSPACE_NAMESPACE must begin with 'crib-' prefix")
 	}
 	return nil
+}
+
+func GetChainlinkDockerRegistries(provider string) map[string]string {
+	if provider == "kind" {
+		// In kind, we need to login to all 3 registries, so pods can pull images via image pull secrets
+		return map[string]string{
+			"sdlc":  "795953128386.dkr.ecr.us-west-2.amazonaws.com",
+			"stage": "323150190480.dkr.ecr.us-west-2.amazonaws.com",
+			"prod":  "804282218731.dkr.ecr.us-west-2.amazonaws.com",
+		}
+	}
+	// If we're deploying to remote EKS we just need to login to stage, so we can push dev images
+	return map[string]string{
+		"stage": "323150190480.dkr.ecr.us-west-2.amazonaws.com",
+	}
 }
 
 func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, rolebindingClient dynamic.ResourceInterface, namespace string, provider string, waitTimeout *time.Duration, sleepBetweenAttempts *time.Duration) error {

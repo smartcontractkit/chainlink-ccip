@@ -121,7 +121,8 @@ var refreshEcrCredentialsCmd = &cobra.Command{
 		}
 
 		ecrClient := wrappers.NewECRClientWrapper(awsSdkConfig)
-		refreshRegistriesOutput := utils.RefreshRegistriesECRCredentials(ecrClient, dockerCli, helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI"))
+		dockerRegistries := utils.GetChainlinkDockerRegistries(viper.GetString("PROVIDER"))
+		refreshRegistriesOutput := utils.RefreshRegistriesECRCredentials(ecrClient, dockerCli, helmRegistryClient, viper.GetString("CHAINLINK_HELM_REGISTRY_URI"), dockerRegistries)
 		if refreshRegistriesOutput.ECRGetAuthorizationTokenError != nil {
 			logger.Error("failed to refresh ECR credentials", slog.Any("error", refreshRegistriesOutput.ECRGetAuthorizationTokenError))
 			os.Exit(1)
