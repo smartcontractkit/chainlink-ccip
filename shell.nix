@@ -1,7 +1,7 @@
 { pkgs, keystone ? false }:
 with pkgs;
 let
-  go = go_1_22;
+  go = go_1_23;
   nodejs = nodejs-18_x;
   nodePackages = pkgs.nodePackages.override { inherit nodejs; };
 
@@ -76,6 +76,7 @@ mkShell' {
 
     # Find the root of the git repository
     repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
+    export GOBIN=$(go env GOPATH)/bin
     export PATH=$PATH:$repo_root/scripts:$GOBIN
 
     ${lib.optionalString (!keystone) ''
