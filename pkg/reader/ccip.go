@@ -698,22 +698,35 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	}
 
 	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
-	cursedSubjectsSet := mapset.NewSet(cursedSubjects.CursedSubjects...)
 
+	return getCurseInfoFromCursedSubjects(
+		r.lggr,
+		mapset.NewSet(cursedSubjects.CursedSubjects...),
+		destChainSelector,
+		sourceChainSelectors,
+	), nil
+}
+
+func getCurseInfoFromCursedSubjects(
+	lggr logger.Logger,
+	cursedSubjectsSet mapset.Set[[16]byte],
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) *CurseInfo {
 	curseInfo := &CurseInfo{
 		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
-		CursedDestination: cursedSubjectsSet.Contains(LegacyCurseSubject) ||
-			cursedSubjectsSet.Contains(GlobalCurseSubject),
+		CursedDestination: cursedSubjectsSet.Contains(GlobalCurseSubject) ||
+			cursedSubjectsSet.Contains(chainSelectorToBytes16(destChainSelector)),
 		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
 	}
 
 	for _, ch := range sourceChainSelectors {
 		chainSelB16 := chainSelectorToBytes16(ch)
-		r.lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
+		lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
 		curseInfo.CursedSourceChains[ch] = cursedSubjectsSet.Contains(chainSelB16)
 	}
 
-	return curseInfo, nil
+	return curseInfo
 }
 
 func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
