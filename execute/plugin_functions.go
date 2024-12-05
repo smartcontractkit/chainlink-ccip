@@ -204,9 +204,10 @@ func filterOutExecutedMessages(
 
 // truncateObservation truncates the observation to fit within the given maxSize after encoding.
 // It removes data from the observation in the following order:
-// 1. Remove complete source chains if we have more than one.
-// 2. Remove the last commit from the remaining source chain one by one until it fits
-// or returns the last report standing even if it's too large.
+// For each chain, remove commit reports one by one, if the encoded observation is still too large,
+// remove the entire chain.
+// Keep repeating this process until the encoded observation fits within the maxSize or there's only
+// one chain with one report left
 // Note: This function doesn't split one report into multiple parts.
 func truncateObservation(
 	observation *exectypes.Observation,
@@ -224,26 +225,19 @@ func truncateObservation(
 
 	// If the encoded observation is too large, start filtering data.
 	for len(encodedObs) > maxSize {
-		// First, remove complete source chains if we have more than one.
-		if len(observation.CommitReports) > 1 {
-			// Remove the first chain found.
-			for _, chain := range chains {
-				truncateChain(chain, observation)
-				chains = maps.Keys(observation.CommitReports)
-				break
-			}
-		} else {
-			// If only one source chain remains, start removing commits one by one.
-			for chain, commits := range observation.CommitReports {
-				if len(commits) == 1 {
-					return
-				}
-
+		for _, chain := range chains {
+			if len(observation.CommitReports[chain]) > 1 {
 				truncateLastCommit(chain, observation)
-				break // only remove one commit at a time to check the new encoded size
+			} else {
+				truncateChain(chain, observation)
 			}
+			chains = maps.Keys(observation.CommitReports)
+			break
 		}
-
+		// If there's only one chain with one report left, stop.
+		if len(observation.CommitReports) == 1 && len(observation.CommitReports[chains[0]]) == 1 {
+			break
+		}
 		encodedObs, err = observation.Encode()
 		if err != nil {
 			return

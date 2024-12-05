@@ -1,13 +1,9 @@
 package execute
 
 import (
-	"fmt"
-	"reflect"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
-	"unsafe"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
@@ -198,39 +194,4 @@ func TestExceedSizeObservation(t *testing.T) {
 	require.Len(t, outcome.Report.ChainReports, 1)
 	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.Len(t, sequenceNumbers, maxMsgsPerReport)
-}
-
-// Output from this function
-// RampMessageHeader size 112
-// Message size 224
-// Observation size 64
-func TestSize(t *testing.T) {
-	sz := SizeOfType(reflect.TypeOf(cciptypes.RampMessageHeader{}))
-	fmt.Printf("RampMessageHeader size %d\n", sz)
-
-	sz = SizeOfType(reflect.TypeOf(cciptypes.Message{}))
-	fmt.Printf("Message size %d\n", sz)
-
-	sz = SizeOfType(reflect.TypeOf(exectypes.Observation{}))
-	fmt.Printf("Observation size %d\n", sz)
-}
-
-// SizeOfType calculates the size in bytes of a given type using reflection.
-func SizeOfType(t reflect.Type) uintptr {
-	switch t.Kind() {
-	case reflect.Array:
-		return uintptr(t.Len()) * SizeOfType(t.Elem())
-	case reflect.Slice, reflect.String:
-		return unsafe.Sizeof(uintptr(0)) + unsafe.Sizeof(uintptr(0))
-	case reflect.Struct:
-		var size uintptr
-		for i := 0; i < t.NumField(); i++ {
-			size += SizeOfType(t.Field(i).Type)
-		}
-		return size
-	case reflect.Ptr, reflect.Uintptr:
-		return unsafe.Sizeof(uintptr(0))
-	default:
-		return t.Size()
-	}
 }
