@@ -177,12 +177,9 @@ func filterOutExecutedMessages(
 	for _, executed := range executedMessages {
 		for i := reportIdx; i < len(reports); i++ {
 			reportRange := reports[i].SequenceNumberRange
-
 			if executed.End() < reportRange.Start() {
-				// add report that has non-executed messages.
-				reportIdx++
-				filtered = append(filtered, reports[i])
-				continue
+				// need to go to the next set of executed messages.
+				break
 			}
 
 			if reportRange.Start() >= executed.Start() && reportRange.End() <= executed.End() {
