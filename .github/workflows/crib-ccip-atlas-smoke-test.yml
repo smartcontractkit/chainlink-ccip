@@ -61,6 +61,7 @@ jobs:
       id-token: write
       contents: read
       actions: read
+      pull-requests: read
     steps:
       - name: Prevent running on draft PRs
         id: check-prereqs-for-running
@@ -81,7 +82,7 @@ jobs:
       - name: Deploy and validate CRIB Environment for CCIP
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@cce4937a43fb6f769332183e7b3125c5a9687321 # crib-deploy-environment@6.4.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@8c539469e7b527217aa1d46f8b8126391352c676 # crib-deploy-environment@7.0.0
         with:
           aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}

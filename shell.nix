@@ -84,11 +84,11 @@ mkShell' {
       # Install changesets (no nix package available at the moment)
       pnpm install
 
-      if [ "$CRIB_CI_ENV" = "true" ]; then
-        # in CI, download the CLI from the corresponding GH release
+      if [ "$CRIB_CI_ENV" = "true" ] && [ "$CLI_CHANGED" != "true" ]; then
+        # in CI, download the CLI from the corresponding GH release if the CLI hasn't changed
         task fetch-cli
       else
-        # in local, build the CLI from source
+        # when CLI has changed or when running in local, build the CLI from source
         task build
       fi
 
