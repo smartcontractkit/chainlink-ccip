@@ -74,7 +74,7 @@ pipelines:
         echo "You need to provide an explicit image tag via the DEVSPACE_IMAGE_TAG variable."
         exit 1
       else
-        build_images --all
+        GOBIN= build_images --all
         create_deployments app
       fi
 
