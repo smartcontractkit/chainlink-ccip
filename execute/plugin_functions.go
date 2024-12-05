@@ -3,6 +3,7 @@ package execute
 import (
 	"errors"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"sort"
 	"time"
 
@@ -214,54 +215,58 @@ func filterOutExecutedMessages(
 	return filtered, nil
 }
 
-func truncateCommitObservations(
-	observation exectypes.Observation,
+// truncateObservation truncates the observation to fit within the given maxSize after encoding.
+// It removes data from the observation in the following order:
+// 1. Remove complete source chains if we have more than one.
+// 2. Remove the last commit from the remaining source chain one by one until it fits
+// or returns the last report standing even if it's too large.
+// Note: This function doesn't split one report into multiple parts.
+func truncateObservation(
+	observation *exectypes.Observation,
 	maxSize int,
-) (exectypes.CommitObservations, error) {
-	truncatedCommits := observation.CommitReports
+) {
 
 	encodedObs, err := observation.Encode()
 	if err != nil {
-		return exectypes.CommitObservations{}, fmt.Errorf("unable to encode observation: %w", err)
+		return
 	}
+
+	chains := maps.Keys(observation.CommitReports)
+	sort.Slice(chains, func(i, j int) bool {
+		return chains[i] < chains[j]
+	})
 
 	// If the encoded observation is too large, start filtering data.
 	for len(encodedObs) > maxSize {
 		// First, remove complete source chains if we have more than one.
-		// It's intentional that we don't check for largest chain and have them removed randomly so that we don't
-		// always remove the same chain across different rounds.
-		if len(truncatedCommits) > 1 {
+		if len(observation.CommitReports) > 1 {
 			// Remove the first chain found.
-			for chain := range truncatedCommits {
-				truncateChain(chain, &observation)
+			for _, chain := range chains {
+				truncateChain(chain, observation)
+				chains = maps.Keys(observation.CommitReports)
 				break
 			}
 		} else {
 			// If only one source chain remains, start removing commits one by one.
-			for chain, commits := range truncatedCommits {
+			for chain, commits := range observation.CommitReports {
 				if len(commits) > 1 {
-					// Remove the last commit from the list.
-					truncatedCommits[chain] = commits[:len(commits)-1]
+					truncateLastCommit(chain, observation)
 				} else {
-					// If there's only one commit left, we can't remove more.
-					// Note: this is not a desired state, but we shouldn't error out here.
-					return truncatedCommits, nil
+					return // only one commit left, can't truncate further
 				}
 				break // only remove one commit at a time to check the new encoded size
 			}
 		}
 
-		// Re-encode the observation to check the new size.
-		observation.CommitReports = truncatedCommits
 		encodedObs, err = observation.Encode()
 		if err != nil {
-			return exectypes.CommitObservations{}, fmt.Errorf("unable to encode observation: %w", err)
+			return
 		}
 	}
-
-	return truncatedCommits, nil
 }
 
+// truncateLastCommit removes the last commit from the observation.
+// errors if there are no commits to truncate.
 func truncateLastCommit(
 	chain cciptypes.ChainSelector,
 	observation *exectypes.Observation,
@@ -294,6 +299,7 @@ func truncateLastCommit(
 }
 
 // truncateChain removes all data related to the given chain from the observation.
+// errors if the chain is not present in the observation.
 func truncateChain(
 	chain cciptypes.ChainSelector,
 	observation *exectypes.Observation,

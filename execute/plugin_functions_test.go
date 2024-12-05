@@ -1493,3 +1493,80 @@ func Test_truncateChain(t *testing.T) {
 		})
 	}
 }
+
+func Test_truncateObservation(t *testing.T) {
+	tests := []struct {
+		name        string
+		observation exectypes.Observation
+		maxSize     int
+		expected    exectypes.Observation
+	}{
+		{
+			name: "no truncation needed",
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+			},
+			maxSize: 1000,
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+			},
+		},
+		{
+			name: "truncate last commit",
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
+					},
+				},
+			},
+			maxSize: 50,
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+			},
+		},
+		{
+			name: "truncate entire chain",
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+					2: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
+					},
+				},
+			},
+			maxSize: 50,
+			// Notice that truncate chains still returns one report although one chain report is more than the max size
+			// This is because truncate function doesn't split one report into multiple reports.
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					2: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			truncateObservation(&tt.observation, tt.maxSize)
+			assert.Equal(t, tt.expected, tt.observation)
+		})
+	}
+}
