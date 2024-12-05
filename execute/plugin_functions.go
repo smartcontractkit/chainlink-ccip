@@ -225,7 +225,6 @@ func truncateObservation(
 	observation *exectypes.Observation,
 	maxSize int,
 ) {
-
 	encodedObs, err := observation.Encode()
 	if err != nil {
 		return
@@ -270,10 +269,10 @@ func truncateObservation(
 func truncateLastCommit(
 	chain cciptypes.ChainSelector,
 	observation *exectypes.Observation,
-) error {
+) bool {
 	commits := observation.CommitReports[chain]
 	if len(commits) == 0 {
-		return fmt.Errorf("no commits to truncate")
+		return false
 	}
 	lastCommit := commits[len(commits)-1]
 	// Remove the last commit from the list.
@@ -295,17 +294,17 @@ func truncateLastCommit(
 		}
 	}
 
-	return nil
+	return true
 }
 
 // truncateChain removes all data related to the given chain from the observation.
-// errors if the chain is not present in the observation.
+// returns true if the chain was found and truncated, false otherwise.
 func truncateChain(
 	chain cciptypes.ChainSelector,
 	observation *exectypes.Observation,
-) error {
+) bool {
 	if _, ok := observation.CommitReports[chain]; !ok {
-		return fmt.Errorf("no commits to truncate for chain %d", chain)
+		return false
 	}
 	//var messageIDs []cciptypes.Bytes32
 	messageIDs := make(map[cciptypes.Bytes32]struct{})
@@ -330,7 +329,7 @@ func truncateChain(
 	delete(observation.Nonces, chain)
 	deleteCostlyMessages()
 
-	return nil
+	return true
 }
 
 func decodeAttributedObservations(

@@ -2,7 +2,6 @@ package exectypes
 
 import (
 	"encoding/json"
-
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -85,17 +84,6 @@ func NewObservation(
 // Encode the Observation into a byte slice.
 func (obs Observation) Encode() ([]byte, error) {
 	return json.Marshal(obs)
-}
-
-func (obs Observation) Truncate(maxSize int) (Observation, error) {
-	encodedObs, err := obs.Encode()
-	if err != nil {
-		return Observation{}, err
-	}
-	if len(encodedObs) >= maxSize {
-		return Observation{}, nil
-	}
-	return obs, nil
 }
 
 // DecodeObservation from a byte slice into an Observation.

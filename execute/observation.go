@@ -209,11 +209,7 @@ func (p *Plugin) getMessagesObservation(
 		"size", len(encodedObs),
 	)
 	if len(encodedObs) >= maxObservationLength {
-		//truncatedObs, err := truncateCommitObservations(observation, maxObservationLength)
-		return exectypes.Observation{}, fmt.Errorf(
-			"observation size exceeds maximum size, current size: %d",
-			len(encodedObs),
-		)
+		truncateObservation(&observation, maxObservationLength)
 	}
 
 	return observation, nil

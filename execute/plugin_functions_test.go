@@ -1326,7 +1326,7 @@ func Test_truncateLastCommit(t *testing.T) {
 		chain       cciptypes.ChainSelector
 		observation exectypes.Observation
 		expected    exectypes.Observation
-		wantErr     bool
+		success     bool
 	}{
 		{
 			name:  "no commits to truncate",
@@ -1341,7 +1341,7 @@ func Test_truncateLastCommit(t *testing.T) {
 					1: {},
 				},
 			},
-			wantErr: true,
+			success: false,
 		},
 		{
 			name:  "truncate last commit",
@@ -1385,18 +1385,14 @@ func Test_truncateLastCommit(t *testing.T) {
 				},
 				CostlyMessages: []cciptypes.Bytes32{},
 			},
-			wantErr: false,
+			success: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := truncateLastCommit(tt.chain, &tt.observation)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+			truncated := truncateLastCommit(tt.chain, &tt.observation)
+			require.Equal(t, tt.success, truncated)
 			require.Equal(t, tt.expected, tt.observation)
 		})
 	}
@@ -1408,7 +1404,7 @@ func Test_truncateChain(t *testing.T) {
 		chain       cciptypes.ChainSelector
 		observation exectypes.Observation
 		expected    exectypes.Observation
-		wantErr     bool
+		success     bool
 	}{
 		{
 			name:  "truncate chain data",
@@ -1437,9 +1433,10 @@ func Test_truncateChain(t *testing.T) {
 				TokenData:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{},
 				CostlyMessages: []cciptypes.Bytes32{},
 			},
+			success: true,
 		},
 		{
-			name:  "truncate chain data",
+			name:  "truncate non existent chain",
 			chain: 2, // non existent chain
 			observation: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
@@ -1477,18 +1474,14 @@ func Test_truncateChain(t *testing.T) {
 				},
 				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
-			wantErr: true,
+			success: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := truncateChain(tt.chain, &tt.observation)
-			if tt.wantErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
+			truncated := truncateChain(tt.chain, &tt.observation)
+			require.Equal(t, tt.success, truncated)
 			require.Equal(t, tt.expected, tt.observation)
 		})
 	}
