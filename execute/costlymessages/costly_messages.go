@@ -93,6 +93,7 @@ func (o *observer) Observe(
 	messages []cciptypes.Message,
 	messageTimestamps map[cciptypes.Bytes32]time.Time,
 ) ([]cciptypes.Bytes32, error) {
+	o.lggr.Infof("Observing messages")
 	if !o.enabled {
 		o.lggr.Infof("Observer is disabled")
 		return nil, nil
@@ -123,7 +124,7 @@ func (o *observer) Observe(
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
 		} else {
-			o.lggr.Debugw("Message is not too costly to execute", "messageID",
+			o.lggr.Warnw("Message is not too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 		}
 	}
@@ -315,14 +316,14 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 		} else {
 			now := c.now()
 			sub := now.Sub(timestamp)
-			c.lggr.Debugw("Message fee calculation", "feeUSD18", feeUSD18, "timestamp", timestamp, "now", now, "sub", sub)
+			c.lggr.Warnw("Message fee calculation", "feeUSD18", feeUSD18, "timestamp", timestamp, "now", now, "sub", sub)
 
 			k := 1.0 + sub.Hours()*c.relativeBoostPerWaitHour
-			c.lggr.Debugw("Message fee calculation", "k", k)
+			c.lggr.Warnw("Message fee calculation", "k", k)
 			boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(feeUSD18))
-			c.lggr.Debugw("Message fee calculation", "boostedFee", boostedFee)
+			c.lggr.Warnw("Message fee calculation", "boostedFee", boostedFee)
 			res, _ := boostedFee.Int(nil)
-			c.lggr.Debugw("Message fee calculation", "boostedFee", res)
+			c.lggr.Warnw("Message fee calculation", "boostedFee", res)
 
 			feeUSD18 = waitBoostedFee(sub, feeUSD18, c.relativeBoostPerWaitHour)
 		}
@@ -413,7 +414,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	executionFee := mathslib.CalculateUsdPerUnitGas(feeComponents.ExecutionFee, nativeTokenPrice.Int)
 	dataAvailabilityFee := mathslib.CalculateUsdPerUnitGas(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
-	c.lggr.Debugw("Fee calculation", "nativeTokenPrice", nativeTokenPrice,
+	c.lggr.Warnw("Fee calculation", "nativeTokenPrice", nativeTokenPrice,
 		"feeComponents.ExecutionFee", feeComponents.ExecutionFee,
 		"feeComponents.DataAvailabilityFee", feeComponents.DataAvailabilityFee,
 		"executionFee", executionFee,
