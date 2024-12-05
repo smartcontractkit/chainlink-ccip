@@ -1,5 +1,16 @@
 # @chainlink/crib
 
+## 1.0.0
+
+### Major Changes
+
+- [#253](https://github.com/smartcontractkit/crib/pull/253) [`f20e1db`](https://github.com/smartcontractkit/crib/commit/f20e1db369005617d92c583b61a49843e9a3b337) Thanks [@scheibinger](https://github.com/scheibinger)! - Deleted `go.work` to facilitate more flexible go module development within CRIB mono repo
+  This is backward incompatible change.
+
+### Patch Changes
+
+- [#309](https://github.com/smartcontractkit/crib/pull/309) [`27397d9`](https://github.com/smartcontractkit/crib/commit/27397d99996399bdb3a7f4d28aba0f83ecdb6bd5) Thanks [@scheibinger](https://github.com/scheibinger)! - Fix CRIB nix config to use GOBIN from the go env provided by nix environment
+
 ## 0.2.1
 
 ### Patch Changes
