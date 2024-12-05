@@ -1413,6 +1413,7 @@ func Test_truncateChain(t *testing.T) {
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
 					},
 				},
 				Messages: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{

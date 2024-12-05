@@ -210,6 +210,13 @@ func (p *Plugin) getMessagesObservation(
 	)
 	if len(encodedObs) >= maxObservationLength {
 		truncateObservation(&observation, maxObservationLength)
+		encodedObs2, err2 := observation.Encode()
+		if err2 != nil {
+			return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err2)
+		}
+		p.lggr.Infow("encoded observation after truncation",
+			"size", len(encodedObs2),
+		)
 	}
 
 	return observation, nil

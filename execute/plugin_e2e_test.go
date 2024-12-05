@@ -144,15 +144,16 @@ func TestExceedSizeObservation(t *testing.T) {
 	srcSelector := cciptypes.ChainSelector(1)
 	dstSelector := cciptypes.ChainSelector(2)
 
-	// 1 msg * 1 byte -> 879  | 2 msg * 1 byte -> 1311 | 3 msg * 1 byte -> 1743
-	// 3 msg * 2 bytes -> 882 | 3 msg * 2 byte -> 1319 | 3 msg * 2 byte -> 1755
-	// 10 -> 897
-	// 50 -> 977
-	// 100 -> 1077
-	// 1000 -> 2877
+	// 1 msg * 1 byte    -> 879  | 2 msg * 1 byte -> 1311 | 3 msg * 1 byte -> 1743
+	// 3 msg * 2 bytes   -> 882  | 3 msg * 2 byte -> 1319 | 3 msg * 2 byte -> 1755
+	// 10 msg * 1 byte   -> 897
+	// 100 msg * 1 byte  -> 1077
+	// 1000 msg * 1 byte -> 2877
 	msgDataSize := 1000
 	// TODO: More deterministic way to reduce any future flaky tests?
-	maxMessages := 432 // Currently 431 is the max with msgDataSize = 1000
+	maxMsgsPerReport := 431
+	nReports := 2
+	maxMessages := maxMsgsPerReport * nReports // Currently 431 message per report is the max with msgDataSize = 1000
 	startSeqNr := cciptypes.SeqNum(100)
 
 	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
@@ -169,7 +170,7 @@ func TestExceedSizeObservation(t *testing.T) {
 	}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 2)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -178,25 +179,25 @@ func TestExceedSizeObservation(t *testing.T) {
 	require.Equal(t, exectypes.Initialized, outcome.State)
 
 	// Round 1 - Get Commit Reports
-	// One pending commit report only.
-	// Two of the messages are executed which should be indicated in the Outcome.
+	// Two pending commit reports.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
-	//require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
+	require.Len(t, outcome.PendingCommitReports, nReports)
 
 	// Round 2 - Get Messages
-	// Messages now attached to the pending commit.
+	// Still 2 pending reports from previous round.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.PendingCommitReports, nReports)
+	require.Len(t, outcome.PendingCommitReports[0].Messages, maxMsgsPerReport)
+	require.Len(t, outcome.PendingCommitReports[1].Messages, 0)
 
 	// Round 3 - Filter
-	// An execute report with the following messages executed: 102, 103, 104, 105.
+	// An execute report with the messages executed until the max per report
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 1)
-	//sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	//require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, sequenceNumbers, maxMsgsPerReport)
 }
 
 // Output from this function
