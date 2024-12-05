@@ -1319,3 +1319,177 @@ func Test_getMessageTimestampMap(t *testing.T) {
 		})
 	}
 }
+
+func Test_truncateLastCommit(t *testing.T) {
+	tests := []struct {
+		name        string
+		chain       cciptypes.ChainSelector
+		observation exectypes.Observation
+		expected    exectypes.Observation
+		wantErr     bool
+	}{
+		{
+			name:  "no commits to truncate",
+			chain: 1,
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {},
+				},
+			},
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name:  "truncate last commit",
+			chain: 1,
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
+					},
+				},
+				Messages: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
+					1: {
+						1:  {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+						11: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x02}}},
+					},
+				},
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					1: {
+						1:  exectypes.NewMessageTokenData(),
+						11: exectypes.NewMessageTokenData(),
+					},
+				},
+				CostlyMessages: []cciptypes.Bytes32{{0x02}},
+			},
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+				Messages: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
+					1: {
+						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+					},
+				},
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					1: {
+						1: exectypes.NewMessageTokenData(),
+					},
+				},
+				CostlyMessages: []cciptypes.Bytes32{},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := truncateLastCommit(tt.chain, &tt.observation)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.expected, tt.observation)
+		})
+	}
+}
+
+func Test_truncateChain(t *testing.T) {
+	tests := []struct {
+		name        string
+		chain       cciptypes.ChainSelector
+		observation exectypes.Observation
+		expected    exectypes.Observation
+		wantErr     bool
+	}{
+		{
+			name:  "truncate chain data",
+			chain: 1,
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+				Messages: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
+					1: {
+						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+					},
+				},
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					1: {
+						1: exectypes.NewMessageTokenData(),
+					},
+				},
+				CostlyMessages: []cciptypes.Bytes32{{0x01}},
+			},
+			expected: exectypes.Observation{
+				CommitReports:  map[cciptypes.ChainSelector][]exectypes.CommitData{},
+				Messages:       map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{},
+				TokenData:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{},
+				CostlyMessages: []cciptypes.Bytes32{},
+			},
+		},
+		{
+			name:  "truncate chain data",
+			chain: 2, // non existent chain
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+				Messages: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
+					1: {
+						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+					},
+				},
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					1: {
+						1: exectypes.NewMessageTokenData(),
+					},
+				},
+				CostlyMessages: []cciptypes.Bytes32{{0x01}},
+			},
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+				},
+				Messages: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{
+					1: {
+						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
+					},
+				},
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					1: {
+						1: exectypes.NewMessageTokenData(),
+					},
+				},
+				CostlyMessages: []cciptypes.Bytes32{{0x01}},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := truncateChain(tt.chain, &tt.observation)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.expected, tt.observation)
+		})
+	}
+}

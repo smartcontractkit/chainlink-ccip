@@ -176,10 +176,6 @@ func filterOutExecutedMessages(
 	for _, executed := range executedMessages {
 		for i := reportIdx; i < len(reports); i++ {
 			reportRange := reports[i].SequenceNumberRange
-			if executed.End() < reportRange.Start() {
-				// need to go to the next set of executed messages.
-				break
-			}
 
 			if executed.End() < reportRange.Start() {
 				// add report that has non-executed messages.
@@ -216,6 +212,119 @@ func filterOutExecutedMessages(
 	}
 
 	return filtered, nil
+}
+
+func truncateCommitObservations(
+	observation exectypes.Observation,
+	maxSize int,
+) (exectypes.CommitObservations, error) {
+	truncatedCommits := observation.CommitReports
+
+	encodedObs, err := observation.Encode()
+	if err != nil {
+		return exectypes.CommitObservations{}, fmt.Errorf("unable to encode observation: %w", err)
+	}
+
+	// If the encoded observation is too large, start filtering data.
+	for len(encodedObs) > maxSize {
+		// First, remove complete source chains if we have more than one.
+		// It's intentional that we don't check for largest chain and have them removed randomly so that we don't
+		// always remove the same chain across different rounds.
+		if len(truncatedCommits) > 1 {
+			// Remove the first chain found.
+			for chain := range truncatedCommits {
+				truncateChain(chain, &observation)
+				break
+			}
+		} else {
+			// If only one source chain remains, start removing commits one by one.
+			for chain, commits := range truncatedCommits {
+				if len(commits) > 1 {
+					// Remove the last commit from the list.
+					truncatedCommits[chain] = commits[:len(commits)-1]
+				} else {
+					// If there's only one commit left, we can't remove more.
+					// Note: this is not a desired state, but we shouldn't error out here.
+					return truncatedCommits, nil
+				}
+				break // only remove one commit at a time to check the new encoded size
+			}
+		}
+
+		// Re-encode the observation to check the new size.
+		observation.CommitReports = truncatedCommits
+		encodedObs, err = observation.Encode()
+		if err != nil {
+			return exectypes.CommitObservations{}, fmt.Errorf("unable to encode observation: %w", err)
+		}
+	}
+
+	return truncatedCommits, nil
+}
+
+func truncateLastCommit(
+	chain cciptypes.ChainSelector,
+	observation *exectypes.Observation,
+) error {
+	commits := observation.CommitReports[chain]
+	if len(commits) == 0 {
+		return fmt.Errorf("no commits to truncate")
+	}
+	lastCommit := commits[len(commits)-1]
+	// Remove the last commit from the list.
+	commits = commits[:len(commits)-1]
+	observation.CommitReports[chain] = commits
+	for seqNum, msg := range observation.Messages[chain] {
+		if lastCommit.SequenceNumberRange.Contains(seqNum) {
+			// Remove the message from the observation.
+			delete(observation.Messages[chain], seqNum)
+			// Remove the token data from the observation.
+			delete(observation.TokenData[chain], seqNum)
+			// Remove costly messages
+			for i, costlyMessage := range observation.CostlyMessages {
+				if costlyMessage == msg.Header.MessageID {
+					observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
+				}
+			}
+			// Leaving Nonces untouched
+		}
+	}
+
+	return nil
+}
+
+// truncateChain removes all data related to the given chain from the observation.
+func truncateChain(
+	chain cciptypes.ChainSelector,
+	observation *exectypes.Observation,
+) error {
+	if _, ok := observation.CommitReports[chain]; !ok {
+		return fmt.Errorf("no commits to truncate for chain %d", chain)
+	}
+	//var messageIDs []cciptypes.Bytes32
+	messageIDs := make(map[cciptypes.Bytes32]struct{})
+	// To remove costly message IDs we need to iterate over all messages and find the ones that belong to the chain.
+	for _, seqNumMap := range observation.Messages {
+		for _, message := range seqNumMap {
+			messageIDs[message.Header.MessageID] = struct{}{}
+		}
+	}
+
+	deleteCostlyMessages := func() {
+		for i, costlyMessage := range observation.CostlyMessages {
+			if _, ok := messageIDs[costlyMessage]; ok {
+				observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
+			}
+		}
+	}
+
+	delete(observation.CommitReports, chain)
+	delete(observation.Messages, chain)
+	delete(observation.TokenData, chain)
+	delete(observation.Nonces, chain)
+	deleteCostlyMessages()
+
+	return nil
 }
 
 func decodeAttributedObservations(

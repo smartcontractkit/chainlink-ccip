@@ -87,6 +87,17 @@ func (obs Observation) Encode() ([]byte, error) {
 	return json.Marshal(obs)
 }
 
+func (obs Observation) Truncate(maxSize int) (Observation, error) {
+	encodedObs, err := obs.Encode()
+	if err != nil {
+		return Observation{}, err
+	}
+	if len(encodedObs) >= maxSize {
+		return Observation{}, nil
+	}
+	return obs, nil
+}
+
 // DecodeObservation from a byte slice into an Observation.
 func DecodeObservation(b []byte) (Observation, error) {
 	if len(b) == 0 {

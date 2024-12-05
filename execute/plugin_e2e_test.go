@@ -135,6 +135,9 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100, 101, 102})
 }
 
+// TestExceedSizeObservation tests the case where the observation size exceeds the maximum size.
+// Setup multiple commit reports that the total size of the observation exceeds the maximum size.
+// Make sure that the observation reports are truncated to fit the maximum size.
 func TestExceedSizeObservation(t *testing.T) {
 	ctx := tests.Context(t)
 
@@ -148,7 +151,8 @@ func TestExceedSizeObservation(t *testing.T) {
 	// 100 -> 1077
 	// 1000 -> 2877
 	msgDataSize := 1000
-	maxMessages := 100 // Currently 431 is the max with msgDataSize = 1000
+	// TODO: More deterministic way to reduce any future flaky tests?
+	maxMessages := 432 // Currently 431 is the max with msgDataSize = 1000
 	startSeqNr := cciptypes.SeqNum(100)
 
 	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
@@ -178,19 +182,19 @@ func TestExceedSizeObservation(t *testing.T) {
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 2)
+	require.Len(t, outcome.PendingCommitReports, 1)
 	//require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 2)
+	require.Len(t, outcome.PendingCommitReports, 1)
 
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
 	outcome = runner.MustRunRound(ctx, t)
-	require.Len(t, outcome.Report.ChainReports, 2)
+	require.Len(t, outcome.Report.ChainReports, 1)
 	//sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	//require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{102, 103, 104, 105})
 }
