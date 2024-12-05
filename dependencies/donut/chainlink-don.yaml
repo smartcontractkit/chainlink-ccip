@@ -13,7 +13,7 @@ vars:
   # local
   LOCAL_CHARTS_DIR:
     source: env
-    default: ./repos/infra-charts
+    default: "${CHAINLINK_CODE_DIR}/infra-charts"
   LOCAL_TEMPLATES_DIR:
     source: env
     default: ./templates
@@ -32,6 +32,11 @@ vars:
   CCIP_TOOLING_VERSION:
     source: env
     default: ""
+  # Dir where CRIB will save env details, persisted between devspace pipeline reruns
+  TMP_DIR:
+    source: env
+  SCRIPTS_DIR:
+    source: env
   # don
   DON_TYPE:
     source: env
@@ -69,17 +74,27 @@ pipelines:
 
       if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
         run_dependency_pipelines job-distributor
-        # run ccip-v2 scripts to generate capability contract address
-        run_dependency_pipelines ccip-v2-scripts --pipeline generate-nodes-toml
-        create_deployments chainlink-don --from-file="${DEVSPACE_TMPDIR}/ccip-v2-node-overrides.yaml"
+
+        # deploy-home-chain-contracts pipeline write 2 files to temp dir
+        #   - ccip-v2-scripts-node-overrides.toml
+        #   - ccip-v2-scripts-address-book.json
+        run_dependency_pipelines ccip-v2-scripts-deploy-home-chain
+
+        tmp_dir="${TMP_DIR}"
+
+        NODE_TOML_OVERRIDES=$(cat ${tmp_dir}/ccip-v2-scripts-node-overrides.toml) \
+          gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${tmp_dir}/ccip-v2-node-overrides.yaml
+        echo "========== Node Overrides ===================="
+        cat "${tmp_dir}/ccip-v2-node-overrides.yaml"
+        create_deployments chainlink-don --from-file="${tmp_dir}/ccip-v2-node-overrides.yaml"
+
+        # Ensure all ingresses are ready before proceeding
+        ./${SCRIPTS_DIR}/ingress_check.sh
+        # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
+        run_dependency_pipelines ccip-v2-scripts-deploy-ccip
       else
         create_deployments chainlink-don
       fi
-
-      if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
-        # todo: run ccip-v2 scripts deploy on chain contracts (tokens, lanes, token pools, price registry, router)
-      fi
-
 deployments:
   chainlink-don:
     updateImageTags: false
@@ -88,7 +103,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/chainlink-cluster
-        version: "2.1.5"
+        version: "2.4.4"
       valuesFiles: []
       values: {}
 
@@ -210,9 +225,15 @@ profiles:
       - op: add
         path: dependencies
         value:
-          ccip-v2-scripts:
-            path: ${DEPENDENCIES_DIR}/donut/ccip-v2-scripts.yaml
+          ccip-v2-scripts-deploy-home-chain:
+            path: ${DEPENDENCIES_DIR}/ccip-v2-scripts/devspace.yaml
             overwriteVars: true
+            pipeline: deploy-home-chain-contracts
+            namespace: ${DEVSPACE_NAMESPACE}
+          ccip-v2-scripts-deploy-ccip:
+            path: ${DEPENDENCIES_DIR}/ccip-v2-scripts/devspace.yaml
+            overwriteVars: true
+            pipeline: deploy-ccip
             namespace: ${DEVSPACE_NAMESPACE}
           job-distributor:
             path: ${DEPENDENCIES_DIR}/job-distributor

@@ -20,6 +20,7 @@ tasks:
       SHELLCHECK_OPTS: -e SC1004
     cmd: find . -type f -name "*.sh" -exec shfmt -w {} \;
 
+  # cli tasks
   build:
     desc: Builds the crib CLI
     env:
@@ -27,7 +28,7 @@ tasks:
         sh: go env GOPATH
       GOBIN:
         sh: echo ${GOBIN:-$(go env GOPATH)/bin}
-    cmd: go build -o $GOBIN/crib ./cli/.
+    cmd: go build -C ./cli -o $GOBIN/crib
 
   fetch-cli:
     desc: Downloads the crib binary from the corresponding tag-based release in GitHub when applicable, otherwise uses latest
@@ -71,3 +72,90 @@ tasks:
       REPO_ROOT:
         sh: git rev-parse --show-toplevel
     cmd: crib init --write-config
+
+  test:
+    desc: Run unit tests for cli module
+    dir: cli
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: go test ./...
+
+  # ccip-v2-scripts tasks
+  ccip-v2-scripts:build:
+    desc: Build dependencies/ccip-v2-scripts go module
+    dir: dependencies/ccip-v2-scripts
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: go build -o $GOBIN/ccip-v2-scripts .
+  ccip-v2-scripts:test:
+    desc: Test dependencies/ccip-v2-scripts go module
+    dir: dependencies/ccip-v2-scripts
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: go test ./...
+  ccip-v2-scripts:lint:
+    desc: Go Lint ccip-v2-scripts module
+    dir: dependencies/ccip-v2-scripts
+    cmd: golangci-lint run --path-prefix=./dependencies/ccip-v2-scripts
+  ccip-v2-scripts:lint-fix-gci:
+    desc: Fix gci errors
+    dir: dependencies/ccip-v2-scripts
+    cmds:
+      - gci write -s standard -s default -s "prefix(github.com/smartcontractkit/crib/ccip-v2-scripts)" .
+  ccip-v2-scripts:lint-fix-gofumpt:
+    desc: Fix gofumpt errors
+    dir: dependencies/ccip-v2-scripts
+    cmds:
+      - find . -name '*.go' -exec gofumpt -w {} +
+  ccip-v2-scripts:fix-all:
+    desc: Fix all possible lint errors
+    deps:
+      - ccip-v2-scripts:lint-fix-gci
+      - ccip-v2-scripts:lint-fix-gofumpt
+  # sdk-build
+  sdk:build:
+    desc: Build sdk go module
+    dir: sdk
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: go build ./...
+  sdk:test:
+    desc: Test sdk go module
+    dir: sdk
+    env:
+      GOPATH:
+        sh: go env GOPATH
+      GOBIN:
+        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
+    cmd: go test ./...
+  sdk:lint:
+    desc: Go Lint sdk module
+    dir: sdk
+    cmd: golangci-lint run --path-prefix=./sdk
+  sdk:lint-fix-gci:
+    desc: Fix gci errors
+    dir: sdk
+    cmds:
+      - gci write -s standard -s default -s "prefix(github.com/smartcontractkit/crib/sdk)" .
+  sdk:lint-fix-gofumpt:
+    desc: Fix gofumpt errors
+    dir: sdk
+    cmds:
+      - find . -name '*.go' -exec gofumpt -w {} +
+  sdk:fix-all:
+    desc: Fix all possible lint errors
+    deps:
+      - sdk:lint-fix-gci
+      - sdk:lint-fix-gofumpt

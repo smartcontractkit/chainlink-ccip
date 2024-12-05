@@ -7,7 +7,7 @@ common:
         ChainID = "2337"
         MinContractPayment = '0'
         AutoCreateKey = true
-        FinalityDepth = 1
+        FinalityDepth = 50
 
         [[EVM.Nodes]]
         Name = 'node-2337'

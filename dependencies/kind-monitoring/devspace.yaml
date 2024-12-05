@@ -1,0 +1,42 @@
+version: v2beta1
+name: kind-monitoring
+
+vars:
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  MONITORING_ENABLED:
+    source: env
+    default: true
+
+pipelines:
+  deploy:
+    run: |-
+      run_dependency_pipelines prometheus-crds
+      run_dependency_pipelines promtail
+      run_dependency_pipelines grafana
+      run_dependency_pipelines loki
+
+dependencies:
+  prometheus-crds:
+    path: ${DEPENDENCIES_DIR}/prometheus-crds
+    namespace: prometheus-crds
+    overwriteVars: true
+  grafana:
+    path: ${DEPENDENCIES_DIR}/grafana
+    namespace: ${DEVSPACE_NAMESPACE}
+    overwriteVars: true
+    profiles:
+      - kind
+  loki:
+    path: ${DEPENDENCIES_DIR}/loki
+    namespace: ${DEVSPACE_NAMESPACE}
+    overwriteVars: true
+    profiles:
+      - kind
+  promtail:
+    path: ${DEPENDENCIES_DIR}/promtail
+    namespace: ${DEVSPACE_NAMESPACE}
+    overwriteVars: true
+    profiles:
+      - default

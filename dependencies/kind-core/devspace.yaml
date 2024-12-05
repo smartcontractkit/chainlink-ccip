@@ -1,0 +1,26 @@
+version: v2beta1
+name: kind-core
+
+vars:
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  MONITORING_ENABLED:
+    source: env
+    default: true
+
+pipelines:
+  deploy:
+    run: |-
+      run_dependency_pipelines ingress-controller
+      run_dependency_pipelines cert-manager
+
+dependencies:
+  ingress-controller:
+    path: ${DEPENDENCIES_DIR}/ingress-controller
+    namespace: ingress-nginx
+    overwriteVars: true
+  cert-manager:
+    path: ${DEPENDENCIES_DIR}/cert-manager
+    namespace: cert-manager
+    overwriteVars: true

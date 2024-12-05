@@ -1,14 +1,18 @@
 ---
 extends: default
+
+ignore: |
+  .tmp/
+  node_modules/
+  ./pnpm-lock.yaml
+  templates
+
 rules:
   new-line-at-end-of-file:
     level: warning
   line-length:
-    max: 120
+    max: 160
     level: warning
-ignore:
-  - 'templates'
-  - 'node_modules'
 yaml-files:
   - '*.yaml'
   - '*.yml'

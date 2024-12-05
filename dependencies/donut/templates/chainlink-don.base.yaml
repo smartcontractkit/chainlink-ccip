@@ -9,6 +9,9 @@ in: |
           fullnameOverride: ${DON_TYPE}
           nodeCount: {{ .Env.DON_NODE_COUNT }}
           bootNodeCount: {{ .Env.DON_BOOT_NODE_COUNT }}
+          serviceAccount:
+            enabled: false
+            name: 'default'
           overrides:
           {{- if gt (conv.ToInt .Env.DON_BOOT_NODE_COUNT) 0 }}
           {{- range $i := seq 0 (math.Sub .Env.DON_BOOT_NODE_COUNT 1) }}

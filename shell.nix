@@ -20,6 +20,7 @@ in
 mkShell' {
   nativeBuildInputs = [
     go
+    libiconv
 
     curl
     nodejs

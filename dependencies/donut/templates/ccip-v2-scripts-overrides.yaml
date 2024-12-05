@@ -6,4 +6,4 @@ in: |
         chainlink:
           v2Config:
             03-ccip-v2-scripts-override.toml: |
-              {{- .Env.NODE_TOML_OVERRIDES | strings.Indent 14 }}
+              {{- .Env.NODE_TOML_OVERRIDES | strings.Indent 12 }}

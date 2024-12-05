@@ -20,10 +20,13 @@ jobs:
           # TODO: read from pnpm-workspace.yaml
           filters: |
             ./cli: './cli/**'
+            ./dependencies/ccip-v2-scripts: './dependencies/ccip-v2-scripts/**'
+            ./sdk: './sdk/**'
 
   ci-lint:
     needs: changes
     strategy:
+      fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.packages) }}
     runs-on: ubuntu-latest
@@ -38,13 +41,16 @@ jobs:
       - name: ci-lint
         uses: smartcontractkit/.github/actions/ci-lint-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # ci-lint-go@0.2.4
         with:
+          use-go-cache: 'true'
           go-directory: ${{ matrix.package }}
           go-version-file: ${{ matrix.package }}/go.mod
-          golangci-lint-args: "--timeout 5m"
+          go-cache-dep-path: ${{ matrix.package }}/go.sum
+          golangci-lint-args: "--timeout 20m"
 
   ci-lint-misc:
     needs: changes
     strategy:
+      fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.packages) }}
     runs-on: ubuntu-latest
@@ -58,6 +64,7 @@ jobs:
   ci-test:
     needs: changes
     strategy:
+      fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.packages) }}
     runs-on: ubuntu-latest
@@ -72,6 +79,7 @@ jobs:
       - name: ci-test
         uses: smartcontractkit/.github/actions/ci-test-go@7a4d99cb349ea8f25195d2390d157942031f8a57 # ci-test-go@0.1.5
         with:
+          use-go-cache: 'true'
           go-version-file: ${{ matrix.package }}/go.mod
           go-cache-dep-path: ${{ matrix.package }}/go.sum
-          go-test-cmd: "go test ${{ matrix.package }}/..."
+          go-test-cmd: "go test -C ${{ matrix.package }} ./..."

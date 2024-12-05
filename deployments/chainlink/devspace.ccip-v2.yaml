@@ -1,0 +1,134 @@
+version: v2beta1
+name: chainlink
+
+vars:
+  SCRIPTS_DIR:
+    source: env
+    default: "../../scripts"
+  DEVSPACE_ENV_FILE: .env
+  DEPENDENCIES_DIR:
+    source: env
+    default: "../../dependencies"
+  IMPORTS_DIR:
+    source: env
+    default: "../../imports"
+  TMP_DIR:
+    source: env
+    default: "../../tmp/ccip-v2"
+  # "The provider being used to deploy CRIB"
+  PROVIDER:
+    source: all
+    default: "aws"
+  CHAINLINK_CODE_DIR:
+    source: env
+    default: "../../.."
+  CHAINLINK_HELM_REGISTRY_URI:
+    source: env
+    default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  DON_NODE_COUNT:
+    source: env
+    default: 4
+  DON_BOOT_NODE_COUNT:
+    source: env
+    default: 1
+imports:
+  - path: ${IMPORTS_DIR}/lib-common
+  - path: ${IMPORTS_DIR}/lib-aws
+  - path: ${IMPORTS_DIR}/lib-kind
+
+pipelines:
+  ccip-v2:
+    run: |-
+      run_dependency_pipelines kind-core
+      run_dependency_pipelines geth
+      run_pipelines ingress-check
+
+      # Deploy CCIP enabled fully configured DON
+      run_dependency_pipelines donut-cluster
+      run_pipelines ingress-check
+  ccip-v2-scripts-home-chain:
+    run: |-
+      run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
+  ccip-v2-scripts-deploy-ccip:
+    run: |-
+      run_dependency_pipelines ccip-v2-scripts --pipeline deploy-ccip
+  job-distributor:
+    run: |-
+      run_dependency_pipelines job-distributor
+
+profiles:
+  - name: ccip-v2-scripts
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          ccip-v2-scripts:
+            path: ${DEPENDENCIES_DIR}/ccip-v2-scripts
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+  - name: job-distributor
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          job-distributor:
+            path: ${DEPENDENCIES_DIR}/job-distributor
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+  - name: ccip-v2
+    patches:
+      - op: add
+        path: vars
+        value:
+          DON_TYPE:
+            source: env
+            default: ccip
+          DON_VERSION:
+            source: env
+            default: ccip-dev
+          CCIP_TOOLING_VERSION:
+            source: env
+            default: v2
+          INGRESS_CERT_ARN:
+            source: env
+            default: ${DEVSPACE_INGRESS_CERT_ARN}
+      - op: add
+        path: dependencies
+        value:
+          kind-core:
+            path: ${DEPENDENCIES_DIR}/kind-core
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          geth:
+            path: ${DEPENDENCIES_DIR}/geth
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
+          donut-cluster:
+            path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - network-geth-chain-1337
+              - network-geth-chain-2337
+commands:
+  job-distributor:
+    command: devspace run-pipeline job-distributor -p job-distributor
+    description: Run the job-distributor pipeline.
+    appendArgs: true
+  ccip-v2:
+    command: devspace run-pipeline ccip-v2 -p ccip-v2
+    description: Run the ccip v2 pipeline.
+    appendArgs: true
+  ccip-v2-scripts-home-chain:
+    command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-home-chain
+    description: Deploy CCIP Contracts and Add lanes.
+    appendArgs: true
+  ccip-v2-deploy-ccip:
+    command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-deploy-ccip
+    description: Deploy CCIP Contracts and Add lanes.
+    appendArgs: true
+  ccip-v2-purge:
+    command: rm -f ${TMP_DIR}/* && kubectl delete ns ${DEVSPACE_NAMESPACE}
+    description: purge ccip-v2 env

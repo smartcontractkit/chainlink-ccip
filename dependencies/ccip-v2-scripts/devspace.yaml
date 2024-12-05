@@ -1,0 +1,31 @@
+version: v2beta1
+name: ccip-v2-scripts
+
+vars:
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  TMP_DIR:
+    source: env
+    default: "/tmp/ccip-v2"
+
+pipelines:
+  # deploy home chain contracts and return capability registry address
+  deploy-home-chain-contracts: |-
+    echo "running deploy scripts"
+
+    tmp_dir="${TMP_DIR}"
+    mkdir -p "$tmp_dir"
+    task ccip-v2-scripts:build
+    ccip-v2-scripts deploy-home-chain --deploy-home-out "$TMP_DIR"
+
+    echo "======= Node Overrides =============="
+    cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml
+    echo "======= Address Book =============="
+    cat ${TMP_DIR}/ccip-v2-scripts-address-book.json
+
+  deploy-ccip: |-
+    echo "deploy on chain contracts (tokens, lanes, token pools, price registry, router)"
+    ccip-v2-scripts deploy-ccip \
+      --deploy-ccip-in "$TMP_DIR" \
+      --deploy-ccip-out "$TMP_DIR"

@@ -247,7 +247,7 @@ pipelines:
 ```
 
 
-### Configuring CRIB ingress
+### Configuring CRIB ingress (aws provider)
 Configuring Ingress in kubernetes is required to expose services to be accessible from Dev environment via VPN.
 
 Ideally you should define Ingress resource in the kubernetes chart for an app.
@@ -258,6 +258,22 @@ You should make it configurable, so we can pass CRIB specific configuration opti
 * DEVSPACE_INGRESS_BASE_DOMAIN
 
 CRIB uses these variable to set the context for a given environment for example, in staging cluster (aws provider) `DEVSPACE_INGRESS_BASE_DOMAIN` would be set to `main.stage.cldev.sh`. In kind provider it would be something different. 
+
+### Configuring CRIB ingress (kind provider)
+#### Configure TLS in kind
+CRIB uses cert-manager to provision certs automatically. It uses mkcert for managing local CA authority. [More info here](https://github.com/smartcontractkit/crib/pull/268)
+
+To make TLS working for you service you need add the following annotations:
+```
+annotations:
+  cert-manager.io/cluster-issuer: mkcert-issuer
+  nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  nginx.ingress.kubernetes.io/backend-protocol: "<your backend protocol>"
+```
+
+Another thing to update is the Ingress resource in your service chart.
+Make sure to add `.spec.tls` section. [Example in job-distributor](https://github.com/smartcontractkit/job-distributor/commit/561d7eb164156cc4bd31c77b2ec4b124f964101a#diff-bbbee2372ae725dc31dad37f7d421040583a959a787ac237a3167964e118307aR15)
+
 
 ### Adding local-charts profile
 When working on changes in Helm charts it is handy to test them quickly in CRIB before even creating a pull request.

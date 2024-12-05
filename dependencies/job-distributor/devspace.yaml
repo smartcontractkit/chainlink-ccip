@@ -39,33 +39,19 @@ deployments:
       releaseName: "job-distributor"
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/job-distributor
-        version: "0.2.6"
+        version: "0.2.11"
       values:
+        image:
+          tag: 0.6.1
         envVars:
           ENVIRONMENT: development
           DATABASE_URL: postgresql://chainlink:JGVgp7M2Emcg7Av8KKVUgMZb@postgres:5432/chainlink?sslmode=disable
           CSA_KEY_ENCRYPTION_SECRET: supersecret
           SERVER_ENABLE_REFLECTION: true
-        noderpc:
-          annotations:
-            external-dns.alpha.kubernetes.io/hostname: ${DEVSPACE_NAMESPACE}-job-distributor-node-rpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
-            service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
-            service.beta.kubernetes.io/load-balancer-source-ranges: "10.0.0.0/8"
-            service.beta.kubernetes.io/aws-load-balancer-type: "external"
-            service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
         ingress:
           enabled: true
-          className: "alb"
           host: ${DEVSPACE_NAMESPACE}-job-distributor-grpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
           annotations:
-            alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
-            alb.ingress.kubernetes.io/ssl-redirect: "443"
-            alb.ingress.kubernetes.io/backend-protocol-version: "GRPC"
-            alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
-            alb.ingress.kubernetes.io/certificate-arn: ${DEVSPACE_INGRESS_CERT_ARN}
-            alb.ingress.kubernetes.io/group.name: ${DEVSPACE_NAMESPACE}
-            alb.ingress.kubernetes.io/scheme: internal
-            alb.ingress.kubernetes.io/target-type: ip
             external-dns.alpha.kubernetes.io/ttl: "120"
         networkPolicyDefault:
           ingress:
@@ -93,6 +79,36 @@ profiles:
               name: job-distributor
               path: ${CHAINLINK_CODE_DIR}/job-distributor/charts/job-distributor
               version: null
+  - name: aws
+    activation:
+      - vars:
+          PROVIDER: "aws"
+    merge:
+      deployments:
+        job-distributor:
+          helm:
+            values:
+              noderpc:
+                annotations:
+                  external-dns.alpha.kubernetes.io/hostname: ${DEVSPACE_NAMESPACE}-job-distributor-node-rpc.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                  service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+                  service.beta.kubernetes.io/load-balancer-source-ranges: "10.0.0.0/8"
+                  service.beta.kubernetes.io/aws-load-balancer-type: external
+                  service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+                  service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: http
+                  service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8081"
+                  service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /healthz
+              ingress:
+                className: "alb"
+                annotations:
+                  alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+                  alb.ingress.kubernetes.io/ssl-redirect: "443"
+                  alb.ingress.kubernetes.io/backend-protocol-version: "GRPC"
+                  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+                  alb.ingress.kubernetes.io/certificate-arn: ${DEVSPACE_INGRESS_CERT_ARN}
+                  alb.ingress.kubernetes.io/group.name: ${DEVSPACE_NAMESPACE}
+                  alb.ingress.kubernetes.io/scheme: internal
+                  alb.ingress.kubernetes.io/target-type: ip
   - name: kind
     activation:
       - vars:
@@ -108,3 +124,11 @@ profiles:
             values:
               imagePullSecrets:
                 - name: regcred-prod-ecr
+              ingress:
+                className: "nginx"
+                tls:
+                  enabled: true
+                annotations:
+                  cert-manager.io/cluster-issuer: mkcert-issuer
+                  nginx.ingress.kubernetes.io/ssl-redirect: "true"
+                  nginx.ingress.kubernetes.io/backend-protocol: "GRPC"

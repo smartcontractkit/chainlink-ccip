@@ -16,6 +16,8 @@ debug.env
 *.txt
 repos
 node_modules
+tmp
+*.tar.gz
 
 # Ignore DevSpace cache and log folder
 .devspace/
@@ -27,3 +29,6 @@ node_modules
 
 # CLI related
 cli/dist/
+
+# go package related
+.run.id

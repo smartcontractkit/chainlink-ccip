@@ -81,7 +81,7 @@ jobs:
       - name: Deploy and validate CRIB Environment for CCIP
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@656a169b769c56cdc6da532a7e1c9b4619e028f7 # crib-deploy-environment@6.3.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@cce4937a43fb6f769332183e7b3125c5a9687321 # crib-deploy-environment@6.4.0
         with:
           aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}
