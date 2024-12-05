@@ -3,9 +3,10 @@ package execute
 import (
 	"errors"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"sort"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -81,16 +82,6 @@ func validateObservedSequenceNumbers(
 
 var errOverlappingRanges = errors.New("overlapping sequence numbers in reports")
 
-func executedMessages(reports []exectypes.CommitData) map[cciptypes.SeqNum]struct{} {
-	executed := make(map[cciptypes.SeqNum]struct{})
-	for _, report := range reports {
-		for _, seqNum := range report.ExecutedMessages {
-			executed[seqNum] = struct{}{}
-		}
-	}
-	return executed
-}
-
 // computeRanges takes a slice of reports and computes the smallest number of contiguous ranges
 // that cover all the sequence numbers in the reports.
 // Note: reports need all messages to create a proof even if some are already executed.
@@ -144,8 +135,6 @@ func groupByChainSelector(
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
-//
-//nolint:gocyclo // todo
 func filterOutExecutedMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ([]exectypes.CommitData, error) {
@@ -178,7 +167,8 @@ func filterOutExecutedMessages(
 		for i := reportIdx; i < len(reports); i++ {
 			reportRange := reports[i].SequenceNumberRange
 			if executed.End() < reportRange.Start() {
-				// need to go to the next set of executed messages.
+				// No messages in current executed range are in reports[i]
+				// need to go to the next set of executed range.
 				break
 			}
 
@@ -245,11 +235,11 @@ func truncateObservation(
 		} else {
 			// If only one source chain remains, start removing commits one by one.
 			for chain, commits := range observation.CommitReports {
-				if len(commits) > 1 {
-					truncateLastCommit(chain, observation)
-				} else {
-					return // only one commit left, can't truncate further
+				if len(commits) == 1 {
+					return
 				}
+
+				truncateLastCommit(chain, observation)
 				break // only remove one commit at a time to check the new encoded size
 			}
 		}
