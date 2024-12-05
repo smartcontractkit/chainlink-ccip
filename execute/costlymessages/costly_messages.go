@@ -122,6 +122,9 @@ func (o *observer) Observe(
 			o.lggr.Warnw("Message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
+		} else {
+			o.lggr.Debugw("Message is not too costly to execute", "messageID",
+				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 		}
 	}
 
@@ -310,7 +313,18 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			// message will not be executed (as it will be considered too costly).
 			c.lggr.Warnw("missing timestamp for message", "messageID", msg.Header.MessageID)
 		} else {
-			feeUSD18 = waitBoostedFee(c.now().Sub(timestamp), feeUSD18, c.relativeBoostPerWaitHour)
+			now := c.now()
+			sub := now.Sub(timestamp)
+			c.lggr.Debugw("Message fee calculation", "feeUSD18", feeUSD18, "timestamp", timestamp, "now", now, "sub", sub)
+
+			k := 1.0 + sub.Hours()*c.relativeBoostPerWaitHour
+			c.lggr.Debugw("Message fee calculation", "k", k)
+			boostedFee := big.NewFloat(0).Mul(big.NewFloat(k), new(big.Float).SetInt(feeUSD18))
+			c.lggr.Debugw("Message fee calculation", "boostedFee", boostedFee)
+			res, _ := boostedFee.Int(nil)
+			c.lggr.Debugw("Message fee calculation", "boostedFee", res)
+
+			feeUSD18 = waitBoostedFee(sub, feeUSD18, c.relativeBoostPerWaitHour)
 		}
 
 		messageFees[msg.Header.MessageID] = feeUSD18
