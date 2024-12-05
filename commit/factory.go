@@ -97,7 +97,7 @@ type PluginFactory struct {
 	homeChainReader   reader.HomeChain
 	homeChainSelector cciptypes.ChainSelector
 	contractReaders   map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters      map[cciptypes.ChainSelector]types.ChainWriter
+	chainWriters      map[cciptypes.ChainSelector]types.ContractWriter
 	rmnPeerClient     rmn.PeerClient
 	rmnCrypto         cciptypes.RMNCrypto
 }
@@ -113,7 +113,7 @@ func NewPluginFactory(
 	homeChainReader reader.HomeChain,
 	homeChainSelector cciptypes.ChainSelector,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	rmnPeerClient rmn.PeerClient,
 	rmnCrypto cciptypes.RMNCrypto,
 ) *PluginFactory {

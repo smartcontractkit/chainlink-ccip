@@ -922,7 +922,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_HappyPath(t *testing.T) {
-	cw := writer_mocks.NewMockChainWriter(t)
+	cw := writer_mocks.NewMockContractWriter(t)
 	cw.EXPECT().GetFeeComponents(mock.Anything).Return(
 		&types.ChainFeeComponents{
 			ExecutionFee:        big.NewInt(1),
@@ -930,7 +930,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		}, nil,
 	)
 
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	// Missing writer for chainB
 	contractWriters[chainA] = cw
 	contractWriters[chainC] = cw
@@ -958,8 +958,8 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
-	cw := writer_mocks.NewMockChainWriter(t)
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	// Missing writer for dest chain chainC
 	contractWriters[chainA] = cw
 	ccipReader := newCCIPChainReaderInternal(

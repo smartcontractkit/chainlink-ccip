@@ -14,16 +14,16 @@ jobs:
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
 
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: ['1.22.5']
     steps:
       - name: Checkout the chainlink-ccip repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-      - name: Setup Go ${{ matrix.go-version }}
+      - name: Determine Go version
+        id: go_version
+        run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
+      - name: Setup Go ${{ env.GO_VERSION }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
       - name: Display Go version
         run: go version
       - name: Fetch latest pull request data
@@ -44,8 +44,11 @@ jobs:
         run: |
           default="develop"
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment='${{ steps.fetch_pr_data.outputs.result }}'
-            echo $comment
+          comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
+          ${{ steps.fetch_pr_data.outputs.result }}
+          GREAT_PR_DESCRIPTION_HERE
+          )
+            echo "$comment"
             core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
             if [ -n "$core_ref" ]; then
               echo "Overriding chainlink repository commit hash with: $core_ref"
@@ -99,7 +102,7 @@ jobs:
       - name: Run ccip ocr3 initial deploy integration test
         run: |
           cd $GITHUB_WORKSPACE/chainlink/deployment
-          go test -v -run '^TestInitialDeploy$' -timeout 6m ./ccip/changeset
+          go test -v -run '^TestAddLanesWithTestRouter$' -timeout 6m ./ccip/changeset
           EXITCODE=${PIPESTATUS[0]}
           if [ $EXITCODE -ne 0 ]; then
             echo "Integration test failed"

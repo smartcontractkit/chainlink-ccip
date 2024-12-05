@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -102,7 +103,7 @@ func NewPlugin(
 			reportingCfg.F,
 			oracleIDToP2pID,
 		),
-		chainSupport: plugincommon.NewCCIPChainSupport(
+		chainSupport: plugincommon.NewChainSupport(
 			lggr,
 			homeChain,
 			oracleIDToP2pID,
@@ -303,6 +304,23 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
 		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+
+	sourceChains := slicelib.Map(decodedReport.ChainReports,
+		func(r cciptypes.ExecutePluginReportSingleChain) cciptypes.ChainSelector {
+			return r.SourceChainSelector
+		})
+	isCursed, err := plugincommon.IsReportCursed(ctx, p.lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
+	if err != nil {
+		p.lggr.Errorw(
+			"report not accepted due to curse checking error",
+			"err", err,
+		)
+		return false, err
+	}
+	if isCursed {
+		// Detailed logging is already done by IsReportCursed.
+		return false, nil
 	}
 
 	p.lggr.Infow("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)

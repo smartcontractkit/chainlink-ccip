@@ -7,12 +7,13 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -95,7 +96,7 @@ type PluginFactory struct {
 	estimateProvider gas.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
+	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
 func NewPluginFactory(
@@ -108,7 +109,7 @@ func NewPluginFactory(
 	tokenDataEncoder cciptypes.TokenDataEncoder,
 	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 ) *PluginFactory {
 	return &PluginFactory{
 		lggr:             lggr,

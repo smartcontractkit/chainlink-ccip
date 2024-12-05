@@ -38,7 +38,7 @@ import (
 type ccipChainReader struct {
 	lggr            logger.Logger
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 }
@@ -47,7 +47,7 @@ func newCCIPChainReaderInternal(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) *ccipChainReader {
@@ -673,8 +673,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(
 	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
-) (*rmntypes.CurseInfo, error) {
+) (*CurseInfo, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
@@ -699,11 +700,11 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
 	cursedSubjectsSet := mapset.NewSet(cursedSubjects.CursedSubjects...)
 
-	curseInfo := &rmntypes.CurseInfo{
+	curseInfo := &CurseInfo{
 		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
-		CursedDestination: cursedSubjectsSet.Contains(rmntypes.LegacyCurseSubject) ||
-			cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
-		GlobalCurse: cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
+		CursedDestination: cursedSubjectsSet.Contains(LegacyCurseSubject) ||
+			cursedSubjectsSet.Contains(GlobalCurseSubject),
+		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
 	}
 
 	for _, ch := range sourceChainSelectors {

@@ -82,7 +82,7 @@ func NewPlugin(
 		offchainCfg.MaxMerkleTreeSize = merklemulti.MaxNumberTreeLeaves
 	}
 
-	chainSupport := plugincommon.NewCCIPChainSupport(
+	chainSupport := plugincommon.NewChainSupport(
 		logger.Named(lggr, "CCIPChainSupport"),
 		homeChain,
 		oracleIDToP2pID,

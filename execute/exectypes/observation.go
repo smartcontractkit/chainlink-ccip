@@ -13,6 +13,17 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 // and sequence number.
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
+// Flatten nested maps into a slice of messages.
+func (mo MessageObservations) Flatten() []cciptypes.Message {
+	var results []cciptypes.Message
+	for _, msgs := range mo {
+		for _, msg := range msgs {
+			results = append(results, msg)
+		}
+	}
+	return results
+}
+
 // NonceObservations contain the latest nonce for senders in the previously observed messages.
 // Nonces are organized by source chain selector and the string encoded sender address. The address
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
