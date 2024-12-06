@@ -122,6 +122,9 @@ func (o *observer) Observe(
 			o.lggr.Warnw("Message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
+		} else {
+			o.lggr.Debugw("Message is not too costly to execute", "messageID",
+				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 		}
 	}
 
@@ -304,6 +307,8 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 			new(big.Int).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int),
 			new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
 		)
+		c.lggr.Debugw("Fee calculation",
+			"linkPriceUSD", linkPriceUSD, "msg.FeeValueJuels", msg.FeeValueJuels, "feeUSD18", feeUSD18)
 		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
 		if !ok {
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
