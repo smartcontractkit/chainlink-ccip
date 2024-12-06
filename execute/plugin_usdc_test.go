@@ -53,7 +53,7 @@ func Test_USDC_Transfer(t *testing.T) {
 	}
 
 	intTest := SetupSimpleTest(t, sourceChain, destChain)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
 	intTest.WithUSDC(randomEthAddress, attestation104, events)
 	runner := intTest.Start()
 	defer intTest.Close()

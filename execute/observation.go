@@ -241,6 +241,12 @@ func (p *Plugin) getMessagesObservation(
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 
+	// Make sure encoded observation fits within the maximum observation size.
+	observation, err = truncateObservation(observation, maxObservationLength)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
+	}
+
 	return observation, nil
 }
 

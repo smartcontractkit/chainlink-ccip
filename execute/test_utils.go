@@ -89,33 +89,48 @@ func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelec
 	}
 }
 
-func (it *IntTest) WithMessages(messages []inmem.MessagesWithMetadata, crBlockNumber uint64, crTimestamp time.Time) {
+func (it *IntTest) WithMessages(
+	messages []inmem.MessagesWithMetadata,
+	crBlockNumber uint64,
+	crTimestamp time.Time,
+	numReports int) {
 	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
-	reportData := exectypes.CommitData{
-		SourceChain: it.srcSelector,
-		SequenceNumberRange: cciptypes.NewSeqNumRange(
-			messages[0].Header.SequenceNumber,
-			messages[len(messages)-1].Header.SequenceNumber,
-		),
-		Messages: mapped,
-	}
+	totalMessages := len(mapped)
+	messagesPerReport := totalMessages / numReports
 
-	tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, logger.Test(it.t))
-	require.NoError(it.t, err, "failed to construct merkle tree")
+	for i := 0; i < numReports; i++ {
+		startIndex := i * messagesPerReport
+		endIndex := startIndex + messagesPerReport
+		if i == numReports-1 {
+			endIndex = totalMessages // Ensure the last report includes any remaining messages
+		}
 
-	it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
-		Report: cciptypes.CommitPluginReport{
-			MerkleRoots: []cciptypes.MerkleRootChain{
-				{
-					ChainSel:     reportData.SourceChain,
-					SeqNumsRange: reportData.SequenceNumberRange,
-					MerkleRoot:   tree.Root(),
+		reportData := exectypes.CommitData{
+			SourceChain: it.srcSelector,
+			SequenceNumberRange: cciptypes.NewSeqNumRange(
+				mapped[startIndex].Header.SequenceNumber,
+				mapped[endIndex-1].Header.SequenceNumber,
+			),
+			Messages: mapped[startIndex:endIndex],
+		}
+
+		tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, logger.Test(it.t))
+		require.NoError(it.t, err, "failed to construct merkle tree")
+
+		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
+			Report: cciptypes.CommitPluginReport{
+				MerkleRoots: []cciptypes.MerkleRootChain{
+					{
+						ChainSel:     reportData.SourceChain,
+						SeqNumsRange: reportData.SequenceNumberRange,
+						MerkleRoot:   tree.Root(),
+					},
 				},
 			},
-		},
-		BlockNum:  crBlockNumber,
-		Timestamp: crTimestamp,
-	})
+			BlockNum:  crBlockNumber,
+			Timestamp: crTimestamp,
+		})
+	}
 
 	it.ccipReader.Messages[it.srcSelector] = append(
 		it.ccipReader.Messages[it.srcSelector],
@@ -390,6 +405,12 @@ func withFeeValueJuels(fee int64) msgOption {
 	return func(m *cciptypes.Message) {
 		juels := new(big.Int).Mul(big.NewInt(fee), new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
 		m.FeeValueJuels = cciptypes.NewBigInt(juels)
+	}
+}
+
+func withData(data []byte) msgOption {
+	return func(m *cciptypes.Message) {
+		m.Data = data
 	}
 }
 
