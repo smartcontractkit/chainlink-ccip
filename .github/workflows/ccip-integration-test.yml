@@ -122,7 +122,6 @@ jobs:
 
   integration-test-ccip-ocr3:
     if: always()
-    name: Integration Tests Checker
     runs-on: ubuntu-latest
     needs: [integration-test-matrix]
     steps:
