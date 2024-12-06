@@ -116,6 +116,6 @@ jobs:
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
       - name: Run ${{ matrix.type.name }}
-        run: ${{ matrix.type.cmd }}
+        run: cd $GITHUB_WORKSPACE/chainlink/ && ${{ matrix.type.cmd }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
