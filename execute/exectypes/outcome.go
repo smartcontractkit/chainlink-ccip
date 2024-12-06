@@ -88,11 +88,9 @@ func newSortedOutcome(
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {
-			return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
-		})
-	sort.Slice(
-		pendingCommitsCP,
-		func(i, j int) bool {
+			if pendingCommitsCP[i].SourceChain != pendingCommitsCP[j].SourceChain {
+				return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
+			}
 			return pendingCommitsCP[i].SequenceNumberRange.Start() < pendingCommitsCP[j].SequenceNumberRange.Start()
 		})
 	sort.Slice(

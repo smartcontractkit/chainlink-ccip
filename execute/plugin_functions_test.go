@@ -1326,7 +1326,6 @@ func Test_truncateLastCommit(t *testing.T) {
 		chain       cciptypes.ChainSelector
 		observation exectypes.Observation
 		expected    exectypes.Observation
-		success     bool
 	}{
 		{
 			name:  "no commits to truncate",
@@ -1341,7 +1340,6 @@ func Test_truncateLastCommit(t *testing.T) {
 					1: {},
 				},
 			},
-			success: false,
 		},
 		{
 			name:  "truncate last commit",
@@ -1385,15 +1383,13 @@ func Test_truncateLastCommit(t *testing.T) {
 				},
 				CostlyMessages: []cciptypes.Bytes32{},
 			},
-			success: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			truncated := truncateLastCommit(tt.chain, &tt.observation)
-			require.Equal(t, tt.success, truncated)
-			require.Equal(t, tt.expected, tt.observation)
+			truncated := truncateLastCommit(tt.observation, tt.chain)
+			require.Equal(t, tt.expected, truncated)
 		})
 	}
 }
@@ -1404,7 +1400,6 @@ func Test_truncateChain(t *testing.T) {
 		chain       cciptypes.ChainSelector
 		observation exectypes.Observation
 		expected    exectypes.Observation
-		success     bool
 	}{
 		{
 			name:  "truncate chain data",
@@ -1434,7 +1429,6 @@ func Test_truncateChain(t *testing.T) {
 				TokenData:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{},
 				CostlyMessages: []cciptypes.Bytes32{},
 			},
-			success: true,
 		},
 		{
 			name:  "truncate non existent chain",
@@ -1475,15 +1469,13 @@ func Test_truncateChain(t *testing.T) {
 				},
 				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
-			success: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			truncated := truncateChain(tt.chain, &tt.observation)
-			require.Equal(t, tt.success, truncated)
-			require.Equal(t, tt.expected, tt.observation)
+			truncated := truncateChain(tt.observation, tt.chain)
+			require.Equal(t, tt.expected, truncated)
 		})
 	}
 }
@@ -1559,8 +1551,8 @@ func Test_truncateObservation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			truncateObservation(&tt.observation, tt.maxSize)
-			assert.Equal(t, tt.expected, tt.observation)
+			obs := truncateObservation(tt.observation, tt.maxSize)
+			assert.Equal(t, tt.expected, obs)
 		})
 	}
 }

@@ -210,12 +210,13 @@ func filterOutExecutedMessages(
 // one chain with one report left
 // Note: This function doesn't split one report into multiple parts.
 func truncateObservation(
-	observation *exectypes.Observation,
+	obs exectypes.Observation,
 	maxSize int,
-) {
+) exectypes.Observation {
+	observation := obs
 	encodedObs, err := observation.Encode()
 	if err != nil {
-		return
+		return exectypes.Observation{}
 	}
 
 	chains := maps.Keys(observation.CommitReports)
@@ -227,9 +228,9 @@ func truncateObservation(
 	for len(encodedObs) > maxSize {
 		for _, chain := range chains {
 			if len(observation.CommitReports[chain]) > 1 {
-				truncateLastCommit(chain, observation)
+				observation = truncateLastCommit(observation, chain)
 			} else {
-				truncateChain(chain, observation)
+				observation = truncateChain(observation, chain)
 			}
 			chains = maps.Keys(observation.CommitReports)
 			break
@@ -240,20 +241,22 @@ func truncateObservation(
 		}
 		encodedObs, err = observation.Encode()
 		if err != nil {
-			return
+			return exectypes.Observation{}
 		}
 	}
+	return observation
 }
 
 // truncateLastCommit removes the last commit from the observation.
 // errors if there are no commits to truncate.
 func truncateLastCommit(
+	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
-	observation *exectypes.Observation,
-) bool {
+) exectypes.Observation {
+	observation := obs
 	commits := observation.CommitReports[chain]
 	if len(commits) == 0 {
-		return false
+		return observation
 	}
 	lastCommit := commits[len(commits)-1]
 	// Remove the last commit from the list.
@@ -275,19 +278,19 @@ func truncateLastCommit(
 		}
 	}
 
-	return true
+	return observation
 }
 
 // truncateChain removes all data related to the given chain from the observation.
 // returns true if the chain was found and truncated, false otherwise.
 func truncateChain(
+	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
-	observation *exectypes.Observation,
-) bool {
+) exectypes.Observation {
+	observation := obs
 	if _, ok := observation.CommitReports[chain]; !ok {
-		return false
+		return observation
 	}
-	//var messageIDs []cciptypes.Bytes32
 	messageIDs := make(map[cciptypes.Bytes32]struct{})
 	// To remove costly message IDs we need to iterate over all messages and find the ones that belong to the chain.
 	for _, seqNumMap := range observation.Messages {
@@ -310,7 +313,7 @@ func truncateChain(
 	delete(observation.Nonces, chain)
 	deleteCostlyMessages()
 
-	return true
+	return observation
 }
 
 func decodeAttributedObservations(
