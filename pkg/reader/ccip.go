@@ -318,7 +318,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 					Value:    seqNumRange.End(),
 					Operator: primitives.Lte,
 				}),
-				query.Confidence(primitives.Finalized),
+				query.Confidence(primitives.Unconfirmed),
 			},
 		},
 		query.LimitAndSort{

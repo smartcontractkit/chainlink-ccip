@@ -403,6 +403,23 @@ func (o observerImpl) ObserveMerkleRoots(
 					return
 				}
 
+				o.lggr.Debugw("get MsgsBetweenSeqNums inside the agreed, previous outcome seqNumRange",
+					"msgs", msgs,
+					"chainRange", chainRange,
+					"chainSelector", chainRange.ChainSel,
+				)
+
+				expMsgsCnt := uint64(chainRange.SeqNumRange.End() - chainRange.SeqNumRange.Start() + 1)
+				if uint64(len(msgs)) != expMsgsCnt {
+					o.lggr.Warnw(
+						"not all messages found by MsgsBetweenSeqNums call",
+						"expectedCount", expMsgsCnt,
+						"actualCount", len(msgs),
+						"chainSelector", chainRange.ChainSel,
+						"seqNumRange", chainRange.SeqNumRange)
+					return
+				}
+
 				root, err := o.computeMerkleRoot(ctx, msgs)
 				if err != nil {
 					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
