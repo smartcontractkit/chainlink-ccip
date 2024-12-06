@@ -319,6 +319,9 @@ func (b *execReportBuilder) verifyReport(
 
 // buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
+// returns
+// 1. the exec report that's added to builder
+// 2. the updated commit report after marking new messages from the exec report as executed
 //
 //nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
