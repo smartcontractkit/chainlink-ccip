@@ -241,24 +241,10 @@ func (p *Plugin) getMessagesObservation(
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 
-	encodedObs, err := observation.Encode()
+	// Make sure encoded observation fits within the maximum observation size.
+	observation, err = truncateObservation(observation, maxObservationLength)
 	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err)
-	}
-
-	p.lggr.Infow("encoded observation",
-		"size", len(encodedObs),
-		"maxObservationLength", maxObservationLength,
-	)
-	if len(encodedObs) >= maxObservationLength {
-		observation = truncateObservation(observation, maxObservationLength)
-		encodedObs2, err2 := observation.Encode()
-		if err2 != nil {
-			return exectypes.Observation{}, fmt.Errorf("unable to encode observation: %w", err2)
-		}
-		p.lggr.Infow("encoded observation after truncation",
-			"size", len(encodedObs2),
-		)
+		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}
 
 	return observation, nil

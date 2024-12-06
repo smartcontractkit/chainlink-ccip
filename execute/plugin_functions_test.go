@@ -1486,6 +1486,7 @@ func Test_truncateObservation(t *testing.T) {
 		observation exectypes.Observation
 		maxSize     int
 		expected    exectypes.Observation
+		wantErr     assert.ErrorAssertionFunc
 	}{
 		{
 			name: "no truncation needed",
@@ -1504,6 +1505,7 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "truncate last commit",
@@ -1515,7 +1517,7 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
-			maxSize: 50,
+			maxSize: 500,
 			expected: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
@@ -1523,6 +1525,7 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "truncate entire chain",
@@ -1536,7 +1539,7 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
-			maxSize: 50,
+			maxSize: 500,
 			// Notice that truncate chains still returns one report although one chain report is more than the max size
 			// This is because truncate function doesn't split one report into multiple reports.
 			expected: exectypes.Observation{
@@ -1546,12 +1549,32 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "truncate failure",
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+					},
+					2: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
+					},
+				},
+			},
+			maxSize:  50, // less than what can fit a single commit report for single chain
+			expected: exectypes.Observation{},
+			wantErr:  assert.Error,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			obs := truncateObservation(tt.observation, tt.maxSize)
+			obs, err := truncateObservation(tt.observation, tt.maxSize)
+			if !tt.wantErr(t, err) {
+				return
+			}
 			assert.Equal(t, tt.expected, obs)
 		})
 	}

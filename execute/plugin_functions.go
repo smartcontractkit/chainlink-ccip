@@ -212,11 +212,11 @@ func filterOutExecutedMessages(
 func truncateObservation(
 	obs exectypes.Observation,
 	maxSize int,
-) exectypes.Observation {
+) (exectypes.Observation, error) {
 	observation := obs
 	encodedObs, err := observation.Encode()
 	if err != nil {
-		return exectypes.Observation{}
+		return exectypes.Observation{}, err
 	}
 
 	chains := maps.Keys(observation.CommitReports)
@@ -235,16 +235,17 @@ func truncateObservation(
 			chains = maps.Keys(observation.CommitReports)
 			break
 		}
-		// If there's only one chain with one report left, stop.
-		if len(observation.CommitReports) == 1 && len(observation.CommitReports[chains[0]]) == 1 {
-			break
+
+		// Truncated all chains.
+		if len(observation.CommitReports) == 0 {
+			return exectypes.Observation{}, fmt.Errorf("no more data to truncate")
 		}
 		encodedObs, err = observation.Encode()
 		if err != nil {
-			return exectypes.Observation{}
+			return exectypes.Observation{}, nil
 		}
 	}
-	return observation
+	return observation, nil
 }
 
 // truncateLastCommit removes the last commit from the observation.
