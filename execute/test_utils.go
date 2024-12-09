@@ -51,6 +51,7 @@ import (
 type IntTest struct {
 	t *testing.T
 
+	lggr  logger.Logger
 	donID uint32
 
 	srcSelector cciptypes.ChainSelector
@@ -65,7 +66,7 @@ type IntTest struct {
 	execCostCalculator  *costlymessages.StaticMessageExecCostUSD18Calculator
 }
 
-func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
+func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -79,6 +80,7 @@ func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelec
 
 	return &IntTest{
 		t:                   t,
+		lggr:                lggr,
 		donID:               donID,
 		msgHasher:           msgHasher,
 		srcSelector:         srcSelector,
@@ -114,7 +116,7 @@ func (it *IntTest) WithMessages(
 			Messages: mapped[startIndex:endIndex],
 		}
 
-		tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, logger.Test(it.t))
+		tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, it.lggr)
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
 		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
@@ -144,7 +146,7 @@ func (it *IntTest) WithCustomFeeBoosting(
 	messageCost map[cciptypes.Bytes32]plugintypes.USD18,
 ) {
 	it.feeCalculator = costlymessages.NewCCIPMessageFeeUSD18Calculator(
-		logger.Test(it.t),
+		it.lggr,
 		it.ccipReader,
 		relativeBoostPerWaitHour,
 		now,
@@ -224,14 +226,14 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		},
 	}
 
-	homeChain := setupHomeChainPoller(it.t, it.donID, logger.Test(it.t), chainConfigInfos)
+	homeChain := setupHomeChainPoller(it.t, it.donID, it.lggr, chainConfigInfos)
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		logger.Test(it.t),
+		it.lggr,
 		it.dstSelector,
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
@@ -254,7 +256,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 
 	costlyMessageObserver := costlymessages.NewObserver(
-		logger.Test(it.t),
+		it.lggr,
 		true,
 		feeCalculator,
 		execCostCalculator,
@@ -327,7 +329,7 @@ func (it *IntTest) newNode(
 		homeChain,
 		tokenDataObserver,
 		ep,
-		logger.Test(it.t),
+		it.lggr,
 		costlyMessageObserver,
 	)
 

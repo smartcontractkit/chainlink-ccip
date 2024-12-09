@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sel "github.com/smartcontractkit/chain-selectors"
+	logger2 "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
@@ -52,7 +53,7 @@ func Test_USDC_Transfer(t *testing.T) {
 		}`,
 	}
 
-	intTest := SetupSimpleTest(t, sourceChain, destChain)
+	intTest := SetupSimpleTest(t, logger2.Test(t), sourceChain, destChain)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
 	intTest.WithUSDC(randomEthAddress, attestation104, events)
 	runner := intTest.Start()
