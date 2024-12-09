@@ -198,7 +198,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.homeChainReader,
 			tokenDataObserver,
 			p.estimateProvider,
-			p.baseLggr,
+			lggr,
 			costlyMessageObserver,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
