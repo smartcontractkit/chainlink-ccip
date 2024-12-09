@@ -52,27 +52,26 @@ func NewProcessor(
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
 ) *Processor {
-	observer := observerImpl{
-		lggr,
-		homeChain,
-		oracleID,
-		chainSupport,
-		ccipReader,
-		msgHasher,
-	}
 	return &Processor{
 		oracleID:        oracleID,
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
 		lggr:            lggr,
-		observer:        observer,
-		ccipReader:      ccipReader,
-		reportingCfg:    reportingCfg,
-		chainSupport:    chainSupport,
-		rmnController:   rmnController,
-		rmnCrypto:       rmnCrypto,
-		rmnHomeReader:   rmnHomeReader,
+		observer: newObserverImpl(
+			lggr,
+			homeChain,
+			oracleID,
+			chainSupport,
+			ccipReader,
+			msgHasher,
+		),
+		ccipReader:    ccipReader,
+		reportingCfg:  reportingCfg,
+		chainSupport:  chainSupport,
+		rmnController: rmnController,
+		rmnCrypto:     rmnCrypto,
+		rmnHomeReader: rmnHomeReader,
 	}
 }
 

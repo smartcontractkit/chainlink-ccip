@@ -11,6 +11,26 @@ type RMNReport struct {
 	LaneUpdates                 []RMNLaneUpdate
 }
 
+func NewRMNReport(
+	reportVersionDigest Bytes32,
+	destChainID BigInt,
+	destChainSelector ChainSelector,
+	rmnRemoteContractAddress UnknownAddress,
+	offRampAddress UnknownAddress,
+	rmnHomeContractConfigDigest Bytes32,
+	laneUpdates []RMNLaneUpdate,
+) RMNReport {
+	return RMNReport{
+		ReportVersionDigest:         reportVersionDigest,
+		DestChainID:                 destChainID,
+		DestChainSelector:           destChainSelector,
+		RmnRemoteContractAddress:    rmnRemoteContractAddress,
+		OfframpAddress:              offRampAddress,
+		RmnHomeContractConfigDigest: rmnHomeContractConfigDigest,
+		LaneUpdates:                 laneUpdates,
+	}
+}
+
 // RMNLaneUpdate represents an interval that has been observed by an RMN node.
 // It is part of the payload that is signed and transmitted onchain.
 type RMNLaneUpdate struct {

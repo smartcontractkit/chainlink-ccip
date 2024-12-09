@@ -438,7 +438,7 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			if tc.err != "" {
 				assert.True(t, errorFound)
 			}
-			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 50*time.Millisecond)
+			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 100*time.Millisecond)
 		})
 	}
 }

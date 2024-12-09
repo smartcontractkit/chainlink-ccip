@@ -15,49 +15,49 @@ func TestNextState(t *testing.T) {
 	tests := []struct {
 		name        string
 		outcomeType OutcomeType
-		expected    State
+		expected    processorState
 	}{
 		{
 			name:        "ReportIntervalsSelected -> BuildingReport",
 			outcomeType: ReportIntervalsSelected,
-			expected:    BuildingReport,
+			expected:    buildingReport,
 		},
 		{
 			name:        "ReportGenerated -> WaitingForReportTransmission",
 			outcomeType: ReportGenerated,
-			expected:    WaitingForReportTransmission,
+			expected:    waitingForReportTransmission,
 		},
 		{
 			name:        "ReportEmpty -> SelectingRangesForReport",
 			outcomeType: ReportEmpty,
-			expected:    SelectingRangesForReport,
+			expected:    selectingRangesForReport,
 		},
 		{
 			name:        "ReportInFlight -> WaitingForReportTransmission",
 			outcomeType: ReportInFlight,
-			expected:    WaitingForReportTransmission,
+			expected:    waitingForReportTransmission,
 		},
 		{
 			name:        "ReportTransmitted -> SelectingRangesForReport",
 			outcomeType: ReportTransmitted,
-			expected:    SelectingRangesForReport,
+			expected:    selectingRangesForReport,
 		},
 		{
 			name:        "ReportTransmissionFailed -> SelectingRangesForReport",
 			outcomeType: ReportTransmissionFailed,
-			expected:    SelectingRangesForReport,
+			expected:    selectingRangesForReport,
 		},
 		{
 			name:        "Unknown -> SelectingRangesForReport",
 			outcomeType: OutcomeType(999), // An invalid outcome type to test the default case
-			expected:    SelectingRangesForReport,
+			expected:    selectingRangesForReport,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			outcome := &Outcome{OutcomeType: tt.outcomeType}
-			assert.Equal(t, tt.expected, outcome.NextState())
+			assert.Equal(t, tt.expected, outcome.nextState())
 		})
 	}
 }
@@ -118,7 +118,7 @@ func TestObservation_IsEmpty(t *testing.T) {
 				MerkleRoots:        []cciptypes.MerkleRootChain{},
 				OnRampMaxSeqNums:   []plugintypes.SeqNumChain{},
 				OffRampNextSeqNums: []plugintypes.SeqNumChain{},
-				RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress([]byte("hello world address"))},
+				RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress("hello world address")},
 				FChain:             map[cciptypes.ChainSelector]int{},
 			},
 			expected: false,
@@ -168,7 +168,7 @@ func TestAggregateObservations(t *testing.T) {
 						MerkleRoots:        []cciptypes.MerkleRootChain{{ChainSel: 1}},
 						OnRampMaxSeqNums:   []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 1}},
 						OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 1}},
-						RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress([]byte("address"))},
+						RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress("address")},
 						FChain:             map[cciptypes.ChainSelector]int{1: 1},
 					},
 				},
@@ -177,7 +177,7 @@ func TestAggregateObservations(t *testing.T) {
 				MerkleRoots:        map[cciptypes.ChainSelector][]cciptypes.MerkleRootChain{1: {{ChainSel: 1}}},
 				OnRampMaxSeqNums:   map[cciptypes.ChainSelector][]cciptypes.SeqNum{1: {1}},
 				OffRampNextSeqNums: map[cciptypes.ChainSelector][]cciptypes.SeqNum{1: {1}},
-				RMNRemoteConfigs:   []rmntypes.RemoteConfig{{ContractAddress: cciptypes.UnknownAddress([]byte("address"))}},
+				RMNRemoteConfigs:   []rmntypes.RemoteConfig{{ContractAddress: cciptypes.UnknownAddress("address")}},
 				FChain:             map[cciptypes.ChainSelector][]int{1: {1}},
 			},
 		},
@@ -189,7 +189,7 @@ func TestAggregateObservations(t *testing.T) {
 						MerkleRoots:        []cciptypes.MerkleRootChain{{ChainSel: 1}},
 						OnRampMaxSeqNums:   []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 1}},
 						OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 1, SeqNum: 1}},
-						RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress([]byte("address1"))},
+						RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress("address1")},
 						FChain:             map[cciptypes.ChainSelector]int{1: 1},
 					},
 				},
@@ -198,7 +198,7 @@ func TestAggregateObservations(t *testing.T) {
 						MerkleRoots:        []cciptypes.MerkleRootChain{{ChainSel: 2}},
 						OnRampMaxSeqNums:   []plugintypes.SeqNumChain{{ChainSel: 2, SeqNum: 2}},
 						OffRampNextSeqNums: []plugintypes.SeqNumChain{{ChainSel: 2, SeqNum: 2}},
-						RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress([]byte("address2"))},
+						RMNRemoteConfig:    rmntypes.RemoteConfig{ContractAddress: cciptypes.UnknownAddress("address2")},
 						FChain:             map[cciptypes.ChainSelector]int{2: 2},
 					},
 				},
@@ -208,8 +208,8 @@ func TestAggregateObservations(t *testing.T) {
 				OnRampMaxSeqNums:   map[cciptypes.ChainSelector][]cciptypes.SeqNum{1: {1}, 2: {2}},
 				OffRampNextSeqNums: map[cciptypes.ChainSelector][]cciptypes.SeqNum{1: {1}, 2: {2}},
 				RMNRemoteConfigs: []rmntypes.RemoteConfig{
-					{ContractAddress: cciptypes.UnknownAddress([]byte("address1"))},
-					{ContractAddress: cciptypes.UnknownAddress([]byte("address2"))},
+					{ContractAddress: cciptypes.UnknownAddress("address1")},
+					{ContractAddress: cciptypes.UnknownAddress("address2")},
 				},
 				FChain: map[cciptypes.ChainSelector][]int{1: {1}, 2: {2}},
 			},

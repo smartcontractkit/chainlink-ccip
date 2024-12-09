@@ -10,13 +10,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 )
 
-func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
-	if !w.offchainCfg.RMNEnabled {
+func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, error) {
+	if !p.offchainCfg.RMNEnabled {
 		return Query{}, nil
 	}
 
-	nextState := prevOutcome.NextState()
-	if nextState != BuildingReport {
+	nextState := prevOutcome.nextState()
+	if nextState != buildingReport {
 		return Query{}, nil
 	}
 
@@ -24,22 +24,22 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		return Query{}, fmt.Errorf("RMN report config is empty")
 	}
 
-	if err := w.initializeRMNController(ctx, prevOutcome); err != nil {
+	if err := p.prepareRMNController(ctx, prevOutcome); err != nil {
 		return Query{}, fmt.Errorf("initialize RMN controller: %w", err)
 	}
 
-	offRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOffRamp, w.destChain)
+	offRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOffRamp, p.destChain)
 	if err != nil {
 		return Query{}, fmt.Errorf("get offRamp contract address: %w", err)
 	}
 	dstChainInfo := &rmnpb.LaneDest{
-		DestChainSelector: uint64(w.destChain),
+		DestChainSelector: uint64(p.destChain),
 		OfframpAddress:    offRampAddress,
 	}
 
 	reqUpdates := make([]*rmnpb.FixedDestLaneUpdateRequest, 0, len(prevOutcome.RangesSelectedForReport))
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
-		onRampAddress, err := w.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
+		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
 			return Query{}, fmt.Errorf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 		}
@@ -56,15 +56,15 @@ func (w *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 		})
 	}
 
-	ctxQuery, cancel := context.WithTimeout(ctx, w.offchainCfg.RMNSignaturesTimeout)
+	ctxQuery, cancel := context.WithTimeout(ctx, p.offchainCfg.RMNSignaturesTimeout)
 	defer cancel()
 
 	// Get signatures for the requested updates. The signatures might contain a subset of the requested updates.
 	// While building the report the plugin should exclude source chain updates without signatures.
-	sigs, err := w.rmnController.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
+	sigs, err := p.rmnController.ComputeReportSignatures(ctxQuery, dstChainInfo, reqUpdates, prevOutcome.RMNRemoteCfg)
 	if err != nil {
 		if errors.Is(err, rmn.ErrTimeout) {
-			w.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
+			p.lggr.Errorf("RMN timeout while computing signatures for %d updates for chain %v",
 				len(reqUpdates), dstChainInfo)
 			return Query{RetryRMNSignatures: true}, nil
 		}

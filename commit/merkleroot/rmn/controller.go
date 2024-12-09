@@ -660,15 +660,15 @@ func (c *controller) getRmnReportSignatures(
 		return nil, fmt.Errorf("failed to convert lane updates from protobuf: %w", err)
 	}
 
-	rmnReport := cciptypes.RMNReport{
-		ReportVersionDigest:         rmnRemoteCfg.RmnReportVersion,
-		DestChainID:                 cciptypes.NewBigIntFromInt64(int64(destChainInfo.EvmChainID)),
-		DestChainSelector:           cciptypes.ChainSelector(destChain.DestChainSelector),
-		RmnRemoteContractAddress:    rmnRemoteCfg.ContractAddress,
-		OfframpAddress:              destChain.OfframpAddress,
-		RmnHomeContractConfigDigest: rmnRemoteCfg.ConfigDigest,
-		LaneUpdates:                 laneUpdates,
-	}
+	rmnReport := cciptypes.NewRMNReport(
+		rmnRemoteCfg.RmnReportVersion,
+		cciptypes.NewBigIntFromInt64(int64(destChainInfo.EvmChainID)),
+		cciptypes.ChainSelector(destChain.DestChainSelector),
+		rmnRemoteCfg.ContractAddress,
+		destChain.OfframpAddress,
+		rmnRemoteCfg.ConfigDigest,
+		laneUpdates,
+	)
 
 	chainInfo, exists := chainsel.ChainBySelector(destChain.DestChainSelector)
 	if !exists {

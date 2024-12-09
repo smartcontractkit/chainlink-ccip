@@ -26,47 +26,47 @@ import (
 // - chooses the seq num ranges for the next round
 // - builds a report
 // - checks for the transmission of a previous report
-func (w *Processor) Outcome(
+func (p *Processor) Outcome(
 	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	tStart := time.Now()
-	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
-	w.lggr.Infow("Sending Outcome",
+	outcome, nextState := p.getOutcome(prevOutcome, query, aos)
+	p.lggr.Infow("Sending Outcome",
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
 
-func (w *Processor) getOutcome(
+func (p *Processor) getOutcome(
 	previousOutcome Outcome,
 	q Query,
 	aos []plugincommon.AttributedObservation[Observation],
-) (Outcome, State) {
-	nextState := previousOutcome.NextState()
+) (Outcome, processorState) {
+	nextState := previousOutcome.nextState()
 
-	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.destChain, aos)
+	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
-		w.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
+		p.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
 		return Outcome{}, nextState
 	}
 
 	switch nextState {
-	case SelectingRangesForReport:
-		return reportRangesOutcome(q, w.lggr, consensusObservation, w.offchainCfg.MaxMerkleTreeSize, w.destChain), nextState
-	case BuildingReport:
+	case selectingRangesForReport:
+		return reportRangesOutcome(q, p.lggr, consensusObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain), nextState
+	case buildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
 			// The current observations should all be empty.
-			return previousOutcome, BuildingReport
+			return previousOutcome, buildingReport
 		}
-		return buildReport(q, w.lggr, consensusObservation, previousOutcome), nextState
-	case WaitingForReportTransmission:
+		return buildReport(q, p.lggr, consensusObservation, previousOutcome), nextState
+	case waitingForReportTransmission:
 		return checkForReportTransmission(
-			w.lggr, w.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
+			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
 	default:
-		w.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
+		p.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
 		return Outcome{}, nextState
 	}
 }
