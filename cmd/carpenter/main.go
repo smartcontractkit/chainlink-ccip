@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -20,13 +21,23 @@ func maybeExit(err error, s string, a ...interface{}) {
 	os.Exit(1)
 }
 
+// renderData
+/*
+
+2024-12-04T20:15:35Z | 1.1.1 |       Commit(MerkleRoot) | <processor details>
+                       | | |           |     |-- processor
+                       | | |           |-- OCR Plugin
+                       | | |-- sequence number
+                       | |-- DON ID
+                       -- oracleID
+
+*/
 func renderData(data *parse.Data) {
-	var timeStyle = lipgloss.NewStyle().Width(19).Height(1)
-	// 2024-12-04T20:11:51.997Z |
+	var timeStyle = lipgloss.NewStyle().Width(30).MaxWidth(30).Height(1).MaxHeight(1)
 
 	out :=
-		timeStyle.Render(data.Timestamp)
-	fmt.Println(data)
+		timeStyle.Render(data.Timestamp.Format(time.RFC3339))
+	//fmt.Println(data)
 	fmt.Println(out)
 }
 

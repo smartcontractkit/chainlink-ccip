@@ -1,6 +1,9 @@
 package filter
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/smartcontractkit/chainlink-ccip/cmd/carpenter/internal/parse"
 )
 
@@ -11,9 +14,10 @@ func init() {
 var _ parse.DataFilter = MerkleRootObservation
 
 func MerkleRootObservation(object map[string]interface{}) *parse.Data {
-	if nameContains("CommitPlugin.MerkleRootProcessor", object) {
-		return &parse.Data{
-			Timestamp:       getString("ts", object),
+	var result *parse.Data
+	switch {
+	case nameContains("CommitPlugin.MerkleRootProcessor", object):
+		result = &parse.Data{
 			Level:           getString("level", object),
 			Caller:          getString("caller", object),
 			Plugin:          "Commit",
@@ -22,5 +26,17 @@ func MerkleRootObservation(object map[string]interface{}) *parse.Data {
 			Details:         getString("msg", object),
 		}
 	}
-	return nil
+
+	if result == nil {
+		return nil
+	}
+
+	time, err := getTimestamp("ts", object)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to parse timestamp: %s", err)
+	} else {
+		result.Timestamp = time
+	}
+
+	return result
 }
