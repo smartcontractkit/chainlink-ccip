@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
@@ -30,7 +31,7 @@ type ContractDiscoveryProcessor struct {
 }
 
 func NewContractDiscoveryProcessor(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	reader *reader.CCIPReader,
 	homechain reader.HomeChain,
 	dest cciptypes.ChainSelector,

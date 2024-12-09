@@ -1,6 +1,7 @@
 package merkleroot
 
 import (
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -25,7 +26,7 @@ type Processor struct {
 	oracleIDToP2pID        map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg            pluginconfig.CommitOffchainConfig
 	destChain              cciptypes.ChainSelector
-	lggr                   logger.Logger
+	lggr                   cc.Logger
 	observer               Observer
 	ccipReader             readerpkg.CCIPReader
 	reportingCfg           ocr3types.ReportingPluginConfig
@@ -40,7 +41,7 @@ type Processor struct {
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	lggr logger.Logger,
+	lggr cc.Logger,
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
