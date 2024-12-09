@@ -243,8 +243,14 @@ func (h *httpClient) parsePayload(res *http.Response) (cciptypes.Bytes, error) {
 func (h *httpClient) setCoolDownPeriod(headers http.Header) {
 	coolDownDuration := defaultCoolDownDuration
 	if retryAfterHeader, exists := headers["Retry-After"]; exists && len(retryAfterHeader) > 0 {
-		if retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64); errParseInt == nil {
+		retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64)
+		if errParseInt == nil {
 			coolDownDuration = time.Duration(retryAfterSec) * time.Second
+		} else {
+			parsedTime, err := time.Parse(time.RFC1123, retryAfterHeader[0])
+			if err == nil {
+				coolDownDuration = time.Until(parsedTime)
+			}
 		}
 	}
 
