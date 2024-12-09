@@ -6,7 +6,7 @@ type RMNReport struct {
 	DestChainID                 BigInt  // If applies, a chain specific id, e.g. evm chain id otherwise empty.
 	DestChainSelector           ChainSelector
 	RmnRemoteContractAddress    UnknownAddress
-	OffRampAddress              UnknownAddress
+	OfframpAddress              UnknownAddress
 	RmnHomeContractConfigDigest Bytes32
 	LaneUpdates                 []RMNLaneUpdate
 }
@@ -25,7 +25,7 @@ func NewRMNReport(
 		DestChainID:                 destChainID,
 		DestChainSelector:           destChainSelector,
 		RmnRemoteContractAddress:    rmnRemoteContractAddress,
-		OffRampAddress:              offRampAddress,
+		OfframpAddress:              offRampAddress,
 		RmnHomeContractConfigDigest: rmnHomeContractConfigDigest,
 		LaneUpdates:                 laneUpdates,
 	}
