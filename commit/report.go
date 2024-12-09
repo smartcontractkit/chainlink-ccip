@@ -112,6 +112,32 @@ func (p *Plugin) Reports(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	if isActive, err := p.checkActiveInstance(ctx); err != nil || !isActive {
+		return false, err
+	}
+
+	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return false, fmt.Errorf("get latest price seq nr: %w", err)
+	}
+
+	decodedReport, err := p.decodeReport(ctx, r.Report)
+	if err != nil || decodedReport.IsEmpty() {
+		return false, err
+	}
+
+	if p.isStaleReport(seqNr, latestSeqNr, decodedReport) {
+		return false, nil
+	}
+
+	if isCursed, err := p.checkReportCursed(ctx, decodedReport); err != nil || isCursed {
+		return false, err
+	}
+
+	return p.validateReportInfo(r.Info, decodedReport)
+}
+
+func (p *Plugin) checkActiveInstance(ctx context.Context) (bool, error) {
 	isActiveInstance, err := p.isActiveInstance(ctx)
 	if err != nil {
 		return false, fmt.Errorf("isActiveInstance: %w", err)
@@ -120,60 +146,51 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		p.lggr.Warnw("not the active instance, skipping report acceptance")
 		return false, nil
 	}
-	latestOnchainSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	return true, nil
+}
+
+func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.CommitPluginReport, error) {
+	decodedReport, err := p.reportCodec.Decode(ctx, report)
 	if err != nil {
-		return false, fmt.Errorf("get latest price seq nr: %w", err)
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("decode commit plugin report: %w", err)
 	}
-
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
-	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	if decodedReport.IsEmpty() {
+		p.lggr.Infow("empty report")
 	}
+	return decodedReport, nil
+}
 
-	isEmpty := decodedReport.IsEmpty()
-	if isEmpty {
-		p.lggr.Infow("skipping empty report")
-		return false, nil
+func (p *Plugin) isStaleReport(seqNr, latestSeqNr uint64, decodedReport cciptypes.CommitPluginReport) bool {
+	if seqNr < latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
+		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
+		return true
 	}
+	return false
+}
 
-	p.lggr.Infow("ShouldAcceptAttestedReport",
-		"seqNr", seqNr,
-		"latestOnchainSeqNr", latestOnchainSeqNr,
-		"decodedReport", decodedReport,
-	)
-	if seqNr < latestOnchainSeqNr && len(decodedReport.MerkleRoots) == 0 {
-		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestOnchainSeqNr)
-		return false, nil
-	}
-
-	// Check if anything was cursed while building the report
+func (p *Plugin) checkReportCursed(ctx context.Context, decodedReport cciptypes.CommitPluginReport) (bool, error) {
 	sourceChains := slicelib.Map(decodedReport.MerkleRoots,
 		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector {
 			return r.ChainSel
 		})
 	isCursed, err := plugincommon.IsReportCursed(ctx, p.lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
-		p.lggr.Errorw(
-			"report not accepted due to curse checking error",
-			"err", err,
-		)
+		p.lggr.Errorw("report not accepted due to curse checking error", "err", err)
 		return false, err
 	}
-	if isCursed {
-		// Detailed logging is already done by IsReportCursed.
-		return false, nil
-	}
+	return isCursed, nil
+}
 
-	// Build final report
+func (p *Plugin) validateReportInfo(info []byte, decodedReport cciptypes.CommitPluginReport) (bool, error) {
 	var reportInfo ReportInfo
-	if err := reportInfo.Decode(r.Info); err != nil {
+	if err := reportInfo.Decode(info); err != nil {
 		return false, fmt.Errorf("decode report info: %w", err)
 	}
 
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d+1",
+		p.lggr.Infow("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, nil
 	}
@@ -184,41 +201,21 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR configs from the home chain.
-	isActiveInstance, err := p.isActiveInstance(ctx)
-	if err != nil {
-		return false, fmt.Errorf("isActiveInstance: %w", err)
-	}
-	if !isActiveInstance {
-		p.lggr.Warnw("not the active instance, skipping report acceptance")
-		return false, nil
+	if isActive, err := p.checkActiveInstance(ctx); err != nil || !isActive {
+		return false, err
 	}
 
-	latestOnchainSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get latest price seq nr: %w", err)
 	}
 
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
-	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
+	decodedReport, err := p.decodeReport(ctx, r.Report)
+	if err != nil || decodedReport.IsEmpty() {
+		return false, err
 	}
 
-	isEmpty := decodedReport.IsEmpty()
-	if isEmpty {
-		p.lggr.Infow("skipping empty report")
-		return false, nil
-	}
-
-	p.lggr.Infow("ShouldTransmitAcceptedReport",
-		"seqNr", seqNr,
-		"latestOnchainSeqNr", latestOnchainSeqNr,
-		"decodedReport", decodedReport,
-	)
-
-	if seqNr < latestOnchainSeqNr && len(decodedReport.MerkleRoots) == 0 {
-		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestOnchainSeqNr", latestOnchainSeqNr)
+	if p.isStaleReport(seqNr, latestSeqNr, decodedReport) {
 		return false, nil
 	}
 
