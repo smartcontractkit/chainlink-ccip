@@ -9,9 +9,8 @@ import (
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -37,7 +36,7 @@ func NewProcessor(
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
-		lggr:         lggr,
+		lggr:         logger.NewProcessorLogWrapper(lggr, "ChainFee"),
 		oracleID:     oracleID,
 		destChain:    destChain,
 		homeChain:    homeChain,

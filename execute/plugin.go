@@ -77,8 +77,6 @@ func NewPlugin(
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
 ) *Plugin {
-	lggr = logger.Named(lggr, "ExecutePlugin")
-	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	return &Plugin{
