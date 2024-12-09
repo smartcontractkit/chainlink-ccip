@@ -367,11 +367,13 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						{
 							Header: cciptypes.RampMessageHeader{
 								SequenceNumber: cciptypes.SeqNum(100),
+								MsgHash:        cciptypes.Bytes32{0x10},
 							},
 						},
 						{
 							Header: cciptypes.RampMessageHeader{
 								SequenceNumber: cciptypes.SeqNum(102),
+								MsgHash:        cciptypes.Bytes32{0x12},
 							},
 						},
 					},
@@ -404,22 +406,13 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Select hasher mock.
-			var resolvedHasher cciptypes.MessageHasher
-			if tt.args.hasher != nil {
-				resolvedHasher = tt.args.hasher
-			} else {
-				resolvedHasher = mocks.NewMessageHasher()
-			}
-
-			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
 
 			test := func(readyMessages map[int]struct{}) {
-				_, err := buildSingleChainReportHelper(ctx, lggr, resolvedHasher, tt.args.report, readyMessages)
+				_, err := buildSingleChainReportHelper(lggr, tt.args.report, readyMessages)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 			}
