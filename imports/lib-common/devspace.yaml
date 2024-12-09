@@ -26,4 +26,4 @@ pipelines:
       kubectl delete ns ${DEVSPACE_NAMESPACE}
   ingress-check:
     run: |-
-      ./${SCRIPTS_DIR}/ingress_check.sh
+      crib devspace ingress-check

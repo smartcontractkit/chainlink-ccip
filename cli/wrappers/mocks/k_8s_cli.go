@@ -12,6 +12,8 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
+	networkingv1 "k8s.io/api/networking/v1"
+
 	rest "k8s.io/client-go/rest"
 
 	time "time"
@@ -391,6 +393,66 @@ func (_c *K8sCLI_EnsureNamespaceExists_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// GetIngress provides a mock function with given fields: ctx, namespace, name
+func (_m *K8sCLI) GetIngress(ctx context.Context, namespace string, name string) (*networkingv1.Ingress, error) {
+	ret := _m.Called(ctx, namespace, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIngress")
+	}
+
+	var r0 *networkingv1.Ingress
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) (*networkingv1.Ingress, error)); ok {
+		return rf(ctx, namespace, name)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) *networkingv1.Ingress); ok {
+		r0 = rf(ctx, namespace, name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*networkingv1.Ingress)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = rf(ctx, namespace, name)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// K8sCLI_GetIngress_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIngress'
+type K8sCLI_GetIngress_Call struct {
+	*mock.Call
+}
+
+// GetIngress is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+//   - name string
+func (_e *K8sCLI_Expecter) GetIngress(ctx interface{}, namespace interface{}, name interface{}) *K8sCLI_GetIngress_Call {
+	return &K8sCLI_GetIngress_Call{Call: _e.mock.On("GetIngress", ctx, namespace, name)}
+}
+
+func (_c *K8sCLI_GetIngress_Call) Run(run func(ctx context.Context, namespace string, name string)) *K8sCLI_GetIngress_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *K8sCLI_GetIngress_Call) Return(_a0 *networkingv1.Ingress, _a1 error) *K8sCLI_GetIngress_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *K8sCLI_GetIngress_Call) RunAndReturn(run func(context.Context, string, string) (*networkingv1.Ingress, error)) *K8sCLI_GetIngress_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LabelNamespace provides a mock function with given fields: ctx, namespace, key, value
 func (_m *K8sCLI) LabelNamespace(ctx context.Context, namespace string, key string, value string) error {
 	ret := _m.Called(ctx, namespace, key, value)
@@ -436,6 +498,65 @@ func (_c *K8sCLI_LabelNamespace_Call) Return(_a0 error) *K8sCLI_LabelNamespace_C
 }
 
 func (_c *K8sCLI_LabelNamespace_Call) RunAndReturn(run func(context.Context, string, string, string) error) *K8sCLI_LabelNamespace_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListIngresses provides a mock function with given fields: ctx, namespace
+func (_m *K8sCLI) ListIngresses(ctx context.Context, namespace string) (*networkingv1.IngressList, error) {
+	ret := _m.Called(ctx, namespace)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListIngresses")
+	}
+
+	var r0 *networkingv1.IngressList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*networkingv1.IngressList, error)); ok {
+		return rf(ctx, namespace)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *networkingv1.IngressList); ok {
+		r0 = rf(ctx, namespace)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*networkingv1.IngressList)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, namespace)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// K8sCLI_ListIngresses_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListIngresses'
+type K8sCLI_ListIngresses_Call struct {
+	*mock.Call
+}
+
+// ListIngresses is a helper method to define mock.On call
+//   - ctx context.Context
+//   - namespace string
+func (_e *K8sCLI_Expecter) ListIngresses(ctx interface{}, namespace interface{}) *K8sCLI_ListIngresses_Call {
+	return &K8sCLI_ListIngresses_Call{Call: _e.mock.On("ListIngresses", ctx, namespace)}
+}
+
+func (_c *K8sCLI_ListIngresses_Call) Run(run func(ctx context.Context, namespace string)) *K8sCLI_ListIngresses_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *K8sCLI_ListIngresses_Call) Return(_a0 *networkingv1.IngressList, _a1 error) *K8sCLI_ListIngresses_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *K8sCLI_ListIngresses_Call) RunAndReturn(run func(context.Context, string) (*networkingv1.IngressList, error)) *K8sCLI_ListIngresses_Call {
 	_c.Call.Return(run)
 	return _c
 }

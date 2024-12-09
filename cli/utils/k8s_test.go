@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
+	networkingv1api "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -326,6 +327,165 @@ func TestLabelNamespace(t *testing.T) {
 				assert.Equal(t, tt.expectErr, err.Error())
 			} else {
 				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetIngress(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test-namespace"
+	ingressName := "test-ingress"
+
+	tests := []struct {
+		name                    string
+		applyIngressesMockCalls func(m *k8smocks.IngressInterface)
+		expectedIngress         *networkingv1api.Ingress
+		expectErr               string
+	}{
+		{
+			name: "Success",
+			applyIngressesMockCalls: func(m *k8smocks.IngressInterface) {
+				m.EXPECT().
+					Get(
+						context.TODO(),
+						ingressName,
+						metav1.GetOptions{},
+					).Return(&networkingv1api.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: ingressName,
+					},
+				}, nil).Times(1)
+			},
+			expectedIngress: &networkingv1api.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: ingressName,
+				},
+			},
+			expectErr: "",
+		},
+		{
+			name: "Error",
+			applyIngressesMockCalls: func(m *k8smocks.IngressInterface) {
+				m.EXPECT().
+					Get(
+						context.TODO(),
+						ingressName,
+						metav1.GetOptions{},
+					).Return(nil, fmt.Errorf("some error")).Times(1)
+			},
+			expectedIngress: nil,
+			expectErr:       "some error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockIngresses := k8smocks.NewIngressInterface(t)
+			tt.applyIngressesMockCalls(mockIngresses)
+
+			mockNetworkingV1 := k8smocks.NewNetworkingV1Interface(t)
+			mockNetworkingV1.EXPECT().Ingresses(namespace).Return(mockIngresses)
+
+			mockClientset := wrappermocks.NewK8sClientset(t)
+			mockClientset.EXPECT().NetworkingV1().Return(mockNetworkingV1)
+
+			configFlags := &genericclioptions.ConfigFlags{}
+			k8sClient, err := wrappers.NewK8sClient(configFlags, mockClientset)
+			require.NoError(t, err)
+
+			ingress, err := k8sClient.GetIngress(context.TODO(), namespace, ingressName)
+			if tt.expectErr != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectErr, err.Error())
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedIngress, ingress)
+			}
+		})
+	}
+}
+
+func TestListIngresses(t *testing.T) {
+	t.Parallel()
+
+	namespace := "test-namespace"
+
+	tests := []struct {
+		name                    string
+		applyIngressesMockCalls func(m *k8smocks.IngressInterface)
+		expectedIngressList     *networkingv1api.IngressList
+		expectErr               string
+	}{
+		{
+			name: "Success",
+			applyIngressesMockCalls: func(m *k8smocks.IngressInterface) {
+				m.EXPECT().
+					List(
+						context.TODO(),
+						metav1.ListOptions{},
+					).Return(&networkingv1api.IngressList{
+					Items: []networkingv1api.Ingress{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "test-ingress",
+							},
+						},
+					},
+				}, nil).Times(1)
+			},
+			expectedIngressList: &networkingv1api.IngressList{
+				Items: []networkingv1api.Ingress{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-ingress",
+						},
+					},
+				},
+			},
+			expectErr: "",
+		},
+		{
+			name: "Error",
+			applyIngressesMockCalls: func(m *k8smocks.IngressInterface) {
+				m.EXPECT().
+					List(
+						context.TODO(),
+						metav1.ListOptions{},
+					).Return(nil, fmt.Errorf("some error")).Times(1)
+			},
+			expectedIngressList: nil,
+			expectErr:           "some error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockIngresses := k8smocks.NewIngressInterface(t)
+			tt.applyIngressesMockCalls(mockIngresses)
+
+			mockNetworkingV1 := k8smocks.NewNetworkingV1Interface(t)
+			mockNetworkingV1.EXPECT().Ingresses(namespace).Return(mockIngresses)
+
+			mockClientset := wrappermocks.NewK8sClientset(t)
+			mockClientset.EXPECT().NetworkingV1().Return(mockNetworkingV1)
+
+			configFlags := &genericclioptions.ConfigFlags{}
+			k8sClient, err := wrappers.NewK8sClient(configFlags, mockClientset)
+			require.NoError(t, err)
+
+			ingressList, err := k8sClient.ListIngresses(context.TODO(), namespace)
+			if tt.expectErr != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectErr, err.Error())
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedIngressList, ingressList)
 			}
 		})
 	}

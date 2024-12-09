@@ -89,7 +89,7 @@ pipelines:
         create_deployments chainlink-don --from-file="${tmp_dir}/ccip-v2-node-overrides.yaml"
 
         # Ensure all ingresses are ready before proceeding
-        ./${SCRIPTS_DIR}/ingress_check.sh
+        crib devspace ingress-check
         # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
         run_dependency_pipelines ccip-v2-scripts-deploy-ccip
       else

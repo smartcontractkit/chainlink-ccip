@@ -314,3 +314,28 @@ func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, ro
 	}
 	return nil
 }
+
+// PrintIngressHosts prints the hostnames of the ingresses in the specified namespace
+func PrintIngressHosts(ctx context.Context, k8sClient wrappers.K8sCLI, namespace, provider string) error {
+	ingressList, err := k8sClient.ListIngresses(ctx, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to list ingresses: %w", err)
+	}
+
+	hostPreffix := "https://"
+	if provider == "kind" {
+		hostPreffix = "http://"
+	}
+
+	fmt.Println("#############################################################")
+	fmt.Println("###    Ingress hostnames")
+	fmt.Println("#############################################################")
+	for _, ingress := range ingressList.Items {
+		for _, rule := range ingress.Spec.Rules {
+			if rule.Host != "" {
+				fmt.Printf("%s%s\n", hostPreffix, rule.Host)
+			}
+		}
+	}
+	return nil
+}

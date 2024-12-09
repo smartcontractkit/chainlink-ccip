@@ -30,7 +30,7 @@ preprovision_keystone() {
 	if [ "$(get_flag "skip_provision")" == "false" ]; then
 		deploy_app "${ARTEFACTS_DIR}/crib-preprovision.yaml"
 	fi
-	../../scripts/ingress_check.sh
+	crib devspace ingress-check
 	kubectl label namespace/"${DEVSPACE_NAMESPACE}" network=crib >/dev/null 2>&1 || true
 }
 

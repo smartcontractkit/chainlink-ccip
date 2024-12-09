@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	networkingv1api "k8s.io/api/networking/v1"
 )
 
 func TestGetGitTopLevelDir(t *testing.T) {
@@ -845,6 +847,118 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 				assert.Equal(t, tc.expectedErr.Error(), err.Error())
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+// nolint: paralleltest, nolintlint
+func TestPrintIngressHosts(t *testing.T) {
+	namespace := "test-namespace"
+
+	testCases := []struct {
+		name                    string
+		applyK8sClientMockCalls func(*wrappermocks.K8sCLI)
+		provider                string
+		expectedErr             string
+		expectedHosts           []string
+	}{
+		{
+			name:     "ValidIngressesProviderAWS",
+			provider: "aws",
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					ListIngresses(context.TODO(), namespace).
+					Return(&networkingv1api.IngressList{Items: []networkingv1api.Ingress{
+						{
+							Spec: networkingv1api.IngressSpec{
+								Rules: []networkingv1api.IngressRule{
+									{Host: "example.com"},
+									{Host: "test.com"},
+								},
+							},
+						},
+					}}, nil)
+			},
+			expectedErr:   "",
+			expectedHosts: []string{"https://example.com", "https://test.com"},
+		},
+		{
+			name:     "ValidIngressesProviderKind",
+			provider: "kind",
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					ListIngresses(context.TODO(), namespace).
+					Return(&networkingv1api.IngressList{Items: []networkingv1api.Ingress{
+						{
+							Spec: networkingv1api.IngressSpec{
+								Rules: []networkingv1api.IngressRule{
+									{Host: "example.com"},
+									{Host: "test.com"},
+								},
+							},
+						},
+					}}, nil)
+			},
+			expectedErr:   "",
+			expectedHosts: []string{"http://example.com", "http://test.com"},
+		},
+		{
+			name:     "NoIngresses",
+			provider: string(mock.AnythingOfType("string")),
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					ListIngresses(context.TODO(), namespace).
+					Return(&networkingv1api.IngressList{}, nil)
+			},
+			expectedErr:   "",
+			expectedHosts: []string{},
+		},
+		{
+			name:     "ListIngressesError",
+			provider: string(mock.AnythingOfType("string")),
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					ListIngresses(context.TODO(), namespace).
+					Return(&networkingv1api.IngressList{}, fmt.Errorf("error listing ingresses"))
+			},
+			expectedErr:   "error listing ingresses",
+			expectedHosts: []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockK8sClient := wrappermocks.NewK8sCLI(t)
+			tc.applyK8sClientMockCalls(mockK8sClient)
+
+			// Capture the output
+			oldStdout := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			err := utils.PrintIngressHosts(context.TODO(), mockK8sClient, namespace, tc.provider)
+			if tc.expectedErr != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			// Restore stdout and read the captured output
+			w.Close()
+			os.Stdout = oldStdout
+			var output []byte
+			output, _ = io.ReadAll(r)
+
+			// Check the output
+			capturedOutput := string(output)
+			if tc.name != "ListIngressesError" {
+				assert.Contains(t, capturedOutput, "Ingress hostnames")
+			}
+
+			for _, host := range tc.expectedHosts {
+				assert.Contains(t, capturedOutput, host)
 			}
 		})
 	}

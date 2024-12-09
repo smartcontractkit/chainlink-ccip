@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -398,6 +399,146 @@ var labelNamespaceCmd = &cobra.Command{
 	},
 }
 
+// ingressCheckCmd represents the devspace ingress-check subcommand
+var ingressCheckCmd = &cobra.Command{
+	Use:   "ingress-check",
+	Short: "Verify that all ingresses hostnames are resolvable up to a certain timeout and print them",
+	Run: func(cmd *cobra.Command, args []string) {
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
+
+		configFlags := genericclioptions.NewConfigFlags(true)
+		kubeconfig := viper.GetString("KUBECONFIG")
+		configFlags.KubeConfig = &kubeconfig
+		k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+		if err != nil {
+			logger.Error("failed to initialize kube client", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		ingressList, err := k8sClient.ListIngresses(context.TODO(), viper.GetString("DEVSPACE_NAMESPACE"))
+		if err != nil {
+			logger.Error("failed to list ingresses", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		start := time.Now()
+		i := 0
+		ingressHosts := []string{}
+		for i < len(ingressList.Items) {
+			if time.Since(start) > viper.GetDuration("timeout") {
+				logger.Error("timeout reached", slog.Any("timeout", viper.GetDuration("timeout")))
+				os.Exit(1)
+			}
+
+			ingress := &ingressList.Items[i]
+			logger.Info("validating ingress", slog.String("name", ingress.Name), slog.String("namespace", ingress.Namespace))
+			logger.Debug("ingress object contents", slog.Any("status", ingress.Status))
+			var ingressSuffix string
+			switch *ingress.Spec.IngressClassName {
+			case "alb":
+				ingressSuffix = ".elb.amazonaws.com"
+			case "nginx":
+				ingressSuffix = "localhost"
+			default:
+				logger.Error("unsupported ingress class", slog.String("ingress_class", *ingress.Spec.IngressClassName), slog.Any("supported_classes", []string{"alb", "nginx"}))
+				os.Exit(1)
+			}
+
+			for {
+				if time.Since(start) > viper.GetDuration("timeout") {
+					logger.Error("timeout reached", slog.Any("timeout", viper.GetDuration("timeout")))
+					os.Exit(1)
+				}
+
+				// GetIngress makes sure we're refreshing the object's status every time
+				ingress, err := k8sClient.GetIngress(context.TODO(), ingress.Namespace, ingress.Name)
+				if err != nil {
+					logger.Error("failed to refresh ingress status", slog.Any("ingress", ingress), slog.Any("error", err))
+					os.Exit(1)
+				}
+				logger.Debug("ingress object contents", slog.Any("status", ingress.Status))
+
+				if len(ingress.Status.LoadBalancer.Ingress) > 0 && strings.HasSuffix(ingress.Status.LoadBalancer.Ingress[0].Hostname, ingressSuffix) {
+					logger.Info("ingress ready", slog.String("hostname", ingress.Status.LoadBalancer.Ingress[0].Hostname), slog.Duration("elapsed", time.Since(start)))
+					for _, rule := range ingress.Spec.Rules {
+						if rule.Host != "" {
+							ingressHosts = append(ingressHosts, rule.Host)
+						}
+					}
+					i++
+					break
+				} else {
+					logger.Info("waiting for ingress creation", slog.String("name", ingress.Name), slog.Duration("internal", viper.GetDuration("interval")))
+					time.Sleep(viper.GetDuration("interval"))
+				}
+			}
+		}
+
+		if len(ingressHosts) == 0 {
+			logger.Error("no ingress hostnames found in namespace", slog.String("namespace", viper.GetString("DEVSPACE_NAMESPACE")))
+			os.Exit(1)
+		}
+
+		if viper.GetString("PROVIDER") == "kind" {
+			ingressIP := "127.0.0.1"
+			for _, host := range ingressHosts {
+				entry := fmt.Sprintf("%s %s", ingressIP, host)
+				already_exists, err := utils.AddToEtcHosts(entry, "")
+				if err != nil {
+					logger.Error("failed to add entry to /etc/hosts", slog.String("entry", entry), slog.Any("error", err))
+					os.Exit(1)
+				}
+				logger.Info("entry in /etc/hosts in place", slog.String("entry", entry), slog.Bool("already_exists", already_exists))
+			}
+			logger.Info("hosts file configured successfully")
+		}
+
+		for _, host := range ingressHosts {
+			if time.Since(start) > viper.GetDuration("timeout") {
+				logger.Error("timeout reached", slog.Any("timeout", viper.GetDuration("timeout")))
+				os.Exit(1)
+			}
+
+			elapsed, err := utils.CheckHostnameResolution(host, viper.GetDuration("nsTimeout"), viper.GetDuration("interval"), nil)
+			if err != nil {
+				logger.Error("failed to resolve hostname", slog.String("hostname", host), slog.Any("error", err))
+				os.Exit(1)
+			}
+			logger.Info("hostname resolved", slog.String("hostname", host), slog.Duration("elapsed", elapsed))
+		}
+
+		logger.Info("all ingress hostnames resolved", slog.String("namespace", viper.GetString("DEVSPACE_NAMESPACE")))
+
+		if err := utils.PrintIngressHosts(context.TODO(), k8sClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER")); err != nil {
+			logger.Error("failed to ingress hosts", slog.Any("error", err))
+			os.Exit(1)
+		}
+	},
+}
+
+// printIngressHostsCmd represents the devspace print-ingress-hosts subcommand
+var printIngressHostsCmd = &cobra.Command{
+	Use:   "print-ingress-hosts",
+	Short: "Print all ingress hostnames in the namespace",
+	Run: func(cmd *cobra.Command, args []string) {
+		logger.Debug("Running with the following parameters", "config", viper.AllSettings())
+
+		configFlags := genericclioptions.NewConfigFlags(true)
+		kubeconfig := viper.GetString("KUBECONFIG")
+		configFlags.KubeConfig = &kubeconfig
+		k8sClient, err := wrappers.NewK8sClient(configFlags, nil)
+		if err != nil {
+			logger.Error("failed to initialize kube client", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		if err := utils.PrintIngressHosts(context.TODO(), k8sClient, viper.GetString("DEVSPACE_NAMESPACE"), viper.GetString("PROVIDER")); err != nil {
+			logger.Error("failed to ingress hosts", slog.Any("error", err))
+			os.Exit(1)
+		}
+	},
+}
+
 //nolint:gochecknoinits
 func init() {
 	rootCmd.AddCommand(devspaceCmd)
@@ -417,4 +558,13 @@ func init() {
 	devspaceCmd.AddCommand(purgeKindCmd)
 
 	devspaceCmd.AddCommand(labelNamespaceCmd)
+
+	ingressCheckCmd.Flags().Duration("timeout", 2*time.Minute, "Timeout for the entire ingress check")
+	ingressCheckCmd.Flags().Duration("nsTimeout", 1*time.Minute, "Timeout for each DNS lookup attempt")
+	ingressCheckCmd.Flags().Duration("interval", 10*time.Second, "Time between retries")
+	devspaceCmd.AddCommand(ingressCheckCmd)
+
+	_ = viper.BindPFlags(ingressCheckCmd.Flags())
+
+	devspaceCmd.AddCommand(printIngressHostsCmd)
 }
