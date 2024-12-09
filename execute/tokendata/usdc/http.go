@@ -249,7 +249,7 @@ func (h *httpClient) setCoolDownPeriod(headers http.Header) {
 		} else {
 			parsedTime, err := time.Parse(time.RFC1123, retryAfterHeader[0])
 			if err == nil {
-				coolDownDuration = parsedTime.Sub(time.Now())
+				coolDownDuration = time.Until(parsedTime)
 			}
 		}
 	}
