@@ -12,7 +12,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -179,7 +179,7 @@ func Test_validateObservedOffRampMaxSeqNums(t *testing.T) {
 }
 
 func Test_validateRMNRemoteConfig(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		name              string
 		observer          commontypes.OracleID
 		supportsDestChain bool
@@ -329,7 +329,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain, tt.rmnRemoteConfig)
 			if tt.expectedError {
@@ -437,7 +437,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 	ctx := tests.Context(t)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reader := reader_mock.NewMockCCIPReader(t)
+			reader := readermock.NewMockCCIPReader(t)
 			rep := cciptypes.CommitPluginReport{}
 			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
 			for _, snc := range tc.onRampNextSeqNum {

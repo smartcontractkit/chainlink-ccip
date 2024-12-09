@@ -16,7 +16,7 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func (w *Processor) ValidateObservation(
+func (p *Processor) ValidateObservation(
 	_ Outcome,
 	q Query,
 	ao plugincommon.AttributedObservation[Observation]) error {
@@ -29,12 +29,12 @@ func (w *Processor) ValidateObservation(
 	if err := validateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("validate FChain: %w", err)
 	}
-	observerSupportedChains, err := w.chainSupport.SupportedChains(ao.OracleID)
+	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
 	if err != nil {
 		return fmt.Errorf("get supported chains: %w", err)
 	}
 
-	supportsDestChain, err := w.chainSupport.SupportsDestChain(ao.OracleID)
+	supportsDestChain, err := p.chainSupport.SupportsDestChain(ao.OracleID)
 	if err != nil {
 		return fmt.Errorf("call to supportsDestChain failed: %w", err)
 	}
@@ -52,7 +52,7 @@ func (w *Processor) ValidateObservation(
 	}
 
 	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
-		w.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
+		p.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
 		return fmt.Errorf("validate RMNRemoteConfig: %w", err)
 	}
 

@@ -255,13 +255,14 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			defer chainSupport.AssertExpectations(t)
 			defer ccipReader.AssertExpectations(t)
 
-			o := observerImpl{
-				nodeID:       nodeID,
-				lggr:         logger.Test(t),
-				msgHasher:    mocks.NewMessageHasher(),
-				ccipReader:   ccipReader,
-				chainSupport: chainSupport,
-			}
+			o := newObserverImpl(
+				logger.Test(t),
+				nil,
+				nodeID,
+				chainSupport,
+				ccipReader,
+				mocks.NewMessageHasher(),
+			)
 
 			assert.Equal(t, tc.expResult, o.ObserveOffRampNextSeqNums(ctx))
 		})
@@ -445,7 +446,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			var nodeID commontypes.OracleID = 1
-			reader := reader_mock.NewMockCCIPReader(t)
+			mockCCIPReader := reader_mock.NewMockCCIPReader(t)
 			for _, r := range tc.ranges {
 				// Skip unexpected calls.
 				if tc.supportedChainsFails || !tc.supportedChains.Contains(r.ChainSel) {
@@ -456,12 +457,12 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				if e, exists := tc.msgsBetweenSeqNumsErrors[r.ChainSel]; exists {
 					err = e
 				}
-				reader.On(
+				mockCCIPReader.On(
 					"MsgsBetweenSeqNums", ctx, r.ChainSel, r.SeqNumRange,
 				).Return(tc.msgsBetweenSeqNums[r.ChainSel], err)
 			}
 
-			reader.EXPECT().
+			mockCCIPReader.EXPECT().
 				GetContractAddress(mock.Anything, mock.Anything).
 				Return(cciptypes.Bytes{}, nil).Maybe()
 
@@ -474,13 +475,14 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				chainSupport.On("SupportedChains", nodeID).Return(tc.supportedChains, nil)
 			}
 
-			o := observerImpl{
-				nodeID:       nodeID,
-				lggr:         logger.Test(t),
-				msgHasher:    mocks.NewMessageHasher(),
-				ccipReader:   reader,
-				chainSupport: chainSupport,
-			}
+			o := newObserverImpl(
+				logger.Test(t),
+				nil,
+				nodeID,
+				chainSupport,
+				mockCCIPReader,
+				mocks.NewMessageHasher(),
+			)
 
 			roots := o.ObserveMerkleRoots(ctx, tc.ranges)
 			if tc.expMerkleRoots == nil {
@@ -608,16 +610,16 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 		offchainCfg: pluginconfig.CommitOffchainConfig{RMNEnabled: false},
 	}
 
-	err := p.initializeRMNController(ctx, Outcome{})
+	err := p.prepareRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "rmn is not enabled")
 
 	p.offchainCfg.RMNEnabled = true
 	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
-	err = p.initializeRMNController(ctx, Outcome{})
+	err = p.prepareRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "rmn enabled but controller already initialized")
 
 	p.rmnControllerCfgDigest = cciptypes.Bytes32{1}
-	err = p.initializeRMNController(ctx, Outcome{})
+	err = p.prepareRMNController(ctx, Outcome{})
 	assert.NoError(t, err, "previous outcome does not contain remote config digest")
 
 	rmnHomeReader := readerpkg_mock.NewMockRMNHome(t)
@@ -641,7 +643,7 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 		rmnNodes,
 	).Return(nil)
 
-	err = p.initializeRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
+	err = p.prepareRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
 	assert.NoError(t, err, "rmn controller initialized")
 	assert.Equal(t, cfg.ConfigDigest, p.rmnControllerCfgDigest)
 }

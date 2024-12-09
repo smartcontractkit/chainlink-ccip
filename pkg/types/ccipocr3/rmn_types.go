@@ -6,9 +6,29 @@ type RMNReport struct {
 	DestChainID                 BigInt  // If applies, a chain specific id, e.g. evm chain id otherwise empty.
 	DestChainSelector           ChainSelector
 	RmnRemoteContractAddress    UnknownAddress
-	OfframpAddress              UnknownAddress
+	OffRampAddress              UnknownAddress
 	RmnHomeContractConfigDigest Bytes32
 	LaneUpdates                 []RMNLaneUpdate
+}
+
+func NewRMNReport(
+	reportVersionDigest Bytes32,
+	destChainID BigInt,
+	destChainSelector ChainSelector,
+	rmnRemoteContractAddress UnknownAddress,
+	offRampAddress UnknownAddress,
+	rmnHomeContractConfigDigest Bytes32,
+	laneUpdates []RMNLaneUpdate,
+) RMNReport {
+	return RMNReport{
+		ReportVersionDigest:         reportVersionDigest,
+		DestChainID:                 destChainID,
+		DestChainSelector:           destChainSelector,
+		RmnRemoteContractAddress:    rmnRemoteContractAddress,
+		OffRampAddress:              offRampAddress,
+		RmnHomeContractConfigDigest: rmnHomeContractConfigDigest,
+		LaneUpdates:                 laneUpdates,
+	}
 }
 
 // RMNLaneUpdate represents an interval that has been observed by an RMN node.
