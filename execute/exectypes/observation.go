@@ -60,7 +60,7 @@ type Observation struct {
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
 
-	// CostlyMessages are determined during the third phase of execute.
+	// CostlyMessages are determined during the second phase of execute.
 	// It contains the message IDs of messages that cost more to execute than their source fees. These messages will not
 	// be executed in the current round, but may be executed in future rounds (e.g. if gas prices decrease or if
 	// these messages' fees are boosted high enough).

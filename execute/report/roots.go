@@ -38,12 +38,7 @@ func ConstructMerkleTree(
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
 				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}
-		leaf, err := hasher.Hash(ctx, msg)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"unable to hash message (%d, %d): %w",
-				msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
-		}
+		leaf := msg.Header.MsgHash
 		lggr.Debugw("Hashed message, adding to tree leaves",
 			"hash", leaf,
 			"msg", msg,

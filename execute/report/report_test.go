@@ -182,6 +182,21 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 	}
 }
 
+func makeMessageWithHash(
+	src cciptypes.ChainSelector,
+	num cciptypes.SeqNum,
+	nonce uint64,
+	hasher cciptypes.MessageHasher,
+) cciptypes.Message {
+	msg := makeMessage(src, num, nonce)
+	hash, err := hasher.Hash(context.Background(), msg)
+	if err != nil {
+		panic(fmt.Sprintf("unable to hash message: %s", err))
+	}
+	msg.Header.MsgHash = hash
+	return msg
+}
+
 // makeTestCommitReportWithSenders is the same as makeTestCommitReport but overrides the senders.
 func makeTestCommitReportWithSenders(
 	hasher cciptypes.MessageHasher,
@@ -231,10 +246,12 @@ func makeTestCommitReport(
 	}
 	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		msg := makeMessage(
+		msg := makeMessageWithHash(
 			cciptypes.ChainSelector(srcChain),
 			cciptypes.SeqNum(i+firstSeqNum),
-			uint64(i)+1)
+			uint64(i)+1,
+			hasher,
+		)
 		msg.Sender = sender
 		messages = append(messages, msg)
 	}
@@ -373,26 +390,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						{
 							Header: cciptypes.RampMessageHeader{
 								SourceChainSelector: 2222,
-								SequenceNumber:      cciptypes.SeqNum(100),
-							},
-						},
-					},
-				},
-				hasher: badHasher{},
-			},
-		},
-		{
-			name:    "bad hasher",
-			wantErr: "unable to hash message (1234567, 100): bad hasher",
-			args: args{
-				report: exectypes.CommitData{
-					MessageTokenData:    make([]exectypes.MessageTokenData, 1),
-					SourceChain:         1234567,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					Messages: []cciptypes.Message{
-						{
-							Header: cciptypes.RampMessageHeader{
-								SourceChainSelector: 1234567,
 								SequenceNumber:      cciptypes.SeqNum(100),
 							},
 						},

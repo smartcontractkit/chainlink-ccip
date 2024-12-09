@@ -94,7 +94,15 @@ func (it *IntTest) WithMessages(
 	crBlockNumber uint64,
 	crTimestamp time.Time,
 	numReports int) {
-	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
+	mapped := slicelib.Map(messages,
+		func(m inmem.MessagesWithMetadata) cciptypes.Message {
+			msg := m.Message
+			hash, err := it.msgHasher.Hash(context.Background(), msg)
+			require.NoError(it.t, err, "failed to hash message")
+			msg.Header.MsgHash = hash
+			return msg
+		},
+	)
 	totalMessages := len(mapped)
 	messagesPerReport := totalMessages / numReports
 
