@@ -5,9 +5,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
+
+	sel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -132,6 +135,7 @@ func NewPluginFactory(
 	}
 }
 
+//nolint:gocyclo
 func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
 	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
@@ -148,11 +152,21 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
+	// map types to the facade.
+	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
+	for chain, cr := range p.contractReaders {
+		chainID, err1 := sel.ChainIdFromSelector(uint64(chain))
+		if err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
+		}
+		readers[chain] = contractreader.NewObserverReader(cr, p.lggr, strconv.FormatUint(chainID, 10))
+	}
+
 	// Bind the RMNHome contract
 	var rmnHomeReader readerpkg.RMNHome
 	if offchainConfig.RMNEnabled {
 		rmnHomeAddress := p.ocrConfig.Config.RmnHomeAddress
-		rmnCr, ok := p.contractReaders[p.homeChainSelector]
+		rmnCr, ok := readers[p.homeChainSelector]
 		if !ok {
 			return nil,
 				ocr3types.ReportingPluginInfo{},
@@ -176,12 +190,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err := rmnHomeReader.Start(ctx); err != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to start RMNHome reader: %w", err)
 		}
-	}
-
-	// map types to the facade.
-	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade, len(p.contractReaders))
-	for chain, cr := range p.contractReaders {
-		readers[chain] = cr
 	}
 
 	if err := validateOcrConfig(p.ocrConfig.Config); err != nil {
