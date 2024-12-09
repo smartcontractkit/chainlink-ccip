@@ -3,21 +3,21 @@ package chainfee
 import (
 	"context"
 
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type processor struct {
 	oracleID     commontypes.OracleID
 	destChain    cciptypes.ChainSelector
-	lggr         logger.Logger
+	lggr         cc.Logger
 	homeChain    reader.HomeChain
 	ccipReader   readerpkg.CCIPReader
 	cfg          pluginconfig.CommitOffchainConfig
@@ -26,7 +26,7 @@ type processor struct {
 }
 
 func NewProcessor(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	oracleID commontypes.OracleID,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,

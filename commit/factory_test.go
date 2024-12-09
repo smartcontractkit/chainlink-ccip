@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -294,7 +295,7 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 		require.NoError(t, err)
 
 		p := &PluginFactory{
-			lggr: lggr,
+			baseLggr: lggr,
 			ocrConfig: reader.OCR3ConfigWithMeta{
 				Version:      1,
 				ConfigDigest: [32]byte{1, 2, 3},

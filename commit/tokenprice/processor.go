@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -16,7 +17,7 @@ import (
 
 type processor struct {
 	oracleID         commontypes.OracleID
-	lggr             logger.Logger
+	lggr             cc.Logger
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
@@ -27,7 +28,7 @@ type processor struct {
 
 func NewProcessor(
 	oracleID commontypes.OracleID,
-	lggr logger.Logger,
+	lggr cc.Logger,
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,

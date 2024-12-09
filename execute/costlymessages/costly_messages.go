@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"time"
 
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
@@ -66,7 +67,7 @@ func NewObserverWithDefaults(
 // NewObserver allows to specific feeCalculator and execCostCalculator.
 // Therefore, it's very convenient for testing.
 func NewObserver(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	enabled bool,
 	feeCalculator MessageFeeE18USDCalculator,
 	execCostCalculator MessageExecCostUSD18Calculator,
@@ -81,7 +82,7 @@ func NewObserver(
 }
 
 type observer struct {
-	lggr               logger.Logger
+	lggr               cc.Logger
 	enabled            bool
 	feeCalculator      MessageFeeE18USDCalculator
 	execCostCalculator MessageExecCostUSD18Calculator
@@ -261,7 +262,7 @@ var _ MessageExecCostUSD18Calculator = &StaticMessageExecCostUSD18Calculator{}
 
 // CCIPMessageFeeUSD18Calculator calculates the fees (paid at source) of a set of messages in USD18s.
 type CCIPMessageFeeUSD18Calculator struct {
-	lggr logger.Logger
+	lggr cc.Logger
 
 	ccipReader readerpkg.CCIPReader
 
@@ -274,7 +275,7 @@ type CCIPMessageFeeUSD18Calculator struct {
 }
 
 func NewCCIPMessageFeeUSD18Calculator(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 	now func() time.Time,
@@ -340,7 +341,7 @@ func waitBoostedFee(
 }
 
 type CCIPMessageExecCostUSD18Calculator struct {
-	lggr             logger.Logger
+	lggr             cc.Logger
 	ccipReader       readerpkg.CCIPReader
 	estimateProvider gas.EstimateProvider
 }
