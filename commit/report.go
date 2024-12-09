@@ -59,6 +59,8 @@ func (p *Plugin) Reports(
 		rep     cciptypes.CommitPluginReport
 		repInfo ReportInfo
 	)
+
+	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 	rep = cciptypes.CommitPluginReport{
 		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
 		PriceUpdates: cciptypes.PriceUpdates{
@@ -66,6 +68,11 @@ func (p *Plugin) Reports(
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+	}
+
+	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportEmpty {
+		rep.MerkleRoots = []cciptypes.MerkleRootChain{}
+		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
