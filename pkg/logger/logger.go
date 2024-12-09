@@ -16,6 +16,9 @@ func appendArgs(lggr cc.Logger, newArgs ...interface{}) Logger {
 	case Logger:
 		args = t.args
 		lggr = t.Logger
+	case *Logger:
+		lggr = t.Logger
+		args = t.args
 	}
 
 	args = append(args, newArgs...)
@@ -44,6 +47,9 @@ func Named(lggr cc.Logger, n string) Logger {
 	case Logger:
 		lggr = t.Logger
 		args = t.args
+	case *Logger:
+		lggr = t.Logger
+		args = t.args
 	}
 
 	return Logger{
@@ -62,5 +68,13 @@ type Logger struct {
 // I mainly want to add something to the plugin logger so that it is a superset
 // of the common logger.
 func (l *Logger) WithSeqNr(seqNr int) {
-	l.Logger = cc.With(l.Logger, "seqNr", seqNr)
+	lggr := l.Logger
+	switch t := lggr.(type) {
+	case Logger:
+		lggr = t.Logger
+	case *Logger:
+		lggr = t.Logger
+	}
+
+	l.Logger = cc.With(lggr, "seqNr", seqNr)
 }

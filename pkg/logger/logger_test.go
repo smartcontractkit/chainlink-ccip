@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,9 +48,22 @@ func TestNamed(t *testing.T) {
 	namedLggr2 := Named(namedLggr, "ObiWan")
 	namedLggr2.Info("Star Wars")
 
-	a := hook.All()
-	fmt.Println(a)
-
 	require.Equal(t, 2, hook.Len())
 	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[1].LoggerName)
+}
+
+func TestLogPointers(t *testing.T) {
+	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
+	namedLggr := Named(lggr, "ElToroLoco")
+	namePtr := Named(&namedLggr, "ObiWan")
+
+	namePtr.Info("Hello1")
+	require.Equal(t, 1, hook.Len())
+	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[0].LoggerName)
+
+	ptrWrap := NewProcessorLogWrapper(namePtr, "Star Wars")
+	ptrWrap.Info("Hello2")
+	require.Equal(t, 2, hook.Len())
+	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[1].LoggerName)
+	require.Equal(t, "Star Wars", hook.All()[1].ContextMap()["processor"])
 }
