@@ -7,12 +7,11 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -39,7 +38,7 @@ func NewContractDiscoveryProcessor(
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
-		lggr:            lggr,
+		lggr:            logger.NewProcessorLogWrapper(lggr, "Discovery"),
 		reader:          reader,
 		homechain:       homechain,
 		dest:            dest,
@@ -80,6 +79,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 	_ dt.Outcome, _ dt.Query, ao plugincommon.AttributedObservation[dt.Observation],
 ) error {
+	cdp.lggr.Infow("wtf mate")
 	oraclePeerID, ok := cdp.oracleIDToP2PID[ao.OracleID]
 	if !ok {
 		// should never happen in practice.
