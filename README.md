@@ -10,7 +10,7 @@ To learn more about CRIB please the general documentation in Confluence:
 ## Project Structure
 ```
 .
-├── cli                 (CLI for CRIB - currently under development)
+├── cli                 (CLI for CRIB)
 ├── dependencies        (DevSpace components used as dependencies)
 ├── deployments
 │   └── chainlink       (Consolidated Chainlink deployment)
