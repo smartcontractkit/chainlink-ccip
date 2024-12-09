@@ -682,6 +682,9 @@ func prepareCcipReaderMock(
 			Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
 	}
 	ccipReader.EXPECT().
+		GetLatestPriceSeqNr(ctx).
+		Return(0, nil).Maybe()
+	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(ctx, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 	ccipReader.EXPECT().
