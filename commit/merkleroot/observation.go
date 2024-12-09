@@ -247,7 +247,8 @@ func (p *Processor) getObservation(
 	}
 }
 
-type observer interface {
+// Observer is an interface for observing data from the offRamp, onRamp, RMN remote config, etc...
+type Observer interface {
 	// ObserveOffRampNextSeqNums observes the next OffRamp sequence numbers for each source chain.
 	// If the destination chain is cursed it returns nil or
 	// if some source chain is cursed, it's skipped from the results.

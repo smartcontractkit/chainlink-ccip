@@ -26,7 +26,7 @@ type Processor struct {
 	offchainCfg            pluginconfig.CommitOffchainConfig
 	destChain              cciptypes.ChainSelector
 	lggr                   logger.Logger
-	observer               observer
+	observer               Observer
 	ccipReader             readerpkg.CCIPReader
 	reportingCfg           ocr3types.ReportingPluginConfig
 	chainSupport           plugincommon.ChainSupport
