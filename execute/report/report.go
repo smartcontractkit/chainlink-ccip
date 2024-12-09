@@ -55,7 +55,7 @@ func buildSingleChainReportHelper(
 		"expectedRoot", report.MerkleRoot.String(),
 		"treeLeaves", len(report.Messages))
 
-	tree, err := ConstructMerkleTree(ctx, hasher, report, lggr)
+	tree, err := ConstructMerkleTree(report, lggr)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
