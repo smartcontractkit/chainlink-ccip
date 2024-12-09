@@ -1,0 +1,57 @@
+package logger
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/libocr/commontypes"
+)
+
+func TestLogWrapper(t *testing.T) {
+	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
+
+	expected := map[string]interface{}{
+		"donID":    uint32(2),
+		"oracleID": commontypes.OracleID(3),
+		"plugin":   "TestPlugin",
+	}
+	var donID uint32 = 2
+	var oracleID commontypes.OracleID = 3
+
+	// Initial wrapping of base logger.
+	wrapped := NewPluginLogWrapper(lggr, "TestPlugin", donID, oracleID)
+	wrapped.Info("Where do thumbs hang out at work?")
+	require.Equal(t, hook.Len(), 1)
+	require.Equal(t, expected, hook.All()[0].ContextMap())
+
+	// Second wrapping.
+	wrapped2 := NewProcessorLogWrapper(wrapped, "TestProcessor")
+	expected["processor"] = "TestProcessor"
+	wrapped2.Info("The space bar.")
+	require.Equal(t, hook.Len(), 2)
+	require.Equal(t, expected, hook.All()[1].ContextMap())
+}
+
+func TestNamed(t *testing.T) {
+	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
+
+	// Name the base logger.
+	namedLggr := Named(lggr, "ElToroLoco")
+	namedLggr.Info("Monster Jam")
+	require.Equal(t, 1, hook.Len())
+	require.Equal(t, "ElToroLoco", hook.All()[0].LoggerName)
+
+	// Name the named logger.
+	namedLggr2 := Named(namedLggr, "ObiWan")
+	namedLggr2.Info("Star Wars")
+
+	a := hook.All()
+	fmt.Println(a)
+
+	require.Equal(t, 2, hook.Len())
+	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[1].LoggerName)
+}
