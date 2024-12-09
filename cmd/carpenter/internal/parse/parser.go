@@ -4,7 +4,46 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 )
+
+/*
+Ideal log format
+
+{
+	// global log-level information
+	"timestamp",
+	"level",
+	"caller", // package/file:linenum
+	"logger", // name, i.e. CCIPCCIPExecOCR3.evm.1337.0xe6e...
+	"version", // 2.18.0@732cc15
+	"msg", // Unstructured log message.
+
+	// app specific fields also go at this level.
+	"oid",
+	"oracleID",
+	"donID",
+	"seqNr",
+	"e",
+	"l"
+	"proto",
+	...
+
+	// New - organize all chainlink-ccip specific data into this field.
+	"plugin": {
+		// static data here, automatically included by logger enhancements.
+		"oid",
+		"donID",
+		"seqNum",
+		"plugin", // commit|execute
+		"processor", // merkleRoot, discovery, etc
+		"logger stuff", // split up CCIPCCIPExecOCR3.evm.1337.0xe6e...
+
+		"type", // used to serialize data
+		"event", // a go struct 'lggr.LogEvent(CommitObservationLog{obs: observation})'
+	},
+}
+*/
 
 // DataFilter is used by Filter to identify lines that should be displayed.
 type DataFilter func(object map[string]interface{}) *Data
@@ -65,12 +104,14 @@ type Data struct {
 	// level, ts, logger, caller, msg, version, donID, oracleID
 	// Data that we expect from most logs.
 	// This is all part of the primary display.
-	Timestamp       string
+	Timestamp       time.Time
 	Level           string
 	Caller          string
 	SequenceNumber  int
 	Plugin          string
 	PluginProcessor string
+	OracleID        int
+	DONID           int
 
 	// Additional detail space, can be unique to each filter.
 	// i.e. an error message, observer details, number of messages, etc
