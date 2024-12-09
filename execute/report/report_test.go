@@ -182,6 +182,21 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 	}
 }
 
+func makeMessageWithHash(
+	src cciptypes.ChainSelector,
+	num cciptypes.SeqNum,
+	nonce uint64,
+	hasher cciptypes.MessageHasher,
+) cciptypes.Message {
+	msg := makeMessage(src, num, nonce)
+	hash, err := hasher.Hash(context.Background(), msg)
+	if err != nil {
+		panic(fmt.Sprintf("unable to hash message: %s", err))
+	}
+	msg.Header.MsgHash = hash
+	return msg
+}
+
 // makeTestCommitReportWithSenders is the same as makeTestCommitReport but overrides the senders.
 func makeTestCommitReportWithSenders(
 	hasher cciptypes.MessageHasher,
@@ -231,10 +246,12 @@ func makeTestCommitReport(
 	}
 	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		msg := makeMessage(
+		msg := makeMessageWithHash(
 			cciptypes.ChainSelector(srcChain),
 			cciptypes.SeqNum(i+firstSeqNum),
-			uint64(i)+1)
+			uint64(i)+1,
+			hasher,
+		)
 		msg.Sender = sender
 		messages = append(messages, msg)
 	}
@@ -265,7 +282,7 @@ func makeTestCommitReport(
 	// calculate merkle root
 	root := rootOverride
 	if root.IsEmpty() {
-		tree, err := ConstructMerkleTree(context.Background(), hasher, commitReport, logger.Nop())
+		tree, err := ConstructMerkleTree(commitReport, logger.Nop())
 		if err != nil {
 			panic(fmt.Sprintf("unable to construct merkle tree: %s", err))
 		}
@@ -350,11 +367,13 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						{
 							Header: cciptypes.RampMessageHeader{
 								SequenceNumber: cciptypes.SeqNum(100),
+								MsgHash:        cciptypes.Bytes32{0x10},
 							},
 						},
 						{
 							Header: cciptypes.RampMessageHeader{
 								SequenceNumber: cciptypes.SeqNum(102),
+								MsgHash:        cciptypes.Bytes32{0x12},
 							},
 						},
 					},
@@ -381,48 +400,19 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 				hasher: badHasher{},
 			},
 		},
-		{
-			name:    "bad hasher",
-			wantErr: "unable to hash message (1234567, 100): bad hasher",
-			args: args{
-				report: exectypes.CommitData{
-					MessageTokenData:    make([]exectypes.MessageTokenData, 1),
-					SourceChain:         1234567,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					Messages: []cciptypes.Message{
-						{
-							Header: cciptypes.RampMessageHeader{
-								SourceChainSelector: 1234567,
-								SequenceNumber:      cciptypes.SeqNum(100),
-							},
-						},
-					},
-				},
-				hasher: badHasher{},
-			},
-		},
 	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Select hasher mock.
-			var resolvedHasher cciptypes.MessageHasher
-			if tt.args.hasher != nil {
-				resolvedHasher = tt.args.hasher
-			} else {
-				resolvedHasher = mocks.NewMessageHasher()
-			}
-
-			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
 
 			test := func(readyMessages map[int]struct{}) {
-				_, err := buildSingleChainReportHelper(ctx, lggr, resolvedHasher, tt.args.report, readyMessages)
+				_, err := buildSingleChainReportHelper(lggr, tt.args.report, readyMessages)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 			}

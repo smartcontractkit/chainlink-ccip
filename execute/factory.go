@@ -52,7 +52,8 @@ const (
 	// maxReportLength is set to an estimate of a maximum report size.
 	// This can be tuned over time, it may be more efficient to have
 	// smaller reports.
-	maxReportLength = 1024 * 1024 // allowing large reports for now
+
+	maxReportLength = ocr3types.MaxMaxReportLength // allowing large reports for now
 
 	// maxReportCount controls how many OCR3 reports can be returned. Note that
 	// the actual exec report type (ExecutePluginReport) may contain multiple

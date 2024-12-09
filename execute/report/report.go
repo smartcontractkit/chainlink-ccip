@@ -23,9 +23,7 @@ import (
 //
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 func buildSingleChainReportHelper(
-	ctx context.Context,
 	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
 	report exectypes.CommitData,
 	readyMessages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, error) {
@@ -55,7 +53,7 @@ func buildSingleChainReportHelper(
 		"expectedRoot", report.MerkleRoot.String(),
 		"treeLeaves", len(report.Messages))
 
-	tree, err := ConstructMerkleTree(ctx, hasher, report, lggr)
+	tree, err := ConstructMerkleTree(report, lggr)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
@@ -359,7 +357,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 	// Attempt to include all messages in the report.
 	finalReport, err :=
-		buildSingleChainReportHelper(ctx, b.lggr, b.hasher, report, readyMessages)
+		buildSingleChainReportHelper(b.lggr, report, readyMessages)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			exectypes.CommitData{},
@@ -384,7 +382,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err := buildSingleChainReportHelper(ctx, b.lggr, b.hasher, report, msgs)
+		finalReport2, err := buildSingleChainReportHelper(b.lggr, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},
