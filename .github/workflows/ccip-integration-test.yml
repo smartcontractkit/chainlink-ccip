@@ -7,23 +7,39 @@ on:
       - 'main'
 
 jobs:
-  integration-test-ccip-ocr3:
+  integration-test-matrix:
     env:
       # We explicitly have this env var not be "CL_DATABASE_URL" to avoid having it be used by core related tests
       # when they should not be using it, while still allowing us to DRY up the setup
       DB_URL: postgresql://postgres:postgres@localhost:5432/chainlink_test?sslmode=disable
-
-    runs-on: ubuntu-latest
+    
     strategy:
+      fail-fast: false
       matrix:
-        go-version: ['1.22.5']
+        type:
+          - cmd: cd integration-tests/smoke/ccip && go test ccip_fees_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "Fees Test"
+          - cmd: cd integration-tests/smoke/ccip && go test ccip_messaging_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "Messaging Test"
+          - cmd: cd integration-tests/smoke/ccip && go test ccip_fee_boosting_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "Fee Boosting Test"
+          - cmd: cd integration-tests/smoke/ccip && go test ccip_batching_test.go -timeout 12m -test.parallel=2 -count=1 -json
+            name: "Batching Test"
+          - cmd: cd integration-tests/contracts && go test ccipreader_test.go -timeout 5m -test.parallel=1 -count=1 -json
+            name: "CCIPReader Test"
+    
+    name: Integration Tests (${{ matrix.type.name }})
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout the chainlink-ccip repo
         uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
-      - name: Setup Go ${{ matrix.go-version }}
+      - name: Determine Go version
+        id: go_version
+        run: echo "GO_VERSION=$(cat go.mod |grep "^go"|cut -d' ' -f 2)" >> $GITHUB_ENV
+      - name: Setup Go ${{ env.GO_VERSION }}
         uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: ${{ env.GO_VERSION }}
       - name: Display Go version
         run: go version
       - name: Fetch latest pull request data
@@ -44,8 +60,11 @@ jobs:
         run: |
           default="develop"
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            comment='${{ steps.fetch_pr_data.outputs.result }}'
-            echo $comment
+          comment=$(cat <<'GREAT_PR_DESCRIPTION_HERE'
+          ${{ steps.fetch_pr_data.outputs.result }}
+          GREAT_PR_DESCRIPTION_HERE
+          )
+            echo "$comment"
             core_ref=$(echo "$comment" | grep -oE 'core ref: [a-f0-9]{40}' | cut -d' ' -f3 || true)
             if [ -n "$core_ref" ]; then
               echo "Overriding chainlink repository commit hash with: $core_ref"
@@ -96,29 +115,16 @@ jobs:
           ./ccip.test local db preparetest
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-      - name: Run ccip ocr3 initial deploy integration test
-        run: |
-          cd $GITHUB_WORKSPACE/chainlink/deployment
-          go test -v -run '^TestInitialDeploy$' -timeout 6m ./ccip/changeset
-          EXITCODE=${PIPESTATUS[0]}
-          if [ $EXITCODE -ne 0 ]; then
-            echo "Integration test failed"
-          else
-            echo "Integration test passed!"
-          fi
-          exit $EXITCODE
+      - name: Run ${{ matrix.type.name }}
+        run: cd $GITHUB_WORKSPACE/chainlink/ && ${{ matrix.type.cmd }}
         env:
           CL_DATABASE_URL: ${{ env.DB_URL }}
-      - name: Run ccip ocr3 add chain integration test
-        run: |
-          cd $GITHUB_WORKSPACE/chainlink/deployment
-          go test -v -run '^TestAddChainInbound$' -timeout 6m ./ccip/changeset
-          EXITCODE=${PIPESTATUS[0]}
-          if [ $EXITCODE -ne 0 ]; then
-            echo "Integration test failed"
-          else
-            echo "Integration test passed!"
-          fi
-          exit $EXITCODE
-        env:
-          CL_DATABASE_URL: ${{ env.DB_URL }}
+
+  integration-test-ccip-ocr3:
+    if: always()
+    runs-on: ubuntu-latest
+    needs: [integration-test-matrix]
+    steps:
+      - name: Fail the job if ccip tests in PR not successful
+        if: always() && needs.integration-test-matrix.result == 'failure'
+        run: exit 1

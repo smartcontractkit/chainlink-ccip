@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -82,6 +83,25 @@ func (p *Plugin) Observation(
 	return observation.Encode()
 }
 
+func (p *Plugin) getCurseInfo(ctx context.Context) (*reader.CurseInfo, error) {
+	allSourceChains, err := p.chainSupport.KnownSourceChainsSlice()
+	if err != nil {
+		p.lggr.Warnw("call to KnownSourceChainsSlice failed", "err", err)
+		return nil, fmt.Errorf("call to KnownSourceChainsSlice failed: %w", err)
+	}
+
+	curseInfo, err := p.ccipReader.GetRmnCurseInfo(ctx, p.chainSupport.DestChain(), allSourceChains)
+	if err != nil {
+		p.lggr.Errorw("nothing to observe: rmn read error",
+			"err", err,
+			"sourceChains", allSourceChains,
+		)
+		return nil, fmt.Errorf("nothing to observe: rmn read error: %w", err)
+	}
+
+	return curseInfo, nil
+}
+
 // getCommitReportsObservations implements phase1 of the execute plugin state machine. It fetches commit reports from
 // the destination chain and determines which messages are ready to be executed. These are added to the provided
 // observation object.
@@ -97,19 +117,41 @@ func (p *Plugin) getCommitReportsObservation(
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
 	}
-	if supportsDest {
-		groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, p.lggr)
-		if err != nil {
-			return exectypes.Observation{}, err
-		}
 
-		observation.CommitReports = groupedCommits
-
-		// TODO: truncate grouped to a maximum observation size?
+	// No observation for non-dest readers.
+	if !supportsDest {
 		return observation, nil
 	}
 
-	// No observation for non-dest readers.
+	// Get curse information from the destination chain.
+	ci, err := p.getCurseInfo(ctx)
+	if err != nil {
+		// If we can't get curse info, we can't proceed.
+		// But we still need to return discovery data.
+		// The error is logged by getCurseInfo.
+		return observation, nil
+	}
+	if ci.GlobalCurse || ci.CursedDestination {
+		p.lggr.Warnw("nothing to observe: rmn curse", "curseInfo", ci)
+		return observation, nil
+	}
+
+	// Get pending exec reports.
+	groupedCommits, err := getPendingExecutedReports(ctx, p.ccipReader, p.destChain, fetchFrom, p.lggr)
+	if err != nil {
+		return exectypes.Observation{}, err
+	}
+
+	// Remove cursed observations.
+	for chainSelector, isCursed := range ci.CursedSourceChains {
+		if isCursed {
+			delete(groupedCommits, chainSelector)
+		}
+	}
+
+	observation.CommitReports = groupedCommits
+
+	// TODO: truncate grouped to a maximum observation size?
 	return observation, nil
 }
 
@@ -126,56 +168,62 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
+func readAllMessages(
+	ctx context.Context, ccipReader reader.CCIPReader, commitObs exectypes.CommitObservations,
+) (exectypes.MessageObservations, error) {
+	messageObs := make(exectypes.MessageObservations)
+
+	for srcChain, reports := range commitObs {
+		if len(reports) == 0 {
+			continue
+		}
+
+		ranges, err := computeRanges(reports)
+		if err != nil {
+			return exectypes.MessageObservations{}, err
+		}
+
+		// Read messages for each range.
+		for _, seqRange := range ranges {
+			// TODO: check if srcChain is supported.
+			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqRange)
+			if err != nil {
+				return exectypes.MessageObservations{}, err
+			}
+			for _, msg := range msgs {
+				if _, ok := messageObs[srcChain]; !ok {
+					messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+				}
+				messageObs[srcChain][msg.Header.SequenceNumber] = msg
+			}
+		}
+	}
+	return messageObs, nil
+}
+
 func (p *Plugin) getMessagesObservation(
 	ctx context.Context,
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	messageObs := make(exectypes.MessageObservations)
-	messages := make([]cciptypes.Message, 0)
-	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
 	if len(previousOutcome.PendingCommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
-	} else {
-		commitReportCache := make(map[cciptypes.ChainSelector][]exectypes.CommitData)
-		for _, report := range previousOutcome.PendingCommitReports {
-			commitReportCache[report.SourceChain] = append(commitReportCache[report.SourceChain], report)
-		}
+		return observation, nil
+	}
 
-		for srcChain, reports := range commitReportCache {
-			if len(reports) == 0 {
-				continue
-			}
+	// group reports by chain selector.
+	commitReportCache := regroup(previousOutcome.PendingCommitReports)
 
-			ranges, err := computeRanges(reports)
-			if err != nil {
-				return exectypes.Observation{}, err
-			}
+	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
+	if err != nil {
+		return exectypes.Observation{}, err
+	}
 
-			// Read messages for each range.
-			for _, seqRange := range ranges {
-				// TODO: check if srcChain is supported.
-				msgs, err := p.ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqRange)
-				if err != nil {
-					return exectypes.Observation{}, err
-				}
-				messages = append(messages, msgs...)
-				for _, msg := range msgs {
-					if _, ok := messageObs[srcChain]; !ok {
-						messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-					}
-					messageObs[srcChain][msg.Header.SequenceNumber] = msg
-				}
-			}
-		}
-
-		var err error
-		messageTimestamps, err = getMessageTimestampMap(commitReportCache, messageObs)
-		if err != nil {
-			return exectypes.Observation{}, err
-		}
+	messageTimestamps, err := getMessageTimestampMap(commitReportCache, messageObs)
+	if err != nil {
+		return exectypes.Observation{}, err
 	}
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
@@ -183,15 +231,21 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
-	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messages, messageTimestamps)
+	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
 	}
 
-	observation.CommitReports = regroup(previousOutcome.PendingCommitReports)
+	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
+
+	// Make sure encoded observation fits within the maximum observation size.
+	observation, err = truncateObservation(observation, maxObservationLength)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
+	}
 
 	return observation, nil
 }
@@ -205,10 +259,17 @@ func (p *Plugin) getFilterObservation(
 	//          This phase also determines which messages are too costly to execute.
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
-
-	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
+	supportsDest, err := p.supportsDestChain()
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+	}
+	// No observation for non-dest readers.
+	if !supportsDest {
+		return observation, nil
+	}
 
 	// Collect unique senders.
+	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
 	for _, commitReport := range previousOutcome.PendingCommitReports {
 		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
 			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
@@ -231,6 +292,10 @@ func (p *Plugin) getFilterObservation(
 		}
 		nonceObservations[srcChain] = nonces
 	}
+
+	// Note: it is technically possible to check for curses at this point. If a curse
+	// occurred after the GetMessages observations checking now could possibly recover a report.
+	// It would only work for ordered messages.
 
 	observation.Nonces = nonceObservations
 

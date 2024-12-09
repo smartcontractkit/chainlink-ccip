@@ -41,7 +41,7 @@ func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) CCIPReader {
@@ -60,7 +60,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) CCIPReader {
@@ -152,8 +152,9 @@ type CCIPReader interface {
 	// from the destination chain RMN remote contract. Caller should be able to access destination.
 	GetRmnCurseInfo(
 		ctx context.Context,
+		destChainSelector cciptypes.ChainSelector,
 		sourceChainSelectors []cciptypes.ChainSelector,
-	) (*rmntypes.CurseInfo, error)
+	) (*CurseInfo, error)
 
 	// DiscoverContracts reads from all available contract readers to discover contract addresses.
 	DiscoverContracts(ctx context.Context) (ContractAddresses, error)

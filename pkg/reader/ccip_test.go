@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -922,7 +923,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_HappyPath(t *testing.T) {
-	cw := writer_mocks.NewMockChainWriter(t)
+	cw := writer_mocks.NewMockContractWriter(t)
 	cw.EXPECT().GetFeeComponents(mock.Anything).Return(
 		&types.ChainFeeComponents{
 			ExecutionFee:        big.NewInt(1),
@@ -930,7 +931,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		}, nil,
 	)
 
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	// Missing writer for chainB
 	contractWriters[chainA] = cw
 	contractWriters[chainC] = cw
@@ -958,8 +959,8 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 }
 
 func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
-	cw := writer_mocks.NewMockChainWriter(t)
-	contractWriters := make(map[cciptypes.ChainSelector]types.ChainWriter)
+	cw := writer_mocks.NewMockContractWriter(t)
+	contractWriters := make(map[cciptypes.ChainSelector]types.ContractWriter)
 	// Missing writer for dest chain chainC
 	contractWriters[chainA] = cw
 	ccipReader := newCCIPChainReaderInternal(
@@ -1167,6 +1168,148 @@ func TestCCIPChainReader_GetMedianDataAvailabilityGasConfig(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.expectedConfig, config)
 			}
+		})
+	}
+}
+
+func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		cursedSubjectsSet    mapset.Set[[16]byte]
+		destChainSelector    cciptypes.ChainSelector
+		sourceChainSelectors []cciptypes.ChainSelector
+		expCurseInfo         CurseInfo
+	}{
+		{
+			name:              "no cursed subjects",
+			cursedSubjectsSet: mapset.NewSet[[16]byte](),
+			destChainSelector: chainA,
+			sourceChainSelectors: []cciptypes.ChainSelector{
+				chainB,
+				chainC,
+			},
+			expCurseInfo: CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					chainB: false,
+					chainC: false,
+				},
+				CursedDestination: false,
+				GlobalCurse:       false,
+			},
+		},
+		{
+			name: "everything cursed",
+			cursedSubjectsSet: mapset.NewSet[[16]byte](
+				chainSelectorToBytes16(chainB),
+				chainSelectorToBytes16(chainC),
+				chainSelectorToBytes16(chainA), // dest
+				GlobalCurseSubject,
+			),
+			destChainSelector: chainA,
+			sourceChainSelectors: []cciptypes.ChainSelector{
+				chainB,
+				chainC,
+			},
+			expCurseInfo: CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					chainB: true,
+					chainC: true,
+				},
+				CursedDestination: true,
+				GlobalCurse:       true,
+			},
+		},
+		{
+			name: "no global curse",
+			cursedSubjectsSet: mapset.NewSet[[16]byte](
+				chainSelectorToBytes16(chainB),
+				chainSelectorToBytes16(chainC),
+				chainSelectorToBytes16(chainA), // dest
+			),
+			destChainSelector: chainA,
+			sourceChainSelectors: []cciptypes.ChainSelector{
+				chainB,
+				chainC,
+			},
+			expCurseInfo: CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					chainB: true,
+					chainC: true,
+				},
+				CursedDestination: true,
+				GlobalCurse:       false,
+			},
+		},
+		{
+			name: "dest cursed due to global curse",
+			cursedSubjectsSet: mapset.NewSet[[16]byte](
+				chainSelectorToBytes16(chainB),
+				chainSelectorToBytes16(chainC),
+				GlobalCurseSubject,
+			),
+			destChainSelector: chainA,
+			sourceChainSelectors: []cciptypes.ChainSelector{
+				chainB,
+				chainC,
+			},
+			expCurseInfo: CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					chainB: true,
+					chainC: true,
+				},
+				CursedDestination: true,
+				GlobalCurse:       true,
+			},
+		},
+		{
+			name: "dest not cursed",
+			cursedSubjectsSet: mapset.NewSet[[16]byte](
+				chainSelectorToBytes16(chainB),
+				chainSelectorToBytes16(chainC),
+			),
+			destChainSelector: chainA,
+			sourceChainSelectors: []cciptypes.ChainSelector{
+				chainB,
+				chainC,
+			},
+			expCurseInfo: CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					chainB: true,
+					chainC: true,
+				},
+				CursedDestination: false,
+				GlobalCurse:       false,
+			},
+		},
+		{
+			name: "source chain B not cursed",
+			cursedSubjectsSet: mapset.NewSet[[16]byte](
+				chainSelectorToBytes16(chainC),
+				chainSelectorToBytes16(chainA), // dest
+				GlobalCurseSubject,
+			),
+			destChainSelector: chainA,
+			sourceChainSelectors: []cciptypes.ChainSelector{
+				chainB,
+				chainC,
+			},
+			expCurseInfo: CurseInfo{
+				CursedSourceChains: map[cciptypes.ChainSelector]bool{
+					chainB: false,
+					chainC: true,
+				},
+				CursedDestination: true,
+				GlobalCurse:       true,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+			curseInfo := getCurseInfoFromCursedSubjects(
+				lggr, tc.cursedSubjectsSet, tc.destChainSelector, tc.sourceChainSelectors)
+			assert.Equal(t, tc.expCurseInfo, *curseInfo)
 		})
 	}
 }

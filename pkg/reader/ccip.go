@@ -38,7 +38,7 @@ import (
 type ccipChainReader struct {
 	lggr            logger.Logger
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 }
@@ -47,7 +47,7 @@ func newCCIPChainReaderInternal(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) *ccipChainReader {
@@ -673,8 +673,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 // from the destination chain RMN remote contract.
 func (r *ccipChainReader) GetRmnCurseInfo(
 	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
 	sourceChainSelectors []cciptypes.ChainSelector,
-) (*rmntypes.CurseInfo, error) {
+) (*CurseInfo, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return nil, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
@@ -697,22 +698,35 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	}
 
 	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
-	cursedSubjectsSet := mapset.NewSet(cursedSubjects.CursedSubjects...)
 
-	curseInfo := &rmntypes.CurseInfo{
+	return getCurseInfoFromCursedSubjects(
+		r.lggr,
+		mapset.NewSet(cursedSubjects.CursedSubjects...),
+		destChainSelector,
+		sourceChainSelectors,
+	), nil
+}
+
+func getCurseInfoFromCursedSubjects(
+	lggr logger.Logger,
+	cursedSubjectsSet mapset.Set[[16]byte],
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) *CurseInfo {
+	curseInfo := &CurseInfo{
 		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
-		CursedDestination: cursedSubjectsSet.Contains(rmntypes.LegacyCurseSubject) ||
-			cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
-		GlobalCurse: cursedSubjectsSet.Contains(rmntypes.GlobalCurseSubject),
+		CursedDestination: cursedSubjectsSet.Contains(GlobalCurseSubject) ||
+			cursedSubjectsSet.Contains(chainSelectorToBytes16(destChainSelector)),
+		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
 	}
 
 	for _, ch := range sourceChainSelectors {
 		chainSelB16 := chainSelectorToBytes16(ch)
-		r.lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
+		lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
 		curseInfo.CursedSourceChains[ch] = cursedSubjectsSet.Contains(chainSelB16)
 	}
 
-	return curseInfo, nil
+	return curseInfo
 }
 
 func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {

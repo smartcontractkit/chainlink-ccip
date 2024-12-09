@@ -36,11 +36,11 @@ clean-generate: ensure_go_version
 	rm -rf ./commit/merkleroot/rmn/rmnpb/*
 	rm -rf ./mocks/
 
-test: ensure_go_version
+test:
 	go test -race -fullpath -shuffle on -count $(TEST_COUNT) -coverprofile=$(COVERAGE_FILE) \
 		`go list ./... | grep -Ev 'chainlink-ccip/internal/mocks|chainlink-ccip/mocks|chainlink-ccip/commit/merkleroot/rmn/rmnpb'`
 
-lint: ensure_go_version ensure_golangcilint_1_59
+lint: ensure_go_version ensure_golangcilint_1_62_2
 	golangci-lint run -c .golangci.yml
 
 checks: test lint
@@ -57,13 +57,13 @@ install-protoc:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31
 
 install-golangcilint:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.59
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
 
 ensure_go_version:
-	@go version | grep -q 'go1.22' || (echo "Please use go1.22" && exit 1)
+	@go version | grep -q 'go1.23' || (echo "Please use go1.23" && exit 1)
 
-ensure_golangcilint_1_59:
-	@golangci-lint --version | grep -q '1.59' || (echo "Please use golangci-lint 1.59" && exit 1)
+ensure_golangcilint_1_62_2:
+	@golangci-lint --version | grep -q '1.62.2' || (echo "Please use golangci-lint 1.62.2" && exit 1)
 
 ensure_protoc_28_0:
 	@$(PROTOC_BIN) --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0, (make install-protoc)" && exit 1)

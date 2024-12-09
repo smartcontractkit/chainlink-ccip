@@ -100,7 +100,16 @@ func (r *OCR3Runner[RI]) RunRound(ctx context.Context) (result RoundResult[RI], 
 
 	// check that all the outcomes are the same.
 	if countUniqueOutcomes(outcomes) > 1 {
-		return RoundResult[RI]{}, fmt.Errorf("outcomes are not equal")
+		decodedOs := make([]exectypes.Outcome, len(outcomes))
+		for i, o := range outcomes {
+			decoded, err := exectypes.DecodeOutcome(o)
+			if err != nil {
+				return RoundResult[RI]{}, fmt.Errorf("error decoding outcomes: %w", err)
+			}
+			decodedOs[i] = decoded
+		}
+
+		return RoundResult[RI]{}, fmt.Errorf("outcomes are not equal, decoded outcomes: %v", decodedOs)
 	}
 
 	r.previousOutcome = outcomes[0]

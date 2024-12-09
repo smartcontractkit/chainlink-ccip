@@ -30,7 +30,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour))
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
 	runner := intTest.Start()
 	defer intTest.Close()
 
@@ -76,7 +76,7 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	tm := timeMachine{now: messageTimestamp}
 
 	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
-	intTest.WithMessages(messages, 1000, messageTimestamp)
+	intTest.WithMessages(messages, 1000, messageTimestamp, 1)
 	intTest.WithCustomFeeBoosting(1.0, tm.Now, map[cciptypes.Bytes32]plugintypes.USD18{
 		messages[0].Header.MessageID: plugintypes.NewUSD18(40000),
 		messages[1].Header.MessageID: plugintypes.NewUSD18(200000),
@@ -130,4 +130,69 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	}
 	sequenceNumbers = extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
 	require.ElementsMatch(t, sequenceNumbers, []cciptypes.SeqNum{100, 101, 102})
+}
+
+// TestExceedSizeObservation tests the case where the observation size exceeds the maximum size.
+// Setup multiple commit reports that the total size of the observation exceeds the maximum size.
+// Make sure that the observation reports are truncated to fit the maximum size.
+func TestExceedSizeObservation(t *testing.T) {
+	ctx := tests.Context(t)
+
+	srcSelector := cciptypes.ChainSelector(1)
+	dstSelector := cciptypes.ChainSelector(2)
+
+	// 1 msg * 1 byte    -> 879  | 2 msg * 1 byte -> 1311 | 3 msg * 1 byte -> 1743
+	// 3 msg * 2 bytes   -> 882  | 3 msg * 2 byte -> 1319 | 3 msg * 2 byte -> 1755
+	// 10 msg * 1 byte   -> 897
+	// 100 msg * 1 byte  -> 1077
+	// 1000 msg * 1 byte -> 2877
+	msgDataSize := 1000
+	// TODO: More deterministic way to reduce any future flaky tests?
+	maxMsgsPerReport := 431
+	nReports := 2
+	maxMessages := maxMsgsPerReport * nReports // Currently 431 message per report is the max with msgDataSize = 1000
+	startSeqNr := cciptypes.SeqNum(100)
+
+	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
+	for i := 0; i < maxMessages; i++ {
+		messages = append(messages,
+			makeMsg(
+				startSeqNr+cciptypes.SeqNum(i),
+				srcSelector,
+				dstSelector,
+				false,
+				withData(make([]byte, msgDataSize)),
+			),
+		)
+	}
+
+	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
+	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports)
+	runner := intTest.Start()
+	defer intTest.Close()
+
+	// Contract Discovery round.
+	outcome := runner.MustRunRound(ctx, t)
+	require.Equal(t, exectypes.Initialized, outcome.State)
+
+	// Round 1 - Get Commit Reports
+	// Two pending commit reports.
+	outcome = runner.MustRunRound(ctx, t)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.PendingCommitReports, nReports)
+
+	// Round 2 - Get Messages
+	// Still 2 pending reports from previous round.
+	outcome = runner.MustRunRound(ctx, t)
+	require.Len(t, outcome.Report.ChainReports, 0)
+	require.Len(t, outcome.PendingCommitReports, nReports)
+	require.Len(t, outcome.PendingCommitReports[0].Messages, maxMsgsPerReport)
+	require.Len(t, outcome.PendingCommitReports[1].Messages, 0)
+
+	// Round 3 - Filter
+	// An execute report with the messages executed until the max per report
+	outcome = runner.MustRunRound(ctx, t)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, sequenceNumbers, maxMsgsPerReport)
 }

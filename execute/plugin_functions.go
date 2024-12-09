@@ -6,6 +6,8 @@ import (
 	"sort"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -133,8 +135,6 @@ func groupByChainSelector(
 
 // filterOutExecutedMessages returns a new reports slice with fully executed messages removed.
 // Unordered inputs are supported.
-//
-//nolint:gocyclo // todo
 func filterOutExecutedMessages(
 	reports []exectypes.CommitData, executedMessages []cciptypes.SeqNumRange,
 ) ([]exectypes.CommitData, error) {
@@ -167,15 +167,9 @@ func filterOutExecutedMessages(
 		for i := reportIdx; i < len(reports); i++ {
 			reportRange := reports[i].SequenceNumberRange
 			if executed.End() < reportRange.Start() {
-				// need to go to the next set of executed messages.
+				// No messages in current executed range are in reports[i]
+				// need to go to the next set of executed range.
 				break
-			}
-
-			if executed.End() < reportRange.Start() {
-				// add report that has non-executed messages.
-				reportIdx++
-				filtered = append(filtered, reports[i])
-				continue
 			}
 
 			if reportRange.Start() >= executed.Start() && reportRange.End() <= executed.End() {
@@ -206,6 +200,121 @@ func filterOutExecutedMessages(
 	}
 
 	return filtered, nil
+}
+
+// truncateObservation truncates the observation to fit within the given maxSize after encoding.
+// It removes data from the observation in the following order:
+// For each chain, remove commit reports one by one, if the encoded observation is still too large,
+// remove the entire chain.
+// Keep repeating this process until the encoded observation fits within the maxSize or there's only
+// one chain with one report left
+// Note: This function doesn't split one report into multiple parts.
+func truncateObservation(
+	obs exectypes.Observation,
+	maxSize int,
+) (exectypes.Observation, error) {
+	observation := obs
+	encodedObs, err := observation.Encode()
+	if err != nil {
+		return exectypes.Observation{}, err
+	}
+
+	chains := maps.Keys(observation.CommitReports)
+	sort.Slice(chains, func(i, j int) bool {
+		return chains[i] < chains[j]
+	})
+
+	// If the encoded observation is too large, start filtering data.
+	for len(encodedObs) > maxSize {
+		for _, chain := range chains {
+			if len(observation.CommitReports[chain]) > 1 {
+				observation = truncateLastCommit(observation, chain)
+			} else {
+				observation = truncateChain(observation, chain)
+			}
+			chains = maps.Keys(observation.CommitReports)
+			break
+		}
+
+		// Truncated all chains.
+		if len(observation.CommitReports) == 0 {
+			return exectypes.Observation{}, fmt.Errorf("no more data to truncate")
+		}
+		encodedObs, err = observation.Encode()
+		if err != nil {
+			return exectypes.Observation{}, nil
+		}
+	}
+	return observation, nil
+}
+
+// truncateLastCommit removes the last commit from the observation.
+// errors if there are no commits to truncate.
+func truncateLastCommit(
+	obs exectypes.Observation,
+	chain cciptypes.ChainSelector,
+) exectypes.Observation {
+	observation := obs
+	commits := observation.CommitReports[chain]
+	if len(commits) == 0 {
+		return observation
+	}
+	lastCommit := commits[len(commits)-1]
+	// Remove the last commit from the list.
+	commits = commits[:len(commits)-1]
+	observation.CommitReports[chain] = commits
+	for seqNum, msg := range observation.Messages[chain] {
+		if lastCommit.SequenceNumberRange.Contains(seqNum) {
+			// Remove the message from the observation.
+			delete(observation.Messages[chain], seqNum)
+			// Remove the token data from the observation.
+			delete(observation.TokenData[chain], seqNum)
+			// Remove costly messages
+			for i, costlyMessage := range observation.CostlyMessages {
+				if costlyMessage == msg.Header.MessageID {
+					observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
+				}
+			}
+			// Leaving Nonces untouched
+		}
+	}
+
+	return observation
+}
+
+// truncateChain removes all data related to the given chain from the observation.
+// returns true if the chain was found and truncated, false otherwise.
+func truncateChain(
+	obs exectypes.Observation,
+	chain cciptypes.ChainSelector,
+) exectypes.Observation {
+	observation := obs
+	if _, ok := observation.CommitReports[chain]; !ok {
+		return observation
+	}
+	messageIDs := make(map[cciptypes.Bytes32]struct{})
+	// To remove costly message IDs we need to iterate over all messages and find the ones that belong to the chain.
+	for _, seqNumMap := range observation.Messages {
+		for _, message := range seqNumMap {
+			messageIDs[message.Header.MessageID] = struct{}{}
+		}
+	}
+
+	deleteCostlyMessages := func() {
+		for i, costlyMessage := range observation.CostlyMessages {
+			if _, ok := messageIDs[costlyMessage]; ok {
+				observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
+			}
+		}
+	}
+
+	delete(observation.CommitReports, chain)
+	delete(observation.Messages, chain)
+	delete(observation.TokenData, chain)
+	delete(observation.Nonces, chain)
+	deleteCostlyMessages()
+
+	return observation
 }
 
 func decodeAttributedObservations(

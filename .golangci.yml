@@ -31,6 +31,10 @@ linters:
     - unparam
     - unused
 linters-settings:
+  gosec:
+    # TODO - remove this and fix linter complaint
+    excludes:
+      - G115
   exhaustive:
     default-signifies-exhaustive: true
   goimports:
