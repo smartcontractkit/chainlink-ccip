@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
@@ -23,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -89,7 +90,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr             logger.Logger
+	baseLggr         cc.Logger
 	donID            plugintypes.DonID
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
@@ -102,7 +103,7 @@ type PluginFactory struct {
 }
 
 func NewPluginFactory(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
@@ -114,7 +115,7 @@ func NewPluginFactory(
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:             lggr,
+		baseLggr:         lggr,
 		donID:            donID,
 		ocrConfig:        ocrConfig,
 		execCodec:        execCodec,
@@ -130,6 +131,8 @@ func NewPluginFactory(
 func (p PluginFactory) NewReportingPlugin(
 	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
+	lggr := logger.NewPluginLogWrapper(p.baseLggr, "Execute", p.donID, config.OracleID)
+
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
@@ -156,7 +159,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		p.lggr,
+		lggr,
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -165,7 +168,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		logger.Named(p.lggr, "BaseCompositeObserver"),
+		logger.Named(lggr, "BaseCompositeObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
@@ -176,7 +179,7 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		p.lggr,
+		lggr,
 		true,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
@@ -195,7 +198,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.homeChainReader,
 			tokenDataObserver,
 			p.estimateProvider,
-			p.lggr,
+			p.baseLggr,
 			costlyMessageObserver,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",

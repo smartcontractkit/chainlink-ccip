@@ -6,12 +6,12 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -45,6 +45,7 @@ func NewObserverWithDefaults(
 	relativeBoostPerWaitHour float64,
 	estimateProvider gas.EstimateProvider,
 ) Observer {
+	lggr = logger.NewProcessorLogWrapper(lggr, "CostlyMessages")
 	return NewObserver(
 		lggr,
 		enabled,
@@ -70,6 +71,7 @@ func NewObserver(
 	feeCalculator MessageFeeE18USDCalculator,
 	execCostCalculator MessageExecCostUSD18Calculator,
 ) Observer {
+	lggr = logger.NewProcessorLogWrapper(lggr, "CostlyMessages")
 	return &observer{
 		lggr:               lggr,
 		enabled:            enabled,
