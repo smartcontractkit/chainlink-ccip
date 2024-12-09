@@ -112,6 +112,14 @@ func (p *Plugin) Reports(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	isActiveInstance, err := p.isActiveInstance(ctx)
+	if err != nil {
+		return false, fmt.Errorf("isActiveInstance: %w", err)
+	}
+	if !isActiveInstance {
+		p.lggr.Warnw("not the active instance, skipping report acceptance")
+		return false, nil
+	}
 	latestOnchainSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
 	if err != nil {
 		return false, fmt.Errorf("get latest price seq nr: %w", err)
@@ -178,13 +186,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 ) (bool, error) {
 	// we only transmit reports if we are the "active" instance.
 	// we can check this by reading the OCR configs from the home chain.
-	isCandidate, err := p.isCandidateInstance(ctx)
+	isActiveInstance, err := p.isActiveInstance(ctx)
 	if err != nil {
-		return false, fmt.Errorf("isCandidateInstance: %w", err)
+		return false, fmt.Errorf("isActiveInstance: %w", err)
 	}
-
-	if isCandidate {
-		p.lggr.Infow("not the active instance, skipping report transmission")
+	if !isActiveInstance {
+		p.lggr.Warnw("not the active instance, skipping report acceptance")
 		return false, nil
 	}
 
@@ -230,11 +237,11 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	return true, nil
 }
 
-func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
+func (p *Plugin) isActiveInstance(ctx context.Context) (bool, error) {
 	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeCommit)
 	if err != nil {
 		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
 	}
 
-	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
+	return ocrConfigs.ActiveConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }

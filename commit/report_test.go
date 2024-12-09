@@ -209,7 +209,7 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 	require.Error(t, err)
 }
 
-func Test_IsCandidateCheck(t *testing.T) {
+func Test_IsActiveCheck(t *testing.T) {
 	rb := rand.RandomBytes32()
 	digest := types.ConfigDigest(rb[:])
 	donID := uint32(3)
@@ -235,10 +235,10 @@ func Test_IsCandidateCheck(t *testing.T) {
 				h := reader_mock.NewMockHomeChain(t)
 				h.On("GetOCRConfigs", mock.Anything, mock.Anything, consts.PluginTypeCommit).
 					Return(reader.ActiveAndCandidate{
-						ActiveConfig: reader.OCR3ConfigWithMeta{},
-						CandidateConfig: reader.OCR3ConfigWithMeta{
+						ActiveConfig: reader.OCR3ConfigWithMeta{
 							ConfigDigest: digest,
 						},
+						CandidateConfig: reader.OCR3ConfigWithMeta{},
 					}, nil)
 				return h
 			},
@@ -260,10 +260,10 @@ func Test_IsCandidateCheck(t *testing.T) {
 				h := reader_mock.NewMockHomeChain(t)
 				h.On("GetOCRConfigs", mock.Anything, mock.Anything, consts.PluginTypeCommit).
 					Return(reader.ActiveAndCandidate{
-						ActiveConfig: reader.OCR3ConfigWithMeta{},
-						CandidateConfig: reader.OCR3ConfigWithMeta{
+						ActiveConfig: reader.OCR3ConfigWithMeta{
 							ConfigDigest: digest,
 						},
+						CandidateConfig: reader.OCR3ConfigWithMeta{},
 					}, nil)
 				return h
 			},
@@ -271,7 +271,7 @@ func Test_IsCandidateCheck(t *testing.T) {
 			wantError:  false,
 		},
 		{
-			name: "Should work as expected without candidate instance",
+			name: "Should work as expected without active instance",
 			makePlugin: func(t *testing.T, hc *reader_mock.MockHomeChain) *Plugin {
 				p := &Plugin{
 					homeChain: hc,
@@ -323,7 +323,7 @@ func Test_IsCandidateCheck(t *testing.T) {
 			ctx := tests.Context(t)
 			hc := tt.makeHomeChain(t)
 			p := tt.makePlugin(t, hc)
-			actualOutput, actualError := p.isCandidateInstance(ctx)
+			actualOutput, actualError := p.isActiveInstance(ctx)
 			assert.Equal(t, tt.wantOutput, actualOutput)
 			if tt.wantError {
 				require.Error(t, actualError)
