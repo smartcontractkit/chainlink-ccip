@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -80,7 +81,6 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 	_ dt.Outcome, _ dt.Query, ao plugincommon.AttributedObservation[dt.Observation],
 ) error {
-	cdp.lggr.Infow("wtf mate")
 	oraclePeerID, ok := cdp.oracleIDToP2PID[ao.OracleID]
 	if !ok {
 		// should never happen in practice.
