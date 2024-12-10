@@ -84,8 +84,8 @@ deployments:
         metadata:
           name: beholder-load-tester
         spec:
-          completions: 6  # Total number of pods to complete
-          parallelism: 6  # Number of pods to run simultaneously
+          completions: ${NUMBER_OF_LOAD_TESTERS}  # Total number of pods to complete
+          parallelism: ${NUMBER_OF_LOAD_TESTERS}  # Number of pods to run simultaneously
           template:
             metadata:
               labels:
@@ -93,7 +93,7 @@ deployments:
             spec:
               containers:
                 - name: beholder-load-tester
-                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:dad4b9407cccfd0580e98f94f1e7f352808ff173
+                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:${LOAD_TESTER_TAG}
                   imagePullPolicy: Always
                   env:
                     - name: OTEL_COLLECTOR_GRPC_ENDPOINT
@@ -204,7 +204,7 @@ deployments:
                   endpoint: 0.0.0.0:4318
           exporters:
             debug:
-              verbosity: normal
+              verbosity: detailed
             otlphttp:
               endpoint: http://deployment-collector:4318
               tls:
@@ -223,13 +223,6 @@ deployments:
               logs:
                 receivers: [otlp]
                 exporters: [debug, otlphttp]
-        resources:
-          requests:
-            memory: "325Mi"
-            cpu: "1500m"
-          limits:
-            memory: "512Mi"
-            cpu: "2000m"
         ingress:
           enabled: true
           ingressClassName: "alb"
@@ -338,14 +331,6 @@ deployments:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
-          resources:
-            limits:
-              cpu: '1'
-              memory: 512Mi
-            requests:
-              cpu: '1'
-              memory: 512Mi
-
         image:
           registry: 804282218731.dkr.ecr.us-west-2.amazonaws.com
           repository: atlas-beholder-gateway-otel-collector
@@ -424,6 +409,9 @@ profiles:
           helm:
             values:
               config:
+                exporters:
+                  debug:
+                    verbosity: normal
                 service:
                   pipelines:
                     traces:
@@ -442,17 +430,26 @@ profiles:
                 limits:
                   memory: "512Mi"
                   cpu: "2000m"
-
-
         beholder-otel-collector-gateway:
           helm:
             values:
               deployment:
                 replicas: 1
+                resources:
+                  limits:
+                    cpu: '1'
+                    memory: 512Mi
+                  requests:
+                    cpu: '1'
+                    memory: 512Mi
     patches:
       - op: add
         path: vars
         value:
+          NUMBER_OF_LOAD_TESTERS:
+            default: "1"
+          LOAD_TESTER_TAG:
+            default: "qa-latest"
           OTEL_METRICS_READER_INTERVAL:
             default: "1s"
           OTEL_TRACE_SAMPLE_RATIO:
@@ -511,6 +508,10 @@ profiles:
             default: ""
           LOKI_URL:
             default: ""
+      - op: add
+        path: dependencies.redpanda.profiles
+        value:
+          - load-test
 
   - name: git-charts
     merge:
