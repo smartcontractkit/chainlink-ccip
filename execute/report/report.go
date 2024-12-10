@@ -125,6 +125,7 @@ const (
 	ReadyToExecute                messageStatus = "ready_to_execute"
 	AlreadyExecuted               messageStatus = "already_executed"
 	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
+	MessagePseudoDeleted          messageStatus = "message_pseudo_deleted"
 	TokenDataFetchError           messageStatus = "token_data_fetch_error"
 	InsufficientRemainingBatchGas messageStatus = "insufficient_remaining_batch_gas"
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
@@ -155,6 +156,17 @@ func (b *execReportBuilder) checkMessage(
 	}
 
 	msg := execReport.Messages[idx]
+
+	if msg.PseudoDeleted {
+		b.lggr.Infow(
+			"message pseudo deleted",
+			"messageID", msg.Header.MessageID,
+			"sourceChain", execReport.SourceChain,
+			"seqNum", msg.Header.SequenceNumber,
+			"messageState", MessagePseudoDeleted)
+		return execReport, MessagePseudoDeleted, nil
+
+	}
 
 	// 1. Check if the message has already been executed.
 	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {

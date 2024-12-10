@@ -227,15 +227,44 @@ func truncateObservation(
 	// If the encoded observation is too large, start filtering data.
 	for len(encodedObs) > maxSize {
 		for _, chain := range chains {
-			if len(observation.CommitReports[chain]) > 1 {
-				observation = truncateLastCommit(observation, chain)
-			} else {
-				observation = truncateChain(observation, chain)
+			commits := observation.CommitReports[chain]
+			if len(commits) == 0 {
+				continue
 			}
-			chains = maps.Keys(observation.CommitReports)
-			break
-		}
 
+			lastCommit := &commits[len(commits)-1]
+			deletedMsgs := 0
+			nMessages := lastCommit.SequenceNumberRange.End() - lastCommit.SequenceNumberRange.Start() + 1
+			if deletedMsgs < int(nMessages) {
+				seqNum := lastCommit.SequenceNumberRange.Start()
+				for seqNum <= lastCommit.SequenceNumberRange.End() {
+					if _, ok := observation.Messages[chain][seqNum]; !ok {
+						return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
+					}
+					observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
+
+					if _, ok := observation.TokenData[chain][seqNum]; !ok {
+						return exectypes.Observation{}, fmt.Errorf(
+							"missing tokenData for message with seqNr %d from chain %d", seqNum, chain,
+						)
+					}
+					observation.TokenData[chain][seqNum] = PseudoDeleteTokenData(observation.TokenData[chain][seqNum])
+
+					deletedMsgs++
+					seqNum++
+					break // check only one message at a time
+				}
+			} else {
+				// If all messages in the report are truncated, truncate the last commit
+				observation = truncateLastCommit(observation, chain)
+				if len(observation.CommitReports[chain]) == 0 {
+					// If the last commit report was truncated, truncate the chain
+					observation = truncateChain(observation, chain)
+				}
+				chains = maps.Keys(observation.CommitReports)
+				break
+			}
+		}
 		// Truncated all chains.
 		if len(observation.CommitReports) == 0 {
 			return exectypes.Observation{}, fmt.Errorf("no more data to truncate")
@@ -245,7 +274,28 @@ func truncateObservation(
 			return exectypes.Observation{}, nil
 		}
 	}
+
 	return observation, nil
+}
+
+func PseudoDeleteMessage(msg cciptypes.Message) cciptypes.Message {
+	pseudoDeletedMsg := msg
+
+	pseudoDeletedMsg.Data = nil
+	pseudoDeletedMsg.ExtraArgs = nil
+	pseudoDeletedMsg.TokenAmounts = nil
+	pseudoDeletedMsg.PseudoDeleted = true
+
+	return pseudoDeletedMsg
+}
+
+func PseudoDeleteTokenData(tokenData exectypes.MessageTokenData) exectypes.MessageTokenData {
+	msgTokenData := tokenData
+	for _, td := range msgTokenData.TokenData {
+		td.Data = nil
+		td.Ready = false
+	}
+	return msgTokenData
 }
 
 // truncateLastCommit removes the last commit from the observation.
