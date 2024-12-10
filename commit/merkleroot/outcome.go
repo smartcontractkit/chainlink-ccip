@@ -69,7 +69,7 @@ func (p *Processor) getOutcome(
 			// The current observations should all be empty.
 			return previousOutcome, buildingReport, nil
 		}
-		return buildReport(q, p.lggr, consObservation, previousOutcome), nextState, nil
+		return buildReport(q, p.offchainCfg.RMNEnabled, p.lggr, consObservation, previousOutcome), nextState, nil
 	case waitingForReportTransmission:
 		return checkForReportTransmission(
 			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
@@ -82,15 +82,15 @@ func (p *Processor) getOutcome(
 func reportRangesOutcome(
 	_ Query,
 	lggr logger.Logger,
-	consensusObservation consensusObservation,
+	consObservation consensusObservation,
 	maxMerkleTreeSize uint64,
 	dstChain cciptypes.ChainSelector,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
-	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
-	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
-	observedRMNRemoteConfig := consensusObservation.RMNRemoteConfig
+	observedOnRampMaxSeqNumsMap := consObservation.OnRampMaxSeqNums
+	observedOffRampNextSeqNumsMap := consObservation.OffRampNextSeqNums
+	observedRMNRemoteConfig := consObservation.RMNRemoteConfig
 
 	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
 
@@ -100,7 +100,15 @@ func reportRangesOutcome(
 			continue
 		}
 
-		if offRampNextSeqNum <= onRampMaxSeqNum {
+		if onRampMaxSeqNum < offRampNextSeqNum-1 {
+			lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
+				"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
+				"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+			continue
+		}
+
+		newMsgsExist := offRampNextSeqNum <= onRampMaxSeqNum
+		if newMsgsExist {
 			rng := cciptypes.NewSeqNumRange(offRampNextSeqNum, onRampMaxSeqNum)
 
 			chainRange := plugintypes.ChainRange{
@@ -130,7 +138,7 @@ func reportRangesOutcome(
 
 	var rmnRemoteConfig rmntypes.RemoteConfig
 	if observedRMNRemoteConfig[dstChain].IsEmpty() {
-		lggr.Warn("RMNRemoteConfig is nil")
+		lggr.Warn("RMNRemoteConfig is empty")
 	} else {
 		rmnRemoteConfig = observedRMNRemoteConfig[dstChain]
 	}
@@ -145,10 +153,10 @@ func reportRangesOutcome(
 	return outcome
 }
 
-// Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
-// to transmit on-chain
+// Given a set of agreed observed merkle roots and RMN signatures, construct an outcome.
 func buildReport(
 	q Query,
+	rmnEnabled bool,
 	lggr logger.Logger,
 	consensusObservation consensusObservation,
 	prevOutcome Outcome,
@@ -160,10 +168,15 @@ func buildReport(
 		outcomeType = ReportEmpty
 	}
 
+	if len(roots) > 0 && rmnEnabled && q.RMNSignatures == nil {
+		lggr.Errorw("RMN signatures are nil while RMN is enabled. Returning an empty outcome")
+		return Outcome{}
+	}
+
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
-	if q.RMNSignatures != nil { // TODO: should never be nil, error after e2e RMN integration.
+	if rmnEnabled && q.RMNSignatures != nil {
 		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
 			lggr.Errorw("Failed to parse RMN signatures returning an empty outcome", "err", err)
@@ -241,13 +254,21 @@ func checkForReportTransmission(
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-
 	offRampUpdated := false
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
-			if previousSeqNumChain.SeqNum != currentSeqNum {
+			if previousSeqNumChain.SeqNum < currentSeqNum {
 				offRampUpdated = true
 				break
+			}
+
+			if previousSeqNumChain.SeqNum > currentSeqNum {
+				lggr.Errorw("OffRampNextSeqNums reached an impossible state, "+
+					"previous offRampNextSeqNum is greater than current offRampNextSeqNum",
+					"chain", previousSeqNumChain.ChainSel,
+					"previousSeqNum", previousSeqNumChain.SeqNum,
+					"currentSeqNum", currentSeqNum,
+				)
 			}
 		}
 	}

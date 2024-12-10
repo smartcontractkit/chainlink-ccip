@@ -44,8 +44,8 @@ func Test_buildReport(t *testing.T) {
 		lggr := logger.Test(t)
 
 		for i := 0; i < rounds; i++ {
-			report1 := buildReport(Query{}, lggr, obs, Outcome{})
-			report2 := buildReport(Query{}, lggr, obs, Outcome{})
+			report1 := buildReport(Query{}, false, lggr, obs, Outcome{})
+			report2 := buildReport(Query{}, false, lggr, obs, Outcome{})
 			require.Equal(t, report1, report2)
 		}
 	})
