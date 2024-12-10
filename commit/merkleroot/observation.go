@@ -508,28 +508,40 @@ func (o observerImpl) ObserveMerkleRoots(
 	return roots
 }
 
-// computeMerkleRoot computes the merkle root of a list of messages
+// computeMerkleRoot computes the merkle root of a list of messages.
+// Messages should be sorted by sequence number and not have any gaps.
 func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
-	var hashes [][32]byte
-	sort.Slice(msgs, func(i, j int) bool { return msgs[i].Header.SequenceNumber < msgs[j].Header.SequenceNumber })
+	hashes := make([][32]byte, len(msgs))
+	hashesStr := make([]string, len(hashes)) // also keep hashes as strings for logging purposes
 
+	eg := &errgroup.Group{}
 	for i, msg := range msgs {
-		// Assert there are no sequence number gaps in msgs
-		if i > 0 {
-			if msg.Header.SequenceNumber != msgs[i-1].Header.SequenceNumber+1 {
-				return [32]byte{}, fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
-					"gap between sequence nums %d and %d, messages: %v", msgs[i-1].Header.SequenceNumber,
-					msg.Header.SequenceNumber, msgs)
+		i := i
+		msg := msg
+		eg.Go(func() error {
+			// Assert there are no sequence number gaps in msgs
+			if i > 0 {
+				if msg.Header.SequenceNumber != msgs[i-1].Header.SequenceNumber+1 {
+					return fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
+						"gap between sequence nums %d and %d, messages: %v", msgs[i-1].Header.SequenceNumber,
+						msg.Header.SequenceNumber, msgs)
+				}
 			}
-		}
 
-		msgHash, err := o.msgHasher.Hash(ctx, msg)
-		if err != nil {
-			o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
-			return cciptypes.Bytes32{}, fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
-		}
+			msgHash, err := o.msgHasher.Hash(ctx, msg)
+			if err != nil {
+				o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
+			}
 
-		hashes = append(hashes, msgHash)
+			hashes[i] = msgHash
+			hashesStr[i] = msgHash.String()
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return [32]byte{}, err
 	}
 
 	// TODO: Do not hard code the hash function, it should be derived from the message hasher
@@ -538,10 +550,6 @@ func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(hashes), err)
 	}
 
-	hashesStr := make([]string, len(hashes))
-	for i, h := range hashes {
-		hashesStr[i] = cciptypes.Bytes32(h).String()
-	}
 	root := tree.Root()
 	o.lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
 	return root, nil
