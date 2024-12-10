@@ -22,7 +22,7 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
-	lggr            logger.Logger
+	lggr            cc.Logger
 	reader          *reader.CCIPReader
 	homechain       reader.HomeChain
 	dest            cciptypes.ChainSelector
@@ -136,7 +136,7 @@ type aggObs struct {
 // aggregateObservations combines observations for multiple objects into aggObs, which is a convenient
 // format for consensus.GetConsensusMap.
 func aggregateObservations(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	dest cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[dt.Observation],
 ) aggObs {
