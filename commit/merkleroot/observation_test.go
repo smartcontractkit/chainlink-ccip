@@ -729,6 +729,10 @@ func Test_Processor_ObservationQuorum(t *testing.T) {
 	}
 }
 
+func Test_shouldSkipRMNVerification(t *testing.T) {
+	t.Skipf("todo")
+}
+
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
 	msgID, err := cciptypes.NewBytes32FromString(msgIDHex)
 	if err != nil {

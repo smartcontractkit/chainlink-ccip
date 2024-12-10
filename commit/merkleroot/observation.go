@@ -61,7 +61,10 @@ func (p *Processor) Observation(
 	}
 
 	tStart := time.Now()
-	observation, nextState := p.getObservation(ctx, q, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, q, prevOutcome)
+	if err != nil {
+		return Observation{}, fmt.Errorf("get observation: %w", err)
+	}
 
 	p.lggr.Infow("sending merkle root processor observation",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
@@ -212,7 +215,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 }
 
 func (p *Processor) getObservation(
-	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState) {
+	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
@@ -225,25 +228,26 @@ func (p *Processor) getObservation(
 			OffRampNextSeqNums: offRampNextSeqNums,
 			RMNRemoteConfig:    rmnRemoteCfg,
 			FChain:             p.observer.ObserveFChain(),
-		}, nextState
+		}, nextState, nil
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
 			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState
+			return Observation{}, nextState, nil
 		}
 		return Observation{
 			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			FChain:      p.observer.ObserveFChain(),
-		}, nextState
+		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{
 			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
 			FChain:             p.observer.ObserveFChain(),
-		}, nextState
+		}, nextState, nil
 	default:
-		p.lggr.Errorw("Unexpected state", "state", nextState)
-		return Observation{}, nextState
+		return Observation{},
+			nextState,
+			fmt.Errorf("unexpected nextState=%d with prevOutcome=%d", nextState, previousOutcome.OutcomeType)
 	}
 }
 
