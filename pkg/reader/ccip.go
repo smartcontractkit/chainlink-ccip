@@ -1448,7 +1448,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 		ctx,
 		consts.ContractNameOffRamp,
 		consts.MethodNameGetLatestPriceSequenceNumber,
-		primitives.Finalized,
+		primitives.Unconfirmed,
 		map[string]any{},
 		&latestSeqNr,
 	)
