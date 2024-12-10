@@ -61,7 +61,10 @@ func (p *Processor) Observation(
 	}
 
 	tStart := time.Now()
-	observation, nextState := p.getObservation(ctx, q, prevOutcome)
+	observation, nextState, err := p.getObservation(ctx, q, prevOutcome)
+	if err != nil {
+		return Observation{}, fmt.Errorf("get observation: %w", err)
+	}
 
 	p.lggr.Infow("sending merkle root processor observation",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
@@ -189,6 +192,9 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 
 	// Skip verification if we are retrying RMN signatures in the next round.
 	if nextState == buildingReport && q.RetryRMNSignatures {
+		if q.RMNSignatures != nil {
+			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
+		}
 		return true, nil
 	}
 
@@ -212,7 +218,7 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 }
 
 func (p *Processor) getObservation(
-	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState) {
+	ctx context.Context, q Query, previousOutcome Outcome) (Observation, processorState, error) {
 	nextState := previousOutcome.nextState()
 	switch nextState {
 	case selectingRangesForReport:
@@ -225,25 +231,26 @@ func (p *Processor) getObservation(
 			OffRampNextSeqNums: offRampNextSeqNums,
 			RMNRemoteConfig:    rmnRemoteCfg,
 			FChain:             p.observer.ObserveFChain(),
-		}, nextState
+		}, nextState, nil
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// RMN signature computation failed, we only want to retry getting the RMN signatures in the next round.
 			// So there's nothing to observe, i.e. we don't want to build the report yet.
-			return Observation{}, nextState
+			return Observation{}, nextState, nil
 		}
 		return Observation{
 			MerkleRoots: p.observer.ObserveMerkleRoots(ctx, previousOutcome.RangesSelectedForReport),
 			FChain:      p.observer.ObserveFChain(),
-		}, nextState
+		}, nextState, nil
 	case waitingForReportTransmission:
 		return Observation{
 			OffRampNextSeqNums: p.observer.ObserveOffRampNextSeqNums(ctx),
 			FChain:             p.observer.ObserveFChain(),
-		}, nextState
+		}, nextState, nil
 	default:
-		p.lggr.Errorw("Unexpected state", "state", nextState)
-		return Observation{}, nextState
+		return Observation{},
+			nextState,
+			fmt.Errorf("unexpected nextState=%d with prevOutcome=%d", nextState, previousOutcome.OutcomeType)
 	}
 }
 
@@ -440,6 +447,33 @@ func (o observerImpl) ObserveMerkleRoots(
 					return
 				}
 
+				if uint64(len(msgs)) != uint64(chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1) {
+					o.lggr.Warnw("call to MsgsBetweenSeqNums returned unexpected number of messages chain skipped",
+						"chain", chainRange.ChainSel,
+						"range", chainRange.SeqNumRange,
+						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
+						"actual", len(msgs),
+					)
+					return
+				}
+
+				// If the returned messages do not match the sequence numbers range
+				// there is nothing to observe for this chain since messages are missing.
+				msgIdx := 0
+				for seqNum := chainRange.SeqNumRange.Start(); seqNum <= chainRange.SeqNumRange.End(); seqNum++ {
+					msgSeqNum := msgs[msgIdx].Header.SequenceNumber
+					if msgSeqNum != seqNum {
+						o.lggr.Warnw("message sequence number does not match seqNum range chain skipped",
+							"chain", chainRange.ChainSel,
+							"seqNum", seqNum,
+							"msgSeqNum", msgSeqNum,
+							"range", chainRange.SeqNumRange,
+						)
+						return
+					}
+					msgIdx++
+				}
+
 				root, err := o.computeMerkleRoot(ctx, msgs)
 				if err != nil {
 					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)
@@ -474,28 +508,40 @@ func (o observerImpl) ObserveMerkleRoots(
 	return roots
 }
 
-// computeMerkleRoot computes the merkle root of a list of messages
+// computeMerkleRoot computes the merkle root of a list of messages.
+// Messages should be sorted by sequence number and not have any gaps.
 func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Message) (cciptypes.Bytes32, error) {
-	var hashes [][32]byte
-	sort.Slice(msgs, func(i, j int) bool { return msgs[i].Header.SequenceNumber < msgs[j].Header.SequenceNumber })
+	hashes := make([][32]byte, len(msgs))
+	hashesStr := make([]string, len(hashes)) // also keep hashes as strings for logging purposes
 
+	eg := &errgroup.Group{}
 	for i, msg := range msgs {
-		// Assert there are no sequence number gaps in msgs
-		if i > 0 {
-			if msg.Header.SequenceNumber != msgs[i-1].Header.SequenceNumber+1 {
-				return [32]byte{}, fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
-					"gap between sequence nums %d and %d, messages: %v", msgs[i-1].Header.SequenceNumber,
-					msg.Header.SequenceNumber, msgs)
+		i := i
+		msg := msg
+		eg.Go(func() error {
+			// Assert there are no sequence number gaps in msgs
+			if i > 0 {
+				if msg.Header.SequenceNumber != msgs[i-1].Header.SequenceNumber+1 {
+					return fmt.Errorf("found non-consecutive sequence numbers when computing merkle root, "+
+						"gap between sequence nums %d and %d, messages: %v", msgs[i-1].Header.SequenceNumber,
+						msg.Header.SequenceNumber, msgs)
+				}
 			}
-		}
 
-		msgHash, err := o.msgHasher.Hash(ctx, msg)
-		if err != nil {
-			o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
-			return cciptypes.Bytes32{}, fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
-		}
+			msgHash, err := o.msgHasher.Hash(ctx, msg)
+			if err != nil {
+				o.lggr.Warnw("failed to hash message", "msg", msg, "err", err)
+				return fmt.Errorf("hash message with id %s: %w", msg.Header.MessageID, err)
+			}
 
-		hashes = append(hashes, msgHash)
+			hashes[i] = msgHash
+			hashesStr[i] = msgHash.String()
+			return nil
+		})
+	}
+
+	if err := eg.Wait(); err != nil {
+		return [32]byte{}, err
 	}
 
 	// TODO: Do not hard code the hash function, it should be derived from the message hasher
@@ -504,10 +550,6 @@ func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 		return [32]byte{}, fmt.Errorf("failed to construct merkle tree from %d leaves: %w", len(hashes), err)
 	}
 
-	hashesStr := make([]string, len(hashes))
-	for i, h := range hashes {
-		hashesStr[i] = cciptypes.Bytes32(h).String()
-	}
 	root := tree.Root()
 	o.lggr.Infow("Computed merkle root", "hashes", hashesStr, "root", cciptypes.Bytes32(root).String())
 	return root, nil
@@ -537,7 +579,7 @@ func (o observerImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
-		o.lggr.Warnw("call to GetFChain failed", "err", err)
+		o.lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
