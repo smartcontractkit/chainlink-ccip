@@ -730,7 +730,83 @@ func Test_Processor_ObservationQuorum(t *testing.T) {
 }
 
 func Test_shouldSkipRMNVerification(t *testing.T) {
-	t.Skipf("todo")
+	testCases := []struct {
+		name                       string
+		nextProcessorState         processorState
+		queryContainsRmnSigs       bool
+		queryIndicatesSigsRetrying bool
+		rmnRemoteConfigEmpty       bool
+		expErr                     bool
+		expSkip                    bool
+	}{
+		{
+			name:    "all empty should skip rmn verification",
+			expSkip: true,
+		},
+		{
+			name:                 "happy path proceed with verification",
+			nextProcessorState:   buildingReport,
+			queryContainsRmnSigs: true,
+		},
+		{
+			name:               "rmn sigs missing error is expected",
+			nextProcessorState: buildingReport,
+			expErr:             true,
+		},
+		{
+			name:                       "rmn sigs are present while we retry sigs in the next round this is invalid",
+			nextProcessorState:         buildingReport,
+			queryContainsRmnSigs:       true,
+			queryIndicatesSigsRetrying: true,
+			expErr:                     true,
+		},
+		{
+			name:                       "retrying sigs in the next round sig verification should be skipped",
+			nextProcessorState:         buildingReport,
+			queryIndicatesSigsRetrying: true,
+			expSkip:                    true,
+		},
+		{
+			name:                 "rmn remote config from previous outcome is empty error is expected",
+			nextProcessorState:   buildingReport,
+			queryContainsRmnSigs: true,
+			rmnRemoteConfigEmpty: true,
+			expErr:               true,
+		},
+		{
+			name:                 "signatures were provided but we are not in the right state",
+			nextProcessorState:   selectingRangesForReport,
+			queryContainsRmnSigs: true,
+			expErr:               true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q := Query{}
+
+			if tc.queryContainsRmnSigs {
+				q.RMNSignatures = &rmn.ReportSignatures{}
+			}
+
+			if tc.queryIndicatesSigsRetrying {
+				q.RetryRMNSignatures = true
+			}
+
+			prevOutcome := Outcome{}
+			if !tc.rmnRemoteConfigEmpty {
+				prevOutcome.RMNRemoteCfg = rmntypes.RemoteConfig{F: 1}
+			}
+
+			shouldSkip, err := shouldSkipRMNVerification(tc.nextProcessorState, q, prevOutcome)
+			if tc.expErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expSkip, shouldSkip)
+		})
+	}
 }
 
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {

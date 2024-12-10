@@ -192,6 +192,9 @@ func shouldSkipRMNVerification(nextState processorState, q Query, prevOutcome Ou
 
 	// Skip verification if we are retrying RMN signatures in the next round.
 	if nextState == buildingReport && q.RetryRMNSignatures {
+		if q.RMNSignatures != nil {
+			return false, fmt.Errorf("RMN signatures are provided but not expected if retrying is set to true")
+		}
 		return true, nil
 	}
 
