@@ -24,17 +24,34 @@ type OCR3Config = reader_internal.OCR3Config
 
 type OCR3Node = reader_internal.OCR3Node
 
+// Keeping it for the compatibility with the code in the chainlink repo
 func NewHomeChainReader(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
 ) HomeChain {
+	return NewObservedHomeChainReader(
+		homeChainReader,
+		lggr,
+		pollingInterval,
+		ccipConfigBoundContract,
+		"homeChain",
+	)
+}
+
+func NewObservedHomeChainReader(
+	homeChainReader types.ContractReader,
+	lggr logger.Logger,
+	pollingInterval time.Duration,
+	ccipConfigBoundContract types.BoundContract,
+	chainID string,
+) HomeChain {
 	return reader_internal.NewHomeChainConfigPoller(
 		contractreader.NewObserverReader(
 			homeChainReader,
 			lggr,
-			"home",
+			chainID,
 		),
 		lggr,
 		pollingInterval,

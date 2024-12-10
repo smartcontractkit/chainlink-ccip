@@ -29,15 +29,15 @@ var (
 		float64(5 * time.Second),
 	}
 
-	crDirectRequestsDurations = promauto.NewHistogramVec(
+	CrDirectRequestsDurations = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "contract_reader_direct_request_duration",
 			Help:    "The amount of time elapsed during the ChainReader's GetLatestValue execution",
 			Buckets: buckets,
 		},
-		[]string{"chainID", "function", "contract"},
+		[]string{"chainID", "contract", "method"},
 	)
-	crBatchRequestsDurations = promauto.NewHistogramVec(
+	CrBatchRequestsDurations = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "contract_reader_batch_request_duration",
 			Help:    "The amount of time elapsed during the ChainReader's BatchGetLatestValues execution",
@@ -45,14 +45,14 @@ var (
 		},
 		[]string{"chainID"},
 	)
-	crBatchSizes = promauto.NewCounterVec(
+	CrBatchSizes = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "contract_reader_batch_request_szie",
+			Name: "contract_reader_batch_request_size",
 			Help: "The size of the batch request",
 		},
 		[]string{"chainID"},
 	)
-	crErrors = promauto.NewCounterVec(
+	CrErrors = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "contract_reader_errors",
 			Help: "The number of errors that occurred during the ChainReader's execution",
@@ -82,10 +82,10 @@ func NewObserverReader(
 		ContractReaderFacade:    cr,
 		lggr:                    lggr,
 		chainID:                 chainID,
-		directRequestsDurations: crDirectRequestsDurations,
-		batchRequestsDurations:  crBatchRequestsDurations,
-		batchSizes:              crBatchSizes,
-		errors:                  crErrors,
+		directRequestsDurations: CrDirectRequestsDurations,
+		batchRequestsDurations:  CrBatchRequestsDurations,
+		batchSizes:              CrBatchSizes,
+		errors:                  CrErrors,
 	}
 }
 
