@@ -95,6 +95,11 @@ func reportRangesOutcome(
 	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
+		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
+			ChainSel: chainSel,
+			SeqNum:   offRampNextSeqNum,
+		})
+
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
 		if !exists {
 			continue
@@ -104,7 +109,6 @@ func reportRangesOutcome(
 			lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
 				"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
 				"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
-			continue
 		}
 
 		newMsgsExist := offRampNextSeqNum <= onRampMaxSeqNum
@@ -123,11 +127,6 @@ func reportRangesOutcome(
 				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
 		}
-
-		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
-			ChainSel: chainSel,
-			SeqNum:   offRampNextSeqNum,
-		})
 	}
 
 	// deterministic outcome

@@ -3,20 +3,300 @@ package merkleroot
 import (
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 var rmnRemoteCfg = testhelpers.CreateRMNRemoteCfg()
 
 func Test_Processor_Outcome(t *testing.T) {
-	t.Skipf("todo")
+	const (
+		chainA = 1
+		chainB = 2
+		chainC = 3
+		chainD = 100
+		chainE = 4
+		chainF = 5
+	)
+
+	type testCase struct {
+		name              string
+		prevOutcome       Outcome
+		q                 Query
+		observations      []func(tc testCase) Observation
+		observers         []commontypes.OracleID
+		bigF              int
+		destChainSel      cciptypes.ChainSelector
+		maxMerkleTreeSize uint64
+		rmnEnabled        bool
+		expOutcome        Outcome
+		expErr            bool
+	}
+
+	testCases := []testCase{
+		{
+			name:        "empty previous outcome this should be a ranges outcome",
+			prevOutcome: Outcome{},
+			q:           Query{},
+			observations: []func(tc testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OnRampMaxSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 20},
+							{ChainSel: chainC, SeqNum: 30},
+						},
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10}, // we have to execute 10
+							{ChainSel: chainB, SeqNum: 21}, // this is still at 20, nothing to execute
+							{ChainSel: chainC, SeqNum: 35}, // this is an unexpected state but should not lead to issues
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1, // 2f+1 observations required for each chain
+							chainB: 1,
+							chainC: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers: []commontypes.OracleID{
+				commontypes.OracleID(1),
+				commontypes.OracleID(2),
+				commontypes.OracleID(3),
+			},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 256,
+			rmnEnabled:        false,
+			expOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{ChainSel: chainA, SeqNumRange: cciptypes.NewSeqNumRange(10, 10)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 21},
+					{ChainSel: chainC, SeqNum: 35},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name:        "no fChain consensus should lead to offRamp sequence numbers not being reported for a chain",
+			prevOutcome: Outcome{},
+			q:           Query{},
+			observations: []func(tc testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OnRampMaxSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 20},
+							{ChainSel: chainC, SeqNum: 30},
+						},
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10}, // we have to execute 10
+							{ChainSel: chainB, SeqNum: 21}, // this is still at 20, nothing to execute
+							{ChainSel: chainC, SeqNum: 35}, // this is an unexpected state but should not lead to issues
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1, // 2f+1 observations required for each chain
+							chainB: 1,
+							chainC: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation {
+					baseObs := tc.observations[0](tc)
+					baseObs.OffRampNextSeqNums = []plugintypes.SeqNumChain{
+						{ChainSel: chainA, SeqNum: 10},
+						// <-------------- chainB is missing
+						{ChainSel: chainC, SeqNum: 35},
+					}
+					return baseObs
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers: []commontypes.OracleID{
+				commontypes.OracleID(1),
+				commontypes.OracleID(2),
+				commontypes.OracleID(3),
+			},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 256,
+			rmnEnabled:        false,
+			expOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{ChainSel: chainA, SeqNumRange: cciptypes.NewSeqNumRange(10, 10)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainC, SeqNum: 35},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name:        "multiple source chain ranges selected",
+			prevOutcome: Outcome{},
+			q:           Query{},
+			observations: []func(tc testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OnRampMaxSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 20},
+							{ChainSel: chainC, SeqNum: 30},
+						},
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 5},
+							{ChainSel: chainC, SeqNum: 1},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1, // 2f+1 observations required for each chain
+							chainB: 1,
+							chainC: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers: []commontypes.OracleID{
+				commontypes.OracleID(1),
+				commontypes.OracleID(2),
+				commontypes.OracleID(3),
+			},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 256,
+			rmnEnabled:        false,
+			expOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{ChainSel: chainA, SeqNumRange: cciptypes.NewSeqNumRange(10, 10)},
+					{ChainSel: chainB, SeqNumRange: cciptypes.NewSeqNumRange(5, 20)},
+					{ChainSel: chainC, SeqNumRange: cciptypes.NewSeqNumRange(1, 30)},
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 5},
+					{ChainSel: chainC, SeqNum: 1},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name:        "multiple source chain ranges but some of them do not reach consensus",
+			prevOutcome: Outcome{},
+			q:           Query{},
+			observations: []func(tc testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OnRampMaxSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 20},
+							{ChainSel: chainC, SeqNum: 30},
+						},
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 5},
+							{ChainSel: chainC, SeqNum: 1},
+							{ChainSel: chainE, SeqNum: 4}, // <---- but "onRamp" seqNum for chainE does not exist
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1, // 2f+1 observations required for each chain
+							chainB: 2, // <----------------------- chainB requires 2f+1=5 observations which not exist
+							chainC: 1,
+							chainD: 1,
+							chainE: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers: []commontypes.OracleID{
+				commontypes.OracleID(1),
+				commontypes.OracleID(2),
+				commontypes.OracleID(3),
+			},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 10, // <------ notice that this will lead to range truncation
+			rmnEnabled:        false,
+			expOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{ChainSel: chainA, SeqNumRange: cciptypes.NewSeqNumRange(10, 10)},
+					// chainB missing due to not reach 2f+1
+					{ChainSel: chainC, SeqNumRange: cciptypes.NewSeqNumRange(1, 10)}, // <--- truncated
+					// chainE missing due to onRamp seqNums not observed
+				},
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					// chainB missing
+					{ChainSel: chainC, SeqNum: 1},
+					{ChainSel: chainE, SeqNum: 4},
+				},
+			},
+			expErr: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		require.Equal(t, len(tc.observations), len(tc.observers), "test case is wrong")
+		t.Run(tc.name, func(t *testing.T) {
+			lggr := logger.Test(t)
+			ctx := tests.Context(t)
+
+			p := &Processor{
+				lggr: lggr,
+				reportingCfg: ocr3types.ReportingPluginConfig{
+					F: tc.bigF,
+				},
+				destChain: tc.destChainSel,
+				offchainCfg: pluginconfig.CommitOffchainConfig{
+					MaxMerkleTreeSize: tc.maxMerkleTreeSize,
+					RMNEnabled:        tc.rmnEnabled,
+				},
+			}
+
+			aos := make([]plugincommon.AttributedObservation[Observation], 0, len(tc.observations))
+			for i, o := range tc.observations {
+				aos = append(aos, plugincommon.AttributedObservation[Observation]{
+					Observation: o(tc),
+					OracleID:    tc.observers[i],
+				})
+			}
+
+			outc, err := p.Outcome(ctx, tc.prevOutcome, tc.q, aos)
+			if tc.expErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expOutcome, outc)
+		})
+	}
 }
 
 func Test_buildReport(t *testing.T) {
