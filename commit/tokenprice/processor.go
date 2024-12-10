@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -17,7 +17,7 @@ import (
 
 type processor struct {
 	oracleID         commontypes.OracleID
-	lggr             logger.Logger
+	lggr             cc.Logger
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
@@ -28,7 +28,7 @@ type processor struct {
 
 func NewProcessor(
 	oracleID commontypes.OracleID,
-	lggr logger.Logger,
+	lggr cc.Logger,
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
@@ -38,7 +38,7 @@ func NewProcessor(
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
-		lggr:             lggr,
+		lggr:             logger.WithProcessor(lggr, "TokenPrice"),
 		offChainCfg:      offChainCfg,
 		destChain:        destChain,
 		chainSupport:     chainSupport,

@@ -4,15 +4,15 @@ import (
 	"context"
 	"fmt"
 
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -22,7 +22,7 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
-	lggr            logger.Logger
+	lggr            cc.Logger
 	reader          *reader.CCIPReader
 	homechain       reader.HomeChain
 	dest            cciptypes.ChainSelector
@@ -31,7 +31,7 @@ type ContractDiscoveryProcessor struct {
 }
 
 func NewContractDiscoveryProcessor(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	reader *reader.CCIPReader,
 	homechain reader.HomeChain,
 	dest cciptypes.ChainSelector,
@@ -39,7 +39,7 @@ func NewContractDiscoveryProcessor(
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
-		lggr:            lggr,
+		lggr:            logger.WithProcessor(lggr, "Discovery"),
 		reader:          reader,
 		homechain:       homechain,
 		dest:            dest,
@@ -80,6 +80,7 @@ func (cdp *ContractDiscoveryProcessor) Observation(
 func (cdp *ContractDiscoveryProcessor) ValidateObservation(
 	_ dt.Outcome, _ dt.Query, ao plugincommon.AttributedObservation[dt.Observation],
 ) error {
+	cdp.lggr.Infow("wtf mate")
 	oraclePeerID, ok := cdp.oracleIDToP2PID[ao.OracleID]
 	if !ok {
 		// should never happen in practice.
@@ -135,7 +136,7 @@ type aggObs struct {
 // aggregateObservations combines observations for multiple objects into aggObs, which is a convenient
 // format for consensus.GetConsensusMap.
 func aggregateObservations(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	dest cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[dt.Observation],
 ) aggObs {

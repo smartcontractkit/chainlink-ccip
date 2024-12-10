@@ -6,12 +6,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -45,6 +46,7 @@ func NewObserverWithDefaults(
 	relativeBoostPerWaitHour float64,
 	estimateProvider gas.EstimateProvider,
 ) Observer {
+	lggr = logger.WithProcessor(lggr, "CostlyMessages")
 	return NewObserver(
 		lggr,
 		enabled,
@@ -65,11 +67,12 @@ func NewObserverWithDefaults(
 // NewObserver allows to specific feeCalculator and execCostCalculator.
 // Therefore, it's very convenient for testing.
 func NewObserver(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	enabled bool,
 	feeCalculator MessageFeeE18USDCalculator,
 	execCostCalculator MessageExecCostUSD18Calculator,
 ) Observer {
+	lggr = logger.WithProcessor(lggr, "CostlyMessages")
 	return &observer{
 		lggr:               lggr,
 		enabled:            enabled,
@@ -79,7 +82,7 @@ func NewObserver(
 }
 
 type observer struct {
-	lggr               logger.Logger
+	lggr               cc.Logger
 	enabled            bool
 	feeCalculator      MessageFeeE18USDCalculator
 	execCostCalculator MessageExecCostUSD18Calculator
@@ -259,7 +262,7 @@ var _ MessageExecCostUSD18Calculator = &StaticMessageExecCostUSD18Calculator{}
 
 // CCIPMessageFeeUSD18Calculator calculates the fees (paid at source) of a set of messages in USD18s.
 type CCIPMessageFeeUSD18Calculator struct {
-	lggr logger.Logger
+	lggr cc.Logger
 
 	ccipReader readerpkg.CCIPReader
 
@@ -272,7 +275,7 @@ type CCIPMessageFeeUSD18Calculator struct {
 }
 
 func NewCCIPMessageFeeUSD18Calculator(
-	lggr logger.Logger,
+	lggr cc.Logger,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
 	now func() time.Time,
@@ -338,7 +341,7 @@ func waitBoostedFee(
 }
 
 type CCIPMessageExecCostUSD18Calculator struct {
-	lggr             logger.Logger
+	lggr             cc.Logger
 	ccipReader       readerpkg.CCIPReader
 	estimateProvider gas.EstimateProvider
 }

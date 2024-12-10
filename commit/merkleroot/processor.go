@@ -1,16 +1,17 @@
 package merkleroot
 
 import (
+	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -25,7 +26,7 @@ type Processor struct {
 	oracleIDToP2pID        map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg            pluginconfig.CommitOffchainConfig
 	destChain              cciptypes.ChainSelector
-	lggr                   logger.Logger
+	lggr                   cc.Logger
 	observer               Observer
 	ccipReader             readerpkg.CCIPReader
 	reportingCfg           ocr3types.ReportingPluginConfig
@@ -40,7 +41,7 @@ type Processor struct {
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	lggr logger.Logger,
+	lggr cc.Logger,
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
@@ -65,7 +66,7 @@ func NewProcessor(
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
-		lggr:            lggr,
+		lggr:            logger.WithProcessor(lggr, "MerkleRoot"),
 		observer:        observer,
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
