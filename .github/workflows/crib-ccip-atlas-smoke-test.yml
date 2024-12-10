@@ -21,6 +21,8 @@ on:
       - "!**/*.md" # Exclude doc updates
       # Exclude .gitignore
       - "!.gitignore"
+      # Exclude changesets version bumps
+      - "!package.json"
     types:
       - opened
       - reopened
@@ -43,6 +45,8 @@ on:
       - "!**/*.md" # Exclude doc updates
       # Exclude .gitignore
       - "!.gitignore"
+      # Exclude changesets version bumps
+      - "!package.json"
   workflow_dispatch:
     inputs:
       debug:
