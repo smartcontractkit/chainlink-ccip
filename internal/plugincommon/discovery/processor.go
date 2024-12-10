@@ -39,7 +39,7 @@ func NewContractDiscoveryProcessor(
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
-		lggr:            logger.NewProcessorLogWrapper(lggr, "Discovery"),
+		lggr:            logger.WithProcessor(lggr, "Discovery"),
 		reader:          reader,
 		homechain:       homechain,
 		dest:            dest,

@@ -38,7 +38,7 @@ func NewProcessor(
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
-		lggr:             logger.NewProcessorLogWrapper(lggr, "TokenPrice"),
+		lggr:             logger.WithProcessor(lggr, "TokenPrice"),
 		offChainCfg:      offChainCfg,
 		destChain:        destChain,
 		chainSupport:     chainSupport,
