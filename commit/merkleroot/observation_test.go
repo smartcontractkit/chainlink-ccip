@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+	types2 "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -646,6 +648,85 @@ func Test_Processor_initializeRMNController(t *testing.T) {
 	err = p.prepareRMNController(ctx, Outcome{RMNRemoteCfg: cfg})
 	assert.NoError(t, err, "rmn controller initialized")
 	assert.Equal(t, cfg.ConfigDigest, p.rmnControllerCfgDigest)
+}
+
+func Test_Processor_ObservationQuorum(t *testing.T) {
+	testCases := []struct {
+		name                      string
+		numOracles                int
+		bigF                      int
+		numAttributedObservations int
+		expectedQuorum            bool
+		expErr                    bool
+	}{
+		{
+			name:                      "all empty no quorum",
+			numOracles:                0,
+			bigF:                      0,
+			numAttributedObservations: 0,
+			expectedQuorum:            false,
+			expErr:                    false,
+		},
+		{
+			name:                      "happy path 2F+1 observations",
+			numOracles:                8,
+			bigF:                      3,
+			numAttributedObservations: 7,
+			expectedQuorum:            true,
+			expErr:                    false,
+		},
+		{
+			name:                      "no quorum path less than 2F+1 observations",
+			numOracles:                8,
+			bigF:                      3,
+			numAttributedObservations: 6,
+			expectedQuorum:            false,
+			expErr:                    false,
+		},
+		{
+			name:                      "zero observations case",
+			numOracles:                8,
+			bigF:                      3,
+			numAttributedObservations: 0,
+			expectedQuorum:            false,
+			expErr:                    false,
+		},
+		{
+			name:                      "even with zero oracles quorum not affected",
+			numOracles:                0,
+			bigF:                      3,
+			numAttributedObservations: 7,
+			expectedQuorum:            true,
+			expErr:                    false,
+		},
+	}
+
+	ctx := tests.Context(t)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &Processor{
+				lggr: logger.Test(t),
+				reportingCfg: ocr3types.ReportingPluginConfig{
+					N: tc.numOracles,
+					F: tc.bigF,
+				},
+			}
+
+			quorum, err := p.ObservationQuorum(
+				ctx,
+				ocr3types.OutcomeContext{},
+				types2.Query{},
+				make([]types2.AttributedObservation, tc.numAttributedObservations),
+			)
+
+			if tc.expErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedQuorum, quorum)
+		})
+	}
 }
 
 func mustNewMessageID(msgIDHex string) cciptypes.Bytes32 {
