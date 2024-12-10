@@ -69,7 +69,11 @@ func (p *Processor) getOutcome(
 			// The current observations should all be empty.
 			return previousOutcome, buildingReport, nil
 		}
-		return buildReport(q, p.offchainCfg.RMNEnabled, p.lggr, consObservation, previousOutcome), nextState, nil
+
+		merkleRootsOutcome, err := buildMerkleRootsOutcome(
+			q, p.offchainCfg.RMNEnabled, p.lggr, consObservation, previousOutcome)
+
+		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
 		return checkForReportTransmission(
 			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
@@ -152,14 +156,15 @@ func reportRangesOutcome(
 	return outcome
 }
 
-// Given a set of agreed observed merkle roots and RMN signatures, construct an outcome.
-func buildReport(
+// buildMerkleRootsOutcome is given a set of agreed observed merkle roots and RMN signatures
+// and construct a merkleRoots outcome.
+func buildMerkleRootsOutcome(
 	q Query,
 	rmnEnabled bool,
 	lggr logger.Logger,
 	consensusObservation consensusObservation,
 	prevOutcome Outcome,
-) Outcome {
+) (Outcome, error) {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
 	outcomeType := ReportGenerated
@@ -168,8 +173,7 @@ func buildReport(
 	}
 
 	if len(roots) > 0 && rmnEnabled && q.RMNSignatures == nil {
-		lggr.Errorw("RMN signatures are nil while RMN is enabled. Returning an empty outcome")
-		return Outcome{}
+		return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
 	}
 
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
@@ -178,8 +182,7 @@ func buildReport(
 	if rmnEnabled && q.RMNSignatures != nil {
 		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
-			lggr.Errorw("Failed to parse RMN signatures returning an empty outcome", "err", err)
-			return Outcome{}
+			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
 		}
 		sigs = parsedSigs
 
@@ -237,7 +240,7 @@ func buildReport(
 		RMNRemoteCfg:        prevOutcome.RMNRemoteCfg,
 	}
 
-	return outcome
+	return outcome, nil
 }
 
 // checkForReportTransmission checks if the OffRamp has an updated set of max seq nums compared to the seq nums that

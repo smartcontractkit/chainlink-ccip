@@ -461,7 +461,7 @@ func Test_Processor_Outcome(t *testing.T) {
 	}
 }
 
-func Test_buildReport(t *testing.T) {
+func Test_buildMerkleRootsOutcome(t *testing.T) {
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
 
@@ -486,8 +486,10 @@ func Test_buildReport(t *testing.T) {
 		lggr := logger.Test(t)
 
 		for i := 0; i < rounds; i++ {
-			report1 := buildReport(Query{}, false, lggr, obs, Outcome{})
-			report2 := buildReport(Query{}, false, lggr, obs, Outcome{})
+			report1, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			require.NoError(t, err)
+			report2, err := buildMerkleRootsOutcome(Query{}, false, lggr, obs, Outcome{})
+			require.NoError(t, err)
 			require.Equal(t, report1, report2)
 		}
 	})
