@@ -6,7 +6,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
@@ -29,7 +32,7 @@ func TestPlugin(t *testing.T) {
 		makeMsg(105, srcSelector, dstSelector, false),
 	}
 
-	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
+	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), 1)
 	runner := intTest.Start()
 	defer intTest.Close()
@@ -75,7 +78,7 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	messageTimestamp := time.Now().Add(-4 * time.Hour)
 	tm := timeMachine{now: messageTimestamp}
 
-	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
+	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
 	intTest.WithMessages(messages, 1000, messageTimestamp, 1)
 	intTest.WithCustomFeeBoosting(1.0, tm.Now, map[cciptypes.Bytes32]plugintypes.USD18{
 		messages[0].Header.MessageID: plugintypes.NewUSD18(40000),
@@ -166,7 +169,7 @@ func TestExceedSizeObservation(t *testing.T) {
 		)
 	}
 
-	intTest := SetupSimpleTest(t, srcSelector, dstSelector)
+	intTest := SetupSimpleTest(t, mocks.NullLogger, srcSelector, dstSelector)
 	intTest.WithMessages(messages, 1000, time.Now().Add(-4*time.Hour), nReports)
 	runner := intTest.Start()
 	defer intTest.Close()
