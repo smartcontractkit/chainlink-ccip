@@ -1,8 +1,6 @@
 package execute
 
 import (
-	"context"
-	crand "crypto/rand"
 	"encoding/binary"
 	"math/big"
 	"net/http"
@@ -16,13 +14,11 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
@@ -226,7 +222,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		},
 	}
 
-	homeChain := setupHomeChainPoller(it.t, it.donID, it.lggr, chainConfigInfos)
+	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
@@ -268,9 +264,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -307,15 +303,16 @@ func (it *IntTest) newNode(
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
+	configDigest [32]byte,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
-	b := make([]byte, 32)
-	_, _ = crand.Read(b)
 	rCfg := ocr3types.ReportingPluginConfig{
 		N:            N,
 		OracleID:     commontypes.OracleID(id),
-		ConfigDigest: ocrtypes.ConfigDigest(b),
+		ConfigDigest: configDigest,
 	}
+
+	it.ccipReader.ConfigDigest = configDigest
 
 	node1 := NewPlugin(
 		it.donID,
@@ -456,7 +453,6 @@ type nodeSetup struct {
 
 func setupHomeChainPoller(
 	t *testing.T,
-	donID plugintypes.DonID,
 	lggr logger.Logger,
 	chainConfigInfos []reader.ChainConfigInfo,
 ) reader.HomeChain {
@@ -485,26 +481,6 @@ func setupHomeChainPoller(
 				*arg = []reader.ChainConfigInfo{} // return empty for other pages
 			}
 		}).Return(nil)
-
-	homeChainReader.EXPECT().
-		GetLatestValue(mock.Anything, types.BoundContract{
-			Address: ccipConfigAddress,
-			Name:    consts.ContractNameCCIPConfig,
-		}.ReadIdentifier(consts.MethodNameGetOCRConfig), primitives.Unconfirmed, map[string]any{
-			"donId":      donID,
-			"pluginType": consts.PluginTypeExecute,
-		}, mock.Anything).
-		Run(
-			func(
-				ctx context.Context,
-				readIdentifier string,
-				confidenceLevel primitives.ConfidenceLevel,
-				params,
-				returnVal interface{},
-			) {
-				*returnVal.(*reader.ActiveAndCandidate) = reader.ActiveAndCandidate{}
-			}).
-		Return(nil)
 
 	homeChain := reader.NewHomeChainConfigPoller(
 		homeChainReader,

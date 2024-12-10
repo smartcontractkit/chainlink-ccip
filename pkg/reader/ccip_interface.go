@@ -175,4 +175,7 @@ type CCIPReader interface {
 	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
 	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.
 	GetLatestPriceSeqNr(ctx context.Context) (uint64, error)
+
+	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
+	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 }

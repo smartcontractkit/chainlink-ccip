@@ -1,7 +1,9 @@
 package execute
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -295,6 +297,32 @@ func (p *Plugin) Reports(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
+	// check if we support the dest, if not we can't do the checks needed.
+	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
+	if err != nil {
+		return false, fmt.Errorf("supports dest chain: %w", err)
+	}
+
+	if !supports {
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+
+		// TODO: return false here or a non-nil error?
+		return false, nil
+	}
+
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
+	if err != nil {
+		return false, fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
+		return false, nil
+	}
+
 	// Just a safety check, should never happen.
 	if r.Report == nil {
 		p.lggr.Warn("skipping nil report")
@@ -334,33 +362,37 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	isWriter, err := p.supportsDestChain()
+	// check if we support the dest, if not we can't do the checks needed.
+	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
 	if err != nil {
-		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+		return false, fmt.Errorf("supports dest chain: %w", err)
 	}
-	if !isWriter {
-		p.lggr.Debug("not a destination writer, skipping report transmission")
+
+	if !supports {
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+
+		// TODO: return false here or a non-nil error?
 		return false, nil
 	}
 
-	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR configs home chain.
-	isCandidate, err := p.isCandidateInstance(ctx)
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
 	if err != nil {
-		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isCandidateInstance: %w", err)
+		return false, fmt.Errorf("get offramp config digest: %w", err)
 	}
 
-	if isCandidate {
-		p.lggr.Debugw("not the active instance, skipping report transmission",
-			"myDigest", p.reportingCfg.ConfigDigest.Hex())
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
 		return false, nil
 	}
 
 	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
 	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
+		return false, fmt.Errorf("decode execute plugin report: %w", err)
 	}
 
 	// TODO: Final validation?
