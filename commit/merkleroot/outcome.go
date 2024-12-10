@@ -282,7 +282,7 @@ func checkForReportTransmission(
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
-		lggr.Warnw("Failed to detect report transmission")
+		lggr.Warnw("report not transmitted, max check attempts reached, moving to next state")
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}

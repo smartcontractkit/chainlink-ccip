@@ -38,17 +38,18 @@ func Test_Processor_Outcome(t *testing.T) {
 	)
 
 	type testCase struct {
-		name              string
-		prevOutcome       Outcome
-		q                 Query
-		observations      []func(tc testCase) Observation
-		observers         []commontypes.OracleID
-		bigF              int
-		destChainSel      cciptypes.ChainSelector
-		maxMerkleTreeSize uint64
-		rmnEnabled        bool
-		expOutcome        Outcome
-		expErr            bool
+		name                               string
+		prevOutcome                        Outcome
+		q                                  Query
+		observations                       []func(tc testCase) Observation
+		observers                          []commontypes.OracleID
+		bigF                               int
+		destChainSel                       cciptypes.ChainSelector
+		maxMerkleTreeSize                  uint64
+		rmnEnabled                         bool
+		maxReportTransmissionCheckAttempts int
+		expOutcome                         Outcome
+		expErr                             bool
 	}
 
 	testCases := []testCase{
@@ -422,6 +423,126 @@ func Test_Processor_Outcome(t *testing.T) {
 			},
 			expErr: false,
 		},
+		{
+			name: "waiting for merkleRoots report transmission",
+			prevOutcome: Outcome{
+				OutcomeType: ReportGenerated,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+			},
+			q: Query{},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 20},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1,
+							chainB: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers:                          []commontypes.OracleID{1, 2, 3},
+			bigF:                               1,
+			destChainSel:                       chainD,
+			maxMerkleTreeSize:                  20,
+			rmnEnabled:                         true,
+			maxReportTransmissionCheckAttempts: 5,
+			expOutcome: Outcome{
+				OutcomeType: ReportInFlight,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				ReportTransmissionCheckAttempts: 0x1,
+			},
+			expErr: false,
+		},
+		{
+			name: "waiting for merkleRoots report transmission",
+			prevOutcome: Outcome{
+				OutcomeType: ReportGenerated,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+			},
+			q: Query{},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 21}, // <--- indicates report transmission (also for chainA)
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1,
+							chainB: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers:                          []commontypes.OracleID{1, 2, 3},
+			bigF:                               1,
+			destChainSel:                       chainD,
+			maxMerkleTreeSize:                  20,
+			rmnEnabled:                         true,
+			maxReportTransmissionCheckAttempts: 5,
+			expOutcome: Outcome{
+				OutcomeType: ReportTransmitted,
+			},
+			expErr: false,
+		},
+		{
+			name: "reached all report transmission check attempts",
+			prevOutcome: Outcome{
+				OutcomeType: ReportGenerated,
+				OffRampNextSeqNums: []plugintypes.SeqNumChain{
+					{ChainSel: chainA, SeqNum: 10},
+					{ChainSel: chainB, SeqNum: 20},
+				},
+				ReportTransmissionCheckAttempts: 10, // <------------
+			},
+			q: Query{},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+							{ChainSel: chainB, SeqNum: 20},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1,
+							chainB: 1,
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers:                          []commontypes.OracleID{1, 2, 3},
+			bigF:                               1,
+			destChainSel:                       chainD,
+			maxMerkleTreeSize:                  20,
+			rmnEnabled:                         true,
+			maxReportTransmissionCheckAttempts: 10, // <-----------------
+			expOutcome: Outcome{
+				OutcomeType: ReportTransmissionFailed, // <----------- we don't want to retry checking
+			},
+			expErr: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -437,8 +558,9 @@ func Test_Processor_Outcome(t *testing.T) {
 				},
 				destChain: tc.destChainSel,
 				offchainCfg: pluginconfig.CommitOffchainConfig{
-					MaxMerkleTreeSize: tc.maxMerkleTreeSize,
-					RMNEnabled:        tc.rmnEnabled,
+					MaxMerkleTreeSize:                  tc.maxMerkleTreeSize,
+					RMNEnabled:                         tc.rmnEnabled,
+					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
 				},
 			}
 
