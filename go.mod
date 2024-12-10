@@ -6,7 +6,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
-	github.com/smartcontractkit/chain-selectors v1.0.23
+	github.com/smartcontractkit/chain-selectors v1.0.34
 	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241127162636-07aa781ee1f4
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0

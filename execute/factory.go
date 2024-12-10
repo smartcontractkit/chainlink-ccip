@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"google.golang.org/grpc"
 
@@ -148,11 +147,11 @@ func (p PluginFactory) NewReportingPlugin(
 	// map types to the facade.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
-		chainID, err1 := sel.ChainIdFromSelector(uint64(chain))
+		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
-		readers[chain] = contractreader.NewObserverReader(cr, p.lggr, strconv.FormatUint(chainID, 10))
+		readers[chain] = contractreader.NewObserverReader(cr, p.lggr, chainID)
 	}
 
 	ccipReader := readerpkg.NewCCIPChainReader(
