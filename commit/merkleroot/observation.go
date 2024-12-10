@@ -447,6 +447,33 @@ func (o observerImpl) ObserveMerkleRoots(
 					return
 				}
 
+				if uint64(len(msgs)) != uint64(chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1) {
+					o.lggr.Warnw("call to MsgsBetweenSeqNums returned unexpected number of messages chain skipped",
+						"chain", chainRange.ChainSel,
+						"range", chainRange.SeqNumRange,
+						"expected", chainRange.SeqNumRange.End()-chainRange.SeqNumRange.Start()+1,
+						"actual", len(msgs),
+					)
+					return
+				}
+
+				// If the returned messages do not match the sequence numbers range
+				// there is nothing to observe for this chain since messages are missing.
+				msgIdx := 0
+				for seqNum := chainRange.SeqNumRange.Start(); seqNum <= chainRange.SeqNumRange.End(); seqNum++ {
+					msgSeqNum := msgs[msgIdx].Header.SequenceNumber
+					if msgSeqNum != seqNum {
+						o.lggr.Warnw("message sequence number does not match seqNum range chain skipped",
+							"chain", chainRange.ChainSel,
+							"seqNum", seqNum,
+							"msgSeqNum", msgSeqNum,
+							"range", chainRange.SeqNumRange,
+						)
+						return
+					}
+					msgIdx++
+				}
+
 				root, err := o.computeMerkleRoot(ctx, msgs)
 				if err != nil {
 					o.lggr.Warnw("call to computeMerkleRoot failed", "err", err)

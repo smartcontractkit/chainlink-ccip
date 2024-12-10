@@ -537,6 +537,47 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 				8: "5b81aaf37240df67f3ab0e845f30e29f35fdf9169e2517c436c1c0c11224c97b",
 			},
 		},
+		{
+			name: "multiple chains, some of them have missing messages within the range",
+			ranges: []plugintypes.ChainRange{
+				{ChainSel: 8, SeqNumRange: cciptypes.SeqNumRange{10, 11}},
+				{ChainSel: 15, SeqNumRange: cciptypes.SeqNumRange{53, 55}},
+				{ChainSel: 16, SeqNumRange: cciptypes.SeqNumRange{63, 65}},
+				{ChainSel: 9, SeqNumRange: cciptypes.SeqNumRange{93, 95}},
+				{ChainSel: 17, SeqNumRange: cciptypes.SeqNumRange{73, 75}},
+				{ChainSel: 18, SeqNumRange: cciptypes.SeqNumRange{83, 85}},
+			},
+			supportedChains:      mapset.NewSet[cciptypes.ChainSelector](8, 15, 16, 9, 17, 18),
+			supportedChainsFails: false,
+			msgsBetweenSeqNums: map[cciptypes.ChainSelector][]cciptypes.Message{
+				// 8: valid messages
+				8: {{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x1a"), SequenceNumber: 10}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x1b"), SequenceNumber: 11}}},
+				// 15: missing middle message of the range
+				15: {{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x2a"), SequenceNumber: 53}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x2c"), SequenceNumber: 55}}},
+				// 16: missing first message of the range
+				16: {{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x3a"), SequenceNumber: 64}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x3c"), SequenceNumber: 65}}},
+				// 17: missing last message of the range
+				17: {{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x4a"), SequenceNumber: 73}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x4c"), SequenceNumber: 74}}},
+				// 18: length of msgs is correct but sequence numbers are not
+				18: {{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x5a"), SequenceNumber: 84}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x5b"), SequenceNumber: 85}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0x5c"), SequenceNumber: 86}},
+				},
+				// 9: valid messages
+				9: {{Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0xa1"), SequenceNumber: 93}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0xa2"), SequenceNumber: 94}}, {
+					Header: cciptypes.RampMessageHeader{MessageID: mustNewMessageID("0xa3"), SequenceNumber: 95}}},
+			},
+			msgsBetweenSeqNumsErrors: map[cciptypes.ChainSelector]error{},
+			expMerkleRoots: map[cciptypes.ChainSelector]string{
+				8: "5b81aaf37240df67f3ab0e845f30e29f35fdf9169e2517c436c1c0c11224c97b",
+				9: "f1b02d28559f60a67b431e2c580ac1d6b3e0fd7319ff055c6c67408aa31788e4",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -585,6 +626,7 @@ func Test_ObserveMerkleRoots(t *testing.T) {
 			if tc.expMerkleRoots == nil {
 				assert.Nil(t, roots)
 			} else {
+				assert.Len(t, roots, len(tc.expMerkleRoots))
 				for _, root := range roots {
 					assert.Equal(t, tc.expMerkleRoots[root.ChainSel], hex.EncodeToString(root.MerkleRoot[:]))
 				}
