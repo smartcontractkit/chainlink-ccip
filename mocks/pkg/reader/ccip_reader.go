@@ -598,6 +598,65 @@ func (_c *MockCCIPReader_GetMedianDataAvailabilityGasConfig_Call) RunAndReturn(r
 	return _c
 }
 
+// GetOffRampConfigDigest provides a mock function with given fields: ctx, pluginType
+func (_m *MockCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
+	ret := _m.Called(ctx, pluginType)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOffRampConfigDigest")
+	}
+
+	var r0 [32]byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint8) ([32]byte, error)); ok {
+		return rf(ctx, pluginType)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint8) [32]byte); ok {
+		r0 = rf(ctx, pluginType)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([32]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint8) error); ok {
+		r1 = rf(ctx, pluginType)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCCIPReader_GetOffRampConfigDigest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOffRampConfigDigest'
+type MockCCIPReader_GetOffRampConfigDigest_Call struct {
+	*mock.Call
+}
+
+// GetOffRampConfigDigest is a helper method to define mock.On call
+//   - ctx context.Context
+//   - pluginType uint8
+func (_e *MockCCIPReader_Expecter) GetOffRampConfigDigest(ctx interface{}, pluginType interface{}) *MockCCIPReader_GetOffRampConfigDigest_Call {
+	return &MockCCIPReader_GetOffRampConfigDigest_Call{Call: _e.mock.On("GetOffRampConfigDigest", ctx, pluginType)}
+}
+
+func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) Run(run func(ctx context.Context, pluginType uint8)) *MockCCIPReader_GetOffRampConfigDigest_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uint8))
+	})
+	return _c
+}
+
+func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) Return(_a0 [32]byte, _a1 error) *MockCCIPReader_GetOffRampConfigDigest_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCCIPReader_GetOffRampConfigDigest_Call) RunAndReturn(run func(context.Context, uint8) ([32]byte, error)) *MockCCIPReader_GetOffRampConfigDigest_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRMNRemoteConfig provides a mock function with given fields: ctx, destChainSelector
 func (_m *MockCCIPReader) GetRMNRemoteConfig(ctx context.Context, destChainSelector ccipocr3.ChainSelector) (rmntypes.RemoteConfig, error) {
 	ret := _m.Called(ctx, destChainSelector)

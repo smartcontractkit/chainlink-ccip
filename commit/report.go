@@ -1,7 +1,9 @@
 package commit
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -112,8 +114,30 @@ func (p *Plugin) Reports(
 func (p *Plugin) ShouldAcceptAttestedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	if isActive, err := p.checkActiveInstance(ctx); err != nil || !isActive {
-		return false, err
+	// check if we support the dest, if not we can't do the checks needed.
+	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	if err != nil {
+		return false, fmt.Errorf("supports dest chain: %w", err)
+	}
+
+	if !supports {
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+
+		// TODO: return false here or a non-nil error?
+		return false, nil
+	}
+
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
+	if err != nil {
+		return false, fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
+		return false, nil
 	}
 
 	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
@@ -135,18 +159,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	return p.validateReportInfo(r.Info, decodedReport)
-}
-
-func (p *Plugin) checkActiveInstance(ctx context.Context) (bool, error) {
-	isActiveInstance, err := p.isActiveInstance(ctx)
-	if err != nil {
-		return false, fmt.Errorf("isActiveInstance: %w", err)
-	}
-	if !isActiveInstance {
-		p.lggr.Warnw("not the active instance, skipping report acceptance")
-		return false, nil
-	}
-	return true, nil
 }
 
 func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.CommitPluginReport, error) {
@@ -201,8 +213,30 @@ func (p *Plugin) validateReportInfo(info []byte, decodedReport cciptypes.CommitP
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	if isActive, err := p.checkActiveInstance(ctx); err != nil || !isActive {
-		return false, err
+	// check if we support the dest, if not we can't do the checks needed.
+	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	if err != nil {
+		return false, fmt.Errorf("supports dest chain: %w", err)
+	}
+
+	if !supports {
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+
+		// TODO: return false here or a non-nil error?
+		return false, nil
+	}
+
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
+	if err != nil {
+		return false, fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
+		return false, nil
 	}
 
 	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
@@ -232,13 +266,4 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 	return true, nil
-}
-
-func (p *Plugin) isActiveInstance(ctx context.Context) (bool, error) {
-	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeCommit)
-	if err != nil {
-		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
-	}
-
-	return ocrConfigs.ActiveConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }

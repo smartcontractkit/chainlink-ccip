@@ -838,6 +838,10 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetRMNRemoteConfig(params.ctx, mock.Anything).
 		Return(params.rmnReportCfg, nil).Maybe()
 
+	ccipReader.EXPECT().
+		GetOffRampConfigDigest(params.ctx, consts.PluginTypeCommit).
+		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
+
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
