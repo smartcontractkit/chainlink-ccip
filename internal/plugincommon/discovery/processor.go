@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -22,7 +22,7 @@ var _ plugincommon.PluginProcessor[dt.Query, dt.Observation, dt.Outcome] = &Cont
 
 // ContractDiscoveryProcessor is a plugin processor for discovering contracts.
 type ContractDiscoveryProcessor struct {
-	lggr            cc.Logger
+	lggr            logger.Logger
 	reader          *reader.CCIPReader
 	homechain       reader.HomeChain
 	dest            cciptypes.ChainSelector
@@ -31,7 +31,7 @@ type ContractDiscoveryProcessor struct {
 }
 
 func NewContractDiscoveryProcessor(
-	lggr cc.Logger,
+	lggr logger.Logger,
 	reader *reader.CCIPReader,
 	homechain reader.HomeChain,
 	dest cciptypes.ChainSelector,
@@ -39,7 +39,7 @@ func NewContractDiscoveryProcessor(
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
-		lggr:            logger.WithProcessor(lggr, "Discovery"),
+		lggr:            logutil.WithProcessor(lggr, "Discovery"),
 		reader:          reader,
 		homechain:       homechain,
 		dest:            dest,
@@ -136,7 +136,7 @@ type aggObs struct {
 // aggregateObservations combines observations for multiple objects into aggObs, which is a convenient
 // format for consensus.GetConsensusMap.
 func aggregateObservations(
-	lggr cc.Logger,
+	lggr logger.Logger,
 	dest cciptypes.ChainSelector,
 	aos []plugincommon.AttributedObservation[dt.Observation],
 ) aggObs {

@@ -15,7 +15,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -92,7 +92,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 }
 
 type PluginFactory struct {
-	baseLggr          cc.Logger
+	baseLggr          logger.Logger
 	donID             plugintypes.DonID
 	ocrConfig         reader.OCR3ConfigWithMeta
 	commitCodec       cciptypes.CommitPluginCodec
@@ -108,7 +108,7 @@ type PluginFactory struct {
 // NewPluginFactory creates a new PluginFactory instance. For commit plugin, oracle instances are not managed by the
 // factory. It is safe to assume that a factory instance will create exactly one plugin instance.
 func NewPluginFactory(
-	lggr cc.Logger,
+	lggr logger.Logger,
 	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	commitCodec cciptypes.CommitPluginCodec,
@@ -138,7 +138,7 @@ func NewPluginFactory(
 //nolint:gocyclo
 func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	lggr := logger.WithPluginConstants(p.baseLggr, "Commit", p.donID, config.OracleID)
+	lggr := logutil.WithPluginConstants(p.baseLggr, "Commit", p.donID, config.OracleID)
 
 	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
 	if err != nil {
