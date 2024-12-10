@@ -231,39 +231,35 @@ func truncateObservation(
 			if len(commits) == 0 {
 				continue
 			}
-
 			lastCommit := &commits[len(commits)-1]
-			deletedMsgs := 0
-			nMessages := lastCommit.SequenceNumberRange.End() - lastCommit.SequenceNumberRange.Start() + 1
-			if deletedMsgs < int(nMessages) {
-				seqNum := lastCommit.SequenceNumberRange.Start()
-				for seqNum <= lastCommit.SequenceNumberRange.End() {
-					if _, ok := observation.Messages[chain][seqNum]; !ok {
-						return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
-					}
-					observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
-
-					if _, ok := observation.TokenData[chain][seqNum]; !ok {
-						return exectypes.Observation{}, fmt.Errorf(
-							"missing tokenData for message with seqNr %d from chain %d", seqNum, chain,
-						)
-					}
-					observation.TokenData[chain][seqNum] = PseudoDeleteTokenData(observation.TokenData[chain][seqNum])
-
-					deletedMsgs++
-					seqNum++
-					break // check only one message at a time
+			seqNum := lastCommit.SequenceNumberRange.Start()
+			for seqNum <= lastCommit.SequenceNumberRange.End() {
+				if _, ok := observation.Messages[chain][seqNum]; !ok {
+					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
-			} else {
-				// If all messages in the report are truncated, truncate the last commit
-				observation = truncateLastCommit(observation, chain)
-				if len(observation.CommitReports[chain]) == 0 {
-					// If the last commit report was truncated, truncate the chain
-					observation = truncateChain(observation, chain)
+				observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
+
+				if _, ok := observation.TokenData[chain][seqNum]; !ok {
+					return exectypes.Observation{}, fmt.Errorf(
+						"missing tokenData for message with seqNr %d from chain %d", seqNum, chain,
+					)
 				}
-				chains = maps.Keys(observation.CommitReports)
-				break
+				observation.TokenData[chain][seqNum] = PseudoDeleteTokenData(observation.TokenData[chain][seqNum])
+
+				seqNum++
+				if observationFitsSize(observation, maxSize) {
+					return observation, nil
+				}
 			}
+
+			// Reaching here means that all messages in the report are truncated, truncate the last commit
+			observation = truncateLastCommit(observation, chain)
+
+			if len(observation.CommitReports[chain]) == 0 {
+				// If the last commit report was truncated, truncate the chain
+				observation = truncateChain(observation, chain)
+			}
+			chains = maps.Keys(observation.CommitReports)
 		}
 		// Truncated all chains.
 		if len(observation.CommitReports) == 0 {
@@ -278,6 +274,13 @@ func truncateObservation(
 	return observation, nil
 }
 
+func observationFitsSize(obs exectypes.Observation, maxSize int) bool {
+	encodedObs, err := obs.Encode()
+	if err != nil {
+		return false
+	}
+	return len(encodedObs) <= maxSize
+}
 func PseudoDeleteMessage(msg cciptypes.Message) cciptypes.Message {
 	pseudoDeletedMsg := msg
 
