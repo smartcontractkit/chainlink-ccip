@@ -273,7 +273,7 @@ deployments:
                 kafka_sasl_username: ""
                 schema_registry_url: http://redpanda:8081
               debug:
-                verbosity: normal
+                verbosity: detailed
             processors:
               batch:
                 send_batch_size: 512
