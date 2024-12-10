@@ -46,7 +46,7 @@ Ideal log format
 */
 
 // DataFilter is used by Filter to identify lines that should be displayed.
-type DataFilter func(object map[string]interface{}) *Data
+type DataFilter func(data Data, object map[string]interface{}) *Data
 
 type filter struct {
 	name string
@@ -85,8 +85,13 @@ func Filter(line string) (*Data, error) {
 		return nil, fmt.Errorf("ParseLine: %w", err)
 	}
 
+	var data Data
+	if err := json.Unmarshal([]byte(line), &data); err != nil {
+		return nil, fmt.Errorf("unparsable line: %w", err)
+	}
+
 	for _, f := range filters {
-		data := f.df(object)
+		data := f.df(data, object)
 		if data != nil {
 			data.FilterName = f.name
 			return data, nil
@@ -104,14 +109,17 @@ type Data struct {
 	// level, ts, logger, caller, msg, version, donID, oracleID
 	// Data that we expect from most logs.
 	// This is all part of the primary display.
-	Timestamp       time.Time
-	Level           string
-	Caller          string
+	LoggerName      string    `json:"logger"`
+	Timestamp       time.Time `json:"ts"`
+	Level           string    `json:"level"`
+	Caller          string    `json:"caller"`
 	SequenceNumber  int
-	Plugin          string
-	PluginProcessor string
-	OracleID        int
-	DONID           int
+	Plugin          string `json:"plugin"`
+	PluginProcessor string `json:"processor"`
+	OracleID        int    `json:"oracleID"`
+	DONID           int    `json:"donID"`
+	Message         string `json:"msg"`
+	Version         string `json:"version"`
 
 	// Additional detail space, can be unique to each filter.
 	// i.e. an error message, observer details, number of messages, etc

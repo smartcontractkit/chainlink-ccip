@@ -13,18 +13,11 @@ func init() {
 
 var _ parse.DataFilter = MerkleRootObservation
 
-func MerkleRootObservation(object map[string]interface{}) *parse.Data {
+func MerkleRootObservation(data parse.Data, object map[string]interface{}) *parse.Data {
 	var result *parse.Data
-	switch {
-	case nameContains("CommitPlugin.MerkleRootProcessor", object):
-		result = &parse.Data{
-			Level:           getString("level", object),
-			Caller:          getString("caller", object),
-			Plugin:          "Commit",
-			PluginProcessor: "MerkleRoot",
-			SequenceNumber:  0,
-			Details:         getString("msg", object),
-		}
+	if data.PluginProcessor == "MerkleRoot" {
+		result = &data
+		data.Details = data.Message
 	}
 
 	if result == nil {
