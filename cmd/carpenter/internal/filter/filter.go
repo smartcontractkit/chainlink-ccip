@@ -8,16 +8,17 @@ import (
 )
 
 func init() {
-	parse.RegisterDataFilter("Merkle Root Observation", MerkleRootObservation)
+	parse.RegisterDataFilter("CommitFilter", CommitFilter)
 }
 
-var _ parse.DataFilter = MerkleRootObservation
+var _ parse.DataFilter = CommitFilter
 
-func MerkleRootObservation(data parse.Data, object map[string]interface{}) *parse.Data {
+func CommitFilter(data parse.Data, object map[string]interface{}) *parse.Data {
 	var result *parse.Data
-	if data.PluginProcessor == "MerkleRoot" {
+	if data.Plugin == "Commit" {
+		//if data.PluginProcessor == "MerkleRoot" {
 		result = &data
-		data.Details = data.Message
+		//data.Details = data.Message
 	}
 
 	if result == nil {

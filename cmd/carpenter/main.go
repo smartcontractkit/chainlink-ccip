@@ -44,6 +44,8 @@ func renderData(data *parse.Data) {
 	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
 		Align(lipgloss.Center)
 	var uidStyle = lipgloss.NewStyle().Width(15).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).PaddingLeft(1).Bold(true)
+	var messageStyle = lipgloss.NewStyle().Width(50).Height(1).MaxHeight(1).
 		Align(lipgloss.Left).PaddingLeft(1)
 
 	uid := fmt.Sprintf("%s.%s.%s",
@@ -52,9 +54,10 @@ func renderData(data *parse.Data) {
 		withColor(data.SequenceNumber, data.SequenceNumber),
 	)
 
-	fmt.Printf("%s|%s|    \n",
+	fmt.Printf("%s|%s|%s\n",
 		timeStyle.Render(data.Timestamp.Format(time.TimeOnly)),
 		uidStyle.Render(uid),
+		messageStyle.Render(data.Message),
 	)
 }
 
