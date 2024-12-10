@@ -129,8 +129,8 @@ func Test_reportRangesOutcome(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			outc := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain)
-			require.Equal(t, tc.expectedOutcome, outc)
+			outcome := reportRangesOutcome(Query{}, lggr, tc.consensusObservation, tc.merkleTreeSizeLimit, destChain)
+			require.Equal(t, tc.expectedOutcome, outcome)
 		})
 	}
 }
