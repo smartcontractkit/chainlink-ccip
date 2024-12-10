@@ -27,13 +27,19 @@ import (
 // - builds a report
 // - checks for the transmission of a previous report
 func (p *Processor) Outcome(
-	ctx context.Context,
+	_ context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	tStart := time.Now()
-	outcome, nextState := p.getOutcome(prevOutcome, query, aos)
+
+	outcome, nextState, err := p.getOutcome(prevOutcome, query, aos)
+	if err != nil {
+		p.lggr.Errorw("outcome failed with error", "err", err)
+		return Outcome{}, err
+	}
+
 	p.lggr.Infow("Sending Outcome",
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
@@ -43,31 +49,32 @@ func (p *Processor) getOutcome(
 	previousOutcome Outcome,
 	q Query,
 	aos []plugincommon.AttributedObservation[Observation],
-) (Outcome, processorState) {
+) (Outcome, processorState, error) {
 	nextState := previousOutcome.nextState()
 
 	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
 		p.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
-		return Outcome{}, nextState
+		return Outcome{}, nextState, nil
 	}
 
 	switch nextState {
 	case selectingRangesForReport:
-		return reportRangesOutcome(q, p.lggr, consensusObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain), nextState
+		return reportRangesOutcome(q, p.lggr, consensusObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
+			nextState,
+			nil
 	case buildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
 			// The current observations should all be empty.
-			return previousOutcome, buildingReport
+			return previousOutcome, buildingReport, nil
 		}
-		return buildReport(q, p.lggr, consensusObservation, previousOutcome), nextState
+		return buildReport(q, p.lggr, consensusObservation, previousOutcome), nextState, nil
 	case waitingForReportTransmission:
 		return checkForReportTransmission(
-			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
+			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState, nil
 	default:
-		p.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
-		return Outcome{}, nextState
+		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
 }
 
