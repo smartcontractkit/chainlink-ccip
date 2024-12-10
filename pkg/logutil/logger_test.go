@@ -1,4 +1,4 @@
-package logger
+package logutil
 
 import (
 	"testing"
@@ -41,33 +41,17 @@ func TestNamed(t *testing.T) {
 	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
 
 	// Name the base logger.
-	namedLggr := Named(lggr, "ElToroLoco")
+	namedLggr := logger.Named(lggr, "ElToroLoco")
 	namedLggr.Info("Monster Jam")
 	require.Equal(t, 1, hook.Len())
 	require.Equal(t, "ElToroLoco", hook.All()[0].LoggerName)
 
 	// Name the named logger.
-	namedLggr2 := Named(namedLggr, "ObiWan")
+	namedLggr2 := logger.Named(namedLggr, "ObiWan")
 	namedLggr2.Info("Star Wars")
 
 	require.Equal(t, 2, hook.Len())
 	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[1].LoggerName)
-}
-
-func TestLogPointers(t *testing.T) {
-	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
-	namedLggr := Named(lggr, "ElToroLoco")
-	namePtr := Named(&namedLggr, "ObiWan")
-
-	namePtr.Info("Hello1")
-	require.Equal(t, 1, hook.Len())
-	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[0].LoggerName)
-
-	ptrWrap := WithProcessor(namePtr, "Star Wars")
-	ptrWrap.Info("Hello2")
-	require.Equal(t, 2, hook.Len())
-	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[1].LoggerName)
-	require.Equal(t, "Star Wars", hook.All()[1].ContextMap()["processor"])
 }
 
 func TestLogCopy(t *testing.T) {

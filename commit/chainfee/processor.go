@@ -3,12 +3,12 @@ package chainfee
 import (
 	"context"
 
-	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -17,7 +17,7 @@ import (
 type processor struct {
 	oracleID     commontypes.OracleID
 	destChain    cciptypes.ChainSelector
-	lggr         cc.Logger
+	lggr         logger.Logger
 	homeChain    reader.HomeChain
 	ccipReader   readerpkg.CCIPReader
 	cfg          pluginconfig.CommitOffchainConfig
@@ -26,7 +26,7 @@ type processor struct {
 }
 
 func NewProcessor(
-	lggr cc.Logger,
+	lggr logger.Logger,
 	oracleID commontypes.OracleID,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
@@ -36,7 +36,7 @@ func NewProcessor(
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
-		lggr:         logger.WithProcessor(lggr, "ChainFee"),
+		lggr:         logutil.WithProcessor(lggr, "ChainFee"),
 		oracleID:     oracleID,
 		destChain:    destChain,
 		homeChain:    homeChain,
