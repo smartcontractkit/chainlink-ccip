@@ -247,6 +247,101 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			},
 			expResult: nil,
 		},
+		{
+			name: "dest chain is cursed sequence numbers not observed",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+					CursedSourceChains: nil,
+					CursedDestination:  true,
+					GlobalCurse:        false,
+				}, nil)
+				return chainSupport, ccipReader
+			},
+		},
+		{
+			name: "global curse sequence numbers not observed",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+					CursedSourceChains: nil,
+					CursedDestination:  false,
+					GlobalCurse:        true,
+				}, nil)
+				return chainSupport, ccipReader
+			},
+		},
+		{
+			name: "one source chain is cursed sequence numbers not observed for that chain",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				knownSourceChains := []cciptypes.ChainSelector{4, 7, 19}
+				cursedSourceChains := map[cciptypes.ChainSelector]bool{7: true, 4: false}
+				knownSourceChainsExcludingCursed := []cciptypes.ChainSelector{4, 19}
+				nextSeqNumsExcludingCursed := []cciptypes.SeqNum{345, 7713}
+
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+
+				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChainsExcludingCursed).
+					Return(nextSeqNumsExcludingCursed, nil)
+
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+					CursedSourceChains: cursedSourceChains,
+					CursedDestination:  false,
+					GlobalCurse:        false,
+				}, nil)
+				return chainSupport, ccipReader
+			},
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(4, 345),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
+		},
+		{
+			name: "all source chains are cursed",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				knownSourceChains := []cciptypes.ChainSelector{4, 7, 19}
+				cursedSourceChains := map[cciptypes.ChainSelector]bool{7: true, 4: true, 19: true}
+
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).Return(&reader.CurseInfo{
+					CursedSourceChains: cursedSourceChains,
+					CursedDestination:  false,
+					GlobalCurse:        false,
+				}, nil)
+				return chainSupport, ccipReader
+			},
+		},
+		{
+			name: "ccip reader error while fetching curse info",
+			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
+				chainSupport := common_mock.NewMockChainSupport(t)
+				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
+				chainSupport.EXPECT().DestChain().Return(1)
+				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
+				ccipReader := reader_mock.NewMockCCIPReader(t)
+
+				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+					Return(&reader.CurseInfo{}, fmt.Errorf("some error"))
+				return chainSupport, ccipReader
+			},
+		},
 	}
 
 	for _, tc := range testCases {
