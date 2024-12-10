@@ -63,12 +63,16 @@ jobs:
       actions: read
       pull-requests: read
     steps:
-      - name: Prevent running on draft PRs
+      - name: Prevent running on draft or changesets PRs
         id: check-prereqs-for-running
         run: |
           should_run=true
-          if [ "${{ github.event_name }}" == "pull_request" ] && [ "${{ github.event.pull_request.draft }}" == "true" ]; then
-            should_run=false
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            if [ "${{ github.event.pull_request.draft }}" == "true" ]; then
+              should_run=false
+            elif [ "${{ github.event.pull_request.user.login }}" == "app-token-issuer-infra-releng[bot]" ] && [[ "${{ github.event.pull_request.title }}" == "Version Packages" ]]; then
+              should_run=false
+            fi
           fi
           echo "should_run=$should_run" >> "$GITHUB_OUTPUT"
 

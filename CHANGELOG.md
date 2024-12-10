@@ -1,5 +1,11 @@
 # @chainlink/crib
 
+## 1.1.0
+
+### Minor Changes
+
+- [#298](https://github.com/smartcontractkit/crib/pull/298) [`1544e36`](https://github.com/smartcontractkit/crib/commit/1544e360c3309fcfddbbe33c574bcce7cd198e09) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - replaced ingress_check.sh with the new CLI command `crib devspace ingress-check`
+
 ## 1.0.0
 
 ### Major Changes
