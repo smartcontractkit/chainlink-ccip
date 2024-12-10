@@ -66,7 +66,7 @@ func NewProcessor(
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
-		lggr:            logger.NewProcessorLogWrapper(lggr, "MerkleRoot"),
+		lggr:            logger.WithProcessor(lggr, "MerkleRoot"),
 		observer:        observer,
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
