@@ -10,6 +10,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -28,6 +30,11 @@ func Test_Processor_Outcome(t *testing.T) {
 		chainD = 100
 		chainE = 4
 		chainF = 5
+	)
+
+	var (
+		bytes32a = [32]byte{0xa}
+		bytes32b = [32]byte{0xb}
 	)
 
 	type testCase struct {
@@ -256,6 +263,161 @@ func Test_Processor_Outcome(t *testing.T) {
 					// chainB missing
 					{ChainSel: chainC, SeqNum: 1},
 					{ChainSel: chainE, SeqNum: 4},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "we are in the building report next phase but leader said we want to retry rmn sigs",
+			prevOutcome: Outcome{
+				OutcomeType:                     ReportIntervalsSelected,
+				ReportTransmissionCheckAttempts: 123, // <--- random value to verify if the same outcome is sent
+			},
+			q: Query{
+				RetryRMNSignatures: true,
+			},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						OnRampMaxSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+						},
+						OffRampNextSeqNums: []plugintypes.SeqNumChain{
+							{ChainSel: chainA, SeqNum: 10},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainD: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+			},
+			observers:         []commontypes.OracleID{1, 2, 3},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 10,
+			rmnEnabled:        true,
+			expOutcome: Outcome{
+				OutcomeType:                     ReportIntervalsSelected,
+				ReportTransmissionCheckAttempts: 123,
+			},
+			expErr: false,
+		},
+		{
+			name: "outcome of merkle roots and rmn signatures checking",
+			prevOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+			},
+			q: Query{
+				RMNSignatures: &rmn.ReportSignatures{
+					Signatures: []*rmnpb.EcdsaSignature{
+						{R: bytes32a[:], S: bytes32b[:]},
+						{R: bytes32a[:], S: bytes32b[:]},
+					},
+					LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+						{
+							LaneSource: &rmnpb.LaneSource{
+								SourceChainSelector: chainA,
+								OnrampAddress:       []byte{0xa},
+							},
+							ClosedInterval: &rmnpb.ClosedInterval{
+								MinMsgNr: 10,
+								MaxMsgNr: 15,
+							},
+							Root: bytes32a[:],
+						},
+						{
+							LaneSource: &rmnpb.LaneSource{
+								SourceChainSelector: chainF,
+								OnrampAddress:       []byte{0xa1},
+							},
+							ClosedInterval: &rmnpb.ClosedInterval{
+								MinMsgNr: 10,
+								MaxMsgNr: 15,
+							},
+							Root: bytes32a[:],
+						},
+					},
+				},
+			},
+			observations: []func(testCase) Observation{
+				func(tc testCase) Observation {
+					return Observation{
+						MerkleRoots: []cciptypes.MerkleRootChain{
+							{
+								ChainSel:      chainA,
+								OnRampAddress: []byte{0xa},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
+								MerkleRoot:    bytes32a,
+							},
+							{
+								ChainSel:      chainB,
+								OnRampAddress: []byte{0xb},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
+								MerkleRoot:    cciptypes.Bytes32{0xa},
+							},
+							{
+								ChainSel:      chainC,
+								OnRampAddress: []byte{0xc},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
+								MerkleRoot:    cciptypes.Bytes32{0xa},
+							},
+							{
+								ChainSel:      chainE,
+								OnRampAddress: []byte{0xd},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
+								MerkleRoot:    cciptypes.Bytes32{0xa},
+							},
+							{
+								ChainSel:      chainF,
+								OnRampAddress: []byte{0xa1},
+								SeqNumsRange:  cciptypes.NewSeqNumRange(10, 14), // [10,14] is not signed
+								MerkleRoot:    bytes32a,
+							},
+						},
+						FChain: map[cciptypes.ChainSelector]int{
+							chainA: 1,
+							chainB: 1,
+							chainC: 1,
+							chainD: 1,
+							chainE: 1,
+							chainF: 1,
+						},
+					}
+				},
+				func(tc testCase) Observation { return tc.observations[0](tc) },
+				func(tc testCase) Observation {
+					baseObs := tc.observations[0](tc)
+					baseObs.MerkleRoots = append(baseObs.MerkleRoots[:1], baseObs.MerkleRoots[2:]...) // skip chainB
+
+					// report a different onRamp address for chainC this leads to no consensus for chainC merkle roots
+					baseObs.MerkleRoots[1].OnRampAddress = []byte{0xd}
+
+					// report a different seqNum for chainE
+					baseObs.MerkleRoots[2].SeqNumsRange = cciptypes.NewSeqNumRange(10, 16)
+
+					return baseObs
+				},
+			},
+			observers:         []commontypes.OracleID{1, 2, 3},
+			bigF:              1,
+			destChainSel:      chainD,
+			maxMerkleTreeSize: 10,
+			rmnEnabled:        true,
+			expOutcome: Outcome{
+				OutcomeType: ReportGenerated,
+				RootsToReport: []cciptypes.MerkleRootChain{
+					{
+						ChainSel:      chainA,
+						OnRampAddress: []byte{0xa},
+						SeqNumsRange:  cciptypes.NewSeqNumRange(10, 15),
+						MerkleRoot:    cciptypes.Bytes32{0xa},
+					},
+				},
+				RMNReportSignatures: []cciptypes.RMNECDSASignature{
+					{R: bytes32a, S: bytes32b},
+					{R: bytes32a, S: bytes32b},
 				},
 			},
 			expErr: false,
