@@ -132,6 +132,8 @@ deployments:
                       value: "${METRICS_BYTES_PER_ATTRIBUTE}"
                     - name: TRACES_ENABLED
                       value: "${TRACES_ENABLED}"
+                    - name: TRACES_POOL_SIZE
+                      value: "${TRACES_POOL_SIZE}"
                     - name: TRACES_TRACE_DEPTH
                       value: "${TRACES_TRACE_DEPTH}"
                     - name: TRACES_ATTRIBUTES_COUNT
@@ -484,6 +486,8 @@ profiles:
             default: "50"
           TRACES_ENABLED:
             default: "true"
+          TRACES_POOL_SIZE:
+            default: "20"
           TRACES_TRACE_DEPTH:
             default: "5"
           TRACES_ATTRIBUTES_COUNT:
