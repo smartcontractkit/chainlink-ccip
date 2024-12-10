@@ -52,7 +52,7 @@ func (p *Processor) getOutcome(
 ) (Outcome, processorState, error) {
 	nextState := previousOutcome.nextState()
 
-	consensusObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
+	consObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
 		p.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
 		return Outcome{}, nextState, nil
@@ -60,7 +60,7 @@ func (p *Processor) getOutcome(
 
 	switch nextState {
 	case selectingRangesForReport:
-		return reportRangesOutcome(q, p.lggr, consensusObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
+		return reportRangesOutcome(q, p.lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
 			nextState,
 			nil
 	case buildingReport:
@@ -69,10 +69,10 @@ func (p *Processor) getOutcome(
 			// The current observations should all be empty.
 			return previousOutcome, buildingReport, nil
 		}
-		return buildReport(q, p.lggr, consensusObservation, previousOutcome), nextState, nil
+		return buildReport(q, p.lggr, consObservation, previousOutcome), nextState, nil
 	case waitingForReportTransmission:
 		return checkForReportTransmission(
-			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState, nil
+			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}

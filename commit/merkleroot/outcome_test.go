@@ -15,6 +15,10 @@ import (
 
 var rmnRemoteCfg = testhelpers.CreateRMNRemoteCfg()
 
+func Test_Processor_Outcome(t *testing.T) {
+	t.Skipf("todo")
+}
+
 func Test_buildReport(t *testing.T) {
 	t.Run("determinism check", func(t *testing.T) {
 		const rounds = 50
