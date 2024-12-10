@@ -33,12 +33,29 @@ func maybeExit(err error, s string, a ...interface{}) {
 
 */
 func renderData(data *parse.Data) {
-	var timeStyle = lipgloss.NewStyle().Width(30).MaxWidth(30).Height(1).MaxHeight(1)
+	// simple color selection algorithm
+	withColor := func(in interface{}, i int) string {
+		color := fmt.Sprintf("%d", i%7+1)
+		str := fmt.Sprintf("%v", in)
 
-	out :=
-		timeStyle.Render(data.Timestamp.Format(time.RFC3339))
-	//fmt.Println(data)
-	fmt.Println(out)
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(str)
+	}
+
+	var timeStyle = lipgloss.NewStyle().Width(10).Height(1).MaxHeight(1).
+		Align(lipgloss.Center)
+	var uidStyle = lipgloss.NewStyle().Width(15).Height(1).MaxHeight(1).
+		Align(lipgloss.Left).PaddingLeft(1)
+
+	uid := fmt.Sprintf("%s.%s.%s",
+		withColor(data.OracleID, data.OracleID),
+		withColor(data.DONID, data.DONID),
+		withColor(data.SequenceNumber, data.SequenceNumber),
+	)
+
+	fmt.Printf("%s|%s|    \n",
+		timeStyle.Render(data.Timestamp.Format(time.TimeOnly)),
+		uidStyle.Render(uid),
+	)
 }
 
 func main() {
