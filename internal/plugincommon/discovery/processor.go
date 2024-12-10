@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -39,7 +40,7 @@ func NewContractDiscoveryProcessor(
 	oracleIDToP2PID map[commontypes.OracleID]ragep2ptypes.PeerID,
 ) *ContractDiscoveryProcessor {
 	return &ContractDiscoveryProcessor{
-		lggr:            lggr,
+		lggr:            logutil.WithProcessor(lggr, "Discovery"),
 		reader:          reader,
 		homechain:       homechain,
 		dest:            dest,

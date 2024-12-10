@@ -72,8 +72,6 @@ func NewPlugin(
 	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
 ) *Plugin {
-	lggr = logger.Named(lggr, "CommitPlugin")
-	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	if offchainCfg.MaxMerkleTreeSize == 0 {
@@ -103,7 +101,7 @@ func NewPlugin(
 	merkleRootProcessor := merkleroot.NewProcessor(
 		reportingCfg.OracleID,
 		oracleIDToP2pID,
-		logger.Named(lggr, "MerkleRootProcessor"),
+		lggr,
 		offchainCfg,
 		destChain,
 		homeChain,

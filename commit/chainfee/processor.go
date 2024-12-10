@@ -3,16 +3,15 @@ package chainfee
 import (
 	"context"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
+	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type processor struct {
@@ -37,7 +36,7 @@ func NewProcessor(
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
-		lggr:         lggr,
+		lggr:         logutil.WithProcessor(lggr, "ChainFee"),
 		oracleID:     oracleID,
 		destChain:    destChain,
 		homeChain:    homeChain,
