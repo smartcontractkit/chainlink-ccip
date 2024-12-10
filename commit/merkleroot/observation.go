@@ -579,7 +579,7 @@ func (o observerImpl) ObserveFChain() map[cciptypes.ChainSelector]int {
 	fChain, err := o.homeChain.GetFChain()
 	if err != nil {
 		// TODO: metrics
-		o.lggr.Warnw("call to GetFChain failed", "err", err)
+		o.lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain
