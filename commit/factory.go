@@ -135,7 +135,7 @@ func NewPluginFactory(
 
 func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	lggr := logger.NewPluginLogWrapper(p.baseLggr, "Commit", p.donID, config.OracleID)
+	lggr := logger.WithPluginConstants(p.baseLggr, "Commit", p.donID, config.OracleID)
 
 	offchainConfig, err := pluginconfig.DecodeCommitOffchainConfig(config.OffchainConfig)
 	if err != nil {

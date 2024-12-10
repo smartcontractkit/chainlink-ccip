@@ -36,7 +36,7 @@ func NewProcessor(
 	fRoleDON int,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
-		lggr:         logger.NewProcessorLogWrapper(lggr, "ChainFee"),
+		lggr:         logger.WithProcessor(lggr, "ChainFee"),
 		oracleID:     oracleID,
 		destChain:    destChain,
 		homeChain:    homeChain,

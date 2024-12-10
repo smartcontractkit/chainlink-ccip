@@ -46,7 +46,7 @@ func NewObserverWithDefaults(
 	relativeBoostPerWaitHour float64,
 	estimateProvider gas.EstimateProvider,
 ) Observer {
-	lggr = logger.NewProcessorLogWrapper(lggr, "CostlyMessages")
+	lggr = logger.WithProcessor(lggr, "CostlyMessages")
 	return NewObserver(
 		lggr,
 		enabled,
@@ -72,7 +72,7 @@ func NewObserver(
 	feeCalculator MessageFeeE18USDCalculator,
 	execCostCalculator MessageExecCostUSD18Calculator,
 ) Observer {
-	lggr = logger.NewProcessorLogWrapper(lggr, "CostlyMessages")
+	lggr = logger.WithProcessor(lggr, "CostlyMessages")
 	return &observer{
 		lggr:               lggr,
 		enabled:            enabled,
