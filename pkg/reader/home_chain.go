@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	reader_internal "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 type HomeChain = reader_internal.HomeChain
@@ -29,5 +30,14 @@ func NewHomeChainReader(
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
 ) HomeChain {
-	return reader_internal.NewHomeChainConfigPoller(homeChainReader, lggr, pollingInterval, ccipConfigBoundContract)
+	return reader_internal.NewHomeChainConfigPoller(
+		contractreader.NewObserverReader(
+			homeChainReader,
+			lggr,
+			"home",
+		),
+		lggr,
+		pollingInterval,
+		ccipConfigBoundContract,
+	)
 }
