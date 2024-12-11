@@ -12,12 +12,12 @@ To run Beholder on CRIB, ensure the following dependencies are met:
       - Replace the command in step 2 below with the alternative command provided.
 
 ## Quick Start
-1. Change to the `deployments/chainlink` directory and run `./cribbit.sh`. This script configures the provider and credentials for your namespace (usually 'crib' followed by your name). It can be run multiple times; it's idempotent.
+1. Change to the `deployments/chainlink` directory and run `nix develop`. This will internally call the crib CLI command `crib init --write-config`, which configures the provider and credentials for your namespace (usually 'crib-' followed by your name) and stores it in your local `.env` file, to avoid further prompts.
 
    ```bash
-   ./cribbit.sh <namespace-name>
+   nix develop
    ```
-   You will then be prompted to choose a provider. Currently, this step works only with aws so please choose `aws`.
+   On the first run, you will then be prompted to type in values for `PROVIDER` (possible values are `aws` or `kind`) and `DEVSPACE_NAMESPACE` (should be your `crib-` prefixed namespace name).
 
 2. Deploy Beholder on CRIB by executing the following command:
 
