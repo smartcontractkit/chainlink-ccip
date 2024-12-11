@@ -401,15 +401,6 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	return true, nil
 }
 
-func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
-	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
-	if err != nil {
-		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
-	}
-
-	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
-}
-
 func (p *Plugin) Close() error {
 	return p.tokenDataObserver.Close()
 }
