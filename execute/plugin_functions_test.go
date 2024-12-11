@@ -1486,7 +1486,7 @@ func Test_truncateObservation(t *testing.T) {
 		observation exectypes.Observation
 		maxSize     int
 		expected    exectypes.Observation
-		wantErr     assert.ErrorAssertionFunc
+		wantErr     bool
 	}{
 		{
 			name: "no truncation needed",
@@ -1505,37 +1505,82 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
-			wantErr: assert.NoError,
 		},
 		{
 			name: "truncate last commit",
 			observation: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(4, 5)},
 					},
 				},
 				Messages: makeMessageObservation(
 					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
-						1: {1, 20},
+						1: {1, 5},
 					},
+					withData(make([]byte, 100)),
 				),
 				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
-			maxSize: 500,
+			maxSize: 3570, // this number is calculated by checking encoded sizes for the observation we expect
 			expected: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
 					},
 				},
+				Messages: makeMessageObservation(
+					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
+						1: {1, 5},
+					},
+					withData(make([]byte, 100)),
+				),
+				PseudoDeleted: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool{
+					1: {4: true, 5: true},
+				},
 			},
-
-			wantErr: assert.NoError,
 		},
 		{
 			name: "truncate entire chain",
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					1: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
+					},
+					2: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
+					},
+				},
+				Messages: makeMessageObservation(
+					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
+						1: {1, 2},
+						2: {3, 4},
+					},
+					withData(make([]byte, 100)),
+				),
+				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
+			},
+			maxSize: 1789,
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+					2: {
+						{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
+					},
+				},
+				Messages: makeMessageObservation(
+					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
+						2: {3, 4},
+					},
+					withData(make([]byte, 100)),
+				),
+				PseudoDeleted: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool{
+					1: {1: true, 2: true},
+				},
+			},
+		},
+		{
+			name: "truncate failure",
 			observation: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
@@ -1553,44 +1598,25 @@ func Test_truncateObservation(t *testing.T) {
 				),
 				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
-			maxSize: 500,
-			// Notice that truncate chains still returns one report although one chain report is more than the max size
-			// This is because truncate function doesn't split one report into multiple reports.
-			expected: exectypes.Observation{
-				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
-					2: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
-					},
-				},
-			},
-			wantErr: assert.NoError,
-		},
-		{
-			name: "truncate failure",
-			observation: exectypes.Observation{
-				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
-					1: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
-					},
-					2: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
-					},
-				},
-			},
 			maxSize:  50, // less than what can fit a single commit report for single chain
 			expected: exectypes.Observation{},
-			wantErr:  assert.Error,
+			wantErr:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.observation.TokenData = makeNoopTokenDataObservations(tt.observation.Messages)
+			tt.expected.TokenData = tt.observation.TokenData
+			//sz, _ := tt.expected.Encode()
+			//println(sz)
 			obs, err := truncateObservation(tt.observation, tt.maxSize)
-			if !tt.wantErr(t, err) {
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
-			assert.Equal(t, tt.expected, obs)
+			require.Equal(t, tt.expected.CommitReports, obs.CommitReports)
+			require.Equal(t, tt.expected.PseudoDeleted, obs.PseudoDeleted)
 		})
 	}
 }

@@ -301,6 +301,10 @@ func truncateObservation(
 				// If the last commit report was truncated, truncate the chain
 				observation = truncateChain(observation, chain)
 			}
+
+			if observationFitsSize(observation, maxSize) {
+				return observation, nil
+			}
 			chains = maps.Keys(observation.CommitReports)
 		}
 		// Truncated all chains.
