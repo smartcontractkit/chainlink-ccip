@@ -1465,20 +1465,24 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
 
-	type configInfo struct {
-		ConfigDigest                   [32]byte `json:"configDigest"`
-		F                              uint8    `json:"F"`
-		N                              uint8    `json:"n"`
-		IsSignatureVerificationEnabled bool     `json:"isSignatureVerificationEnabled"`
+	type ConfigInfo struct {
+		ConfigDigest                   [32]byte
+		F                              uint8
+		N                              uint8
+		IsSignatureVerificationEnabled bool
 	}
 
-	type ocrConfig struct {
-		ConfigInfo   configInfo                 `json:"configInfo"`
-		Signers      []cciptypes.UnknownAddress `json:"signers"`
-		Transmitters []cciptypes.UnknownAddress `json:"transmitters"`
+	type OCRConfig struct {
+		ConfigInfo   ConfigInfo
+		Signers      [][]byte
+		Transmitters [][]byte
 	}
 
-	var cfg ocrConfig
+	type OCRConfigResponse struct {
+		OCRConfig OCRConfig
+	}
+
+	var resp OCRConfigResponse
 	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -1487,14 +1491,14 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		map[string]any{
 			"ocrPluginType": pluginType,
 		},
-		&cfg,
+		&resp,
 	)
 
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get latest price sequence number: %w", err)
 	}
 
-	return cfg.ConfigInfo.ConfigDigest, nil
+	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
 // Interface compliance check
