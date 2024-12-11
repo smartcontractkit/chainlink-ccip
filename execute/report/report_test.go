@@ -246,14 +246,22 @@ func makeTestCommitReport(
 	}
 	var messages []cciptypes.Message
 	for i := 0; i < numMessages; i++ {
-		msg := makeMessageWithHash(
+		msg := makeMessage(
 			cciptypes.ChainSelector(srcChain),
 			cciptypes.SeqNum(i+firstSeqNum),
 			uint64(i)+1,
-			hasher,
 		)
 		msg.Sender = sender
 		messages = append(messages, msg)
+	}
+
+	var hashes []cciptypes.Bytes32
+	for i := 0; i < len(messages); i++ {
+		hash, err := hasher.Hash(context.Background(), messages[i])
+		if err != nil {
+			panic(fmt.Sprintf("unable to hash message: %s", err))
+		}
+		hashes = append(hashes, hash)
 	}
 
 	messageTokenData := make([]exectypes.MessageTokenData, numMessages)
@@ -270,13 +278,15 @@ func makeTestCommitReport(
 
 	commitReport := exectypes.CommitData{
 		//MerkleRoot:          root,
-		SourceChain:         cciptypes.ChainSelector(srcChain),
-		SequenceNumberRange: sequenceNumberRange,
-		Timestamp:           time.UnixMilli(timestamp),
-		BlockNum:            uint64(block),
-		Messages:            messages,
-		ExecutedMessages:    executed,
-		MessageTokenData:    messageTokenData,
+		SourceChain:          cciptypes.ChainSelector(srcChain),
+		SequenceNumberRange:  sequenceNumberRange,
+		Timestamp:            time.UnixMilli(timestamp),
+		BlockNum:             uint64(block),
+		Messages:             messages,
+		Hashes:               hashes,
+		MessagePseudoDeleted: make([]bool, numMessages),
+		ExecutedMessages:     executed,
+		MessageTokenData:     messageTokenData,
 	}
 
 	// calculate merkle root
@@ -367,16 +377,19 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						{
 							Header: cciptypes.RampMessageHeader{
 								SequenceNumber: cciptypes.SeqNum(100),
-								MsgHash:        cciptypes.Bytes32{0x10},
 							},
 						},
 						{
 							Header: cciptypes.RampMessageHeader{
 								SequenceNumber: cciptypes.SeqNum(102),
-								MsgHash:        cciptypes.Bytes32{0x12},
 							},
 						},
 					},
+					Hashes: []cciptypes.Bytes32{
+						{0x1},
+						{0x2},
+					},
+					MessagePseudoDeleted: []bool{false, false},
 				},
 			},
 		},
@@ -396,6 +409,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 							},
 						},
 					},
+					Hashes: []cciptypes.Bytes32{
+						{0x1},
+					},
+					MessagePseudoDeleted: []bool{false},
 				},
 				hasher: badHasher{},
 			},
@@ -470,7 +487,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2654,
+				maxReportSize: 2854,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -1004,7 +1021,8 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
-					ExecutedMessages: []cciptypes.SeqNum{100},
+					ExecutedMessages:     []cciptypes.SeqNum{100},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: AlreadyExecuted,
@@ -1021,6 +1039,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: false, Data: nil}}},
 					},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: TokenDataNotReady,
@@ -1037,6 +1056,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 					},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: ReadyToExecute,
@@ -1047,6 +1067,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				MessageTokenData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 				},
+				MessagePseudoDeleted: []bool{false},
 			},
 		},
 		{
@@ -1060,6 +1081,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: ReadyToExecute,
@@ -1070,6 +1092,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				MessageTokenData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 				},
+				MessagePseudoDeleted: []bool{false},
 			},
 		},
 		{
@@ -1085,6 +1108,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
+					MessagePseudoDeleted: []bool{false, false},
 				},
 			},
 			expectedStatus: ReadyToExecute,
@@ -1097,6 +1121,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 				},
+				MessagePseudoDeleted: []bool{false, false},
 			},
 		},
 		{
@@ -1111,6 +1136,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: MissingNoncesForChain,
@@ -1130,6 +1156,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: MissingNonce,
@@ -1151,10 +1178,12 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
+					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: InvalidNonce,
 		},
+		// TODO: Test PseudoDeleted status
 	}
 	for _, tt := range tests {
 		tt := tt

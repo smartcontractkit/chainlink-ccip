@@ -43,6 +43,45 @@ func validateObserverReadingEligibility(
 	return nil
 }
 
+func validateTokenDataObservations(observedMsgs exectypes.MessageObservations, tokenData exectypes.TokenDataObservations) error {
+
+	if len(observedMsgs) != len(tokenData) {
+		return fmt.Errorf("unexpected number of token data observations: expected %d, got %d",
+			len(observedMsgs), len(tokenData))
+	}
+
+	for chain, msgs := range observedMsgs {
+		for seq, msg := range msgs {
+			if _, ok := tokenData[chain][seq]; !ok {
+				return fmt.Errorf("token data not found for message %s", msg)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateHashesExist checks if the hashes exist for all the messages in the observation.
+func validateHashesExist(
+	observedMsgs exectypes.MessageObservations,
+	hashes exectypes.MessageHashes,
+) error {
+	if len(observedMsgs) != len(hashes) {
+		return fmt.Errorf("malformed observation, unexpected number of message hashes: expected %d, got %d",
+			len(observedMsgs), len(hashes))
+	}
+
+	for chain, msgs := range observedMsgs {
+		for seq, msg := range msgs {
+			if _, ok := hashes[chain][seq]; !ok {
+				return fmt.Errorf("hash not found for message %s", msg)
+			}
+		}
+	}
+
+	return nil
+}
+
 // validateObservedSequenceNumbers checks if the sequence numbers of the provided messages are unique for each chain
 // and that they match the observed max sequence numbers.
 func validateObservedSequenceNumbers(
@@ -233,11 +272,14 @@ func truncateObservation(
 			}
 			lastCommit := &commits[len(commits)-1]
 			seqNum := lastCommit.SequenceNumberRange.Start()
+
+			observation.PseudoDeletedMessages[chain] = make(map[cciptypes.SeqNum]bool)
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
 				if _, ok := observation.Messages[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
 				observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
+				observation.PseudoDeletedMessages[chain][seqNum] = true
 
 				if _, ok := observation.TokenData[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf(
@@ -287,7 +329,6 @@ func PseudoDeleteMessage(msg cciptypes.Message) cciptypes.Message {
 	pseudoDeletedMsg.Data = nil
 	pseudoDeletedMsg.ExtraArgs = nil
 	pseudoDeletedMsg.TokenAmounts = nil
-	pseudoDeletedMsg.PseudoDeleted = true
 
 	return pseudoDeletedMsg
 }

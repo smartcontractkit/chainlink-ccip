@@ -129,8 +129,6 @@ type Message struct {
 	FeeValueJuels BigInt `json:"feeValueJuels"`
 	// TokenAmounts is the array of tokens and amounts to transfer.
 	TokenAmounts []RampTokenAmount `json:"tokenAmounts"`
-
-	PseudoDeleted bool `json:"pseudoDeleted"`
 }
 
 func (c Message) String() string {

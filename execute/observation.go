@@ -247,8 +247,14 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
 	}
 
+	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
+	}
+
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
+	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 

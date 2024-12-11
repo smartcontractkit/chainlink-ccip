@@ -1,6 +1,7 @@
 package exectypes
 
 import (
+	"context"
 	"encoding/json"
 
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
@@ -14,6 +15,8 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 // and sequence number.
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
+type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
+
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
 	var results []cciptypes.Message
@@ -23,6 +26,21 @@ func (mo MessageObservations) Flatten() []cciptypes.Message {
 		}
 	}
 	return results
+}
+
+func GetHashes(ctx context.Context, mo MessageObservations, hasher cciptypes.MessageHasher) (MessageHashes, error) {
+	hashes := make(MessageHashes)
+	for chain, msgs := range mo {
+		hashes[chain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+		for seq, msg := range msgs {
+			hash, err := hasher.Hash(ctx, msg)
+			if err != nil {
+				return nil, err
+			}
+			hashes[chain][seq] = hash
+		}
+	}
+	return hashes, nil
 }
 
 // NonceObservations contain the latest nonce for senders in the previously observed messages.
@@ -54,13 +72,14 @@ type Observation struct {
 	// Ideally, it contains all the messages identified by the previous outcome's
 	// NextCommits. With the previous outcome, and these messsages, we can build the
 	// execute report.
-	Messages MessageObservations `json:"messages"`
-
+	Messages              MessageObservations                                   `json:"messages"`
+	Hashes                MessageHashes                                         `json:"messageHashes"`
+	PseudoDeletedMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool `json:"pseudoDeletedMessages"`
 	// TokenData are determined during the second phase of execute.
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
 
-	// CostlyMessages are determined during the second phase of execute.
+	// CostlyMessages are determined during the GetMessages state of execute.
 	// It contains the message IDs of messages that cost more to execute than their source fees. These messages will not
 	// be executed in the current round, but may be executed in future rounds (e.g. if gas prices decrease or if
 	// these messages' fees are boosted high enough).

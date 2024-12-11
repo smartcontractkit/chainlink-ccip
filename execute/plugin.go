@@ -197,6 +197,14 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
+	if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
+		return fmt.Errorf("validate hashes exist: %w", err)
+	}
+
+	if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
+		return fmt.Errorf("validate token data observations: %w", err)
+	}
+
 	return nil
 }
 

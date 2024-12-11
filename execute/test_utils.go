@@ -98,11 +98,7 @@ func (it *IntTest) WithMessages(
 	numReports int) {
 	mapped := slicelib.Map(messages,
 		func(m inmem.MessagesWithMetadata) cciptypes.Message {
-			msg := m.Message
-			hash, err := it.msgHasher.Hash(context.Background(), msg)
-			require.NoError(it.t, err, "failed to hash message")
-			msg.Header.MsgHash = hash
-			return msg
+			return m.Message
 		},
 	)
 	totalMessages := len(mapped)
@@ -115,13 +111,22 @@ func (it *IntTest) WithMessages(
 			endIndex = totalMessages // Ensure the last report includes any remaining messages
 		}
 
+		msgs := mapped[startIndex:endIndex]
+		hashes := make([]cciptypes.Bytes32, len(msgs))
+		for i, m := range msgs {
+			hash, err := it.msgHasher.Hash(context.Background(), m)
+			require.NoError(it.t, err, "failed to hash message")
+			hashes[i] = hash
+		}
 		reportData := exectypes.CommitData{
 			SourceChain: it.srcSelector,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
 				mapped[startIndex].Header.SequenceNumber,
 				mapped[endIndex-1].Header.SequenceNumber,
 			),
-			Messages: mapped[startIndex:endIndex],
+			Messages:             msgs,
+			Hashes:               hashes,
+			MessagePseudoDeleted: make([]bool, len(msgs)),
 		}
 
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))

@@ -127,21 +127,40 @@ func (p *Plugin) getMessagesOutcome(
 		costlyMessagesSet.Add(msgID)
 	}
 
+	// First ensure that all observed messages has hashes and token data.
+	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
+		p.lggr.Errorw("validate hashes exist: %w", err)
+		return exectypes.Outcome{}
+	}
+	if err := validateTokenDataObservations(observation.Messages, observation.TokenData); err != nil {
+		p.lggr.Errorw("validate token data observations: %w", err)
+		return exectypes.Outcome{}
+	}
+
 	// add messages to their commitReports.
 	for i, report := range commitReports {
 		report.Messages = nil
 		report.CostlyMessages = nil
 		for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
 			if msg, ok := observation.Messages[report.SourceChain][j]; ok {
+				// Always add the message to the report, even if it is pseudo-deleted.
 				report.Messages = append(report.Messages, msg)
+
+				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
+
+				// Add the pseudo-deleted status to the report.
+				if observation.PseudoDeletedMessages[report.SourceChain] != nil {
+					report.MessagePseudoDeleted = append(report.MessagePseudoDeleted,
+						observation.PseudoDeletedMessages[report.SourceChain][j],
+					)
+				} else {
+					report.MessagePseudoDeleted = append(report.MessagePseudoDeleted, false)
+				}
 				if costlyMessagesSet.Contains(msg.Header.MessageID) {
 					report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
 				}
 			}
-
-			if tokenData, ok := observation.TokenData[report.SourceChain][j]; ok {
-				report.MessageTokenData = append(report.MessageTokenData, tokenData)
-			}
+			report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 		}
 		commitReports[i].Messages = report.Messages
 		commitReports[i].MessageTokenData = report.MessageTokenData

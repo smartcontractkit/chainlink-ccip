@@ -23,8 +23,20 @@ func ConstructMerkleTree(
 			report.MerkleRoot.String(), numMsgs, len(report.Messages))
 	}
 
+	if numMsgs != len(report.Hashes) {
+		return nil, fmt.Errorf(
+			"malformed report %s, unexpected number of message hashes: expected %d, got %d",
+			report.MerkleRoot.String(), numMsgs, len(report.Hashes))
+	}
+	//
+	//if numMsgs != len(report.MessagePseudoDeleted) {
+	//	return nil, fmt.Errorf(
+	//		"malformed report %s, unexpected number of message pseudo-deleted flags: expected %d, got %d",
+	//		report.MerkleRoot.String(), numMsgs, len(report.MessagePseudoDeleted))
+	//}
+
 	treeLeaves := make([][32]byte, 0)
-	for _, msg := range report.Messages {
+	for i, msg := range report.Messages {
 		if !report.SequenceNumberRange.Contains(msg.Header.SequenceNumber) {
 			return nil, fmt.Errorf(
 				"malformed report, message %s sequence number %d outside of report range %s",
@@ -34,10 +46,10 @@ func ConstructMerkleTree(
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
 				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}
-		if msg.Header.MsgHash == [32]byte{} {
+		if report.Hashes[i] == [32]byte{} {
 			return nil, fmt.Errorf("malformed report, message %s has empty hash", msg)
 		}
-		leaf := msg.Header.MsgHash
+		leaf := report.Hashes[i]
 		lggr.Debugw("Hashed message, adding to tree leaves",
 			"hash", leaf,
 			"msg", msg,

@@ -28,6 +28,13 @@ type CommitData struct {
 
 	// Messages that are part of the commit report.
 	Messages []cciptypes.Message `json:"messages"`
+	// Hashes are the hashes of the respective messages in Messages slice.
+	// Get populated during GetMessages Outcome phase
+	Hashes []cciptypes.Bytes32 `json:"messageHashes"`
+	// MessagePseudoDeleted is a slice of booleans that indicate whether the message with same index
+	// in Messages was pseudo-deleted.
+	// Get populated during GetMessages Outcome phase
+	MessagePseudoDeleted []bool `json:"messagePseudoDeleted"`
 
 	// CostlyMessages are the message IDs of messages that cost more to execute than was paid to execute them (i.e.
 	// source fee < execution cost). These messages will not be executed in the current round, but may be executed in
