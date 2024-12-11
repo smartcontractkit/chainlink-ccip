@@ -115,6 +115,8 @@ func (p *Plugin) Reports(
 // Pure checks are placed earlier in the function on purpose to avoid
 // unnecessary network or DB I/O.
 // If you're added more checks make sure to follow this pattern.
+//
+//nolint:gocyclo
 func (p *Plugin) validateReport(
 	ctx context.Context,
 	seqNr uint64,
