@@ -436,7 +436,7 @@ func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	}
 }
 
-func makeMsg(
+func makeMsgWithMetadata(
 	seqNum cciptypes.SeqNum,
 	src, dest cciptypes.ChainSelector,
 	executed bool,
@@ -460,6 +460,43 @@ func makeMsg(
 		Destination: dest,
 		Executed:    executed,
 	}
+}
+
+func makeMessageObservation(
+	srcToSeqNumRange map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
+	opts ...msgOption) exectypes.MessageObservations {
+
+	obs := make(exectypes.MessageObservations)
+	for src, seqNumRng := range srcToSeqNumRange {
+		obs[src] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		for i := seqNumRng.Start(); i <= seqNumRng.End(); i++ {
+			msg := cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					SourceChainSelector: src,
+					SequenceNumber:      i,
+					MessageID:           rand.RandomBytes32(),
+				},
+				FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
+			}
+			for _, opt := range opts {
+				opt(&msg)
+			}
+			obs[src][i] = msg
+		}
+	}
+	return obs
+}
+
+func makeNoopTokenDataObservations(msgs exectypes.MessageObservations) exectypes.TokenDataObservations {
+	tokenData := make(exectypes.TokenDataObservations)
+	for src, seqNumToMsg := range msgs {
+		tokenData[src] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		for seq, _ := range seqNumToMsg {
+			tokenData[src][seq] = exectypes.NewMessageTokenData()
+		}
+	}
+	return tokenData
+
 }
 
 type nodeSetup struct {

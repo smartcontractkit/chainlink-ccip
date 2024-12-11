@@ -17,7 +17,7 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 
 type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
 
-type PsuedoDeletedMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool
+type PseudoDeletedMessages map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool
 
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
@@ -76,7 +76,7 @@ type Observation struct {
 	// execute report.
 	Messages      MessageObservations   `json:"messages"`
 	Hashes        MessageHashes         `json:"messageHashes"`
-	PseudoDeleted PsuedoDeletedMessages `json:"pseudoDeletedMessages"`
+	PseudoDeleted PseudoDeletedMessages `json:"pseudoDeletedMessages"`
 	// TokenData are determined during the second phase of execute.
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
@@ -95,6 +95,14 @@ type Observation struct {
 	Contracts dt.Observation `json:"contracts"`
 }
 
+func (co CommitObservations) Flatten() []CommitData {
+	var results []CommitData
+	for _, reports := range co {
+		results = append(results, reports...)
+	}
+	return results
+}
+
 // NewObservation constructs an Observation object.
 func NewObservation(
 	commitReports CommitObservations,
@@ -104,7 +112,7 @@ func NewObservation(
 	nonces NonceObservations,
 	contracts dt.Observation,
 	hashes MessageHashes,
-	pseudoDeleted PsuedoDeletedMessages,
+	pseudoDeleted PseudoDeletedMessages,
 ) Observation {
 	return Observation{
 		CommitReports:  commitReports,

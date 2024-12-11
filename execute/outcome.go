@@ -121,7 +121,7 @@ func (p *Plugin) getMessagesOutcome(
 	observation exectypes.Observation,
 	previousOutcome exectypes.Outcome,
 ) exectypes.Outcome {
-	commitReports := previousOutcome.PendingCommitReports
+	commitReports := make([]exectypes.CommitData, 0)
 	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
 	for _, msgID := range observation.CostlyMessages {
 		costlyMessagesSet.Add(msgID)
@@ -137,8 +137,9 @@ func (p *Plugin) getMessagesOutcome(
 		return exectypes.Outcome{}
 	}
 
+	reports := observation.CommitReports.Flatten()
 	// add messages to their commitReports.
-	for i, report := range commitReports {
+	for i, report := range reports {
 		report.Messages = nil
 		report.CostlyMessages = nil
 		for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
@@ -162,11 +163,17 @@ func (p *Plugin) getMessagesOutcome(
 			}
 			report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 		}
-		commitReports[i].Messages = report.Messages
-		commitReports[i].Hashes = report.Hashes
-		commitReports[i].MessagePseudoDeleted = report.MessagePseudoDeleted
-		commitReports[i].MessageTokenData = report.MessageTokenData
-		commitReports[i].CostlyMessages = report.CostlyMessages
+		if len(report.Messages) == 0 {
+			// If there are no messages, remove the commit report.
+			commitReports = append(commitReports[:i], commitReports[i+1:]...)
+			//i--
+		}
+		commitReports = append(commitReports, report)
+		//commitReports[i].Messages = report.Messages
+		//commitReports[i].Hashes = report.Hashes
+		//commitReports[i].MessagePseudoDeleted = report.MessagePseudoDeleted
+		//commitReports[i].MessageTokenData = report.MessageTokenData
+		//commitReports[i].CostlyMessages = report.CostlyMessages
 	}
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.

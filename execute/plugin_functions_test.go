@@ -1516,6 +1516,12 @@ func Test_truncateObservation(t *testing.T) {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
 					},
 				},
+				Messages: makeMessageObservation(
+					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
+						1: {1, 20},
+					},
+				),
+				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
 			maxSize: 500,
 			expected: exectypes.Observation{
@@ -1525,6 +1531,7 @@ func Test_truncateObservation(t *testing.T) {
 					},
 				},
 			},
+
 			wantErr: assert.NoError,
 		},
 		{
@@ -1538,6 +1545,13 @@ func Test_truncateObservation(t *testing.T) {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
 					},
 				},
+				Messages: makeMessageObservation(
+					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
+						1: {1, 10},
+						2: {11, 20},
+					},
+				),
+				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
 			maxSize: 500,
 			// Notice that truncate chains still returns one report although one chain report is more than the max size
@@ -1571,6 +1585,7 @@ func Test_truncateObservation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.observation.TokenData = makeNoopTokenDataObservations(tt.observation.Messages)
 			obs, err := truncateObservation(tt.observation, tt.maxSize)
 			if !tt.wantErr(t, err) {
 				return

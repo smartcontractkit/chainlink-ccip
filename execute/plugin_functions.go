@@ -513,16 +513,16 @@ func mergeCommitObservations(
 func mergePseudoDeletedMessages(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-) (exectypes.PsuedoDeletedMessages, error) {
+) (exectypes.PseudoDeletedMessages, error) {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.MinObservation[bool])
-	results := make(exectypes.PsuedoDeletedMessages)
+	results := make(exectypes.PseudoDeletedMessages)
 
 	for _, ao := range aos {
 		for selector, seqMap := range ao.Observation.PseudoDeleted {
 			f, ok := fChain[selector]
 			if !ok {
-				return exectypes.PsuedoDeletedMessages{}, fmt.Errorf("no F defined for chain %d", selector)
+				return exectypes.PseudoDeletedMessages{}, fmt.Errorf("no F defined for chain %d", selector)
 			}
 
 			if _, ok1 := results[selector]; !ok1 {
