@@ -207,6 +207,9 @@ type mockContractReader struct {
 	BatchGetLatestValuesResponse types.BatchGetLatestValuesResult
 }
 
-func (m *mockContractReader) BatchGetLatestValues(_ context.Context, _ types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error) {
+func (m *mockContractReader) BatchGetLatestValues(
+	_ context.Context,
+	_ types.BatchGetLatestValuesRequest,
+) (types.BatchGetLatestValuesResult, error) {
 	return m.BatchGetLatestValuesResponse, nil
 }
