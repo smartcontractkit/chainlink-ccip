@@ -78,7 +78,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
-        version: "0.1.0"
+        version: "0.4.0"
       valuesFiles:
         - ${MONITORING_NETWORK_1_VALUES_PATH}
       values:
@@ -93,7 +93,7 @@ deployments:
       displayOutput: true
       chart:
         name: ${CHAINLINK_HELM_REGISTRY_URI}/crib-atlas-core
-        version: "0.0.4"
+        version: "0.4.0"
       valuesFiles:
         - ${MONITORING_NETWORK_2_VALUES_PATH}
       values:
