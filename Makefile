@@ -43,6 +43,9 @@ test:
 lint: ensure_go_version ensure_golangcilint_1_62_2
 	golangci-lint run -c .golangci.yml
 
+lint-fix: ensure_go_version ensure_golangcilint_1_62_2
+	golangci-lint run -c .golangci.yml --fix
+
 checks: test lint
 
 install-protoc:

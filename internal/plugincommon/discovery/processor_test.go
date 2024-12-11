@@ -693,7 +693,6 @@ func TestContractDiscoveryProcessor_ValidateObservation_OracleNotAllowedToObserv
 	}
 
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			lggr := logger.Test(t)
 			fRoleDON := 1
