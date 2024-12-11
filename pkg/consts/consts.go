@@ -30,6 +30,7 @@ const (
 	MethodNameOffRampGetDynamicConfig         = "OffRampGetDynamicConfig"
 	MethodNameOffRampGetStaticConfig          = "OffRampGetStaticConfig"
 	MethodNameOffRampGetDestChainConfig       = "OffRampGetDestChainConfig"
+	MethodNameOffRampLatestConfigDetails      = "OffRampLatestConfigDetails"
 	MethodNameGetLatestPriceSequenceNumber    = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                       = "IsBlessed"
 	MethodNameGetMerkleRoot                   = "GetMerkleRoot"
