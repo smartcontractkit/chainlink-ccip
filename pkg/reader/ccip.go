@@ -136,7 +136,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			},
 		},
 		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(limit * 2),
+			},
 		},
 		&ev,
 	)
@@ -146,7 +149,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	r.lggr.Debugw("queried commit reports", "numReports", len(iter),
 		"destChain", dest,
 		"ts", ts,
-		"limit", limit)
+		"limit", limit*2)
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
@@ -260,7 +263,10 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 			},
 		},
 		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+			},
 		},
 		&dataTyp,
 	)
@@ -323,7 +329,10 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{
-				query.NewSortByTimestamp(query.Asc),
+				query.NewSortBySequence(query.Asc),
+			},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
 		&SendRequestedEvent{},
@@ -425,7 +434,6 @@ func (r *ccipChainReader) Nonces(
 	eg := new(errgroup.Group)
 
 	for _, address := range addresses {
-		address := address
 		eg.Go(func() error {
 			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
 			if err != nil {
@@ -1046,7 +1054,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		}
 
 		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
@@ -1231,7 +1238,6 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 			continue
 		}
 
-		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
 			resp := getOnRampDynamicConfigResponse{}
@@ -1291,7 +1297,6 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 		// For chain X, all DestChainConfigs will have one of 2 values for the Router address
 		// 1. Chain X Test Router in case we're testing a new lane
 		// 2. Chain X Router
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
