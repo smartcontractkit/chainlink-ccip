@@ -8,21 +8,27 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
 func TestLogWrapper(t *testing.T) {
 	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
 
-	expected := map[string]interface{}{
-		"donID":    uint32(2),
-		"oracleID": commontypes.OracleID(3),
-		"plugin":   "TestPlugin",
-	}
 	var donID uint32 = 2
 	var oracleID commontypes.OracleID = 3
+	var digest types.ConfigDigest
+	digest[0] = 1
+	digest[31] = 31
+
+	expected := map[string]interface{}{
+		"donID":        donID,
+		"oracleID":     oracleID,
+		"plugin":       "TestPlugin",
+		"configDigest": digest.String(),
+	}
 
 	// Initial wrapping of base logger.
-	wrapped := WithPluginConstants(lggr, "TestPlugin", donID, oracleID)
+	wrapped := WithPluginConstants(lggr, "TestPlugin", donID, oracleID, digest)
 	wrapped.Info("Where do thumbs hang out at work?")
 	require.Equal(t, hook.Len(), 1)
 	require.Len(t, hook.All()[0].Context, len(expected))
@@ -57,16 +63,21 @@ func TestNamed(t *testing.T) {
 func TestLogCopy(t *testing.T) {
 	lggr, hook := logger.TestObserved(t, zapcore.DebugLevel)
 
-	expected := map[string]interface{}{
-		"donID":    uint32(2),
-		"oracleID": commontypes.OracleID(3),
-		"plugin":   "TestPlugin",
-	}
 	var donID uint32 = 2
 	var oracleID commontypes.OracleID = 3
+	var digest types.ConfigDigest
+	digest[0] = 1
+	digest[31] = 31
+
+	expected := map[string]interface{}{
+		"donID":        donID,
+		"oracleID":     oracleID,
+		"plugin":       "TestPlugin",
+		"configDigest": digest.String(),
+	}
 
 	// Initial wrapping of base logger.
-	wrapped := WithPluginConstants(lggr, "TestPlugin", donID, oracleID)
+	wrapped := WithPluginConstants(lggr, "TestPlugin", donID, oracleID, digest)
 	wrapped.Info("Where do thumbs hang out at work?")
 	require.Equal(t, hook.Len(), 1)
 	require.Equal(t, expected, hook.All()[0].ContextMap())
