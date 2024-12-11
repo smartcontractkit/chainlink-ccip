@@ -62,15 +62,7 @@ pipelines:
        ensure_pull_secrets --all
       fi
 
-      # Deploy DBs
-      for i in $(seq 0 $((DON_BOOT_NODE_COUNT-1)))
-      do
-        create_deployments "chainlink-don-db-bt-$i"
-      done
-      for i in $(seq 0 $((DON_NODE_COUNT-1)))
-      do
-        create_deployments "chainlink-don-db-$i"
-      done
+      create_deployments --all
 
       if [[ "$CCIP_TOOLING_VERSION" == "v2" ]]; then
         run_dependency_pipelines job-distributor
@@ -80,20 +72,12 @@ pipelines:
         #   - ccip-v2-scripts-address-book.json
         run_dependency_pipelines ccip-v2-scripts-deploy-home-chain
 
-        tmp_dir="${TMP_DIR}"
+        NODE_TOML_OVERRIDES=$(cat ${TMP_DIR}/ccip-v2-scripts-node-overrides.toml) \
+          gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${TMP_DIR}/ccip-v2-node-overrides.yaml
+        create_deployments chainlink-don --from-file="${TMP_DIR}/ccip-v2-node-overrides.yaml"
 
-        NODE_TOML_OVERRIDES=$(cat ${tmp_dir}/ccip-v2-scripts-node-overrides.toml) \
-          gomplate --config ${LOCAL_TEMPLATES_DIR}/ccip-v2-scripts-overrides.yaml > ${tmp_dir}/ccip-v2-node-overrides.yaml
-        echo "========== Node Overrides ===================="
-        cat "${tmp_dir}/ccip-v2-node-overrides.yaml"
-        create_deployments chainlink-don --from-file="${tmp_dir}/ccip-v2-node-overrides.yaml"
-
-        # Ensure all ingresses are ready before proceeding
-        crib devspace ingress-check
         # deploy on chain contracts (tokens, lanes, token pools, price registry, router)
         run_dependency_pipelines ccip-v2-scripts-deploy-ccip
-      else
-        create_deployments chainlink-don
       fi
 deployments:
   chainlink-don:
@@ -106,7 +90,26 @@ deployments:
         version: "2.4.4"
       valuesFiles: []
       values: {}
-
+hooks:
+  # This hook will ensure that every time the deployment
+  # chainlink-don is deployed that DevSpace will wait until
+  # all pods and containers that match the labelSelector
+  # app.kubernetes.io/name: chainlink-don are running
+  # https://www.devspace.sh/docs/configuration/hooks/#wait-for-a-pod-to-be-running
+  - wait:
+      running: true
+      # This can be needed for init containers
+      # that terminate instead of become running.
+      terminatedWithCode: 0
+    container:
+      labelSelector:
+        "app.kubernetes.io/name": "chainlink-don"
+    name: "wait-for-chainlink-don-pods"
+    events: ["after:deploy:chainlink-don"]
+  - name: Wait for ingress hosts
+    events: ["after:deploy:chainlink-don"]
+    command: crib
+    args: ["devspace", "ingress-check"]
 profiles:
   # charts
   - name: local-charts

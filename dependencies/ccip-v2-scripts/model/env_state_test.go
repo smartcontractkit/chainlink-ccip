@@ -18,7 +18,7 @@ func TestSaveJSONOutputFile(t *testing.T) {
 		Namespace: "test-ns",
 		TmpDir:    tmpDir,
 	}
-	state := NewEnvState(env)
+	state := NewEnvState(nil, env)
 
 	savedFile := state.SaveJSONOutputFile("test_file.json", env)
 	file, err := os.ReadFile(savedFile)

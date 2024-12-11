@@ -2,19 +2,20 @@ version: v2beta1
 name: chainlink
 
 vars:
+  CRIB_DIR: $(git rev-parse --show-toplevel 2>/dev/null)
   SCRIPTS_DIR:
     source: env
-    default: "../../scripts"
+    default: "${CRIB_DIR}/scripts"
   DEVSPACE_ENV_FILE: .env
   DEPENDENCIES_DIR:
     source: env
-    default: "../../dependencies"
+    default: "${CRIB_DIR}/dependencies"
   IMPORTS_DIR:
     source: env
-    default: "../../imports"
+    default: "${CRIB_DIR}/imports"
   TMP_DIR:
     source: env
-    default: "../../tmp/ccip-v2"
+    default: "${CRIB_DIR}/deployments/ccip-v2/.tmp"
   # "The provider being used to deploy CRIB"
   PROVIDER:
     source: all
@@ -39,12 +40,15 @@ imports:
 pipelines:
   ccip-v2:
     run: |-
-      run_dependency_pipelines kind-core
+      if [ "$PROVIDER" == "kind" ]; then
+        run_dependency_pipelines kind-core
+      fi
+
       run_dependency_pipelines geth
       run_pipelines ingress-check
 
       # Deploy CCIP enabled fully configured DON
-      run_dependency_pipelines donut-cluster
+      run_dependency_pipelines ccip-don
       run_pipelines ingress-check
   ccip-v2-scripts-home-chain:
     run: |-
@@ -57,6 +61,18 @@ pipelines:
       run_dependency_pipelines job-distributor
 
 profiles:
+  - name: kind
+    activation:
+      - vars:
+          PROVIDER: "kind"
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          kind-core:
+            path: ${DEPENDENCIES_DIR}/kind-core
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
   - name: ccip-v2-scripts
     patches:
       - op: add
@@ -95,17 +111,13 @@ profiles:
       - op: add
         path: dependencies
         value:
-          kind-core:
-            path: ${DEPENDENCIES_DIR}/kind-core
-            overwriteVars: true
-            namespace: ${DEVSPACE_NAMESPACE}
           geth:
             path: ${DEPENDENCIES_DIR}/geth
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - ccip
-          donut-cluster:
+          ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
@@ -113,22 +125,24 @@ profiles:
               - network-geth-chain-1337
               - network-geth-chain-2337
 commands:
-  job-distributor:
-    command: devspace run-pipeline job-distributor -p job-distributor
-    description: Run the job-distributor pipeline.
-    appendArgs: true
   ccip-v2:
     command: devspace run-pipeline ccip-v2 -p ccip-v2
     description: Run the ccip v2 pipeline.
     appendArgs: true
-  ccip-v2-scripts-home-chain:
+  deploy-job-distributor:
+    command: devspace run-pipeline job-distributor -p job-distributor
+    description: Run the job-distributor pipeline.
+    appendArgs: true
+  deploy-home-chain:
     command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-home-chain
     description: Deploy CCIP Contracts and Add lanes.
     appendArgs: true
-  ccip-v2-deploy-ccip:
+  deploy-ccip:
     command: devspace -p ccip-v2-scripts run-pipeline ccip-v2-scripts-deploy-ccip
     description: Deploy CCIP Contracts and Add lanes.
     appendArgs: true
-  ccip-v2-purge:
-    command: rm -f ${TMP_DIR}/* && kubectl delete ns ${DEVSPACE_NAMESPACE}
-    description: purge ccip-v2 env
+  purge:
+    command: |
+      rm -f ${TMP_DIR}/*
+      devspace purge
+    description: Cleanup temp files and purge devspace env

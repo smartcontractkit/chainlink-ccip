@@ -39,3 +39,21 @@ deployments:
           enabled: false
         metrics:
           enabled: false
+profiles:
+  - name: aws
+    activation:
+      - vars:
+          PROVIDER: "aws"
+    merge:
+      deployments:
+        postgres:
+          helm:
+            values:
+              primary:
+                nodeSelector:
+                  node-role: crib
+                tolerations:
+                  - key: "node-role"
+                    operator: "Equal"
+                    value: "crib"
+                    effect: "NoSchedule"

@@ -1,6 +1,8 @@
 package scripts
 
 import (
+	"context"
+
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	v2logger "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/config"
@@ -22,14 +24,15 @@ func DeployCCIPAndAddLanes(logger *zap.SugaredLogger, env config.DevspaceEnv, ou
 		panic(err)
 	}
 	ccipLogger, _ := v2logger.NewLogger()
+	ctx := context.Background()
 
-	output, err := crib.DeployCCIPAndAddLanes(ccipLogger, envConfig, alphaChainSel, betaChainSel, addressBook)
+	output, err := crib.DeployCCIPAndAddLanes(ctx, ccipLogger, envConfig, alphaChainSel, betaChainSel, addressBook)
 	if err != nil {
 		logger.Error("Deployment failed due to error", "error", err.Error())
 		panic(err)
 	}
 
-	envState := model.NewEnvState(env)
+	envState := model.NewEnvState(logger, env)
 	if err != nil {
 		panic(err)
 	}

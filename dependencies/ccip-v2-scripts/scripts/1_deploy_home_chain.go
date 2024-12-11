@@ -1,8 +1,7 @@
 package scripts
 
 import (
-	"fmt"
-	"log/slog"
+	"context"
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	v2logger "github.com/smartcontractkit/chainlink/v2/core/logger"
@@ -26,7 +25,7 @@ func NewHomeChainDeployer(logger *zap.SugaredLogger, env config.DevspaceEnv) *Ho
 	return &HomeChainDeployer{
 		logger:   logger,
 		env:      env,
-		envState: model.NewEnvState(env),
+		envState: model.NewEnvState(logger, env),
 	}
 }
 
@@ -37,16 +36,19 @@ func (h HomeChainDeployer) Deploy() {
 	}
 	// Use the output value
 	h.logger.Info("Deploying home chain",
-		slog.String("tmp_dir", h.env.TmpDir),
+		zap.String("tmp_dir", h.env.TmpDir),
 	)
 
 	ccipLogger, _ := v2logger.NewLogger()
 	envConfig := config.NewEnvConfig(h.env)
 
 	homeChainID := uint64(1337)
+	feedChainID := uint64(2337)
 	homeChainSelector := config.ChainSelector(homeChainID)
+	feedChainSelector := config.ChainSelector(feedChainID)
 
-	capRegConfig, addressBook, err := crib.DeployHomeChainContracts(ccipLogger, envConfig, homeChainSelector)
+	ctx := context.Background()
+	capRegConfig, addressBook, err := crib.DeployHomeChainContracts(ctx, ccipLogger, envConfig, homeChainSelector, feedChainSelector)
 	if err != nil {
 		panic(err)
 	}
@@ -65,12 +67,12 @@ func (h HomeChainDeployer) Deploy() {
 
 func (h HomeChainDeployer) shouldSkip() bool {
 	if h.envState.AddressBookExists() {
-		fmt.Printf("Address book file exists\n")
-		slog.Info("Skipping Home Chain Deployment, Home chain is already deployed")
+		h.logger.Info("Address book file exists")
+		h.logger.Info("Skipping Home Chain Deployment, Home chain is already deployed")
 		return true
 	}
 
-	fmt.Printf("Address book file does not exist\n")
+	h.logger.Info("Address book file does not exist")
 
 	return false
 }

@@ -121,6 +121,10 @@ tasks:
     deps:
       - ccip-v2-scripts:lint-fix-gci
       - ccip-v2-scripts:lint-fix-gofumpt
+  ccip-v2-scripts:update-dependencies:
+    dir: dependencies/ccip-v2-scripts
+    desc: sync dependencies
+    cmd: go mod tidy
   # sdk-build
   sdk:build:
     desc: Build sdk go module
@@ -159,3 +163,11 @@ tasks:
     deps:
       - sdk:lint-fix-gci
       - sdk:lint-fix-gofumpt
+  sdk:update-dependencies:
+    dir: sdk
+    desc: sync dependencies
+    cmd: go mod tidy
+  update-go-dependencies:
+    deps:
+      - sdk:update-dependencies
+      - ccip-v2-scripts:update-dependencies

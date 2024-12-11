@@ -4,31 +4,35 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/smartcontractkit/chainlink/deployment"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/config"
 	"github.com/smartcontractkit/crib/sdk/ccip"
+	"go.uber.org/zap"
 )
 
 const nodeOverridesTomlFilePath = "ccip-v2-scripts-node-overrides.toml"
 
-func NewEnvState(env config.DevspaceEnv) CCIPEnvState {
+func NewEnvState(logger *zap.SugaredLogger, env config.DevspaceEnv) CCIPEnvState {
 	return CCIPEnvState{
+		logger:      logger,
 		devspaceEnv: env,
 	}
 }
 
 type CCIPEnvState struct {
 	devspaceEnv config.DevspaceEnv
+	logger      *zap.SugaredLogger
 }
 
 func (e *CCIPEnvState) getOutputFilePath(fileName string) string {
-	return fmt.Sprintf("%s/%s", e.devspaceEnv.TmpDir, fileName)
+	return path.Join(e.devspaceEnv.TmpDir, fileName)
 }
 
 func (e *CCIPEnvState) SaveAddressBook(addresses map[uint64]map[string]deployment.TypeAndVersion) {
-	e.SaveJSONOutputFile(e.getOutputFilePath(ccip.AddressBookFileName), addresses)
+	e.SaveJSONOutputFile(ccip.AddressBookFileName, addresses)
 }
 
 func (e *CCIPEnvState) SaveChainConfigs(chainConfigs []devenv.ChainConfig) {
@@ -36,7 +40,7 @@ func (e *CCIPEnvState) SaveChainConfigs(chainConfigs []devenv.ChainConfig) {
 	for _, chainConfig := range chainConfigs {
 		configs = append(configs, TransmittedConfig(chainConfig))
 	}
-	e.SaveJSONOutputFile(e.getOutputFilePath(ccip.ChainsConfigsFileName), configs)
+	e.SaveJSONOutputFile(ccip.ChainsConfigsFileName, configs)
 }
 
 func TransmittedConfig(c devenv.ChainConfig) ccip.ChainConfig {
@@ -80,17 +84,18 @@ ChainID = '%d'`, capRegConfig.Contract.String(), "evm", homeChainID)
 }
 
 func (e *CCIPEnvState) SaveNodeDetails(details ccip.NodesDetails) {
-	e.SaveJSONOutputFile(e.getOutputFilePath(ccip.NodesDetailsFileName), details)
+	e.SaveJSONOutputFile(ccip.NodesDetailsFileName, details)
 }
 
 func (e *CCIPEnvState) SaveJSONOutputFile(filename string, data interface{}) string {
 	err := os.MkdirAll(e.devspaceEnv.TmpDir, os.ModeDir)
 	if err != nil {
+		e.logger.Error("unable to create temporary directory: %s", e.devspaceEnv.TmpDir)
 		panic(err)
 	}
 	file, err := os.Create(e.getOutputFilePath(filename))
 	if err != nil {
-		fmt.Println(err)
+		e.logger.Errorf("unable to create JSON file: %s", e.getOutputFilePath(filename))
 		return ""
 	}
 	defer func(file *os.File) {
