@@ -770,7 +770,10 @@ func TestPlugin_ShouldTransmitAcceptedReport_MismatchingConfigDigests(t *testing
 	}, nil)
 
 	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-	ccipReaderMock.EXPECT().GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).Return(onchainConfigDigest, nil)
+	ccipReaderMock.
+		EXPECT().
+		GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).
+		Return(onchainConfigDigest, nil)
 
 	codec := codec_mocks.NewMockExecutePluginCodec(t)
 	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
