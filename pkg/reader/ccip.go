@@ -707,22 +707,35 @@ func (r *ccipChainReader) GetRmnCurseInfo(
 	}
 
 	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
-	cursedSubjectsSet := mapset.NewSet(cursedSubjects.CursedSubjects...)
 
+	return getCurseInfoFromCursedSubjects(
+		r.lggr,
+		mapset.NewSet(cursedSubjects.CursedSubjects...),
+		destChainSelector,
+		sourceChainSelectors,
+	), nil
+}
+
+func getCurseInfoFromCursedSubjects(
+	lggr logger.Logger,
+	cursedSubjectsSet mapset.Set[[16]byte],
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) *CurseInfo {
 	curseInfo := &CurseInfo{
 		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
-		CursedDestination: cursedSubjectsSet.Contains(LegacyCurseSubject) ||
-			cursedSubjectsSet.Contains(GlobalCurseSubject),
+		CursedDestination: cursedSubjectsSet.Contains(GlobalCurseSubject) ||
+			cursedSubjectsSet.Contains(chainSelectorToBytes16(destChainSelector)),
 		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
 	}
 
 	for _, ch := range sourceChainSelectors {
 		chainSelB16 := chainSelectorToBytes16(ch)
-		r.lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
+		lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
 		curseInfo.CursedSourceChains[ch] = cursedSubjectsSet.Contains(chainSelB16)
 	}
 
-	return curseInfo, nil
+	return curseInfo
 }
 
 func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
@@ -1433,6 +1446,27 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 	}
 
 	return daConfig, nil
+}
+
+func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return 0, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+	var latestSeqNr uint64
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameGetLatestPriceSequenceNumber,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&latestSeqNr,
+	)
+
+	if err != nil {
+		return 0, fmt.Errorf("get latest price sequence number: %w", err)
+	}
+
+	return latestSeqNr, nil
 }
 
 // Interface compliance check

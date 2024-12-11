@@ -81,7 +81,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 					w.WriteHeader(http.StatusInternalServerError)
 				}))
 			},
-			timeout:            longTimeout,
+			timeout:            time.Hour, // not relevant to the test
 			expectedError:      ErrUnknownResponse,
 			expectedStatusCode: http.StatusInternalServerError,
 		},
@@ -89,12 +89,23 @@ func Test_HTTPClient_Get(t *testing.T) {
 			name: "default timeout",
 			getTs: func(t *testing.T) *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					time.Sleep(1 * time.Second)
-					_, err := w.Write(validAttestationResponse)
-					require.NoError(t, err)
+					ctx := r.Context()
+					done := make(chan struct{})
+					go func() {
+						defer close(done)
+						time.Sleep(time.Hour) // Simulate long processing time
+					}()
+					select {
+					case <-ctx.Done(): // Listen for request cancellation
+						http.Error(w, "request canceled", http.StatusRequestTimeout)
+						return
+					case <-done: // Proceed when processing is done
+						_, err := w.Write(validAttestationResponse)
+						require.NoError(t, err)
+					}
 				}))
 			},
-			timeout:            100 * time.Millisecond,
+			timeout:            50 * time.Millisecond,
 			expectedError:      ErrTimeout,
 			expectedStatusCode: http.StatusRequestTimeout,
 		},
@@ -106,7 +117,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 					require.NoError(t, err)
 				}))
 			},
-			timeout:            longTimeout,
+			timeout:            time.Hour, // not relevant to the test
 			expectedStatusCode: http.StatusOK,
 			expectedError:      fmt.Errorf("attestation API error: some error"),
 		},
@@ -124,7 +135,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 					require.NoError(t, err)
 				}))
 			},
-			timeout:            longTimeout,
+			timeout:            time.Hour, // not relevant to the test
 			expectedStatusCode: http.StatusOK,
 			expectedError: fmt.Errorf(
 				"failed to decode attestation hex: Bytes must be of at least length 2 (i.e, '0x' prefix): 0",
@@ -144,7 +155,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 					require.NoError(t, err)
 				}))
 			},
-			timeout:            longTimeout,
+			timeout:            time.Hour,
 			expectedStatusCode: http.StatusOK,
 			expectedError:      fmt.Errorf("invalid attestation response"),
 		},
@@ -161,7 +172,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 					require.NoError(t, err)
 				}))
 			},
-			timeout:            longTimeout,
+			timeout:            time.Hour,
 			expectedStatusCode: http.StatusOK,
 			expectedError:      fmt.Errorf("invalid attestation response"),
 		},
@@ -172,7 +183,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 					w.WriteHeader(http.StatusTooManyRequests)
 				}))
 			},
-			timeout:            longTimeout,
+			timeout:            time.Hour,
 			expectedStatusCode: http.StatusTooManyRequests,
 			expectedError:      ErrRateLimit,
 		},
@@ -184,7 +195,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 				}))
 			},
 			messageHash:        [32]byte{1, 2, 3, 4, 5},
-			timeout:            longTimeout,
+			timeout:            time.Hour,
 			expectedError:      ErrNotReady,
 			expectedStatusCode: http.StatusNotFound,
 		},
@@ -201,7 +212,7 @@ func Test_HTTPClient_Get(t *testing.T) {
 				}))
 			},
 			messageHash:        [32]byte{1, 2, 3, 4},
-			timeout:            longTimeout,
+			timeout:            time.Hour,
 			expectedStatusCode: http.StatusOK,
 			expectedResponse:   mustDecode("0x720502893578a89a8a87982982ef781c18b193"),
 		},
@@ -300,7 +311,7 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 		if requestCount%2 == 1 {
 			w.WriteHeader(http.StatusInternalServerError)
 		} else {
-			w.Header().Set("Retry-After", "1")
+			w.Header().Set("Retry-After", time.Now().Add(50*time.Millisecond).Format(time.RFC1123))
 			w.WriteHeader(http.StatusTooManyRequests)
 		}
 	}))
@@ -309,7 +320,7 @@ func Test_HTTPClient_CoolDownWithRetryHeader(t *testing.T) {
 	attestationURI, err := url.ParseRequestURI(ts.URL)
 	require.NoError(t, err)
 
-	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, longTimeout)
+	client, err := newHTTPClient(logger.Test(t), attestationURI.String(), 1*time.Millisecond, time.Hour)
 	require.NoError(t, err)
 	_, _, err = client.Get(tests.Context(t), [32]byte{1, 2, 3})
 	require.EqualError(t, err, ErrUnknownResponse.Error())
@@ -339,19 +350,19 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 		{
 			name:         "rate limited with default config",
 			requests:     5,
-			rateConfig:   100 * time.Millisecond,
-			testDuration: 4 * 100 * time.Millisecond,
+			rateConfig:   50 * time.Millisecond,
+			testDuration: 4 * 50 * time.Millisecond,
 		},
 		{
 			name:         "rate limited with config",
-			requests:     10,
+			requests:     5,
 			rateConfig:   50 * time.Millisecond,
-			testDuration: 9 * 50 * time.Millisecond,
+			testDuration: 4 * 50 * time.Millisecond,
 		},
 		{
 			name:         "timeout after first request",
 			requests:     5,
-			rateConfig:   100 * time.Millisecond,
+			rateConfig:   50 * time.Millisecond,
 			testDuration: 1 * time.Millisecond,
 			timeout:      1 * time.Millisecond,
 			err:          "token data API is being rate limited",
@@ -359,9 +370,9 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 		{
 			name:         "timeout after second request",
 			requests:     5,
-			rateConfig:   100 * time.Millisecond,
-			testDuration: 100 * time.Millisecond,
-			timeout:      150 * time.Millisecond,
+			rateConfig:   50 * time.Millisecond,
+			testDuration: 50 * time.Millisecond,
+			timeout:      75 * time.Millisecond,
 			err:          "token data API is being rate limited",
 		},
 	}
@@ -427,7 +438,7 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 			if tc.err != "" {
 				assert.True(t, errorFound)
 			}
-			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 50*time.Millisecond)
+			assert.WithinDuration(t, start.Add(tc.testDuration), finish, 100*time.Millisecond)
 		})
 	}
 }

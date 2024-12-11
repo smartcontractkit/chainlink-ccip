@@ -32,16 +32,6 @@ func (ci CurseInfo) NonCursedSourceChains(inputChains []ccipocr3.ChainSelector) 
 	return sourceChains
 }
 
-// LegacyCurseSubject Defined as a const in RMNRemote.sol
-// Docs of RMNRemote:
-// An active curse on this subject will cause isCursed() to return true. Use this subject if there is an issue
-// with a remote chain, for which there exists a legacy lane contract deployed on the same chain as this RMN contract
-// is deployed, relying on isCursed().
-var LegacyCurseSubject = [16]byte{
-	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-}
-
 // GlobalCurseSubject Defined as a const in RMNRemote.sol
 // Docs of RMNRemote:
 // An active curse on this subject will cause isCursed() and isCursed(bytes16) to return true. Use this subject
