@@ -250,6 +250,7 @@ func filterOutExecutedMessages(
 // exclude messages from one chain only.
 // Keep repeating this process until the encoded observation fits within the maxSize
 // *pseudo delete means putting any bytes as nil.
+// Important Note: We can't delete messages completely from single reports as we need them to create merkle proofs.
 func truncateObservation(
 	obs exectypes.Observation,
 	maxSize int,
