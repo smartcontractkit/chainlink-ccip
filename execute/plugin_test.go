@@ -696,55 +696,6 @@ func TestPlugin_ShouldTransmitAcceptedReport_DecodeFailure(t *testing.T) {
 	require.ErrorContains(t, err, "validate exec report: decode exec plugin report: test error")
 }
 
-func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
-	lggr := logger.Test(t)
-	destChain := rand.RandomInt64()
-	configDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
-	oracleID := commontypes.OracleID(1)
-	peerID := libocrtypes.PeerID{1}
-
-	homeChainMock := reader_mock.NewMockHomeChain(t)
-	homeChainMock.EXPECT().GetChainConfig(cciptypes.ChainSelector(destChain)).Return(reader.ChainConfig{
-		SupportedNodes: mapset.NewSet(peerID),
-	}, nil)
-
-	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
-	ccipReaderMock.EXPECT().GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).Return(configDigest, nil)
-
-	codec := codec_mocks.NewMockExecutePluginCodec(t)
-	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
-		ChainReports: []cciptypes.ExecutePluginReportSingleChain{
-			{}, {},
-		},
-	}, nil)
-
-	p := &Plugin{
-		lggr:      lggr,
-		homeChain: homeChainMock,
-		chainSupport: plugincommon.NewChainSupport(
-			logger.Test(t),
-			homeChainMock,
-			map[commontypes.OracleID]libocrtypes.PeerID{
-				oracleID: peerID,
-			},
-			oracleID,
-			cciptypes.ChainSelector(destChain),
-		),
-		reportingCfg: ocr3types.ReportingPluginConfig{
-			OracleID:     oracleID,
-			ConfigDigest: configDigest,
-		},
-		reportCodec: codec,
-		ccipReader:  ccipReaderMock,
-	}
-
-	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
-		Report: []byte("report"), // faked out, see mock above
-	})
-	require.NoError(t, err)
-	require.True(t, shouldTransmit)
-}
-
 func TestPlugin_ShouldTransmitAcceptReport_SupportsDestChainCheckFails(t *testing.T) {
 	lggr := logger.Test(t)
 	oracleID := commontypes.OracleID(1)
@@ -803,4 +754,103 @@ func TestPlugin_ShouldTransmitAcceptReport_DontSupportDestChain(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.False(t, shouldTransmit)
+}
+
+func TestPlugin_ShouldTransmitAcceptedReport_MismatchingConfigDigests(t *testing.T) {
+	lggr := logger.Test(t)
+	destChain := rand.RandomInt64()
+	configDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
+	onchainConfigDigest := [32]byte{0xca, 0xfe, 0xba, 0xbe}
+	oracleID := commontypes.OracleID(1)
+	peerID := libocrtypes.PeerID{1}
+
+	homeChainMock := reader_mock.NewMockHomeChain(t)
+	homeChainMock.EXPECT().GetChainConfig(cciptypes.ChainSelector(destChain)).Return(reader.ChainConfig{
+		SupportedNodes: mapset.NewSet(peerID),
+	}, nil)
+
+	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
+	ccipReaderMock.EXPECT().GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).Return(onchainConfigDigest, nil)
+
+	codec := codec_mocks.NewMockExecutePluginCodec(t)
+	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
+		ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+			{}, {},
+		},
+	}, nil)
+
+	p := &Plugin{
+		lggr:      lggr,
+		homeChain: homeChainMock,
+		chainSupport: plugincommon.NewChainSupport(
+			logger.Test(t),
+			homeChainMock,
+			map[commontypes.OracleID]libocrtypes.PeerID{
+				oracleID: peerID,
+			},
+			oracleID,
+			cciptypes.ChainSelector(destChain),
+		),
+		reportingCfg: ocr3types.ReportingPluginConfig{
+			OracleID:     oracleID,
+			ConfigDigest: configDigest,
+		},
+		reportCodec: codec,
+		ccipReader:  ccipReaderMock,
+	}
+
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
+		Report: []byte("report"), // faked out, see mock above
+	})
+	require.NoError(t, err)
+	require.False(t, shouldTransmit)
+}
+
+func TestPlugin_ShouldTransmitAcceptReport_Success(t *testing.T) {
+	lggr := logger.Test(t)
+	destChain := rand.RandomInt64()
+	configDigest := [32]byte{0xde, 0xad, 0xbe, 0xef}
+	oracleID := commontypes.OracleID(1)
+	peerID := libocrtypes.PeerID{1}
+
+	homeChainMock := reader_mock.NewMockHomeChain(t)
+	homeChainMock.EXPECT().GetChainConfig(cciptypes.ChainSelector(destChain)).Return(reader.ChainConfig{
+		SupportedNodes: mapset.NewSet(peerID),
+	}, nil)
+
+	ccipReaderMock := readerpkg_mock.NewMockCCIPReader(t)
+	ccipReaderMock.EXPECT().GetOffRampConfigDigest(mock.Anything, consts.PluginTypeExecute).Return(configDigest, nil)
+
+	codec := codec_mocks.NewMockExecutePluginCodec(t)
+	codec.EXPECT().Decode(mock.Anything, mock.Anything).Return(cciptypes.ExecutePluginReport{
+		ChainReports: []cciptypes.ExecutePluginReportSingleChain{
+			{}, {},
+		},
+	}, nil)
+
+	p := &Plugin{
+		lggr:      lggr,
+		homeChain: homeChainMock,
+		chainSupport: plugincommon.NewChainSupport(
+			logger.Test(t),
+			homeChainMock,
+			map[commontypes.OracleID]libocrtypes.PeerID{
+				oracleID: peerID,
+			},
+			oracleID,
+			cciptypes.ChainSelector(destChain),
+		),
+		reportingCfg: ocr3types.ReportingPluginConfig{
+			OracleID:     oracleID,
+			ConfigDigest: configDigest,
+		},
+		reportCodec: codec,
+		ccipReader:  ccipReaderMock,
+	}
+
+	shouldTransmit, err := p.ShouldTransmitAcceptedReport(context.Background(), 1, ocr3types.ReportWithInfo[[]byte]{
+		Report: []byte("report"), // faked out, see mock above
+	})
+	require.NoError(t, err)
+	require.True(t, shouldTransmit)
 }
