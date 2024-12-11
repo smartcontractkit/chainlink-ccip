@@ -29,6 +29,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -93,10 +94,10 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  lggr,
+		lggr:                  logutil.WithContext(lggr, "Plugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
-			lggr,
+			logutil.WithContext(lggr, "Discovery"),
 			&ccipReader,
 			homeChain,
 			destChain,
@@ -104,7 +105,7 @@ func NewPlugin(
 			oracleIDToP2pID,
 		),
 		chainSupport: plugincommon.NewChainSupport(
-			lggr,
+			logutil.WithContext(lggr, "ChainSupport"),
 			homeChain,
 			oracleIDToP2pID,
 			reportingCfg.OracleID,

@@ -185,7 +185,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		rmnHomeReader = readerpkg.NewRMNHomePoller(
 			rmnCr,
 			rmnHomeBoundContract,
-			lggr,
+			logutil.WithContext(lggr, "RMNHomePoller"),
 			5*time.Second,
 		)
 
@@ -200,7 +200,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		lggr,
+		logutil.WithContext(lggr, "CCIPReader"),
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -224,7 +224,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 	}
 
 	onChainTokenPricesReader := readerpkg.NewPriceReader(
-		lggr,
+		logutil.WithContext(lggr, "PriceReader"),
 		readers,
 		offchainConfig.TokenInfo,
 		ccipReader,

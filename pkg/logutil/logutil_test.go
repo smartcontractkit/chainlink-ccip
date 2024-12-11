@@ -35,8 +35,8 @@ func TestLogWrapper(t *testing.T) {
 	require.Equal(t, expected, hook.All()[0].ContextMap())
 
 	// Second wrapping.
-	wrapped2 := WithProcessor(wrapped, "TestProcessor")
-	expected["processor"] = "TestProcessor"
+	wrapped2 := WithContext(wrapped, "TestProcessor")
+	expected["context"] = "TestProcessor"
 	wrapped2.Info("The space bar.")
 	require.Equal(t, hook.Len(), 2)
 	require.Len(t, hook.All()[1].Context, len(expected))
@@ -84,8 +84,8 @@ func TestLogCopy(t *testing.T) {
 
 	// Second wrapping.
 	logCopy := wrapped
-	wrapped2 := WithProcessor(logCopy, "TestProcessor")
-	expected["processor"] = "TestProcessor"
+	wrapped2 := WithContext(logCopy, "TestProcessor")
+	expected["context"] = "TestProcessor"
 	wrapped2.Info("The space bar.")
 	require.Equal(t, hook.Len(), 2)
 	require.Len(t, hook.All()[1].Context, len(expected))

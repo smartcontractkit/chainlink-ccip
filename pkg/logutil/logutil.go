@@ -6,9 +6,9 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
-// WithProcessor adds the "processor" field. Do not call multiple times.
-func WithProcessor(lggr logger.Logger, processor string) logger.Logger {
-	return logger.With(lggr, "processor", processor)
+// WithContext adds the "processor" field. Do not call multiple times.
+func WithContext(lggr logger.Logger, processor string) logger.Logger {
+	return logger.With(lggr, "context", processor)
 }
 
 // WithPluginConstants adds the plugin name, donID and oracleID. Maybe more in the future.
