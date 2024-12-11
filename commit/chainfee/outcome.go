@@ -17,9 +17,9 @@ import (
 )
 
 func (p *processor) Outcome(
-	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
+	_ context.Context,
+	_ Outcome,
+	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	consensusObs, err := p.getConsensusObservation(aos)
