@@ -294,46 +294,74 @@ func (p *Plugin) Reports(
 	return report, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
-) (bool, error) {
+// validateReport validates various aspects of the report.
+// Pure checks are placed earlier in the function on purpose to avoid
+// unnecessary network or DB I/O.
+// If you're added more checks make sure to follow this pattern.
+func (p *Plugin) validateReport(
+	ctx context.Context,
+	seqNr uint64,
+	r ocr3types.ReportWithInfo[[]byte],
+) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
+	// Just a safety check, should never happen.
+	if r.Report == nil {
+		p.lggr.Warn("skipping nil report", "seqNr", seqNr)
+		return false, cciptypes.ExecutePluginReport{}, nil
+	}
+
+	decodedReport, err = p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("decode exec plugin report: %w", err)
+	}
+
+	if len(decodedReport.ChainReports) == 0 {
+		p.lggr.Info("skipping empty report", "seqNr", seqNr)
+		return false, cciptypes.ExecutePluginReport{}, nil
+	}
+
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
 	if err != nil {
-		return false, fmt.Errorf("supports dest chain: %w", err)
+		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("supports dest chain: %w", err)
 	}
 
 	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
-
-		// TODO: return false here or a non-nil error?
-		return false, nil
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures", "seqNr", seqNr)
+		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
 	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
 	if err != nil {
-		return false, fmt.Errorf("get offramp config digest: %w", err)
+		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("get offramp config digest: %w", err)
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+			"seqNr", seqNr,
 		)
-		return false, nil
+		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
-	// Just a safety check, should never happen.
-	if r.Report == nil {
-		p.lggr.Warn("skipping nil report")
-		return false, nil
-	}
+	return true, decodedReport, nil
+}
 
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+func (p *Plugin) ShouldAcceptAttestedReport(
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
+) (bool, error) {
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
 	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
+		return false, fmt.Errorf("validate exec report: %w", err)
 	}
 
+	if !valid {
+		p.lggr.Warn("report not valid, not accepting", "seqNr", seqNr)
+		return false, nil
+	}
+
+	// TODO: consider doing this in validateReport,
+	// will end up doing it in both ShouldAccept and ShouldTransmit.
 	sourceChains := slicelib.Map(decodedReport.ChainReports,
 		func(r cciptypes.ExecutePluginReportSingleChain) cciptypes.ChainSelector {
 			return r.SourceChainSelector
@@ -351,12 +379,6 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	p.lggr.Infow("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
-	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Info("skipping empty report")
-		return false, nil
-	}
-
 	p.lggr.Info("ShouldAcceptAttestedReport returns true, report accepted")
 	return true, nil
 }
@@ -364,38 +386,15 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	// check if we support the dest, if not we can't do the checks needed.
-	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
 	if err != nil {
-		return false, fmt.Errorf("supports dest chain: %w", err)
+		return valid, fmt.Errorf("validate exec report: %w", err)
 	}
 
-	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
-
-		// TODO: return false here or a non-nil error?
+	if !valid {
+		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
 		return false, nil
 	}
-
-	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
-	if err != nil {
-		return false, fmt.Errorf("get offramp config digest: %w", err)
-	}
-
-	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
-			"myConfigDigest", p.reportingCfg.ConfigDigest,
-			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
-		)
-		return false, nil
-	}
-
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
-	if err != nil {
-		return false, fmt.Errorf("decode execute plugin report: %w", err)
-	}
-
-	// TODO: Final validation?
 
 	p.lggr.Infow("transmitting report", "reports", decodedReport.ChainReports)
 	return true, nil

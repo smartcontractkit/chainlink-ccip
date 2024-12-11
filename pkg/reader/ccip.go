@@ -1495,7 +1495,7 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 	)
 
 	if err != nil {
-		return [32]byte{}, fmt.Errorf("get latest price sequence number: %w", err)
+		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
 	}
 
 	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil

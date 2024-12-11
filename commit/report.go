@@ -111,25 +111,57 @@ func (p *Plugin) Reports(
 	}, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(
-	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
-) (bool, error) {
+// validateReport validates various aspects of the report.
+// Pure checks are placed earlier in the function on purpose to avoid
+// unnecessary network or DB I/O.
+// If you're added more checks make sure to follow this pattern.
+func (p *Plugin) validateReport(
+	ctx context.Context,
+	seqNr uint64,
+	r ocr3types.ReportWithInfo[[]byte],
+) (bool, cciptypes.CommitPluginReport, error) {
+	if r.Report == nil {
+		p.lggr.Warn("nil report", "seqNr", seqNr)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	decodedReport, err := p.decodeReport(ctx, r.Report)
+	if err != nil {
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report: %w, report: %x", err, r.Report)
+	}
+
+	if decodedReport.IsEmpty() {
+		p.lggr.Warnw("empty report after decoding", "seqNr", seqNr, "decodedReport", decodedReport)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	var reportInfo ReportInfo
+	if err := reportInfo.Decode(r.Info); err != nil {
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report info: %w", err)
+	}
+
+	if p.offchainCfg.RMNEnabled &&
+		len(decodedReport.MerkleRoots) > 0 &&
+		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
+		p.lggr.Infow("report with insufficient RMN signatures %d < %d+1",
+			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
 	// check if we support the dest, if not we can't do the checks needed.
 	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
 	if err != nil {
-		return false, fmt.Errorf("supports dest chain: %w", err)
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("supports dest chain: %w", err)
 	}
 
 	if !supports {
 		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
-
-		// TODO: return false here or a non-nil error?
-		return false, nil
+		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
 	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
 	if err != nil {
-		return false, fmt.Errorf("get offramp config digest: %w", err)
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("get offramp config digest: %w", err)
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
@@ -137,28 +169,48 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
 		)
-		return false, nil
+		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
 	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
 	if err != nil {
-		return false, fmt.Errorf("get latest price seq nr: %w", err)
-	}
-
-	decodedReport, err := p.decodeReport(ctx, r.Report)
-	if err != nil || decodedReport.IsEmpty() {
-		return false, err
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("get latest price seq nr: %w", err)
 	}
 
 	if p.isStaleReport(seqNr, latestSeqNr, decodedReport) {
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
+	if err != nil {
+		p.lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
+			"err", err, "merkleRoots", decodedReport.MerkleRoots)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	return true, decodedReport, nil
+}
+
+func (p *Plugin) ShouldAcceptAttestedReport(
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
+) (bool, error) {
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	if err != nil {
+		return false, fmt.Errorf("validating report: %w", err)
+	}
+
+	if !valid {
+		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
 		return false, nil
 	}
 
+	// TODO: consider doing this in validateReport,
+	// will end up doing it in both ShouldAccept and ShouldTransmit.
 	if isCursed, err := p.checkReportCursed(ctx, decodedReport); err != nil || isCursed {
 		return false, err
 	}
 
-	return p.validateReportInfo(r.Info, decodedReport)
+	return true, nil
 }
 
 func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.CommitPluginReport, error) {
@@ -193,70 +245,16 @@ func (p *Plugin) checkReportCursed(ctx context.Context, decodedReport cciptypes.
 	return isCursed, nil
 }
 
-func (p *Plugin) validateReportInfo(info []byte, decodedReport cciptypes.CommitPluginReport) (bool, error) {
-	var reportInfo ReportInfo
-	if err := reportInfo.Decode(info); err != nil {
-		return false, fmt.Errorf("decode report info: %w", err)
-	}
-
-	if p.offchainCfg.RMNEnabled &&
-		len(decodedReport.MerkleRoots) > 0 &&
-		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		p.lggr.Infow("report with insufficient RMN signatures %d < %d+1",
-			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
-		return false, nil
-	}
-
-	return true, nil
-}
-
 func (p *Plugin) ShouldTransmitAcceptedReport(
 	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	// check if we support the dest, if not we can't do the checks needed.
-	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
 	if err != nil {
-		return false, fmt.Errorf("supports dest chain: %w", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
-
-		// TODO: return false here or a non-nil error?
-		return false, nil
-	}
-
-	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
-	if err != nil {
-		return false, fmt.Errorf("get offramp config digest: %w", err)
-	}
-
-	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
-			"myConfigDigest", p.reportingCfg.ConfigDigest,
-			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
-		)
-		return false, nil
-	}
-
-	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
-	if err != nil {
-		return false, fmt.Errorf("get latest price seq nr: %w", err)
-	}
-
-	decodedReport, err := p.decodeReport(ctx, r.Report)
-	if err != nil || decodedReport.IsEmpty() {
-		return false, err
-	}
-
-	if p.isStaleReport(seqNr, latestSeqNr, decodedReport) {
-		return false, nil
-	}
-
-	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
-	if err != nil {
-		p.lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
-			"err", err, "merkleRoots", decodedReport.MerkleRoots)
+	if !valid {
+		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
 		return false, nil
 	}
 
