@@ -149,9 +149,9 @@ func (p *Plugin) getMessagesOutcome(
 				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
 
 				// Add the pseudo-deleted status to the report.
-				if observation.PseudoDeletedMessages[report.SourceChain] != nil {
+				if observation.PseudoDeleted[report.SourceChain] != nil {
 					report.MessagePseudoDeleted = append(report.MessagePseudoDeleted,
-						observation.PseudoDeletedMessages[report.SourceChain][j],
+						observation.PseudoDeleted[report.SourceChain][j],
 					)
 				} else {
 					report.MessagePseudoDeleted = append(report.MessagePseudoDeleted, false)
@@ -163,6 +163,8 @@ func (p *Plugin) getMessagesOutcome(
 			report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 		}
 		commitReports[i].Messages = report.Messages
+		commitReports[i].Hashes = report.Hashes
+		commitReports[i].MessagePseudoDeleted = report.MessagePseudoDeleted
 		commitReports[i].MessageTokenData = report.MessageTokenData
 		commitReports[i].CostlyMessages = report.CostlyMessages
 	}

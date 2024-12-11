@@ -214,7 +214,6 @@ func (p *Plugin) getMessagesObservation(
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
 	// Phase 2: Get messages and determine which messages are too costly to execute.
-	//          This phase also determines which messages are too costly to execute.
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
 	if len(previousOutcome.PendingCommitReports) == 0 {

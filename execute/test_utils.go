@@ -127,6 +127,7 @@ func (it *IntTest) WithMessages(
 			Messages:             msgs,
 			Hashes:               hashes,
 			MessagePseudoDeleted: make([]bool, len(msgs)),
+			MessageTokenData:     make([]exectypes.MessageTokenData, len(msgs)),
 		}
 
 		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))

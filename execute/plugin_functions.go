@@ -273,13 +273,13 @@ func truncateObservation(
 			lastCommit := &commits[len(commits)-1]
 			seqNum := lastCommit.SequenceNumberRange.Start()
 
-			observation.PseudoDeletedMessages[chain] = make(map[cciptypes.SeqNum]bool)
+			observation.PseudoDeleted[chain] = make(map[cciptypes.SeqNum]bool)
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
 				if _, ok := observation.Messages[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
 				observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
-				observation.PseudoDeletedMessages[chain][seqNum] = true
+				observation.PseudoDeleted[chain][seqNum] = true
 
 				if _, ok := observation.TokenData[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf(
@@ -510,6 +510,104 @@ func mergeCommitObservations(
 	return results, nil
 }
 
+func mergePseudoDeletedMessages(
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) (exectypes.PsuedoDeletedMessages, error) {
+	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
+	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.MinObservation[bool])
+	results := make(exectypes.PsuedoDeletedMessages)
+
+	for _, ao := range aos {
+		for selector, seqMap := range ao.Observation.PseudoDeleted {
+			f, ok := fChain[selector]
+			if !ok {
+				return exectypes.PsuedoDeletedMessages{}, fmt.Errorf("no F defined for chain %d", selector)
+			}
+
+			if _, ok1 := results[selector]; !ok1 {
+				results[selector] = make(map[cciptypes.SeqNum]bool)
+			}
+
+			if _, ok1 := validators[selector]; !ok1 {
+				validators[selector] = make(map[cciptypes.SeqNum]consensus.MinObservation[bool])
+			}
+
+			for seqNr, deleted := range seqMap {
+				if _, ok := validators[selector][seqNr]; !ok {
+					validators[selector][seqNr] =
+						consensus.NewMinObservation[bool](consensus.FPlus1(f), nil)
+				}
+				validators[selector][seqNr].Add(deleted)
+			}
+
+		}
+	}
+
+	for selector, seqNrs := range validators {
+		for seqNum, validator := range seqNrs {
+			if deleted := validator.GetValid(); len(deleted) == 1 {
+				results[selector][seqNum] = deleted[0]
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	return results, nil
+}
+
+func mergeMessageHashes(
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) (exectypes.MessageHashes, error) {
+	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
+	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
+	results := make(exectypes.MessageHashes)
+
+	for _, ao := range aos {
+		for selector, seqMap := range ao.Observation.Hashes {
+			f, ok := fChain[selector]
+			if !ok {
+				return exectypes.MessageHashes{}, fmt.Errorf("no F defined for chain %d", selector)
+			}
+
+			if _, ok1 := results[selector]; !ok1 {
+				results[selector] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+			}
+
+			if _, ok1 := validators[selector]; !ok1 {
+				validators[selector] = make(map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
+			}
+
+			for seqNr, hash := range seqMap {
+				if _, ok := validators[selector][seqNr]; !ok {
+					validators[selector][seqNr] =
+						consensus.NewMinObservation[cciptypes.Bytes32](consensus.FPlus1(f), nil)
+				}
+				validators[selector][seqNr].Add(hash)
+			}
+
+		}
+	}
+
+	for selector, seqNrs := range validators {
+		for seqNum, validator := range seqNrs {
+			if hashes := validator.GetValid(); len(hashes) == 1 {
+				results[selector][seqNum] = hashes[0]
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		return nil, nil
+	}
+
+	return results, nil
+}
+
 func mergeTokenObservations(
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
@@ -687,6 +785,18 @@ func getConsensusObservation(
 	}
 	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
 
+	mergedHashes, err := mergeMessageHashes(aos, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge message hashes: %w", err)
+	}
+	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
+
+	mergedPseudoDeletedMessages, err := mergePseudoDeletedMessages(aos, fChain)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to merge pseudo deleted messages: %w", err)
+	}
+	lggr.Debugw("merged pseudo deleted messages", "mergedPseudoDeletedMessages", mergedPseudoDeletedMessages)
+
 	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
 	lggr.Debugw("merged costly messages", "mergedCostlyMessages", mergedCostlyMessages)
 
@@ -701,6 +811,8 @@ func getConsensusObservation(
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},
+		mergedHashes,
+		mergedPseudoDeletedMessages,
 	)
 
 	return observation, nil
