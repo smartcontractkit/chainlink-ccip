@@ -172,7 +172,6 @@ func readAllMessages(
 	ctx context.Context,
 	ccipReader reader.CCIPReader,
 	commitObs exectypes.CommitObservations,
-	msgHasher cciptypes.MessageHasher,
 ) (exectypes.MessageObservations, error) {
 	messageObs := make(exectypes.MessageObservations)
 
@@ -196,10 +195,6 @@ func readAllMessages(
 			for _, msg := range msgs {
 				if _, ok := messageObs[srcChain]; !ok {
 					messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-				}
-				msg.Header.MsgHash, err = msgHasher.Hash(ctx, msg)
-				if err != nil {
-					return exectypes.MessageObservations{}, fmt.Errorf("unable to hash message: %w", err)
 				}
 				messageObs[srcChain][msg.Header.SequenceNumber] = msg
 			}
@@ -226,7 +221,7 @@ func (p *Plugin) getMessagesObservation(
 	// group reports by chain selector.
 	commitReportCache := regroup(previousOutcome.PendingCommitReports)
 
-	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache, p.msgHasher)
+	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
 	if err != nil {
 		return exectypes.Observation{}, err
 	}

@@ -182,21 +182,6 @@ func makeMessage(src cciptypes.ChainSelector, num cciptypes.SeqNum, nonce uint64
 	}
 }
 
-func makeMessageWithHash(
-	src cciptypes.ChainSelector,
-	num cciptypes.SeqNum,
-	nonce uint64,
-	hasher cciptypes.MessageHasher,
-) cciptypes.Message {
-	msg := makeMessage(src, num, nonce)
-	hash, err := hasher.Hash(context.Background(), msg)
-	if err != nil {
-		panic(fmt.Sprintf("unable to hash message: %s", err))
-	}
-	msg.Header.MsgHash = hash
-	return msg
-}
-
 // makeTestCommitReportWithSenders is the same as makeTestCommitReport but overrides the senders.
 func makeTestCommitReportWithSenders(
 	hasher cciptypes.MessageHasher,
