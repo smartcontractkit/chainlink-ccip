@@ -150,10 +150,9 @@ func TestExceedSizeObservation(t *testing.T) {
 	// 100 msg * 1 byte  -> 1077
 	// 1000 msg * 1 byte -> 2877
 	msgDataSize := 1000
-	// TODO: More deterministic way to reduce any future flaky tests?
-	maxMsgsPerReport := 431
+	maxMsgsPerReport := 398
 	nReports := 2
-	maxMessages := maxMsgsPerReport * nReports // Currently 431 message per report is the max with msgDataSize = 1000
+	maxMessages := maxMsgsPerReport * nReports // Currently 398 message per report is the max with msgDataSize = 1000
 	startSeqNr := cciptypes.SeqNum(100)
 
 	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
@@ -193,8 +192,8 @@ func TestExceedSizeObservation(t *testing.T) {
 
 	// Round 3 - Filter
 	// An execute report with the messages executed until the max per report
-	//outcome = runner.MustRunRound(ctx, t)
-	//require.Len(t, outcome.Report.ChainReports, 1)
-	//sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
-	//require.Len(t, sequenceNumbers, maxMsgsPerReport)
+	outcome = runner.MustRunRound(ctx, t)
+	require.Len(t, outcome.Report.ChainReports, 1)
+	sequenceNumbers := extractSequenceNumbers(outcome.Report.ChainReports[0].Messages)
+	require.Len(t, sequenceNumbers, maxMsgsPerReport)
 }

@@ -243,11 +243,13 @@ func filterOutExecutedMessages(
 
 // truncateObservation truncates the observation to fit within the given maxSize after encoding.
 // It removes data from the observation in the following order:
-// For each chain, remove commit reports one by one, if the encoded observation is still too large,
-// remove the entire chain.
-// Keep repeating this process until the encoded observation fits within the maxSize or there's only
-// one chain with one report left
-// Note: This function doesn't split one report into multiple parts.
+// For each chain, pick last report and start *pseudoDelete message by message.
+// If removed all messages from the report, remove the report.
+// If removed last report in the chain, remove the chain.
+// After removing full report from a chain, move to the next chain and repeat. This ensures that we don't
+// exclude messages from one chain only.
+// Keep repeating this process until the encoded observation fits within the maxSize
+// *pseudo delete means putting any bytes as nil.
 func truncateObservation(
 	obs exectypes.Observation,
 	maxSize int,
