@@ -378,7 +378,6 @@ func Test_HTTPClient_RateLimiting_Parallel(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, err := w.Write(validAttestationResponse)

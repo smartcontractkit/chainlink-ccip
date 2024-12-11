@@ -434,7 +434,6 @@ func (r *ccipChainReader) Nonces(
 	eg := new(errgroup.Group)
 
 	for _, address := range addresses {
-		address := address
 		eg.Go(func() error {
 			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
 			if err != nil {
@@ -1055,7 +1054,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		}
 
 		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
@@ -1240,7 +1238,6 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 			continue
 		}
 
-		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
 			resp := getOnRampDynamicConfigResponse{}
@@ -1300,7 +1297,6 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 		// For chain X, all DestChainConfigs will have one of 2 values for the Router address
 		// 1. Chain X Test Router in case we're testing a new lane
 		// 2. Chain X Router
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(

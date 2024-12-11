@@ -152,8 +152,6 @@ func (pr *priceReader) GetFeedPricesUSD(
 	}
 	eg := new(errgroup.Group)
 	for idx, token := range tokens {
-		idx := idx
-		token := token
 		eg.Go(func() error {
 			boundContract := commontypes.BoundContract{
 				Address: string(pr.tokenInfo[token].AggregatorAddress),
