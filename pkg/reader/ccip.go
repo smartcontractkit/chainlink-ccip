@@ -136,7 +136,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			},
 		},
 		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(limit * 2),
+			},
 		},
 		&ev,
 	)
@@ -146,7 +149,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	r.lggr.Debugw("queried commit reports", "numReports", len(iter),
 		"destChain", dest,
 		"ts", ts,
-		"limit", limit)
+		"limit", limit*2)
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
@@ -260,7 +263,10 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 			},
 		},
 		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+			},
 		},
 		&dataTyp,
 	)
@@ -323,7 +329,10 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{
-				query.NewSortByTimestamp(query.Asc),
+				query.NewSortBySequence(query.Asc),
+			},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
 		&SendRequestedEvent{},
