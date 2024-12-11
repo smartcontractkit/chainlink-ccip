@@ -98,6 +98,10 @@ func (o *observer) Observe(
 		return nil, nil
 	}
 
+	if len(messages) == 0 {
+		return make([]cciptypes.Bytes32, 0), nil
+	}
+
 	messageFees, err := o.feeCalculator.MessageFeeUSD18(ctx, messages, messageTimestamps)
 	if err != nil {
 		return nil, fmt.Errorf("unable to calculate message fees: %w", err)
@@ -348,6 +352,10 @@ func (c *CCIPMessageExecCostUSD18Calculator) MessageExecCostUSD18(
 	ctx context.Context,
 	messages []cciptypes.Message,
 ) (map[cciptypes.Bytes32]plugintypes.USD18, error) {
+	if len(messages) == 0 {
+		return nil, fmt.Errorf("no messages provided")
+	}
+
 	messageExecCosts := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	feeComponents, err := c.ccipReader.GetDestChainFeeComponents(ctx)
 	if err != nil {
