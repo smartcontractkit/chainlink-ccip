@@ -966,10 +966,10 @@ func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
 	nativePrice := big.NewInt(rand.RandomInt64())
-	usdPrices := chainfee.ComponentsUSDPrices{
+	usdPrices := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
 		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
 		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
-	}.ToPackedFee()
+	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
 		ccipocr3.NewBigInt(nativePrice),
