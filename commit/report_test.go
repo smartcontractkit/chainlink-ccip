@@ -1,33 +1,23 @@
 package commit
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -207,129 +197,4 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 	p := Plugin{lggr: lggr}
 	_, err := p.Reports(tests.Context(t), 0, []byte("invalid json"))
 	require.Error(t, err)
-}
-
-func Test_IsCandidateCheck(t *testing.T) {
-	rb := rand.RandomBytes32()
-	digest := types.ConfigDigest(rb[:])
-	donID := uint32(3)
-	allTests := []struct {
-		name          string
-		makePlugin    func(t *testing.T, hc *reader_mock.MockHomeChain) *Plugin
-		makeHomeChain func(t *testing.T) *reader_mock.MockHomeChain
-		wantOutput    bool
-		wantError     bool
-	}{
-		{
-			name: "Should return true if digest matches",
-			makePlugin: func(t *testing.T, hc *reader_mock.MockHomeChain) *Plugin {
-				p := &Plugin{
-					homeChain: hc,
-					reportingCfg: ocr3types.ReportingPluginConfig{
-						ConfigDigest: digest,
-					},
-				}
-				return p
-			},
-			makeHomeChain: func(t *testing.T) *reader_mock.MockHomeChain {
-				h := reader_mock.NewMockHomeChain(t)
-				h.On("GetOCRConfigs", mock.Anything, mock.Anything, consts.PluginTypeCommit).
-					Return(reader.ActiveAndCandidate{
-						ActiveConfig: reader.OCR3ConfigWithMeta{},
-						CandidateConfig: reader.OCR3ConfigWithMeta{
-							ConfigDigest: digest,
-						},
-					}, nil)
-				return h
-			},
-			wantOutput: true,
-			wantError:  false,
-		},
-		{
-			name: "Should return false if digest doesn't match",
-			makePlugin: func(t *testing.T, hc *reader_mock.MockHomeChain) *Plugin {
-				p := &Plugin{
-					homeChain: hc,
-					reportingCfg: ocr3types.ReportingPluginConfig{
-						ConfigDigest: types.ConfigDigest(rand.RandomBytes32()),
-					},
-				}
-				return p
-			},
-			makeHomeChain: func(t *testing.T) *reader_mock.MockHomeChain {
-				h := reader_mock.NewMockHomeChain(t)
-				h.On("GetOCRConfigs", mock.Anything, mock.Anything, consts.PluginTypeCommit).
-					Return(reader.ActiveAndCandidate{
-						ActiveConfig: reader.OCR3ConfigWithMeta{},
-						CandidateConfig: reader.OCR3ConfigWithMeta{
-							ConfigDigest: digest,
-						},
-					}, nil)
-				return h
-			},
-			wantOutput: false,
-			wantError:  false,
-		},
-		{
-			name: "Should work as expected without candidate instance",
-			makePlugin: func(t *testing.T, hc *reader_mock.MockHomeChain) *Plugin {
-				p := &Plugin{
-					homeChain: hc,
-					reportingCfg: ocr3types.ReportingPluginConfig{
-						ConfigDigest: types.ConfigDigest(rand.RandomBytes32()),
-					},
-				}
-				return p
-			},
-			makeHomeChain: func(t *testing.T) *reader_mock.MockHomeChain {
-				h := reader_mock.NewMockHomeChain(t)
-				h.On("GetOCRConfigs", mock.Anything, mock.Anything, consts.PluginTypeCommit).
-					Return(reader.ActiveAndCandidate{
-						ActiveConfig:    reader.OCR3ConfigWithMeta{},
-						CandidateConfig: reader.OCR3ConfigWithMeta{},
-					}, nil)
-				return h
-			},
-			wantOutput: false,
-			wantError:  false,
-		},
-		{
-			name: "Should throw error if donID doesn't exist",
-			makePlugin: func(t *testing.T, hc *reader_mock.MockHomeChain) *Plugin {
-				p := &Plugin{
-					homeChain: hc,
-					donID:     donID,
-					reportingCfg: ocr3types.ReportingPluginConfig{
-						ConfigDigest: types.ConfigDigest(rand.RandomBytes32()),
-					},
-				}
-				return p
-			},
-			makeHomeChain: func(t *testing.T) *reader_mock.MockHomeChain {
-				h := reader_mock.NewMockHomeChain(t)
-				h.On("GetOCRConfigs", mock.Anything, donID, consts.PluginTypeCommit).
-					Return(reader.ActiveAndCandidate{
-						ActiveConfig:    reader.OCR3ConfigWithMeta{},
-						CandidateConfig: reader.OCR3ConfigWithMeta{},
-					}, fmt.Errorf("DonID does not exist"))
-				return h
-			},
-			wantOutput: false,
-			wantError:  true,
-		},
-	}
-	for _, tt := range allTests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := tests.Context(t)
-			hc := tt.makeHomeChain(t)
-			p := tt.makePlugin(t, hc)
-			actualOutput, actualError := p.isCandidateInstance(ctx)
-			assert.Equal(t, tt.wantOutput, actualOutput)
-			if tt.wantError {
-				require.Error(t, actualError)
-			} else {
-				require.NoError(t, actualError)
-			}
-		})
-	}
 }

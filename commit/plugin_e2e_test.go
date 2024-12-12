@@ -682,6 +682,9 @@ func prepareCcipReaderMock(
 			Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
 	}
 	ccipReader.EXPECT().
+		GetLatestPriceSeqNr(ctx).
+		Return(0, nil).Maybe()
+	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(ctx, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 	ccipReader.EXPECT().
@@ -835,6 +838,10 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetRMNRemoteConfig(params.ctx, mock.Anything).
 		Return(params.rmnReportCfg, nil).Maybe()
 
+	ccipReader.EXPECT().
+		GetOffRampConfigDigest(params.ctx, consts.PluginTypeCommit).
+		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
+
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -963,10 +970,10 @@ func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
 	nativePrice := big.NewInt(rand.RandomInt64())
-	usdPrices := chainfee.ComponentsUSDPrices{
+	usdPrices := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
 		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
 		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
-	}.ToPackedFee()
+	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
 		ccipocr3.NewBigInt(nativePrice),

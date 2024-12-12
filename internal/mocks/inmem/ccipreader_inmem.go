@@ -30,6 +30,8 @@ type InMemoryCCIPReader struct {
 
 	// Dest is used implicitly in some functions
 	Dest cciptypes.ChainSelector
+
+	ConfigDigest [32]byte
 }
 
 func (r InMemoryCCIPReader) GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error) {
@@ -186,6 +188,14 @@ func (r InMemoryCCIPReader) GetMedianDataAvailabilityGasConfig(
 	ctx context.Context,
 ) (cciptypes.DataAvailabilityGasConfig, error) {
 	return cciptypes.DataAvailabilityGasConfig{}, nil
+}
+
+func (r InMemoryCCIPReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+	return 0, nil
+}
+
+func (r InMemoryCCIPReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
+	return r.ConfigDigest, nil
 }
 
 // Interface compatibility check.

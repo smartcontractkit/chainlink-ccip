@@ -3,12 +3,12 @@ run:
 linters:
   verbose: true
   enable:
+    - copyloopvar
     - depguard
     - dupl
     - errcheck
     - errorlint
     - exhaustive
-    - exportloopref
     - goconst
     - gocyclo
     - gofmt

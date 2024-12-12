@@ -97,7 +97,6 @@ func TestMustMakeBytes(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if tt.willPanic {
@@ -401,7 +400,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -729,7 +727,6 @@ func Test_Builder_Build(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
@@ -922,7 +919,6 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -1157,7 +1153,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 		// TODO: Test PseudoDeleted status
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
