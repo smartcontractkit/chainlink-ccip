@@ -109,17 +109,18 @@ type Data struct {
 	// level, ts, logger, caller, msg, version, donID, oracleID
 	// Data that we expect from most logs.
 	// This is all part of the primary display.
-	LoggerName      string    `json:"logger"`
-	Timestamp       time.Time `json:"ts"`
-	Level           string    `json:"level"`
-	Caller          string    `json:"caller"`
-	SequenceNumber  int
-	Plugin          string `json:"plugin"`
-	PluginProcessor string `json:"processor"`
-	OracleID        int    `json:"oracleID"`
-	DONID           int    `json:"donID"`
-	Message         string `json:"msg"`
-	Version         string `json:"version"`
+	LoggerName     string    `json:"logger"`
+	Timestamp      time.Time `json:"ts"`
+	Level          string    `json:"level"`
+	Caller         string    `json:"caller"`
+	SequenceNumber int
+	Plugin         string `json:"plugin"`
+	Context        string `json:"context"`
+	OracleID       int    `json:"oracleID"`
+	DONID          int    `json:"donID"`
+	Message        string `json:"msg"`
+	Version        string `json:"version"`
+	ConfigDigest   string `json:"configDigest"`
 
 	// Additional detail space, can be unique to each filter.
 	// i.e. an error message, observer details, number of messages, etc
