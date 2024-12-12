@@ -30,12 +30,12 @@ If you want to be successful in contributing to CRIB, please read the following 
 6. https://www.devspace.sh/docs/configuration/images/
 
 ### Dev Tooling Setup
-If you like to contribute to CRIB, install following tools in your dev environment:
+If you like to contribute to CRIB, you need at least:
 
-* [taskfile] (https://taskfile.dev/installation/)
-* [yamllint] (https://yamllint.readthedocs.io/en/stable/quickstart.html#installing-yamllint)
-* [shfmt] (https://github.com/patrickvane/shfmt)
-* [shellcheck] (https://github.com/koalaman/shellcheck)
+- [golang](https://go.dev/doc/install) installed locally; and
+- [taskfile](https://taskfile.dev/installation/).
+
+Run `task dev:setup` to have your local dev environment ready.
 
 #### Linting
 If the Linting workflows fails on your PR, you can use local tooling to fix errors. 

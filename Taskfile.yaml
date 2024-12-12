@@ -1,7 +1,159 @@
 ---
 version: '3'
 
+vars:
+  BINDIR: .devtest-tools/bin
+  GOLANGCI_LINT_VERSION: 1.62.2
+  NODE_VERSION: 20.18.1
+  PNPM_VERSION: 9.12.2
+  YAMLLINT_VERSION: 1.35.1
+  SHFMT_VERSION: 3.10.0
+  SHELLCHECK_VERSION: 0.10.0
+  MOCKERY_VERSION: 2.45.1
+
 tasks:
+  # dev/test setup tasks
+  bindir:
+    internal: true
+    silent: true
+    desc: Install dev/test tools
+    cmd: mkdir -p {{ .BINDIR }}
+    status:
+      - test -d {{ .BINDIR }}
+
+  dev:clean:
+    desc: Cleans up the local development environment
+    cmd: rm -rf .devtest-tools node_modules
+
+  install:golangci-lint:
+    internal: true
+    desc: Installs golangci-lint to {{ .BINDIR }}
+    deps: [bindir]
+    cmd: |
+      curl -fsSL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b {{ .BINDIR }} v{{ .GOLANGCI_LINT_VERSION }}
+    status:
+      - test -x {{ .BINDIR }}/golangci-lint
+    preconditions:
+      - command -v curl > /dev/null
+
+  install:shellcheck:
+    internal: true
+    desc: Installs shellcheck to {{ .BINDIR }}
+    deps: [bindir]
+    vars:
+      SHELLCHECK_ARCH:
+        sh: |
+          case "{{ARCH}}" in
+            arm64) echo "aarch64" ;;
+            amd64) echo "x86_64" ;;
+          esac
+    cmd: |
+      shellcheck_release="shellcheck-v{{ .SHELLCHECK_VERSION }}"
+      curl -fsSL https://github.com/koalaman/shellcheck/releases/download/v{{ .SHELLCHECK_VERSION }}/${shellcheck_release}.{{OS}}.{{ .SHELLCHECK_ARCH }}.tar.xz  | tar -xJ -C {{ .BINDIR }} ${shellcheck_release}/shellcheck
+      mv {{ .BINDIR }}/${shellcheck_release}/shellcheck {{ .BINDIR }} && rm -rf {{ .BINDIR }}/${shellcheck_release}
+      chmod +x {{ .BINDIR }}/shellcheck
+    status:
+      - test -x {{ .BINDIR }}/shellcheck
+    preconditions:
+      - command -v curl > /dev/null
+
+  install:yamllint:
+    internal: true
+    desc: Installs yamllint to {{ .BINDIR }}
+    deps: [bindir]
+    vars:
+      YAMLLINT_HOME: .devtest-tools/yamllint
+    cmd: |
+      pip install --target {{ .YAMLLINT_HOME }} "yamllint=={{ .YAMLLINT_VERSION }}"
+      mv {{ .YAMLLINT_HOME }}/bin/yamllint {{ .BINDIR }}
+      # PYTHONPATH={{ .YAMLLINT_HOME }} {{ .BINDIR }}/yamllint --version
+    status:
+      - test -d {{ .YAMLLINT_HOME }}
+      - test -x {{ .BINDIR }}/yamllint
+    preconditions:
+      - command -v pip > /dev/null
+
+  install:shfmt:
+    internal: true
+    desc: Installs shfmt to {{ .BINDIR }}
+    deps: [bindir]
+    cmd: |
+      curl -fsSL https://github.com/mvdan/sh/releases/download/v{{ .SHFMT_VERSION }}/shfmt_v{{ .SHFMT_VERSION }}_{{OS}}_{{ARCH}} -o {{ .BINDIR }}/shfmt
+      chmod +x {{ .BINDIR }}/shfmt
+    status:
+      - test -x {{ .BINDIR }}/shfmt
+    preconditions:
+      - command -v curl > /dev/null
+
+  install:nodejs:
+    internal: true
+    silent: true
+    desc: Installs nodejs to {{ .BINDIR }}
+    deps: [bindir]
+    vars:
+      NODEJS_ARCH:
+        sh: if [ "{{ARCH}}" = "amd64" ]; then echo "x64"; else echo "{{ARCH}}"; fi
+    cmd: |
+      nodejs_release=node-v{{ .NODE_VERSION }}-{{ OS }}-{{ .NODEJS_ARCH }}
+      curl -fsSL https://nodejs.org/dist/v{{ .NODE_VERSION }}/${nodejs_release}.tar.gz | tar -xz -C {{ .BINDIR }} ${nodejs_release}/bin/node
+      mv {{ .BINDIR }}/${nodejs_release}/bin/node {{ .BINDIR }}/node && rm -rf {{ .BINDIR }}/${nodejs_release}
+    status:
+      - test -x {{ .BINDIR }}/node
+    preconditions:
+      - command -v curl > /dev/null
+
+  install:pnpm:
+    internal: true
+    silent: true
+    desc: Installs pnpm to {{ .BINDIR }}
+    deps: [bindir, install:nodejs]
+    vars:
+      PNPM_PLATFORM:
+        sh: if [ "{{OS}}" = "darwin" ]; then echo "macos"; else echo "{{OS}}"; fi
+      PNPM_ARCH:
+        sh: if [ "{{ARCH}}" = "amd64" ]; then echo "x64"; else echo "{{ARCH}}"; fi
+    cmd: |
+      curl -fsSL https://github.com/pnpm/pnpm/releases/download/v{{ .PNPM_VERSION }}/pnpm-{{ .PNPM_PLATFORM }}-{{ .PNPM_ARCH }} -o {{ .BINDIR }}/pnpm
+      chmod +x {{ .BINDIR }}/pnpm
+    status:
+      - test -x {{ .BINDIR }}/pnpm
+    preconditions:
+      - command -v curl > /dev/null
+
+  install:mockery:
+    internal: true
+    desc: Installs mockery to {{ .BINDIR }}
+    deps: [bindir]
+    cmd: |
+      curl -fsSL https://github.com/vektra/mockery/releases/download/v{{ .MOCKERY_VERSION }}/mockery_{{ .MOCKERY_VERSION }}_{{OS}}_{{ARCH}}.tar.gz | tar -xz -C {{ .BINDIR }} mockery
+      chmod +x {{ .BINDIR }}/mockery
+    status:
+      - test -x {{ .BINDIR }}/mockery
+    preconditions:
+      - command -v curl > /dev/null
+
+  run:pnpm-install:
+    desc: Install dependencies using pnpm
+    deps: [install:pnpm]
+    cmd: "PATH={{ .BINDIR }}:$PATH pnpm install"
+
+  dev:setup:
+    desc: Sets up the local development environment
+    cmds:
+      - task: install:shfmt
+      - task: install:shellcheck
+      - task: install:yamllint
+      - task: install:golangci-lint
+      - task: install:mockery
+      - task: install:nodejs
+      - task: install:pnpm
+      - task: run:pnpm-install
+
+  changeset:
+    desc: Run changeset
+    deps: [install:pnpm]
+    cmd: "PATH={{.BINDIR}}:$PATH pnpm changeset"
+
   lint:
     desc: Runs The same lint commands as in CI, doesn't fix errors
     deps: [lint-yaml, shfmt, shellcheck]
@@ -9,16 +161,21 @@ tasks:
     desc: Fixes lint errors, so far it supports shfmt fixes only
     deps: [fix-shfmt-errors]
   lint-yaml:
-    cmd: yamllint -c .yamllint.yml .
+    deps: [install:yamllint]
+    cmd: "{{ .BINDIR }}/yamllint -c .yamllint.yml ."
   # todo: Add script for auto fixing lint errors
   shfmt:
-    cmd: shfmt -s -d .
+    deps: [install:shfmt]
+    cmd: "{{ .BINDIR }}/shfmt -s -d ."
   shellcheck:
-    cmd: git ls-files -- '*.sh' | xargs shellcheck -e SC1004
+    deps: [install:shellcheck]
+    cmd: |
+      git ls-files -- '*.sh' | xargs {{ .BINDIR }}/shellcheck -e SC1004
   fix-shfmt-errors:
+    deps: [install:shfmt]
     vars:
       SHELLCHECK_OPTS: -e SC1004
-    cmd: find . -type f -name "*.sh" -exec shfmt -w {} \;
+    cmd: find . -type f -name "*.sh" -exec {{ .BINDIR }}/shfmt -w {} \;
 
   # cli tasks
   build:
@@ -146,8 +303,9 @@ tasks:
     cmd: go test ./...
   sdk:lint:
     desc: Go Lint sdk module
+    deps: [install:golangci-lint]
     dir: sdk
-    cmd: golangci-lint run --path-prefix=./sdk
+    cmd: "{{ .BINDIR }}/golangci-lint run --path-prefix=./sdk"
   sdk:lint-fix-gci:
     desc: Fix gci errors
     dir: sdk

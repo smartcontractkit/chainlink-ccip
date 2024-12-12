@@ -53,7 +53,7 @@ This repo requires some extra guidelines though, since it adheres to the [go-lib
 
 Let's assume that you've made some local changes in one of the golang apps. Before filing a PR you need to generate a "changeset" description required for the automated release process. Follow the steps below:
 
-* Inside CRIB’s nix shell (nix develop), run pnpm changeset in the git top level directory.
+* Inside CRIB’s nix shell (nix develop), run `task changeset` in the git top level directory.
 * This repo contains multiple packages, so it will ask you for which package it should generate changeset update.
 * Answer remaining questions. At the end, you will have a new `.changeset/<random-name>.md` file generated.
 * Now you need to commit and push your changes
