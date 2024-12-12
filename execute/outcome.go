@@ -71,7 +71,7 @@ func (p *Plugin) Outcome(
 	case exectypes.GetCommitReports:
 		outcome = p.getCommitReportsOutcome(observation)
 	case exectypes.GetMessages:
-		outcome = p.getMessagesOutcome(observation, previousOutcome)
+		outcome = p.getMessagesOutcome(observation)
 	case exectypes.Filter:
 		outcome, err = p.getFilterOutcome(ctx, observation, previousOutcome)
 	default:
@@ -119,7 +119,6 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 func (p *Plugin) getMessagesOutcome(
 	observation exectypes.Observation,
-	previousOutcome exectypes.Outcome,
 ) exectypes.Outcome {
 	commitReports := make([]exectypes.CommitData, 0)
 	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
