@@ -75,7 +75,7 @@ func NewConfigBasedCompositeObservers(
 			} else {
 				lggr.Info("Using background observer for USDC/CCTP")
 				observers[i] = NewBackgroundObserver(
-					logger.Named(lggr, "BackgroundObserver"),
+					lggr,
 					observer,
 					c.USDCCCTPObserverConfig.NumWorkers,
 					c.USDCCCTPObserverConfig.CacheExpirationInterval.Duration(),
