@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -31,4 +33,20 @@ func RandBytes() cciptypes.Bytes {
 		panic(err)
 	}
 	return array[:]
+}
+
+func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.HistogramVec, labels ...string) int {
+	observer, err := histogramVec.GetMetricWithLabelValues(labels...)
+	require.NoError(t, err)
+
+	metricCh := make(chan prometheus.Metric, 1)
+	observer.(prometheus.Histogram).Collect(metricCh)
+	close(metricCh)
+
+	metric := <-metricCh
+	pb := &io_prometheus_client.Metric{}
+	err = metric.Write(pb)
+	require.NoError(t, err)
+
+	return int(pb.GetHistogram().GetSampleCount())
 }
