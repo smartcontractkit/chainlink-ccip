@@ -43,7 +43,10 @@ func validateObserverReadingEligibility(
 	return nil
 }
 
-func validateTokenDataObservations(observedMsgs exectypes.MessageObservations, tokenData exectypes.TokenDataObservations) error {
+func validateTokenDataObservations(
+	observedMsgs exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+) error {
 
 	if len(observedMsgs) != len(tokenData) {
 		return fmt.Errorf("unexpected number of token data observations: expected %d, got %d",

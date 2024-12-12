@@ -488,7 +488,7 @@ func makeNoopTokenDataObservations(msgs exectypes.MessageObservations) exectypes
 	tokenData := make(exectypes.TokenDataObservations)
 	for src, seqNumToMsg := range msgs {
 		tokenData[src] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
-		for seq, _ := range seqNumToMsg {
+		for seq := range seqNumToMsg {
 			tokenData[src][seq] = exectypes.NewMessageTokenData()
 		}
 	}
