@@ -187,10 +187,7 @@ func (p PluginFactory) NewReportingPlugin(
 		p.estimateProvider,
 	)
 
-	metricsReporter, err := metrics.NewPromReporter(
-		p.lggr,
-		p.ocrConfig.Config.ChainSelector,
-	)
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
 	}
