@@ -81,7 +81,9 @@ func (b *Bytes) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("failed to decode hex: %w", err)
 	}
 
-	*b = bs
+	if len(bs) != 0 {
+		*b = bs
+	}
 	return nil
 }
 

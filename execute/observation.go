@@ -207,7 +207,7 @@ func (p *Plugin) getMessagesObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	if len(previousOutcome.PendingCommitReports) == 0 {
+	if len(previousOutcome.CommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
@@ -215,7 +215,7 @@ func (p *Plugin) getMessagesObservation(
 	}
 
 	// group reports by chain selector.
-	commitReportCache := regroup(previousOutcome.PendingCommitReports)
+	commitReportCache := regroup(previousOutcome.CommitReports)
 
 	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
 	if err != nil {
@@ -271,7 +271,7 @@ func (p *Plugin) getFilterObservation(
 
 	// Collect unique senders.
 	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
-	for _, commitReport := range previousOutcome.PendingCommitReports {
+	for _, commitReport := range previousOutcome.CommitReports {
 		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
 			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
 		}

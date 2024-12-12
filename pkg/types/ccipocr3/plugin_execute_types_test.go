@@ -25,36 +25,32 @@ func TestDecodeExecuteReportInfo(t *testing.T) {
 }
 
 func TestExecuteReportInfo_EncodeDecode(t *testing.T) {
-	type fields struct {
-		Roots []Bytes32
-	}
 	tests := []struct {
-		name    string
-		fields  fields
-		want    []byte
-		wantErr require.ErrorAssertionFunc
+		name       string
+		reportInfo ExecuteReportInfo
+		want       []byte
+		wantErr    require.ErrorAssertionFunc
 	}{
 		{
-			name: "nil roots",
-			fields: fields{
-				Roots: nil,
+			name: "zero object",
+			reportInfo: []MerkleRootChain{
+				{},
 			},
-			want:    append([]byte{1}, []byte(`{"Roots":null}`)...),
+			//nolint:lll
+			want:    append([]byte{1}, []byte(`[{"chain":0,"onRampAddress":"0x","seqNumsRange":[0,0],"merkleRoot":"0x0000000000000000000000000000000000000000000000000000000000000000"}]`)...),
 			wantErr: require.NoError,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eri := ExecuteReportInfo{
-				Roots: tt.fields.Roots,
-			}
-			got, err := eri.Encode()
-			tt.wantErr(t, err, fmt.Sprintf("Encode()"))
+			got, err := tt.reportInfo.Encode()
+			fmt.Println(string(got))
+			tt.wantErr(t, err, "Encode()")
 			require.Equalf(t, tt.want, got, "Encode()")
 
 			eri2, err := DecodeExecuteReportInfo(got)
-			tt.wantErr(t, err, fmt.Sprintf("Decode()"))
-			assert.Equalf(t, eri, eri2, "Decode()")
+			tt.wantErr(t, err, "Decode()")
+			assert.Equalf(t, tt.reportInfo, eri2, "Decode()")
 		})
 	}
 }

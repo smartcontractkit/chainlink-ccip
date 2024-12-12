@@ -66,12 +66,12 @@ func Test_USDC_Transfer(t *testing.T) {
 	// Round 1 - Get Commit Reports
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 2 - Get Messages
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// Messages 102-104 are executed, 105 doesn't have token data ready

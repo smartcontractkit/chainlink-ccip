@@ -46,14 +46,14 @@ func TestPlugin(t *testing.T) {
 	// Two of the messages are executed which should be indicated in the Outcome.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
-	require.ElementsMatch(t, outcome.PendingCommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
+	require.Len(t, outcome.CommitReports, 1)
+	require.ElementsMatch(t, outcome.CommitReports[0].ExecutedMessages, []cciptypes.SeqNum{100, 101})
 
 	// Round 2 - Get Messages
 	// Messages now attached to the pending commit.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// An execute report with the following messages executed: 102, 103, 104, 105.
@@ -182,15 +182,15 @@ func TestExceedSizeObservation(t *testing.T) {
 	// Two pending commit reports.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, nReports)
+	require.Len(t, outcome.CommitReports, nReports)
 
 	// Round 2 - Get Messages
 	// Still 2 pending reports from previous round.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, nReports)
-	require.Len(t, outcome.PendingCommitReports[0].Messages, maxMsgsPerReport)
-	require.Len(t, outcome.PendingCommitReports[1].Messages, 0)
+	require.Len(t, outcome.CommitReports, nReports)
+	require.Len(t, outcome.CommitReports[0].Messages, maxMsgsPerReport)
+	require.Len(t, outcome.CommitReports[1].Messages, 0)
 
 	// Round 3 - Filter
 	// An execute report with the messages executed until the max per report

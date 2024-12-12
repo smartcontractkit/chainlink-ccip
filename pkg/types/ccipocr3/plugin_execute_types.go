@@ -25,11 +25,7 @@ type CommitReportWithMessages struct {
 
 // ExecuteReportInfo contains metadata needed by transmitter and contract
 // writer.
-type ExecuteReportInfo struct {
-	// TODO: add real info, this is a placeholder.
-	Roots            []Bytes32
-	CommitReportData []MerkleRootChain
-}
+type ExecuteReportInfo []MerkleRootChain
 
 // Encode v1 execute report info. Very basic versioning in the first byte to
 // allow for future encoding optimizations.

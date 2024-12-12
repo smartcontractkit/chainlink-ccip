@@ -10,6 +10,8 @@ import (
 type CommitData struct {
 	// SourceChain of the chain that contains the commit report.
 	SourceChain cciptypes.ChainSelector `json:"chainSelector"`
+	// OnRampAddress used on the source chain.
+	OnRampAddress cciptypes.Bytes
 	// Timestamp of the block that contains the commit.
 	Timestamp time.Time `json:"timestamp"`
 	// BlockNum of the block that contains the commit.
