@@ -249,7 +249,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
 	observation.Hashes = hashes
-	observation.PseudoDeleted = make(exectypes.PseudoDeletedMessages)
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 

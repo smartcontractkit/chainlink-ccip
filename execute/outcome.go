@@ -149,14 +149,6 @@ func (p *Plugin) getMessagesOutcome(
 
 				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
 
-				// Add the pseudo-deleted status to the report.
-				if observation.PseudoDeleted[report.SourceChain] != nil {
-					report.MessagePseudoDeleted = append(report.MessagePseudoDeleted,
-						observation.PseudoDeleted[report.SourceChain][j],
-					)
-				} else {
-					report.MessagePseudoDeleted = append(report.MessagePseudoDeleted, false)
-				}
 				if costlyMessagesSet.Contains(msg.Header.MessageID) {
 					report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
 				}
@@ -166,14 +158,8 @@ func (p *Plugin) getMessagesOutcome(
 		if len(report.Messages) == 0 {
 			// If there are no messages, remove the commit report.
 			commitReports = append(commitReports[:i], commitReports[i+1:]...)
-			//i--
 		}
 		commitReports = append(commitReports, report)
-		//commitReports[i].Messages = report.Messages
-		//commitReports[i].Hashes = report.Hashes
-		//commitReports[i].MessagePseudoDeleted = report.MessagePseudoDeleted
-		//commitReports[i].MessageTokenData = report.MessageTokenData
-		//commitReports[i].CostlyMessages = report.CostlyMessages
 	}
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.

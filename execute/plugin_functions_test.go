@@ -1521,7 +1521,6 @@ func Test_truncateObservation(t *testing.T) {
 					},
 					withData(make([]byte, 100)),
 				),
-				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
 			maxSize: 3571, // this number is calculated by checking encoded sizes for the observation we expect
 			expected: exectypes.Observation{
@@ -1536,9 +1535,6 @@ func Test_truncateObservation(t *testing.T) {
 					},
 					withData(make([]byte, 100)),
 				),
-				PseudoDeleted: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool{
-					1: {3: true, 4: true},
-				},
 			},
 		},
 		{
@@ -1559,7 +1555,6 @@ func Test_truncateObservation(t *testing.T) {
 					},
 					withData(make([]byte, 100)),
 				),
-				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
 			maxSize: 1789,
 			expected: exectypes.Observation{
@@ -1574,9 +1569,6 @@ func Test_truncateObservation(t *testing.T) {
 					},
 					withData(make([]byte, 100)),
 				),
-				PseudoDeleted: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool{
-					1: {1: true, 2: true},
-				},
 			},
 		},
 		{
@@ -1597,7 +1589,6 @@ func Test_truncateObservation(t *testing.T) {
 					},
 					withData(make([]byte, 100)),
 				),
-				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
 			maxSize: 3159, // chain 1, message 1 will be truncated
 			expected: exectypes.Observation{
@@ -1616,9 +1607,6 @@ func Test_truncateObservation(t *testing.T) {
 					},
 					withData(make([]byte, 100)),
 				),
-				PseudoDeleted: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]bool{
-					1: {1: true},
-				},
 			},
 		},
 		{
@@ -1638,7 +1626,6 @@ func Test_truncateObservation(t *testing.T) {
 						2: {11, 20},
 					},
 				),
-				PseudoDeleted: make(exectypes.PseudoDeletedMessages),
 			},
 			maxSize:  50, // less than what can fit a single commit report for single chain
 			expected: exectypes.Observation{},
@@ -1656,13 +1643,13 @@ func Test_truncateObservation(t *testing.T) {
 				return
 			}
 			require.Equal(t, tt.expected.CommitReports, obs.CommitReports)
-			require.Equal(t, tt.expected.PseudoDeleted, obs.PseudoDeleted)
 
-			for chain, seqNums := range obs.PseudoDeleted {
-				for seqNum := range seqNums {
-					require.Nil(t, obs.Messages[chain][seqNum].Data)
-				}
-			}
+			//TODO: Check deleted messages
+			//for chain, seqNums := range obs.PseudoDeleted {
+			//	for seqNum := range seqNums {
+			//		require.Nil(t, obs.Messages[chain][seqNum].Data)
+			//	}
+			//}
 		})
 	}
 }

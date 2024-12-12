@@ -155,19 +155,11 @@ func (b *execReportBuilder) checkMessage(
 		return execReport, Unknown, fmt.Errorf("message index out of range")
 	}
 
-	if len(execReport.MessagePseudoDeleted) != len(execReport.Messages) {
-		b.lggr.Errorw("message pseudo deleted length mismatch", "numMessages", len(execReport.Messages), "numPseudoDeleted", len(execReport.MessagePseudoDeleted))
-		return execReport, Unknown, fmt.Errorf("message pseudo deleted length mismatch")
-	}
 	msg := execReport.Messages[idx]
 
-	if execReport.MessagePseudoDeleted[idx] {
-		b.lggr.Infow(
-			"message pseudo deleted",
-			"messageID", msg.Header.MessageID,
-			"sourceChain", execReport.SourceChain,
-			"seqNum", msg.Header.SequenceNumber,
-			"messageState", MessagePseudoDeleted)
+	// Check if the message has been pseudo-deleted
+	if msg.IsEmpty() {
+		b.lggr.Errorw("message pseudo deleted", "index", idx)
 		return execReport, MessagePseudoDeleted, nil
 	}
 

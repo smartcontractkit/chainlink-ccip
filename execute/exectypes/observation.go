@@ -74,9 +74,8 @@ type Observation struct {
 	// Ideally, it contains all the messages identified by the previous outcome's
 	// NextCommits. With the previous outcome, and these messsages, we can build the
 	// execute report.
-	Messages      MessageObservations   `json:"messages"`
-	Hashes        MessageHashes         `json:"messageHashes"`
-	PseudoDeleted PseudoDeletedMessages `json:"pseudoDeletedMessages"`
+	Messages MessageObservations `json:"messages"`
+	Hashes   MessageHashes       `json:"messageHashes"`
 	// TokenData are determined during the second phase of execute.
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
@@ -112,7 +111,6 @@ func NewObservation(
 	nonces NonceObservations,
 	contracts dt.Observation,
 	hashes MessageHashes,
-	pseudoDeleted PseudoDeletedMessages,
 ) Observation {
 	return Observation{
 		CommitReports:  commitReports,
@@ -122,7 +120,6 @@ func NewObservation(
 		Nonces:         nonces,
 		Contracts:      contracts,
 		Hashes:         hashes,
-		PseudoDeleted:  pseudoDeleted,
 	}
 }
 

@@ -28,12 +28,6 @@ func ConstructMerkleTree(
 			"malformed report %s, unexpected number of message hashes: expected %d, got %d",
 			report.MerkleRoot.String(), numMsgs, len(report.Hashes))
 	}
-	//
-	//if numMsgs != len(report.MessagePseudoDeleted) {
-	//	return nil, fmt.Errorf(
-	//		"malformed report %s, unexpected number of message pseudo-deleted flags: expected %d, got %d",
-	//		report.MerkleRoot.String(), numMsgs, len(report.MessagePseudoDeleted))
-	//}
 
 	treeLeaves := make([][32]byte, 0)
 	for i, msg := range report.Messages {
