@@ -3,7 +3,6 @@ package metrics
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/stretchr/testify/require"
@@ -12,14 +11,103 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-type expected struct {
-	counter *prometheus.CounterVec
-	labels  []string
-	count   int
-}
-
 func Test_TrackingObservations(t *testing.T) {
+	chainID := "2337"
+	selector := cciptypes.ChainSelector(12922642891491394802)
 
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
+
+	t.Cleanup(cleanupMetrics(reporter))
+
+	tcs := []struct {
+		name                   string
+		observation            exectypes.Observation
+		state                  exectypes.PluginState
+		expectedMessageCount   int
+		expectedCommitReports  int
+		expectedNonces         int
+		expectedCostlyMessages int
+	}{
+		{
+			name: "empty/missing structs should not report anything",
+			observation: exectypes.Observation{
+				CommitReports: make(exectypes.CommitObservations),
+				Messages:      make(exectypes.MessageObservations),
+			},
+			state:                  exectypes.GetCommitReports,
+			expectedCommitReports:  0,
+			expectedMessageCount:   0,
+			expectedNonces:         0,
+			expectedCostlyMessages: 0,
+		},
+		{
+			name: "observation with messages which some of them are costly",
+			observation: exectypes.Observation{
+				CommitReports: exectypes.CommitObservations{
+					cciptypes.ChainSelector(123): make([]exectypes.CommitData, 2),
+					cciptypes.ChainSelector(456): nil,
+					cciptypes.ChainSelector(780): make([]exectypes.CommitData, 1),
+				},
+				Messages: exectypes.MessageObservations{
+					cciptypes.ChainSelector(123): map[cciptypes.SeqNum]cciptypes.Message{
+						1: {},
+						2: {},
+					},
+				},
+				CostlyMessages: make([]cciptypes.Bytes32, 1),
+			},
+			state:                  exectypes.Filter,
+			expectedCommitReports:  3,
+			expectedMessageCount:   2,
+			expectedNonces:         0,
+			expectedCostlyMessages: 1,
+		},
+		{
+			name: "observation with nonces",
+			observation: exectypes.Observation{
+				Nonces: exectypes.NonceObservations{
+					cciptypes.ChainSelector(123): map[string]uint64{
+						"0x123": 1,
+						"0x456": 2,
+					},
+					cciptypes.ChainSelector(456): map[string]uint64{
+						"0x123": 3,
+					},
+					cciptypes.ChainSelector(789): nil,
+				},
+			},
+			state:                  exectypes.GetMessages,
+			expectedCommitReports:  0,
+			expectedMessageCount:   0,
+			expectedNonces:         3,
+			expectedCostlyMessages: 0,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter.TrackObservation(tc.observation, tc.state)
+
+			costlyMsgs := testutil.ToFloat64(reporter.costlyMessagesCounter.WithLabelValues(chainID, string(tc.state)))
+			require.Equal(t, tc.expectedCostlyMessages, int(costlyMsgs))
+
+			nonces := testutil.ToFloat64(
+				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "nonces"),
+			)
+			require.Equal(t, tc.expectedNonces, int(nonces))
+
+			commitReports := testutil.ToFloat64(
+				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "commitReports"),
+			)
+			require.Equal(t, tc.expectedCommitReports, int(commitReports))
+
+			messages := testutil.ToFloat64(
+				reporter.observationDetailsCounter.WithLabelValues(chainID, string(tc.state), "messages"),
+			)
+			require.Equal(t, tc.expectedMessageCount, int(messages))
+		})
+	}
 }
 
 func Test_TrackingOutcomes(t *testing.T) {
@@ -29,44 +117,30 @@ func Test_TrackingOutcomes(t *testing.T) {
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
-	t.Cleanup(func() {
-		promOutcomeDetails.Reset()
-	})
+	t.Cleanup(cleanupMetrics(reporter))
 
 	tcs := []struct {
-		name     string
-		outcome  exectypes.Outcome
-		state    exectypes.PluginState
-		expected []expected
+		name                     string
+		outcome                  exectypes.Outcome
+		state                    exectypes.PluginState
+		expectedMessagesCount    int
+		expectedSourceChainCount int
+		expectedTokenDataCount   int
 	}{
 		{
-			name: "empty structs shouldn not report anything",
+			name: "empty structs should not report anything",
 			outcome: exectypes.Outcome{
 				Report: cciptypes.ExecutePluginReport{
 					ChainReports: []cciptypes.ExecutePluginReportSingleChain{},
 				},
 			},
-			state: exectypes.GetCommitReports,
-			expected: []expected{
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"GetCommitReports", "messages"},
-					count:   0,
-				},
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"GetCommitReports", "tokenData"},
-					count:   0,
-				},
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"GetCommitReports", "sourceChains"},
-					count:   0,
-				},
-			},
+			state:                    exectypes.GetCommitReports,
+			expectedMessagesCount:    0,
+			expectedSourceChainCount: 0,
+			expectedTokenDataCount:   0,
 		},
 		{
-			name: "empty structs shouldn not report anything",
+			name: "single chain report should be properly tracked",
 			outcome: exectypes.Outcome{
 				Report: cciptypes.ExecutePluginReport{
 					ChainReports: []cciptypes.ExecutePluginReportSingleChain{
@@ -78,24 +152,10 @@ func Test_TrackingOutcomes(t *testing.T) {
 					},
 				},
 			},
-			state: exectypes.Filter,
-			expected: []expected{
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"Filter", "messages"},
-					count:   2,
-				},
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"Filter", "tokenData"},
-					count:   0,
-				},
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"Filter", "sourceChains"},
-					count:   1,
-				},
-			},
+			state:                    exectypes.Filter,
+			expectedMessagesCount:    2,
+			expectedTokenDataCount:   0,
+			expectedSourceChainCount: 1,
 		},
 		{
 			name: "multiple chain reports should be tracked",
@@ -115,24 +175,10 @@ func Test_TrackingOutcomes(t *testing.T) {
 					},
 				},
 			},
-			state: exectypes.GetCommitReports,
-			expected: []expected{
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"GetCommitReports", "messages"},
-					count:   15,
-				},
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"GetCommitReports", "tokenData"},
-					count:   30,
-				},
-				{
-					counter: promOutcomeDetails,
-					labels:  []string{"GetCommitReports", "sourceChains"},
-					count:   2,
-				},
-			},
+			state:                    exectypes.GetCommitReports,
+			expectedMessagesCount:    15,
+			expectedTokenDataCount:   30,
+			expectedSourceChainCount: 2,
 		},
 	}
 
@@ -140,14 +186,29 @@ func Test_TrackingOutcomes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reporter.TrackOutcome(tc.outcome, tc.state)
 
-			for _, exp := range tc.expected {
-				labels := make([]string, 0, len(exp.labels)+1)
-				labels = append(labels, chainID)
-				labels = append(labels, exp.labels...)
+			messages := testutil.ToFloat64(
+				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "messages"),
+			)
+			require.Equal(t, tc.expectedMessagesCount, int(messages))
 
-				actual := testutil.ToFloat64(exp.counter.WithLabelValues(labels...))
-				require.Equal(t, exp.count, int(actual))
-			}
+			sourceChains := testutil.ToFloat64(
+				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "sourceChains"),
+			)
+			require.Equal(t, tc.expectedSourceChainCount, int(sourceChains))
+
+			tokenData := testutil.ToFloat64(
+				reporter.outcomeDetailsCounter.WithLabelValues(chainID, string(tc.state), "tokenData"),
+			)
+			require.Equal(t, tc.expectedTokenDataCount, int(tokenData))
 		})
+	}
+}
+
+func cleanupMetrics(p *PromReporter) func() {
+	return func() {
+		p.tokenDataReadinessCounter.Reset()
+		p.outcomeDetailsCounter.Reset()
+		p.observationDetailsCounter.Reset()
+		p.observationDetailsCounter.Reset()
 	}
 }
