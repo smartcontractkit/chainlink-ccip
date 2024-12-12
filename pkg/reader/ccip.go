@@ -434,7 +434,6 @@ func (r *ccipChainReader) Nonces(
 	eg := new(errgroup.Group)
 
 	for _, address := range addresses {
-		address := address
 		eg.Go(func() error {
 			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
 			if err != nil {
@@ -1055,7 +1054,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		}
 
 		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
@@ -1240,7 +1238,6 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 			continue
 		}
 
-		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
 			resp := getOnRampDynamicConfigResponse{}
@@ -1300,7 +1297,6 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 		// For chain X, all DestChainConfigs will have one of 2 values for the Router address
 		// 1. Chain X Test Router in case we're testing a new lane
 		// 2. Chain X Router
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
@@ -1467,6 +1463,47 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 	}
 
 	return latestSeqNr, nil
+}
+
+func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+
+	type ConfigInfo struct {
+		ConfigDigest                   [32]byte
+		F                              uint8
+		N                              uint8
+		IsSignatureVerificationEnabled bool
+	}
+
+	type OCRConfig struct {
+		ConfigInfo   ConfigInfo
+		Signers      [][]byte
+		Transmitters [][]byte
+	}
+
+	type OCRConfigResponse struct {
+		OCRConfig OCRConfig
+	}
+
+	var resp OCRConfigResponse
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOffRampLatestConfigDetails,
+		primitives.Unconfirmed,
+		map[string]any{
+			"ocrPluginType": pluginType,
+		},
+		&resp,
+	)
+
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
+	}
+
+	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
 // Interface compliance check

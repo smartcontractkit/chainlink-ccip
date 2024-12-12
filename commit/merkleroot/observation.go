@@ -394,7 +394,6 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 	eg := &errgroup.Group{}
 
 	for i, sourceChain := range sourceChains {
-		i, sourceChain := i, sourceChain
 		eg.Go(func() error {
 			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
 			if err != nil {
@@ -436,7 +435,6 @@ func (o observerImpl) ObserveMerkleRoots(
 	rootsMu := &sync.Mutex{}
 	wg := sync.WaitGroup{}
 	for _, chainRange := range ranges {
-		chainRange := chainRange
 		if supportedChains.Contains(chainRange.ChainSel) {
 			wg.Add(1)
 			go func() {
@@ -516,8 +514,6 @@ func (o observerImpl) computeMerkleRoot(ctx context.Context, msgs []cciptypes.Me
 
 	eg := &errgroup.Group{}
 	for i, msg := range msgs {
-		i := i
-		msg := msg
 		eg.Go(func() error {
 			// Assert there are no sequence number gaps in msgs
 			if i > 0 {
