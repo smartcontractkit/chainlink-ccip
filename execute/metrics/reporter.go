@@ -10,10 +10,10 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-// Reporter is a simple interfaces used for tracking observations and outcomes of the execute plugin.
+// Reporter is a simple interface used for tracking observations and outcomes of the execution plugin.
 // Default implementation is based on the Prometheus metrics, but it can be extended to support other metrics systems.
-// Main goal is to provide a simple way to track the performance of the execute plugin, for instance:
-// - understand how efficiently we batched (number of messages, number of token data, number of source chains used etc.)
+// Main goal is to provide a simple way to track the performance of the execution plugin, for instance:
+// - understand how efficiently we batch (number of messages, number of token data, number of source chains used etc.)
 // - understand how many messages, reports, token data are observed by plugins
 type Reporter interface {
 	TrackObservation(obs exectypes.Observation)
