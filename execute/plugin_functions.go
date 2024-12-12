@@ -281,7 +281,6 @@ func truncateObservation(
 					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
 				observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
-				//observation.PseudoDeleted[chain][seqNum] = true
 
 				if _, ok := observation.TokenData[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf(
