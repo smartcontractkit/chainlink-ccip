@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
@@ -11,10 +12,69 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func Test_TrackingObservations(t *testing.T) {
-	chainID := "2337"
-	selector := cciptypes.ChainSelector(12922642891491394802)
+const (
+	chainID  = "2337"
+	selector = cciptypes.ChainSelector(12922642891491394802)
+)
 
+func Test_TrackingTokenReadiness(t *testing.T) {
+	reporter, err := NewPromReporter(logger.Test(t), selector)
+	require.NoError(t, err)
+
+	t.Cleanup(cleanupMetrics(reporter))
+
+	tcs := []struct {
+		name                  string
+		observation           exectypes.TokenDataObservations
+		state                 exectypes.PluginState
+		expectedReadyTokens   int
+		expectedWaitingTokens int
+	}{
+		{
+			name:                  "empty/missing structs should not report anything",
+			observation:           exectypes.TokenDataObservations{},
+			state:                 exectypes.GetMessages,
+			expectedReadyTokens:   0,
+			expectedWaitingTokens: 0,
+		},
+		{
+			name: "single chain with some tokens ready and some waiting",
+			observation: exectypes.TokenDataObservations{
+				cciptypes.ChainSelector(123): map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					1: exectypes.NewMessageTokenData(),
+					2: exectypes.NewMessageTokenData(exectypes.NewSuccessTokenData([]byte("asdf"))),
+				},
+				cciptypes.ChainSelector(456): map[cciptypes.SeqNum]exectypes.MessageTokenData{
+					4: exectypes.NewMessageTokenData(
+						exectypes.NewSuccessTokenData([]byte("asdf")),
+						exectypes.NewSuccessTokenData([]byte("qwer")),
+						exectypes.NewErrorTokenData(fmt.Errorf("error")),
+					),
+				},
+			},
+			expectedWaitingTokens: 1,
+			expectedReadyTokens:   3,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state)
+
+			readyTokens := testutil.ToFloat64(
+				reporter.tokenDataReadinessCounter.WithLabelValues(chainID, string(tc.state), "ready"),
+			)
+			require.Equal(t, tc.expectedReadyTokens, int(readyTokens))
+
+			waitingTokens := testutil.ToFloat64(
+				reporter.tokenDataReadinessCounter.WithLabelValues(chainID, string(tc.state), "waiting"),
+			)
+			require.Equal(t, tc.expectedWaitingTokens, int(waitingTokens))
+		})
+	}
+}
+
+func Test_TrackingObservations(t *testing.T) {
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
@@ -111,9 +171,6 @@ func Test_TrackingObservations(t *testing.T) {
 }
 
 func Test_TrackingOutcomes(t *testing.T) {
-	chainID := "2337"
-	selector := cciptypes.ChainSelector(12922642891491394802)
-
 	reporter, err := NewPromReporter(logger.Test(t), selector)
 	require.NoError(t, err)
 
