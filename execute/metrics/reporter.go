@@ -107,14 +107,16 @@ func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome, state exectypes.P
 }
 
 func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome, state string) {
-	messagesCount := 0
-	tokenDataCount := 0
-	sources := 0
+	counters := map[string]int{
+		messagesLabel:     0,
+		tokenDataLabel:    0,
+		sourceChainsLabel: 0,
+	}
 
 	for chainSelector, report := range outcome.Report.ChainReports {
-		sources++
-		messagesCount += len(report.Messages)
-		tokenDataCount += len(report.OffchainTokenData)
+		counters[sourceChainsLabel]++
+		counters[messagesLabel] += len(report.Messages)
+		counters[tokenDataLabel] += len(report.OffchainTokenData)
 
 		p.lggr.Debugw("Execute plugin reporting outcome",
 			"state", state,
@@ -125,15 +127,11 @@ func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome, state s
 		)
 	}
 
-	p.outcomeDetailsCounter.
-		WithLabelValues(p.chainID, state, messagesLabel).
-		Add(float64(messagesCount))
-	p.outcomeDetailsCounter.
-		WithLabelValues(p.chainID, state, tokenDataLabel).
-		Add(float64(tokenDataCount))
-	p.outcomeDetailsCounter.
-		WithLabelValues(p.chainID, state, sourceChainsLabel).
-		Add(float64(sources))
+	for key, count := range counters {
+		p.outcomeDetailsCounter.
+			WithLabelValues(p.chainID, state, key).
+			Add(float64(count))
+	}
 }
 
 func (p *PromReporter) trackCommitReports(commits exectypes.CommitObservations, state string) {
