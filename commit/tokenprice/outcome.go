@@ -80,6 +80,8 @@ func (p *processor) selectTokensForUpdate(
 	for token, feedPrice := range obs.FeedTokenPrices {
 		lastUpdate, exists := obs.FeeQuoterTokenUpdates[token]
 		if !exists {
+			p.lggr.Infow("token not found in fee quoter updates",
+				"token", token, "feedPrice", feedPrice)
 			// if the token is not in the fee quoter updates, then we should update it
 			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
 				TokenID: token,
@@ -95,10 +97,19 @@ func (p *processor) selectTokensForUpdate(
 		}
 
 		nextUpdateTime := lastUpdate.Timestamp.Add(cfg.TokenPriceBatchWriteFrequency.Duration())
-		shouldUpdate :=
-			obs.Timestamp.After(nextUpdateTime) ||
-				mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64())
-		if shouldUpdate {
+		if obs.Timestamp.After(nextUpdateTime) {
+			p.lggr.Infow("token update due to refresh period",
+				"token", token, "nextUpdateTime", nextUpdateTime)
+			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
+				TokenID: token,
+				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
+			})
+			continue
+		}
+
+		if mathslib.Deviates(feedPrice.Price.Int, lastUpdate.Value.Int, ti.DeviationPPB.Int64()) {
+			p.lggr.Infow("token update due to deviation",
+				"token", token, "feedPrice", feedPrice, "lastUpdate", lastUpdate)
 			tokenPrices = append(tokenPrices, cciptypes.TokenPrice{
 				TokenID: token,
 				Price:   cciptypes.NewBigInt(feedPrice.Price.Int),
