@@ -32,11 +32,6 @@ type CommitData struct {
 	// Get populated during GetMessages Outcome phase
 	// Length of this slice should equal to the length of Messages slice.
 	Hashes []cciptypes.Bytes32 `json:"messageHashes"`
-	// MessagePseudoDeleted is a slice of booleans that indicate whether the message with same index
-	// in Messages was pseudo-deleted.
-	// Get populated during GetMessages Outcome phase
-	// Length of this slice should equal to the length of Messages slice.
-	MessagePseudoDeleted []bool `json:"messagePseudoDeleted"`
 
 	// CostlyMessages are the message IDs of messages that cost more to execute than was paid to execute them (i.e.
 	// source fee < execution cost). These messages will not be executed in the current round, but may be executed in

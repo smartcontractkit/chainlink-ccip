@@ -263,15 +263,14 @@ func makeTestCommitReport(
 
 	commitReport := exectypes.CommitData{
 		//MerkleRoot:          root,
-		SourceChain:          cciptypes.ChainSelector(srcChain),
-		SequenceNumberRange:  sequenceNumberRange,
-		Timestamp:            time.UnixMilli(timestamp),
-		BlockNum:             uint64(block),
-		Messages:             messages,
-		Hashes:               hashes,
-		MessagePseudoDeleted: make([]bool, numMessages),
-		ExecutedMessages:     executed,
-		MessageTokenData:     messageTokenData,
+		SourceChain:         cciptypes.ChainSelector(srcChain),
+		SequenceNumberRange: sequenceNumberRange,
+		Timestamp:           time.UnixMilli(timestamp),
+		BlockNum:            uint64(block),
+		Messages:            messages,
+		Hashes:              hashes,
+		ExecutedMessages:    executed,
+		MessageTokenData:    messageTokenData,
 	}
 
 	// calculate merkle root
@@ -374,7 +373,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 						{0x1},
 						{0x2},
 					},
-					MessagePseudoDeleted: []bool{false, false},
 				},
 			},
 		},
@@ -397,7 +395,6 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 					Hashes: []cciptypes.Bytes32{
 						{0x1},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 				hasher: badHasher{},
 			},
@@ -1006,8 +1003,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					Messages: []cciptypes.Message{
 						makeMessage(1, 100, 0),
 					},
-					ExecutedMessages:     []cciptypes.SeqNum{100},
-					MessagePseudoDeleted: []bool{false},
+					ExecutedMessages: []cciptypes.SeqNum{100},
 				},
 			},
 			expectedStatus: AlreadyExecuted,
@@ -1024,7 +1020,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: false, Data: nil}}},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: TokenDataNotReady,
@@ -1041,7 +1036,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: ReadyToExecute,
@@ -1052,7 +1046,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				MessageTokenData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{0x01, 0x02, 0x03}}}},
 				},
-				MessagePseudoDeleted: []bool{false},
 			},
 		},
 		{
@@ -1066,7 +1059,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: ReadyToExecute,
@@ -1077,7 +1069,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 				MessageTokenData: []exectypes.MessageTokenData{
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 				},
-				MessagePseudoDeleted: []bool{false},
 			},
 		},
 		{
@@ -1093,7 +1084,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
-					MessagePseudoDeleted: []bool{false, false},
 				},
 			},
 			expectedStatus: ReadyToExecute,
@@ -1106,7 +1096,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 				},
-				MessagePseudoDeleted: []bool{false, false},
 			},
 		},
 		{
@@ -1121,7 +1110,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: MissingNoncesForChain,
@@ -1141,7 +1129,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: MissingNonce,
@@ -1163,7 +1150,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 					MessageTokenData: []exectypes.MessageTokenData{
 						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
 					},
-					MessagePseudoDeleted: []bool{false},
 				},
 			},
 			expectedStatus: InvalidNonce,

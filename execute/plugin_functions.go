@@ -260,6 +260,9 @@ func truncateObservation(
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
+	if len(encodedObs) <= maxSize {
+		return observation, nil
+	}
 
 	chains := maps.Keys(observation.CommitReports)
 	sort.Slice(chains, func(i, j int) bool {
@@ -280,14 +283,14 @@ func truncateObservation(
 				if _, ok := observation.Messages[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
-				observation.Messages[chain][seqNum] = PseudoDeleteMessage(observation.Messages[chain][seqNum])
+				observation.Messages[chain][seqNum] = cciptypes.Message{}
 
 				if _, ok := observation.TokenData[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf(
 						"missing tokenData for message with seqNr %d from chain %d", seqNum, chain,
 					)
 				}
-				observation.TokenData[chain][seqNum] = PseudoDeleteTokenData(observation.TokenData[chain][seqNum])
+				observation.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
 				seqNum++
 				if observationFitsSize(observation, maxSize) {
@@ -327,24 +330,6 @@ func observationFitsSize(obs exectypes.Observation, maxSize int) bool {
 		return false
 	}
 	return len(encodedObs) <= maxSize
-}
-func PseudoDeleteMessage(msg cciptypes.Message) cciptypes.Message {
-	//pseudoDeletedMsg := msg
-	//
-	//pseudoDeletedMsg.Data = nil
-	//pseudoDeletedMsg.ExtraArgs = nil
-	//pseudoDeletedMsg.TokenAmounts = nil
-	//return pseudoDeletedMsg
-	return cciptypes.Message{}
-}
-
-func PseudoDeleteTokenData(tokenData exectypes.MessageTokenData) exectypes.MessageTokenData {
-	//msgTokenData := tokenData
-	//for _, td := range msgTokenData.TokenData {
-	//	td.Data = nil
-	//	td.Ready = false
-	//}
-	return exectypes.NewMessageTokenData()
 }
 
 // truncateLastCommit removes the last commit from the observation.
