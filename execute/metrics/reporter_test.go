@@ -59,7 +59,6 @@ func Test_TrackingTokenReadiness(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cleanupMetrics(reporter)()
 			reporter.TrackObservation(exectypes.Observation{TokenData: tc.observation}, tc.state)
 
 			readyTokens := testutil.ToFloat64(
@@ -148,7 +147,6 @@ func Test_TrackingObservations(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cleanupMetrics(reporter)()
 			reporter.TrackObservation(tc.observation, tc.state)
 
 			costlyMsgs := testutil.ToFloat64(reporter.costlyMessagesCounter.WithLabelValues(chainID, string(tc.state)))
@@ -243,7 +241,6 @@ func Test_TrackingOutcomes(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			cleanupMetrics(reporter)()
 			reporter.TrackOutcome(tc.outcome, tc.state)
 
 			messages := testutil.ToFloat64(
@@ -266,9 +263,9 @@ func Test_TrackingOutcomes(t *testing.T) {
 
 func cleanupMetrics(p *PromReporter) func() {
 	return func() {
+		p.costlyMessagesCounter.Reset()
 		p.tokenDataReadinessCounter.Reset()
 		p.outcomeDetailsCounter.Reset()
-		p.observationDetailsCounter.Reset()
 		p.observationDetailsCounter.Reset()
 	}
 }
