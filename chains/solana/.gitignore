@@ -4,11 +4,6 @@
 .idea
 .vscode/
 
-# ignore relay build
-pkg/bin
-
-v1/target
-
 # ignore target folders except IDLs
 contracts/target/*
 !contracts/target/idl/
@@ -19,31 +14,7 @@ contracts/id.json
 # ignore all except shared localnet keys
 contracts/artifacts/*
 !contracts/artifacts/localnet/
-ops/localnet.json
 test-ledger
-
-# TS
-node_modules
-**/tsconfig.tsbuildinfo
-dist
-.env
-flow-report.json
-report.json
-bin
-# Gauntlet artifacts
-gauntlet/packages/gauntlet-solana-contracts/artifacts/programId
-gauntlet/packages/gauntlet-solana-contracts/artifacts/bin
-# Multisig local env
-gauntlet/packages/gauntlet-serum-multisig/networks/.env.local
-
-# test
-id.json
-integration-tests/smoke/logs
-integration-tests/smoke/contracts-chaos-state.json
-tmp-manifest-*
-tests-smoke-report.xml
-.env.test*
-overrides.toml
 
 # Test & linter reports
 .test_summary/
@@ -56,4 +27,3 @@ eslint-report.json
 override*.toml
 # go work files
 go.work*
-gauntlet-*/
