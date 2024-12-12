@@ -126,6 +126,9 @@ func (o *observer) Observe(
 			o.lggr.Warnw("Message is too costly to execute", "messageID",
 				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 			costlyMessages = append(costlyMessages, msg.Header.MessageID)
+		} else {
+			o.lggr.Warnw("Message is not too costly to execute", "messageID",
+				msg.Header.MessageID.String(), "fee", fee, "execCost", execCost, "seqNum", msg.Header.SequenceNumber)
 		}
 	}
 
@@ -407,7 +410,7 @@ func (c *CCIPMessageExecCostUSD18Calculator) getFeesUSD18(
 	executionFee := mathslib.CalculateUsdPerUnitGas(feeComponents.ExecutionFee, nativeTokenPrice.Int)
 	dataAvailabilityFee := mathslib.CalculateUsdPerUnitGas(feeComponents.DataAvailabilityFee, nativeTokenPrice.Int)
 
-	c.lggr.Debugw("Fee calculation", "nativeTokenPrice", nativeTokenPrice,
+	c.lggr.Infow("Fee calculation", "nativeTokenPrice", nativeTokenPrice,
 		"feeComponents.ExecutionFee", feeComponents.ExecutionFee,
 		"feeComponents.DataAvailabilityFee", feeComponents.DataAvailabilityFee,
 		"executionFee", executionFee,
