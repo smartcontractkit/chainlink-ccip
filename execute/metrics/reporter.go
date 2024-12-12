@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+
 	sel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
@@ -16,8 +17,8 @@ import (
 // - understand how efficiently we batch (number of messages, number of token data, number of source chains used etc.)
 // - understand how many messages, reports, token data are observed by plugins
 type Reporter interface {
-	TrackObservation(obs exectypes.Observation)
-	TrackOutcome(outcome exectypes.Outcome)
+	TrackObservation(obs exectypes.Observation, state exectypes.PluginState)
+	TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState)
 }
 
 const (
@@ -26,31 +27,41 @@ const (
 	tokenDataLabel     = "tokenData"
 	commitReportsLabel = "commitReports"
 	noncesLabel        = "nonces"
+
+	tokenStateReady   = "ready"
+	tokenStateWaiting = "waiting"
 )
 
 var (
 	promObservationDetails = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ccip_exec_observation_components",
+			Name: "ccip_exec_observation_components_sizes",
 			Help: "This metric tracks the number of different items in the observation of the execute plugin " +
 				"(e.g. number of messages, number of token data etc.)",
 		},
-		[]string{"chainID", "type"},
+		[]string{"chainID", "state", "type"},
 	)
 	promOutcomeDetails = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ccip_exec_outcome_components",
+			Name: "ccip_exec_outcome_components_sizes",
 			Help: "This metric tracks the number of different items in the outcome of the execute plugin " +
 				"(e.g. number of messages, number of source chains used etc.)",
 		},
-		[]string{"chainID", "type"},
+		[]string{"chainID", "state", "type"},
 	)
 	promCostlyMessages = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "ccip_exec_costly_messages",
 			Help: "This metric tracks the number of costly messages observed by the execute plugin",
 		},
-		[]string{"chainID"},
+		[]string{"chainID", "state"},
+	)
+	promTokenDataReadiness = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ccip_exec_token_data_readiness",
+			Help: "This metric tracks the readiness of the token data observed by the execute plugin",
+		},
+		[]string{"chainID", "state", "status"},
 	)
 )
 
@@ -58,10 +69,11 @@ type PromReporter struct {
 	lggr    logger.Logger
 	chainID string
 
-	// Prometheus components
+	// Prometheus reporters
 	observationDetailsCounter *prometheus.CounterVec
 	outcomeDetailsCounter     *prometheus.CounterVec
 	costlyMessagesCounter     *prometheus.CounterVec
+	tokenDataReadinessCounter *prometheus.CounterVec
 }
 
 func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
@@ -77,22 +89,24 @@ func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*Pro
 		observationDetailsCounter: promObservationDetails,
 		outcomeDetailsCounter:     promOutcomeDetails,
 		costlyMessagesCounter:     promCostlyMessages,
+		tokenDataReadinessCounter: promTokenDataReadiness,
 	}, nil
 }
 
-func (p *PromReporter) TrackObservation(obs exectypes.Observation) {
-	p.trackCommitReports(obs.CommitReports)
-	p.trackMessages(obs.Messages)
-	p.trackTokenData(obs.TokenData)
-	p.trackNonceData(obs.Nonces)
-	p.trackCostlyMessages(obs.CostlyMessages)
+func (p *PromReporter) TrackObservation(obs exectypes.Observation, state exectypes.PluginState) {
+	castedState := string(state)
+	p.trackCommitReports(obs.CommitReports, castedState)
+	p.trackMessages(obs.Messages, castedState)
+	p.trackTokenData(obs.TokenData, castedState)
+	p.trackNonceData(obs.Nonces, castedState)
+	p.trackCostlyMessages(obs.CostlyMessages, castedState)
 }
 
-func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome) {
-	p.trackOutcomeComponents(outcome)
+func (p *PromReporter) TrackOutcome(outcome exectypes.Outcome, state exectypes.PluginState) {
+	p.trackOutcomeComponents(outcome, string(state))
 }
 
-func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome) {
+func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome, state string) {
 	messagesCount := 0
 	tokenDataCount := 0
 	sources := 0
@@ -103,6 +117,7 @@ func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome) {
 		tokenDataCount += len(report.OffchainTokenData)
 
 		p.lggr.Debugw("Execute plugin reporting outcome",
+			"state", state,
 			"sourceChainSelector", chainSelector,
 			"destChainSelector", p.chainID,
 			"messagesCount", len(report.Messages),
@@ -111,69 +126,82 @@ func (p *PromReporter) trackOutcomeComponents(outcome exectypes.Outcome) {
 	}
 
 	p.outcomeDetailsCounter.
-		WithLabelValues(p.chainID, messagesLabel).
+		WithLabelValues(p.chainID, state, messagesLabel).
 		Add(float64(messagesCount))
 	p.outcomeDetailsCounter.
-		WithLabelValues(p.chainID, tokenDataLabel).
+		WithLabelValues(p.chainID, state, tokenDataLabel).
 		Add(float64(tokenDataCount))
 	p.outcomeDetailsCounter.
-		WithLabelValues(p.chainID, sourceChainsLabel).
+		WithLabelValues(p.chainID, state, sourceChainsLabel).
 		Add(float64(sources))
 }
 
-func (p *PromReporter) trackCommitReports(commits exectypes.CommitObservations) {
+func (p *PromReporter) trackCommitReports(commits exectypes.CommitObservations, state string) {
 	commitReportsCount := 0
 	for _, commit := range commits {
 		commitReportsCount += len(commit)
 	}
 
 	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, commitReportsLabel).
+		WithLabelValues(p.chainID, state, commitReportsLabel).
 		Add(float64(commitReportsCount))
 }
 
-func (p *PromReporter) trackMessages(messages exectypes.MessageObservations) {
+func (p *PromReporter) trackMessages(messages exectypes.MessageObservations, state string) {
 	messagesCount := 0
 	for _, chainMessages := range messages {
 		messagesCount += len(chainMessages)
 	}
 
 	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, messagesLabel).
+		WithLabelValues(p.chainID, state, messagesLabel).
 		Add(float64(messagesCount))
 }
 
-func (p *PromReporter) trackTokenData(tokens exectypes.TokenDataObservations) {
-	tokensCount := 0
-	for _, chainTokens := range tokens {
-		tokensCount += len(chainTokens)
+func (p *PromReporter) trackTokenData(tokens exectypes.TokenDataObservations, state string) {
+	tokenCounters := map[string]int{
+		tokenStateReady:   0,
+		tokenStateWaiting: 0,
 	}
 
-	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, tokenDataLabel).
-		Add(float64(tokensCount))
+	for _, chainTokens := range tokens {
+		for _, tokenData := range chainTokens {
+			for _, token := range tokenData.TokenData {
+				counterKey := tokenStateWaiting
+				if token.IsReady() {
+					counterKey = tokenStateReady
+				}
+				tokenCounters[counterKey]++
+			}
+		}
+	}
+
+	for key, count := range tokenCounters {
+		p.tokenDataReadinessCounter.
+			WithLabelValues(p.chainID, state, key).
+			Add(float64(count))
+	}
 }
 
-func (p *PromReporter) trackNonceData(nonces exectypes.NonceObservations) {
+func (p *PromReporter) trackNonceData(nonces exectypes.NonceObservations, state string) {
 	noncesCount := 0
 	for _, chainNonces := range nonces {
 		noncesCount += len(chainNonces)
 	}
 
 	p.observationDetailsCounter.
-		WithLabelValues(p.chainID, noncesLabel).
+		WithLabelValues(p.chainID, state, noncesLabel).
 		Add(float64(noncesCount))
 }
 
-func (p *PromReporter) trackCostlyMessages(costlyMessages []cciptypes.Bytes32) {
+func (p *PromReporter) trackCostlyMessages(costlyMessages []cciptypes.Bytes32, state string) {
 	p.costlyMessagesCounter.
-		WithLabelValues(p.chainID).
+		WithLabelValues(p.chainID, state).
 		Add(float64(len(costlyMessages)))
 }
 
 type Noop struct{}
 
-func (n *Noop) TrackObservation(exectypes.Observation) {
-}
+func (n *Noop) TrackObservation(exectypes.Observation, exectypes.PluginState) {}
 
-func (n *Noop) TrackOutcome(exectypes.Outcome) {}
+func (n *Noop) TrackOutcome(exectypes.Outcome, exectypes.PluginState) {}
