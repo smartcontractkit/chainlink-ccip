@@ -7,15 +7,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	io_prometheus_client "github.com/prometheus/client_model/go"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal"
 	mocked "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
@@ -93,7 +91,7 @@ func Test_GetLatestValue(t *testing.T) {
 	c1 := testutil.ToFloat64(contractreader.CrErrors.WithLabelValues(chainID, "contract", "read"))
 	require.Equal(t, 0, int(c1))
 
-	c2 := counterFromHistogramByLabels(t, contractreader.CrDirectRequestsDurations, chainID, "contract", "read")
+	c2 := internal.CounterFromHistogramByLabels(t, contractreader.CrDirectRequestsDurations, chainID, "contract", "read")
 	require.Equal(t, 1, c2)
 
 	err = reader.GetLatestValue(ctx, contractID2, primitives.Unconfirmed, nil, nil)
@@ -108,20 +106,4 @@ func resetMetrics() {
 	contractreader.CrBatchRequestsDurations.Reset()
 	contractreader.CrBatchSizes.Reset()
 	contractreader.CrErrors.Reset()
-}
-
-func counterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.HistogramVec, labels ...string) int {
-	observer, err := histogramVec.GetMetricWithLabelValues(labels...)
-	require.NoError(t, err)
-
-	metricCh := make(chan prometheus.Metric, 1)
-	observer.(prometheus.Histogram).Collect(metricCh)
-	close(metricCh)
-
-	metric := <-metricCh
-	pb := &io_prometheus_client.Metric{}
-	err = metric.Write(pb)
-	require.NoError(t, err)
-
-	return int(pb.GetHistogram().GetSampleCount())
 }
