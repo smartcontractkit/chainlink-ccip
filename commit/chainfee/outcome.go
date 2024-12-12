@@ -220,6 +220,14 @@ func (p *processor) getGasPricesToUpdate(
 		lastUpdate, exists := latestUpdates[chain]
 		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
 		// If the chain is not in the fee quoter updates or is stale, then we should update it
+		p.lggr.Infow("Checking if chain fee needs to be updated",
+			"chain", chain,
+			"exists", exists,
+			"remoteGasPriceBatchWriteFrequency", p.cfg.RemoteGasPriceBatchWriteFrequency,
+			"lastUpdate", lastUpdate,
+			"nextUpdateTime", nextUpdateTime,
+			"obsTimestamp", obsTimestamp,
+		)
 		if !exists || obsTimestamp.After(nextUpdateTime) {
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
