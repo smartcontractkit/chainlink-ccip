@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -53,6 +54,7 @@ type Plugin struct {
 	homeChain    reader.HomeChain
 	discovery    *discovery.ContractDiscoveryProcessor
 	chainSupport plugincommon.ChainSupport
+	observer     metrics.Reporter
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
@@ -78,6 +80,7 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
+	metricsReporter metrics.Reporter,
 ) *Plugin {
 	lggr = logger.Named(lggr, "ExecutePlugin")
 	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
@@ -112,6 +115,7 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
+		observer: metricsReporter,
 	}
 }
 

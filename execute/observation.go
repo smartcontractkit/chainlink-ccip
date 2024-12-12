@@ -78,6 +78,7 @@ func (p *Plugin) Observation(
 		return nil, err
 	}
 
+	p.observer.TrackObservation(observation)
 	p.lggr.Infow("execute plugin got observation", "observation", observation)
 
 	return observation.Encode()
