@@ -229,6 +229,12 @@ func (p *processor) getGasPricesToUpdate(
 			"obsTimestamp", obsTimestamp,
 		)
 		if !exists || obsTimestamp.After(nextUpdateTime) {
+			p.lggr.Infow("Chain fee needs to be updated",
+				"chain", chain,
+				"exists", exists,
+				"obsTimestamp", obsTimestamp,
+				"nextUpdateTime", nextUpdateTime,
+			)
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
