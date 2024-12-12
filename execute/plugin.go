@@ -268,9 +268,18 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
+	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
+	}
+
+	reportInfo := cciptypes.ExecuteReportInfo{
+		Roots:            nil,
+		CommitReportData: nil,
+	}
+	encodedInfo, err := reportInfo.Encode()
+	if err != nil {
+		return nil, err
 	}
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
@@ -287,8 +296,8 @@ func (p *Plugin) Reports(
 	report := []ocr3types.ReportPlus[[]byte]{
 		{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-				Report: encoded,
-				Info:   nil,
+				Report: encodedReport,
+				Info:   encodedInfo,
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
 		},
