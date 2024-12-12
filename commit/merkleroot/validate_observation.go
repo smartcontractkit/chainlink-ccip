@@ -26,7 +26,7 @@ func (p *Processor) ValidateObservation(
 	}
 
 	obs := ao.Observation
-	if err := validateFChain(obs.FChain); err != nil {
+	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("validate FChain: %w", err)
 	}
 	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
@@ -174,16 +174,6 @@ func validateRMNRemoteConfig(
 			return fmt.Errorf("duplicate NodeIndex %d", signer.NodeIndex)
 		}
 		seenNodeIndexes.Add(signer.NodeIndex)
-	}
-
-	return nil
-}
-
-func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for chainSelector, f := range fChain {
-		if f <= 0 {
-			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
-		}
 	}
 
 	return nil

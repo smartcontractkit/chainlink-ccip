@@ -6,20 +6,18 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-
 	"golang.org/x/exp/maps"
 )
 
 func (p *processor) ValidateObservation(
-	prevOutcome Outcome,
-	query Query,
+	_ Outcome,
+	_ Query,
 	ao plugincommon.AttributedObservation[Observation],
 ) error {
 	obs := ao.Observation
 	zero := big.NewInt(0)
 
-	if err := validateFChain(obs.FChain); err != nil {
+	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
@@ -52,14 +50,5 @@ func (p *processor) ValidateObservation(
 		}
 	}
 
-	return nil
-}
-
-func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for chainSelector, f := range fChain {
-		if f <= 0 {
-			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
-		}
-	}
 	return nil
 }
