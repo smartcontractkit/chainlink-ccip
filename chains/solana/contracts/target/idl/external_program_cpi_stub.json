@@ -1,0 +1,103 @@
+{
+  "version": "0.1.0",
+  "name": "external_program_cpi_stub",
+  "instructions": [
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "u8Value",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stubCaller",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "empty",
+      "accounts": [],
+      "args": []
+    },
+    {
+      "name": "u8InstructionData",
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "structInstructionData",
+      "accounts": [],
+      "args": [
+        {
+          "name": "data",
+          "type": {
+            "defined": "Value"
+          }
+        }
+      ]
+    },
+    {
+      "name": "accountRead",
+      "accounts": [
+        {
+          "name": "u8Value",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "accountMut",
+      "accounts": [
+        {
+          "name": "u8Value",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stubCaller",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Value",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "address": "4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ"
+  }
+}

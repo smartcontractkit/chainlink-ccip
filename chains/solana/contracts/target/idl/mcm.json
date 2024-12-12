@@ -1,0 +1,1197 @@
+{
+  "version": "0.1.0",
+  "name": "mcm",
+  "docs": [
+    "This is mcm program supporting multiple instances of multisig configuration",
+    "A single deployed program manages multiple multisig states(configurations) identified by multisig_name"
+  ],
+  "instructions": [
+    {
+      "name": "initialize",
+      "docs": [
+        "initialize a new multisig configuration, store the chain_id and multisig_name",
+        "multisig_name is a unique identifier for the multisig configuration(32 bytes, left-padded)"
+      ],
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "program",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "programData",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rootMetadata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "expiringRootAndOpCount",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "chainId",
+          "type": "u64"
+        },
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "transferOwnership",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "proposedOwner",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "acceptOwnership",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "setConfig",
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "configSigners",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "signerGroups",
+          "type": "bytes"
+        },
+        {
+          "name": "groupQuorums",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "groupParents",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "clearRoot",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "setRoot",
+      "accounts": [
+        {
+          "name": "rootSignatures",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rootMetadata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "seenSignedHashes",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "expiringRootAndOpCount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "multisigConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "validUntil",
+          "type": "u32"
+        },
+        {
+          "name": "metadata",
+          "type": {
+            "defined": "RootMetadataInput"
+          }
+        },
+        {
+          "name": "metadataProof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "execute",
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rootMetadata",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "expiringRootAndOpCount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "to",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "multisigSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "chainId",
+          "type": "u64"
+        },
+        {
+          "name": "nonce",
+          "type": "u64"
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        },
+        {
+          "name": "proof",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initSigners",
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configSigners",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "totalSigners",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "appendSigners",
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configSigners",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "signersBatch",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "clearSigners",
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configSigners",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "finalizeSigners",
+      "accounts": [
+        {
+          "name": "multisigConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "configSigners",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "initSignatures",
+      "accounts": [
+        {
+          "name": "signatures",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "validUntil",
+          "type": "u32"
+        },
+        {
+          "name": "totalSignatures",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "appendSignatures",
+      "accounts": [
+        {
+          "name": "signatures",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "validUntil",
+          "type": "u32"
+        },
+        {
+          "name": "signaturesBatch",
+          "type": {
+            "vec": {
+              "defined": "Signature"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "clearSignatures",
+      "accounts": [
+        {
+          "name": "signatures",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "validUntil",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "finalizeSignatures",
+      "accounts": [
+        {
+          "name": "signatures",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "multisigName",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "validUntil",
+          "type": "u32"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "ConfigSigners",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signerAddresses",
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  20
+                ]
+              }
+            }
+          },
+          {
+            "name": "totalSigners",
+            "type": "u8"
+          },
+          {
+            "name": "isFinalized",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MultisigConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chainId",
+            "type": "u64"
+          },
+          {
+            "name": "multisigName",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "proposedOwner",
+            "type": "publicKey"
+          },
+          {
+            "name": "groupQuorums",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "groupParents",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "signers",
+            "type": {
+              "vec": {
+                "defined": "McmSigner"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RootSignatures",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "totalSignatures",
+            "type": "u8"
+          },
+          {
+            "name": "signatures",
+            "type": {
+              "vec": {
+                "defined": "Signature"
+              }
+            }
+          },
+          {
+            "name": "isFinalized",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RootMetadata",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chainId",
+            "type": "u64"
+          },
+          {
+            "name": "multisig",
+            "type": "publicKey"
+          },
+          {
+            "name": "preOpCount",
+            "type": "u64"
+          },
+          {
+            "name": "postOpCount",
+            "type": "u64"
+          },
+          {
+            "name": "overridePreviousRoot",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ExpiringRootAndOpCount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "root",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "validUntil",
+            "type": "u32"
+          },
+          {
+            "name": "opCount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeenSignedHash",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "seen",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "Signature",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "v",
+            "type": "u8"
+          },
+          {
+            "name": "r",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "s",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "McmSigner",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "evmAddress",
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "index",
+            "type": "u8"
+          },
+          {
+            "name": "group",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RootMetadataInput",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chainId",
+            "type": "u64"
+          },
+          {
+            "name": "multisig",
+            "type": "publicKey"
+          },
+          {
+            "name": "preOpCount",
+            "type": "u64"
+          },
+          {
+            "name": "postOpCount",
+            "type": "u64"
+          },
+          {
+            "name": "overridePreviousRoot",
+            "type": "bool"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "NewRoot",
+      "fields": [
+        {
+          "name": "root",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "validUntil",
+          "type": "u32",
+          "index": false
+        },
+        {
+          "name": "metadataChainId",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "metadataMultisig",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "metadataPreOpCount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "metadataPostOpCount",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "metadataOverridePreviousRoot",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "ConfigSet",
+      "fields": [
+        {
+          "name": "groupParents",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "groupQuorums",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "isRootCleared",
+          "type": "bool",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OpExecuted",
+      "fields": [
+        {
+          "name": "nonce",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "data",
+          "type": "bytes",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "WrongMultiSig",
+      "msg": "Invalid multisig"
+    },
+    {
+      "code": 6001,
+      "name": "WrongChainId",
+      "msg": "Invalid chainID"
+    },
+    {
+      "code": 6002,
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidInputs",
+      "msg": "Invalid inputs"
+    },
+    {
+      "code": 6004,
+      "name": "Overflow",
+      "msg": "overflow occurred."
+    },
+    {
+      "code": 6005,
+      "name": "InvalidSignature",
+      "msg": "Invalid signature"
+    },
+    {
+      "code": 6006,
+      "name": "FailedEcdsaRecover",
+      "msg": "Failed ECDSA recover"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidRootLen",
+      "msg": "Invalid root length"
+    },
+    {
+      "code": 6008,
+      "name": "SignersNotFinalized",
+      "msg": "Config signers not finalized"
+    },
+    {
+      "code": 6009,
+      "name": "SignersAlreadyFinalized",
+      "msg": "Config signers already finalized"
+    },
+    {
+      "code": 6010,
+      "name": "SignaturesAlreadyFinalized",
+      "msg": "Signatures already finalized"
+    },
+    {
+      "code": 6011,
+      "name": "SignatureCountMismatch",
+      "msg": "Uploaded signatures count mismatch"
+    },
+    {
+      "code": 6012,
+      "name": "TooManySignatures",
+      "msg": "Too many signatures"
+    },
+    {
+      "code": 6013,
+      "name": "SignaturesNotFinalized",
+      "msg": "Signatures not finalized"
+    },
+    {
+      "code": 6014,
+      "name": "SignaturesRootMismatch",
+      "msg": "Signatures root mismatch"
+    },
+    {
+      "code": 6015,
+      "name": "SignaturesValidUntilMismatch",
+      "msg": "Signatures valid until mismatch"
+    },
+    {
+      "code": 6200,
+      "name": "MismatchedInputSignerVectorsLength",
+      "msg": "The input vectors for signer addresses and signer groups must have the same length"
+    },
+    {
+      "code": 6201,
+      "name": "OutOfBoundsNumOfSigners",
+      "msg": "The number of signers is 0 or greater than MAX_NUM_SIGNERS"
+    },
+    {
+      "code": 6202,
+      "name": "MismatchedInputGroupArraysLength",
+      "msg": "The input arrays for group parents and group quorums must be of length NUM_GROUPS"
+    },
+    {
+      "code": 6203,
+      "name": "GroupTreeNotWellFormed",
+      "msg": "the group tree isn't well-formed."
+    },
+    {
+      "code": 6204,
+      "name": "SignerInDisabledGroup",
+      "msg": "a disabled group contains a signer."
+    },
+    {
+      "code": 6205,
+      "name": "OutOfBoundsGroupQuorum",
+      "msg": "the quorum of some group is larger than the number of signers in it."
+    },
+    {
+      "code": 6206,
+      "name": "SignersAddressesMustBeStrictlyIncreasing",
+      "msg": "the signers' addresses are not a strictly increasing monotone sequence."
+    },
+    {
+      "code": 6207,
+      "name": "SignedHashAlreadySeen",
+      "msg": "The combination of signature and valid_until has already been seen"
+    },
+    {
+      "code": 6208,
+      "name": "InvalidSigner",
+      "msg": "Invalid signer"
+    },
+    {
+      "code": 6209,
+      "name": "MissingConfig",
+      "msg": "Missing configuration"
+    },
+    {
+      "code": 6210,
+      "name": "InsufficientSigners",
+      "msg": "Insufficient signers"
+    },
+    {
+      "code": 6211,
+      "name": "ValidUntilHasAlreadyPassed",
+      "msg": "Valid until has already passed"
+    },
+    {
+      "code": 6212,
+      "name": "ProofCannotBeVerified",
+      "msg": "Proof cannot be verified"
+    },
+    {
+      "code": 6213,
+      "name": "PendingOps",
+      "msg": "Pending operations"
+    },
+    {
+      "code": 6214,
+      "name": "WrongPreOpCount",
+      "msg": "Wrong pre-operation count"
+    },
+    {
+      "code": 6215,
+      "name": "WrongPostOpCount",
+      "msg": "Wrong post-operation count"
+    },
+    {
+      "code": 6216,
+      "name": "PostOpCountReached",
+      "msg": "Post-operation count reached"
+    },
+    {
+      "code": 6217,
+      "name": "RootExpired",
+      "msg": "Root expired"
+    },
+    {
+      "code": 6218,
+      "name": "WrongNonce",
+      "msg": "Wrong nonce"
+    }
+  ],
+  "metadata": {
+    "address": "6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX"
+  }
+}
