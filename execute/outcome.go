@@ -144,7 +144,8 @@ func (p *Plugin) getMessagesOutcome(
 		report.CostlyMessages = nil
 		for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
 			if msg, ok := observation.Messages[report.SourceChain][j]; ok {
-				// Always add the message to the report, even if it is pseudo-deleted.
+				// Always add the message and hash, even if it wont be executed.
+				// This slice must have an entry for each message in the commit range.
 				report.Messages = append(report.Messages, msg)
 
 				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
