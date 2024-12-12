@@ -243,7 +243,7 @@ func filterOutExecutedMessages(
 
 // truncateObservation truncates the observation to fit within the given maxSize after encoding.
 // It removes data from the observation in the following order:
-// For each chain, pick last report and start *pseudoDelete message by message.
+// For each chain, pick last report and start removing messages one at a time.
 // If removed all messages from the report, remove the report.
 // If removed last report in the chain, remove the chain.
 // After removing full report from a chain, move to the next chain and repeat. This ensures that we don't
