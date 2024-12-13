@@ -276,7 +276,7 @@ func (p *Plugin) Observation(
 		FChain:        p.ObserveFChain(),
 	}
 
-	p.metricsReporter.TrackObservation(obs, "commit")
+	p.metricsReporter.TrackObservation(obs)
 
 	encoded, err := obs.Encode()
 	if err != nil {
@@ -385,7 +385,7 @@ func (p *Plugin) Outcome(
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
 	}
-	p.metricsReporter.TrackOutcome(out, "commit")
+	p.metricsReporter.TrackOutcome(out)
 	return out.Encode()
 }
 
