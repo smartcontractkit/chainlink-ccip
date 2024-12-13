@@ -19,10 +19,12 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -89,7 +91,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr             logger.Logger
+	baseLggr         logger.Logger
 	donID            plugintypes.DonID
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
@@ -114,7 +116,7 @@ func NewPluginFactory(
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:             lggr,
+		baseLggr:         lggr,
 		donID:            donID,
 		ocrConfig:        ocrConfig,
 		execCodec:        execCodec,
@@ -130,6 +132,8 @@ func NewPluginFactory(
 func (p PluginFactory) NewReportingPlugin(
 	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
+	lggr := logutil.WithPluginConstants(p.baseLggr, "Execute", p.donID, config.OracleID, config.ConfigDigest)
+
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
@@ -151,12 +155,12 @@ func (p PluginFactory) NewReportingPlugin(
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
-		readers[chain] = contractreader.NewObserverReader(cr, p.lggr, chainID)
+		readers[chain] = contractreader.NewObserverReader(cr, lggr, chainID)
 	}
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		p.lggr,
+		logutil.WithContext(lggr, "CCIPReader"),
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -165,7 +169,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		logger.Named(p.lggr, "BaseCompositeObserver"),
+		logutil.WithContext(lggr, "TokenDataObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
@@ -176,12 +180,17 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		p.lggr,
+		logutil.WithContext(lggr, "CostlyMessages"),
 		true,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
 	)
+
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
 
 	return NewPlugin(
 			p.donID,
@@ -195,8 +204,9 @@ func (p PluginFactory) NewReportingPlugin(
 			p.homeChainReader,
 			tokenDataObserver,
 			p.estimateProvider,
-			p.lggr,
+			lggr,
 			costlyMessageObserver,
+			metricsReporter,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

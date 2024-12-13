@@ -79,6 +79,7 @@ func Test_Observation(t *testing.T) {
 					offChainCfg:      defaultCfg,
 					destChain:        destChainSel,
 					fRoleDON:         f,
+					metricsReporter:  NoopMetrics{},
 				}
 			},
 			expObs: Observation{
@@ -106,6 +107,7 @@ func Test_Observation(t *testing.T) {
 					destChain:        destChainSel,
 					offChainCfg:      defaultCfg,
 					fRoleDON:         f,
+					metricsReporter:  NoopMetrics{},
 				}
 			},
 			expObs: Observation{},

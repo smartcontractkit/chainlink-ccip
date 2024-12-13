@@ -80,13 +80,10 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	p.lggr.Infow("Gas Prices Outcome",
-		"gasPrices", gasPrices,
-	)
-
-	return Outcome{
-		GasPrices: gasPrices,
-	}, nil
+	p.lggr.Infow("Gas Prices Outcome", "gasPrices", gasPrices)
+	out := Outcome{GasPrices: gasPrices}
+	p.metricsReporter.TrackChainFeeOutcome(out)
+	return out, nil
 }
 
 func (p *processor) getConsensusObservation(

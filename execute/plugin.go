@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -29,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -53,6 +55,7 @@ type Plugin struct {
 	homeChain    reader.HomeChain
 	discovery    *discovery.ContractDiscoveryProcessor
 	chainSupport plugincommon.ChainSupport
+	observer     metrics.Reporter
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
@@ -78,9 +81,8 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
+	metricsReporter metrics.Reporter,
 ) *Plugin {
-	lggr = logger.Named(lggr, "ExecutePlugin")
-	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	return &Plugin{
@@ -95,10 +97,10 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  lggr,
+		lggr:                  logutil.WithContext(lggr, "Plugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
-			lggr,
+			logutil.WithContext(lggr, "Discovery"),
 			&ccipReader,
 			homeChain,
 			destChain,
@@ -106,12 +108,13 @@ func NewPlugin(
 			oracleIDToP2pID,
 		),
 		chainSupport: plugincommon.NewChainSupport(
-			lggr,
+			logutil.WithContext(lggr, "ChainSupport"),
 			homeChain,
 			oracleIDToP2pID,
 			reportingCfg.OracleID,
 			destChain,
 		),
+		observer: metricsReporter,
 	}
 }
 

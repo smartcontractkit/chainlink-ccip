@@ -180,3 +180,28 @@ const (
 	// get transmitted onchain.
 	waitingForReportTransmission
 )
+
+func (p processorState) String() string {
+	switch p {
+	case selectingRangesForReport:
+		return "selectingRangesForReport"
+	case buildingReport:
+		return "buildingReport"
+	case waitingForReportTransmission:
+		return "waitingForReportTransmission"
+	default:
+		return "unknown"
+	}
+}
+
+// MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
+type MetricsReporter interface {
+	TrackMerkleObservation(obs Observation, state string)
+	TrackMerkleOutcome(outcome Outcome, state string)
+}
+
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackMerkleObservation(Observation, string) {}
+
+func (n NoopMetrics) TrackMerkleOutcome(Outcome, string) {}

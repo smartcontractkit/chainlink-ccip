@@ -65,9 +65,9 @@ func (p *Processor) Observation(
 	if err != nil {
 		return Observation{}, fmt.Errorf("get observation: %w", err)
 	}
-
 	p.lggr.Infow("sending merkle root processor observation",
 		"observation", observation, "nextState", nextState, "observationDuration", time.Since(tStart))
+	p.metricsReporter.TrackMerkleObservation(observation, nextState.String())
 	return observation, nil
 }
 

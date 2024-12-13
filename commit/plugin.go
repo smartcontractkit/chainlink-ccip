@@ -17,14 +17,17 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
+	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -51,6 +54,7 @@ type Plugin struct {
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
+	metricsReporter     metrics.CommitPluginReporter
 
 	// state
 	contractsInitialized atomic.Bool
@@ -71,9 +75,8 @@ func NewPlugin(
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnPeerClient rmn.PeerClient,
 	reportingCfg ocr3types.ReportingPluginConfig,
+	reporter metrics.Reporter,
 ) *Plugin {
-	lggr = logger.Named(lggr, "CommitPlugin")
-	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	if offchainCfg.MaxMerkleTreeSize == 0 {
@@ -83,7 +86,7 @@ func NewPlugin(
 	}
 
 	chainSupport := plugincommon.NewChainSupport(
-		logger.Named(lggr, "CCIPChainSupport"),
+		logutil.WithContext(lggr, "ChainSupport"),
 		homeChain,
 		oracleIDToP2pID,
 		reportingCfg.OracleID,
@@ -91,7 +94,7 @@ func NewPlugin(
 	)
 
 	rmnController := rmn.NewController(
-		logger.Named(lggr, "RMNController"),
+		logutil.WithContext(lggr, "RMNController"),
 		rmnCrypto,
 		offchainCfg.SignObservationPrefix,
 		rmnPeerClient,
@@ -103,7 +106,7 @@ func NewPlugin(
 	merkleRootProcessor := merkleroot.NewProcessor(
 		reportingCfg.OracleID,
 		oracleIDToP2pID,
-		logger.Named(lggr, "MerkleRootProcessor"),
+		logutil.WithContext(lggr, "MerkleRoot"),
 		offchainCfg,
 		destChain,
 		homeChain,
@@ -114,21 +117,23 @@ func NewPlugin(
 		rmnController,
 		rmnCrypto,
 		rmnHomeReader,
+		reporter,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		reportingCfg.OracleID,
-		lggr,
+		logutil.WithContext(lggr, "TokenPrice"),
 		offchainCfg,
 		destChain,
 		chainSupport,
 		tokenPricesReader,
 		homeChain,
 		reportingCfg.F,
+		reporter,
 	)
 
 	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
-		lggr,
+		logutil.WithContext(lggr, "Discovery"),
 		&ccipReader,
 		homeChain,
 		destChain,
@@ -137,7 +142,7 @@ func NewPlugin(
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
-		lggr,
+		logutil.WithContext(lggr, "ChainFee"),
 		reportingCfg.OracleID,
 		destChain,
 		homeChain,
@@ -145,13 +150,14 @@ func NewPlugin(
 		offchainCfg,
 		chainSupport,
 		reportingCfg.F,
+		reporter,
 	)
 
 	return &Plugin{
 		donID:               donID,
 		oracleID:            reportingCfg.OracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
-		lggr:                lggr,
+		lggr:                logutil.WithContext(lggr, "Plugin"),
 		offchainCfg:         offchainCfg,
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
@@ -164,14 +170,15 @@ func NewPlugin(
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
+		metricsReporter:     reporter,
 	}
 }
 
 func (p *Plugin) Query(ctx context.Context, outCtx ocr3types.OutcomeContext) (types.Query, error) {
 	var err error
-	var q Query
+	var q committypes.Query
 
-	prevOutcome, err := decodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
@@ -221,7 +228,7 @@ func (p *Plugin) Observation(
 
 	// If the contracts are not initialized then only submit contracts discovery related observation.
 	if !p.contractsInitialized.Load() && p.discoveryProcessor != nil {
-		obs := Observation{DiscoveryObs: discoveryObs}
+		obs := committypes.Observation{DiscoveryObs: discoveryObs}
 		encoded, err := obs.Encode()
 		if err != nil {
 			return nil, fmt.Errorf("encode discovery observation: %w, observation: %+v", err, obs)
@@ -233,12 +240,12 @@ func (p *Plugin) Observation(
 		return encoded, nil
 	}
 
-	prevOutcome, err := decodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
 
-	decodedQ, err := DecodeCommitPluginQuery(q)
+	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
 	if err != nil {
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
@@ -261,13 +268,15 @@ func (p *Plugin) Observation(
 			"err", err, "prevOutcome", prevOutcome.ChainFeeOutcome, "decodedQ", decodedQ.ChainFeeQuery)
 	}
 
-	obs := Observation{
+	obs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenPriceObs,
 		DiscoveryObs:  discoveryObs,
 		ChainFeeObs:   chainFeeObs,
 		FChain:        p.ObserveFChain(),
 	}
+
+	p.metricsReporter.TrackObservation(obs)
 
 	encoded, err := obs.Encode()
 	if err != nil {
@@ -292,12 +301,12 @@ func (p *Plugin) Outcome(
 ) (ocr3types.Outcome, error) {
 	p.lggr.Debugw("performing outcome", "outctx", outCtx, "query", q, "attributedObservations", aos)
 
-	prevOutcome, err := decodeOutcome(outCtx.PreviousOutcome)
+	prevOutcome, err := committypes.DecodeOutcome(outCtx.PreviousOutcome)
 	if err != nil {
 		return nil, fmt.Errorf("decode previous outcome: %w", err)
 	}
 
-	decodedQ, err := DecodeCommitPluginQuery(q)
+	decodedQ, err := committypes.DecodeCommitPluginQuery(q)
 	if err != nil {
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
@@ -308,7 +317,7 @@ func (p *Plugin) Outcome(
 	discoveryObservations := make([]plugincommon.AttributedObservation[dt.Observation], 0, len(aos))
 
 	for _, ao := range aos {
-		obs, err := DecodeCommitPluginObservation(ao.Observation)
+		obs, err := committypes.DecodeCommitPluginObservation(ao.Observation)
 		if err != nil {
 			p.lggr.Warnw("failed to decode observation, observation skipped", "err", err)
 			continue
@@ -371,11 +380,13 @@ func (p *Plugin) Outcome(
 		p.lggr.Warnw("failed to get gas prices outcome", "err", err)
 	}
 
-	return Outcome{
+	out := committypes.Outcome{
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
-	}.Encode()
+	}
+	p.metricsReporter.TrackOutcome(out)
+	return out.Encode()
 }
 
 func (p *Plugin) Close() error {
