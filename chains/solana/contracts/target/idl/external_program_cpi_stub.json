@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.0.0-dev",
   "name": "external_program_cpi_stub",
   "instructions": [
     {
@@ -96,8 +96,5 @@
         ]
       }
     }
-  ],
-  "metadata": {
-    "address": "4HeqEoSyfYpeC2goFLj9eHgkxV33mR5G7JYAbRsN14uQ"
-  }
+  ]
 }

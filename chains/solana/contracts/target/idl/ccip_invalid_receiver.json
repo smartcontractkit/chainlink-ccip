@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.0.0-dev",
   "name": "ccip_invalid_receiver",
   "instructions": [
     {
@@ -99,8 +99,5 @@
         ]
       }
     }
-  ],
-  "metadata": {
-    "address": "9Vjda3WU2gsJgE4VdU6QuDw8rfHLyigfFyWs3XDPNUn8"
-  }
+  ]
 }

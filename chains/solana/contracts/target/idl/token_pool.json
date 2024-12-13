@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.0-dev",
   "name": "token_pool",
   "instructions": [
     {
@@ -841,8 +841,5 @@
       "name": "RLDisabledNonZeroRateLimit",
       "msg": "RateLimit: disabled non-zero rate limit"
     }
-  ],
-  "metadata": {
-    "address": "GRvFSLwR7szpjgNEZbGe4HtxfJYXqySXuuRUAJDpu4WH"
-  }
+  ]
 }

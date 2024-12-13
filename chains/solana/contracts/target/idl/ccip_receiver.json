@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.0-dev",
   "name": "ccip_receiver",
   "docs": [
     "This program an example of a CCIP Receiver Program.",
@@ -298,8 +298,5 @@
         ]
       }
     }
-  ],
-  "metadata": {
-    "address": "CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"
-  }
+  ]
 }

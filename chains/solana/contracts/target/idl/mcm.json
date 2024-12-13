@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.0-dev",
   "name": "mcm",
   "docs": [
     "This is mcm program supporting multiple instances of multisig configuration",
@@ -1190,8 +1190,5 @@
       "name": "WrongNonce",
       "msg": "Wrong nonce"
     }
-  ],
-  "metadata": {
-    "address": "6UmMZr5MEqiKWD5jqTJd1WCR5kT8oZuFYBLJFi1o6GQX"
-  }
+  ]
 }

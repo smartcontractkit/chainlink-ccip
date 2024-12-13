@@ -1,5 +1,5 @@
 {
-  "version": "0.0.1",
+  "version": "0.0.1-dev",
   "name": "timelock",
   "instructions": [
     {
@@ -913,8 +913,5 @@
       "name": "Placeholder",
       "msg": "Todo generate error type with anchor"
     }
-  ],
-  "metadata": {
-    "address": "LoCoNsJFuhTkSQjfdDfn3yuwqhSYoPujmviRHVCzsqn"
-  }
+  ]
 }

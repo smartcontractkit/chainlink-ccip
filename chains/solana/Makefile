@@ -16,7 +16,7 @@ gomods: ## Install gomods
 gomodtidy: gomods
 	gomods tidy
 
-.PHONY: lint-go-integration-tests
+.PHONY: lint-go
 lint-go:
 	golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 15m --out-format checkstyle:golangci-lint-report.xml run
 
