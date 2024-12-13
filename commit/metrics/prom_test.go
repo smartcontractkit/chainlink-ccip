@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -229,6 +231,123 @@ func Test_MerkleRoots(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Cleanup(cleanupMetrics(reporter))
+
+	obsTcs := []struct {
+		name             string
+		observation      merkleroot.Observation
+		state            string
+		expectedRoots    int
+		expectedMessages int
+	}{
+		{
+			name: "empty/missing structs should not report anything",
+			observation: merkleroot.Observation{
+				MerkleRoots: nil,
+			},
+			state:            "state",
+			expectedRoots:    0,
+			expectedMessages: 0,
+		},
+		{
+			name: "data is properly reported",
+			observation: merkleroot.Observation{
+				MerkleRoots: []cciptypes.MerkleRootChain{
+					cciptypes.NewMerkleRootChain(
+						cciptypes.ChainSelector(1),
+						rand.RandomBytes(32),
+						cciptypes.NewSeqNumRange(1, 10),
+						rand.RandomBytes32(),
+					),
+					cciptypes.NewMerkleRootChain(
+						cciptypes.ChainSelector(2),
+						rand.RandomBytes(32),
+						cciptypes.NewSeqNumRange(2, 3),
+						rand.RandomBytes32(),
+					),
+				},
+			},
+			expectedRoots:    2,
+			expectedMessages: 12,
+		},
+	}
+
+	for _, tc := range obsTcs {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter.TrackMerkleObservation(tc.observation, tc.state)
+
+			roots := int(testutil.ToFloat64(
+				reporter.merkleProcessorObservationCounter.WithLabelValues(chainID, tc.state, "roots")),
+			)
+			require.Equal(t, tc.expectedRoots, roots)
+			messages := int(testutil.ToFloat64(
+				reporter.merkleProcessorObservationCounter.WithLabelValues(chainID, tc.state, "messages")),
+			)
+			require.Equal(t, tc.expectedMessages, messages)
+		})
+	}
+
+	outTcs := []struct {
+		name                  string
+		outcome               merkleroot.Outcome
+		state                 string
+		expectedRoots         int
+		expectedMessages      int
+		expectedRMNSignatures int
+	}{
+		{
+			name: "empty/missing structs should not report anything",
+			outcome: merkleroot.Outcome{
+				RootsToReport: nil,
+			},
+			state:                 "state",
+			expectedRoots:         0,
+			expectedMessages:      0,
+			expectedRMNSignatures: 0,
+		},
+		{
+			name: "data is properly reported",
+			outcome: merkleroot.Outcome{
+				RootsToReport: []cciptypes.MerkleRootChain{
+					cciptypes.NewMerkleRootChain(
+						cciptypes.ChainSelector(1),
+						rand.RandomBytes(32),
+						cciptypes.NewSeqNumRange(1, 2),
+						rand.RandomBytes32(),
+					),
+					cciptypes.NewMerkleRootChain(
+						cciptypes.ChainSelector(2),
+						rand.RandomBytes(32),
+						cciptypes.NewSeqNumRange(2, 5),
+						rand.RandomBytes32(),
+					),
+				},
+				RMNReportSignatures: make([]cciptypes.RMNECDSASignature, 5),
+			},
+			state:                 "state",
+			expectedRoots:         2,
+			expectedMessages:      6,
+			expectedRMNSignatures: 5,
+		},
+	}
+
+	for _, tc := range outTcs {
+		t.Run(tc.name, func(t *testing.T) {
+			reporter.TrackMerkleOutcome(tc.outcome, tc.state)
+
+			roots := int(testutil.ToFloat64(
+				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "roots")),
+			)
+			require.Equal(t, tc.expectedRoots, roots)
+			messages := int(testutil.ToFloat64(
+				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "messages")),
+			)
+			require.Equal(t, tc.expectedMessages, messages)
+			rmns := int(testutil.ToFloat64(
+				reporter.merkleProcessorOutcomeCounter.WithLabelValues(chainID, tc.state, "rmnSignatures")),
+			)
+			require.Equal(t, tc.expectedRMNSignatures, rmns)
+		})
+	}
 }
 
 func cleanupMetrics(reporter *PromReporter) func() {
