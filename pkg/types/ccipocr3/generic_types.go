@@ -95,6 +95,10 @@ func (s SeqNumRange) String() string {
 	return fmt.Sprintf("[%d -> %d]", s[0], s[1])
 }
 
+func (s SeqNumRange) Length() int {
+	return int(s.End() - s.Start() + 1)
+}
+
 type ChainSelector uint64
 
 func (c ChainSelector) String() string {

@@ -1,16 +1,23 @@
 package metrics
 
 import (
-	sel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/tokenprice"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
+// Reporter is a simple interface used for tracking observations and outcomes of the commit plugin.
+// Default implementation is based on the Prometheus metrics, but it can be extended to support other metrics systems.
+// It allows you to track observation/outcome on the processor level as well as on the individual plugin level.
+// That gives us more flexibility and granularity in tracking the performance of the commit plugin.
+// Processors have a dedicated sub-interfaces covering only the relevant methods for reporting, please see:
+// - chainfee.MetricsReporter
+// - merkleroot.MetricsReporter
+// - tokenprice.MetricsReporter
+// - CommitPluginReporter
+// This split is required to define the reporting logic in one place but inject only relevant dependencies to
+// plugins/processors. Also, it solves the problem of cyclic dependencies between the plugins/processors.
 type Reporter interface {
 	TrackObservation(obs committypes.Observation)
 	TrackOutcome(outcome committypes.Outcome)
@@ -28,47 +35,6 @@ type Reporter interface {
 type CommitPluginReporter interface {
 	TrackObservation(obs committypes.Observation)
 	TrackOutcome(outcome committypes.Outcome)
-}
-
-type PromReporter struct {
-	lggr    logger.Logger
-	chainID string
-}
-
-func NewPromReporter(lggr logger.Logger, selector cciptypes.ChainSelector) (*PromReporter, error) {
-	chainID, err := sel.GetChainIDFromSelector(uint64(selector))
-	if err != nil {
-		return nil, err
-	}
-
-	return &PromReporter{
-		lggr:    lggr,
-		chainID: chainID,
-	}, nil
-}
-
-func (p *PromReporter) TrackObservation(obs committypes.Observation) {
-}
-
-func (p *PromReporter) TrackOutcome(outcome committypes.Outcome) {
-}
-
-func (p *PromReporter) TrackChainFeeObservation(obs chainfee.Observation) {
-}
-
-func (p *PromReporter) TrackChainFeeOutcome(outcome chainfee.Outcome) {
-}
-
-func (p *PromReporter) TrackMerkleObservation(obs merkleroot.Observation, state string) {
-}
-
-func (p *PromReporter) TrackMerkleOutcome(outcome merkleroot.Outcome, state string) {
-}
-
-func (p *PromReporter) TrackTokenPricesObservation(obs tokenprice.Observation) {
-}
-
-func (p *PromReporter) TrackTokenPricesOutcome(outcome tokenprice.Outcome) {
 }
 
 type Noop struct{}
