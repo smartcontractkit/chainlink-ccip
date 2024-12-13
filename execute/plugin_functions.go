@@ -259,6 +259,8 @@ func truncateObservation(
 	obs exectypes.Observation,
 	maxSize int,
 ) (exectypes.Observation, error) {
+	// TODO: Use a hash to store encoding sizes for individual messages
+	//  and use that to determine how many messages to delete.
 	observation := obs
 	encodedObs, err := observation.Encode()
 	if err != nil {
@@ -298,6 +300,7 @@ func truncateObservation(
 
 				seqNum++
 				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
+				// TODO: Remove the 32 check once we implement the hash size calculation.
 				if seqNum%32 == 0 && observationFitsSize(observation, maxSize) {
 					return observation, nil
 				}
