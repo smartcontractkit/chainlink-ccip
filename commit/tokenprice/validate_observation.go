@@ -16,7 +16,7 @@ func (p *processor) ValidateObservation(
 ) error {
 	obs := ao.Observation
 
-	if err := validateFChain(obs.FChain); err != nil {
+	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
@@ -33,16 +33,6 @@ func (p *processor) ValidateObservation(
 
 	if err := validateObservedTokenPrices(obs.FeedTokenPrices); err != nil {
 		return fmt.Errorf("failed to validate observed token prices: %w", err)
-	}
-
-	return nil
-}
-
-func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for chainSelector, f := range fChain {
-		if f <= 0 {
-			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
-		}
 	}
 
 	return nil
