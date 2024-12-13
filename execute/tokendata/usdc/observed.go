@@ -37,7 +37,7 @@ var (
 		},
 		[]string{"statusCode"},
 	)
-	promTimeToAttestation = promauto.NewHistogram(
+	promTimeToAttestation = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "ccip_time_to_attestation",
 			Help: "The time taken to attest a message from seeing it for the first time till " +
@@ -52,6 +52,7 @@ var (
 				float64(60 * time.Minute),
 			},
 		},
+		[]string{},
 	)
 )
 
@@ -59,7 +60,7 @@ type observedHTTPClient struct {
 	HTTPClient
 	lggr                   logger.Logger
 	requestDurations       *prometheus.HistogramVec
-	timeToAttestation      prometheus.Histogram
+	timeToAttestation      *prometheus.HistogramVec
 	timeToAttestationCache *cache.Cache
 }
 
@@ -112,7 +113,7 @@ func (o *observedHTTPClient) trackTimeToAttestation(
 		// and we don't need to track that
 		if seen {
 			duration := time.Since(messageSeenFirst.(time.Time))
-			o.timeToAttestation.Observe(float64(duration))
+			o.timeToAttestation.WithLabelValues().Observe(float64(duration))
 			o.lggr.Infow("Observed time to attestation for USDC message",
 				"hash", hash,
 				"duration", duration.String(),

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -45,6 +46,63 @@ func Test_ObservedMetrics(t *testing.T) {
 
 	c4 := internal.CounterFromHistogramByLabels(t, promAttestationDurations, "404")
 	require.Equal(t, 0, c4)
+}
+
+func Test_TimeToAttestation(t *testing.T) {
+	ctx := tests.Context(t)
+	http := &fake{status: 200}
+	client := newObservedHTTPClient(http, logger.Test(t))
+
+	t.Cleanup(func() {
+		client.timeToAttestation.Reset()
+	})
+
+	message1 := rand.RandomBytes32()
+	message2 := rand.RandomBytes32()
+	message3 := rand.RandomBytes32()
+
+	t.Run("succesfull response dones't publish anyting", func(t *testing.T) {
+		client.timeToAttestation.Reset()
+
+		_, st, _ := client.Get(ctx, message1)
+		require.Equal(t, 200, int(st))
+		require.Empty(t, client.timeToAttestationCache.Items())
+	})
+
+	t.Run("failed and then back to success published duration", func(t *testing.T) {
+		client.timeToAttestation.Reset()
+
+		http.status = 400
+		_, st, _ := client.Get(ctx, message2)
+		require.Equal(t, 400, int(st))
+
+		http.status = 200
+		_, st, _ = client.Get(ctx, message2)
+		require.Equal(t, 200, int(st))
+		require.Empty(t, client.timeToAttestationCache.Items())
+		require.Equal(t, 1, internal.CounterFromHistogramByLabels(t, promTimeToAttestation))
+	})
+
+	t.Run("forever failed doesn't publish anything", func(t *testing.T) {
+		client.timeToAttestation.Reset()
+
+		http.status = 400
+		_, st, _ := client.Get(ctx, message3)
+		require.Equal(t, 400, int(st))
+
+		http.status = 500
+		_, st, _ = client.Get(ctx, message3)
+		require.Equal(t, 500, int(st))
+
+		require.Equal(t, 0, internal.CounterFromHistogramByLabels(t, promTimeToAttestation))
+
+		// Different message
+		http.status = 200
+		_, st, _ = client.Get(ctx, message2)
+		require.Equal(t, 200, int(st))
+
+		require.Equal(t, 0, internal.CounterFromHistogramByLabels(t, promTimeToAttestation))
+	})
 }
 
 type fake struct {
