@@ -181,6 +181,19 @@ const (
 	waitingForReportTransmission
 )
 
+func (p processorState) String() string {
+	switch p {
+	case selectingRangesForReport:
+		return "selectingRangesForReport"
+	case buildingReport:
+		return "buildingReport"
+	case waitingForReportTransmission:
+		return "waitingForReportTransmission"
+	default:
+		return "unknown"
+	}
+}
+
 // MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
 type MetricsReporter interface {
 	TrackMerkleObservation(obs Observation, state string)
