@@ -153,8 +153,8 @@ func (p *Plugin) getMessagesOutcome(
 				if costlyMessagesSet.Contains(msg.Header.MessageID) {
 					report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
 				}
+				report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 			}
-			report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 		}
 		if len(report.Messages) == 0 {
 			// If there are no messages, remove the commit report.
