@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -749,6 +750,10 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 
 	defaultWaitTimeout := 3 * time.Second
 	defaultsleepBetweenAttempts := 100 * time.Millisecond
+	// Set only the required environment variables
+	viper.Set("CHAINLINK_TEAM", "CRIB")
+	viper.Set("CHAINLINK_PRODUCT", "TestProduct")
+	viper.Set("CHAINLINK_COMPONENT", "CRIB")
 
 	testCases := []struct {
 		name                    string
@@ -772,6 +777,9 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 				m.EXPECT().
 					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
 					Return(nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
+					Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -787,6 +795,9 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 					Return(false, nil)
 				m.EXPECT().
 					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
 					Return(nil)
 			},
 			expectedErr: nil,
@@ -832,6 +843,29 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 					Return(errors.New("timed out waiting for resource crib-test-crib-poweruser"))
 			},
 			expectedErr: fmt.Errorf("failed to wait for crib-power-user role binding to be created: %w", errors.New("timed out waiting for resource crib-test-crib-poweruser")),
+		},
+		{
+			name:                 "LabelNamespaceFails",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(false, nil)
+				m.EXPECT().
+					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{
+						"chain.link/component": "CRIB",
+						"chain.link/product":   "TestProduct",
+						"chain.link/team":      "CRIB",
+					}).
+					Return(errors.New("failed to label namespace namespace=crib-test error"))
+			},
+			expectedErr: errors.New("failed to label namespace namespace=crib-test error"),
 		},
 	}
 

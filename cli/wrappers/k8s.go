@@ -2,7 +2,9 @@ package wrappers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	corev1api "k8s.io/api/core/v1"
@@ -31,7 +33,7 @@ type K8sCLI interface {
 	EnsureNamespaceExists(ctx context.Context, name string) (bool, error)
 	WaitForResource(ctx context.Context, resourceClient dynamic.ResourceInterface, resourceName string, interval, timeout time.Duration) error
 	ApplyConfigMap(ctx context.Context, configMap *corev1api.ConfigMap) (bool, error)
-	LabelNamespace(ctx context.Context, namespace, key, value string) error
+	LabelNamespace(ctx context.Context, namespace string, labels map[string]string) error
 	ListIngresses(ctx context.Context, namespace string) (*networkingv1api.IngressList, error)
 	GetIngress(ctx context.Context, namespace string, name string) (*networkingv1api.Ingress, error)
 }
@@ -183,18 +185,29 @@ func (k *K8sClient) ApplyConfigMap(ctx context.Context, configMap *corev1api.Con
 	return false, nil
 }
 
-// LabelNamespace applies a label update to a namespace using PATCH.
-func (k *K8sClient) LabelNamespace(ctx context.Context, namespace, key, value string) error {
-	patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value)
+// LabelNamespace applies the provided labels to the specified Kubernetes namespace, only if there are differences.
+func (k *K8sClient) LabelNamespace(ctx context.Context, namespaceName string, labels map[string]string) error {
+	// Marshal the labels into JSON for patching
+	patchData := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": labels,
+		},
+	}
 
-	_, err := k.clientset.CoreV1().Namespaces().Patch(
-		ctx,
-		namespace,
-		types.MergePatchType,
-		[]byte(patch),
-		metav1.PatchOptions{},
-	)
-	return err
+	// Convert the patch data into JSON
+	patchBytes, err := json.Marshal(patchData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal patch data: %v", err)
+	}
+
+	// Patch the namespace
+	_, err = k.clientset.CoreV1().Namespaces().Patch(ctx, namespaceName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to patch namespace %s: %v", namespaceName, err)
+	}
+
+	slog.Info("Namespace successfully patched with labels", slog.String("namespace", namespaceName), slog.Any("labels", labels))
+	return nil
 }
 
 // ListIngresses lists all Ingress resources in a namespace.

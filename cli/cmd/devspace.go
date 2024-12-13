@@ -242,6 +242,16 @@ var checkEnvVarsCmd = &cobra.Command{
 			}
 		}
 
+		if viper.GetString("PROVIDER") == "aws" {
+			for _, name := range []string{"DEVSPACE_INGRESS_CERT_ARN", "CHAINLINK_PRODUCT", "CHAINLINK_TEAM"} {
+				value := os.Getenv(name)
+				logger.Debug("reading env var", slog.String("name", name), slog.String("value", value))
+				if value == "" {
+					missingEnvVars = append(missingEnvVars, name)
+				}
+			}
+		}
+
 		missingEnvVarsCount := len(missingEnvVars)
 		if missingEnvVarsCount > 0 {
 			logger.Error("missing required environment variables, make sure they're all added ot the config file and try again (check '.env.example' for reference)", slog.Int("count", missingEnvVarsCount), slog.Any("env_vars", missingEnvVars), slog.String("config_file", viper.ConfigFileUsed()), slog.String("product", product))
@@ -391,7 +401,12 @@ var labelNamespaceCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if err := k8sClient.LabelNamespace(context.TODO(), viper.GetString("DEVSPACE_NAMESPACE"), args[0], args[1]); err != nil {
+		// Generate labels
+		labels := map[string]string{
+			args[0]: args[1],
+		}
+
+		if err := k8sClient.LabelNamespace(context.TODO(), viper.GetString("DEVSPACE_NAMESPACE"), labels); err != nil {
 			logger.Error("failed to label namespace", slog.Any("error", err))
 			os.Exit(1)
 		}

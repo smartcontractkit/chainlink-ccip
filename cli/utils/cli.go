@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/smartcontractkit/crib/cli/wrappers"
+	"github.com/spf13/viper"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -311,6 +312,19 @@ func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, ro
 			slog.String("namespace", namespace),
 			slog.Float64("elapsed_seconds", time.Since(startTime).Seconds()),
 		)
+
+		// Get labels
+		labels, err := GetNamespaceLabels()
+		if err != nil {
+			slog.Error("failed to compose namespace labels", slog.Any("error", err))
+			os.Exit(1)
+		}
+
+		// Apply labels to the namespace
+		if err := k8sClient.LabelNamespace(ctx, namespace, labels); err != nil {
+			slog.Error("failed to label namespace", slog.String("namespace", namespace), slog.Any("error", err))
+			os.Exit(1)
+		}
 	}
 	return nil
 }
@@ -338,4 +352,32 @@ func PrintIngressHosts(ctx context.Context, k8sClient wrappers.K8sCLI, namespace
 		}
 	}
 	return nil
+}
+
+// GetNamespaceLabels generates required labels including cost attribution labels.
+// They are generated based on the user input/config
+func GetNamespaceLabels() (map[string]string, error) {
+	// Retrieve environment variables
+	team := viper.GetString("CHAINLINK_TEAM")
+	product := viper.GetString("CHAINLINK_PRODUCT")
+	component := viper.GetString("CHAINLINK_COMPONENT")
+
+	// Validate mandatory fields
+	if team == "" || product == "" {
+		return nil, fmt.Errorf("one or more required environment variables are missing: CHAINLINK_TEAM, CHAINLINK_PRODUCT")
+	}
+
+	// Set default for component if not specified
+	if component == "" {
+		component = "CRIB"
+	}
+
+	// Generate labels
+	labels := map[string]string{
+		"chain.link/team":      team,
+		"chain.link/product":   product,
+		"chain.link/component": component,
+	}
+
+	return labels, nil
 }

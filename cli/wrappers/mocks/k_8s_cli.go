@@ -454,16 +454,16 @@ func (_c *K8sCLI_GetIngress_Call) RunAndReturn(run func(context.Context, string,
 }
 
 // LabelNamespace provides a mock function with given fields: ctx, namespace, key, value
-func (_m *K8sCLI) LabelNamespace(ctx context.Context, namespace string, key string, value string) error {
-	ret := _m.Called(ctx, namespace, key, value)
+func (_m *K8sCLI) LabelNamespace(ctx context.Context, namespace string, labels map[string]string) error {
+	ret := _m.Called(ctx, namespace, labels)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LabelNamespace")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string, string) error); ok {
-		r0 = rf(ctx, namespace, key, value)
+	if rf, ok := ret.Get(0).(func(context.Context, string, map[string]string) error); ok {
+		r0 = rf(ctx, namespace, labels)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -480,14 +480,14 @@ type K8sCLI_LabelNamespace_Call struct {
 //   - ctx context.Context
 //   - namespace string
 //   - key string
-//   - value string
-func (_e *K8sCLI_Expecter) LabelNamespace(ctx interface{}, namespace interface{}, key interface{}, value interface{}) *K8sCLI_LabelNamespace_Call {
-	return &K8sCLI_LabelNamespace_Call{Call: _e.mock.On("LabelNamespace", ctx, namespace, key, value)}
+//   - value map[string]string
+func (_e *K8sCLI_Expecter) LabelNamespace(ctx interface{}, namespace interface{},  labels map[string]string) *K8sCLI_LabelNamespace_Call {
+	return &K8sCLI_LabelNamespace_Call{Call: _e.mock.On("LabelNamespace", ctx, namespace, labels)}
 }
 
-func (_c *K8sCLI_LabelNamespace_Call) Run(run func(ctx context.Context, namespace string, key string, value string)) *K8sCLI_LabelNamespace_Call {
+func (_c *K8sCLI_LabelNamespace_Call) Run(run func(ctx context.Context, namespace string, labels map[string]string)) *K8sCLI_LabelNamespace_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(map[string]string))
 	})
 	return _c
 }
@@ -497,7 +497,7 @@ func (_c *K8sCLI_LabelNamespace_Call) Return(_a0 error) *K8sCLI_LabelNamespace_C
 	return _c
 }
 
-func (_c *K8sCLI_LabelNamespace_Call) RunAndReturn(run func(context.Context, string, string, string) error) *K8sCLI_LabelNamespace_Call {
+func (_c *K8sCLI_LabelNamespace_Call) RunAndReturn(run func(context.Context, string, map[string]string) error) *K8sCLI_LabelNamespace_Call {
 	_c.Call.Return(run)
 	return _c
 }
