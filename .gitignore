@@ -32,3 +32,6 @@ cli/dist/
 
 # go package related
 .run.id
+
+# dev/test tools downloaded by task dev:setup
+.devtest-tools/

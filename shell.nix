@@ -2,8 +2,6 @@
 with pkgs;
 let
   go = go_1_23;
-  nodejs = nodejs-18_x;
-  nodePackages = pkgs.nodePackages.override { inherit nodejs; };
 
   mkShell' = mkShell.override {
     # The current nix default SDK for macOS fails to compile Go projects, so we use a newer one for now.
@@ -23,24 +21,16 @@ mkShell' {
     libiconv
 
     curl
-    nodejs
-    nodePackages.pnpm
-
-    go-mockery
 
     # Tooling
     actionlint
     gotools
     gopls
     delve
-    golangci-lint
     github-cli
     jq
     gomplate
     go-task
-    yamllint
-    shfmt
-    shellcheck
     kind
 
     # Include only logcli instead of the full loki package
@@ -81,9 +71,6 @@ mkShell' {
     export PATH=$PATH:$repo_root/scripts:$GOBIN
 
     ${lib.optionalString (!keystone) ''
-      # Install changesets (no nix package available at the moment)
-      pnpm install
-
       if [ "$CRIB_CI_ENV" = "true" ] && [ "$CLI_CHANGED" != "true" ]; then
         # in CI, download the CLI from the corresponding GH release if the CLI hasn't changed
         task fetch-cli
