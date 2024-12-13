@@ -25,8 +25,8 @@ func (r RoleAccounts) RandomPick() solana.PrivateKey {
 		panic("no accounts to pick from")
 	}
 
-	max := big.NewInt(int64(len(r.Accounts)))
-	n, err := crypto_rand.Int(crypto_rand.Reader, max)
+	maxN := big.NewInt(int64(len(r.Accounts)))
+	n, err := crypto_rand.Int(crypto_rand.Reader, maxN)
 	if err != nil {
 		panic(err)
 	}

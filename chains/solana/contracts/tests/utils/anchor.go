@@ -128,7 +128,7 @@ func IsEvent(event string, data []byte) bool {
 	return bytes.Equal(d, data[:8])
 }
 
-func ParseEvent(logs []string, event string, obj interface{}, print ...bool) error {
+func ParseEvent(logs []string, event string, obj interface{}, shouldPrint ...bool) error {
 	for _, v := range logs {
 		if strings.Contains(v, "Program data:") {
 			encodedData := strings.TrimSpace(strings.TrimPrefix(v, "Program data:"))
@@ -141,7 +141,7 @@ func ParseEvent(logs []string, event string, obj interface{}, print ...bool) err
 					return err
 				}
 
-				if len(print) > 0 && print[0] {
+				if len(shouldPrint) > 0 && shouldPrint[0] {
 					fmt.Printf("%s: %+v\n", event, obj)
 				}
 				return nil
@@ -151,7 +151,7 @@ func ParseEvent(logs []string, event string, obj interface{}, print ...bool) err
 	return fmt.Errorf("%s: event not found", event)
 }
 
-func ParseMultipleEvents[T any](logs []string, event string, print bool) ([]T, error) {
+func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) ([]T, error) {
 	var results []T
 	for _, v := range logs {
 		if strings.Contains(v, "Program data:") {
@@ -166,7 +166,7 @@ func ParseMultipleEvents[T any](logs []string, event string, print bool) ([]T, e
 					return nil, err
 				}
 
-				if print {
+				if shouldPrint {
 					fmt.Printf("%s: %+v\n", event, obj)
 				}
 

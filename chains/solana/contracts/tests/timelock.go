@@ -103,8 +103,8 @@ func (r RoleMultisigs) GetAnyMultisig() mcmsUtils.Multisig {
 	if len(r.Multisigs) == 0 {
 		panic("no multisigs to pick from")
 	}
-	max := big.NewInt(int64(len(r.Multisigs)))
-	n, err := crypto_rand.Int(crypto_rand.Reader, max)
+	maxN := big.NewInt(int64(len(r.Multisigs)))
+	n, err := crypto_rand.Int(crypto_rand.Reader, maxN)
 	if err != nil {
 		panic(err)
 	}
