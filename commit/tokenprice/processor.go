@@ -77,9 +77,10 @@ func (p *processor) Outcome(
 		"outcome token prices",
 		"tokenPrices", tokenPriceOutcome,
 	)
-	return Outcome{
-		TokenPrices: tokenPriceOutcome,
-	}, nil
+
+	out := Outcome{TokenPrices: tokenPriceOutcome}
+	p.metricsReporter.TrackTokenPricesOutcome(out)
+	return out, nil
 }
 
 func (p *processor) Close() error {

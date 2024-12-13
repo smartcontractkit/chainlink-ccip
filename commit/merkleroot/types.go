@@ -186,3 +186,9 @@ type MetricsReporter interface {
 	TrackMerkleObservation(obs Observation, state string)
 	TrackMerkleOutcome(outcome Outcome, state string)
 }
+
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackMerkleObservation(Observation, string) {}
+
+func (n NoopMetrics) TrackMerkleOutcome(Outcome, string) {}

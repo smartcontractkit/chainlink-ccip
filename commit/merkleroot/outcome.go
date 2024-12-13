@@ -40,6 +40,7 @@ func (p *Processor) Outcome(
 		return Outcome{}, err
 	}
 
+	p.metricsReporter.TrackMerkleOutcome(outcome, "merkleroot")
 	p.lggr.Infow("Sending Outcome",
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil

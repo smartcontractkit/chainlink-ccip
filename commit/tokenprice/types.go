@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -52,6 +51,12 @@ type Observer interface {
 
 // MetricsReporter exposes only relevant methods for reporting token prices from metrics.Reporter
 type MetricsReporter interface {
-	TrackTokenPricesObservation(obs merkleroot.Observation, state string)
-	TrackTokenPricesOutcome(outcome merkleroot.Outcome, state string)
+	TrackTokenPricesObservation(obs Observation)
+	TrackTokenPricesOutcome(outcome Outcome)
 }
+
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackTokenPricesObservation(Observation) {}
+
+func (n NoopMetrics) TrackTokenPricesOutcome(Outcome) {}

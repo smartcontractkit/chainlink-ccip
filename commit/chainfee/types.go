@@ -49,6 +49,12 @@ type Update struct {
 
 // MetricsReporter exposes only relevant methods for reporting chain fees from metrics.Reporter
 type MetricsReporter interface {
-	TrackChainFeeObservation(obs Observation, state string)
-	TrackChainFeeOutcome(outcome Outcome, state string)
+	TrackChainFeeObservation(obs Observation)
+	TrackChainFeeOutcome(outcome Outcome)
 }
+
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackChainFeeObservation(Observation) {}
+
+func (n NoopMetrics) TrackChainFeeOutcome(Outcome) {}

@@ -15,14 +15,19 @@ type Reporter interface {
 	TrackObservation(obs committypes.Observation, state string)
 	TrackOutcome(outcome committypes.Outcome, state string)
 
-	TrackChainFeeObservation(obs chainfee.Observation, state string)
-	TrackChainFeeOutcome(outcome chainfee.Outcome, state string)
-
 	TrackMerkleObservation(obs merkleroot.Observation, state string)
 	TrackMerkleOutcome(outcome merkleroot.Outcome, state string)
 
-	TrackTokenPricesObservation(obs merkleroot.Observation, state string)
-	TrackTokenPricesOutcome(outcome merkleroot.Outcome, state string)
+	TrackChainFeeObservation(obs chainfee.Observation)
+	TrackChainFeeOutcome(outcome chainfee.Outcome)
+
+	TrackTokenPricesObservation(obs tokenprice.Observation)
+	TrackTokenPricesOutcome(outcome tokenprice.Outcome)
+}
+
+type CommitPluginReporter interface {
+	TrackObservation(obs committypes.Observation, state string)
+	TrackOutcome(outcome committypes.Outcome, state string)
 }
 
 type PromReporter struct {
@@ -48,10 +53,10 @@ func (p *PromReporter) TrackObservation(obs committypes.Observation, state strin
 func (p *PromReporter) TrackOutcome(outcome committypes.Outcome, state string) {
 }
 
-func (p *PromReporter) TrackChainFeeObservation(obs chainfee.Observation, state string) {
+func (p *PromReporter) TrackChainFeeObservation(obs chainfee.Observation) {
 }
 
-func (p *PromReporter) TrackChainFeeOutcome(outcome chainfee.Outcome, state string) {
+func (p *PromReporter) TrackChainFeeOutcome(outcome chainfee.Outcome) {
 }
 
 func (p *PromReporter) TrackMerkleObservation(obs merkleroot.Observation, state string) {
@@ -60,10 +65,10 @@ func (p *PromReporter) TrackMerkleObservation(obs merkleroot.Observation, state 
 func (p *PromReporter) TrackMerkleOutcome(outcome merkleroot.Outcome, state string) {
 }
 
-func (p *PromReporter) TrackTokenPricesObservation(obs merkleroot.Observation, state string) {
+func (p *PromReporter) TrackTokenPricesObservation(obs tokenprice.Observation) {
 }
 
-func (p *PromReporter) TrackTokenPricesOutcome(outcome merkleroot.Outcome, state string) {
+func (p *PromReporter) TrackTokenPricesOutcome(outcome tokenprice.Outcome) {
 }
 
 type Noop struct{}
@@ -72,20 +77,21 @@ func (n *Noop) TrackObservation(committypes.Observation, string) {}
 
 func (n *Noop) TrackOutcome(committypes.Outcome, string) {}
 
-func (n *Noop) TrackChainFeeObservation(chainfee.Observation, string) {}
+func (n *Noop) TrackChainFeeObservation(chainfee.Observation) {}
 
-func (n *Noop) TrackChainFeeOutcome(chainfee.Outcome, string) {}
+func (n *Noop) TrackChainFeeOutcome(chainfee.Outcome) {}
 
 func (n *Noop) TrackMerkleObservation(merkleroot.Observation, string) {}
 
 func (n *Noop) TrackMerkleOutcome(merkleroot.Outcome, string) {}
 
-func (n *Noop) TrackTokenPricesObservation(merkleroot.Observation, string) {}
+func (n *Noop) TrackTokenPricesObservation(tokenprice.Observation) {}
 
-func (n *Noop) TrackTokenPricesOutcome(merkleroot.Outcome, string) {}
+func (n *Noop) TrackTokenPricesOutcome(tokenprice.Outcome) {}
 
 var _ Reporter = &Noop{}
 var _ Reporter = &PromReporter{}
+var _ CommitPluginReporter = &PromReporter{}
 var _ chainfee.MetricsReporter = &PromReporter{}
 var _ merkleroot.MetricsReporter = &PromReporter{}
 var _ tokenprice.MetricsReporter = &PromReporter{}
