@@ -180,3 +180,9 @@ const (
 	// get transmitted onchain.
 	waitingForReportTransmission
 )
+
+// MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
+type MetricsReporter interface {
+	TrackMerkleObservation(obs Observation, state string)
+	TrackMerkleOutcome(outcome Outcome, state string)
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -47,4 +48,10 @@ type Observer interface {
 	ObserveFeeQuoterTokenUpdates(ctx context.Context) map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
+}
+
+// MetricsReporter exposes only relevant methods for reporting token prices from metrics.Reporter
+type MetricsReporter interface {
+	TrackTokenPricesObservation(obs merkleroot.Observation, state string)
+	TrackTokenPricesOutcome(outcome merkleroot.Outcome, state string)
 }

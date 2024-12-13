@@ -46,3 +46,9 @@ type Update struct {
 	ChainFee  ComponentsUSDPrices `json:"chainFee"`
 	Timestamp time.Time           `json:"timestamp"`
 }
+
+// MetricsReporter exposes only relevant methods for reporting chain fees from metrics.Reporter
+type MetricsReporter interface {
+	TrackChainFeeObservation(obs Observation, state string)
+	TrackChainFeeOutcome(outcome Outcome, state string)
+}

@@ -116,6 +116,7 @@ func NewPlugin(
 		rmnController,
 		rmnCrypto,
 		rmnHomeReader,
+		reporter,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
@@ -127,6 +128,7 @@ func NewPlugin(
 		tokenPricesReader,
 		homeChain,
 		reportingCfg.F,
+		reporter,
 	)
 
 	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
@@ -147,6 +149,7 @@ func NewPlugin(
 		offchainCfg,
 		chainSupport,
 		reportingCfg.F,
+		reporter,
 	)
 
 	return &Plugin{

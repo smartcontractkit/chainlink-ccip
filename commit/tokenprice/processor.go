@@ -22,6 +22,7 @@ type processor struct {
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
+	metricsReporter  MetricsReporter
 	fRoleDON         int
 }
 
@@ -34,6 +35,7 @@ func NewProcessor(
 	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
@@ -44,6 +46,7 @@ func NewProcessor(
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
 		fRoleDON:         fRoleDON,
+		metricsReporter:  metricsReporter,
 	}
 }
 

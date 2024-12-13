@@ -232,7 +232,10 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.PriceFeedChainSelector,
 	)
 
-	metricsReporter := &metrics.Noop{}
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
 
 	return NewPlugin(
 			p.donID,
