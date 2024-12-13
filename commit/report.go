@@ -12,6 +12,7 @@ import (
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -44,7 +45,7 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	outcome, err := decodeOutcome(outcomeBytes)
+	outcome, err := committypes.DecodeOutcome(outcomeBytes)
 	if err != nil {
 		p.lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
 		return nil, fmt.Errorf("decode outcome: %w", err)
