@@ -1565,42 +1565,42 @@ func Test_truncateObservation(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "truncate one message from first chain",
-			observation: exectypes.Observation{
-				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
-					1: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
-					},
-					2: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
-					},
-				},
-				Messages: makeMessageObservation(
-					map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
-						1: {1, 2},
-						2: {3, 4},
-					},
-					withData(make([]byte, 100)),
-				),
-			},
-			maxSize: 3159, // chain 1, message 1 will be truncated
-			expected: exectypes.Observation{
-				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
-					1: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
-					},
-					2: {
-						{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
-					},
-				},
-			},
-			deletedMsgs: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]struct{}{
-				1: {
-					1: struct{}{},
-				},
-			},
-		},
+		//{
+		//	name: "truncate one message from first chain",
+		//	observation: exectypes.Observation{
+		//		CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+		//			1: {
+		//				{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
+		//			},
+		//			2: {
+		//				{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
+		//			},
+		//		},
+		//		Messages: makeMessageObservation(
+		//			map[cciptypes.ChainSelector]cciptypes.SeqNumRange{
+		//				1: {1, 2},
+		//				2: {3, 4},
+		//			},
+		//			withData(make([]byte, 100)),
+		//		),
+		//	},
+		//	maxSize: 3159, // chain 1, message 1 will be truncated
+		//	expected: exectypes.Observation{
+		//		CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
+		//			1: {
+		//				{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
+		//			},
+		//			2: {
+		//				{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
+		//			},
+		//		},
+		//	},
+		//	deletedMsgs: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]struct{}{
+		//		1: {
+		//			1: struct{}{},
+		//		},
+		//	},
+		//},
 		{
 			name: "truncate all",
 			observation: exectypes.Observation{

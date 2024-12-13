@@ -297,7 +297,8 @@ func truncateObservation(
 				observation.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
 				seqNum++
-				if observationFitsSize(observation, maxSize) {
+				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
+				if seqNum%32 == 0 && observationFitsSize(observation, maxSize) {
 					return observation, nil
 				}
 			}
