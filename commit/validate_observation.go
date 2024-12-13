@@ -7,7 +7,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 )
 
 // ValidateObservation validates an observation to ensure it is well-formed
@@ -32,7 +32,7 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("decode previous outcome: %w", err)
 	}
 
-	if err := validateFChain(obs.FChain); err != nil {
+	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
@@ -62,16 +62,6 @@ func (p *Plugin) ValidateObservation(
 	err = p.chainFeeProcessor.ValidateObservation(prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery, gasObs)
 	if err != nil {
 		return fmt.Errorf("validate chain fee observation: %w", err)
-	}
-
-	return nil
-}
-
-func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for chainSelector, f := range fChain {
-		if f <= 0 {
-			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
-		}
 	}
 
 	return nil
