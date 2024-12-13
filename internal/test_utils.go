@@ -50,16 +50,3 @@ func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.Histogr
 
 	return int(pb.GetHistogram().GetSampleCount())
 }
-
-func CounterFromHistogram(t *testing.T, histogram prometheus.Histogram) int {
-	metricCh := make(chan prometheus.Metric, 1)
-	histogram.Collect(metricCh)
-	close(metricCh)
-
-	metric := <-metricCh
-	pb := &io_prometheus_client.Metric{}
-	err := metric.Write(pb)
-	require.NoError(t, err)
-
-	return int(pb.GetHistogram().GetSampleCount())
-}

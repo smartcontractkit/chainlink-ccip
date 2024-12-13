@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	// cacheExpiration sets how long we keep the seen USDC attestations in the cache for computing duration.
+	// We can't keep them forever, so we don't track messages which are waiting for longer than 70 minutes
 	cacheExpiration = 70 * time.Minute
 	cacheCleanup    = 10 * time.Minute
 )
