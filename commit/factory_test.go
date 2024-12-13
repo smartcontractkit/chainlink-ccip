@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
@@ -53,7 +54,7 @@ func Test_maxQueryLength(t *testing.T) {
 		}
 	}
 
-	q := Query{
+	q := committypes.Query{
 		MerkleRootQuery: merkleroot.Query{
 			RetryRMNSignatures: true,
 			RMNSignatures: &rmn.ReportSignatures{
@@ -122,7 +123,7 @@ func Test_maxObservationLength(t *testing.T) {
 		}
 	}
 
-	maxObs := Observation{
+	maxObs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
 		TokenPriceObs: tokenprice.Observation{
 			FeedTokenPrices: make([]ccipocr3.TokenPrice, estimatedMaxNumberOfPricedTokens),
@@ -162,7 +163,7 @@ func Test_maxObservationLength(t *testing.T) {
 }
 
 func Test_maxOutcomeLength(t *testing.T) {
-	maxOutc := Outcome{
+	maxOutc := committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType:                     merkleroot.OutcomeType(math.MaxInt),
 			RangesSelectedForReport:         make([]plugintypes.ChainRange, estimatedMaxNumberOfSourceChains),

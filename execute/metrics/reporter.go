@@ -203,3 +203,6 @@ type Noop struct{}
 func (n *Noop) TrackObservation(exectypes.Observation, exectypes.PluginState) {}
 
 func (n *Noop) TrackOutcome(exectypes.Outcome, exectypes.PluginState) {}
+
+var _ Reporter = &Noop{}
+var _ Reporter = &PromReporter{}
