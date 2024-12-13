@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/chainfee"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
@@ -252,18 +253,18 @@ func Test_MerkleRoots(t *testing.T) {
 			name: "data is properly reported",
 			observation: merkleroot.Observation{
 				MerkleRoots: []cciptypes.MerkleRootChain{
-					cciptypes.NewMerkleRootChain(
-						cciptypes.ChainSelector(1),
-						rand.RandomBytes(32),
-						cciptypes.NewSeqNumRange(1, 10),
-						rand.RandomBytes32(),
-					),
-					cciptypes.NewMerkleRootChain(
-						cciptypes.ChainSelector(2),
-						rand.RandomBytes(32),
-						cciptypes.NewSeqNumRange(2, 3),
-						rand.RandomBytes32(),
-					),
+					{
+						ChainSel:      cciptypes.ChainSelector(1),
+						OnRampAddress: rand.RandomBytes(32),
+						SeqNumsRange:  cciptypes.NewSeqNumRange(1, 10),
+						MerkleRoot:    rand.RandomBytes32(),
+					},
+					{
+						ChainSel:      cciptypes.ChainSelector(2),
+						OnRampAddress: rand.RandomBytes(32),
+						SeqNumsRange:  cciptypes.NewSeqNumRange(2, 3),
+						MerkleRoot:    rand.RandomBytes32(),
+					},
 				},
 			},
 			expectedRoots:    2,
@@ -308,18 +309,18 @@ func Test_MerkleRoots(t *testing.T) {
 			name: "data is properly reported",
 			outcome: merkleroot.Outcome{
 				RootsToReport: []cciptypes.MerkleRootChain{
-					cciptypes.NewMerkleRootChain(
-						cciptypes.ChainSelector(1),
-						rand.RandomBytes(32),
-						cciptypes.NewSeqNumRange(1, 2),
-						rand.RandomBytes32(),
-					),
-					cciptypes.NewMerkleRootChain(
-						cciptypes.ChainSelector(2),
-						rand.RandomBytes(32),
-						cciptypes.NewSeqNumRange(2, 5),
-						rand.RandomBytes32(),
-					),
+					{
+						ChainSel:      cciptypes.ChainSelector(1),
+						OnRampAddress: rand.RandomBytes(32),
+						SeqNumsRange:  cciptypes.NewSeqNumRange(1, 2),
+						MerkleRoot:    rand.RandomBytes32(),
+					},
+					{
+						ChainSel:      cciptypes.ChainSelector(2),
+						OnRampAddress: rand.RandomBytes(32),
+						SeqNumsRange:  cciptypes.NewSeqNumRange(2, 5),
+						MerkleRoot:    rand.RandomBytes32(),
+					},
 				},
 				RMNReportSignatures: make([]cciptypes.RMNECDSASignature, 5),
 			},
