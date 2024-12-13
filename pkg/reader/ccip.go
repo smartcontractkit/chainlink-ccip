@@ -1152,14 +1152,13 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 }
 
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
-// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L86
-//
-//nolint:lll // It's a URL.
+// See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
 type offRampStaticChainConfig struct {
-	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	RmnRemote          []byte                  `json:"rmnRemote"`
-	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
-	NonceManager       []byte                  `json:"nonceManager"`
+	ChainSelector        cciptypes.ChainSelector `json:"chainSelector"`
+	GasForCallExactCheck uint16                  `json:"gasForCallExactCheck"`
+	RmnRemote            []byte                  `json:"rmnRemote"`
+	TokenAdminRegistry   []byte                  `json:"tokenAdminRegistry"`
+	NonceManager         []byte                  `json:"nonceManager"`
 }
 
 // offRampDynamicChainConfig maps to DynamicConfig in OffRamp.sol
