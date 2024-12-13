@@ -26,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -342,6 +343,7 @@ func (it *IntTest) newNode(
 		ep,
 		it.lggr,
 		costlyMessageObserver,
+		&metrics.Noop{},
 	)
 
 	return nodeSetup{

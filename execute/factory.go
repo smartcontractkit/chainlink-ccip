@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -187,6 +188,11 @@ func (p PluginFactory) NewReportingPlugin(
 		p.estimateProvider,
 	)
 
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
+
 	return NewPlugin(
 			p.donID,
 			config,
@@ -201,6 +207,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.estimateProvider,
 			lggr,
 			costlyMessageObserver,
+			metricsReporter,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{
