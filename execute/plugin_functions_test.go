@@ -563,7 +563,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
 						},
 					},
 				},
@@ -595,7 +595,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(1),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							1: {{MerkleRoot: cciptypes.Bytes32{1}}},
+							1: {{MerkleRoot: cciptypes.Bytes32{1}, OnRampAddress: cciptypes.UnknownAddress{}}},
 						},
 					},
 				},
@@ -603,7 +603,7 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					OracleID: commontypes.OracleID(2),
 					Observation: exectypes.Observation{
 						CommitReports: exectypes.CommitObservations{
-							2: {{MerkleRoot: cciptypes.Bytes32{2}}},
+							2: {{MerkleRoot: cciptypes.Bytes32{2}, OnRampAddress: cciptypes.UnknownAddress{}}},
 						},
 					},
 				},
