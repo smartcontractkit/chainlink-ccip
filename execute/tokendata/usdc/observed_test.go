@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
@@ -18,9 +19,9 @@ func Test_ObservedMetrics(t *testing.T) {
 	successCount := 10
 
 	ctx := tests.Context(t)
-	client200 := newObservedHTTPClient(fake{status: 200})
-	client400 := newObservedHTTPClient(fake{status: 400})
-	client500 := newObservedHTTPClient(fake{status: 500, err: fmt.Errorf("error")})
+	client200 := newObservedHTTPClient(fake{status: 200}, logger.Test(t))
+	client400 := newObservedHTTPClient(fake{status: 400}, logger.Test(t))
+	client500 := newObservedHTTPClient(fake{status: 500, err: fmt.Errorf("error")}, logger.Test(t))
 
 	for i := 0; i < successCount; i++ {
 		_, st, _ := client200.Get(ctx, cciptypes.Bytes32{})

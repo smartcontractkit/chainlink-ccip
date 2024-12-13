@@ -112,7 +112,7 @@ func newHTTPClient(
 		rate:       rate.NewLimiter(rate.Every(apiInterval), 1),
 		coolDownMu: &sync.RWMutex{},
 	}
-	return newObservedHTTPClient(client), nil
+	return newObservedHTTPClient(client, lggr), nil
 }
 
 type attestationStatus string
