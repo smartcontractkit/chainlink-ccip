@@ -1,4 +1,4 @@
-package commit
+package committypes
 
 import (
 	"encoding/json"
@@ -68,7 +68,7 @@ func (o Outcome) Encode() ([]byte, error) {
 	return encodedOutcome, nil
 }
 
-func decodeOutcome(b []byte) (Outcome, error) {
+func DecodeOutcome(b []byte) (Outcome, error) {
 	if len(b) == 0 {
 		return Outcome{}, nil
 	}

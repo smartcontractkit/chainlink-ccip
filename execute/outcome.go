@@ -97,6 +97,7 @@ func (p *Plugin) Outcome(
 		return nil, nil
 	}
 
+	p.observer.TrackOutcome(outcome, state)
 	p.lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
 
 	return outcome.Encode()

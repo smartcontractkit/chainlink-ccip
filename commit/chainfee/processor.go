@@ -14,14 +14,15 @@ import (
 )
 
 type processor struct {
-	oracleID     commontypes.OracleID
-	destChain    cciptypes.ChainSelector
-	lggr         logger.Logger
-	homeChain    reader.HomeChain
-	ccipReader   readerpkg.CCIPReader
-	cfg          pluginconfig.CommitOffchainConfig
-	chainSupport plugincommon.ChainSupport
-	fRoleDON     int
+	oracleID        commontypes.OracleID
+	destChain       cciptypes.ChainSelector
+	lggr            logger.Logger
+	homeChain       reader.HomeChain
+	ccipReader      readerpkg.CCIPReader
+	cfg             pluginconfig.CommitOffchainConfig
+	chainSupport    plugincommon.ChainSupport
+	metricsReporter MetricsReporter
+	fRoleDON        int
 }
 
 func NewProcessor(
@@ -33,16 +34,18 @@ func NewProcessor(
 	offChainConfig pluginconfig.CommitOffchainConfig,
 	chainSupport plugincommon.ChainSupport,
 	fRoleDON int,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
-		lggr:         lggr,
-		oracleID:     oracleID,
-		destChain:    destChain,
-		homeChain:    homeChain,
-		ccipReader:   ccipReader,
-		fRoleDON:     fRoleDON,
-		chainSupport: chainSupport,
-		cfg:          offChainConfig,
+		lggr:            lggr,
+		oracleID:        oracleID,
+		destChain:       destChain,
+		homeChain:       homeChain,
+		ccipReader:      ccipReader,
+		fRoleDON:        fRoleDON,
+		chainSupport:    chainSupport,
+		cfg:             offChainConfig,
+		metricsReporter: metricsReporter,
 	}
 }
 
