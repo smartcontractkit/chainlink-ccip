@@ -3,27 +3,26 @@ package chainfee
 import (
 	"context"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
-
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
 type processor struct {
-	oracleID     commontypes.OracleID
-	destChain    cciptypes.ChainSelector
-	lggr         logger.Logger
-	homeChain    reader.HomeChain
-	ccipReader   readerpkg.CCIPReader
-	cfg          pluginconfig.CommitOffchainConfig
-	chainSupport plugincommon.ChainSupport
-	fRoleDON     int
+	oracleID        commontypes.OracleID
+	destChain       cciptypes.ChainSelector
+	lggr            logger.Logger
+	homeChain       reader.HomeChain
+	ccipReader      readerpkg.CCIPReader
+	cfg             pluginconfig.CommitOffchainConfig
+	chainSupport    plugincommon.ChainSupport
+	metricsReporter MetricsReporter
+	fRoleDON        int
 }
 
 func NewProcessor(
@@ -35,16 +34,18 @@ func NewProcessor(
 	offChainConfig pluginconfig.CommitOffchainConfig,
 	chainSupport plugincommon.ChainSupport,
 	fRoleDON int,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
-		lggr:         lggr,
-		oracleID:     oracleID,
-		destChain:    destChain,
-		homeChain:    homeChain,
-		ccipReader:   ccipReader,
-		fRoleDON:     fRoleDON,
-		chainSupport: chainSupport,
-		cfg:          offChainConfig,
+		lggr:            lggr,
+		oracleID:        oracleID,
+		destChain:       destChain,
+		homeChain:       homeChain,
+		ccipReader:      ccipReader,
+		fRoleDON:        fRoleDON,
+		chainSupport:    chainSupport,
+		cfg:             offChainConfig,
+		metricsReporter: metricsReporter,
 	}
 }
 

@@ -57,7 +57,7 @@ Follow the steps below to ensure that we don't run into any unexpected breakages
 the `main` branch of chainlink-ccip. You can do this by:
     - Creating a branch in the CCIP repo and running `go get github.com/smartcontractkit/chainlink-ccip@<your-branch-commit-sha>`.
     - Fixing the build/tests.
-    - You can specify a particular commit hash on the chainlink repo by adding "core ref: commit sha" to your PR description. See [this](https://github.com/smartcontractkit/chainlink-ccip/pull/307) as an example. If you update the description, manually rerun the workflow.
+    - You can specify a particular commit hash on the chainlink repo by adding "core ref: commit sha" to your PR description. See [this](https://github.com/smartcontractkit/chainlink-ccip/pull/307) as an example. If you update the description, manually rerun the workflow. **NOTE**: Your PR description should not contain single quote (').
 4. Once your chainlink-ccip PR is approved, merge it.
 5. Go back to your chainlink PR and bump the chainlink-ccip version to the latest main.
 6. Once the integration test passes, merge your chainlink PR into `develop`.

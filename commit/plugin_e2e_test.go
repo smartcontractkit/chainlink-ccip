@@ -11,6 +11,8 @@ import (
 
 	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
+	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 
@@ -43,6 +45,7 @@ import (
 	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/reader"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	reader2 "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -95,7 +98,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 	params := defaultNodeParams(t)
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
-	outcomeIntervalsSelected := Outcome{
+	outcomeIntervalsSelected := committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType: merkleroot.ReportIntervalsSelected,
 			RangesSelectedForReport: []plugintypes.ChainRange{
@@ -110,7 +113,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		},
 	}
 
-	outcomeReportGenerated := Outcome{
+	outcomeReportGenerated := committypes.Outcome{
 		MerkleRootOutcome: merkleroot.Outcome{
 			OutcomeType: merkleroot.ReportGenerated,
 			RootsToReport: []ccipocr3.MerkleRootChain{
@@ -135,8 +138,8 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 
 	testCases := []struct {
 		name                  string
-		prevOutcome           Outcome
-		expOutcome            Outcome
+		prevOutcome           committypes.Outcome
+		expOutcome            committypes.Outcome
 		expTransmittedReports []ccipocr3.CommitPluginReport
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
@@ -146,13 +149,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 	}{
 		{
 			name:        "empty previous outcome, should select ranges for report",
-			prevOutcome: Outcome{},
+			prevOutcome: committypes.Outcome{},
 			expOutcome:  outcomeIntervalsSelected,
 		},
 		{
 			name:            "discovery enabled, should discover contracts",
-			prevOutcome:     Outcome{},
-			expOutcome:      Outcome{},
+			prevOutcome:     committypes.Outcome{},
+			expOutcome:      committypes.Outcome{},
 			enableDiscovery: true,
 		},
 		{
@@ -177,7 +180,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		{
 			name:        "report generated in previous outcome, still inflight",
 			prevOutcome: outcomeReportGenerated,
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType:                     merkleroot.ReportInFlight,
 					ReportTransmissionCheckAttempts: 1,
@@ -191,7 +194,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		{
 			name:        "report generated in previous outcome, still inflight, reached all inflight check attempts",
 			prevOutcome: outcomeReportGeneratedOneInflightCheck,
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmissionFailed,
 				},
@@ -202,7 +205,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			prevOutcome:                            outcomeReportGenerated,
 			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
 			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmitted,
 				},
@@ -242,7 +245,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := decodeOutcome(res.Outcome)
+			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -272,15 +275,15 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 
 	testCases := []struct {
 		name                  string
-		prevOutcome           Outcome
-		expOutcome            Outcome
+		prevOutcome           committypes.Outcome
+		expOutcome            committypes.Outcome
 		mockPriceReader       func(*readerpkg_mock.MockPriceReader)
 		expTransmittedReports []ccipocr3.CommitPluginReport
 		enableDiscovery       bool
 	}{
 		{
 			name:        "empty fee_quoter token updates, should select all token prices for update",
-			prevOutcome: Outcome{},
+			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
@@ -295,7 +298,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					).
 					Maybe()
 			},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: orderedTokenPrices,
@@ -320,7 +323,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 		},
 		{
 			name:        "fresh tokens don't need new updates",
-			prevOutcome: Outcome{},
+			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
@@ -339,14 +342,14 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					).
 					Maybe()
 			},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{},
 			},
 		},
 		{
 			name:        "stale tokens need new updates",
-			prevOutcome: Outcome{},
+			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
@@ -370,7 +373,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					).
 					Maybe()
 			},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: []ccipocr3.TokenPrice{
@@ -415,7 +418,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := decodeOutcome(res.Outcome)
+			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -448,16 +451,16 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 
 	testCases := []struct {
 		name                    string
-		prevOutcome             Outcome
-		expOutcome              Outcome
+		prevOutcome             committypes.Outcome
+		expOutcome              committypes.Outcome
 		expTransmittedReportLen int
 
 		mockCCIPReader func(*readerpkg_mock.MockCCIPReader)
 	}{
 		{
 			name:        "fee components should be updated",
-			prevOutcome: Outcome{},
-			expOutcome: Outcome{
+			prevOutcome: committypes.Outcome{},
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
@@ -498,8 +501,8 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		},
 		{
 			name:        "fee components should be updated when there's a subset of chains",
-			prevOutcome: Outcome{},
-			expOutcome: Outcome{
+			prevOutcome: committypes.Outcome{},
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
@@ -523,11 +526,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		},
 		{
 			name: "fee components should not be updated within deviation",
-			prevOutcome: Outcome{
+			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
@@ -549,11 +552,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		},
 		{
 			name: "fresh fees (timestamped) should not be updated, even outside of deviation",
-			prevOutcome: Outcome{
+			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
@@ -582,11 +585,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 		},
 		{
 			name: "stale fees should be updated",
-			prevOutcome: Outcome{
+			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChainFeeOutcome,
 			},
-			expOutcome: Outcome{
+			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
@@ -647,7 +650,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			res, err := runner.RunRound(params.ctx)
 			assert.NoError(t, err)
 
-			decodedOutcome, err := decodeOutcome(res.Outcome)
+			decodedOutcome, err := committypes.DecodeOutcome(res.Outcome)
 			assert.NoError(t, err)
 			assert.Equal(t, normalizeOutcome(tc.expOutcome), normalizeOutcome(decodedOutcome))
 
@@ -657,7 +660,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 }
 
 // normalizeOutcome converts empty slices to nil or nil slices to empty where needed.
-func normalizeOutcome(o Outcome) Outcome {
+func normalizeOutcome(o committypes.Outcome) committypes.Outcome {
 	if len(o.MerkleRootOutcome.RMNRemoteCfg.ContractAddress) == 0 {
 		// Normalize to `nil` if it's an empty slice
 		o.MerkleRootOutcome.RMNRemoteCfg.ContractAddress = nil
@@ -681,11 +684,16 @@ func prepareCcipReaderMock(
 			Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{}).Maybe()
 	}
 	ccipReader.EXPECT().
+		GetLatestPriceSeqNr(ctx).
+		Return(0, nil).Maybe()
+	ccipReader.EXPECT().
 		GetChainFeePriceUpdate(ctx, mock.Anything).
 		Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{}).Maybe()
 	ccipReader.EXPECT().
 		GetContractAddress(mock.Anything, mock.Anything).
 		Return(ccipocr3.Bytes{}, nil).Maybe()
+	ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
+		Return(&reader2.CurseInfo{}, nil).Maybe()
 
 	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()
@@ -832,6 +840,10 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		GetRMNRemoteConfig(params.ctx, mock.Anything).
 		Return(params.rmnReportCfg, nil).Maybe()
 
+	ccipReader.EXPECT().
+		GetOffRampConfigDigest(params.ctx, consts.PluginTypeCommit).
+		Return(params.reportingCfg.ConfigDigest, nil).Maybe()
+
 	p := NewPlugin(
 		params.donID,
 		params.oracleIDToP2pID,
@@ -847,6 +859,7 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		nil,
 		nil,
 		params.reportingCfg,
+		&metrics.Noop{},
 	)
 
 	if !params.enableDiscovery {
@@ -960,10 +973,10 @@ func newRandomFees() (types.ChainFeeComponents, ccipocr3.BigInt, ccipocr3.BigInt
 	execFee := big.NewInt(rand.RandomInt64())
 	dataAvFee := big.NewInt(rand.RandomInt64())
 	nativePrice := big.NewInt(rand.RandomInt64())
-	usdPrices := chainfee.ComponentsUSDPrices{
+	usdPrices := chainfee.FeeComponentsToPackedFee(chainfee.ComponentsUSDPrices{
 		ExecutionFeePriceUSD: mathslib.CalculateUsdPerUnitGas(execFee, nativePrice),
 		DataAvFeePriceUSD:    mathslib.CalculateUsdPerUnitGas(dataAvFee, nativePrice),
-	}.ToPackedFee()
+	})
 
 	return types.ChainFeeComponents{ExecutionFee: execFee, DataAvailabilityFee: dataAvFee},
 		ccipocr3.NewBigInt(nativePrice),

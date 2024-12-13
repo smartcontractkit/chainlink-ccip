@@ -7,6 +7,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	reader_internal "github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 )
 
 type HomeChain = reader_internal.HomeChain
@@ -23,11 +24,21 @@ type OCR3Config = reader_internal.OCR3Config
 
 type OCR3Node = reader_internal.OCR3Node
 
-func NewHomeChainReader(
+func NewObservedHomeChainReader(
 	homeChainReader types.ContractReader,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
+	chainID string,
 ) HomeChain {
-	return reader_internal.NewHomeChainConfigPoller(homeChainReader, lggr, pollingInterval, ccipConfigBoundContract)
+	return reader_internal.NewHomeChainConfigPoller(
+		contractreader.NewObserverReader(
+			homeChainReader,
+			lggr,
+			chainID,
+		),
+		lggr,
+		pollingInterval,
+		ccipConfigBoundContract,
+	)
 }

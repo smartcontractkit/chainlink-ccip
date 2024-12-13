@@ -34,6 +34,9 @@ type TokenDataObserver interface {
 
 	// IsTokenSupported returns true if the token is supported by the observer.
 	IsTokenSupported(sourceChain cciptypes.ChainSelector, msgToken cciptypes.RampTokenAmount) bool
+
+	// Close closes the observer and releases any resources.
+	Close() error
 }
 
 // compositeTokenDataObserver is a TokenDataObserver that combines multiple TokenDataObserver behind the same interface.
@@ -65,7 +68,21 @@ func NewConfigBasedCompositeObservers(
 			if err != nil {
 				return nil, fmt.Errorf("create USDC/CCTP token observer: %w", err)
 			}
-			observers[i] = observer
+
+			if c.USDCCCTPObserverConfig.NumWorkers == 0 {
+				lggr.Info("Using foreground observer for USDC/CCTP")
+				observers[i] = observer
+			} else {
+				lggr.Info("Using background observer for USDC/CCTP")
+				observers[i] = NewBackgroundObserver(
+					lggr,
+					observer,
+					c.USDCCCTPObserverConfig.NumWorkers,
+					c.USDCCCTPObserverConfig.CacheExpirationInterval.Duration(),
+					c.USDCCCTPObserverConfig.CacheCleanupInterval.Duration(),
+					c.USDCCCTPObserverConfig.ObserveTimeout.Duration(),
+				)
+			}
 		default:
 			return nil, errors.New("unsupported token data observer")
 		}
@@ -147,6 +164,15 @@ func (c *compositeTokenDataObserver) IsTokenSupported(
 	return false
 }
 
+func (c *compositeTokenDataObserver) Close() error {
+	for _, ob := range c.observers {
+		if err := ob.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // initTokenDataObservations initializes the token data observations with empty token data, it asks the child observers
 // whether the token is supported or not. If token is supported and requires additional processing we set its state to
 // isReady=false. If token is noop (doesn't require offchain processing) we initialize it with empty
@@ -202,7 +228,10 @@ func merge(
 	return base, nil
 }
 
-type NoopTokenDataObserver struct{}
+type NoopTokenDataObserver struct {
+	tokenSupported bool
+	errorTokenData map[cciptypes.ChainSelector]map[cciptypes.SeqNum][]int
+}
 
 func (n *NoopTokenDataObserver) Observe(
 	_ context.Context,
@@ -216,7 +245,11 @@ func (n *NoopTokenDataObserver) Observe(
 		for seq, message := range obs {
 			tokenData := make([]exectypes.TokenData, len(message.TokenAmounts))
 			for i := range message.TokenAmounts {
-				tokenData[i] = exectypes.NewNoopTokenData()
+				if n.isError(selector, seq, i) {
+					tokenData[i] = exectypes.NewErrorTokenData(errors.New("some error"))
+				} else {
+					tokenData[i] = exectypes.NewNoopTokenData()
+				}
 			}
 			tokenObservations[selector][seq] = exectypes.MessageTokenData{TokenData: tokenData}
 		}
@@ -224,6 +257,37 @@ func (n *NoopTokenDataObserver) Observe(
 	return tokenObservations, nil
 }
 
-func (n *NoopTokenDataObserver) IsTokenSupported(_ cciptypes.ChainSelector, _ cciptypes.RampTokenAmount) bool {
+func (n *NoopTokenDataObserver) Close() error {
+	return nil
+}
+
+func (n *NoopTokenDataObserver) isError(selector cciptypes.ChainSelector, seq cciptypes.SeqNum, tokenIdx int) bool {
+	if n.errorTokenData[selector] == nil {
+		return false
+	}
+
+	if _, exists := n.errorTokenData[selector]; !exists {
+		return false
+	}
+
+	if _, exists := n.errorTokenData[selector][seq]; !exists {
+		return false
+	}
+
+	tokenIdxs, exists := n.errorTokenData[selector][seq]
+	if !exists {
+		return false
+	}
+
+	for _, idx := range tokenIdxs {
+		if idx == tokenIdx {
+			return true
+		}
+	}
+
 	return false
+}
+
+func (n *NoopTokenDataObserver) IsTokenSupported(_ cciptypes.ChainSelector, _ cciptypes.RampTokenAmount) bool {
+	return n.tokenSupported
 }

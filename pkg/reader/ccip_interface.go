@@ -41,7 +41,7 @@ func NewCCIPChainReader(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) CCIPReader {
@@ -60,7 +60,7 @@ func NewCCIPReaderWithExtendedContractReaders(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) CCIPReader {
@@ -148,6 +148,14 @@ type CCIPReader interface {
 		destChainSelector cciptypes.ChainSelector,
 	) (rmntypes.RemoteConfig, error)
 
+	// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
+	// from the destination chain RMN remote contract. Caller should be able to access destination.
+	GetRmnCurseInfo(
+		ctx context.Context,
+		destChainSelector cciptypes.ChainSelector,
+		sourceChainSelectors []cciptypes.ChainSelector,
+	) (*CurseInfo, error)
+
 	// DiscoverContracts reads from all available contract readers to discover contract addresses.
 	DiscoverContracts(ctx context.Context) (ContractAddresses, error)
 
@@ -163,4 +171,11 @@ type CCIPReader interface {
 
 	// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
 	GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error)
+
+	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
+	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.
+	GetLatestPriceSeqNr(ctx context.Context) (uint64, error)
+
+	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
+	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 }

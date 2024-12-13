@@ -61,13 +61,15 @@ var obsNoUpdate = Observation{
 	TimestampNow: ts,
 }
 
-func SameObs(n int, obs Observation) []plugincommon.AttributedObservation[Observation] {
+// sameObs returns n observations with the same observation but from different oracle ids
+func sameObs(n int, obs Observation) []plugincommon.AttributedObservation[Observation] {
 	aos := make([]plugincommon.AttributedObservation[Observation], n)
 	for i := 0; i < n; i++ {
 		aos[i] = plugincommon.AttributedObservation[Observation]{OracleID: commontypes.OracleID(i), Observation: obs}
 	}
 	return aos
 }
+
 func TestGetConsensusObservation(t *testing.T) {
 	lggr := logger.Test(t)
 	p := &processor{
@@ -77,7 +79,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	}
 
 	// 3 oracles, same observations, will pass destChain 2f+1 for chain selector 1
-	aos := SameObs(3, obsNeedUpdate)
+	aos := sameObs(3, obsNeedUpdate)
 
 	consensusObs, err := p.getConsensusObservation(aos)
 	require.NoError(t, err)
@@ -94,7 +96,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	assert.Equal(t, nativeTokenPricesMap[1], consensusObs.NativeTokenPrices[1])
 
 	// 5 oracles, same observations, will pass destChain 2f+1 for both chain selectors
-	aos = SameObs(5, obsNeedUpdate)
+	aos = sameObs(5, obsNeedUpdate)
 
 	consensusObs, err = p.getConsensusObservation(aos)
 	require.NoError(t, err)
@@ -110,6 +112,8 @@ func TestGetConsensusObservation(t *testing.T) {
 }
 
 func TestProcessor_Outcome(t *testing.T) {
+	oneMinuteAgo := time.Now().Add(-time.Minute).UTC()
+
 	cases := []struct {
 		name                   string
 		chainFeeWriteFrequency commonconfig.Duration
@@ -120,7 +124,7 @@ func TestProcessor_Outcome(t *testing.T) {
 	}{
 		{
 			name:          "Outcome gas prices when earliest update is before batch write frequency duration",
-			aos:           SameObs(5, obsNeedUpdate),
+			aos:           sameObs(5, obsNeedUpdate),
 			expectedError: false,
 			expectedOutcome: func() Outcome {
 				gas2 := new(big.Int)
@@ -151,14 +155,64 @@ func TestProcessor_Outcome(t *testing.T) {
 		},
 		{
 			name:          "Empty Outcome when no need to update",
-			aos:           SameObs(5, obsNoUpdate),
+			aos:           sameObs(5, obsNoUpdate),
 			expectedError: false,
 			expectedOutcome: func() Outcome {
 				return Outcome{}
 			},
 			chainFeeWriteFrequency: chainFeePriceBatchWriteFrequency,
 		},
-		//TODO: Add test to check that deviated prices updates
+		{
+			name:                   "happy path with a price deviation",
+			chainFeeWriteFrequency: *commonconfig.MustNewDuration(time.Hour),
+			feeInfo: map[cciptypes.ChainSelector]pluginconfig.FeeInfo{
+				1: {
+					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
+					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
+				},
+				2: {
+					ExecDeviationPPB:             cciptypes.NewBigInt(big.NewInt(1)),
+					DataAvailabilityDeviationPPB: cciptypes.NewBigInt(big.NewInt(1)),
+				},
+			},
+			aos: sameObs(5, Observation{
+				FeeComponents: map[cciptypes.ChainSelector]types.ChainFeeComponents{
+					1: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+					2: {ExecutionFee: big.NewInt(2), DataAvailabilityFee: big.NewInt(1)},
+				},
+				NativeTokenPrices: map[cciptypes.ChainSelector]cciptypes.BigInt{
+					1: cciptypes.NewBigInt(big.NewInt(2e18)), // <----------- token price increased deviation reached
+					2: cciptypes.NewBigInt(big.NewInt(1e18)), // <----------- token price same deviation not reached
+				},
+				ChainFeeUpdates: map[cciptypes.ChainSelector]Update{
+					1: {
+						Timestamp: oneMinuteAgo,
+						ChainFee: ComponentsUSDPrices{
+							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
+						},
+					},
+					2: {
+						Timestamp: oneMinuteAgo,
+						ChainFee: ComponentsUSDPrices{
+							ExecutionFeePriceUSD: big.NewInt(2), DataAvFeePriceUSD: big.NewInt(1),
+						},
+					},
+				},
+				FChain:       map[cciptypes.ChainSelector]int{1: 1},
+				TimestampNow: time.Now().UTC(),
+			}),
+			expectedError: false,
+			expectedOutcome: func() Outcome {
+				var b big.Int
+				exp, ok := b.SetString("10384593717069655257060992658440196", 10)
+				require.True(t, ok)
+				return Outcome{
+					GasPrices: []cciptypes.GasPriceChain{
+						{GasPrice: cciptypes.NewBigInt(exp), ChainSel: 1}, // only chainSel=1
+					},
+				}
+			},
+		},
 	}
 
 	for _, tt := range cases {
@@ -170,7 +224,9 @@ func TestProcessor_Outcome(t *testing.T) {
 				fRoleDON:  1,
 				cfg: pluginconfig.CommitOffchainConfig{
 					RemoteGasPriceBatchWriteFrequency: tt.chainFeeWriteFrequency,
+					FeeInfo:                           tt.feeInfo,
 				},
+				metricsReporter: NoopMetrics{},
 			}
 
 			outcome, err := p.Outcome(ctx, Outcome{}, Query{}, tt.aos)

@@ -1,7 +1,9 @@
 package execute
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -16,23 +18,23 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
-
+	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
-
-// maxReportSizeBytes that should be returned as an execution report payload.
-const maxReportSizeBytes = 250_000
 
 const (
 	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
@@ -53,10 +55,11 @@ type Plugin struct {
 	homeChain    reader.HomeChain
 	discovery    *discovery.ContractDiscoveryProcessor
 	chainSupport plugincommon.ChainSupport
+	observer     metrics.Reporter
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
-	costlyMessageObserver exectypes.CostlyMessageObserver
+	costlyMessageObserver costlymessages.Observer
 	estimateProvider      gas.EstimateProvider
 	lggr                  logger.Logger
 
@@ -77,10 +80,9 @@ func NewPlugin(
 	tokenDataObserver tokendata.TokenDataObserver,
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
-	costlyMessageObserver exectypes.CostlyMessageObserver,
+	costlyMessageObserver costlymessages.Observer,
+	metricsReporter metrics.Reporter,
 ) *Plugin {
-	lggr = logger.Named(lggr, "ExecutePlugin")
-	lggr = logger.With(lggr, "donID", donID, "oracleID", reportingCfg.OracleID)
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
 	return &Plugin{
@@ -95,23 +97,24 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  lggr,
+		lggr:                  logutil.WithContext(lggr, "Plugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
-			lggr,
+			logutil.WithContext(lggr, "Discovery"),
 			&ccipReader,
 			homeChain,
 			destChain,
 			reportingCfg.F,
 			oracleIDToP2pID,
 		),
-		chainSupport: plugincommon.NewCCIPChainSupport(
-			lggr,
+		chainSupport: plugincommon.NewChainSupport(
+			logutil.WithContext(lggr, "ChainSupport"),
 			homeChain,
 			oracleIDToP2pID,
 			reportingCfg.OracleID,
 			destChain,
 		),
+		observer: metricsReporter,
 	}
 }
 
@@ -197,6 +200,14 @@ func (p *Plugin) ValidateObservation(
 
 	if err := validateObservedSequenceNumbers(decodedObservation.CommitReports); err != nil {
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
+	}
+
+	if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
+		return fmt.Errorf("validate hashes exist: %w", err)
+	}
+
+	if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
+		return fmt.Errorf("validate token data observations: %w", err)
 	}
 
 	return nil
@@ -294,23 +305,88 @@ func (p *Plugin) Reports(
 	return report, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
-) (bool, error) {
+// validateReport validates various aspects of the report.
+// Pure checks are placed earlier in the function on purpose to avoid
+// unnecessary network or DB I/O.
+// If you're added more checks make sure to follow this pattern.
+func (p *Plugin) validateReport(
+	ctx context.Context,
+	seqNr uint64,
+	r ocr3types.ReportWithInfo[[]byte],
+) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
 	// Just a safety check, should never happen.
 	if r.Report == nil {
-		p.lggr.Warn("skipping nil report")
+		p.lggr.Warn("skipping nil report", "seqNr", seqNr)
+		return false, cciptypes.ExecutePluginReport{}, nil
+	}
+
+	decodedReport, err = p.reportCodec.Decode(ctx, r.Report)
+	if err != nil {
+		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("decode exec plugin report: %w", err)
+	}
+
+	if len(decodedReport.ChainReports) == 0 {
+		p.lggr.Info("skipping empty report", "seqNr", seqNr)
+		return false, cciptypes.ExecutePluginReport{}, nil
+	}
+
+	// check if we support the dest, if not we can't do the checks needed.
+	supports, err := p.chainSupport.SupportsDestChain(p.reportingCfg.OracleID)
+	if err != nil {
+		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("supports dest chain: %w", err)
+	}
+
+	if !supports {
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures", "seqNr", seqNr)
+		return false, cciptypes.ExecutePluginReport{}, nil
+	}
+
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeExecute)
+	if err != nil {
+		return false, cciptypes.ExecutePluginReport{}, fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+			"seqNr", seqNr,
+		)
+		return false, cciptypes.ExecutePluginReport{}, nil
+	}
+
+	return true, decodedReport, nil
+}
+
+func (p *Plugin) ShouldAcceptAttestedReport(
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
+) (bool, error) {
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	if err != nil {
+		return false, fmt.Errorf("validate exec report: %w", err)
+	}
+
+	if !valid {
+		p.lggr.Warn("report not valid, not accepting", "seqNr", seqNr)
 		return false, nil
 	}
 
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
+	// TODO: consider doing this in validateReport,
+	// will end up doing it in both ShouldAccept and ShouldTransmit.
+	sourceChains := slicelib.Map(decodedReport.ChainReports,
+		func(r cciptypes.ExecutePluginReportSingleChain) cciptypes.ChainSelector {
+			return r.SourceChainSelector
+		})
+	isCursed, err := plugincommon.IsReportCursed(ctx, p.lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
 	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
+		p.lggr.Errorw(
+			"report not accepted due to curse checking error",
+			"err", err,
+		)
+		return false, err
 	}
-
-	p.lggr.Infow("Checking if ShouldAcceptAttestedReport", "chainReports", decodedReport.ChainReports)
-	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Info("skipping empty report")
+	if isCursed {
+		// Detailed logging is already done by IsReportCursed.
 		return false, nil
 	}
 
@@ -319,52 +395,24 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 }
 
 func (p *Plugin) ShouldTransmitAcceptedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	isWriter, err := p.supportsDestChain()
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
 	if err != nil {
-		return false, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
+		return valid, fmt.Errorf("validate exec report: %w", err)
 	}
-	if !isWriter {
-		p.lggr.Debug("not a destination writer, skipping report transmission")
+
+	if !valid {
+		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
 		return false, nil
 	}
-
-	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR configs home chain.
-	isCandidate, err := p.isCandidateInstance(ctx)
-	if err != nil {
-		return false, fmt.Errorf("ShouldTransmitAcceptedReport.isCandidateInstance: %w", err)
-	}
-
-	if isCandidate {
-		p.lggr.Debugw("not the active instance, skipping report transmission",
-			"myDigest", p.reportingCfg.ConfigDigest.Hex())
-		return false, nil
-	}
-
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
-	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
-	}
-
-	// TODO: Final validation?
 
 	p.lggr.Infow("transmitting report", "reports", decodedReport.ChainReports)
 	return true, nil
 }
 
-func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
-	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeExecute)
-	if err != nil {
-		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
-	}
-
-	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
-}
-
 func (p *Plugin) Close() error {
-	return nil
+	return p.tokenDataObserver.Close()
 }
 
 func (p *Plugin) supportedChains(id commontypes.OracleID) (mapset.Set[cciptypes.ChainSelector], error) {

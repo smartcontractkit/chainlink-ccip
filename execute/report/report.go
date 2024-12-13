@@ -23,9 +23,7 @@ import (
 //
 // The hasher and encoding codec are provided as arguments to allow for chain-specific formats to be used.
 func buildSingleChainReportHelper(
-	ctx context.Context,
 	lggr logger.Logger,
-	hasher cciptypes.MessageHasher,
 	report exectypes.CommitData,
 	readyMessages map[int]struct{},
 ) (cciptypes.ExecutePluginReportSingleChain, error) {
@@ -55,7 +53,7 @@ func buildSingleChainReportHelper(
 		"expectedRoot", report.MerkleRoot.String(),
 		"treeLeaves", len(report.Messages))
 
-	tree, err := ConstructMerkleTree(ctx, hasher, report, lggr)
+	tree, err := ConstructMerkleTree(report, lggr)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			fmt.Errorf("unable to construct merkle tree from messages for report (%s): %w", report.MerkleRoot.String(), err)
@@ -127,6 +125,7 @@ const (
 	ReadyToExecute                messageStatus = "ready_to_execute"
 	AlreadyExecuted               messageStatus = "already_executed"
 	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
+	MessagePseudoDeleted          messageStatus = "message_pseudo_deleted"
 	TokenDataFetchError           messageStatus = "token_data_fetch_error"
 	InsufficientRemainingBatchGas messageStatus = "insufficient_remaining_batch_gas"
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
@@ -157,6 +156,12 @@ func (b *execReportBuilder) checkMessage(
 	}
 
 	msg := execReport.Messages[idx]
+
+	// Check if the message has been pseudo-deleted
+	if msg.IsEmpty() {
+		b.lggr.Errorw("message pseudo deleted", "index", idx)
+		return execReport, MessagePseudoDeleted, nil
+	}
 
 	// 1. Check if the message has already been executed.
 	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {
@@ -319,6 +324,9 @@ func (b *execReportBuilder) verifyReport(
 
 // buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
+// returns
+// 1. the exec report that's added to builder
+// 2. the updated commit report after marking new messages from the exec report as executed
 //
 //nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
@@ -356,7 +364,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 	// Attempt to include all messages in the report.
 	finalReport, err :=
-		buildSingleChainReportHelper(ctx, b.lggr, b.hasher, report, readyMessages)
+		buildSingleChainReportHelper(b.lggr, report, readyMessages)
 	if err != nil {
 		return cciptypes.ExecutePluginReportSingleChain{},
 			exectypes.CommitData{},
@@ -381,7 +389,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 
 		msgs[i] = struct{}{}
 
-		finalReport2, err := buildSingleChainReportHelper(ctx, b.lggr, b.hasher, report, msgs)
+		finalReport2, err := buildSingleChainReportHelper(b.lggr, report, msgs)
 		if err != nil {
 			return cciptypes.ExecutePluginReportSingleChain{},
 				exectypes.CommitData{},

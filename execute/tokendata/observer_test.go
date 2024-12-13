@@ -470,3 +470,7 @@ func (f fakeObserver) IsTokenSupported(sourceChain cciptypes.ChainSelector, msgT
 	tokenAddr, ok := f.supportedTokens[sourceChain]
 	return ok && tokenAddr == msgToken.SourcePoolAddress.String()
 }
+
+func (f fakeObserver) Close() error {
+	return nil
+}

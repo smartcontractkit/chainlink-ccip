@@ -26,48 +26,60 @@ import (
 // - chooses the seq num ranges for the next round
 // - builds a report
 // - checks for the transmission of a previous report
-func (w *Processor) Outcome(
-	ctx context.Context,
+func (p *Processor) Outcome(
+	_ context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	tStart := time.Now()
-	outcome, nextState := w.getOutcome(prevOutcome, query, aos)
-	w.lggr.Infow("Sending Outcome",
+
+	outcome, nextState, err := p.getOutcome(prevOutcome, query, aos)
+	if err != nil {
+		p.lggr.Errorw("outcome failed with error", "err", err)
+		return Outcome{}, err
+	}
+
+	p.metricsReporter.TrackMerkleOutcome(outcome, nextState.String())
+	p.lggr.Infow("Sending Outcome",
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
 
-func (w *Processor) getOutcome(
+func (p *Processor) getOutcome(
 	previousOutcome Outcome,
 	q Query,
 	aos []plugincommon.AttributedObservation[Observation],
-) (Outcome, State) {
-	nextState := previousOutcome.NextState()
+) (Outcome, processorState, error) {
+	nextState := previousOutcome.nextState()
 
-	consensusObservation, err := getConsensusObservation(w.lggr, w.reportingCfg.F, w.destChain, aos)
+	consObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
-		w.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
-		return Outcome{}, nextState
+		p.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
+		return Outcome{}, nextState, nil
 	}
 
 	switch nextState {
-	case SelectingRangesForReport:
-		return reportRangesOutcome(q, w.lggr, consensusObservation, w.offchainCfg.MaxMerkleTreeSize, w.destChain), nextState
-	case BuildingReport:
+	case selectingRangesForReport:
+		return reportRangesOutcome(q, p.lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
+			nextState,
+			nil
+	case buildingReport:
 		if q.RetryRMNSignatures {
 			// We want to retry getting the RMN signatures on the exact same outcome we had before.
 			// The current observations should all be empty.
-			return previousOutcome, BuildingReport
+			return previousOutcome, buildingReport, nil
 		}
-		return buildReport(q, w.lggr, consensusObservation, previousOutcome), nextState
-	case WaitingForReportTransmission:
+
+		merkleRootsOutcome, err := buildMerkleRootsOutcome(
+			q, p.offchainCfg.RMNEnabled, p.lggr, consObservation, previousOutcome)
+
+		return merkleRootsOutcome, nextState, err
+	case waitingForReportTransmission:
 		return checkForReportTransmission(
-			w.lggr, w.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consensusObservation), nextState
+			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
 	default:
-		w.lggr.Warnw("Unexpected next state in Outcome", "state", nextState)
-		return Outcome{}, nextState
+		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}
 }
 
@@ -75,25 +87,37 @@ func (w *Processor) getOutcome(
 func reportRangesOutcome(
 	_ Query,
 	lggr logger.Logger,
-	consensusObservation consensusObservation,
+	consObservation consensusObservation,
 	maxMerkleTreeSize uint64,
 	dstChain cciptypes.ChainSelector,
 ) Outcome {
 	rangesToReport := make([]plugintypes.ChainRange, 0)
 
-	observedOnRampMaxSeqNumsMap := consensusObservation.OnRampMaxSeqNums
-	observedOffRampNextSeqNumsMap := consensusObservation.OffRampNextSeqNums
-	observedRMNRemoteConfig := consensusObservation.RMNRemoteConfig
+	observedOnRampMaxSeqNumsMap := consObservation.OnRampMaxSeqNums
+	observedOffRampNextSeqNumsMap := consObservation.OffRampNextSeqNums
+	observedRMNRemoteConfig := consObservation.RMNRemoteConfig
 
 	offRampNextSeqNums := make([]plugintypes.SeqNumChain, 0)
 
 	for chainSel, offRampNextSeqNum := range observedOffRampNextSeqNumsMap {
+		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
+			ChainSel: chainSel,
+			SeqNum:   offRampNextSeqNum,
+		})
+
 		onRampMaxSeqNum, exists := observedOnRampMaxSeqNumsMap[chainSel]
 		if !exists {
 			continue
 		}
 
-		if offRampNextSeqNum <= onRampMaxSeqNum {
+		if onRampMaxSeqNum < offRampNextSeqNum-1 {
+			lggr.Errorw("sequence numbers between offRamp and onRamp reached an impossible state, "+
+				"offRamp latest executed sequence number is greater than onRamp latest executed sequence number",
+				"chain", chainSel, "onRampMaxSeqNum", onRampMaxSeqNum, "offRampNextSeqNum", offRampNextSeqNum)
+		}
+
+		newMsgsExist := offRampNextSeqNum <= onRampMaxSeqNum
+		if newMsgsExist {
 			rng := cciptypes.NewSeqNumRange(offRampNextSeqNum, onRampMaxSeqNum)
 
 			chainRange := plugintypes.ChainRange{
@@ -108,11 +132,6 @@ func reportRangesOutcome(
 				lggr.Infof("Range for chain %d: %s", chainSel, chainRange.SeqNumRange)
 			}
 		}
-
-		offRampNextSeqNums = append(offRampNextSeqNums, plugintypes.SeqNumChain{
-			ChainSel: chainSel,
-			SeqNum:   offRampNextSeqNum,
-		})
 	}
 
 	// deterministic outcome
@@ -123,7 +142,7 @@ func reportRangesOutcome(
 
 	var rmnRemoteConfig rmntypes.RemoteConfig
 	if observedRMNRemoteConfig[dstChain].IsEmpty() {
-		lggr.Warn("RMNRemoteConfig is nil")
+		lggr.Warn("RMNRemoteConfig is empty")
 	} else {
 		rmnRemoteConfig = observedRMNRemoteConfig[dstChain]
 	}
@@ -138,14 +157,15 @@ func reportRangesOutcome(
 	return outcome
 }
 
-// Given a set of observed merkle roots, gas prices and token prices, and roots from RMN, construct a report
-// to transmit on-chain
-func buildReport(
+// buildMerkleRootsOutcome is given a set of agreed observed merkle roots and RMN signatures
+// and construct a merkleRoots outcome.
+func buildMerkleRootsOutcome(
 	q Query,
+	rmnEnabled bool,
 	lggr logger.Logger,
 	consensusObservation consensusObservation,
 	prevOutcome Outcome,
-) Outcome {
+) (Outcome, error) {
 	roots := maps.Values(consensusObservation.MerkleRoots)
 
 	outcomeType := ReportGenerated
@@ -153,14 +173,17 @@ func buildReport(
 		outcomeType = ReportEmpty
 	}
 
+	if len(roots) > 0 && rmnEnabled && q.RMNSignatures == nil {
+		return Outcome{}, fmt.Errorf("RMN signatures are nil while RMN is enabled")
+	}
+
 	sort.Slice(roots, func(i, j int) bool { return roots[i].ChainSel < roots[j].ChainSel })
 
 	sigs := make([]cciptypes.RMNECDSASignature, 0)
-	if q.RMNSignatures != nil { // TODO: should never be nil, error after e2e RMN integration.
+	if rmnEnabled && q.RMNSignatures != nil {
 		parsedSigs, err := rmn.NewECDSASigsFromPB(q.RMNSignatures.Signatures)
 		if err != nil {
-			lggr.Errorw("Failed to parse RMN signatures returning an empty outcome", "err", err)
-			return Outcome{}
+			return Outcome{}, fmt.Errorf("failed to parse RMN signatures: %w", err)
 		}
 		sigs = parsedSigs
 
@@ -218,7 +241,7 @@ func buildReport(
 		RMNRemoteCfg:        prevOutcome.RMNRemoteCfg,
 	}
 
-	return outcome
+	return outcome, nil
 }
 
 // checkForReportTransmission checks if the OffRamp has an updated set of max seq nums compared to the seq nums that
@@ -234,13 +257,21 @@ func checkForReportTransmission(
 	previousOutcome Outcome,
 	consensusObservation consensusObservation,
 ) Outcome {
-
 	offRampUpdated := false
 	for _, previousSeqNumChain := range previousOutcome.OffRampNextSeqNums {
 		if currentSeqNum, exists := consensusObservation.OffRampNextSeqNums[previousSeqNumChain.ChainSel]; exists {
-			if previousSeqNumChain.SeqNum != currentSeqNum {
+			if previousSeqNumChain.SeqNum < currentSeqNum {
 				offRampUpdated = true
 				break
+			}
+
+			if previousSeqNumChain.SeqNum > currentSeqNum {
+				lggr.Errorw("OffRampNextSeqNums reached an impossible state, "+
+					"previous offRampNextSeqNum is greater than current offRampNextSeqNum",
+					"chain", previousSeqNumChain.ChainSel,
+					"previousSeqNum", previousSeqNumChain.SeqNum,
+					"currentSeqNum", currentSeqNum,
+				)
 			}
 		}
 	}
@@ -252,7 +283,7 @@ func checkForReportTransmission(
 	}
 
 	if previousOutcome.ReportTransmissionCheckAttempts+1 >= maxReportTransmissionCheckAttempts {
-		lggr.Warnw("Failed to detect report transmission")
+		lggr.Warnw("report not transmitted, max check attempts reached, moving to next state")
 		return Outcome{
 			OutcomeType: ReportTransmissionFailed,
 		}
