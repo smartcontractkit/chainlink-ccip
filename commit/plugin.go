@@ -54,6 +54,7 @@ type Plugin struct {
 	tokenPriceProcessor plugincommon.PluginProcessor[tokenprice.Query, tokenprice.Observation, tokenprice.Outcome]
 	chainFeeProcessor   plugincommon.PluginProcessor[chainfee.Query, chainfee.Observation, chainfee.Outcome]
 	discoveryProcessor  *discovery.ContractDiscoveryProcessor
+	metricsReporter     metrics.CommitPluginReporter
 
 	// state
 	contractsInitialized atomic.Bool
@@ -116,6 +117,7 @@ func NewPlugin(
 		rmnController,
 		rmnCrypto,
 		rmnHomeReader,
+		reporter,
 	)
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
@@ -127,6 +129,7 @@ func NewPlugin(
 		tokenPricesReader,
 		homeChain,
 		reportingCfg.F,
+		reporter,
 	)
 
 	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
@@ -147,6 +150,7 @@ func NewPlugin(
 		offchainCfg,
 		chainSupport,
 		reportingCfg.F,
+		reporter,
 	)
 
 	return &Plugin{
@@ -166,6 +170,7 @@ func NewPlugin(
 		tokenPriceProcessor: tokenPriceProcessor,
 		chainFeeProcessor:   chainFeeProcessr,
 		discoveryProcessor:  discoveryProcessor,
+		metricsReporter:     reporter,
 	}
 }
 
@@ -271,6 +276,8 @@ func (p *Plugin) Observation(
 		FChain:        p.ObserveFChain(),
 	}
 
+	p.metricsReporter.TrackObservation(obs)
+
 	encoded, err := obs.Encode()
 	if err != nil {
 		return nil, fmt.Errorf("encode observation: %w, observation: %+v", err, obs)
@@ -373,11 +380,13 @@ func (p *Plugin) Outcome(
 		p.lggr.Warnw("failed to get gas prices outcome", "err", err)
 	}
 
-	return committypes.Outcome{
+	out := committypes.Outcome{
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
-	}.Encode()
+	}
+	p.metricsReporter.TrackOutcome(out)
+	return out.Encode()
 }
 
 func (p *Plugin) Close() error {

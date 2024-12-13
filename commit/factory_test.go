@@ -303,7 +303,8 @@ func TestPluginFactory_NewReportingPlugin(t *testing.T) {
 				Config: reader2.OCR3Config{
 					OfframpAddress: []byte{1, 2, 3},
 					OffchainConfig: b,
-					ChainSelector:  1,
+					// Real selector pointing to chain 2337
+					ChainSelector: 12922642891491394802,
 				},
 			},
 		}
