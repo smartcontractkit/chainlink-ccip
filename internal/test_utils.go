@@ -26,22 +26,6 @@ func MessageWithTokens(t *testing.T, tokenPoolAddr ...string) cciptypes.Message 
 	}
 }
 
-func CounterFromHistogramByLabels(t *testing.T, histogramVec *prometheus.HistogramVec, labels ...string) int {
-	observer, err := histogramVec.GetMetricWithLabelValues(labels...)
-	require.NoError(t, err)
-
-	metricCh := make(chan prometheus.Metric, 1)
-	observer.(prometheus.Histogram).Collect(metricCh)
-	close(metricCh)
-
-	metric := <-metricCh
-	pb := &io_prometheus_client.Metric{}
-	err = metric.Write(pb)
-	require.NoError(t, err)
-
-	return int(pb.GetHistogram().GetSampleCount())
-}
-
 func RandBytes() cciptypes.Bytes {
 	var array [32]byte
 	_, err := rand.Read(array[:])
