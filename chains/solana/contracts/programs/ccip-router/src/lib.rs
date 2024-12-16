@@ -33,6 +33,8 @@ use crate::ocr3base::*;
 mod fee_quoter;
 use crate::fee_quoter::*;
 
+mod utils;
+
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
@@ -660,11 +662,14 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<u64> {
+        let accounts = ctx.remaining_accounts;
+
         Ok(fee_for_msg(
             dest_chain_selector,
             &message,
             &ctx.accounts.dest_chain_state,
             &ctx.accounts.billing_token_config.config,
+            &[],
         )?
         .amount)
     }
@@ -693,7 +698,13 @@ pub mod ccip_router {
 
         let dest_chain = &mut ctx.accounts.dest_chain_state;
         let fee_token_config = &ctx.accounts.fee_token_config.config;
-        let fee = fee_for_msg(dest_chain_selector, &message, dest_chain, fee_token_config)?;
+        let fee = fee_for_msg(
+            dest_chain_selector,
+            &message,
+            dest_chain,
+            fee_token_config,
+            &[],
+        )?;
 
         let is_paying_with_native_sol = message.fee_token == Pubkey::zeroed();
         if is_paying_with_native_sol {
