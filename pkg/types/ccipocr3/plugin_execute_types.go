@@ -18,11 +18,6 @@ type ExecutePluginReportSingleChain struct {
 	ProofFlagBits       BigInt        `json:"proofFlagBits"`
 }
 
-type CommitReportWithMessages struct {
-	MerkleRootChain
-	MessagesToExecute []Message
-}
-
 // ExecuteReportInfo contains metadata needed by transmitter and contract
 // writer.
 type ExecuteReportInfo []MerkleRootChain
