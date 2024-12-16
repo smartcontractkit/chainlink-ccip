@@ -4,8 +4,8 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage, SolanaTokenAmount,
-    UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
+    utils::Exponential, BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig,
+    Solana2AnyMessage, SolanaTokenAmount, UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
 // TODO change args and implement
@@ -14,8 +14,8 @@ pub fn fee_for_msg(
     message: &Solana2AnyMessage,
     dest_chain: &DestChain,
     token_config: &BillingTokenConfig,
+    _chain_token_configs: &[PerChainPerTokenConfig],
 ) -> Result<SolanaTokenAmount> {
-    // TODO: Add all validations from lib.rs over the message here as well
     message.validate(dest_chain, token_config)?;
 
     let token = if message.fee_token == Pubkey::default() {
@@ -27,17 +27,72 @@ pub fn fee_for_msg(
     let token_price = get_validated_token_price(token_config)?;
     let _packed_gas_price = get_validated_gas_price(dest_chain)?;
 
+    let network_fee = network_fee(message, dest_chain, token_config);
+
     // TODO un-hardcode
-    let network_fee = U256::new(1);
     let execution_cost = U256::new(1);
     let data_availability_cost = U256::new(1);
 
-    let amount = (network_fee + execution_cost + data_availability_cost) / token_price;
+    let amount = (network_fee.value() + execution_cost + data_availability_cost) / token_price;
     let amount: u64 = amount
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
 
     Ok(SolanaTokenAmount { amount, token })
+}
+
+enum NetworkFee {
+    Message {
+        premium_fee: U256,
+        multiplier_wei_per_eth: u64,
+    },
+    Token {
+        token_transfer_fee_usd_wei: U256,
+        token_transfer_gas: U256,
+        token_transfer_bytes_overhead: U256,
+        multiplier_wei_per_eth: u64,
+    },
+}
+
+impl NetworkFee {
+    pub fn value(&self) -> U256 {
+        match self {
+            NetworkFee::Message {
+                premium_fee,
+                multiplier_wei_per_eth,
+            } => premium_fee * U256::from(*multiplier_wei_per_eth),
+            NetworkFee::Token {
+                token_transfer_fee_usd_wei,
+                multiplier_wei_per_eth,
+                ..
+            } => token_transfer_fee_usd_wei * U256::from(*multiplier_wei_per_eth),
+        }
+    }
+}
+
+fn network_fee(
+    message: &Solana2AnyMessage,
+    dest_chain: &DestChain,
+    token_config: &BillingTokenConfig,
+) -> NetworkFee {
+    if message.token_amounts.is_empty() {
+        return NetworkFee::Message {
+            premium_fee: U256::from(dest_chain.config.network_fee_usdcents) * 1u32.e(16),
+            multiplier_wei_per_eth: token_config.premium_multiplier_wei_per_eth,
+        };
+    }
+
+    for token_amount in &message.token_amounts {}
+
+    todo!();
+}
+
+fn token_transfer_cost(
+    dest_chain: &DestChain,
+    token_config: &BillingTokenConfig,
+    message: &Solana2AnyMessage,
+) -> (U256, i32, i32) {
+    todo!()
 }
 
 pub struct PackedPrice {
@@ -158,6 +213,7 @@ mod tests {
                 &sample_message(),
                 &sample_dest_chain(),
                 &sample_billing_config(),
+                &[]
             )
             .unwrap(),
             SolanaTokenAmount {
@@ -172,7 +228,14 @@ mod tests {
         let mut billing_config = sample_billing_config();
         billing_config.usd_per_token.timestamp = 0;
         assert_eq!(
-            fee_for_msg(0, &sample_message(), &sample_dest_chain(), &billing_config).unwrap_err(),
+            fee_for_msg(
+                0,
+                &sample_message(),
+                &sample_dest_chain(),
+                &billing_config,
+                &[]
+            )
+            .unwrap_err(),
             CcipRouterError::InvalidTokenPrice.into()
         );
     }
@@ -182,7 +245,14 @@ mod tests {
         let mut billing_config = sample_billing_config();
         billing_config.usd_per_token.value = [0u8; 28];
         assert_eq!(
-            fee_for_msg(0, &sample_message(), &sample_dest_chain(), &billing_config).unwrap_err(),
+            fee_for_msg(
+                0,
+                &sample_message(),
+                &sample_dest_chain(),
+                &billing_config,
+                &[]
+            )
+            .unwrap_err(),
             CcipRouterError::InvalidTokenPrice.into()
         );
     }
@@ -196,7 +266,7 @@ mod tests {
         chain.state.usd_per_unit_gas.timestamp =
             -2 * chain.config.gas_price_staleness_threshold as i64;
         assert_eq!(
-            fee_for_msg(0, &sample_message(), &chain, &sample_billing_config()).unwrap_err(),
+            fee_for_msg(0, &sample_message(), &chain, &sample_billing_config(), &[]).unwrap_err(),
             CcipRouterError::StaleGasPrice.into()
         );
     }
