@@ -81,6 +81,13 @@ func (b *Bytes) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("failed to decode hex: %w", err)
 	}
 
+	/*
+		// TODO: return nil instead of an empty slice. This breaks some tests.
+		if len(bs) == 0 {
+			return nil
+		}
+	*/
+
 	*b = bs
 	return nil
 }
