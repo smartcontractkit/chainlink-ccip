@@ -30,6 +30,10 @@ type CommitData struct {
 
 	// Messages that are part of the commit report.
 	Messages []cciptypes.Message `json:"messages"`
+	// Hashes are the hashes of the respective messages in Messages slice.
+	// Get populated during GetMessages Outcome phase
+	// Length of this slice should equal to the length of Messages slice.
+	Hashes []cciptypes.Bytes32 `json:"messageHashes"`
 
 	// CostlyMessages are the message IDs of messages that cost more to execute than was paid to execute them (i.e.
 	// source fee < execution cost). These messages will not be executed in the current round, but may be executed in
@@ -37,5 +41,6 @@ type CommitData struct {
 	CostlyMessages []cciptypes.Bytes32 `json:"costlyMessages"`
 
 	// TokenData for each message.
+	// Length of this slice should equal to the length of Messages slice.
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`
 }

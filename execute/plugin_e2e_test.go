@@ -24,12 +24,12 @@ func TestPlugin(t *testing.T) {
 	dstSelector := cciptypes.ChainSelector(2)
 
 	messages := []inmem.MessagesWithMetadata{
-		makeMsg(100, srcSelector, dstSelector, true),
-		makeMsg(101, srcSelector, dstSelector, true),
-		makeMsg(102, srcSelector, dstSelector, false),
-		makeMsg(103, srcSelector, dstSelector, false),
-		makeMsg(104, srcSelector, dstSelector, false),
-		makeMsg(105, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(100, srcSelector, dstSelector, true),
+		makeMsgWithMetadata(101, srcSelector, dstSelector, true),
+		makeMsgWithMetadata(102, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(103, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(104, srcSelector, dstSelector, false),
+		makeMsgWithMetadata(105, srcSelector, dstSelector, false),
 	}
 
 	intTest := SetupSimpleTest(t, logger.Test(t), srcSelector, dstSelector)
@@ -70,9 +70,9 @@ func Test_ExcludingCostlyMessages(t *testing.T) {
 	dstSelector := cciptypes.ChainSelector(2)
 
 	messages := []inmem.MessagesWithMetadata{
-		makeMsg(100, srcSelector, dstSelector, false, withFeeValueJuels(100)),
-		makeMsg(101, srcSelector, dstSelector, false, withFeeValueJuels(200)),
-		makeMsg(102, srcSelector, dstSelector, false, withFeeValueJuels(300)),
+		makeMsgWithMetadata(100, srcSelector, dstSelector, false, withFeeValueJuels(100)),
+		makeMsgWithMetadata(101, srcSelector, dstSelector, false, withFeeValueJuels(200)),
+		makeMsgWithMetadata(102, srcSelector, dstSelector, false, withFeeValueJuels(300)),
 	}
 
 	messageTimestamp := time.Now().Add(-4 * time.Hour)
@@ -150,16 +150,15 @@ func TestExceedSizeObservation(t *testing.T) {
 	// 100 msg * 1 byte  -> 1077
 	// 1000 msg * 1 byte -> 2877
 	msgDataSize := 1000
-	// TODO: More deterministic way to reduce any future flaky tests?
-	maxMsgsPerReport := 431
+	maxMsgsPerReport := 398
 	nReports := 2
-	maxMessages := maxMsgsPerReport * nReports // Currently 431 message per report is the max with msgDataSize = 1000
+	maxMessages := maxMsgsPerReport * nReports // Currently 398 message per report is the max with msgDataSize = 1000
 	startSeqNr := cciptypes.SeqNum(100)
 
 	messages := make([]inmem.MessagesWithMetadata, 0, maxMessages)
 	for i := 0; i < maxMessages; i++ {
 		messages = append(messages,
-			makeMsg(
+			makeMsgWithMetadata(
 				startSeqNr+cciptypes.SeqNum(i),
 				srcSelector,
 				dstSelector,
@@ -185,12 +184,11 @@ func TestExceedSizeObservation(t *testing.T) {
 	require.Len(t, outcome.CommitReports, nReports)
 
 	// Round 2 - Get Messages
-	// Still 2 pending reports from previous round.
+	// Only 1 pending report from previous round.
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.CommitReports, nReports)
+	require.Len(t, outcome.CommitReports, 1)
 	require.Len(t, outcome.CommitReports[0].Messages, maxMsgsPerReport)
-	require.Len(t, outcome.CommitReports[1].Messages, 0)
 
 	// Round 3 - Filter
 	// An execute report with the messages executed until the max per report

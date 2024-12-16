@@ -135,9 +135,15 @@ type Message struct {
 	TokenAmounts []RampTokenAmount `json:"tokenAmounts"`
 }
 
-func (c Message) String() string {
-	js, _ := json.Marshal(c)
+func (m Message) String() string {
+	js, _ := json.Marshal(m)
 	return string(js)
+}
+
+// IsEmpty returns true if the message is empty. Can't use == Message{} without using reflect.DeepEqual.
+func (m Message) IsEmpty() bool {
+	return m.Header.MessageID == Bytes32{} && m.Header.SourceChainSelector == 0 &&
+		m.Header.DestChainSelector == 0 && m.Header.SequenceNumber == 0 && m.Header.Nonce == 0
 }
 
 // RampMessageHeader is the family-agnostic header for OnRamp and OffRamp messages.
