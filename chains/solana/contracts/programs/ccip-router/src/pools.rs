@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::get_associated_token_address_with_program_id,
+    token::spl_token::native_mint,
     token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint},
     token_interface::TokenAccount,
 };
@@ -12,12 +13,13 @@ use solana_program::{program::get_return_data, program_pack::Pack};
 
 use crate::{
     CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, TOKEN_ADMIN_REGISTRY_SEED, TOKEN_POOL_BILLING_SEED,
-    TOKEN_POOL_CONFIG_SEED,
+    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
+    TOKEN_POOL_BILLING_SEED, TOKEN_POOL_CONFIG_SEED,
 };
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
-const MIN_TOKEN_POOL_ACCOUNTS: usize = 11; // see TokenAccounts struct for all required accounts
+pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
+const MIN_TOKEN_POOL_ACCOUNTS: usize = 12; // see TokenAccounts struct for all required accounts
 
 pub fn calculate_token_pool_account_indices(
     i: usize,
@@ -46,7 +48,7 @@ pub fn calculate_token_pool_account_indices(
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
-    pub _token_billing_config: &'a AccountInfo<'a>,
+    pub token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
@@ -54,6 +56,7 @@ pub struct TokenAccounts<'a> {
     pub pool_signer: &'a AccountInfo<'a>,
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
+    pub fee_token_config: &'a AccountInfo<'a>,
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
@@ -77,6 +80,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     let (pool_signer, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (token_program, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (mint, remaining_accounts) = remaining_accounts.split_first().unwrap();
+    let (fee_token_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
 
     // Account validations (using remaining_accounts does not facilitate built-in anchor checks)
     {
@@ -104,6 +108,22 @@ pub fn validate_and_parse_token_accounts<'info>(
                 && pool_config.key() == expected_pool_config
                 && pool_signer.key() == expected_pool_signer,
             CcipRouterError::InvalidInputsPoolAccounts
+        );
+
+        let (expected_fee_token_config, _) = Pubkey::find_program_address(
+            &[
+                FEE_BILLING_TOKEN_CONFIG,
+                if mint.key() == Pubkey::default() {
+                    native_mint::ID.as_ref() // pre-2022 WSOL
+                } else {
+                    mint.key.as_ref()
+                },
+            ],
+            &router,
+        );
+        require!(
+            fee_token_config.key() == expected_fee_token_config,
+            CcipRouterError::InvalidInputsConfigAccounts
         );
 
         // check token accounts
@@ -181,6 +201,7 @@ pub fn validate_and_parse_token_accounts<'info>(
             pool_signer.key(),
             token_program.key(),
             mint.key(),
+            fee_token_config.key(),
         ];
         let mut remaining_keys: Vec<Pubkey> = remaining_accounts.iter().map(|x| x.key()).collect();
         expected_entries.append(&mut remaining_keys);
@@ -196,7 +217,7 @@ pub fn validate_and_parse_token_accounts<'info>(
 
     Ok(TokenAccounts {
         user_token_account,
-        _token_billing_config: token_billing_config,
+        token_billing_config,
         pool_chain_config,
         pool_program,
         pool_config,
@@ -204,6 +225,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         pool_signer,
         token_program,
         mint,
+        fee_token_config,
         remaining_accounts,
     })
 }

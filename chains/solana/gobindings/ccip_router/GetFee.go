@@ -18,6 +18,17 @@ import (
 // * `dest_chain_selector` - The chain selector for the destination chain.
 // * `message` - The message to be sent.
 //
+// # Additional accounts
+//
+// In addition to the fixed amount of accounts defined in the `GetFee` context,
+// the following accounts must be provided:
+//
+// * First, the billing token config accounts for each token sent with the message, sequentially.
+// For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
+// tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
+// * Then, the per chain / per token config of every token sent with the message, sequentially
+// in the same order.
+//
 // # Returns
 //
 // The fee amount in u64.
