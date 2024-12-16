@@ -1,7 +1,6 @@
 package report
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/hashutil"
@@ -9,13 +8,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 // ConstructMerkleTree creates the merkle tree object from the messages in the report.
 func ConstructMerkleTree(
-	ctx context.Context,
-	hasher cciptypes.MessageHasher,
 	report exectypes.CommitData,
 	lggr logger.Logger,
 ) (*merklemulti.Tree[[32]byte], error) {
@@ -27,8 +23,14 @@ func ConstructMerkleTree(
 			report.MerkleRoot.String(), numMsgs, len(report.Messages))
 	}
 
+	if numMsgs != len(report.Hashes) {
+		return nil, fmt.Errorf(
+			"malformed report %s, unexpected number of message hashes: expected %d, got %d",
+			report.MerkleRoot.String(), numMsgs, len(report.Hashes))
+	}
+
 	treeLeaves := make([][32]byte, 0)
-	for _, msg := range report.Messages {
+	for i, msg := range report.Messages {
 		if !report.SequenceNumberRange.Contains(msg.Header.SequenceNumber) {
 			return nil, fmt.Errorf(
 				"malformed report, message %s sequence number %d outside of report range %s",
@@ -38,12 +40,10 @@ func ConstructMerkleTree(
 			return nil, fmt.Errorf("malformed report, message %s for unexpected source chain: expected %d, got %d",
 				report.MerkleRoot.String(), report.SourceChain, msg.Header.SourceChainSelector)
 		}
-		leaf, err := hasher.Hash(ctx, msg)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"unable to hash message (%d, %d): %w",
-				msg.Header.SourceChainSelector, msg.Header.SequenceNumber, err)
+		if report.Hashes[i] == [32]byte{} {
+			return nil, fmt.Errorf("malformed report, message %s has empty hash", msg)
 		}
+		leaf := report.Hashes[i]
 		lggr.Debugw("Hashed message, adding to tree leaves",
 			"hash", leaf,
 			"msg", msg,

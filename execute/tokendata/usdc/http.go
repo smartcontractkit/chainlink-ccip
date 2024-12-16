@@ -63,7 +63,7 @@ type httpClient struct {
 }
 
 var (
-	clientInstances = make(map[string]*httpClient)
+	clientInstances = make(map[string]HTTPClient)
 	mutex           sync.Mutex
 )
 
@@ -90,7 +90,7 @@ func GetHTTPClient(
 		return nil, err
 	}
 
-	clientInstances[api] = client.(*httpClient)
+	clientInstances[api] = client
 	return client, nil
 }
 
@@ -105,13 +105,14 @@ func newHTTPClient(
 		return nil, err
 	}
 
-	return &httpClient{
+	client := &httpClient{
 		lggr:       lggr,
 		apiURL:     u,
 		apiTimeout: apiTimeout,
 		rate:       rate.NewLimiter(rate.Every(apiInterval), 1),
 		coolDownMu: &sync.RWMutex{},
-	}, nil
+	}
+	return newObservedHTTPClient(client, lggr), nil
 }
 
 type attestationStatus string

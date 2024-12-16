@@ -78,6 +78,7 @@ func (p *Plugin) Observation(
 		return nil, err
 	}
 
+	p.observer.TrackObservation(observation, state)
 	p.lggr.Infow("execute plugin got observation", "observation", observation)
 
 	return observation.Encode()
@@ -169,7 +170,9 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 }
 
 func readAllMessages(
-	ctx context.Context, ccipReader reader.CCIPReader, commitObs exectypes.CommitObservations,
+	ctx context.Context,
+	ccipReader reader.CCIPReader,
+	commitObs exectypes.CommitObservations,
 ) (exectypes.MessageObservations, error) {
 	messageObs := make(exectypes.MessageObservations)
 
@@ -206,6 +209,9 @@ func (p *Plugin) getMessagesObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
+	// Phase 2: Get messages and determine which messages are too costly to execute.
+	//          These messages will not be executed in the current round, but may be executed in future rounds
+	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
 	if len(previousOutcome.PendingCommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
@@ -236,8 +242,14 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
 	}
 
+	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
+	}
+
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
+	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
 
@@ -255,10 +267,6 @@ func (p *Plugin) getFilterObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// Phase 2: Filter messages and determine which messages are too costly to execute.
-	//          This phase also determines which messages are too costly to execute.
-	//          These messages will not be executed in the current round, but may be executed in future rounds
-	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
 	supportsDest, err := p.supportsDestChain()
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)

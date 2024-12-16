@@ -137,10 +137,11 @@ func TestOutcome(t *testing.T) {
 	ctx := tests.Context(t)
 	lggr := logger.Test(t)
 	p := &processor{
-		lggr:        lggr,
-		destChain:   destChainSel,
-		offChainCfg: offChainCfg,
-		fRoleDON:    1,
+		lggr:            lggr,
+		destChain:       destChainSel,
+		offChainCfg:     offChainCfg,
+		fRoleDON:        1,
+		metricsReporter: NoopMetrics{},
 	}
 
 	outcome, err := p.Outcome(ctx, Outcome{}, Query{}, []plugincommon.AttributedObservation[Observation]{

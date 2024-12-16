@@ -4,6 +4,7 @@ go 1.23.3
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
+	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/smartcontractkit/chain-selectors v1.0.34

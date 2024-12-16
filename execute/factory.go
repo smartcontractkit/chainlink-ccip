@@ -19,6 +19,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -55,7 +56,8 @@ const (
 	// maxReportLength is set to an estimate of a maximum report size.
 	// This can be tuned over time, it may be more efficient to have
 	// smaller reports.
-	maxReportLength = 1024 * 1024 // allowing large reports for now
+
+	maxReportLength = ocr3types.MaxMaxReportLength // allowing large reports for now
 
 	// maxReportCount controls how many OCR3 reports can be returned. Note that
 	// the actual exec report type (ExecutePluginReport) may contain multiple
@@ -186,6 +188,11 @@ func (p PluginFactory) NewReportingPlugin(
 		p.estimateProvider,
 	)
 
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
+
 	return NewPlugin(
 			p.donID,
 			config,
@@ -200,6 +207,7 @@ func (p PluginFactory) NewReportingPlugin(
 			p.estimateProvider,
 			lggr,
 			costlyMessageObserver,
+			metricsReporter,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{

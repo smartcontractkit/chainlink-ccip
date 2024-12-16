@@ -1,6 +1,7 @@
 package execute
 
 import (
+	"context"
 	"encoding/binary"
 	"math/big"
 	"net/http"
@@ -25,6 +26,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -92,7 +94,11 @@ func (it *IntTest) WithMessages(
 	crBlockNumber uint64,
 	crTimestamp time.Time,
 	numReports int) {
-	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
+	mapped := slicelib.Map(messages,
+		func(m inmem.MessagesWithMetadata) cciptypes.Message {
+			return m.Message
+		},
+	)
 	totalMessages := len(mapped)
 	messagesPerReport := totalMessages / numReports
 
@@ -103,16 +109,25 @@ func (it *IntTest) WithMessages(
 			endIndex = totalMessages // Ensure the last report includes any remaining messages
 		}
 
+		msgs := mapped[startIndex:endIndex]
+		hashes := make([]cciptypes.Bytes32, len(msgs))
+		for i, m := range msgs {
+			hash, err := it.msgHasher.Hash(context.Background(), m)
+			require.NoError(it.t, err, "failed to hash message")
+			hashes[i] = hash
+		}
 		reportData := exectypes.CommitData{
 			SourceChain: it.srcSelector,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
 				mapped[startIndex].Header.SequenceNumber,
 				mapped[endIndex-1].Header.SequenceNumber,
 			),
-			Messages: mapped[startIndex:endIndex],
+			Messages:         msgs,
+			Hashes:           hashes,
+			MessageTokenData: make([]exectypes.MessageTokenData, len(msgs)),
 		}
 
-		tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, it.lggr)
+		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
 		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
@@ -328,6 +343,7 @@ func (it *IntTest) newNode(
 		ep,
 		it.lggr,
 		costlyMessageObserver,
+		&metrics.Noop{},
 	)
 
 	return nodeSetup{
@@ -419,7 +435,7 @@ func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	}
 }
 
-func makeMsg(
+func makeMsgWithMetadata(
 	seqNum cciptypes.SeqNum,
 	src, dest cciptypes.ChainSelector,
 	executed bool,
@@ -443,6 +459,43 @@ func makeMsg(
 		Destination: dest,
 		Executed:    executed,
 	}
+}
+
+func makeMessageObservation(
+	srcToSeqNumRange map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
+	opts ...msgOption) exectypes.MessageObservations {
+
+	obs := make(exectypes.MessageObservations)
+	for src, seqNumRng := range srcToSeqNumRange {
+		obs[src] = make(map[cciptypes.SeqNum]cciptypes.Message)
+		for i := seqNumRng.Start(); i <= seqNumRng.End(); i++ {
+			msg := cciptypes.Message{
+				Header: cciptypes.RampMessageHeader{
+					SourceChainSelector: src,
+					SequenceNumber:      i,
+					MessageID:           rand.RandomBytes32(),
+				},
+				FeeValueJuels: cciptypes.NewBigIntFromInt64(100),
+			}
+			for _, opt := range opts {
+				opt(&msg)
+			}
+			obs[src][i] = msg
+		}
+	}
+	return obs
+}
+
+func makeNoopTokenDataObservations(msgs exectypes.MessageObservations) exectypes.TokenDataObservations {
+	tokenData := make(exectypes.TokenDataObservations)
+	for src, seqNumToMsg := range msgs {
+		tokenData[src] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
+		for seq := range seqNumToMsg {
+			tokenData[src][seq] = exectypes.NewMessageTokenData()
+		}
+	}
+	return tokenData
+
 }
 
 type nodeSetup struct {
