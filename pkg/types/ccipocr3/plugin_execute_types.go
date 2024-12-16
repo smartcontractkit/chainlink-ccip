@@ -26,7 +26,7 @@ type ExecuteReportInfo []MerkleRootChain
 // allow for future encoding optimizations.
 func (eri ExecuteReportInfo) Encode() ([]byte, error) {
 	data, err := json.Marshal(eri)
-	data = append([]byte{1}, data...)
+	data = append([]byte{01}, data...)
 	return data, err
 }
 
