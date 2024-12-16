@@ -2,4 +2,4 @@
 * @smartcontractkit/ccip-offchain
 
 # solana development ownership
-/chains/solana @smartcontractkit/bix-build
+/chains/solana @smartcontractkit/ccip-onchain-solana
