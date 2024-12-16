@@ -42,6 +42,7 @@ chainlink:
       Mode = 'BlockHistory'
       PriceDefault = '50 gwei'
       PriceMin = '50 gwei'
+      PriceMax = '200 gwei'
       [WebServer.RateLimit]
       Authenticated = 2000
       Unauthenticated = 1000
