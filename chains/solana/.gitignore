@@ -1,5 +1,5 @@
 .direnv
-.DS_Store
+*.DS_Store
 **/*.rs.bk
 .idea
 .vscode/
