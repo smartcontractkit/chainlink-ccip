@@ -72,6 +72,9 @@ type LatestRoundData struct {
 // ContractTokenMap maps contracts to their token indices
 type ContractTokenMap map[commontypes.BoundContract][]int
 
+// Number of batch operations performed (getLatestRoundData and getDecimals)
+const priceReaderOperationCount = 2
+
 func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
 	tokens []ccipocr3.UnknownEncodedAddress,
@@ -169,7 +172,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 	// Process results by contract
 	for boundContract, tokenIndices := range contractTokenMap {
 		contractResults, ok := results[boundContract]
-		if !ok || len(contractResults) != 2 {
+		if !ok || len(contractResults) != priceReaderOperationCount {
 			return nil, fmt.Errorf("invalid results for contract %s", boundContract.Address)
 		}
 
@@ -232,7 +235,7 @@ func (pr *priceReader) prepareBatchRequest(
 
 		// Initialize contract batch if it doesn't exist
 		if _, exists := batchRequest[boundContract]; !exists {
-			batchRequest[boundContract] = make(commontypes.ContractBatch, 2) // Price and decimals
+			batchRequest[boundContract] = make(commontypes.ContractBatch, priceReaderOperationCount)
 			batchRequest[boundContract][0] = commontypes.BatchRead{
 				ReadName:  consts.MethodNameGetLatestRoundData,
 				Params:    nil,
