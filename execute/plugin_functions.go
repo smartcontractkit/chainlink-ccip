@@ -767,7 +767,7 @@ func getConsensusObservation(
 }
 
 // getMessageTimestampMap returns a map of message IDs to their timestamps.
-// cciptypes.MessageAndTokenData does not contain a timestamp, so we need to derive the timestamp from the commit data.
+// cciptypes. Message does not contain a timestamp, so we need to derive the timestamp from the commit data.
 func getMessageTimestampMap(
 	commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData,
 	messages exectypes.MessageObservations,
