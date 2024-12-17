@@ -359,6 +359,7 @@ func GetNamespaceLabels() (map[string]string, error) {
 	team := viper.GetString("CHAINLINK_TEAM")
 	product := viper.GetString("CHAINLINK_PRODUCT")
 	component := viper.GetString("CHAINLINK_COMPONENT")
+	costCenter := viper.GetString("CHAINLINK_COST_CENTER")
 
 	// Validate mandatory fields
 	if team == "" || product == "" {
@@ -367,14 +368,20 @@ func GetNamespaceLabels() (map[string]string, error) {
 
 	// Set default for component if not specified
 	if component == "" {
-		component = "CRIB"
+		component = "crib"
+	}
+
+	// Set default for costCenter if not specified
+	if costCenter == "" {
+		costCenter = "crib"
 	}
 
 	// Generate labels
 	labels := map[string]string{
-		"chain.link/team":      team,
-		"chain.link/product":   product,
-		"chain.link/component": component,
+		"chain.link/component":   component,
+		"chain.link/cost-center": costCenter,
+		"chain.link/product":     product,
+		"chain.link/team":        team,
 	}
 
 	return labels, nil

@@ -315,6 +315,7 @@ func init() {
 	_ = viper.BindPFlag("CHAINLINK_COMPONENT", initCmd.Flags().Lookup("chainlink-component"))
 	_ = viper.BindPFlag("CHAINLINK_PRODUCT", initCmd.Flags().Lookup("chainlink-product"))
 	_ = viper.BindPFlag("CHAINLINK_TEAM", initCmd.Flags().Lookup("chainlink-team"))
+	_ = viper.BindPFlag("CHAINLINK_COST_CENTER", initCmd.Flags().Lookup("chainlink-cost-center"))
 
 	// set defaults
 	viper.SetDefault("AWS_CONFIG_FILE", initCmd.Flags().Lookup("aws-config-file").DefValue)
