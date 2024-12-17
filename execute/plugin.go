@@ -396,7 +396,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if !valid {
-		p.lggr.Warn("report not valid, not accepting", "seqNr", seqNr)
+		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
 		return false, nil
 	}
 

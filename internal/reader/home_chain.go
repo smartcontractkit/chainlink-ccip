@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -247,11 +248,16 @@ func (r *homeChainPoller) GetOCRConfigs(
 }
 
 func (r *homeChainPoller) Close() error {
-	return r.sync.StopOnce(r.Name(), func() error {
+	err := r.sync.StopOnce(r.Name(), func() error {
 		defer r.wg.Wait()
 		close(r.stopCh)
 		return nil
 	})
+
+	if errors.Is(err, services.ErrAlreadyStopped) {
+		return nil
+	}
+	return err
 }
 
 func (r *homeChainPoller) Ready() error {
