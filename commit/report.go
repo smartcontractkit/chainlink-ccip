@@ -21,11 +21,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-const (
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
-	transmissionDelayMultiplier = 3 * time.Second
-)
-
 // ReportInfo is the info data that will be sent with the along with the report
 // It will be used to determine if the report should be accepted or not
 type ReportInfo struct {
@@ -100,7 +95,7 @@ func (p *Plugin) Reports(
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
 		maps.Keys(p.oracleIDToP2PID),
-		transmissionDelayMultiplier,
+		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
@@ -220,6 +215,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, err
 	}
 
+	p.lggr.Infow("ShouldAcceptedAttestedReport passed checks",
+		"seqNr", seqNr,
+		"timestamp", time.Now().UTC(),
+		"rootsLen", len(decodedReport.MerkleRoots),
+		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
+		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
+	)
 	return true, nil
 }
 
@@ -268,10 +270,12 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		return false, nil
 	}
 
-	p.lggr.Infow("transmitting report",
-		"roots", len(decodedReport.MerkleRoots),
-		"tokenPriceUpdates", len(decodedReport.PriceUpdates.TokenPriceUpdates),
-		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
+	p.lggr.Infow("ShouldTransmitAcceptedReport passed checks",
+		"seqNr", seqNr,
+		"timestamp", time.Now().UTC(),
+		"rootsLen", len(decodedReport.MerkleRoots),
+		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
+		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 	return true, nil
 }
