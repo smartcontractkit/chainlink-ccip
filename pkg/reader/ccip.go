@@ -432,6 +432,7 @@ func (r *ccipChainReader) Nonces(
 	// Prepare the batch request
 	contractBatch := make([]types.BatchRead, len(addresses))
 	addressToIndex := make(map[string]int, len(addresses))
+	responses := make([]uint64, len(addresses))
 
 	for i, address := range addresses {
 		sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
@@ -446,14 +447,13 @@ func (r *ccipChainReader) Nonces(
 		r.lggr.Infow("getting nonce for address",
 			"address", address, "sender", hex.EncodeToString(sender))
 
-		var resp uint64
 		contractBatch[i] = types.BatchRead{
 			ReadName: consts.MethodNameGetInboundNonce,
 			Params: map[string]any{
 				"sourceChainSelector": sourceChainSelector,
 				"sender":              sender,
 			},
-			ReturnVal: &resp,
+			ReturnVal: &responses[i],
 		}
 		addressToIndex[address] = i
 	}
@@ -474,19 +474,18 @@ func (r *ccipChainReader) Nonces(
 	res := make(map[string]uint64, len(addresses))
 	for _, results := range batchResult {
 		for i, readResult := range results {
+			address := getAddressByIndex(addressToIndex, i)
+
 			returnVal, err := readResult.GetResult()
 			if err != nil {
-				address := getAddressByIndex(addressToIndex, i)
 				return nil, fmt.Errorf("failed to get nonce for address %s: %w", address, err)
 			}
 
 			val, ok := returnVal.(*uint64)
 			if !ok || val == nil {
-				address := getAddressByIndex(addressToIndex, i)
 				return nil, fmt.Errorf("invalid nonce value returned for address %s", address)
 			}
 
-			address := getAddressByIndex(addressToIndex, i)
 			res[address] = *val
 		}
 	}

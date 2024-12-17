@@ -165,6 +165,7 @@ func groupByChainSelector(
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
 				exectypes.CommitData{
 					SourceChain:         singleReport.ChainSel,
+					OnRampAddress:       singleReport.OnRampAddress,
 					Timestamp:           report.Timestamp,
 					BlockNum:            report.BlockNum,
 					MerkleRoot:          singleReport.MerkleRoot,

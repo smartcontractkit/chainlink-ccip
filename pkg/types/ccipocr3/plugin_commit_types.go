@@ -38,10 +38,10 @@ func (r CommitPluginReport) IsEmpty() bool {
 //
 //nolint:lll // it's a url
 type MerkleRootChain struct {
-	ChainSel      ChainSelector `json:"chain"`
-	OnRampAddress Bytes         `json:"onRampAddress"`
-	SeqNumsRange  SeqNumRange   `json:"seqNumsRange"`
-	MerkleRoot    Bytes32       `json:"merkleRoot"`
+	ChainSel      ChainSelector  `json:"chain"`
+	OnRampAddress UnknownAddress `json:"onRampAddress"`
+	SeqNumsRange  SeqNumRange    `json:"seqNumsRange"`
+	MerkleRoot    Bytes32        `json:"merkleRoot"`
 }
 
 func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
@@ -49,20 +49,6 @@ func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
 		bytes.Equal(m.OnRampAddress, other.OnRampAddress) &&
 		m.SeqNumsRange == other.SeqNumsRange &&
 		m.MerkleRoot == other.MerkleRoot
-}
-
-func NewMerkleRootChain(
-	chainSel ChainSelector,
-	onRampAddress Bytes,
-	seqNumsRange SeqNumRange,
-	merkleRoot Bytes32,
-) MerkleRootChain {
-	return MerkleRootChain{
-		ChainSel:      chainSel,
-		OnRampAddress: onRampAddress,
-		SeqNumsRange:  seqNumsRange,
-		MerkleRoot:    merkleRoot,
-	}
 }
 
 type PriceUpdates struct {
