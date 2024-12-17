@@ -157,9 +157,9 @@ func DecodeObservation(b []byte) (Observation, error) {
 
 type EmptyEncodeSizes struct {
 	MessageAndTokenData int
-	TokenData           int
 	Observation         int
 	CommitData          int
+	SeqNumMap           int
 }
 
 func NewEmptyEncodeSizes() EmptyEncodeSizes {
@@ -172,9 +172,17 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 	}
 	emptyTokenData := MessageTokenData{}
 	emptyCommitData := CommitData{}
+	emptySeqNr := make(map[cciptypes.SeqNum]cciptypes.Message)
+	emptySeqNrSize := 0
+	enc, err := json.Marshal(emptySeqNr)
+	if err == nil {
+		emptySeqNrSize = len(enc)
+	}
+	//println(emptySeqNrSize)
 	return EmptyEncodeSizes{
 		MessageAndTokenData: emptyMsg.EncodedSize() + emptyTokenData.EncodedSize(),
 		CommitData:          emptyCommitData.EncodedSize(),
 		Observation:         emptyObsSize,
+		SeqNumMap:           emptySeqNrSize,
 	}
 }

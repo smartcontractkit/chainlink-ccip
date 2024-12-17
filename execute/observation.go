@@ -236,6 +236,9 @@ func (p *Plugin) getMessagesObservation(
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
+	if validateTokenDataObservations(messageObs, tkData) != nil {
+		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
+	}
 
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
@@ -254,9 +257,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.TokenData = tkData
 	observation.MessageAndTokenDataEncodedSizes = exectypes.GetEncodedMsgAndTokenDataSizes(messageObs, tkData)
 
-	if validateTokenDataObservations(messageObs, tkData) != nil {
-		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
-	}
 	// Make sure encoded observation fits within the maximum observation size.
 	observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
 	if err != nil {

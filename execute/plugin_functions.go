@@ -295,7 +295,9 @@ func truncateObservation(
 				obs.Messages[chain][seqNum] = cciptypes.Message{}
 				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
-				encodedObsSize -= emptyEncodedSizes.MessageAndTokenData
+				encodedObsSize = encodedObsSize -
+					obs.MessageAndTokenDataEncodedSizes[chain][seqNum] +
+					emptyEncodedSizes.MessageAndTokenData
 				seqNum++
 				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
 				// TODO: Remove the 32 check once we implement the hash size calculation.
@@ -305,15 +307,19 @@ func truncateObservation(
 			}
 
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
-			obs = truncateLastCommit(obs, chain)
-			encodedObsSize -= emptyEncodedSizes.CommitData
+			//numMessages := lastCommit.SequenceNumberRange.Length()
+			obs, encodedObsSize = truncateLastCommit(obs, chain, encodedObsSize, emptyEncodedSizes)
+			//// As we completely remove empty messages and token data, we need to subtract the size of the removed data.
+			//encodedObsSize = encodedObsSize -
+			//	emptyEncodedSizes.CommitData -
+			//	numMessages*emptyEncodedSizes.MessageAndTokenData
 
 			if len(obs.CommitReports[chain]) == 0 {
 				// If the last commit report was truncated, truncate the chain
 				obs = truncateChain(obs, chain)
 			}
 
-			if observationFitsSize(obs, maxSize) {
+			if encodedObsSize <= maxSize {
 				return obs, nil
 			}
 			chains = maps.Keys(obs.CommitReports)
@@ -322,10 +328,13 @@ func truncateObservation(
 		if len(obs.CommitReports) == 0 {
 			return obs, nil
 		}
+		// Encoding again after doing a full iteration on all chains and removing messages/commits.
+		// That is because using encoded sizes is not 100% accurate and there are some missing bytes in the calculation.
 		encodedObs, err = obs.Encode()
 		if err != nil {
 			return exectypes.Observation{}, nil
 		}
+		encodedObsSize = len(encodedObs)
 	}
 
 	return obs, nil
@@ -354,22 +363,30 @@ func truncateMessageData(
 func truncateLastCommit(
 	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
-) exectypes.Observation {
+	currentObsEncSize int,
+	emptyEncodedSizes exectypes.EmptyEncodeSizes,
+) (exectypes.Observation, int) {
 	observation := obs
+	newSize := currentObsEncSize
 	commits := observation.CommitReports[chain]
 	if len(commits) == 0 {
-		return observation
+		return observation, currentObsEncSize
 	}
 	lastCommit := commits[len(commits)-1]
 	// Remove the last commit from the list.
 	commits = commits[:len(commits)-1]
 	observation.CommitReports[chain] = commits
+	// Remove from the encoded size.
+	newSize = newSize - emptyEncodedSizes.CommitData
 	for seqNum, msg := range observation.Messages[chain] {
 		if lastCommit.SequenceNumberRange.Contains(seqNum) {
 			// Remove the message from the observation.
 			delete(observation.Messages[chain], seqNum)
 			// Remove the token data from the observation.
 			delete(observation.TokenData[chain], seqNum)
+			//delete(observation.Hashes[chain], seqNum)
+			// Remove the encoded size of the message and token data.
+			newSize = newSize - emptyEncodedSizes.MessageAndTokenData - 2*emptyEncodedSizes.SeqNumMap
 			// Remove costly messages
 			for i, costlyMessage := range observation.CostlyMessages {
 				if costlyMessage == msg.Header.MessageID {
@@ -380,7 +397,7 @@ func truncateLastCommit(
 		}
 	}
 
-	return observation
+	return observation, newSize
 }
 
 // truncateChain removes all data related to the given chain from the observation.

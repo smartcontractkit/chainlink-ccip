@@ -1386,7 +1386,9 @@ func Test_truncateLastCommit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			truncated := truncateLastCommit(tt.observation, tt.chain)
+			enc, err := tt.observation.Encode()
+			require.NoError(t, err)
+			truncated, _ := truncateLastCommit(tt.observation, tt.chain, len(enc), exectypes.NewEmptyEncodeSizes())
 			require.Equal(t, tt.expected, truncated)
 		})
 	}
@@ -1630,6 +1632,8 @@ func Test_truncateObservation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.observation.TokenData = makeNoopTokenDataObservations(tt.observation.Messages)
 			tt.expected.TokenData = tt.observation.TokenData
+			tt.observation.MessageAndTokenDataEncodedSizes =
+				exectypes.GetEncodedMsgAndTokenDataSizes(tt.observation.Messages, tt.observation.TokenData)
 			obs, err := truncateObservation(tt.observation, tt.maxSize, exectypes.NewEmptyEncodeSizes())
 			if tt.wantErr {
 				require.Error(t, err)
