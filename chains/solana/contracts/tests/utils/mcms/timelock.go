@@ -8,7 +8,7 @@ import (
 	"github.com/gagliardetto/solana-go"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/generated/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 )
 
 // test helper with normal accounts
