@@ -858,14 +858,10 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
 					Return(nil)
 				m.EXPECT().
-					LabelNamespace(context.TODO(), "crib-test", map[string]string{
-						"chain.link/component": "CRIB",
-						"chain.link/product":   "TestProduct",
-						"chain.link/team":      "CRIB",
-					}).
-					Return(errors.New("failed to label namespace namespace=crib-test error"))
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
+					Return(errors.New("LabelNamespace failed"))
 			},
-			expectedErr: errors.New("failed to label namespace namespace=crib-test error"),
+			expectedErr: errors.New("failed to label namespace: LabelNamespace failed"),
 		},
 	}
 

@@ -453,7 +453,7 @@ func (_c *K8sCLI_GetIngress_Call) RunAndReturn(run func(context.Context, string,
 	return _c
 }
 
-// LabelNamespace provides a mock function with given fields: ctx, namespace, key, value
+// LabelNamespace provides a mock function with given fields: ctx, namespace, labels
 func (_m *K8sCLI) LabelNamespace(ctx context.Context, namespace string, labels map[string]string) error {
 	ret := _m.Called(ctx, namespace, labels)
 
@@ -479,9 +479,8 @@ type K8sCLI_LabelNamespace_Call struct {
 // LabelNamespace is a helper method to define mock.On call
 //   - ctx context.Context
 //   - namespace string
-//   - key string
-//   - value map[string]string
-func (_e *K8sCLI_Expecter) LabelNamespace(ctx interface{}, namespace interface{},  labels map[string]string) *K8sCLI_LabelNamespace_Call {
+//   - labels map[string]string
+func (_e *K8sCLI_Expecter) LabelNamespace(ctx interface{}, namespace interface{}, labels interface{}) *K8sCLI_LabelNamespace_Call {
 	return &K8sCLI_LabelNamespace_Call{Call: _e.mock.On("LabelNamespace", ctx, namespace, labels)}
 }
 

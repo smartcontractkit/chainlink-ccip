@@ -316,14 +316,12 @@ func EnsureCribNamespaceReady(ctx context.Context, k8sClient wrappers.K8sCLI, ro
 		// Get labels
 		labels, err := GetNamespaceLabels()
 		if err != nil {
-			slog.Error("failed to compose namespace labels", slog.Any("error", err))
-			os.Exit(1)
+			return fmt.Errorf("failed to compose namespace labels: : %w", err)
 		}
 
 		// Apply labels to the namespace
 		if err := k8sClient.LabelNamespace(ctx, namespace, labels); err != nil {
-			slog.Error("failed to label namespace", slog.String("namespace", namespace), slog.Any("error", err))
-			os.Exit(1)
+			return fmt.Errorf("failed to label namespace: %w", err)
 		}
 	}
 	return nil
