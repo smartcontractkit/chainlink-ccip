@@ -68,10 +68,10 @@ type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 // TokenDataObservations are populated during the Observation phase and depend on previously fetched
 // MessageObservations details and the `tokenDataObservers` configured in the ExecuteOffchainConfig.
 // Content of the MessageTokenData is determined by the tokendata.TokenDataObserver implementations.
-//   - if MessageAndTokenData doesn't have any tokens, TokenData slice will be empty.
-//   - if MessageAndTokenData has tokens, but these tokens don't require any special treatment,
+//   - if Message doesn't have any tokens, TokenData slice will be empty.
+//   - if Message has tokens, but these tokens don't require any special treatment,
 //     TokenData slice will contain empty TokenData objects.
-//   - if MessageAndTokenData has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
+//   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
 //     specific tokendata.TokenDataObserver will be used to populate the TokenData slice.
 type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
 
