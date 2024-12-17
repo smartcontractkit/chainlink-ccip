@@ -1,5 +1,15 @@
 # @chainlink/crib
 
+## 1.2.0
+
+### Minor Changes
+
+- [#325](https://github.com/smartcontractkit/crib/pull/325) [`3ff989b`](https://github.com/smartcontractkit/crib/commit/3ff989b79a94fc97fbaccf4b9b163a79ae6b5ad3) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - removed cribbit.sh and references to it
+
+### Patch Changes
+
+- [#332](https://github.com/smartcontractkit/crib/pull/332) [`a2dc1c9`](https://github.com/smartcontractkit/crib/commit/a2dc1c906e424a1eec87490a909764d42843a593) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - setting a PriceMax on dev-simulated-core-ocr1 profile to prevent validation error
+
 ## 1.1.0
 
 ### Minor Changes
