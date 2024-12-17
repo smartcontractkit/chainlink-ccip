@@ -6,6 +6,7 @@ import (
 	"github.com/smartcontractkit/libocr/commontypes"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/mocks/internal_/plugincommon"
 
 	"github.com/stretchr/testify/require"
@@ -24,14 +25,14 @@ import (
 func TestPluginReports(t *testing.T) {
 	testCases := []struct {
 		name          string
-		outc          Outcome
+		outc          committypes.Outcome
 		expErr        bool
 		expReports    []ccipocr3.CommitPluginReport
 		expReportInfo ReportInfo
 	}{
 		{
 			name: "wrong outcome type gives an empty report but no error",
-			outc: Outcome{
+			outc: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportIntervalsSelected,
 				},
@@ -40,7 +41,7 @@ func TestPluginReports(t *testing.T) {
 		},
 		{
 			name: "correct outcome type but empty data",
-			outc: Outcome{
+			outc: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportGenerated,
 				},
@@ -49,7 +50,7 @@ func TestPluginReports(t *testing.T) {
 		},
 		{
 			name: "token prices reported without merkle root is still transmitted",
-			outc: Outcome{
+			outc: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmissionFailed,
 				},
@@ -82,7 +83,7 @@ func TestPluginReports(t *testing.T) {
 		},
 		{
 			name: "only chain fee reported without merkle root is still transmitted",
-			outc: Outcome{
+			outc: committypes.Outcome{
 				ChainFeeOutcome: chainfee.Outcome{
 					GasPrices: []ccipocr3.GasPriceChain{
 						{GasPrice: ccipocr3.NewBigIntFromInt64(3), ChainSel: 123},
@@ -104,7 +105,7 @@ func TestPluginReports(t *testing.T) {
 		},
 		{
 			name: "token prices reported but no merkle roots so report is not empty",
-			outc: Outcome{
+			outc: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportGenerated,
 					RootsToReport: []ccipocr3.MerkleRootChain{

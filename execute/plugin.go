@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -54,6 +55,7 @@ type Plugin struct {
 	homeChain    reader.HomeChain
 	discovery    *discovery.ContractDiscoveryProcessor
 	chainSupport plugincommon.ChainSupport
+	observer     metrics.Reporter
 
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
@@ -79,6 +81,7 @@ func NewPlugin(
 	estimateProvider gas.EstimateProvider,
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
+	metricsReporter metrics.Reporter,
 ) *Plugin {
 	lggr.Infow("creating new plugin instance", "p2pID", oracleIDToP2pID[reportingCfg.OracleID])
 
@@ -111,6 +114,7 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
+		observer: metricsReporter,
 	}
 }
 
@@ -198,6 +202,14 @@ func (p *Plugin) ValidateObservation(
 		return fmt.Errorf("validate observed sequence numbers: %w", err)
 	}
 
+	if err = validateHashesExist(decodedObservation.Messages, decodedObservation.Hashes); err != nil {
+		return fmt.Errorf("validate hashes exist: %w", err)
+	}
+
+	if err = validateTokenDataObservations(decodedObservation.Messages, decodedObservation.TokenData); err != nil {
+		return fmt.Errorf("validate token data observations: %w", err)
+	}
+
 	return nil
 }
 
@@ -223,22 +235,28 @@ func selectReport(
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	var stillPendingReports []exectypes.CommitData
-	for i, report := range commitReports {
-		// Reports at the end may not have messages yet.
-		if len(report.Messages) == 0 {
-			stillPendingReports = append(stillPendingReports, report)
+	var selectedReports []exectypes.CommitData
+	pendingReports := 0
+	for i, commitReport := range commitReports {
+		// handle incomplete observations.
+		if len(commitReport.Messages) == 0 {
+			pendingReports++
 			continue
 		}
 
 		var err error
-		commitReports[i], err = builder.Add(ctx, report)
+		// The builder may attach metadata to the commit report.
+		commitReports[i], err = builder.Add(ctx, commitReport)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
 		}
+
+		selectedReports = append(selectedReports, commitReports[i])
+
 		// If the report has not been fully executed, keep it for the next round.
+		// Detect a report was not fully executed
 		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
-			stillPendingReports = append(stillPendingReports, commitReports[i])
+			pendingReports++
 		}
 	}
 
@@ -247,8 +265,23 @@ func selectReport(
 	lggr.Infow(
 		"reports have been selected",
 		"numReports", len(execReports),
-		"numPendingReports", len(stillPendingReports))
-	return execReports, stillPendingReports, err
+		"numPendingReports", pendingReports)
+	return execReports, selectedReports, err
+}
+
+func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
+	var ri cciptypes.ExecuteReportInfo
+
+	for _, commitReport := range report.CommitReports {
+		ri = append(ri, cciptypes.MerkleRootChain{
+			ChainSel:      commitReport.SourceChain,
+			OnRampAddress: commitReport.OnRampAddress,
+			SeqNumsRange:  commitReport.SequenceNumberRange,
+			MerkleRoot:    commitReport.MerkleRoot,
+		})
+	}
+
+	return ri
 }
 
 func (p *Plugin) Reports(
@@ -264,9 +297,15 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
+	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
+	}
+
+	reportInfo := extractReportInfo(decodedOutcome)
+	encodedInfo, err := reportInfo.Encode()
+	if err != nil {
+		return nil, err
 	}
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
@@ -280,17 +319,17 @@ func (p *Plugin) Reports(
 	p.lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
 
-	report := []ocr3types.ReportPlus[[]byte]{
+	r := []ocr3types.ReportPlus[[]byte]{
 		{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-				Report: encoded,
-				Info:   nil,
+				Report: encodedReport,
+				Info:   encodedInfo,
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
 		},
 	}
 
-	return report, nil
+	return r, nil
 }
 
 // validateReport validates various aspects of the report.
@@ -355,7 +394,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if !valid {
-		p.lggr.Warn("report not valid, not accepting", "seqNr", seqNr)
+		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
 		return false, nil
 	}
 

@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -223,11 +224,17 @@ func (r *rmnHomePoller) GetAllConfigDigests() (
 }
 
 func (r *rmnHomePoller) Close() error {
-	return r.sync.StopOnce(r.Name(), func() error {
+	err := r.sync.StopOnce(r.Name(), func() error {
 		defer r.wg.Wait()
 		close(r.stopCh)
 		return nil
 	})
+
+	if errors.Is(err, services.ErrAlreadyStopped) {
+		return nil
+	}
+
+	return err
 }
 
 func (r *rmnHomePoller) Ready() error {

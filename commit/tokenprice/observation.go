@@ -32,12 +32,14 @@ func (p *processor) Observation(
 		"timestampNow", now,
 	)
 
-	return Observation{
+	obs := Observation{
 		FeedTokenPrices:       feedTokenPrices,
 		FeeQuoterTokenUpdates: feeQuoterUpdates,
 		FChain:                fChain,
 		Timestamp:             now,
-	}, nil
+	}
+	p.metricsReporter.TrackTokenPricesObservation(obs)
+	return obs, nil
 }
 
 func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {

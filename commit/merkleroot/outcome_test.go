@@ -562,6 +562,7 @@ func Test_Processor_Outcome(t *testing.T) {
 					RMNEnabled:                         tc.rmnEnabled,
 					MaxReportTransmissionCheckAttempts: uint(tc.maxReportTransmissionCheckAttempts),
 				},
+				metricsReporter: NoopMetrics{},
 			}
 
 			aos := make([]plugincommon.AttributedObservation[Observation], 0, len(tc.observations))

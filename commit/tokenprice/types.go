@@ -48,3 +48,15 @@ type Observer interface {
 
 	ObserveFChain() map[cciptypes.ChainSelector]int
 }
+
+// MetricsReporter exposes only relevant methods for reporting token prices from metrics.Reporter
+type MetricsReporter interface {
+	TrackTokenPricesObservation(obs Observation)
+	TrackTokenPricesOutcome(outcome Outcome)
+}
+
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackTokenPricesObservation(Observation) {}
+
+func (n NoopMetrics) TrackTokenPricesOutcome(Outcome) {}

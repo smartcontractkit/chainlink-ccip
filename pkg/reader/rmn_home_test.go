@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	tests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -269,6 +270,44 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_RMNHomePoller_Close(t *testing.T) {
+	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	poller := NewRMNHomePoller(
+		homeChainReader,
+		rmnHomeBoundContract,
+		logger.Test(t),
+		10*time.Millisecond,
+	).(*rmnHomePoller)
+
+	homeChainReader.On("GetLatestValue",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Run(func(args mock.Arguments) {
+		result := args.Get(4).(*GetAllConfigsResponse)
+		*result = GetAllConfigsResponse{
+			ActiveConfig: VersionedConfig{
+				ConfigDigest:  [32]byte{1},
+				Version:       1,
+				StaticConfig:  StaticConfig{Nodes: []Node{}},
+				DynamicConfig: DynamicConfig{SourceChains: []SourceChain{}},
+			},
+		}
+	}).Return(nil)
+
+	ctx := tests.Context(t)
+	require.NoError(t, poller.Start(ctx))
+
+	err1 := poller.Close()
+	require.NoError(t, err1)
+	err2 := poller.Close()
+	require.NoError(t, err2)
+	err3 := poller.Close()
+	require.NoError(t, err3)
 }
 
 func TestIsNodeObserver(t *testing.T) {

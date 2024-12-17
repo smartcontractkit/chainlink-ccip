@@ -28,13 +28,13 @@ func Test_USDC_Transfer(t *testing.T) {
 	require.NoError(t, err)
 
 	messages := []inmem.MessagesWithMetadata{
-		makeMsg(102, sourceChain, destChain, false),
-		makeMsg(103, sourceChain, destChain, false),
-		makeMsg(104, sourceChain, destChain, false, withTokens(cciptypes.RampTokenAmount{
+		makeMsgWithMetadata(102, sourceChain, destChain, false),
+		makeMsgWithMetadata(103, sourceChain, destChain, false),
+		makeMsgWithMetadata(104, sourceChain, destChain, false, withTokens(cciptypes.RampTokenAmount{
 			SourcePoolAddress: addressBytes,
 			ExtraData:         readerpkg.NewSourceTokenDataPayload(1, 0).ToBytes(),
 		})),
-		makeMsg(105, sourceChain, destChain, false, withTokens(cciptypes.RampTokenAmount{
+		makeMsgWithMetadata(105, sourceChain, destChain, false, withTokens(cciptypes.RampTokenAmount{
 			SourcePoolAddress: addressBytes,
 			ExtraData:         readerpkg.NewSourceTokenDataPayload(2, 0).ToBytes(),
 		})),
@@ -66,12 +66,12 @@ func Test_USDC_Transfer(t *testing.T) {
 	// Round 1 - Get Commit Reports
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 2 - Get Messages
 	outcome = runner.MustRunRound(ctx, t)
 	require.Len(t, outcome.Report.ChainReports, 0)
-	require.Len(t, outcome.PendingCommitReports, 1)
+	require.Len(t, outcome.CommitReports, 1)
 
 	// Round 3 - Filter
 	// Messages 102-104 are executed, 105 doesn't have token data ready

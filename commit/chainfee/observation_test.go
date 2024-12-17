@@ -101,11 +101,12 @@ func Test_processor_Observation(t *testing.T) {
 			ctx := tests.Context(t)
 
 			p := &processor{
-				lggr:         lggr,
-				chainSupport: cs,
-				ccipReader:   ccipReader,
-				oracleID:     oracleID,
-				homeChain:    homeChain,
+				lggr:            lggr,
+				chainSupport:    cs,
+				ccipReader:      ccipReader,
+				oracleID:        oracleID,
+				homeChain:       homeChain,
+				metricsReporter: NoopMetrics{},
 			}
 
 			cs.EXPECT().SupportedChains(oracleID).

@@ -233,9 +233,19 @@ func makeTestCommitReport(
 		msg := makeMessage(
 			cciptypes.ChainSelector(srcChain),
 			cciptypes.SeqNum(i+firstSeqNum),
-			uint64(i)+1)
+			uint64(i)+1,
+		)
 		msg.Sender = sender
 		messages = append(messages, msg)
+	}
+
+	var hashes []cciptypes.Bytes32
+	for i := 0; i < len(messages); i++ {
+		hash, err := hasher.Hash(context.Background(), messages[i])
+		if err != nil {
+			panic(fmt.Sprintf("unable to hash message: %s", err))
+		}
+		hashes = append(hashes, hash)
 	}
 
 	messageTokenData := make([]exectypes.MessageTokenData, numMessages)
@@ -257,6 +267,7 @@ func makeTestCommitReport(
 		Timestamp:           time.UnixMilli(timestamp),
 		BlockNum:            uint64(block),
 		Messages:            messages,
+		Hashes:              hashes,
 		ExecutedMessages:    executed,
 		MessageTokenData:    messageTokenData,
 	}
@@ -264,7 +275,7 @@ func makeTestCommitReport(
 	// calculate merkle root
 	root := rootOverride
 	if root.IsEmpty() {
-		tree, err := ConstructMerkleTree(context.Background(), hasher, commitReport, logger.Nop())
+		tree, err := ConstructMerkleTree(commitReport, logger.Nop())
 		if err != nil {
 			panic(fmt.Sprintf("unable to construct merkle tree: %s", err))
 		}
@@ -357,6 +368,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 							},
 						},
 					},
+					Hashes: []cciptypes.Bytes32{
+						{0x1},
+						{0x2},
+					},
 				},
 			},
 		},
@@ -376,25 +391,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 							},
 						},
 					},
-				},
-				hasher: badHasher{},
-			},
-		},
-		{
-			name:    "bad hasher",
-			wantErr: "unable to hash message (1234567, 100): bad hasher",
-			args: args{
-				report: exectypes.CommitData{
-					MessageTokenData:    make([]exectypes.MessageTokenData, 1),
-					SourceChain:         1234567,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					Messages: []cciptypes.Message{
-						{
-							Header: cciptypes.RampMessageHeader{
-								SourceChainSelector: 1234567,
-								SequenceNumber:      cciptypes.SeqNum(100),
-							},
-						},
+					Hashes: []cciptypes.Bytes32{
+						{0x1},
 					},
 				},
 				hasher: badHasher{},
@@ -405,22 +403,13 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Select hasher mock.
-			var resolvedHasher cciptypes.MessageHasher
-			if tt.args.hasher != nil {
-				resolvedHasher = tt.args.hasher
-			} else {
-				resolvedHasher = mocks.NewMessageHasher()
-			}
-
-			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
 
 			test := func(readyMessages map[int]struct{}) {
-				_, err := buildSingleChainReportHelper(ctx, lggr, resolvedHasher, tt.args.report, readyMessages)
+				_, err := buildSingleChainReportHelper(lggr, tt.args.report, readyMessages)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 			}
@@ -478,7 +467,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2654,
+				maxReportSize: 2854,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -1161,6 +1150,7 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			},
 			expectedStatus: InvalidNonce,
 		},
+		// TODO: Test PseudoDeleted status
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
