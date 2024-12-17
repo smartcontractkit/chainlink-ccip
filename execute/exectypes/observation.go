@@ -17,6 +17,9 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 
 type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
 
+type EncodedMsgSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]uint
+type EncodedTokenDataSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]uint
+
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
 	var results []cciptypes.Message
