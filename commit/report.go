@@ -1,15 +1,20 @@
 package commit
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
+
+	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot"
+	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -40,7 +45,7 @@ func (ri *ReportInfo) Decode(encodedReportInfo []byte) error {
 func (p *Plugin) Reports(
 	ctx context.Context, seqNr uint64, outcomeBytes ocr3types.Outcome,
 ) ([]ocr3types.ReportPlus[[]byte], error) {
-	outcome, err := decodeOutcome(outcomeBytes)
+	outcome, err := committypes.DecodeOutcome(outcomeBytes)
 	if err != nil {
 		p.lggr.Errorw("failed to decode Outcome", "outcome", string(outcomeBytes), "err", err)
 		return nil, fmt.Errorf("decode outcome: %w", err)
@@ -114,62 +119,153 @@ func (p *Plugin) Reports(
 	}, nil
 }
 
-func (p *Plugin) ShouldAcceptAttestedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
-) (bool, error) {
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
-	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
+// validateReport validates various aspects of the report.
+// Pure checks are placed earlier in the function on purpose to avoid
+// unnecessary network or DB I/O.
+// If you're added more checks make sure to follow this pattern.
+//
+//nolint:gocyclo
+func (p *Plugin) validateReport(
+	ctx context.Context,
+	seqNr uint64,
+	r ocr3types.ReportWithInfo[[]byte],
+) (bool, cciptypes.CommitPluginReport, error) {
+	if r.Report == nil {
+		p.lggr.Warn("nil report", "seqNr", seqNr)
+		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
-	isEmpty := decodedReport.IsEmpty()
-	if isEmpty {
-		p.lggr.Infow("skipping empty report")
-		return false, nil
+	decodedReport, err := p.decodeReport(ctx, r.Report)
+	if err != nil {
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report: %w, report: %x", err, r.Report)
+	}
+
+	if decodedReport.IsEmpty() {
+		p.lggr.Warnw("empty report after decoding", "seqNr", seqNr, "decodedReport", decodedReport)
+		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
 	var reportInfo ReportInfo
 	if err := reportInfo.Decode(r.Info); err != nil {
-		return false, fmt.Errorf("decode report info: %w", err)
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("decode report info: %w", err)
 	}
 
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		p.lggr.Infow("skipping report with insufficient RMN signatures %d < %d+1",
+		p.lggr.Infow("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	// check if we support the dest, if not we can't do the checks needed.
+	supports, err := p.chainSupport.SupportsDestChain(p.oracleID)
+	if err != nil {
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("supports dest chain: %w", err)
+	}
+
+	if !supports {
+		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	offRampConfigDigest, err := p.ccipReader.GetOffRampConfigDigest(ctx, consts.PluginTypeCommit)
+	if err != nil {
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("get offramp config digest: %w", err)
+	}
+
+	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
+		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+			"myConfigDigest", p.reportingCfg.ConfigDigest,
+			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
+		)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	latestSeqNr, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+	if err != nil {
+		return false, cciptypes.CommitPluginReport{}, fmt.Errorf("get latest price seq nr: %w", err)
+	}
+
+	if p.isStaleReport(seqNr, latestSeqNr, decodedReport) {
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
+	if err != nil {
+		p.lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
+			"err", err, "merkleRoots", decodedReport.MerkleRoots)
+		return false, cciptypes.CommitPluginReport{}, nil
+	}
+
+	return true, decodedReport, nil
+}
+
+func (p *Plugin) ShouldAcceptAttestedReport(
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
+) (bool, error) {
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
+	if err != nil {
+		return false, fmt.Errorf("validating report: %w", err)
+	}
+
+	if !valid {
+		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
 		return false, nil
+	}
+
+	// TODO: consider doing this in validateReport,
+	// will end up doing it in both ShouldAccept and ShouldTransmit.
+	if isCursed, err := p.checkReportCursed(ctx, decodedReport); err != nil || isCursed {
+		return false, err
 	}
 
 	return true, nil
 }
 
+func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.CommitPluginReport, error) {
+	decodedReport, err := p.reportCodec.Decode(ctx, report)
+	if err != nil {
+		return cciptypes.CommitPluginReport{}, fmt.Errorf("decode commit plugin report: %w", err)
+	}
+	if decodedReport.IsEmpty() {
+		p.lggr.Infow("empty report")
+	}
+	return decodedReport, nil
+}
+
+func (p *Plugin) isStaleReport(seqNr, latestSeqNr uint64, decodedReport cciptypes.CommitPluginReport) bool {
+	if seqNr < latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
+		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
+		return true
+	}
+	return false
+}
+
+func (p *Plugin) checkReportCursed(ctx context.Context, decodedReport cciptypes.CommitPluginReport) (bool, error) {
+	sourceChains := slicelib.Map(decodedReport.MerkleRoots,
+		func(r cciptypes.MerkleRootChain) cciptypes.ChainSelector {
+			return r.ChainSel
+		})
+	isCursed, err := plugincommon.IsReportCursed(ctx, p.lggr, p.ccipReader, p.chainSupport.DestChain(), sourceChains)
+	if err != nil {
+		p.lggr.Errorw("report not accepted due to curse checking error", "err", err)
+		return false, err
+	}
+	return isCursed, nil
+}
+
 func (p *Plugin) ShouldTransmitAcceptedReport(
-	ctx context.Context, u uint64, r ocr3types.ReportWithInfo[[]byte],
+	ctx context.Context, seqNr uint64, r ocr3types.ReportWithInfo[[]byte],
 ) (bool, error) {
-	// we only transmit reports if we are the "active" instance.
-	// we can check this by reading the OCR configs from the home chain.
-	isCandidate, err := p.isCandidateInstance(ctx)
+	valid, decodedReport, err := p.validateReport(ctx, seqNr, r)
 	if err != nil {
-		return false, fmt.Errorf("isCandidateInstance: %w", err)
+		return false, fmt.Errorf("validating report: %w", err)
 	}
 
-	if isCandidate {
-		p.lggr.Infow("not the active instance, skipping report transmission")
+	if !valid {
+		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
 		return false, nil
-	}
-
-	decodedReport, err := p.reportCodec.Decode(ctx, r.Report)
-	if err != nil {
-		return false, fmt.Errorf("decode commit plugin report: %w", err)
-	}
-
-	isValid, err := merkleroot.ValidateMerkleRootsState(ctx, p.lggr, decodedReport, p.ccipReader)
-	if !isValid {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("validate merkle roots state: %w", err)
 	}
 
 	p.lggr.Infow("transmitting report",
@@ -178,13 +274,4 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 	return true, nil
-}
-
-func (p *Plugin) isCandidateInstance(ctx context.Context) (bool, error) {
-	ocrConfigs, err := p.homeChain.GetOCRConfigs(ctx, p.donID, consts.PluginTypeCommit)
-	if err != nil {
-		return false, fmt.Errorf("failed to get ocr configs from home chain: %w", err)
-	}
-
-	return ocrConfigs.CandidateConfig.ConfigDigest == p.reportingCfg.ConfigDigest, nil
 }

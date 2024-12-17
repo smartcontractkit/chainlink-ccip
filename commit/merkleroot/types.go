@@ -146,29 +146,62 @@ func (o *Outcome) Sort() {
 	})
 }
 
-func (o *Outcome) NextState() State {
+func (o *Outcome) nextState() processorState {
 	switch o.OutcomeType {
 	case ReportIntervalsSelected:
-		return BuildingReport
+		return buildingReport
 	case ReportGenerated:
-		return WaitingForReportTransmission
+		return waitingForReportTransmission
 	case ReportEmpty:
-		return SelectingRangesForReport
+		return selectingRangesForReport
 	case ReportInFlight:
-		return WaitingForReportTransmission
+		return waitingForReportTransmission
 	case ReportTransmitted:
-		return SelectingRangesForReport
+		return selectingRangesForReport
 	case ReportTransmissionFailed:
-		return SelectingRangesForReport
+		return selectingRangesForReport
 	default:
-		return SelectingRangesForReport
+		return selectingRangesForReport
 	}
 }
 
-type State int
+type processorState int
 
 const (
-	SelectingRangesForReport State = iota + 1
-	BuildingReport
-	WaitingForReportTransmission
+	// selectingRangesForReport is the initial state of the processor while oracles agree on which message
+	// sequence number ranges to include in the report.
+	selectingRangesForReport processorState = iota + 1
+
+	// buildingReport is the state of the processor while the report is being built after message
+	// sequence numbers are agreed.
+	buildingReport
+
+	// waitingForReportTransmission is the state of the processor after the report is built and waiting for it to
+	// get transmitted onchain.
+	waitingForReportTransmission
 )
+
+func (p processorState) String() string {
+	switch p {
+	case selectingRangesForReport:
+		return "selectingRangesForReport"
+	case buildingReport:
+		return "buildingReport"
+	case waitingForReportTransmission:
+		return "waitingForReportTransmission"
+	default:
+		return "unknown"
+	}
+}
+
+// MetricsReporter exposes only relevant methods for reporting merkle roots from metrics.Reporter
+type MetricsReporter interface {
+	TrackMerkleObservation(obs Observation, state string)
+	TrackMerkleOutcome(outcome Outcome, state string)
+}
+
+type NoopMetrics struct{}
+
+func (n NoopMetrics) TrackMerkleObservation(Observation, string) {}
+
+func (n NoopMetrics) TrackMerkleOutcome(Outcome, string) {}

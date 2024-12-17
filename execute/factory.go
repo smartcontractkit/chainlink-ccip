@@ -7,6 +7,8 @@ import (
 
 	"google.golang.org/grpc"
 
+	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
@@ -15,15 +17,52 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+)
+
+const (
+	// Estimated maximum number of source chains the system will support.
+	// This value should be adjusted as we approach supporting that number of chains.
+	// Its primary purpose is to assist in defining the limits below.
+	estimatedMaxNumberOfSourceChains = 900
+
+	// maxQueryLength is set to disable queries because they are not used.
+	maxQueryLength = 0
+
+	// maxObservationLength is set to the maximum size of an observation
+	// check factory_test for the calculation.
+	// this is being set to the max maximum observation length due to
+	// the observations being so large at the moment, especially when
+	// commit reports have many messages.
+	// in order to meaningfully decrease this we need to drastically optimise
+	// our observation sizes.
+	maxObservationLength = ocr3types.MaxMaxObservationLength
+
+	// maxOutcomeLength is set to the maximum size of an outcome
+	// check factory_test for the calculation. This is not limited because
+	// these are not sent over the network.
+	maxOutcomeLength = ocr3types.MaxMaxOutcomeLength
+
+	// maxReportLength is set to an estimate of a maximum report size.
+	// This can be tuned over time, it may be more efficient to have
+	// smaller reports.
+
+	maxReportLength = ocr3types.MaxMaxReportLength // allowing large reports for now
+
+	// maxReportCount controls how many OCR3 reports can be returned. Note that
+	// the actual exec report type (ExecutePluginReport) may contain multiple
+	// per-source-chain reports. These are not limited by this value.
+	maxReportCount = 1
 )
 
 // PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
@@ -53,7 +92,7 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	lggr             logger.Logger
+	baseLggr         logger.Logger
 	donID            plugintypes.DonID
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
@@ -62,7 +101,7 @@ type PluginFactory struct {
 	estimateProvider gas.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
-	chainWriters     map[cciptypes.ChainSelector]types.ChainWriter
+	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
 func NewPluginFactory(
@@ -75,10 +114,10 @@ func NewPluginFactory(
 	tokenDataEncoder cciptypes.TokenDataEncoder,
 	estimateProvider gas.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
-	chainWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 ) *PluginFactory {
 	return &PluginFactory{
-		lggr:             lggr,
+		baseLggr:         lggr,
 		donID:            donID,
 		ocrConfig:        ocrConfig,
 		execCodec:        execCodec,
@@ -94,6 +133,8 @@ func NewPluginFactory(
 func (p PluginFactory) NewReportingPlugin(
 	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
+	lggr := logutil.WithPluginConstants(p.baseLggr, "Execute", p.donID, config.OracleID, config.ConfigDigest)
+
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
 	if err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
@@ -111,12 +152,16 @@ func (p PluginFactory) NewReportingPlugin(
 	// map types to the facade.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
-		readers[chain] = cr
+		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
+		if err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
+		}
+		readers[chain] = contractreader.NewObserverReader(cr, lggr, chainID)
 	}
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		p.lggr,
+		logutil.WithContext(lggr, "CCIPReader"),
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -125,7 +170,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		p.lggr,
+		logutil.WithContext(lggr, "TokenDataObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
@@ -135,13 +180,18 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create token data observer: %w", err)
 	}
 
-	costlyMessageObserver := exectypes.NewCostlyMessageObserverWithDefaults(
-		p.lggr,
+	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
+		logutil.WithContext(lggr, "CostlyMessages"),
 		true,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
 	)
+
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
 
 	return NewPlugin(
 			p.donID,
@@ -155,17 +205,18 @@ func (p PluginFactory) NewReportingPlugin(
 			p.homeChainReader,
 			tokenDataObserver,
 			p.estimateProvider,
-			p.lggr,
+			lggr,
 			costlyMessageObserver,
+			metricsReporter,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{
 				// No query for this execute implementation.
-				MaxQueryLength:       0,
-				MaxObservationLength: 20_000,             // 20kB
-				MaxOutcomeLength:     20_000,             // 20kB
-				MaxReportLength:      maxReportSizeBytes, // 250kB
-				MaxReportCount:       10,
+				MaxQueryLength:       maxQueryLength,
+				MaxObservationLength: maxObservationLength,
+				MaxOutcomeLength:     maxOutcomeLength,
+				MaxReportLength:      maxReportLength,
+				MaxReportCount:       maxReportCount,
 			},
 		}, nil
 }

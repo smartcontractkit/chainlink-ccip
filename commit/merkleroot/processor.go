@@ -34,6 +34,7 @@ type Processor struct {
 	rmnControllerCfgDigest cciptypes.Bytes32
 	rmnCrypto              cciptypes.RMNCrypto
 	rmnHomeReader          readerpkg.RMNHome
+	metricsReporter        MetricsReporter
 }
 
 // NewProcessor creates a new Processor
@@ -51,28 +52,29 @@ func NewProcessor(
 	rmnController rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
+	metricsReporter MetricsReporter,
 ) *Processor {
-	observer := observerImpl{
-		lggr,
-		homeChain,
-		oracleID,
-		chainSupport,
-		ccipReader,
-		msgHasher,
-	}
 	return &Processor{
 		oracleID:        oracleID,
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
 		lggr:            lggr,
-		observer:        observer,
+		observer: newObserverImpl(
+			lggr,
+			homeChain,
+			oracleID,
+			chainSupport,
+			ccipReader,
+			msgHasher,
+		),
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
 		chainSupport:    chainSupport,
 		rmnController:   rmnController,
 		rmnCrypto:       rmnCrypto,
 		rmnHomeReader:   rmnHomeReader,
+		metricsReporter: metricsReporter,
 	}
 }
 

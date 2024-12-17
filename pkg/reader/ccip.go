@@ -2,6 +2,7 @@ package reader
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 
@@ -36,7 +38,7 @@ import (
 type ccipChainReader struct {
 	lggr            logger.Logger
 	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter
 	destChain       cciptypes.ChainSelector
 	offrampAddress  string
 }
@@ -45,7 +47,7 @@ func newCCIPChainReaderInternal(
 	ctx context.Context,
 	lggr logger.Logger,
 	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
-	contractWriters map[cciptypes.ChainSelector]types.ChainWriter,
+	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) *ccipChainReader {
@@ -134,7 +136,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 			},
 		},
 		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(limit * 2),
+			},
 		},
 		&ev,
 	)
@@ -144,7 +149,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	r.lggr.Debugw("queried commit reports", "numReports", len(iter),
 		"destChain", dest,
 		"ts", ts,
-		"limit", limit)
+		"limit", limit*2)
 
 	reports := make([]plugintypes2.CommitPluginReportWithMeta, 0)
 	for _, item := range iter {
@@ -258,7 +263,10 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 			},
 		},
 		query.LimitAndSort{
-			SortBy: []query.SortBy{query.NewSortByTimestamp(query.Asc)},
+			SortBy: []query.SortBy{query.NewSortBySequence(query.Asc)},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
+			},
 		},
 		&dataTyp,
 	)
@@ -321,7 +329,10 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 		},
 		query.LimitAndSort{
 			SortBy: []query.SortBy{
-				query.NewSortByTimestamp(query.Asc),
+				query.NewSortBySequence(query.Asc),
+			},
+			Limit: query.Limit{
+				Count: uint64(seqNumRange.End() - seqNumRange.Start() + 1),
 			},
 		},
 		&SendRequestedEvent{},
@@ -423,7 +434,6 @@ func (r *ccipChainReader) Nonces(
 	eg := new(errgroup.Group)
 
 	for _, address := range addresses {
-		address := address
 		eg.Go(func() error {
 			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
 			if err != nil {
@@ -665,6 +675,73 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
+}
+
+// GetRmnCurseInfo returns rmn curse/pausing information about the provided chains
+// from the destination chain RMN remote contract.
+func (r *ccipChainReader) GetRmnCurseInfo(
+	ctx context.Context,
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) (*CurseInfo, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return nil, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+
+	type retTyp struct {
+		CursedSubjects [][16]byte
+	}
+	var cursedSubjects retTyp
+
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameRMNRemote,
+		consts.MethodNameGetCursedSubjects,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&cursedSubjects,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get latest value of %s: %w", consts.MethodNameGetCursedSubjects, err)
+	}
+
+	r.lggr.Debugw("got cursed subjects", "cursedSubjects", cursedSubjects.CursedSubjects)
+
+	return getCurseInfoFromCursedSubjects(
+		r.lggr,
+		mapset.NewSet(cursedSubjects.CursedSubjects...),
+		destChainSelector,
+		sourceChainSelectors,
+	), nil
+}
+
+func getCurseInfoFromCursedSubjects(
+	lggr logger.Logger,
+	cursedSubjectsSet mapset.Set[[16]byte],
+	destChainSelector cciptypes.ChainSelector,
+	sourceChainSelectors []cciptypes.ChainSelector,
+) *CurseInfo {
+	curseInfo := &CurseInfo{
+		CursedSourceChains: make(map[cciptypes.ChainSelector]bool, len(sourceChainSelectors)),
+		CursedDestination: cursedSubjectsSet.Contains(GlobalCurseSubject) ||
+			cursedSubjectsSet.Contains(chainSelectorToBytes16(destChainSelector)),
+		GlobalCurse: cursedSubjectsSet.Contains(GlobalCurseSubject),
+	}
+
+	for _, ch := range sourceChainSelectors {
+		chainSelB16 := chainSelectorToBytes16(ch)
+		lggr.Debugf("checking if chain %d is cursed after casting it to 16 bytes: %v", ch, chainSelB16)
+		curseInfo.CursedSourceChains[ch] = cursedSubjectsSet.Contains(chainSelB16)
+	}
+
+	return curseInfo
+}
+
+func chainSelectorToBytes16(chainSel cciptypes.ChainSelector) [16]byte {
+	var result [16]byte
+	// Convert the uint64 to bytes and place it in the last 8 bytes of the array
+	binary.BigEndian.PutUint64(result[8:], uint64(chainSel))
+	return result
 }
 
 // discoverOffRampContracts uses the offRamp for a given chain to discover the addresses of other contracts.
@@ -977,7 +1054,6 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 		}
 
 		// TODO: look into using BatchGetLatestValue instead to simplify concurrency?
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := sourceChainConfig{}
 			err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
@@ -1076,14 +1152,13 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 }
 
 // offRampStaticChainConfig is used to parse the response from the offRamp contract's getStaticConfig method.
-// See: https://github.com/smartcontractkit/ccip/blob/a3f61f7458e4499c2c62eb38581c60b4942b1160/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L86
-//
-//nolint:lll // It's a URL.
+// See: <chainlink repo>/contracts/src/v0.8/ccip/offRamp/OffRamp.sol:StaticConfig
 type offRampStaticChainConfig struct {
-	ChainSelector      cciptypes.ChainSelector `json:"chainSelector"`
-	RmnRemote          []byte                  `json:"rmnRemote"`
-	TokenAdminRegistry []byte                  `json:"tokenAdminRegistry"`
-	NonceManager       []byte                  `json:"nonceManager"`
+	ChainSelector        cciptypes.ChainSelector `json:"chainSelector"`
+	GasForCallExactCheck uint16                  `json:"gasForCallExactCheck"`
+	RmnRemote            []byte                  `json:"rmnRemote"`
+	TokenAdminRegistry   []byte                  `json:"tokenAdminRegistry"`
+	NonceManager         []byte                  `json:"nonceManager"`
 }
 
 // offRampDynamicChainConfig maps to DynamicConfig in OffRamp.sol
@@ -1162,7 +1237,6 @@ func (r *ccipChainReader) getOnRampDynamicConfigs(
 			continue
 		}
 
-		chainSel := chainSel
 		eg.Go(func() error {
 			// read onramp dynamic config
 			resp := getOnRampDynamicConfigResponse{}
@@ -1222,7 +1296,6 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 		// For chain X, all DestChainConfigs will have one of 2 values for the Router address
 		// 1. Chain X Test Router in case we're testing a new lane
 		// 2. Chain X Router
-		chainSel := chainSel
 		eg.Go(func() error {
 			resp := onRampDestChainConfig{}
 			err := r.contractReaders[chainSel].ExtendedGetLatestValue(
@@ -1368,6 +1441,68 @@ func (r *ccipChainReader) GetMedianDataAvailabilityGasConfig(
 	}
 
 	return daConfig, nil
+}
+
+func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return 0, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+	var latestSeqNr uint64
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameGetLatestPriceSequenceNumber,
+		primitives.Unconfirmed,
+		map[string]any{},
+		&latestSeqNr,
+	)
+
+	if err != nil {
+		return 0, fmt.Errorf("get latest price sequence number: %w", err)
+	}
+
+	return latestSeqNr, nil
+}
+
+func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error) {
+	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
+		return [32]byte{}, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
+	}
+
+	type ConfigInfo struct {
+		ConfigDigest                   [32]byte
+		F                              uint8
+		N                              uint8
+		IsSignatureVerificationEnabled bool
+	}
+
+	type OCRConfig struct {
+		ConfigInfo   ConfigInfo
+		Signers      [][]byte
+		Transmitters [][]byte
+	}
+
+	type OCRConfigResponse struct {
+		OCRConfig OCRConfig
+	}
+
+	var resp OCRConfigResponse
+	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
+		ctx,
+		consts.ContractNameOffRamp,
+		consts.MethodNameOffRampLatestConfigDetails,
+		primitives.Unconfirmed,
+		map[string]any{
+			"ocrPluginType": pluginType,
+		},
+		&resp,
+	)
+
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
+	}
+
+	return resp.OCRConfig.ConfigInfo.ConfigDigest, nil
 }
 
 // Interface compliance check

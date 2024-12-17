@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -23,6 +22,7 @@ type processor struct {
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
+	metricsReporter  MetricsReporter
 	fRoleDON         int
 }
 
@@ -35,6 +35,7 @@ func NewProcessor(
 	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
@@ -45,6 +46,7 @@ func NewProcessor(
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
 		fRoleDON:         fRoleDON,
+		metricsReporter:  metricsReporter,
 	}
 }
 
@@ -75,9 +77,10 @@ func (p *processor) Outcome(
 		"outcome token prices",
 		"tokenPrices", tokenPriceOutcome,
 	)
-	return Outcome{
-		TokenPrices: tokenPriceOutcome,
-	}, nil
+
+	out := Outcome{TokenPrices: tokenPriceOutcome}
+	p.metricsReporter.TrackTokenPricesOutcome(out)
+	return out, nil
 }
 
 func (p *processor) Close() error {

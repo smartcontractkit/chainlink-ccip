@@ -54,9 +54,13 @@ type Outcome struct {
 	// State that the outcome was generated for.
 	State PluginState
 
-	// PendingCommitReports are the oldest reports with pending commits. The slice is
-	// sorted from oldest to newest.
-	PendingCommitReports []CommitData `json:"commitReports"`
+	// CommitReports are the oldest reports with pending commits. The slice is
+	// sorted from oldest to newest. The content of this field changes based on
+	// the state:
+	// * GetCommitReports: All pending commit reports which were observed.
+	// * GetMessages: All pending commit reports with messages.
+	// * Filter: Commit reports associated with the final execution report.
+	CommitReports []CommitData `json:"commitReports"`
 
 	// Report is built from the oldest pending commit reports.
 	Report cciptypes.ExecutePluginReport `json:"report"`
@@ -64,16 +68,16 @@ type Outcome struct {
 
 // IsEmpty returns true if the outcome has no pending commit reports or chain reports.
 func (o Outcome) IsEmpty() bool {
-	return len(o.PendingCommitReports) == 0 && len(o.Report.ChainReports) == 0
+	return len(o.CommitReports) == 0 && len(o.Report.ChainReports) == 0
 }
 
 // NewOutcome creates a new Outcome with the pending commit reports and the chain reports sorted.
 func NewOutcome(
 	state PluginState,
-	pendingCommits []CommitData,
+	selectedCommits []CommitData,
 	report cciptypes.ExecutePluginReport,
 ) Outcome {
-	return newSortedOutcome(state, pendingCommits, report)
+	return newSortedOutcome(state, selectedCommits, report)
 }
 
 // newSortedOutcome ensures canonical ordering of the outcome.
@@ -88,7 +92,10 @@ func newSortedOutcome(
 	sort.Slice(
 		pendingCommitsCP,
 		func(i, j int) bool {
-			return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
+			if pendingCommitsCP[i].SourceChain != pendingCommitsCP[j].SourceChain {
+				return pendingCommitsCP[i].SourceChain < pendingCommitsCP[j].SourceChain
+			}
+			return pendingCommitsCP[i].SequenceNumberRange.Start() < pendingCommitsCP[j].SequenceNumberRange.Start()
 		})
 	sort.Slice(
 		reportCP,
@@ -96,9 +103,9 @@ func newSortedOutcome(
 			return reportCP[i].SourceChainSelector < reportCP[j].SourceChainSelector
 		})
 	return Outcome{
-		State:                state,
-		PendingCommitReports: pendingCommitsCP,
-		Report:               cciptypes.ExecutePluginReport{ChainReports: reportCP},
+		State:         state,
+		CommitReports: pendingCommitsCP,
+		Report:        cciptypes.ExecutePluginReport{ChainReports: reportCP},
 	}
 }
 
@@ -107,7 +114,7 @@ func newSortedOutcome(
 // The encoding MUST be deterministic.
 func (o Outcome) Encode() (ocr3types.Outcome, error) {
 	// We sort again here in case construction is not via the constructor.
-	return json.Marshal(newSortedOutcome(o.State, o.PendingCommitReports, o.Report))
+	return json.Marshal(newSortedOutcome(o.State, o.CommitReports, o.Report))
 }
 
 // DecodeOutcome decodes the outcome from JSON. An empty string is treated as an empty outcome.

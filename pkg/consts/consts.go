@@ -30,6 +30,7 @@ const (
 	MethodNameOffRampGetDynamicConfig         = "OffRampGetDynamicConfig"
 	MethodNameOffRampGetStaticConfig          = "OffRampGetStaticConfig"
 	MethodNameOffRampGetDestChainConfig       = "OffRampGetDestChainConfig"
+	MethodNameOffRampLatestConfigDetails      = "OffRampLatestConfigDetails"
 	MethodNameGetLatestPriceSequenceNumber    = "GetLatestPriceSequenceNumber"
 	MethodNameIsBlessed                       = "IsBlessed"
 	MethodNameGetMerkleRoot                   = "GetMerkleRoot"
@@ -105,6 +106,7 @@ const (
 	// Used by the rmn remote reader.
 	MethodNameGetVersionedConfig    = "GetVersionedConfig"
 	MethodNameGetReportDigestHeader = "GetReportDigestHeader"
+	MethodNameGetCursedSubjects     = "GetCursedSubjects"
 
 	// RMNProxy.sol methods
 	MethodNameGetARM = "GetARM"

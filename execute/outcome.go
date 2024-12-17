@@ -71,7 +71,7 @@ func (p *Plugin) Outcome(
 	case exectypes.GetCommitReports:
 		outcome = p.getCommitReportsOutcome(observation)
 	case exectypes.GetMessages:
-		outcome = p.getMessagesOutcome(observation, previousOutcome)
+		outcome = p.getMessagesOutcome(observation)
 	case exectypes.Filter:
 		outcome, err = p.getFilterOutcome(ctx, observation, previousOutcome)
 	default:
@@ -85,6 +85,8 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("unable to get outcome: %w", err)
 	}
 
+	// This may happen if there is nothing to observe, or during startup when the contracts have
+	// been discovered. In the latter case, getCommitReportsOutcome will return an empty outcome.
 	if outcome.IsEmpty() {
 		p.lggr.Warnw(
 			fmt.Sprintf("[oracle %d] exec outcome: empty outcome", p.reportingCfg.OracleID),
@@ -95,6 +97,7 @@ func (p *Plugin) Outcome(
 		return nil, nil
 	}
 
+	p.observer.TrackOutcome(outcome, state)
 	p.lggr.Infow("generated outcome", "execPluginState", state, "outcome", outcome)
 
 	return outcome.Encode()
@@ -117,33 +120,47 @@ func (p *Plugin) getCommitReportsOutcome(observation exectypes.Observation) exec
 
 func (p *Plugin) getMessagesOutcome(
 	observation exectypes.Observation,
-	previousOutcome exectypes.Outcome,
 ) exectypes.Outcome {
-	commitReports := previousOutcome.PendingCommitReports
+	commitReports := make([]exectypes.CommitData, 0)
 	costlyMessagesSet := mapset.NewSet[cciptypes.Bytes32]()
 	for _, msgID := range observation.CostlyMessages {
 		costlyMessagesSet.Add(msgID)
 	}
 
+	// First ensure that all observed messages has hashes and token data.
+	if err := validateHashesExist(observation.Messages, observation.Hashes); err != nil {
+		p.lggr.Errorw("validate hashes exist: %w", err)
+		return exectypes.Outcome{}
+	}
+	if err := validateTokenDataObservations(observation.Messages, observation.TokenData); err != nil {
+		p.lggr.Errorw("validate token data observations: %w", err)
+		return exectypes.Outcome{}
+	}
+
+	reports := observation.CommitReports.Flatten()
 	// add messages to their commitReports.
-	for i, report := range commitReports {
+	for i, report := range reports {
 		report.Messages = nil
 		report.CostlyMessages = nil
 		for j := report.SequenceNumberRange.Start(); j <= report.SequenceNumberRange.End(); j++ {
 			if msg, ok := observation.Messages[report.SourceChain][j]; ok {
+				// Always add the message and hash, even if it wont be executed.
+				// This slice must have an entry for each message in the commit range.
 				report.Messages = append(report.Messages, msg)
+
+				report.Hashes = append(report.Hashes, observation.Hashes[report.SourceChain][j])
+
 				if costlyMessagesSet.Contains(msg.Header.MessageID) {
 					report.CostlyMessages = append(report.CostlyMessages, msg.Header.MessageID)
 				}
-			}
-
-			if tokenData, ok := observation.TokenData[report.SourceChain][j]; ok {
-				report.MessageTokenData = append(report.MessageTokenData, tokenData)
+				report.MessageTokenData = append(report.MessageTokenData, observation.TokenData[report.SourceChain][j])
 			}
 		}
-		commitReports[i].Messages = report.Messages
-		commitReports[i].MessageTokenData = report.MessageTokenData
-		commitReports[i].CostlyMessages = report.CostlyMessages
+		if len(report.Messages) == 0 {
+			// If there are no messages, remove the commit report.
+			commitReports = append(commitReports[:i], commitReports[i+1:]...)
+		}
+		commitReports = append(commitReports, report)
 	}
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
@@ -156,7 +173,7 @@ func (p *Plugin) getFilterOutcome(
 	observation exectypes.Observation,
 	previousOutcome exectypes.Outcome,
 ) (exectypes.Outcome, error) {
-	commitReports := previousOutcome.PendingCommitReports
+	commitReports := previousOutcome.CommitReports
 
 	builder := report.NewBuilder(
 		p.lggr,
@@ -165,16 +182,17 @@ func (p *Plugin) getFilterOutcome(
 		p.estimateProvider,
 		observation.Nonces,
 		p.destChain,
-		uint64(maxReportSizeBytes),
+		uint64(maxReportLength),
 		p.offchainCfg.BatchGasLimit,
 	)
-	outcomeReports, commitReports, err := selectReport(
+
+	outcomeReports, selectedReports, err := selectReport(
 		ctx,
 		p.lggr,
 		commitReports,
 		builder)
 	if err != nil {
-		return exectypes.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
+		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}
 
 	execReport := cciptypes.ExecutePluginReport{
@@ -183,5 +201,5 @@ func (p *Plugin) getFilterOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, commitReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, selectedReports, execReport), nil
 }

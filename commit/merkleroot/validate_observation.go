@@ -3,20 +3,20 @@ package merkleroot
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-
+	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func (w *Processor) ValidateObservation(
+func (p *Processor) ValidateObservation(
 	_ Outcome,
 	q Query,
 	ao plugincommon.AttributedObservation[Observation]) error {
@@ -26,15 +26,15 @@ func (w *Processor) ValidateObservation(
 	}
 
 	obs := ao.Observation
-	if err := validateFChain(obs.FChain); err != nil {
+	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("validate FChain: %w", err)
 	}
-	observerSupportedChains, err := w.chainSupport.SupportedChains(ao.OracleID)
+	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
 	if err != nil {
 		return fmt.Errorf("get supported chains: %w", err)
 	}
 
-	supportsDestChain, err := w.chainSupport.SupportsDestChain(ao.OracleID)
+	supportsDestChain, err := p.chainSupport.SupportsDestChain(ao.OracleID)
 	if err != nil {
 		return fmt.Errorf("call to supportsDestChain failed: %w", err)
 	}
@@ -51,7 +51,8 @@ func (w *Processor) ValidateObservation(
 		return fmt.Errorf("validate OffRampNextSeqNums: %w", err)
 	}
 
-	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain); err != nil {
+	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
+		p.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
 		return fmt.Errorf("validate RMNRemoteConfig: %w", err)
 	}
 
@@ -137,63 +138,94 @@ func validateObservedOffRampMaxSeqNums(
 func validateRMNRemoteConfig(
 	observer commontypes.OracleID,
 	supportsDestChain bool,
+	rmnRemoteConfig types.RemoteConfig,
 ) error {
+	if rmnRemoteConfig.IsEmpty() {
+		return nil
+	}
+
 	if !supportsDestChain {
-		return fmt.Errorf("oracle %d does not support dest chain, but has observed a RMNRemoteConfig", observer)
+		return fmt.Errorf("oracle %d does not support dest chain, but has observed an RMNRemoteConfig", observer)
 	}
 
-	return nil
-}
+	if rmnRemoteConfig.ConfigDigest.IsEmpty() {
+		return fmt.Errorf("empty ConfigDigest")
+	}
 
-func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for chainSelector, f := range fChain {
-		if f <= 0 {
-			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
+	if rmnRemoteConfig.RmnReportVersion.IsEmpty() {
+		return fmt.Errorf("empty RmnReportVersion")
+	}
+
+	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.F+1 {
+		return fmt.Errorf("not enough signers to cover F+1 threshold")
+	}
+
+	if len(rmnRemoteConfig.ContractAddress) == 0 {
+		return fmt.Errorf("empty ContractAddress")
+	}
+
+	seenNodeIndexes := mapset.NewSet[uint64]()
+	for _, signer := range rmnRemoteConfig.Signers {
+		if len(signer.OnchainPublicKey) == 0 {
+			return fmt.Errorf("empty signer OnchainPublicKey")
 		}
+
+		if seenNodeIndexes.Contains(signer.NodeIndex) {
+			return fmt.Errorf("duplicate NodeIndex %d", signer.NodeIndex)
+		}
+		seenNodeIndexes.Add(signer.NodeIndex)
 	}
 
 	return nil
 }
 
-// ValidateMerkleRootsState merkle roots seq nums validation by comparing with on-chain state.
+// ValidateMerkleRootsState validates the proposed merkle roots against the current on-chain state.
+// This function is not-pure as it reads from the chain by making one network/reader call.
 func ValidateMerkleRootsState(
 	ctx context.Context,
-	lggr logger.Logger,
-	report cciptypes.CommitPluginReport,
+	proposedMerkleRoots []cciptypes.MerkleRootChain,
 	reader reader.CCIPReader,
-) (bool, error) {
-	reportChains := make([]cciptypes.ChainSelector, 0)
-	reportMinSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-	for _, mr := range report.MerkleRoots {
-		reportChains = append(reportChains, mr.ChainSel)
-		reportMinSeqNums[mr.ChainSel] = mr.SeqNumsRange.Start()
+) error {
+	if len(proposedMerkleRoots) == 0 {
+		return nil
 	}
 
-	if len(reportChains) == 0 {
-		return true, nil
+	chainSet := mapset.NewSet[cciptypes.ChainSelector]()
+	newNextOnRampSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
+
+	for _, r := range proposedMerkleRoots {
+		if chainSet.Contains(r.ChainSel) {
+			return fmt.Errorf("duplicate chain %d", r.ChainSel)
+		}
+		chainSet.Add(r.ChainSel)
+		newNextOnRampSeqNums[r.ChainSel] = r.SeqNumsRange.Start()
 	}
 
-	onchainNextSeqNums, err := reader.NextSeqNum(ctx, reportChains)
+	chainSlice := chainSet.ToSlice()
+	sort.Slice(chainSlice, func(i, j int) bool { return chainSlice[i] < chainSlice[j] })
+
+	offRampExpNextSeqNums, err := reader.NextSeqNum(ctx, chainSlice)
 	if err != nil {
-		return false, fmt.Errorf("get next sequence numbers: %w", err)
-	}
-	if len(onchainNextSeqNums) != len(reportChains) {
-		return false, fmt.Errorf("critical error: onchainSeqNums length mismatch")
+		return fmt.Errorf("get next sequence numbers: %w", err)
 	}
 
-	for i, nextSeqNum := range onchainNextSeqNums {
-		chain := reportChains[i]
-		reportMinSeqNum, ok := reportMinSeqNums[chain]
+	if len(offRampExpNextSeqNums) != len(chainSlice) {
+		return fmt.Errorf("critical reader error: seq nums length mismatch")
+	}
+
+	for i, offRampExpNextSeqNum := range offRampExpNextSeqNums {
+		chain := chainSlice[i]
+
+		newNextOnRampSeqNum, ok := newNextOnRampSeqNums[chain]
 		if !ok {
-			return false, fmt.Errorf("critical error: reportSeqNum not found for chain %d", chain)
+			return fmt.Errorf("critical unexpected error: newOnRampSeqNum not found")
 		}
 
-		if reportMinSeqNum != nextSeqNum {
-			lggr.Warnw("report is not valid due to seq num mismatch",
-				"chain", chain, "reportMinSeqNum", reportMinSeqNum, "onchainNextSeqNum", nextSeqNum)
-			return false, nil
+		if newNextOnRampSeqNum != offRampExpNextSeqNum {
+			return fmt.Errorf("unexpected seq nums offRampNext=%d newOnRampNext=%d",
+				offRampExpNextSeqNum, newNextOnRampSeqNum)
 		}
 	}
 
-	return true, nil
+	return nil
 }
