@@ -259,6 +259,7 @@ func filterOutExecutedMessages(
 func truncateObservation(
 	obs exectypes.Observation,
 	maxSize int,
+	emptyEncodedSizes exectypes.EmptyEncodeSizes,
 ) (exectypes.Observation, error) {
 	// TODO: Use a hash to store encoding sizes for individual messages
 	//  and use that to determine how many messages to delete.
@@ -267,7 +268,8 @@ func truncateObservation(
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
-	if len(encodedObs) <= maxSize {
+	encodedObsSize := len(encodedObs)
+	if encodedObsSize <= maxSize {
 		return observation, nil
 	}
 
@@ -277,7 +279,7 @@ func truncateObservation(
 	})
 
 	// If the encoded observation is too large, start filtering data.
-	for len(encodedObs) > maxSize {
+	for encodedObsSize > maxSize {
 		for _, chain := range chains {
 			commits := observation.CommitReports[chain]
 			if len(commits) == 0 {
@@ -287,17 +289,10 @@ func truncateObservation(
 			seqNum := lastCommit.SequenceNumberRange.Start()
 
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
-				if _, ok := observation.Messages[chain][seqNum]; !ok {
-					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
+				observation, err = truncateMessageData(observation, chain, seqNum)
+				if err != nil {
+					return exectypes.Observation{}, err
 				}
-				observation.Messages[chain][seqNum] = cciptypes.Message{}
-
-				if _, ok := observation.TokenData[chain][seqNum]; !ok {
-					return exectypes.Observation{}, fmt.Errorf(
-						"missing tokenData for message with seqNr %d from chain %d", seqNum, chain,
-					)
-				}
-				observation.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
 				seqNum++
 				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
@@ -339,6 +334,25 @@ func observationFitsSize(obs exectypes.Observation, maxSize int) bool {
 		return false
 	}
 	return len(encodedObs) <= maxSize
+}
+
+func truncateMessageData(
+	obs exectypes.Observation,
+	chain cciptypes.ChainSelector,
+	seqNum cciptypes.SeqNum,
+) (exectypes.Observation, error) {
+	newObs := obs
+	if _, ok := newObs.Messages[chain][seqNum]; !ok {
+		return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
+	}
+	newObs.Messages[chain][seqNum] = cciptypes.Message{}
+
+	if _, ok := newObs.TokenData[chain][seqNum]; !ok {
+		return exectypes.Observation{}, fmt.Errorf("missing tokenData for message with seqNr %d from chain %d", seqNum, chain)
+	}
+	newObs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
+
+	return newObs, nil
 }
 
 // truncateLastCommit removes the last commit from the observation.
@@ -762,7 +776,7 @@ func getConsensusObservation(
 }
 
 // getMessageTimestampMap returns a map of message IDs to their timestamps.
-// cciptypes.Message does not contain a timestamp, so we need to derive the timestamp from the commit data.
+// cciptypes.MessageAndTokenData does not contain a timestamp, so we need to derive the timestamp from the commit data.
 func getMessageTimestampMap(
 	commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData,
 	messages exectypes.MessageObservations,

@@ -17,8 +17,7 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 
 type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
 
-type EncodedMsgSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]uint
-type EncodedTokenDataSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]uint
+type EncodedMsgAndTokenDataSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]int
 
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
@@ -46,6 +45,19 @@ func GetHashes(ctx context.Context, mo MessageObservations, hasher cciptypes.Mes
 	return hashes, nil
 }
 
+// GetEncodedMsgAndTokenDataSizes calculates the encoded sizes of messages and their token data counterpart.
+func GetEncodedMsgAndTokenDataSizes(mo MessageObservations, tds TokenDataObservations) EncodedMsgAndTokenDataSizes {
+	sizes := make(EncodedMsgAndTokenDataSizes)
+	for chain, msgs := range mo {
+		sizes[chain] = make(map[cciptypes.SeqNum]int)
+		for seq, msg := range msgs {
+			td := tds[chain][seq]
+			sizes[chain][seq] = msg.EncodedSize() + td.EncodedSize()
+		}
+	}
+	return sizes
+}
+
 // NonceObservations contain the latest nonce for senders in the previously observed messages.
 // Nonces are organized by source chain selector and the string encoded sender address. The address
 // must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
@@ -56,10 +68,10 @@ type NonceObservations map[cciptypes.ChainSelector]map[string]uint64
 // TokenDataObservations are populated during the Observation phase and depend on previously fetched
 // MessageObservations details and the `tokenDataObservers` configured in the ExecuteOffchainConfig.
 // Content of the MessageTokenData is determined by the tokendata.TokenDataObserver implementations.
-//   - if Message doesn't have any tokens, TokenData slice will be empty.
-//   - if Message has tokens, but these tokens don't require any special treatment,
+//   - if MessageAndTokenData doesn't have any tokens, TokenData slice will be empty.
+//   - if MessageAndTokenData has tokens, but these tokens don't require any special treatment,
 //     TokenData slice will contain empty TokenData objects.
-//   - if Message has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
+//   - if MessageAndTokenData has tokens and these tokens require additional processing defined in ExecuteOffchainConfig,
 //     specific tokendata.TokenDataObserver will be used to populate the TokenData slice.
 type TokenDataObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData
 
@@ -77,6 +89,10 @@ type Observation struct {
 	// execute report.
 	Messages MessageObservations `json:"messages"`
 	Hashes   MessageHashes       `json:"messageHashes"`
+	// EncodedMsgAndTokenDataSizes are determined during the Get Messages phase
+	// It contains the sum of encoded sizes of messages and their token data counterpart that were observed in same
+	// phase.
+	MessageAndTokenDataEncodedSizes EncodedMsgAndTokenDataSizes `json:"messageEncodedSizes"`
 	// TokenData are determined during the second phase of execute.
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
@@ -137,4 +153,27 @@ func DecodeObservation(b []byte) (Observation, error) {
 	obs := Observation{}
 	err := json.Unmarshal(b, &obs)
 	return obs, err
+}
+
+type EmptyEncodeSizes struct {
+	MessageAndTokenData int
+	TokenData           int
+	Observation         int
+}
+
+func NewEmptyEncodeSizes() EmptyEncodeSizes {
+	msg := cciptypes.Message{}
+	emptyMsgSize := msg.EncodedSize()
+	obs := Observation{}
+	emptyObsEnc, err := obs.Encode()
+	emptyObsSize := 0
+	if err == nil {
+		emptyObsSize = len(emptyObsEnc)
+	}
+	td := MessageTokenData{}
+	emptyTokenDataSize := td.EncodedSize()
+	return EmptyEncodeSizes{
+		MessageAndTokenData: emptyMsgSize + emptyTokenDataSize,
+		Observation:         emptyObsSize,
+	}
 }

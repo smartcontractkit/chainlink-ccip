@@ -1630,7 +1630,7 @@ func Test_truncateObservation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.observation.TokenData = makeNoopTokenDataObservations(tt.observation.Messages)
 			tt.expected.TokenData = tt.observation.TokenData
-			obs, err := truncateObservation(tt.observation, tt.maxSize)
+			obs, err := truncateObservation(tt.observation, tt.maxSize, exectypes.NewEmptyEncodeSizes())
 			if tt.wantErr {
 				require.Error(t, err)
 				return
