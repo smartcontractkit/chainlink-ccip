@@ -257,31 +257,31 @@ func filterOutExecutedMessages(
 //
 //nolint:gocyclo
 func truncateObservation(
-	obs exectypes.Observation,
+	observation exectypes.Observation,
 	maxSize int,
 	emptyEncodedSizes exectypes.EmptyEncodeSizes,
 ) (exectypes.Observation, error) {
 	// TODO: Use a hash to store encoding sizes for individual messages
 	//  and use that to determine how many messages to delete.
-	observation := obs
-	encodedObs, err := observation.Encode()
+	obs := observation
+	encodedObs, err := obs.Encode()
 	if err != nil {
 		return exectypes.Observation{}, err
 	}
 	encodedObsSize := len(encodedObs)
 	if encodedObsSize <= maxSize {
-		return observation, nil
+		return obs, nil
 	}
 
-	chains := maps.Keys(observation.CommitReports)
+	chains := maps.Keys(obs.CommitReports)
 	sort.Slice(chains, func(i, j int) bool {
 		return chains[i] < chains[j]
 	})
 
-	// If the encoded observation is too large, start filtering data.
+	// If the encoded obs is too large, start filtering data.
 	for encodedObsSize > maxSize {
 		for _, chain := range chains {
-			commits := observation.CommitReports[chain]
+			commits := obs.CommitReports[chain]
 			if len(commits) == 0 {
 				continue
 			}
@@ -289,43 +289,46 @@ func truncateObservation(
 			seqNum := lastCommit.SequenceNumberRange.Start()
 
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
-				observation, err = truncateMessageData(observation, chain, seqNum)
-				if err != nil {
-					return exectypes.Observation{}, err
+				if _, ok := obs.Messages[chain][seqNum]; !ok {
+					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
+				obs.Messages[chain][seqNum] = cciptypes.Message{}
+				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
+				encodedObsSize -= emptyEncodedSizes.MessageAndTokenData
 				seqNum++
 				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
 				// TODO: Remove the 32 check once we implement the hash size calculation.
-				if seqNum%32 == 0 && observationFitsSize(observation, maxSize) {
-					return observation, nil
+				if seqNum%32 == 0 && encodedObsSize <= maxSize {
+					return obs, nil
 				}
 			}
 
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
-			observation = truncateLastCommit(observation, chain)
+			obs = truncateLastCommit(obs, chain)
+			encodedObsSize -= emptyEncodedSizes.CommitData
 
-			if len(observation.CommitReports[chain]) == 0 {
+			if len(obs.CommitReports[chain]) == 0 {
 				// If the last commit report was truncated, truncate the chain
-				observation = truncateChain(observation, chain)
+				obs = truncateChain(obs, chain)
 			}
 
-			if observationFitsSize(observation, maxSize) {
-				return observation, nil
+			if observationFitsSize(obs, maxSize) {
+				return obs, nil
 			}
-			chains = maps.Keys(observation.CommitReports)
+			chains = maps.Keys(obs.CommitReports)
 		}
-		// Truncated all chains. Return observation as is. (it has other data like contract discovery)
-		if len(observation.CommitReports) == 0 {
-			return observation, nil
+		// Truncated all chains. Return obs as is. (it has other data like contract discovery)
+		if len(obs.CommitReports) == 0 {
+			return obs, nil
 		}
-		encodedObs, err = observation.Encode()
+		encodedObs, err = obs.Encode()
 		if err != nil {
 			return exectypes.Observation{}, nil
 		}
 	}
 
-	return observation, nil
+	return obs, nil
 }
 
 func observationFitsSize(obs exectypes.Observation, maxSize int) bool {
@@ -342,15 +345,6 @@ func truncateMessageData(
 	seqNum cciptypes.SeqNum,
 ) (exectypes.Observation, error) {
 	newObs := obs
-	if _, ok := newObs.Messages[chain][seqNum]; !ok {
-		return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
-	}
-	newObs.Messages[chain][seqNum] = cciptypes.Message{}
-
-	if _, ok := newObs.TokenData[chain][seqNum]; !ok {
-		return exectypes.Observation{}, fmt.Errorf("missing tokenData for message with seqNr %d from chain %d", seqNum, chain)
-	}
-	newObs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
 	return newObs, nil
 }

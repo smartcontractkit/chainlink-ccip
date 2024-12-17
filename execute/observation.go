@@ -254,6 +254,9 @@ func (p *Plugin) getMessagesObservation(
 	observation.TokenData = tkData
 	observation.MessageAndTokenDataEncodedSizes = exectypes.GetEncodedMsgAndTokenDataSizes(messageObs, tkData)
 
+	if validateTokenDataObservations(messageObs, tkData) != nil {
+		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
+	}
 	// Make sure encoded observation fits within the maximum observation size.
 	observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
 	if err != nil {

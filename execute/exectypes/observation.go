@@ -159,21 +159,22 @@ type EmptyEncodeSizes struct {
 	MessageAndTokenData int
 	TokenData           int
 	Observation         int
+	CommitData          int
 }
 
 func NewEmptyEncodeSizes() EmptyEncodeSizes {
-	msg := cciptypes.Message{}
-	emptyMsgSize := msg.EncodedSize()
+	emptyMsg := cciptypes.Message{}
 	obs := Observation{}
 	emptyObsEnc, err := obs.Encode()
 	emptyObsSize := 0
 	if err == nil {
 		emptyObsSize = len(emptyObsEnc)
 	}
-	td := MessageTokenData{}
-	emptyTokenDataSize := td.EncodedSize()
+	emptyTokenData := MessageTokenData{}
+	emptyCommitData := CommitData{}
 	return EmptyEncodeSizes{
-		MessageAndTokenData: emptyMsgSize + emptyTokenDataSize,
+		MessageAndTokenData: emptyMsg.EncodedSize() + emptyTokenData.EncodedSize(),
+		CommitData:          emptyCommitData.EncodedSize(),
 		Observation:         emptyObsSize,
 	}
 }
