@@ -51,6 +51,7 @@ func NewPriceReader(
 	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
 	feedChain ccipocr3.ChainSelector,
+	decimalsCache cache.Cache[string, uint8],
 ) PriceReader {
 	return &priceReader{
 		lggr:          lggr,
@@ -58,7 +59,7 @@ func NewPriceReader(
 		tokenInfo:     tokenInfo,
 		ccipReader:    ccipReader,
 		feedChain:     feedChain,
-		decimalsCache: cache.NewCache[string, uint8](cache.NeverExpirePolicy{}),
+		decimalsCache: decimalsCache,
 	}
 }
 

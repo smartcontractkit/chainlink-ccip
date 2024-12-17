@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	mockcache "github.com/smartcontractkit/chainlink-ccip/mocks/internal_/cache"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
@@ -91,13 +93,21 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 
 	for _, tc := range testCases {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
+		mockCache := mockcache.NewMockCache[string, uint8](t)
+		// Setup cache expectations - it should return cache miss for any key
+		mockCache.On("Get", mock.Anything).Return(uint8(0), false)
+		// Expect Set to be called for each successful decimal fetch
+		mockCache.On("Set", mock.Anything, mock.Anything).Return()
+
 		feedChain := cciptypes.ChainSelector(1)
 		tokenPricesReader := priceReader{
+			lggr: logger.Test(t),
 			chainReaders: map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				feedChain: contractReader,
 			},
-			tokenInfo: tc.tokenInfo,
-			feedChain: feedChain,
+			tokenInfo:     tc.tokenInfo,
+			feedChain:     feedChain,
+			decimalsCache: mockCache,
 		}
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
@@ -109,6 +119,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tc.want, result)
+			mockCache.AssertExpectations(t)
 		})
 	}
 }

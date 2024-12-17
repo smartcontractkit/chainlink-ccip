@@ -14,6 +14,9 @@ packages:
         interfaces:
             ChainSupport:
             PluginProcessor:
+    github.com/smartcontractkit/chainlink-ccip/internal/cache:
+        interfaces:
+            Cache:
     github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn:
         interfaces:
             Controller:
