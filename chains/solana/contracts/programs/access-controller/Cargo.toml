@@ -1,0 +1,21 @@
+[package]
+name = "access-controller"
+version = "1.0.1"
+description = "Created with Anchor"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "access_controller"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.29.0"
+bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"]}
+static_assertions = "1.1.0"
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }

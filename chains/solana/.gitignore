@@ -1,0 +1,29 @@
+.direnv
+*.DS_Store
+**/*.rs.bk
+.idea
+.vscode/
+
+# ignore target folders except IDLs
+contracts/target/*
+!contracts/target/idl/
+contracts/programs/*/target
+contracts/.anchor
+# keypair used by anchor/anchor test
+contracts/id.json
+# ignore all except shared localnet keys
+contracts/artifacts/*
+!contracts/artifacts/localnet/
+test-ledger
+
+# Test & linter reports
+.test_summary/
+*report.xml
+*report.json
+*.out
+*coverage*
+eslint-report.json
+.run.id
+override*.toml
+# go work files
+go.work*
