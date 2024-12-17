@@ -11,6 +11,8 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	cachekeys "github.com/smartcontractkit/chainlink-ccip/internal/cache/keys"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/cache"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -195,7 +197,7 @@ func (pr *priceReader) getFeedDecimals(
 	feedChainReader contractreader.ContractReaderFacade,
 ) (uint8, error) {
 	// Create cache key using token and contract address
-	cacheKey := string(token) + "-" + boundContract.Address
+	cacheKey := cachekeys.TokenDecimals(token, boundContract.Address)
 
 	// Try to get from cache first
 	if decimals, found := pr.decimalsCache.Get(cacheKey); found {
@@ -219,12 +221,13 @@ func (pr *priceReader) getFeedDecimals(
 		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
 	}
 
-	// Store in cache
-	pr.decimalsCache.Set(cacheKey, decimals)
+	// Store in cache and log whether it was a new entry
+	isNew := pr.decimalsCache.Set(cacheKey, decimals)
 	pr.lggr.Debugw("Cached token decimals",
 		"token", token,
 		"contract", boundContract.Address,
-		"decimals", decimals)
+		"decimals", decimals,
+		"isNewEntry", isNew)
 
 	return decimals, nil
 }

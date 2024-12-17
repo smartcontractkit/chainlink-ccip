@@ -18,8 +18,21 @@ func (_m *MockCache[K, V]) EXPECT() *MockCache_Expecter[K, V] {
 }
 
 // Delete provides a mock function with given fields: key
-func (_m *MockCache[K, V]) Delete(key K) {
-	_m.Called(key)
+func (_m *MockCache[K, V]) Delete(key K) bool {
+	ret := _m.Called(key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Delete")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(K) bool); ok {
+		r0 = rf(key)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 // MockCache_Delete_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Delete'
@@ -40,12 +53,12 @@ func (_c *MockCache_Delete_Call[K, V]) Run(run func(key K)) *MockCache_Delete_Ca
 	return _c
 }
 
-func (_c *MockCache_Delete_Call[K, V]) Return() *MockCache_Delete_Call[K, V] {
-	_c.Call.Return()
+func (_c *MockCache_Delete_Call[K, V]) Return(_a0 bool) *MockCache_Delete_Call[K, V] {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCache_Delete_Call[K, V]) RunAndReturn(run func(K)) *MockCache_Delete_Call[K, V] {
+func (_c *MockCache_Delete_Call[K, V]) RunAndReturn(run func(K) bool) *MockCache_Delete_Call[K, V] {
 	_c.Call.Return(run)
 	return _c
 }
@@ -107,8 +120,21 @@ func (_c *MockCache_Get_Call[K, V]) RunAndReturn(run func(K) (V, bool)) *MockCac
 }
 
 // Set provides a mock function with given fields: key, value
-func (_m *MockCache[K, V]) Set(key K, value V) {
-	_m.Called(key, value)
+func (_m *MockCache[K, V]) Set(key K, value V) bool {
+	ret := _m.Called(key, value)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Set")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(K, V) bool); ok {
+		r0 = rf(key, value)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
 }
 
 // MockCache_Set_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Set'
@@ -130,12 +156,12 @@ func (_c *MockCache_Set_Call[K, V]) Run(run func(key K, value V)) *MockCache_Set
 	return _c
 }
 
-func (_c *MockCache_Set_Call[K, V]) Return() *MockCache_Set_Call[K, V] {
-	_c.Call.Return()
+func (_c *MockCache_Set_Call[K, V]) Return(_a0 bool) *MockCache_Set_Call[K, V] {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockCache_Set_Call[K, V]) RunAndReturn(run func(K, V)) *MockCache_Set_Call[K, V] {
+func (_c *MockCache_Set_Call[K, V]) RunAndReturn(run func(K, V) bool) *MockCache_Set_Call[K, V] {
 	_c.Call.Return(run)
 	return _c
 }

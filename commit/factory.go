@@ -231,7 +231,7 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,
-		cache.NewCache[string, uint8](cache.NeverExpirePolicy{}),
+		cache.NewInMemoryCache[string, uint8](cache.NewNeverExpirePolicy()),
 	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)

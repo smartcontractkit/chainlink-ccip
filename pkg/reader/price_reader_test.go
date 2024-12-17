@@ -97,7 +97,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		// Setup cache expectations - it should return cache miss for any key
 		mockCache.On("Get", mock.Anything).Return(uint8(0), false)
 		// Expect Set to be called for each successful decimal fetch
-		mockCache.On("Set", mock.Anything, mock.Anything).Return()
+		mockCache.On("Set", mock.Anything, mock.Anything).Return(false)
 
 		feedChain := cciptypes.ChainSelector(1)
 		tokenPricesReader := priceReader{

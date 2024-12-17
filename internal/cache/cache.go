@@ -8,11 +8,16 @@ import (
 // Cache defines the interface for cache operations
 type Cache[K comparable, V any] interface {
 	// Get retrieves a value from the cache
+	// Returns the value and true if found, zero value and false if not found
 	Get(key K) (V, bool)
+
 	// Set adds or updates a value in the cache
-	Set(key K, value V)
+	// Returns true if a new entry was created, false if an existing entry was updated
+	Set(key K, value V) bool
+
 	// Delete removes a value from the cache
-	Delete(key K)
+	// Returns true if an entry was deleted, false if the key wasn't found
+	Delete(key K) bool
 }
 
 // EvictionPolicy defines how entries should be evicted from the cache
@@ -33,8 +38,9 @@ type inMemoryCache[K comparable, V any] struct {
 	mutex  sync.RWMutex
 }
 
-// NewCache creates a new cache with the specified eviction policy
-func NewCache[K comparable, V any](policy EvictionPolicy) Cache[K, V] {
+// NewInMemoryCache creates a new cache with the specified eviction policy
+// The cache is thread-safe and can be used concurrently
+func NewInMemoryCache[K comparable, V any](policy EvictionPolicy) Cache[K, V] {
 	return &inMemoryCache[K, V]{
 		data:   make(map[K]*cacheEntry),
 		policy: policy,
@@ -42,14 +48,16 @@ func NewCache[K comparable, V any](policy EvictionPolicy) Cache[K, V] {
 }
 
 // Set adds or updates a value in the cache
-func (c *inMemoryCache[K, V]) Set(key K, value V) {
+func (c *inMemoryCache[K, V]) Set(key K, value V) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	_, exists := c.data[key]
 	c.data[key] = &cacheEntry{
 		value:     value,
 		createdAt: time.Now(),
 	}
+	return !exists
 }
 
 // Get retrieves a value from the cache
@@ -68,46 +76,60 @@ func (c *inMemoryCache[K, V]) Get(key K) (V, bool) {
 		return zero, false
 	}
 
-	return entry.value.(V), true
+	value, ok := entry.value.(V)
+	if !ok {
+		var zero V
+		return zero, false
+	}
+
+	return value, true
 }
 
 // Delete removes a value from the cache
-func (c *inMemoryCache[K, V]) Delete(key K) {
+func (c *inMemoryCache[K, V]) Delete(key K) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	delete(c.data, key)
+	_, exists := c.data[key]
+	if exists {
+		delete(c.data, key)
+	}
+	return exists
 }
 
-// NeverExpirePolicy implements EvictionPolicy for entries that should never expire
-type NeverExpirePolicy struct{}
+// neverExpirePolicy implements EvictionPolicy for entries that should never expire
+type neverExpirePolicy struct{}
 
-func (p NeverExpirePolicy) ShouldEvict(_ *cacheEntry) bool {
+func NewNeverExpirePolicy() EvictionPolicy {
+	return neverExpirePolicy{}
+}
+
+func (p neverExpirePolicy) ShouldEvict(_ *cacheEntry) bool {
 	return false
 }
 
-// TimeBasedPolicy implements EvictionPolicy for time-based expiration
-type TimeBasedPolicy struct {
+// timeBasedPolicy implements EvictionPolicy for time-based expiration
+type timeBasedPolicy struct {
 	ttl time.Duration
 }
 
-func NewTimeBasedPolicy(ttl time.Duration) *TimeBasedPolicy {
-	return &TimeBasedPolicy{ttl: ttl}
+func NewTimeBasedPolicy(ttl time.Duration) EvictionPolicy {
+	return &timeBasedPolicy{ttl: ttl}
 }
 
-func (p TimeBasedPolicy) ShouldEvict(entry *cacheEntry) bool {
+func (p timeBasedPolicy) ShouldEvict(entry *cacheEntry) bool {
 	return time.Since(entry.createdAt) > p.ttl
 }
 
-// CustomPolicy implements EvictionPolicy with a custom eviction function
-type CustomPolicy struct {
+// customPolicy implements EvictionPolicy with a custom eviction function
+type customPolicy struct {
 	evictFunc func(interface{}) bool
 }
 
-func NewCustomPolicy(evictFunc func(interface{}) bool) *CustomPolicy {
-	return &CustomPolicy{evictFunc: evictFunc}
+func NewCustomPolicy(evictFunc func(interface{}) bool) EvictionPolicy {
+	return &customPolicy{evictFunc: evictFunc}
 }
 
-func (p CustomPolicy) ShouldEvict(entry *cacheEntry) bool {
+func (p customPolicy) ShouldEvict(entry *cacheEntry) bool {
 	return p.evictFunc(entry.value)
 }
