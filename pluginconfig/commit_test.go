@@ -331,6 +331,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 			},
 		},
 		{
@@ -346,6 +347,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 			},
 		},
 		{
@@ -356,6 +358,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				NewMsgScanBatchSize:                500,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
+				TransmissionDelayMultiplier:        20,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -365,6 +368,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  1000,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        20,
 			},
 		},
 		{
@@ -382,6 +386,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  500,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
 			},
 		},
 	}
