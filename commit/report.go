@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
