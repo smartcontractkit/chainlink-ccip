@@ -11,6 +11,7 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/cache"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -36,11 +37,12 @@ type PriceReader interface {
 }
 
 type priceReader struct {
-	lggr         logger.Logger
-	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
-	tokenInfo    map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
-	ccipReader   CCIPReader
-	feedChain    ccipocr3.ChainSelector
+	lggr          logger.Logger
+	chainReaders  map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
+	tokenInfo     map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
+	ccipReader    CCIPReader
+	feedChain     ccipocr3.ChainSelector
+	decimalsCache cache.Cache[string, uint8]
 }
 
 func NewPriceReader(
@@ -51,11 +53,12 @@ func NewPriceReader(
 	feedChain ccipocr3.ChainSelector,
 ) PriceReader {
 	return &priceReader{
-		lggr:         lggr,
-		chainReaders: chainReaders,
-		tokenInfo:    tokenInfo,
-		ccipReader:   ccipReader,
-		feedChain:    feedChain,
+		lggr:          lggr,
+		chainReaders:  chainReaders,
+		tokenInfo:     tokenInfo,
+		ccipReader:    ccipReader,
+		feedChain:     feedChain,
+		decimalsCache: cache.NewCache[string, uint8](cache.NeverExpirePolicy{}),
 	}
 }
 
@@ -190,6 +193,19 @@ func (pr *priceReader) getFeedDecimals(
 	boundContract commontypes.BoundContract,
 	feedChainReader contractreader.ContractReaderFacade,
 ) (uint8, error) {
+	// Create cache key using token and contract address
+	cacheKey := string(token) + "-" + boundContract.Address
+
+	// Try to get from cache first
+	if decimals, found := pr.decimalsCache.Get(cacheKey); found {
+		pr.lggr.Debugw("Cache hit for token decimals",
+			"token", token,
+			"contract", boundContract.Address,
+			"decimals", decimals)
+		return decimals, nil
+	}
+
+	// If not in cache, get from contract
 	var decimals uint8
 	if err :=
 		feedChainReader.GetLatestValue(
@@ -201,6 +217,13 @@ func (pr *priceReader) getFeedDecimals(
 		); err != nil {
 		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
 	}
+
+	// Store in cache
+	pr.decimalsCache.Set(cacheKey, decimals)
+	pr.lggr.Debugw("Cached token decimals",
+		"token", token,
+		"contract", boundContract.Address,
+		"decimals", decimals)
 
 	return decimals, nil
 }
