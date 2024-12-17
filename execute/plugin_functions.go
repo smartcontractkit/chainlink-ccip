@@ -261,8 +261,6 @@ func truncateObservation(
 	maxSize int,
 	emptyEncodedSizes exectypes.EmptyEncodeSizes,
 ) (exectypes.Observation, error) {
-	// TODO: Use a hash to store encoding sizes for individual messages
-	//  and use that to determine how many messages to delete.
 	obs := observation
 	encodedObs, err := obs.Encode()
 	if err != nil {
@@ -300,8 +298,7 @@ func truncateObservation(
 					emptyEncodedSizes.MessageAndTokenData
 				seqNum++
 				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
-				// TODO: Remove the 32 check once we implement the hash size calculation.
-				if seqNum%32 == 0 && encodedObsSize <= maxSize {
+				if seqNum == 0 && encodedObsSize <= maxSize {
 					return obs, nil
 				}
 			}
@@ -340,24 +337,6 @@ func truncateObservation(
 	return obs, nil
 }
 
-func observationFitsSize(obs exectypes.Observation, maxSize int) bool {
-	encodedObs, err := obs.Encode()
-	if err != nil {
-		return false
-	}
-	return len(encodedObs) <= maxSize
-}
-
-func truncateMessageData(
-	obs exectypes.Observation,
-	chain cciptypes.ChainSelector,
-	seqNum cciptypes.SeqNum,
-) (exectypes.Observation, error) {
-	newObs := obs
-
-	return newObs, nil
-}
-
 // truncateLastCommit removes the last commit from the observation.
 // errors if there are no commits to truncate.
 func truncateLastCommit(
@@ -377,7 +356,7 @@ func truncateLastCommit(
 	commits = commits[:len(commits)-1]
 	observation.CommitReports[chain] = commits
 	// Remove from the encoded size.
-	newSize = newSize - emptyEncodedSizes.CommitData
+	newSize = newSize - emptyEncodedSizes.CommitData - 4 // brackets, and commas
 	for seqNum, msg := range observation.Messages[chain] {
 		if lastCommit.SequenceNumberRange.Contains(seqNum) {
 			// Remove the message from the observation.
@@ -386,7 +365,8 @@ func truncateLastCommit(
 			delete(observation.TokenData[chain], seqNum)
 			//delete(observation.Hashes[chain], seqNum)
 			// Remove the encoded size of the message and token data.
-			newSize = newSize - emptyEncodedSizes.MessageAndTokenData - 2*emptyEncodedSizes.SeqNumMap
+			newSize = newSize - emptyEncodedSizes.MessageAndTokenData - 2*emptyEncodedSizes.SeqNumMap -
+				4 // for brackets and commas
 			// Remove costly messages
 			for i, costlyMessage := range observation.CostlyMessages {
 				if costlyMessage == msg.Header.MessageID {

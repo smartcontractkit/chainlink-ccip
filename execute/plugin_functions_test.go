@@ -1558,7 +1558,7 @@ func Test_truncateObservation(t *testing.T) {
 					withData(make([]byte, 100)),
 				),
 			},
-			maxSize: 1789,
+			maxSize: 1819,
 			expected: exectypes.Observation{
 				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					2: {
