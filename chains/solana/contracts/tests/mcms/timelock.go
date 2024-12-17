@@ -11,12 +11,12 @@ import (
 	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/eth"
 	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 )
 
 // instruction builder for initializing access controllers

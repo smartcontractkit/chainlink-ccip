@@ -13,9 +13,9 @@ import (
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 )
 
 func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, error) {

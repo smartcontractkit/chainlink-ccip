@@ -7,10 +7,10 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/gagliardetto/solana-go"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/eth"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 )
 
 func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigners []eth.Signer) (sigs [][65]byte, err error) {

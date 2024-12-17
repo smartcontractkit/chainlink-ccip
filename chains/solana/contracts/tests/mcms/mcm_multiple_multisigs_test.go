@@ -11,11 +11,11 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/eth"
 	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
 )
 
 func TestMcmMultipleMultisigs(t *testing.T) {
