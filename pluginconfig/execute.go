@@ -3,6 +3,7 @@ package pluginconfig
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 )
@@ -36,6 +37,20 @@ type ExecuteOffchainConfig struct {
 
 	// TokenDataObservers registers different strategies for processing token data.
 	TokenDataObservers []TokenDataObserverConfig `json:"tokenDataObservers"`
+
+	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
+}
+
+func (e ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
+	e.applyDefaults()
+	return e.Validate()
+}
+
+func (e ExecuteOffchainConfig) applyDefaults() {
+	if e.TransmissionDelayMultiplier == 0 {
+		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
+	}
 }
 
 func (e ExecuteOffchainConfig) Validate() error {
