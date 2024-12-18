@@ -297,8 +297,7 @@ func truncateObservation(
 					obs.MessageAndTokenDataEncodedSizes[chain][seqNum] +
 					emptyEncodedSizes.MessageAndTokenData
 				seqNum++
-				// Each report will be deleted completely by maximum looping 8 times as the max report messages is 256.
-				if seqNum == 0 && encodedObsSize <= maxSize {
+				if encodedObsSize <= maxSize {
 					return obs, nil
 				}
 			}
