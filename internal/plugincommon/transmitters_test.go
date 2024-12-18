@@ -50,6 +50,15 @@ func TestGetTransmissionSchedule(t *testing.T) {
 			expectedError:               true,
 			chainSupportReturnsError:    true,
 		},
+		{
+			name:                        "determinism check",
+			allTheOracles:               []commontypes.OracleID{3, 1, 2}, // <------ not ordered
+			oraclesSupportingDest:       []commontypes.OracleID{1, 3},
+			transmissionDelayMultiplier: 5 * time.Second,
+			expectedTransmitters:        []commontypes.OracleID{1, 3},
+			expectedTransmissionDelays:  []time.Duration{5 * time.Second, 10 * time.Second},
+			expectedError:               false,
+		},
 	}
 
 	for _, tc := range testCases {
