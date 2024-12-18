@@ -3,9 +3,11 @@ package exectypes
 import (
 	"encoding/json"
 	"fmt"
-	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"golang.org/x/exp/maps"
 	"sort"
+
+	"golang.org/x/exp/maps"
+
+	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
 type ObservationOptimizer struct {
