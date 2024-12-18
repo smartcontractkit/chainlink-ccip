@@ -180,7 +180,7 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 
 			// Create extended reader with mock
 			extendedReader := &extendedContractReader{
-				ContractReaderFacade:   mockReader,
+				reader:                 mockReader,
 				contractBindingsByName: tt.bindings,
 				mu:                     &sync.RWMutex{},
 			}

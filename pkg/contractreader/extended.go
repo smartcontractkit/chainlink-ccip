@@ -7,7 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
@@ -15,8 +17,9 @@ import (
 )
 
 var (
-	ErrTooManyBindings = errors.New("contract binding not found")
-	ErrNoBindings      = errors.New("no bindings found")
+	ErrFinalityViolated = errors.New("finality violated")
+	ErrTooManyBindings  = errors.New("contract binding not found")
+	ErrNoBindings       = errors.New("no bindings found")
 )
 
 // Extended version of a ContractReader.
@@ -62,14 +65,14 @@ type ExtendedBoundContract struct {
 
 // extendedContractReader is an extended version of the contract reader.
 type extendedContractReader struct {
-	ContractReaderFacade
+	reader                 ContractReaderFacade
 	contractBindingsByName map[string][]ExtendedBoundContract
 	mu                     *sync.RWMutex
 }
 
 func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended {
 	return &extendedContractReader{
-		ContractReaderFacade:   baseContractReader,
+		reader:                 baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
 		mu:                     &sync.RWMutex{},
 	}
@@ -96,12 +99,16 @@ func (e *extendedContractReader) ExtendedQueryKey(
 	limitAndSort query.LimitAndSort,
 	sequenceDataType any,
 ) ([]types.Sequence, error) {
+	if e.hasFinalityViolation() {
+		return nil, ErrFinalityViolated
+	}
+
 	binding, err := e.getOneBinding(contractName)
 	if err != nil {
 		return nil, fmt.Errorf("ExtendedQueryKey: %w", err)
 	}
 
-	return e.QueryKey(
+	return e.reader.QueryKey(
 		ctx,
 		binding.Binding,
 		filter,
@@ -116,13 +123,17 @@ func (e *extendedContractReader) ExtendedGetLatestValue(
 	confidenceLevel primitives.ConfidenceLevel,
 	params, returnVal any,
 ) error {
+	if e.hasFinalityViolation() {
+		return ErrFinalityViolated
+	}
+
 	binding, err := e.getOneBinding(contractName)
 	if err != nil {
 		return fmt.Errorf("ExtendedGetLatestValue: %w", err)
 	}
 	readIdentifier := binding.Binding.ReadIdentifier(methodName)
 
-	return e.GetLatestValue(
+	return e.reader.GetLatestValue(
 		ctx,
 		readIdentifier,
 		confidenceLevel,
@@ -135,6 +146,10 @@ func (e *extendedContractReader) ExtendedBatchGetLatestValues(
 	ctx context.Context,
 	request ExtendedBatchGetLatestValuesRequest,
 ) (types.BatchGetLatestValuesResult, error) {
+	if e.hasFinalityViolation() {
+		return nil, ErrFinalityViolated
+	}
+
 	// Convert the request from contract names to BoundContracts
 	convertedRequest := make(types.BatchGetLatestValuesRequest)
 
@@ -150,7 +165,7 @@ func (e *extendedContractReader) ExtendedBatchGetLatestValues(
 	}
 
 	// Call the underlying BatchGetLatestValues with the converted request
-	return e.ContractReaderFacade.BatchGetLatestValues(ctx, convertedRequest)
+	return e.reader.BatchGetLatestValues(ctx, convertedRequest)
 }
 
 func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.BoundContract) error {
@@ -159,7 +174,7 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 		return nil
 	}
 
-	err := e.ContractReaderFacade.Bind(ctx, validBindings)
+	err := e.reader.Bind(ctx, validBindings)
 	if err != nil {
 		return fmt.Errorf("failed to call ContractReader.Bind: %w", err)
 	}
@@ -199,6 +214,12 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 		}
 	}
 	return false
+}
+
+func (e *extendedContractReader) hasFinalityViolation() bool {
+	return services.ContainsError(
+		e.reader.HealthReport(),
+		clcommontypes.ErrFinalityViolated)
 }
 
 // Interface compliance check
