@@ -60,7 +60,7 @@ func GetConsensusMapAggregator[K comparable, T any](
 
 	for key, values := range items {
 		if thresh, ok := f.Get(key); ok && len(values) < int(thresh) {
-			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
+			lggr.Debugf("could not reach consensus on %s for key %v", objectName, key)
 			continue
 		}
 		consensus[key] = agg(values)
