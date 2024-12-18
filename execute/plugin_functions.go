@@ -254,8 +254,6 @@ func filterOutExecutedMessages(
 // exclude messages from one chain only.
 // Keep repeating this process until the encoded observation fits within the maxSize
 // Important Note: We can't delete messages completely from single reports as we need them to create merkle proofs.
-//
-//nolint:gocyclo
 func truncateObservation(
 	observation exectypes.Observation,
 	maxSize int,
@@ -294,8 +292,8 @@ func truncateObservation(
 				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 
 				encodedObsSize = encodedObsSize -
-					obs.MessageAndTokenDataEncodedSizes[chain][seqNum] +
-					emptyEncodedSizes.MessageAndTokenData
+					obs.MessageAndTokenDataEncodedSizes[chain][seqNum] + // Subtract the removed message and token size
+					emptyEncodedSizes.MessageAndTokenData // Add empty message and token encoded size
 				seqNum++
 				if encodedObsSize <= maxSize {
 					return obs, nil
@@ -303,12 +301,7 @@ func truncateObservation(
 			}
 
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
-			//numMessages := lastCommit.SequenceNumberRange.Length()
 			obs, encodedObsSize = truncateLastCommit(obs, chain, encodedObsSize, emptyEncodedSizes)
-			//// As we completely remove empty messages and token data, we need to subtract the size of the removed data.
-			//encodedObsSize = encodedObsSize -
-			//	emptyEncodedSizes.CommitData -
-			//	numMessages*emptyEncodedSizes.MessageAndTokenData
 
 			if len(obs.CommitReports[chain]) == 0 {
 				// If the last commit report was truncated, truncate the chain
