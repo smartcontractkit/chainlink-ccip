@@ -304,7 +304,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		homeFMap := make(map[cciptypes.ChainSelector]int)
 
 		for _, chain := range versionedConfig.DynamicConfig.SourceChains {
-			homeFMap[chain.ChainSelector] = int(chain.F)
+			homeFMap[chain.ChainSelector] = int(chain.FObserve)
 			for j := 0; j < len(nodes); j++ {
 				isObserver, err := IsNodeObserver(chain, j, len(nodes))
 				if err != nil {
@@ -388,7 +388,7 @@ type Node struct {
 // SourceChain mirrors RMNHome.sol's SourceChain struct
 type SourceChain struct {
 	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
-	F                   uint64                  `json:"f"` // previously: MinObservers
+	FObserve            uint64                  `json:"f"` // previously: MinObservers
 	ObserverNodesBitmap *big.Int                `json:"observerNodesBitmap"`
 }
 
