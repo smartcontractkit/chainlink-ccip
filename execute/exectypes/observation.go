@@ -89,10 +89,6 @@ type Observation struct {
 	// execute report.
 	Messages MessageObservations `json:"messages"`
 	Hashes   MessageHashes       `json:"messageHashes"`
-	// EncodedMsgAndTokenDataSizes are determined during the Get Messages phase
-	// It contains the sum of encoded sizes of messages and their token data counterpart that were observed in same
-	// phase.
-	MessageAndTokenDataEncodedSizes EncodedMsgAndTokenDataSizes `json:"messageEncodedSizes"`
 	// TokenData are determined during the second phase of execute.
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`

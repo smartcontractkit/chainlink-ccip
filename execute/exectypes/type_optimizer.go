@@ -13,6 +13,13 @@ type ObservationOptimizer struct {
 	emptyEncodedSizes EmptyEncodeSizes
 }
 
+func NewObservationOptimizer(maxEncodedSize int) ObservationOptimizer {
+	return ObservationOptimizer{
+		maxEncodedSize:    maxEncodedSize,
+		emptyEncodedSizes: NewEmptyEncodeSizes(),
+	}
+}
+
 type EmptyEncodeSizes struct {
 	MessageAndTokenData int
 	CommitData          int
@@ -38,7 +45,7 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 	}
 }
 
-// truncateObservation truncates the observation to fit within the given op.maxEncodedSize after encoding.
+// TruncateObservation truncates the observation to fit within the given op.maxEncodedSize after encoding.
 // It removes data from the observation in the following order:
 // For each chain, pick last report and start removing messages one at a time.
 // If removed all messages from the report, remove the report.
@@ -47,7 +54,7 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 // exclude messages from one chain only.
 // Keep repeating this process until the encoded observation fits within the op.maxEncodedSize
 // Important Note: We can't delete messages completely from single reports as we need them to create merkle proofs.
-func (op ObservationOptimizer) truncateObservation(observation Observation) (Observation, error) {
+func (op ObservationOptimizer) TruncateObservation(observation Observation) (Observation, error) {
 	obs := observation
 	encodedObs, err := obs.Encode()
 	if err != nil {
@@ -63,6 +70,7 @@ func (op ObservationOptimizer) truncateObservation(observation Observation) (Obs
 		return chains[i] < chains[j]
 	})
 
+	messageAndTokenDataEncodedSizes := GetEncodedMsgAndTokenDataSizes(obs.Messages, obs.TokenData)
 	// If the encoded obs is too large, start filtering data.
 	for encodedObsSize > op.maxEncodedSize {
 		for _, chain := range chains {
@@ -79,18 +87,21 @@ func (op ObservationOptimizer) truncateObservation(observation Observation) (Obs
 				}
 				obs.Messages[chain][seqNum] = cciptypes.Message{}
 				obs.TokenData[chain][seqNum] = NewMessageTokenData()
-
-				encodedObsSize = encodedObsSize -
-					obs.MessageAndTokenDataEncodedSizes[chain][seqNum] + // Subtract the removed message and token size
-					op.emptyEncodedSizes.MessageAndTokenData // Add empty message and token encoded size
+				// Subtract the removed message and token size
+				encodedObsSize -= messageAndTokenDataEncodedSizes[chain][seqNum]
+				// Add empty message and token encoded size
+				encodedObsSize += op.emptyEncodedSizes.MessageAndTokenData
 				seqNum++
 				if encodedObsSize <= op.maxEncodedSize {
 					return obs, nil
 				}
 			}
 
+			var sizeDelta int
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
-			obs, encodedObsSize = op.truncateLastCommit(obs, chain, encodedObsSize)
+			obs, sizeDelta = op.truncateLastCommit(obs, chain)
+
+			encodedObsSize += sizeDelta
 
 			if len(obs.CommitReports[chain]) == 0 {
 				// If the last commit report was truncated, truncate the chain
@@ -123,20 +134,19 @@ func (op ObservationOptimizer) truncateObservation(observation Observation) (Obs
 func (op ObservationOptimizer) truncateLastCommit(
 	obs Observation,
 	chain cciptypes.ChainSelector,
-	currentObsEncSize int,
 ) (Observation, int) {
 	observation := obs
-	newSize := currentObsEncSize
+	sizeDelta := 0
 	commits := observation.CommitReports[chain]
 	if len(commits) == 0 {
-		return observation, currentObsEncSize
+		return observation, sizeDelta
 	}
 	lastCommit := commits[len(commits)-1]
 	// Remove the last commit from the list.
 	commits = commits[:len(commits)-1]
 	observation.CommitReports[chain] = commits
 	// Remove from the encoded size.
-	newSize = newSize - op.emptyEncodedSizes.CommitData - 4 // brackets, and commas
+	sizeDelta = sizeDelta - op.emptyEncodedSizes.CommitData - 4 // brackets, and commas
 	for seqNum, msg := range observation.Messages[chain] {
 		if lastCommit.SequenceNumberRange.Contains(seqNum) {
 			// Remove the message from the observation.
@@ -145,8 +155,9 @@ func (op ObservationOptimizer) truncateLastCommit(
 			delete(observation.TokenData[chain], seqNum)
 			//delete(observation.Hashes[chain], seqNum)
 			// Remove the encoded size of the message and token data.
-			newSize = newSize - op.emptyEncodedSizes.MessageAndTokenData - 2*op.emptyEncodedSizes.SeqNumMap -
-				4 // for brackets and commas
+			sizeDelta -= op.emptyEncodedSizes.MessageAndTokenData
+			sizeDelta -= 2 * op.emptyEncodedSizes.SeqNumMap
+			sizeDelta -= 4 // for brackets and commas
 			// Remove costly messages
 			for i, costlyMessage := range observation.CostlyMessages {
 				if costlyMessage == msg.Header.MessageID {
@@ -157,7 +168,7 @@ func (op ObservationOptimizer) truncateLastCommit(
 		}
 	}
 
-	return observation, newSize
+	return observation, sizeDelta
 }
 
 // truncateChain removes all data related to the given chain from the observation.
