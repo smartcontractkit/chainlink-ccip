@@ -61,7 +61,7 @@ type rmnHomePoller struct {
 	stopCh               services.StopChan
 	sync                 services.StateMachine
 	mutex                *sync.RWMutex
-	contractReader       contractreader.Extended
+	contractReader       contractreader.ContractReaderFacade
 	rmnHomeBoundContract types.BoundContract
 	lggr                 logger.Logger
 	rmnHomeState         rmnHomeState
@@ -70,7 +70,7 @@ type rmnHomePoller struct {
 }
 
 func NewRMNHomePoller(
-	contractReader contractreader.Extended,
+	contractReader contractreader.ContractReaderFacade,
 	rmnHomeBoundContract types.BoundContract,
 	lggr logger.Logger,
 	pollingInterval time.Duration,

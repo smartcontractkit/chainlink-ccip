@@ -404,6 +404,53 @@ func (_c *MockExtended_GetLatestValue_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// HealthReport provides a mock function with given fields:
+func (_m *MockExtended) HealthReport() map[string]error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HealthReport")
+	}
+
+	var r0 map[string]error
+	if rf, ok := ret.Get(0).(func() map[string]error); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]error)
+		}
+	}
+
+	return r0
+}
+
+// MockExtended_HealthReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HealthReport'
+type MockExtended_HealthReport_Call struct {
+	*mock.Call
+}
+
+// HealthReport is a helper method to define mock.On call
+func (_e *MockExtended_Expecter) HealthReport() *MockExtended_HealthReport_Call {
+	return &MockExtended_HealthReport_Call{Call: _e.mock.On("HealthReport")}
+}
+
+func (_c *MockExtended_HealthReport_Call) Run(run func()) *MockExtended_HealthReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockExtended_HealthReport_Call) Return(_a0 map[string]error) *MockExtended_HealthReport_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockExtended_HealthReport_Call) RunAndReturn(run func() map[string]error) *MockExtended_HealthReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryKey provides a mock function with given fields: ctx, contract, filter, limitAndSort, sequenceDataType
 func (_m *MockExtended) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{}) ([]types.Sequence, error) {
 	ret := _m.Called(ctx, contract, filter, limitAndSort, sequenceDataType)
@@ -462,6 +509,53 @@ func (_c *MockExtended_QueryKey_Call) Return(_a0 []types.Sequence, _a1 error) *M
 }
 
 func (_c *MockExtended_QueryKey_Call) RunAndReturn(run func(context.Context, types.BoundContract, query.KeyFilter, query.LimitAndSort, interface{}) ([]types.Sequence, error)) *MockExtended_QueryKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Unbind provides a mock function with given fields: ctx, bindings
+func (_m *MockExtended) Unbind(ctx context.Context, bindings []types.BoundContract) error {
+	ret := _m.Called(ctx, bindings)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Unbind")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []types.BoundContract) error); ok {
+		r0 = rf(ctx, bindings)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockExtended_Unbind_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Unbind'
+type MockExtended_Unbind_Call struct {
+	*mock.Call
+}
+
+// Unbind is a helper method to define mock.On call
+//   - ctx context.Context
+//   - bindings []types.BoundContract
+func (_e *MockExtended_Expecter) Unbind(ctx interface{}, bindings interface{}) *MockExtended_Unbind_Call {
+	return &MockExtended_Unbind_Call{Call: _e.mock.On("Unbind", ctx, bindings)}
+}
+
+func (_c *MockExtended_Unbind_Call) Run(run func(ctx context.Context, bindings []types.BoundContract)) *MockExtended_Unbind_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]types.BoundContract))
+	})
+	return _c
+}
+
+func (_c *MockExtended_Unbind_Call) Return(_a0 error) *MockExtended_Unbind_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockExtended_Unbind_Call) RunAndReturn(run func(context.Context, []types.BoundContract) error) *MockExtended_Unbind_Call {
 	_c.Call.Return(run)
 	return _c
 }

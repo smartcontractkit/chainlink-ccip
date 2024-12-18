@@ -24,6 +24,11 @@ var (
 
 // Extended version of a ContractReader.
 type Extended interface {
+	// Unbind is included for compatibility with ContractReader
+	Unbind(ctx context.Context, bindings []types.BoundContract) error
+	// HealthReport is included for compatibility with ContractReader
+	HealthReport() map[string]error
+
 	Bind(ctx context.Context, bindings []types.BoundContract) error
 
 	GetBindings(contractName string) []ExtendedBoundContract
@@ -278,18 +283,18 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 }
 
 func (e *extendedContractReader) hasFinalityViolation() bool {
-	if e.reader == nil {
-		return false
-	}
-
-	if _, ok := e.reader.(Extended); ok {
-		panic("bad news")
-	}
-
 	report := e.reader.HealthReport()
 	return services.ContainsError(
 		report,
 		clcommontypes.ErrFinalityViolated)
+}
+
+func (e *extendedContractReader) Unbind(ctx context.Context, bindings []types.BoundContract) error {
+	return e.reader.Unbind(ctx, bindings)
+}
+
+func (e *extendedContractReader) HealthReport() map[string]error {
+	return e.reader.HealthReport()
 }
 
 // Interface compliance check
