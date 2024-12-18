@@ -57,6 +57,8 @@ func (p *Plugin) Reports(
 		rep     cciptypes.CommitPluginReport
 		repInfo ReportInfo
 	)
+
+	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 	rep = cciptypes.CommitPluginReport{
 		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
 		PriceUpdates: cciptypes.PriceUpdates{
@@ -64,6 +66,11 @@ func (p *Plugin) Reports(
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+	}
+
+	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportEmpty {
+		rep.MerkleRoots = []cciptypes.MerkleRootChain{}
+		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
@@ -230,7 +237,7 @@ func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.Com
 }
 
 func (p *Plugin) isStaleReport(seqNr, latestSeqNr uint64, decodedReport cciptypes.CommitPluginReport) bool {
-	if seqNr < latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
+	if seqNr <= latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
 		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
 		return true
 	}
