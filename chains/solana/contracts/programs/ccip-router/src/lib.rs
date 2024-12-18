@@ -669,6 +669,43 @@ pub mod ccip_router {
         .amount)
     }
 
+    /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
+    /// Only the CCIP Admin can extract billed fees.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the transfer of billed fees.
+    /// * `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.
+    /// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
+    pub fn transfer_billed_funds(
+        ctx: Context<TransferBilledFunds>,
+        transfer_all: bool,
+        desired_amount: u64, // send 0 if transfer_all is false
+    ) -> Result<()> {
+        let transfer = token_interface::TransferChecked {
+            from: ctx.accounts.fee_token_accum.to_account_info(),
+            to: ctx.accounts.recipient.to_account_info(),
+            mint: ctx.accounts.fee_token_mint.to_account_info(),
+            authority: ctx.accounts.fee_billing_signer.to_account_info(),
+        };
+
+        let amount = if transfer_all {
+            require!(desired_amount == 0, CcipRouterError::InvalidInputs);
+            ctx.accounts.fee_token_accum.amount
+        } else {
+            // the SPL token program transfer later on already checks that there is enough balance
+            desired_amount
+        };
+
+        do_transfer(
+            ctx.accounts.token_program.to_account_info(),
+            transfer,
+            amount,
+            ctx.accounts.fee_token_mint.decimals,
+            ctx.bumps.fee_billing_signer,
+        )
+    }
+
     /// ON RAMP FLOW
     /// Sends a message to the destination chain.
     ///
