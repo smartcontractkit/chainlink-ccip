@@ -670,15 +670,15 @@ pub mod ccip_router {
     }
 
     /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
-    /// Only the CCIP Admin can extract billed fees.
+    /// Only the CCIP Admin can withdraw billed funds.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for the transfer of billed fees.
     /// * `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.
     /// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
-    pub fn transfer_billed_funds(
-        ctx: Context<TransferBilledFunds>,
+    pub fn withdraw_billed_funds(
+        ctx: Context<WithdrawBilledFunds>,
         transfer_all: bool,
         desired_amount: u64, // send 0 if transfer_all is false
     ) -> Result<()> {
@@ -691,9 +691,17 @@ pub mod ccip_router {
 
         let amount = if transfer_all {
             require!(desired_amount == 0, CcipRouterError::InvalidInputs);
+            require!(
+                ctx.accounts.fee_token_accum.amount > 0,
+                CcipRouterError::InsufficientFunds
+            );
             ctx.accounts.fee_token_accum.amount
         } else {
-            // the SPL token program transfer later on already checks that there is enough balance
+            require!(desired_amount > 0, CcipRouterError::InvalidInputs);
+            require!(
+                desired_amount <= ctx.accounts.fee_token_accum.amount,
+                CcipRouterError::InsufficientFunds
+            );
             desired_amount
         };
 
@@ -1640,6 +1648,8 @@ pub enum CcipRouterError {
     StaleGasPrice,
     #[msg("Insufficient lamports")]
     InsufficientLamports,
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
 }
 
 // TODO: Refactor this to use the same structure as messages: execution_report.validate(..)
