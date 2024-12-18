@@ -21,7 +21,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/commit/metrics"
-	"github.com/smartcontractkit/chainlink-ccip/internal/cache"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -231,7 +230,6 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		offchainConfig.TokenInfo,
 		ccipReader,
 		offchainConfig.PriceFeedChainSelector,
-		cache.NewInMemoryCache[string, uint8](cache.NewNeverExpirePolicy()),
 	)
 
 	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
