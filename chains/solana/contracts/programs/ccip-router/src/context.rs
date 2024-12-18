@@ -139,7 +139,7 @@ pub struct GetFee<'info> {
 }
 
 #[derive(Accounts)]
-pub struct TransferBilledFunds<'info> {
+pub struct WithdrawBilledFunds<'info> {
     #[account(
         owner = token_program.key() @ CcipRouterError::InvalidInputs,
     )]
@@ -184,8 +184,6 @@ pub struct TransferBilledFunds<'info> {
 
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]

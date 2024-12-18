@@ -1020,10 +1020,10 @@
       "returns": "u64"
     },
     {
-      "name": "transferBilledFunds",
+      "name": "withdrawBilledFunds",
       "docs": [
         "Transfers the accumulated billed fees in a particular token to an arbitrary token account.",
-        "Only the CCIP Admin can extract billed fees.",
+        "Only the CCIP Admin can withdraw billed funds.",
         "",
         "# Arguments",
         "",
@@ -1070,11 +1070,6 @@
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -2798,6 +2793,9 @@
           },
           {
             "name": "InsufficientLamports"
+          },
+          {
+            "name": "InsufficientFunds"
           }
         ]
       }
