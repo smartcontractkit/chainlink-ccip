@@ -44,8 +44,31 @@ func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, 
 	return hash.Sum(nil), nil
 }
 
+var reportSequence uint64 = 1
+
+func CreateReportContext(sequence uint64) [3][32]byte {
+	return [3][32]byte{
+		config.ConfigDigest,
+		[32]byte(binary.BigEndian.AppendUint64(config.Empty24Byte[:], sequence)),
+		utils.MakeRandom32ByteArray(),
+	}
+}
+
+func ParseSequenceNumber(ctx [3][32]byte) uint64 {
+	return binary.BigEndian.Uint64(ctx[1][24:])
+}
+
+func ReportSequence() uint64 {
+	return reportSequence
+}
+
+func NextCommitReportContext() [3][32]byte {
+	reportSequence++
+	return CreateReportContext(reportSequence)
+}
+
 func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testing.T) (ccip_router.Any2SolanaRampMessage, [32]byte) {
-	nextSeq := NextSequenceNumber(ctx, solanaGoClient, config.EvmChainStatePDA, t)
+	nextSeq := NextSequenceNumber(ctx, solanaGoClient, config.EvmSourceChainStatePDA, t)
 	msg := CreateDefaultMessageWith(config.EvmChainSelector, nextSeq)
 
 	hash, err := HashEvmToSolanaMessage(msg, config.OnRampAddress)
@@ -53,11 +76,11 @@ func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testi
 	return msg, [32]byte(hash)
 }
 
-func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, chainStatePDA solana.PublicKey, t *testing.T) uint64 {
-	var chainStateAccount ccip_router.ChainState
-	err := utils.GetAccountDataBorshInto(ctx, solanaGoClient, chainStatePDA, config.DefaultCommitment, &chainStateAccount)
+func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceChainStatePDA solana.PublicKey, t *testing.T) uint64 {
+	var chainStateAccount ccip_router.SourceChain
+	err := utils.GetAccountDataBorshInto(ctx, solanaGoClient, sourceChainStatePDA, config.DefaultCommitment, &chainStateAccount)
 	require.NoError(t, err)
-	return chainStateAccount.SourceChain.State.MinSeqNr
+	return chainStateAccount.State.MinSeqNr
 }
 
 func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_router.Any2SolanaRampMessage {

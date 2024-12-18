@@ -129,16 +129,6 @@ fn execute(
 #[derive(Accounts)]
 #[instruction(id: [u8; 32])]
 pub struct ExecuteBatch<'info> {
-    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
-    pub config: Account<'info, Config>,
-
-    /// CHECK: program signer PDA that can hold balance
-    #[account(
-        seeds = [TIMELOCK_SIGNER_SEED],
-        bump
-    )]
-    pub timelock_signer: UncheckedAccount<'info>,
-
     #[account(
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
@@ -149,16 +139,7 @@ pub struct ExecuteBatch<'info> {
 
     /// CHECK: Will be validated in handler if predecessor exists
     pub predecessor_operation: UncheckedAccount<'info>,
-    // NOTE: access controller check happens in only_role_or_admin_role macro
-    pub role_access_controller: AccountLoader<'info, AccessController>,
 
-    #[account(mut)]
-    pub authority: Signer<'info>,
-}
-
-#[derive(Accounts)]
-#[instruction(id: [u8; 32])]
-pub struct BypasserExecuteBatch<'info> {
     #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
     pub config: Account<'info, Config>,
 
@@ -169,6 +150,16 @@ pub struct BypasserExecuteBatch<'info> {
     )]
     pub timelock_signer: UncheckedAccount<'info>,
 
+    // NOTE: access controller check happens in only_role_or_admin_role macro
+    pub role_access_controller: AccountLoader<'info, AccessController>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(id: [u8; 32])]
+pub struct BypasserExecuteBatch<'info> {
     #[account(
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
@@ -176,6 +167,17 @@ pub struct BypasserExecuteBatch<'info> {
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
     )]
     pub operation: Account<'info, Operation>,
+
+    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    pub config: Account<'info, Config>,
+
+    /// CHECK: program signer PDA that can hold balance
+    #[account(
+        seeds = [TIMELOCK_SIGNER_SEED],
+        bump
+    )]
+    pub timelock_signer: UncheckedAccount<'info>,
+
     // NOTE: access controller check happens in only_role_or_admin_role macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 

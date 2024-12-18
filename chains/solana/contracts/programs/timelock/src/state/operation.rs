@@ -6,22 +6,23 @@ use crate::constants::DONE_TIMESTAMP;
 
 #[account]
 pub struct Operation {
-    pub timestamp: u64,
-    pub id: [u8; 32],
-    pub predecessor: [u8; 32],
-    pub salt: [u8; 32],
-
-    pub authority: Pubkey,
-    pub is_finalized: bool,
-    pub total_instructions: u32,
-    pub instructions: Vec<InstructionData>,
+    pub timestamp: u64,                     // scheduled timestamp in unix time
+    pub id: [u8; 32],                       // hashed operation id
+    pub predecessor: [u8; 32],              // hash of the previous operation
+    pub salt: [u8; 32],                     // random salt for the operation
+    pub authority: Pubkey,                  // authority of the operation
+    pub is_finalized: bool,                 // flag to indicate if the operation is finalized
+    pub total_instructions: u32,            // total number of instructions in the operation
+    pub instructions: Vec<InstructionData>, // list of instructions
 }
 
 impl Operation {
+    // before scheduling, timestamp should be 0
     pub fn is_scheduled(&self) -> bool {
         self.timestamp > 0
     }
 
+    // scheduled but not executed
     pub fn is_pending(&self) -> bool {
         self.timestamp > DONE_TIMESTAMP
     }
@@ -64,7 +65,6 @@ impl Operation {
         encoded_data.extend_from_slice(&self.predecessor);
         encoded_data.extend_from_slice(&salt);
 
-        // hash everything with keccak256
         hashv(&[&encoded_data]).to_bytes()
     }
 

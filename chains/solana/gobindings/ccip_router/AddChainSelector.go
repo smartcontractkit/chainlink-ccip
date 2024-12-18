@@ -27,20 +27,22 @@ type AddChainSelector struct {
 	SourceChainConfig *SourceChainConfig
 	DestChainConfig   *DestChainConfig
 
-	// [0] = [WRITE] chainState
+	// [0] = [WRITE] sourceChainState
 	//
-	// [1] = [] config
+	// [1] = [WRITE] destChainState
 	//
-	// [2] = [WRITE, SIGNER] authority
+	// [2] = [] config
 	//
-	// [3] = [] systemProgram
+	// [3] = [WRITE, SIGNER] authority
+	//
+	// [4] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAddChainSelectorInstructionBuilder creates a new `AddChainSelector` instruction builder.
 func NewAddChainSelectorInstructionBuilder() *AddChainSelector {
 	nd := &AddChainSelector{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
 	}
 	return nd
 }
@@ -63,48 +65,59 @@ func (inst *AddChainSelector) SetDestChainConfig(destChainConfig DestChainConfig
 	return inst
 }
 
-// SetChainStateAccount sets the "chainState" account.
-func (inst *AddChainSelector) SetChainStateAccount(chainState ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(chainState).WRITE()
+// SetSourceChainStateAccount sets the "sourceChainState" account.
+func (inst *AddChainSelector) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *AddChainSelector {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(sourceChainState).WRITE()
 	return inst
 }
 
-// GetChainStateAccount gets the "chainState" account.
-func (inst *AddChainSelector) GetChainStateAccount() *ag_solanago.AccountMeta {
+// GetSourceChainStateAccount gets the "sourceChainState" account.
+func (inst *AddChainSelector) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
+}
+
+// SetDestChainStateAccount sets the "destChainState" account.
+func (inst *AddChainSelector) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *AddChainSelector {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChainState).WRITE()
+	return inst
+}
+
+// GetDestChainStateAccount gets the "destChainState" account.
+func (inst *AddChainSelector) GetDestChainStateAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
 }
 
 // SetConfigAccount sets the "config" account.
 func (inst *AddChainSelector) SetConfigAccount(config ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(config)
 	return inst
 }
 
 // GetConfigAccount gets the "config" account.
 func (inst *AddChainSelector) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetAuthorityAccount sets the "authority" account.
 func (inst *AddChainSelector) SetAuthorityAccount(authority ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AddChainSelector) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *AddChainSelector) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AddChainSelector {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *AddChainSelector) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[4]
 }
 
 func (inst AddChainSelector) Build() *Instruction {
@@ -141,15 +154,18 @@ func (inst *AddChainSelector) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.ChainState is not set")
+			return errors.New("accounts.SourceChainState is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.DestChainState is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -172,11 +188,12 @@ func (inst *AddChainSelector) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("   chainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("sourceChainState", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("  destChainState", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("          config", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       authority", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("   systemProgram", inst.AccountMetaSlice[4]))
 					})
 				})
 		})
@@ -226,7 +243,8 @@ func NewAddChainSelectorInstruction(
 	sourceChainConfig SourceChainConfig,
 	destChainConfig DestChainConfig,
 	// Accounts:
-	chainState ag_solanago.PublicKey,
+	sourceChainState ag_solanago.PublicKey,
+	destChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AddChainSelector {
@@ -234,7 +252,8 @@ func NewAddChainSelectorInstruction(
 		SetNewChainSelector(newChainSelector).
 		SetSourceChainConfig(sourceChainConfig).
 		SetDestChainConfig(destChainConfig).
-		SetChainStateAccount(chainState).
+		SetSourceChainStateAccount(sourceChainState).
+		SetDestChainStateAccount(destChainState).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)

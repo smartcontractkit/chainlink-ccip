@@ -111,11 +111,11 @@ pub fn set_config(
     config.group_parents = group_parents;
 
     emit!(ConfigSet {
-        // todo: memory inefficient, finding workaround
-        // signers: config.signers.clone(),
         group_parents,
         group_quorums,
         is_root_cleared: clear_root,
+        // todo: memory inefficient, finding workaround
+        // signers: config.signers.clone(),
     });
 
     Ok(())
@@ -130,9 +130,8 @@ pub fn init_signers(
         total_signers > 0 && total_signers <= MAX_NUM_SIGNERS as u8,
         McmError::OutOfBoundsNumOfSigners
     );
-    let evm_signers_acc = &mut ctx.accounts.config_signers;
-    evm_signers_acc.bump = ctx.bumps.config_signers;
-    evm_signers_acc.total_signers = total_signers;
+    let config_signers = &mut ctx.accounts.config_signers;
+    config_signers.total_signers = total_signers;
 
     // Note: is_finalized stays false until finalization
     Ok(())
@@ -143,17 +142,17 @@ pub fn append_signers(
     _multisig_name: [u8; MULTISIG_NAME_PADDED],
     signers_batch: Vec<[u8; 20]>,
 ) -> Result<()> {
-    let evm_signers_acc = &mut ctx.accounts.config_signers;
+    let config_signers = &mut ctx.accounts.config_signers;
 
     // check bounds
     require!(
-        evm_signers_acc.signer_addresses.len() + signers_batch.len()
-            <= evm_signers_acc.total_signers as usize,
+        config_signers.signer_addresses.len() + signers_batch.len()
+            <= config_signers.total_signers as usize,
         McmError::OutOfBoundsNumOfSigners
     );
 
     // check if the signers are strictly increasing from the last signer
-    let mut prev_signer = evm_signers_acc
+    let mut prev_signer = config_signers
         .signer_addresses
         .last()
         .copied()
@@ -165,17 +164,17 @@ pub fn append_signers(
             McmError::SignersAddressesMustBeStrictlyIncreasing
         );
         prev_signer = sig;
-        evm_signers_acc.signer_addresses.push(sig);
+        config_signers.signer_addresses.push(sig);
     }
     Ok(())
 }
 
 pub fn clear_signers(
-    ctx: Context<ClearSigners>,
+    _ctx: Context<ClearSigners>,
     _multisig_name: [u8; MULTISIG_NAME_PADDED],
 ) -> Result<()> {
-    let config_signers = &mut ctx.accounts.config_signers;
-    config_signers.signer_addresses.clear();
+    // NOTE: ctx.accounts.config_signers is closed to be able to re-initialized,
+    // also allow finalized config_signers to be cleared
     Ok(())
 }
 
@@ -183,15 +182,15 @@ pub fn finalize_signers(
     ctx: Context<FinalizeSigners>,
     _multisig_name: [u8; MULTISIG_NAME_PADDED],
 ) -> Result<()> {
-    let evm_signers_acc = &mut ctx.accounts.config_signers;
+    let config_signers = &mut ctx.accounts.config_signers;
 
     require!(
-        !evm_signers_acc.signer_addresses.is_empty()
-            && evm_signers_acc.signer_addresses.len() == evm_signers_acc.total_signers as usize,
+        !config_signers.signer_addresses.is_empty()
+            && config_signers.signer_addresses.len() == config_signers.total_signers as usize,
         McmError::OutOfBoundsNumOfSigners
     );
 
-    evm_signers_acc.is_finalized = true;
+    config_signers.is_finalized = true;
     Ok(())
 }
 
@@ -219,7 +218,7 @@ pub struct SetConfig<'info> {
     )]
     pub config_signers: Account<'info, ConfigSigners>, // preloaded signers account
 
-    #[account(mut, address = multisig_config.owner @ McmError::Unauthorized)]
+    #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -240,7 +239,7 @@ pub struct InitSigners<'info> {
     )]
     pub config_signers: Account<'info, ConfigSigners>,
 
-    #[account(mut, address = multisig_config.owner @ McmError::Unauthorized)]
+    #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -260,7 +259,7 @@ pub struct AppendSigners<'info> {
     )]
     pub config_signers: Account<'info, ConfigSigners>,
 
-    #[account(mut, address = multisig_config.owner @ McmError::Unauthorized)]
+    #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -274,11 +273,11 @@ pub struct ClearSigners<'info> {
         mut,
         seeds = [CONFIG_SIGNERS_SEED, multisig_name.as_ref()],
         bump,
-        constraint = !config_signers.is_finalized @ McmError::SignersNotFinalized,
+        close = authority // close so that it can be re-initialized
     )]
     pub config_signers: Account<'info, ConfigSigners>,
 
-    #[account(mut, address = multisig_config.owner @ McmError::Unauthorized)]
+    #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -296,6 +295,6 @@ pub struct FinalizeSigners<'info> {
     )]
     pub config_signers: Account<'info, ConfigSigners>,
 
-    #[account(mut, address = multisig_config.owner @ McmError::Unauthorized)]
+    #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }

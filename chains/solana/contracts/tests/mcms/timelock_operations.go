@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/eth"
 	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
 )
 
@@ -58,8 +57,8 @@ func (op *TimelockOperation) IxsCountU32() uint32 {
 // convert operation to timelock instruction data slice
 func (op *TimelockOperation) ToInstructionData() []timelock.InstructionData {
 	ixs := make([]timelock.InstructionData, len(op.instructions))
-	for i, instr := range op.instructions {
-		ixData, err := convertToInstructionData(instr.Ix)
+	for i, ix := range op.instructions {
+		ixData, err := convertToInstructionData(ix.Ix)
 		if err != nil {
 			panic(err)
 		}
@@ -151,7 +150,7 @@ func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte
 	encodedData.Write(predecessor[:])
 	encodedData.Write(salt[:])
 
-	result := eth.Keccak256(encodedData.Bytes())
+	result := mcmsUtils.Keccak256(encodedData.Bytes())
 
 	var hash [32]byte
 	copy(hash[:], result)

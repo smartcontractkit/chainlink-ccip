@@ -7,13 +7,12 @@ pub struct RootSignatures {
     pub total_signatures: u8,
     pub signatures: Vec<Signature>,
     pub is_finalized: bool,
-    pub bump: u8,
 }
 
 impl RootSignatures {
-    // 8 (discriminator) + 4 (vec len) + (65 * max_sigs) + 32 (root) + 4 (valid_until) + 1 (is_finalized) + 1 (bump)
+    // 8 (discriminator) + 4 (vec len) + (65 * max_sigs) + 32 (root) + 4 (valid_until) + 1 (is_finalized)
     pub const fn space(total_signatures: usize) -> usize {
-        8 + 4 + (65 * total_signatures) + 32 + 4 + 1 + 1 + 1
+        8 + 4 + (65 * total_signatures) + 32 + 4 + 1 + 1
     }
 }
 

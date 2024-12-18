@@ -25,7 +25,7 @@ type GetFee struct {
 	DestChainSelector *uint64
 	Message           *Solana2AnyMessage
 
-	// [0] = [] chainState
+	// [0] = [] destChainState
 	//
 	// [1] = [] billingTokenConfig
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -51,14 +51,14 @@ func (inst *GetFee) SetMessage(message Solana2AnyMessage) *GetFee {
 	return inst
 }
 
-// SetChainStateAccount sets the "chainState" account.
-func (inst *GetFee) SetChainStateAccount(chainState ag_solanago.PublicKey) *GetFee {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(chainState)
+// SetDestChainStateAccount sets the "destChainState" account.
+func (inst *GetFee) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *GetFee {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(destChainState)
 	return inst
 }
 
-// GetChainStateAccount gets the "chainState" account.
-func (inst *GetFee) GetChainStateAccount() *ag_solanago.AccountMeta {
+// GetDestChainStateAccount gets the "destChainState" account.
+func (inst *GetFee) GetDestChainStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -104,7 +104,7 @@ func (inst *GetFee) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.ChainState is not set")
+			return errors.New("accounts.DestChainState is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.BillingTokenConfig is not set")
@@ -129,7 +129,7 @@ func (inst *GetFee) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("        chainState", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("    destChainState", inst.AccountMetaSlice[0]))
 						accountsBranch.Child(ag_format.Meta("billingTokenConfig", inst.AccountMetaSlice[1]))
 					})
 				})
@@ -169,11 +169,11 @@ func NewGetFeeInstruction(
 	destChainSelector uint64,
 	message Solana2AnyMessage,
 	// Accounts:
-	chainState ag_solanago.PublicKey,
+	destChainState ag_solanago.PublicKey,
 	billingTokenConfig ag_solanago.PublicKey) *GetFee {
 	return NewGetFeeInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetMessage(message).
-		SetChainStateAccount(chainState).
+		SetDestChainStateAccount(destChainState).
 		SetBillingTokenConfigAccount(billingTokenConfig)
 }

@@ -242,7 +242,7 @@ func IxToMcmTestOpNode(multisig solana.PublicKey, msigSigner solana.PublicKey, i
 
 	for _, acc := range ix.Accounts() {
 		accCopy := *acc
-		// NOTE: this bypasses utils.sendTransaction signing part since it's PDA we don't have private key
+		// NOTE: this bypasses utils.sendTransaction signing part since it's PDA and it doesn't have private key
 		if accCopy.PublicKey == msigSigner {
 			accCopy.IsSigner = false
 		}
