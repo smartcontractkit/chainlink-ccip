@@ -1,10 +1,12 @@
 package exectypes
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/testhelpers/rand"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_truncateLastCommit(t *testing.T) {
