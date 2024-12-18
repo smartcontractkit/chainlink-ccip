@@ -230,7 +230,7 @@ func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.Com
 }
 
 func (p *Plugin) isStaleReport(seqNr, latestSeqNr uint64, decodedReport cciptypes.CommitPluginReport) bool {
-	if seqNr < latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
+	if seqNr <= latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
 		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
 		return true
 	}
