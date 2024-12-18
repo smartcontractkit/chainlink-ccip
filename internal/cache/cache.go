@@ -22,6 +22,7 @@ type Cache[K comparable, V any] interface {
 
 // EvictionPolicy defines how entries should be evicted from the cache
 type EvictionPolicy interface {
+	// TODO: async process needed
 	ShouldEvict(entry *cacheEntry) bool
 }
 
