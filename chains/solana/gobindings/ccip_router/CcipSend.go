@@ -30,7 +30,7 @@ type CcipSend struct {
 
 	// [0] = [] config
 	//
-	// [1] = [WRITE] chainState
+	// [1] = [WRITE] destChainState
 	//
 	// [2] = [WRITE] nonce
 	//
@@ -46,7 +46,9 @@ type CcipSend struct {
 	//
 	// [7] = [] feeTokenConfig
 	//
-	// [8] = [WRITE] feeTokenUserAssociatedAccount
+	// [8] = [] feeTokenUserAssociatedAccount
+	// ··········· CHECK this is the associated token account for the user paying the fee.
+	// ··········· If paying with native SOL, this must be the zero address.
 	//
 	// [9] = [WRITE] feeTokenReceiver
 	//
@@ -87,14 +89,14 @@ func (inst *CcipSend) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetChainStateAccount sets the "chainState" account.
-func (inst *CcipSend) SetChainStateAccount(chainState ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainState).WRITE()
+// SetDestChainStateAccount sets the "destChainState" account.
+func (inst *CcipSend) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *CcipSend {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(destChainState).WRITE()
 	return inst
 }
 
-// GetChainStateAccount gets the "chainState" account.
-func (inst *CcipSend) GetChainStateAccount() *ag_solanago.AccountMeta {
+// GetDestChainStateAccount gets the "destChainState" account.
+func (inst *CcipSend) GetDestChainStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -169,12 +171,16 @@ func (inst *CcipSend) GetFeeTokenConfigAccount() *ag_solanago.AccountMeta {
 }
 
 // SetFeeTokenUserAssociatedAccountAccount sets the "feeTokenUserAssociatedAccount" account.
+// CHECK this is the associated token account for the user paying the fee.
+// If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) SetFeeTokenUserAssociatedAccountAccount(feeTokenUserAssociatedAccount ag_solanago.PublicKey) *CcipSend {
-	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeTokenUserAssociatedAccount).WRITE()
+	inst.AccountMetaSlice[8] = ag_solanago.Meta(feeTokenUserAssociatedAccount)
 	return inst
 }
 
 // GetFeeTokenUserAssociatedAccountAccount gets the "feeTokenUserAssociatedAccount" account.
+// CHECK this is the associated token account for the user paying the fee.
+// If paying with native SOL, this must be the zero address.
 func (inst *CcipSend) GetFeeTokenUserAssociatedAccountAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[8]
 }
@@ -246,7 +252,7 @@ func (inst *CcipSend) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.ChainState is not set")
+			return errors.New("accounts.DestChainState is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Nonce is not set")
@@ -299,7 +305,7 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=12]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("            chainState", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("        destChainState", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("                 nonce", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[4]))
@@ -349,7 +355,7 @@ func NewCcipSendInstruction(
 	message Solana2AnyMessage,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	chainState ag_solanago.PublicKey,
+	destChainState ag_solanago.PublicKey,
 	nonce ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey,
@@ -364,7 +370,7 @@ func NewCcipSendInstruction(
 		SetDestChainSelector(destChainSelector).
 		SetMessage(message).
 		SetConfigAccount(config).
-		SetChainStateAccount(chainState).
+		SetDestChainStateAccount(destChainState).
 		SetNonceAccount(nonce).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

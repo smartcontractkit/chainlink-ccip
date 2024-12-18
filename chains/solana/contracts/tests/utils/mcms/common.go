@@ -1,16 +1,14 @@
 package mcms
 
 import (
-	"bytes"
 	crypto_rand "crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"time"
 
-	"github.com/gagliardetto/solana-go"
+	"golang.org/x/crypto/sha3"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/eth"
 )
@@ -71,10 +69,10 @@ func NewValidMcmConfig(msigName [32]byte, signerPrivateKeys []string, signerGrou
 	return config, nil
 }
 
-func FindInSortedList(list []solana.PublicKey, target solana.PublicKey) (int, bool) {
-	return slices.BinarySearchFunc(list, target, func(a, b solana.PublicKey) int {
-		return bytes.Compare(a.Bytes(), b.Bytes())
-	})
+func Keccak256(data []byte) []byte {
+	hash := sha3.NewLegacyKeccak256()
+	hash.Write(data)
+	return hash.Sum(nil)
 }
 
 func SafeToUint8(n int) (uint8, error) {

@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use access_controller::AccessController;
 
-use crate::error::TimelockError;
+use crate::error::{AuthError, TimelockError};
 use crate::state::{Config, Role};
 
 // NOTE: This macro is used to check if the authority is the owner
@@ -40,7 +40,7 @@ pub fn only_role_or_admin_role(
     // check if the authority has access to the role
     require!(
         access_controller::has_access(role_controller, &authority.key())?,
-        TimelockError::Unauthorized
+        AuthError::Unauthorized
     );
 
     Ok(())
@@ -56,6 +56,6 @@ macro_rules! only_admin {
 }
 
 pub fn only_admin(config: &Account<Config>, authority: &Signer) -> Result<()> {
-    require_keys_eq!(authority.key(), config.owner, TimelockError::Unauthorized);
+    require_keys_eq!(authority.key(), config.owner, AuthError::Unauthorized);
     Ok(())
 }

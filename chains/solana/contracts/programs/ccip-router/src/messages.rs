@@ -1,7 +1,15 @@
-use crate::{ReportContext, TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR};
+use crate::{
+    BillingTokenConfig, CcipRouterError, DestChain, ReportContext,
+    TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
+};
 use anchor_lang::prelude::*;
+use ethnum::U256;
 
 use crate::{ocr3base::Ocr3Report, ToTxData, TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR};
+
+pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
+
+const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
 // Family-agnostic header for OnRamp & OffRamp messages.
@@ -76,7 +84,7 @@ impl SolanaExtraArgs {
 }
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
-pub struct EvmExtraArgs {
+pub struct AnyExtraArgs {
     pub gas_limit: u128,
     pub allow_out_of_order_execution: bool,
 }
@@ -161,13 +169,23 @@ pub struct Solana2AnyRampMessage {
     pub sender: Pubkey,            // sender address on the source chain
     pub data: Vec<u8>,             // arbitrary data payload supplied by the message sender
     pub receiver: Vec<u8>,         // receiver address on the destination chain
-    pub extra_args: EvmExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
+    pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
     pub token_amounts: Vec<Solana2AnyTokenTransfer>,
 }
 
 impl Solana2AnyRampMessage {
     pub fn hash(&self) -> [u8; 32] {
+        // TODO: Modify this hash to be similar to the one in EVM
+        // https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/libraries/Internal.sol#L129
+        // Fixed-size message fields are included in nested hash to reduce stack pressure.
+        // - metadata_hash =  sha256("Solana2AnyMessageHashV1", solana_chain_selector, dest_chain_selector, ccip_router_program_id))
+        // - first_part = sha256(sender, sequence_number, nonce, fee_token, fee_token_amount)
+        // - receiver
+        // - message.data
+        // - token_amounts
+        // - extra_args
+
         use anchor_lang::solana_program::hash;
 
         // Push Data Size to ensure that the hash is unique
@@ -297,11 +315,106 @@ pub struct ReleaseOrMintOutV1 {
     pub destination_amount: u64, // TODO: u256 on EVM?
 }
 
-#[cfg(test)]
-mod tests {
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct Solana2AnyMessage {
+    pub receiver: Vec<u8>,
+    pub data: Vec<u8>,
+    pub token_amounts: Vec<SolanaTokenAmount>,
+    pub fee_token: Pubkey, // pass zero address if native SOL
+    pub extra_args: ExtraArgsInput,
 
+    // solana specific parameter for mapping tokens to set of accounts
+    pub token_indexes: Vec<u8>,
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
+pub struct SolanaTokenAmount {
+    pub token: Pubkey,
+    pub amount: u64, // u64 - amount local to solana
+}
+
+#[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
+pub struct ExtraArgsInput {
+    pub gas_limit: Option<u128>,
+    pub allow_out_of_order_execution: Option<bool>,
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+pub struct Any2SolanaMessage {
+    pub message_id: [u8; 32],
+    pub source_chain_selector: u64,
+    pub sender: Vec<u8>,
+    pub data: Vec<u8>,
+    pub token_amounts: Vec<SolanaTokenAmount>,
+}
+
+impl Solana2AnyMessage {
+    pub fn validate(
+        &self,
+        dest_chain: &DestChain,
+        token_config: &BillingTokenConfig,
+    ) -> Result<()> {
+        require!(
+            dest_chain.config.is_enabled,
+            CcipRouterError::DestinationChainDisabled
+        );
+
+        require!(token_config.enabled, CcipRouterError::FeeTokenDisabled);
+
+        require_gte!(
+            dest_chain.config.max_data_bytes,
+            self.data.len() as u32,
+            CcipRouterError::MessageTooLarge
+        );
+
+        require_gte!(
+            dest_chain.config.max_number_of_tokens_per_msg as usize,
+            self.token_amounts.len(),
+            CcipRouterError::UnsupportedNumberOfTokens
+        );
+
+        self.validate_dest_family_address(dest_chain.config.chain_family_selector)
+    }
+
+    pub fn validate_dest_family_address(&self, chain_family_selector: [u8; 4]) -> Result<()> {
+        const PRECOMPILE_SPACE: u32 = 1024;
+
+        let selector = u32::from_be_bytes(chain_family_selector);
+        // Only EVM is supported as a destination family.
+        require_eq!(
+            selector,
+            CHAIN_FAMILY_SELECTOR_EVM,
+            CcipRouterError::UnsupportedChainFamilySelector
+        );
+
+        require_eq!(self.receiver.len(), 32, CcipRouterError::InvalidEVMAddress);
+
+        let address: U256 = U256::from_be_bytes(
+            self.receiver
+                .clone()
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidEncoding)?,
+        );
+
+        require!(address <= U160_MAX, CcipRouterError::InvalidEVMAddress);
+
+        if let Ok(small_address) = TryInto::<u32>::try_into(address) {
+            require_gte!(
+                small_address,
+                PRECOMPILE_SPACE,
+                CcipRouterError::InvalidEVMAddress
+            )
+        };
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
     use super::*;
     use anchor_lang::solana_program::pubkey::Pubkey;
+    use bytemuck::Zeroable;
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
@@ -342,5 +455,155 @@ mod tests {
             "03da97f96c82237d8a8ab0f68d4f7ba02afe188b4a876f348278fbf2226312ed",
             hex::encode(hash_result)
         );
+    }
+
+    #[test]
+    fn message_not_validated_for_disabled_destination_chain() {
+        let mut chain = sample_dest_chain();
+        chain.config.is_enabled = false;
+
+        assert_eq!(
+            sample_message()
+                .validate(&chain, &sample_billing_config())
+                .unwrap_err(),
+            CcipRouterError::DestinationChainDisabled.into()
+        );
+    }
+
+    #[test]
+    fn message_not_validated_for_disabled_token() {
+        let mut billing_config = sample_billing_config();
+        billing_config.enabled = false;
+
+        assert_eq!(
+            sample_message()
+                .validate(&sample_dest_chain(), &billing_config)
+                .unwrap_err(),
+            CcipRouterError::FeeTokenDisabled.into()
+        );
+    }
+
+    #[test]
+    fn large_message_fails_to_validate() {
+        let dest_chain = sample_dest_chain();
+        let mut message = sample_message();
+        message.data = vec![0; dest_chain.config.max_data_bytes as usize + 1];
+        assert_eq!(
+            message
+                .validate(&sample_dest_chain(), &sample_billing_config())
+                .unwrap_err(),
+            CcipRouterError::MessageTooLarge.into()
+        );
+    }
+
+    #[test]
+    fn invalid_addresses_fail_to_validate() {
+        let mut address_bigger_than_u160_max = vec![0u8; 32];
+        address_bigger_than_u160_max[11] = 1;
+        let mut address_in_precompile_space = vec![0u8; 32];
+        address_in_precompile_space[30] = 1;
+        let incorrect_length_address = vec![1u8, 12];
+
+        let invalid_addresses = [
+            address_bigger_than_u160_max,
+            address_in_precompile_space,
+            incorrect_length_address,
+        ];
+
+        let mut message = sample_message();
+        for address in invalid_addresses {
+            message.receiver = address;
+            assert_eq!(
+                message
+                    .validate(&sample_dest_chain(), &sample_billing_config())
+                    .unwrap_err(),
+                CcipRouterError::InvalidEVMAddress.into()
+            );
+        }
+    }
+
+    #[test]
+    fn message_with_too_many_tokens_fails_to_validate() {
+        let dest_chain = sample_dest_chain();
+        let mut message = sample_message();
+        message.token_amounts = vec![
+            SolanaTokenAmount {
+                token: Pubkey::new_unique(),
+                amount: 1
+            };
+            dest_chain.config.max_number_of_tokens_per_msg as usize + 1
+        ];
+        assert_eq!(
+            message
+                .validate(&sample_dest_chain(), &sample_billing_config())
+                .unwrap_err(),
+            CcipRouterError::UnsupportedNumberOfTokens.into()
+        );
+    }
+
+    pub fn sample_message() -> Solana2AnyMessage {
+        let mut receiver = vec![0u8; 32];
+
+        // Arbitrary value that pushes the address to the right EVM range
+        // (above precompile space, under u160::max)
+        receiver[20] = 0xA;
+
+        Solana2AnyMessage {
+            receiver,
+            data: vec![],
+            token_amounts: vec![],
+            fee_token: Pubkey::zeroed(),
+            extra_args: crate::ExtraArgsInput {
+                gas_limit: None,
+                allow_out_of_order_execution: None,
+            },
+            token_indexes: vec![],
+        }
+    }
+
+    pub fn sample_billing_config() -> BillingTokenConfig {
+        let mut value = [0; 28];
+        value[27] = 3;
+        BillingTokenConfig {
+            enabled: true,
+            mint: Pubkey::new_unique(),
+            usd_per_token: crate::TimestampedPackedU224 {
+                value,
+                timestamp: 100,
+            },
+            premium_multiplier_wei_per_eth: 0,
+        }
+    }
+
+    pub fn sample_dest_chain() -> DestChain {
+        DestChain {
+            version: 1,
+            state: crate::DestChainState {
+                sequence_number: 0,
+                usd_per_unit_gas: crate::TimestampedPackedU224 {
+                    value: [0; 28],
+                    timestamp: 0,
+                },
+            },
+            config: crate::DestChainConfig {
+                is_enabled: true,
+                max_number_of_tokens_per_msg: 5,
+                max_data_bytes: 200,
+                max_per_msg_gas_limit: 0,
+                dest_gas_overhead: 0,
+                dest_gas_per_payload_byte: 0,
+                dest_data_availability_overhead_gas: 0,
+                dest_gas_per_data_availability_byte: 0,
+                dest_data_availability_multiplier_bps: 0,
+                default_token_fee_usdcents: 0,
+                default_token_dest_gas_overhead: 0,
+                default_tx_gas_limit: 0,
+                gas_multiplier_wei_per_eth: 0,
+                network_fee_usdcents: 0,
+                gas_price_staleness_threshold: 10,
+                enforce_out_of_order: false,
+                chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),
+            },
+        }
     }
 }

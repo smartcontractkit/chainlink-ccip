@@ -13,10 +13,12 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/external_program_cpi_stub"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 )
 
@@ -135,24 +137,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
-			var ac access_controller.AccessController
-			acAccErr := utils.GetAccountDataBorshInto(
-				ctx,
-				solanaGoClient,
-				data.AccessController.PublicKey(),
-				config.DefaultCommitment,
-				&ac,
-			)
-			require.NoError(t, acAccErr)
-
-			require.Equal(t, uint64(len(data.Accounts)), ac.AccessList.Len,
-				"AccessList length mismatch for %s", data.Role)
-
 			for _, account := range data.Accounts {
-				targetPubKey := account.PublicKey()
-				_, found := mcmsUtils.FindInSortedList(ac.AccessList.Xs[:ac.AccessList.Len], targetPubKey)
-				require.True(t, found, "Account %s not found in %s AccessList",
-					targetPubKey, data.Role)
+				found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, data.AccessController.PublicKey(), account.PublicKey(), config.DefaultCommitment)
+				require.NoError(t, ferr)
+				require.True(t, found, "Account %s not found in %s AccessList", account.PublicKey(), data.Role)
 			}
 		}
 	})
@@ -276,7 +264,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			op3 := TimelockOperation{
 				Predecessor: op1.OperationID(),
 				Salt:        salt3,
-				Delay:       60,
+				Delay:       300, // enough delay to assert OperationNotReady error
 			}
 
 			anotherTransferIx, atErr := utils.TokenTransferChecked(
@@ -301,76 +289,39 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("success: schedule all operations", func(t *testing.T) {
 					for _, op := range []TimelockOperation{op1, op2, op3} {
-						id := op.OperationID()
-						operationPDA1 := op.OperationPDA()
-
-						initOpIx, iErr := timelock.NewInitializeOperationInstruction(
-							op.OperationID(),
-							op.Predecessor,
-							op.Salt,
-							op.IxsCountU32(),
-							config.TimelockConfigPDA,
-							op.OperationPDA(),
-							proposer.PublicKey(),
-							proposer.PublicKey(),
-							solana.SystemProgramID,
-						).ValidateAndBuild()
-						require.NoError(t, iErr)
-
-						utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initOpIx}, proposer, config.DefaultCommitment)
-
-						for _, ixData := range op.ToInstructionData() {
-							appendIxsIx, aErr := timelock.NewAppendInstructionsInstruction(
-								op.OperationID(),
-								[]timelock.InstructionData{ixData},
-								op.OperationPDA(),
-								proposer.PublicKey(),
-								solana.SystemProgramID, // for reallocation
-							).ValidateAndBuild()
-							require.NoError(t, aErr)
-							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIxsIx}, proposer, config.DefaultCommitment)
+						invalidIxs, ierr := TimelockPreloadOperationIxs(ctx, op, proposer.PublicKey(), solanaGoClient)
+						require.NoError(t, ierr)
+						for _, ix := range invalidIxs {
+							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 						}
 
-						t.Run("clear & reappend op instructions", func(t *testing.T) {
+						t.Run("clear operation", func(t *testing.T) {
 							// clear instructions so that we can reinitialize the operation
-							clearIx, ciErr := timelock.NewClearOperationInstruction(op.OperationID(), op.OperationPDA(), proposer.PublicKey()).ValidateAndBuild()
+							clearIx, ciErr := timelock.NewClearOperationInstruction(
+								op.OperationID(),
+								op.OperationPDA(),
+								config.TimelockConfigPDA,
+								proposer.PublicKey(),
+							).ValidateAndBuild()
 							require.NoError(t, ciErr)
 
 							// send clear and check if it's closed
 							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, proposer, config.DefaultCommitment)
 							utils.AssertClosedAccount(ctx, t, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
-
-							// reinitialize operation
-							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initOpIx}, proposer, config.DefaultCommitment)
-
-							// reappend instructions
-							for _, ixData := range op.ToInstructionData() {
-								appendIxsIx, aErr := timelock.NewAppendInstructionsInstruction(
-									op.OperationID(),
-									[]timelock.InstructionData{ixData},
-									op.OperationPDA(),
-									proposer.PublicKey(),
-									solana.SystemProgramID, // for reallocation
-								).ValidateAndBuild()
-								require.NoError(t, aErr)
-								utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIxsIx}, proposer, config.DefaultCommitment)
-							}
 						})
 
-						finIxIx, fErr := timelock.NewFinalizeOperationInstruction(
-							op.OperationID(),
-							op.OperationPDA(),
-							proposer.PublicKey(),
-						).ValidateAndBuild()
-						require.NoError(t, fErr)
-
-						utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finIxIx}, proposer, config.DefaultCommitment)
+						// re-preload instructions
+						ixs, err := TimelockPreloadOperationIxs(ctx, op, proposer.PublicKey(), solanaGoClient)
+						require.NoError(t, err)
+						for _, ix := range ixs {
+							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
+						}
 
 						ix, ixVErr := timelock.NewScheduleBatchInstruction(
-							id,
+							op.OperationID(),
 							op.Delay,
+							op.OperationPDA(),
 							config.TimelockConfigPDA,
-							operationPDA1,
 							proposerAccessController,
 							proposer.PublicKey(),
 						).ValidateAndBuild()
@@ -380,10 +331,8 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						require.NotNil(t, result)
 
 						var opAccount timelock.Operation
-						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA1, config.DefaultCommitment, &opAccount)
-						if err != nil {
-							require.NoError(t, err, "failed to get account info")
-						}
+						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment, &opAccount)
+						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t,
 							result.BlockTime.Time().Add(time.Duration(op.Delay)*time.Second).Unix(),
@@ -392,7 +341,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						)
 
 						require.Equal(t,
-							id,
+							op.OperationID(),
 							opAccount.Id,
 							"Ids don't match",
 						)
@@ -409,8 +358,8 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					ix := timelock.NewScheduleBatchInstruction(
 						op1.OperationID(),
 						op1.Delay,
-						config.TimelockConfigPDA,
 						op1.OperationPDA(),
+						config.TimelockConfigPDA,
 						proposerAccessController,
 						proposer.PublicKey(),
 					).Build()
@@ -427,10 +376,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				t.Run("fail: should provide the right dependency pda", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
 						op2.OperationID(),
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
 						op2.OperationPDA(),
 						op2.OperationPDA(), // wrong dependency
+						config.TimelockConfigPDA,
+						config.TimelockSignerPDA,
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -445,10 +394,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				t.Run("fail: not able to execute op2 before dependency(op1) execution", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
 						op2.OperationID(),
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
 						op2.OperationPDA(),
 						op1.OperationPDA(), // not executed yet
+						config.TimelockConfigPDA,
+						config.TimelockSignerPDA,
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -464,10 +413,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				t.Run("success: op1 executed", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
 						op1.OperationID(),
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
 						op1.OperationPDA(),
 						config.TimelockEmptyOpID,
+						config.TimelockConfigPDA,
+						config.TimelockSignerPDA,
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -477,8 +426,22 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					vIx, err := ix.ValidateAndBuild()
 					require.NoError(t, err)
 
-					result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, executor, config.DefaultCommitment)
-					require.NotNil(t, result)
+					tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, executor, config.DefaultCommitment)
+					require.NotNil(t, tx)
+
+					parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
+						[]utils.EventMapping{
+							utils.EventMappingFor[CallExecuted]("CallExecuted"),
+						},
+					)
+
+					for i, ixx := range op1.ToInstructionData() {
+						event := parsedLogs[0].EventData[i].Data.(*CallExecuted)
+						require.Equal(t, op1.OperationID(), event.ID)
+						require.Equal(t, uint64(i), event.Index)
+						require.Equal(t, ixx.ProgramId, event.Target)
+						require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+					}
 
 					var opAccount timelock.Operation
 					err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &opAccount)
@@ -496,10 +459,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				t.Run("success: op2 executed", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
 						op2.OperationID(),
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
 						op2.OperationPDA(),
 						op1.OperationPDA(),
+						config.TimelockConfigPDA,
+						config.TimelockSignerPDA,
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -509,8 +472,22 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					vIx, err := ix.ValidateAndBuild()
 					require.NoError(t, err)
 
-					result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, executor, config.DefaultCommitment)
-					require.NotNil(t, result)
+					tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, executor, config.DefaultCommitment)
+					require.NotNil(t, tx)
+
+					parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
+						[]utils.EventMapping{
+							utils.EventMappingFor[CallExecuted]("CallExecuted"),
+						},
+					)
+
+					for i, ixx := range op2.ToInstructionData() {
+						event := parsedLogs[0].EventData[i].Data.(*CallExecuted)
+						require.Equal(t, op2.OperationID(), event.ID)
+						require.Equal(t, uint64(i), event.Index)
+						require.Equal(t, ixx.ProgramId, event.Target)
+						require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+					}
 
 					var opAccount timelock.Operation
 					err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &opAccount)
@@ -540,10 +517,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				t.Run("failure on execution try: op3 is not ready", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
 						op3.OperationID(),
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
 						op3.OperationPDA(),
 						config.TimelockEmptyOpID,
+						config.TimelockConfigPDA,
+						config.TimelockSignerPDA,
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -555,6 +532,159 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 					utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{vIx}, executor, config.DefaultCommitment, []string{"Error Code: " + timelock.OperationNotReady_TimelockError.String()})
 				})
 			})
+		})
+	})
+
+	t.Run("function blockers", func(t *testing.T) {
+		proposer := roleMap[timelock.Proposer_Role].RandomPick()
+		proposerAccessController := roleMap[timelock.Proposer_Role].AccessController.PublicKey()
+
+		salt, err := mcmsUtils.SimpleSalt()
+		require.NoError(t, err)
+
+		op := TimelockOperation{
+			Predecessor: config.TimelockEmptyOpID,
+			Salt:        salt,
+			Delay:       1,
+		}
+
+		ix, err := external_program_cpi_stub.NewInitializeInstruction(
+			config.StubAccountPDA,
+			admin.PublicKey(),
+			solana.SystemProgramID,
+		).ValidateAndBuild()
+		require.NoError(t, err)
+
+		op.AddInstruction(ix, []solana.PublicKey{solana.TokenProgramID, solana.SPLAssociatedTokenAccountProgramID})
+
+		t.Run("blocks initialize function", func(t *testing.T) {
+			bIx, bIxErr := timelock.NewBlockFunctionSelectorInstruction(
+				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, bIxErr)
+			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bIx}, admin, config.DefaultCommitment)
+
+			blockedSelectors, bserr := GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			require.NoError(t, bserr)
+			require.Contains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize.Bytes())
+		})
+
+		t.Run("not able to block function that is already blocked", func(t *testing.T) {
+			bbIx, bbIxErr := timelock.NewBlockFunctionSelectorInstruction(
+				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, bbIxErr)
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bbIx}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.AlreadyBlocked_TimelockError.String()})
+		})
+
+		id := op.OperationID()
+		operationPDA := op.OperationPDA()
+
+		ixs, err := TimelockPreloadOperationIxs(ctx, op, proposer.PublicKey(), solanaGoClient)
+		require.NoError(t, err)
+		for _, ix := range ixs {
+			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
+		}
+
+		scIx, scIxVErr := timelock.NewScheduleBatchInstruction(
+			id,
+			op.Delay,
+			operationPDA,
+			config.TimelockConfigPDA,
+			proposerAccessController,
+			proposer.PublicKey(),
+		).ValidateAndBuild()
+		require.NoError(t, scIxVErr)
+
+		utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{scIx}, proposer, config.DefaultCommitment, []string{"Error Code: " + timelock.BlockedSelector_TimelockError.String()})
+
+		t.Run("unblocks initialize function", func(t *testing.T) {
+			bIx, bIxErr := timelock.NewUnblockFunctionSelectorInstruction(
+				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, bIxErr)
+			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bIx}, admin, config.DefaultCommitment)
+
+			blockedSelectors, bserr := GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			require.NoError(t, bserr)
+			require.NotContains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize.Bytes())
+		})
+
+		t.Run("not able to unblock function that is not blocked", func(t *testing.T) {
+			bbIx, bbIxErr := timelock.NewUnblockFunctionSelectorInstruction(
+				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, bbIxErr)
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{bbIx}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.SelectorNotFound_TimelockError.String()})
+		})
+
+		t.Run("when unblocked, able to schedule operation", func(t *testing.T) {
+			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scIx}, proposer, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			var opAccount timelock.Operation
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
+			require.NoError(t, err, "failed to get account info")
+
+			require.Equal(t, op.OperationID(), opAccount.Id, "Ids don't match")
+			require.Equal(t,
+				result.BlockTime.Time().Add(time.Duration(op.Delay)*time.Second).Unix(),
+				int64(opAccount.Timestamp),
+				"Scheduled Times don't match",
+			)
+		})
+
+		t.Run("can't register more than MAX_SELECTOR", func(t *testing.T) {
+			// check if it's empty
+			oldBlockedSelectors, gberr := GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			require.NoError(t, gberr)
+			require.Empty(t, oldBlockedSelectors)
+
+			ixs := []solana.Instruction{}
+			for i := 0; i < config.MaxFunctionSelectorLen; i++ {
+				ix, nberr := timelock.NewBlockFunctionSelectorInstruction(
+					[8]uint8{byte(i)},
+					config.TimelockConfigPDA,
+					admin.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, nberr)
+
+				ixs = append(ixs, ix)
+			}
+
+			// max selectors at 32, two transactions happen here
+			chunkSize := 16
+			for i := 0; i < len(ixs); i += chunkSize {
+				end := i + chunkSize
+				if end > len(ixs) {
+					end = len(ixs)
+				}
+				chunk := ixs[i:end]
+				utils.SendAndConfirm(ctx, t, solanaGoClient, chunk, admin, config.DefaultCommitment)
+			}
+
+			// check if it's full
+			blockedSelectors, bserr := GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			require.NoError(t, bserr)
+			require.Equal(t, config.MaxFunctionSelectorLen, len(blockedSelectors))
+
+			// try one more
+			ix, nberr := timelock.NewBlockFunctionSelectorInstruction(
+				[8]uint8{255},
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, nberr)
+
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.MaxCapacityReached_TimelockError.String()})
 		})
 	})
 }

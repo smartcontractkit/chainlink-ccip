@@ -21,7 +21,7 @@ import (
 type DisableDestChainSelector struct {
 	DestChainSelector *uint64
 
-	// [0] = [WRITE] chainState
+	// [0] = [WRITE] destChainState
 	//
 	// [1] = [] config
 	//
@@ -43,14 +43,14 @@ func (inst *DisableDestChainSelector) SetDestChainSelector(destChainSelector uin
 	return inst
 }
 
-// SetChainStateAccount sets the "chainState" account.
-func (inst *DisableDestChainSelector) SetChainStateAccount(chainState ag_solanago.PublicKey) *DisableDestChainSelector {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(chainState).WRITE()
+// SetDestChainStateAccount sets the "destChainState" account.
+func (inst *DisableDestChainSelector) SetDestChainStateAccount(destChainState ag_solanago.PublicKey) *DisableDestChainSelector {
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(destChainState).WRITE()
 	return inst
 }
 
-// GetChainStateAccount gets the "chainState" account.
-func (inst *DisableDestChainSelector) GetChainStateAccount() *ag_solanago.AccountMeta {
+// GetDestChainStateAccount gets the "destChainState" account.
+func (inst *DisableDestChainSelector) GetDestChainStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
@@ -104,7 +104,7 @@ func (inst *DisableDestChainSelector) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.ChainState is not set")
+			return errors.New("accounts.DestChainState is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.Config is not set")
@@ -131,9 +131,9 @@ func (inst *DisableDestChainSelector) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("chainState", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    config", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta(" authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("destChainState", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("        config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -161,12 +161,12 @@ func NewDisableDestChainSelectorInstruction(
 	// Parameters:
 	destChainSelector uint64,
 	// Accounts:
-	chainState ag_solanago.PublicKey,
+	destChainState ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *DisableDestChainSelector {
 	return NewDisableDestChainSelectorInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
-		SetChainStateAccount(chainState).
+		SetDestChainStateAccount(destChainState).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

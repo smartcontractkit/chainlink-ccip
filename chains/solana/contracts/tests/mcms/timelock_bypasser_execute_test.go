@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
@@ -136,24 +137,10 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
-			var ac access_controller.AccessController
-			acAccountErr := utils.GetAccountDataBorshInto(
-				ctx,
-				solanaGoClient,
-				data.AccessController.PublicKey(),
-				config.DefaultCommitment,
-				&ac,
-			)
-			require.NoError(t, acAccountErr)
-
-			require.Equal(t, uint64(len(data.Accounts)), ac.AccessList.Len,
-				"AccessList length mismatch for %s", data.Role)
-
 			for _, account := range data.Accounts {
-				targetPubKey := account.PublicKey()
-				_, found := mcmsUtils.FindInSortedList(ac.AccessList.Xs[:ac.AccessList.Len], targetPubKey)
-				require.True(t, found, "Account %s not found in %s AccessList",
-					targetPubKey, data.Role)
+				found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, data.AccessController.PublicKey(), account.PublicKey(), config.DefaultCommitment)
+				require.NoError(t, ferr)
+				require.True(t, found, "Account %s not found in %s AccessList", account.PublicKey(), data.Role)
 			}
 		}
 	})
@@ -252,43 +239,13 @@ func TestTimelockBypasserExecute(t *testing.T) {
 
 			id := op.OperationID()
 			operationPDA := op.OperationPDA()
-
 			signer := roleMap[timelock.Proposer_Role].RandomPick()
 
-			initOpIx, err := timelock.NewInitializeOperationInstruction(
-				op.OperationID(),
-				op.Predecessor,
-				op.Salt,
-				op.IxsCountU32(),
-				config.TimelockConfigPDA,
-				op.OperationPDA(),
-				signer.PublicKey(),
-				signer.PublicKey(), // proposer - who calls the schedule_batch
-				solana.SystemProgramID,
-			).ValidateAndBuild()
+			ixs, err := TimelockPreloadOperationIxs(ctx, op, signer.PublicKey(), solanaGoClient)
 			require.NoError(t, err)
-
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initOpIx}, signer, config.DefaultCommitment)
-
-			for _, ixData := range op.ToInstructionData() {
-				appendIxIx, aErr := timelock.NewAppendInstructionsInstruction(
-					op.OperationID(),
-					[]timelock.InstructionData{ixData},
-					op.OperationPDA(),
-					signer.PublicKey(),
-					solana.SystemProgramID, // for reallocation
-				).ValidateAndBuild()
-				require.NoError(t, aErr)
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{appendIxIx}, signer, config.DefaultCommitment)
+			for _, ix := range ixs {
+				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
 			}
-
-			finIxIx, err := timelock.NewFinalizeOperationInstruction(
-				op.OperationID(),
-				op.OperationPDA(),
-				signer.PublicKey(),
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finIxIx}, signer, config.DefaultCommitment)
 
 			var opAccount timelock.Operation
 			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
@@ -308,9 +265,9 @@ func TestTimelockBypasserExecute(t *testing.T) {
 
 				ix := timelock.NewBypasserExecuteBatchInstruction(
 					id,
+					operationPDA,
 					config.TimelockConfigPDA,
 					config.TimelockSignerPDA,
-					operationPDA,
 					ac.PublicKey(),
 					signer.PublicKey(),
 				)
@@ -319,8 +276,21 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
-				result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, signer, config.DefaultCommitment)
-				require.NotNil(t, result)
+				tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, signer, config.DefaultCommitment)
+				require.NotNil(t, tx)
+
+				parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
+					[]utils.EventMapping{
+						utils.EventMappingFor[BypasserCallExecuted]("BypasserCallExecuted"),
+					},
+				)
+
+				for i, ixx := range op.ToInstructionData() {
+					event := parsedLogs[0].EventData[i].Data.(*BypasserCallExecuted)
+					require.Equal(t, uint64(i), event.Index)
+					require.Equal(t, ixx.ProgramId, event.Target)
+					require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+				}
 
 				var opAccount timelock.Operation
 				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)

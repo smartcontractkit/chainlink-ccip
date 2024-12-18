@@ -112,7 +112,6 @@ pub mod timelock {
             new_duration: delay,
         });
         config.min_delay = delay;
-
         Ok(())
     }
 
@@ -121,7 +120,8 @@ pub mod timelock {
         ctx: Context<BlockFunctionSelector>,
         selector: [u8; 8],
     ) -> Result<()> {
-        // todo: implement function blocker related methods
+        let config = &mut ctx.accounts.config;
+        config.blocked_selectors.block_selector(selector)?;
         emit!(FunctionSelectorBlocked { selector });
         Ok(())
     }
@@ -131,7 +131,8 @@ pub mod timelock {
         ctx: Context<UnblockFunctionSelector>,
         selector: [u8; 8],
     ) -> Result<()> {
-        // todo: implement function blocker related methods
+        let config = &mut ctx.accounts.config;
+        config.blocked_selectors.unblock_selector(selector)?;
         emit!(FunctionSelectorUnblocked { selector });
         Ok(())
     }
@@ -166,7 +167,7 @@ pub struct TransferOwnership<'info> {
 pub struct AcceptOwnership<'info> {
     #[account(mut, seeds = [TIMELOCK_CONFIG_SEED], bump)]
     pub config: Account<'info, Config>,
-    #[account(address = config.proposed_owner @ TimelockError::Unauthorized)]
+    #[account(address = config.proposed_owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -180,7 +181,7 @@ pub struct UpdateDelay<'info> {
 
 #[derive(Accounts)]
 pub struct BlockFunctionSelector<'info> {
-    #[account(seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(mut, seeds = [TIMELOCK_CONFIG_SEED], bump)]
     pub config: Account<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,
@@ -188,7 +189,7 @@ pub struct BlockFunctionSelector<'info> {
 
 #[derive(Accounts)]
 pub struct UnblockFunctionSelector<'info> {
-    #[account(seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(mut, seeds = [TIMELOCK_CONFIG_SEED], bump)]
     pub config: Account<'info, Config>,
     // owner(admin) only, access control with only_admin macro
     pub authority: Signer<'info>,

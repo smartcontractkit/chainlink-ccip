@@ -16,6 +16,7 @@ type Config struct {
 	CancellerRoleAccessController ag_solanago.PublicKey
 	BypasserRoleAccessController  ag_solanago.PublicKey
 	MinDelay                      uint64
+	BlockedSelectors              BlockedSelectors
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -58,6 +59,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `MinDelay` param:
 	err = encoder.Encode(obj.MinDelay)
+	if err != nil {
+		return err
+	}
+	// Serialize `BlockedSelectors` param:
+	err = encoder.Encode(obj.BlockedSelectors)
 	if err != nil {
 		return err
 	}
@@ -110,6 +116,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `MinDelay`:
 	err = decoder.Decode(&obj.MinDelay)
+	if err != nil {
+		return err
+	}
+	// Deserialize `BlockedSelectors`:
+	err = decoder.Decode(&obj.BlockedSelectors)
 	if err != nil {
 		return err
 	}
