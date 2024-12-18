@@ -162,8 +162,8 @@ func (p *PluginFactory) NewReportingPlugin(ctx context.Context, config ocr3types
 		if err1 != nil {
 			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
 		}
-		readers[chain] = contractreader.NewObserverReader(
-			contractreader.NewExtendedContractReader(cr), lggr, chainID)
+		readers[chain] = contractreader.NewExtendedContractReader(
+			contractreader.NewObserverReader(cr, lggr, chainID))
 	}
 
 	// Bind the RMNHome contract

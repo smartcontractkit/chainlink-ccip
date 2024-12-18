@@ -55,7 +55,7 @@ type homeChainPoller struct {
 	wg                      sync.WaitGroup
 	stopCh                  services.StopChan
 	sync                    services.StateMachine
-	homeChainReader         contractreader.Extended
+	homeChainReader         contractreader.ContractReaderFacade
 	lggr                    logger.Logger
 	mutex                   *sync.RWMutex
 	state                   state
@@ -68,7 +68,7 @@ type homeChainPoller struct {
 const MaxFailedPolls = 10
 
 func NewHomeChainConfigPoller(
-	homeChainReader contractreader.Extended,
+	homeChainReader contractreader.ContractReaderFacade,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,

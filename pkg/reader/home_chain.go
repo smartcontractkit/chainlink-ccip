@@ -25,7 +25,7 @@ type OCR3Config = reader_internal.OCR3Config
 type OCR3Node = reader_internal.OCR3Node
 
 func NewObservedHomeChainReader(
-	homeChainReader contractreader.Extended,
+	homeChainReader contractreader.ContractReaderFacade,
 	lggr logger.Logger,
 	pollingInterval time.Duration,
 	ccipConfigBoundContract types.BoundContract,
