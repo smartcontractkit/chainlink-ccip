@@ -42,18 +42,18 @@ type ExecuteOffchainConfig struct {
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
 }
 
-func (e ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
+func (e *ExecuteOffchainConfig) ApplyDefaultsAndValidate() error {
 	e.applyDefaults()
 	return e.Validate()
 }
 
-func (e ExecuteOffchainConfig) applyDefaults() {
+func (e *ExecuteOffchainConfig) applyDefaults() {
 	if e.TransmissionDelayMultiplier == 0 {
 		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
 	}
 }
 
-func (e ExecuteOffchainConfig) Validate() error {
+func (e *ExecuteOffchainConfig) Validate() error {
 	// TODO: this doesn't really make much sense for non-EVM chains.
 	// Maybe we need to have a field in the config that is not JSON-encoded
 	// that indicates chain family?
@@ -92,7 +92,7 @@ func (e ExecuteOffchainConfig) Validate() error {
 	return nil
 }
 
-func (e ExecuteOffchainConfig) IsUSDCEnabled() bool {
+func (e *ExecuteOffchainConfig) IsUSDCEnabled() bool {
 	for _, ob := range e.TokenDataObservers {
 		if ob.WellFormed() != nil {
 			continue
