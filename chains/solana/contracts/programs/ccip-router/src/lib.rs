@@ -1601,6 +1601,8 @@ pub enum CcipRouterError {
     InvalidTokenPrice,
     #[msg("Stale gas price")]
     StaleGasPrice,
+    #[msg("Insufficient lamports")]
+    InsufficientLamports,
 }
 
 // TODO: Refactor this to use the same structure as messages: execution_report.validate(..)
