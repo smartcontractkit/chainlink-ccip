@@ -388,7 +388,7 @@ type Node struct {
 // SourceChain mirrors RMNHome.sol's SourceChain struct
 type SourceChain struct {
 	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
-	FObserve            uint64                  `json:"f"` // previously: MinObservers
+	FObserve            uint64                  `json:"fObserve"` // previously: MinObservers / F
 	ObserverNodesBitmap *big.Int                `json:"observerNodesBitmap"`
 }
 

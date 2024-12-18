@@ -684,7 +684,7 @@ func (c *controller) getRmnReportSignatures(
 		},
 		AttributedSignedObservations: transformAndSortObservations(rmnSignedObservations),
 	}
-	remoteF := int(rmnRemoteCfg.F)
+	remoteF := int(rmnRemoteCfg.FSign)
 	signers := rmnRemoteCfg.Signers
 	requestIDs, signersRequested, err := c.sendReportSignatureRequest(
 		reportSigReq,
