@@ -5,8 +5,7 @@ import (
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
 var (
@@ -33,7 +32,7 @@ var (
 
 	SolanaChainSelector uint64 = 15
 	EvmChainSelector    uint64 = 21
-	EvmChainLE                 = utils.Uint64ToLE(EvmChainSelector)
+	EvmChainLE                 = common.Uint64ToLE(EvmChainSelector)
 
 	SolanaSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SolanaChainSelector)}, CcipRouterProgram)
 	SolanaDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SolanaChainSelector)}, CcipRouterProgram)
@@ -45,7 +44,7 @@ var (
 
 	MaxOracles                      = 16
 	OcrF                      uint8 = 5
-	ConfigDigest                    = utils.MakeRandom32ByteArray()
+	ConfigDigest                    = common.MakeRandom32ByteArray()
 	Empty24Byte                     = [24]byte{}
 	MaxSignersAndTransmitters       = 16
 )

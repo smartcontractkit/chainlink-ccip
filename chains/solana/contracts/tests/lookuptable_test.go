@@ -13,19 +13,20 @@ import (
 
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
 func TestSolanaLookupTables(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
-	url := utils.SetupLocalSolNode(t)
+	url := testutils.SetupLocalSolNode(t)
 	c := rpc.New(url)
 
 	sender, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
-	utils.FundAccounts(ctx, []solana.PrivateKey{sender}, c, t)
+	testutils.FundAccounts(ctx, []solana.PrivateKey{sender}, c, t)
 
 	// transfer instructions
 	pubkeys := solana.PublicKeySlice{}
@@ -41,17 +42,17 @@ func TestSolanaLookupTables(t *testing.T) {
 		// create lookup table
 		slot, serr := c.GetSlot(ctx, rpc.CommitmentFinalized)
 		require.NoError(t, serr)
-		table, instruction, ierr := utils.NewCreateLookupTableInstruction(
+		table, instruction, ierr := common.NewCreateLookupTableInstruction(
 			sender.PublicKey(),
 			sender.PublicKey(),
 			slot,
 		)
 		require.NoError(t, ierr)
-		utils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
+		common.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
 
 		// add entries to lookup table
-		utils.SendAndConfirm(ctx, t, c, []solana.Instruction{
-			utils.NewExtendLookupTableInstruction(
+		common.SendAndConfirm(ctx, t, c, []solana.Instruction{
+			common.NewExtendLookupTableInstruction(
 				table, sender.PublicKey(), sender.PublicKey(),
 				k,
 			),
