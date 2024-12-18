@@ -250,7 +250,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 					require.NotEmpty(t, offchainConfig)
 				}
 
-				minObsMap, err := configPoller.GetF(config.ConfigDigest)
+				minObsMap, err := configPoller.GetFObserve(config.ConfigDigest)
 				if isEmpty {
 					require.Error(t, err)
 					require.Empty(t, minObsMap)

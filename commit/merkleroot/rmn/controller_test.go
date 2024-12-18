@@ -497,7 +497,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	t.Run("empty lane update request", func(t *testing.T) {
 		ts := newTestSetup(t)
 
-		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetFObserve", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
@@ -515,7 +515,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts := newTestSetup(t)
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
-		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetFObserve", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2, chainD1: 2}, nil)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
@@ -556,7 +556,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnController.reportsInitialRequestTimerDuration = time.Nanosecond
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
-		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetFObserve", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
 		go func() {
