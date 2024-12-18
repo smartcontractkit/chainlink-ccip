@@ -63,7 +63,7 @@ var (
 )
 
 type Observed struct {
-	ContractReaderFacade
+	Extended
 	lggr    logger.Logger
 	chainID string
 
@@ -75,12 +75,12 @@ type Observed struct {
 }
 
 func NewObserverReader(
-	cr ContractReaderFacade,
+	cr Extended,
 	lggr logger.Logger,
 	chainID string,
 ) *Observed {
 	return &Observed{
-		ContractReaderFacade:    cr,
+		Extended:                cr,
 		lggr:                    lggr,
 		chainID:                 chainID,
 		directRequestsDurations: CrDirectRequestsDurations,
@@ -97,7 +97,7 @@ func (o *Observed) GetLatestValue(
 	params, returnVal any,
 ) error {
 	start := time.Now()
-	err := o.ContractReaderFacade.GetLatestValue(ctx, readIdentifier, confidenceLevel, params, returnVal)
+	err := o.Extended.GetLatestValue(ctx, readIdentifier, confidenceLevel, params, returnVal)
 	duration := time.Since(start)
 
 	contract, function := unpackReadIdentifier(readIdentifier)
@@ -121,7 +121,7 @@ func (o *Observed) BatchGetLatestValues(
 	request types.BatchGetLatestValuesRequest,
 ) (types.BatchGetLatestValuesResult, error) {
 	start := time.Now()
-	result, err := o.ContractReaderFacade.BatchGetLatestValues(ctx, request)
+	result, err := o.Extended.BatchGetLatestValues(ctx, request)
 	duration := time.Since(start)
 
 	o.batchRequestsDurations.

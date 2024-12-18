@@ -36,7 +36,7 @@ func bindExtendedReaderContract(
 func bindFacadeReaderContract(
 	ctx context.Context,
 	lggr logger.Logger,
-	readers map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	readers map[cciptypes.ChainSelector]contractreader.Extended,
 	chainSel cciptypes.ChainSelector,
 	contractName string,
 	address []byte,

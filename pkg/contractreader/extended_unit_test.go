@@ -211,3 +211,7 @@ func (m *mockContractReader) BatchGetLatestValues(
 ) (types.BatchGetLatestValuesResult, error) {
 	return m.BatchGetLatestValuesResponse, nil
 }
+
+func (m *mockContractReader) HealthReport() map[string]error {
+	return nil
+}

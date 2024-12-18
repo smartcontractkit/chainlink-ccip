@@ -49,7 +49,7 @@ var CCTPDestDomains = map[uint64]uint32{
 
 type usdcMessageReader struct {
 	lggr            logger.Logger
-	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
+	contractReaders map[cciptypes.ChainSelector]contractreader.Extended
 	cctpDestDomain  map[uint64]uint32
 	boundContracts  map[cciptypes.ChainSelector]types.BoundContract
 }
@@ -79,7 +79,7 @@ func NewUSDCMessageReader(
 	ctx context.Context,
 	lggr logger.Logger,
 	tokensConfig map[cciptypes.ChainSelector]pluginconfig.USDCCCTPTokenConfig,
-	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 ) (USDCMessageReader, error) {
 	boundContracts := make(map[cciptypes.ChainSelector]types.BoundContract)
 	for chainSelector, token := range tokensConfig {

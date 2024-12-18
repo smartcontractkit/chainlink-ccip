@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
-	tests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
@@ -28,7 +29,7 @@ var (
 )
 
 func TestRMNHomeChainConfigPoller_Ready(t *testing.T) {
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	homeChainReader := readermock.NewMockExtended(t)
 	configPoller := NewRMNHomePoller(
 		homeChainReader,
 		rmnHomeBoundContract,
@@ -77,7 +78,7 @@ func TestRMNHomePoller_HealthReport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			homeChainReader := readermock.NewMockContractReaderFacade(t)
+			homeChainReader := readermock.NewMockExtended(t)
 
 			homeChainReader.On("GetLatestValue",
 				mock.Anything,
@@ -180,7 +181,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 				secondaryConfig,
 			}
 
-			homeChainReader := readermock.NewMockContractReaderFacade(t)
+			homeChainReader := readermock.NewMockExtended(t)
 			homeChainReader.On(
 				"GetLatestValue",
 				mock.Anything,
@@ -273,7 +274,7 @@ func Test_RMNHomePollingWorking(t *testing.T) {
 }
 
 func Test_RMNHomePoller_Close(t *testing.T) {
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	homeChainReader := readermock.NewMockExtended(t)
 	poller := NewRMNHomePoller(
 		homeChainReader,
 		rmnHomeBoundContract,

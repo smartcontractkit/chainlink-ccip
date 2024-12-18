@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -23,7 +24,7 @@ func Test_GetBatchValue(t *testing.T) {
 
 	ctx := tests.Context(t)
 	chainID := "solana"
-	mockedReader := mocked.NewMockContractReaderFacade(t)
+	mockedReader := mocked.NewMockExtended(t)
 
 	r := make(types.BatchGetLatestValuesResult)
 
@@ -73,7 +74,7 @@ func Test_GetLatestValue(t *testing.T) {
 
 	ctx := tests.Context(t)
 	chainID := "1"
-	mockedReader := mocked.NewMockContractReaderFacade(t)
+	mockedReader := mocked.NewMockExtended(t)
 
 	contractID1 := "0x1-contract-read"
 	contractID2 := "0x2-contract-faulty"

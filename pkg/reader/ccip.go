@@ -46,19 +46,14 @@ type ccipChainReader struct {
 func newCCIPChainReaderInternal(
 	ctx context.Context,
 	lggr logger.Logger,
-	contractReaders map[cciptypes.ChainSelector]contractreader.ContractReaderFacade,
+	contractReaders map[cciptypes.ChainSelector]contractreader.Extended,
 	contractWriters map[cciptypes.ChainSelector]types.ContractWriter,
 	destChain cciptypes.ChainSelector,
 	offrampAddress []byte,
 ) *ccipChainReader {
-	var crs = make(map[cciptypes.ChainSelector]contractreader.Extended)
-	for chainSelector, cr := range contractReaders {
-		crs[chainSelector] = contractreader.NewExtendedContractReader(cr)
-	}
-
 	reader := &ccipChainReader{
 		lggr:            lggr,
-		contractReaders: crs,
+		contractReaders: contractReaders,
 		contractWriters: contractWriters,
 		destChain:       destChain,
 		offrampAddress:  typeconv.AddressBytesToString(offrampAddress, uint64(destChain)),

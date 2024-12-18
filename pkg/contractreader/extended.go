@@ -28,6 +28,11 @@ type Extended interface {
 
 	GetBindings(contractName string) []ExtendedBoundContract
 
+	// GetLatestValue allows providing
+	GetLatestValue(ctx context.Context, readIdentifier string, confidenceLevel primitives.ConfidenceLevel, params, returnVal any) error
+	BatchGetLatestValues(ctx context.Context, request types.BatchGetLatestValuesRequest) (types.BatchGetLatestValuesResult, error)
+	QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType any) ([]types.Sequence, error)
+
 	// ExtendedQueryKey performs automatic binding from contractName to the first bound contract.
 	// An error is generated if there are more than one bound contract for the contractName.
 	ExtendedQueryKey(
@@ -92,9 +97,9 @@ func (e *extendedContractReader) getOneBinding(contractName string) (ExtendedBou
 	}
 }
 
-func (e *extendedContractReader) ExtendedQueryKey(
+func (e *extendedContractReader) QueryKey(
 	ctx context.Context,
-	contractName string,
+	contract types.BoundContract,
 	filter query.KeyFilter,
 	limitAndSort query.LimitAndSort,
 	sequenceDataType any,
@@ -103,12 +108,28 @@ func (e *extendedContractReader) ExtendedQueryKey(
 		return nil, ErrFinalityViolated
 	}
 
+	return e.reader.QueryKey(
+		ctx,
+		contract,
+		filter,
+		limitAndSort,
+		sequenceDataType,
+	)
+}
+
+func (e *extendedContractReader) ExtendedQueryKey(
+	ctx context.Context,
+	contractName string,
+	filter query.KeyFilter,
+	limitAndSort query.LimitAndSort,
+	sequenceDataType any,
+) ([]types.Sequence, error) {
 	binding, err := e.getOneBinding(contractName)
 	if err != nil {
 		return nil, fmt.Errorf("ExtendedQueryKey: %w", err)
 	}
 
-	return e.reader.QueryKey(
+	return e.QueryKey(
 		ctx,
 		binding.Binding,
 		filter,
@@ -117,21 +138,15 @@ func (e *extendedContractReader) ExtendedQueryKey(
 	)
 }
 
-func (e *extendedContractReader) ExtendedGetLatestValue(
+func (e *extendedContractReader) GetLatestValue(
 	ctx context.Context,
-	contractName, methodName string,
+	readIdentifier string,
 	confidenceLevel primitives.ConfidenceLevel,
 	params, returnVal any,
 ) error {
 	if e.hasFinalityViolation() {
 		return ErrFinalityViolated
 	}
-
-	binding, err := e.getOneBinding(contractName)
-	if err != nil {
-		return fmt.Errorf("ExtendedGetLatestValue: %w", err)
-	}
-	readIdentifier := binding.Binding.ReadIdentifier(methodName)
 
 	return e.reader.GetLatestValue(
 		ctx,
@@ -142,14 +157,42 @@ func (e *extendedContractReader) ExtendedGetLatestValue(
 	)
 }
 
-func (e *extendedContractReader) ExtendedBatchGetLatestValues(
+func (e *extendedContractReader) ExtendedGetLatestValue(
 	ctx context.Context,
-	request ExtendedBatchGetLatestValuesRequest,
+	contractName, methodName string,
+	confidenceLevel primitives.ConfidenceLevel,
+	params, returnVal any,
+) error {
+	binding, err := e.getOneBinding(contractName)
+	if err != nil {
+		return fmt.Errorf("ExtendedGetLatestValue: %w", err)
+	}
+	readIdentifier := binding.Binding.ReadIdentifier(methodName)
+
+	return e.GetLatestValue(
+		ctx,
+		readIdentifier,
+		confidenceLevel,
+		params,
+		returnVal,
+	)
+}
+
+func (e *extendedContractReader) BatchGetLatestValues(
+	ctx context.Context,
+	request types.BatchGetLatestValuesRequest,
 ) (types.BatchGetLatestValuesResult, error) {
 	if e.hasFinalityViolation() {
 		return nil, ErrFinalityViolated
 	}
 
+	return e.reader.BatchGetLatestValues(ctx, request)
+}
+
+func (e *extendedContractReader) ExtendedBatchGetLatestValues(
+	ctx context.Context,
+	request ExtendedBatchGetLatestValuesRequest,
+) (types.BatchGetLatestValuesResult, error) {
 	// Convert the request from contract names to BoundContracts
 	convertedRequest := make(types.BatchGetLatestValuesRequest)
 
@@ -165,7 +208,7 @@ func (e *extendedContractReader) ExtendedBatchGetLatestValues(
 	}
 
 	// Call the underlying BatchGetLatestValues with the converted request
-	return e.reader.BatchGetLatestValues(ctx, convertedRequest)
+	return e.BatchGetLatestValues(ctx, convertedRequest)
 }
 
 func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.BoundContract) error {
@@ -217,8 +260,17 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 }
 
 func (e *extendedContractReader) hasFinalityViolation() bool {
+	if e.reader == nil {
+		return false
+	}
+
+	if _, ok := e.reader.(Extended); ok {
+		panic("bad news")
+	}
+
+	report := e.reader.HealthReport()
 	return services.ContainsError(
-		e.reader.HealthReport(),
+		report,
 		clcommontypes.ErrFinalityViolated)
 }
 
