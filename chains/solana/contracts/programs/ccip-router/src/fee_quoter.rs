@@ -238,11 +238,15 @@ pub fn transfer_fee<'info>(
 mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
+        message,
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
     use super::*;
-    use crate::tests::{sample_billing_config, sample_dest_chain, sample_message};
+    use crate::{
+        tests::{sample_billing_config, sample_dest_chain, sample_message},
+        TimestampedPackedU224, TokenBilling,
+    };
 
     struct TestStubs;
 
@@ -271,6 +275,152 @@ mod tests {
                 amount: 1
             }
         );
+    }
+
+    #[test]
+    fn network_fee_config_is_reflected_on_fee_retrieval() {
+        set_syscall_stubs(Box::new(TestStubs));
+        let mut chain = sample_dest_chain();
+        chain.config.network_fee_usdcents *= 12;
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &sample_message(),
+                &chain,
+                &[&sample_billing_config()],
+                &[]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                // Increases proportionally to the network fee component of the sum
+                amount: 4
+            }
+        );
+    }
+
+    #[test]
+    fn network_fee_for_an_unsupported_token_fails() {
+        let mut message = sample_message();
+        message.token_amounts = vec![SolanaTokenAmount {
+            token: Pubkey::new_unique(),
+            amount: 1,
+        }];
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &sample_dest_chain(),
+                &[&sample_billing_config()],
+                &[]
+            )
+            .unwrap_err(),
+            CcipRouterError::UnsupportedToken.into()
+        );
+    }
+
+    #[test]
+    fn network_fee_for_a_supported_token_with_disabled_billing() {
+        let mut chain = sample_dest_chain();
+
+        // Will have no effect because we're not using the network fee
+        chain.config.network_fee_usdcents *= 0;
+
+        let (_, mut per_chain_per_token) = sample_additional_token();
+
+        // Not enabled == no overrides
+        per_chain_per_token.billing.is_enabled = false;
+
+        // Will have no effect since billing overrides are disabled
+        per_chain_per_token.billing.min_fee_usdcents = 0;
+        per_chain_per_token.billing.max_fee_usdcents = 0;
+
+        let mut message = sample_message();
+        message.token_amounts = vec![SolanaTokenAmount {
+            token: per_chain_per_token.mint,
+            amount: 1,
+        }];
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &chain,
+                &[&sample_billing_config()],
+                &[&per_chain_per_token]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                amount: 1
+            }
+        );
+    }
+
+    #[test]
+    fn network_fee_for_a_supported_token_with_enabled_billing() {
+        let mut chain = sample_dest_chain();
+
+        // Will have no effect because we're not using the network fee
+        chain.config.network_fee_usdcents *= 0;
+        let (another_token_config, mut another_per_chain_per_token_config) =
+            sample_additional_token();
+
+        another_per_chain_per_token_config.billing.min_fee_usdcents = 800;
+        another_per_chain_per_token_config.billing.max_fee_usdcents = 1600;
+
+        let mut message = sample_message();
+        message.token_amounts = vec![SolanaTokenAmount {
+            token: another_token_config.mint,
+            amount: 1,
+        }];
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &chain,
+                &[&sample_billing_config(), &another_token_config],
+                &[&another_per_chain_per_token_config]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                // Increases proportionally to the min_fee
+                amount: 3
+            }
+        );
+    }
+
+    fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
+        let mint = Pubkey::new_unique();
+        let mut usd_per_token = [0u8; 28];
+        usd_per_token.clone_from_slice(&1u32.e(16).to_be_bytes()[4..]);
+        (
+            BillingTokenConfig {
+                enabled: true,
+                mint,
+                usd_per_token: TimestampedPackedU224 {
+                    value: usd_per_token,
+                    timestamp: 0,
+                },
+                premium_multiplier_wei_per_eth: 1,
+            },
+            PerChainPerTokenConfig {
+                version: 1,
+                chain_selector: 0,
+                mint,
+                billing: TokenBilling {
+                    min_fee_usdcents: 100,
+                    max_fee_usdcents: 300,
+                    deci_bps: 0,
+                    dest_gas_overhead: 100,
+                    dest_bytes_overhead: 100,
+                    is_enabled: true,
+                },
+            },
+        )
     }
 
     #[test]
