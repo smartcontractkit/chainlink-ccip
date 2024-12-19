@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -125,8 +126,10 @@ func (p *Plugin) validateReport(
 	seqNr uint64,
 	r ocr3types.ReportWithInfo[[]byte],
 ) (bool, cciptypes.CommitPluginReport, error) {
+	lggr := logger.With(p.lggr, "seqNr", seqNr)
+
 	if r.Report == nil {
-		p.lggr.Warn("nil report", "seqNr", seqNr)
+		lggr.Warn("nil report")
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -136,7 +139,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if decodedReport.IsEmpty() {
-		p.lggr.Warnw("empty report after decoding", "seqNr", seqNr, "decodedReport", decodedReport)
+		lggr.Warnw("empty report after decoding", "decodedReport", decodedReport)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -148,7 +151,7 @@ func (p *Plugin) validateReport(
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		p.lggr.Infow("report with insufficient RMN signatures %d < %d+1",
+		lggr.Infof("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
@@ -160,7 +163,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -170,7 +173,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
 		)
@@ -188,7 +191,7 @@ func (p *Plugin) validateReport(
 
 	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
 	if err != nil {
-		p.lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
+		lggr.Infow("report reached transmission protocol but not transmitted, invalid merkle roots state",
 			"err", err, "merkleRoots", decodedReport.MerkleRoots)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
@@ -205,7 +208,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
+		p.lggr.Infow("report is not accepted", "seqNr", seqNr)
 		return false, nil
 	}
 
@@ -266,7 +269,7 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
+		p.lggr.Infow("report not valid, not transmitting", "seqNr", seqNr)
 		return false, nil
 	}
 

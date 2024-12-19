@@ -6,10 +6,10 @@ pub struct CallScheduled {
     pub id: [u8; 32],
     pub index: u64,
     pub target: Pubkey,
-    pub data: Vec<u8>,
     pub predecessor: [u8; 32],
     pub salt: [u8; 32],
     pub delay: u64,
+    pub data: Vec<u8>,
 }
 
 #[event]

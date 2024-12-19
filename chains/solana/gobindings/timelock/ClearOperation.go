@@ -16,14 +16,16 @@ type ClearOperation struct {
 
 	// [0] = [WRITE] operation
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] config
+	//
+	// [2] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewClearOperationInstructionBuilder creates a new `ClearOperation` instruction builder.
 func NewClearOperationInstructionBuilder() *ClearOperation {
 	nd := &ClearOperation{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -45,15 +47,26 @@ func (inst *ClearOperation) GetOperationAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *ClearOperation) SetConfigAccount(config ag_solanago.PublicKey) *ClearOperation {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *ClearOperation) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *ClearOperation) SetAuthorityAccount(authority ag_solanago.PublicKey) *ClearOperation {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *ClearOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst ClearOperation) Build() *Instruction {
@@ -87,6 +100,9 @@ func (inst *ClearOperation) Validate() error {
 			return errors.New("accounts.Operation is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.Config is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -107,9 +123,10 @@ func (inst *ClearOperation) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -138,9 +155,11 @@ func NewClearOperationInstruction(
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ClearOperation {
 	return NewClearOperationInstructionBuilder().
 		SetId(id).
 		SetOperationAccount(operation).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

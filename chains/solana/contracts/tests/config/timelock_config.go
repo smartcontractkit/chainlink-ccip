@@ -22,4 +22,6 @@ var (
 
 	TimelockEmptyOpID       = [32]byte{}
 	TimelockOpDoneTimestamp = uint64(1)
+
+	MaxFunctionSelectorLen = 32 // tested with 128, but for test time consideration, keeping at 32
 )

@@ -11,6 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
@@ -49,8 +50,8 @@ func TestTimelockRBAC(t *testing.T) {
 
 	t.Run("setup:init access controllers", func(t *testing.T) {
 		for _, data := range roleMap {
-			initAccIxs, err := InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
-			require.NoError(t, err)
+			initAccIxs, ierr := InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
+			require.NoError(t, ierr)
 
 			utils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, utils.AddSigners(data.AccessController))
 
@@ -76,7 +77,7 @@ func TestTimelockRBAC(t *testing.T) {
 		}
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-		initTimelockIx, err := timelock.NewInitializeInstruction(
+		initTimelockIx, ierr := timelock.NewInitializeInstruction(
 			config.MinDelay,
 			config.TimelockConfigPDA,
 			anotherAdmin.PublicKey(),
@@ -89,9 +90,9 @@ func TestTimelockRBAC(t *testing.T) {
 			roleMap[timelock.Canceller_Role].AccessController.PublicKey(),
 			roleMap[timelock.Bypasser_Role].AccessController.PublicKey(),
 		).ValidateAndBuild()
-		require.NoError(t, err)
+		require.NoError(t, ierr)
 
-		result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + timelock.Unauthorized_TimelockError.String()})
+		result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
 		require.NotNil(t, result)
 	})
 
@@ -109,7 +110,7 @@ func TestTimelockRBAC(t *testing.T) {
 		}
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
-		initTimelockIx, err := timelock.NewInitializeInstruction(
+		initTimelockIx, ierr := timelock.NewInitializeInstruction(
 			config.MinDelay,
 			config.TimelockConfigPDA,
 			admin.PublicKey(),
@@ -122,7 +123,7 @@ func TestTimelockRBAC(t *testing.T) {
 			roleMap[timelock.Canceller_Role].AccessController.PublicKey(),
 			roleMap[timelock.Bypasser_Role].AccessController.PublicKey(),
 		).ValidateAndBuild()
-		require.NoError(t, err)
+		require.NoError(t, ierr)
 
 		utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
@@ -141,89 +142,96 @@ func TestTimelockRBAC(t *testing.T) {
 	})
 
 	t.Run("timelock:ownership", func(t *testing.T) {
-		// Fail to transfer ownership when not owner
-		instruction, err := timelock.NewTransferOwnershipInstruction(
-			anotherAdmin.PublicKey(),
-			config.TimelockConfigPDA,
-			user.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + timelock.Unauthorized_TimelockError.String()})
-		require.NotNil(t, result)
+		t.Run("fail to transfer ownership when not owner", func(t *testing.T) {
+			instruction, ierr := timelock.NewTransferOwnershipInstruction(
+				anotherAdmin.PublicKey(),
+				config.TimelockConfigPDA,
+				user.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, ierr)
+			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			require.NotNil(t, result)
+		})
 
-		// successfully transfer ownership
-		instruction, err = timelock.NewTransferOwnershipInstruction(
-			anotherAdmin.PublicKey(),
-			config.TimelockConfigPDA,
-			admin.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-		require.NotNil(t, result)
+		t.Run("Current owner cannot propose self", func(t *testing.T) {
+			instruction, ierr := timelock.NewTransferOwnershipInstruction(
+				admin.PublicKey(),
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, ierr)
+			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.InvalidInput_TimelockError.String()})
+			require.NotNil(t, result)
+		})
 
-		// Fail to accept ownership when not proposed_owner
-		instruction, err = timelock.NewAcceptOwnershipInstruction(
-			config.TimelockConfigPDA,
-			user.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result = utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + timelock.Unauthorized_TimelockError.String()})
-		require.NotNil(t, result)
+		t.Run("successfully transfer ownership", func(t *testing.T) {
+			instruction, ierr := timelock.NewTransferOwnershipInstruction(
+				anotherAdmin.PublicKey(),
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, ierr)
+			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
+		})
 
-		// Successfully accept ownership
-		// anotherAdmin becomes owner for remaining tests
-		instruction, err = timelock.NewAcceptOwnershipInstruction(
-			config.TimelockConfigPDA,
-			anotherAdmin.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
-		require.NotNil(t, result)
+		t.Run("Fail to accept ownership when not proposed_owner", func(t *testing.T) {
+			instruction, ierr := timelock.NewAcceptOwnershipInstruction(
+				config.TimelockConfigPDA,
+				user.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, ierr)
+			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			require.NotNil(t, result)
+		})
 
-		// Current owner cannot propose self
-		instruction, err = timelock.NewTransferOwnershipInstruction(
-			anotherAdmin.PublicKey(),
-			config.TimelockConfigPDA,
-			anotherAdmin.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result = utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + timelock.InvalidInput_TimelockError.String()})
-		require.NotNil(t, result)
+		t.Run("anotherAdmin becomes owner", func(t *testing.T) {
+			instruction, ierr := timelock.NewAcceptOwnershipInstruction(
+				config.TimelockConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, ierr)
+			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
 
-		// Validate proposed set to 0-address after accepting ownership
-		var configAccount timelock.Config
-		err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
-		if err != nil {
-			require.NoError(t, err, "failed to get account info")
-		}
-		require.Equal(t, anotherAdmin.PublicKey(), configAccount.Owner)
-		require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+			// Validate proposed set to 0-address after accepting ownership
+			var configAccount timelock.Config
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			if err != nil {
+				require.NoError(t, err, "failed to get account info")
+			}
+			require.Equal(t, anotherAdmin.PublicKey(), configAccount.Owner)
+			require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+		})
 
 		// get it back
-		instruction, err = timelock.NewTransferOwnershipInstruction(
-			admin.PublicKey(),
-			config.TimelockConfigPDA,
-			anotherAdmin.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
-		require.NotNil(t, result)
+		t.Run("retrieve back ownership to admin", func(t *testing.T) {
+			tix, ierr := timelock.NewTransferOwnershipInstruction(
+				admin.PublicKey(),
+				config.TimelockConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, ierr)
+			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tix}, anotherAdmin, config.DefaultCommitment)
+			require.NotNil(t, result)
 
-		instruction, err = timelock.NewAcceptOwnershipInstruction(
-			config.TimelockConfigPDA,
-			admin.PublicKey(),
-		).ValidateAndBuild()
-		require.NoError(t, err)
-		result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
-		require.NotNil(t, result)
+			aix, aerr := timelock.NewAcceptOwnershipInstruction(
+				config.TimelockConfigPDA,
+				admin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, aerr)
+			result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{aix}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
 
-		err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
-		if err != nil {
-			require.NoError(t, err, "failed to get account info")
-		}
+			var configAccount timelock.Config
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			if err != nil {
+				require.NoError(t, err, "failed to get account info")
+			}
 
-		require.Equal(t, admin.PublicKey(), configAccount.Owner)
-		require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+			require.Equal(t, admin.PublicKey(), configAccount.Owner)
+			require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
+		})
 	})
 
 	t.Run("setup:register access list & verify", func(t *testing.T) {
@@ -232,38 +240,24 @@ func TestTimelockRBAC(t *testing.T) {
 			for _, account := range data.Accounts {
 				addresses = append(addresses, account.PublicKey())
 			}
-			batchAddAccessIxs, err := TimelockBatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
-			require.NoError(t, err)
+			batchAddAccessIxs, baerr := TimelockBatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+			require.NoError(t, baerr)
 
 			for _, ix := range batchAddAccessIxs {
 				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
-			var ac access_controller.AccessController
-			err = utils.GetAccountDataBorshInto(
-				ctx,
-				solanaGoClient,
-				data.AccessController.PublicKey(),
-				config.DefaultCommitment,
-				&ac,
-			)
-			require.NoError(t, err)
-
-			require.Equal(t, uint64(len(data.Accounts)), ac.AccessList.Len,
-				"AccessList length mismatch for %s", data.Role)
-
 			for _, account := range data.Accounts {
-				targetPubKey := account.PublicKey()
-				_, found := mcmsUtils.FindInSortedList(ac.AccessList.Xs[:ac.AccessList.Len], targetPubKey)
-				require.True(t, found, "Account %s not found in %s AccessList",
-					targetPubKey, data.Role)
+				found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, data.AccessController.PublicKey(), account.PublicKey(), config.DefaultCommitment)
+				require.NoError(t, ferr)
+				require.True(t, found, "Account %s not found in %s AccessList", account.PublicKey(), data.Role)
 			}
 		}
 	})
 
 	t.Run("rbac: schedule and cancel a timelock operation", func(t *testing.T) {
-		salt, err := mcmsUtils.SimpleSalt()
-		require.NoError(t, err)
+		salt, serr := mcmsUtils.SimpleSalt()
+		require.NoError(t, serr)
 		nonExecutableOp := TimelockOperation{
 			Predecessor: config.TimelockEmptyOpID,
 			Salt:        salt,
@@ -273,136 +267,197 @@ func TestTimelockRBAC(t *testing.T) {
 		ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
 		nonExecutableOp.AddInstruction(ix, []solana.PublicKey{})
 
-		id := nonExecutableOp.OperationID()
-		operationPDA := nonExecutableOp.OperationPDA()
-
-		t.Run("rbac: Should able to schedule tx with proposer role", func(t *testing.T) {
-			signer := roleMap[timelock.Proposer_Role].RandomPick()
+		t.Run("rbac: when try to schedule from non proposer role, it fails", func(t *testing.T) {
+			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			ixs := make([]solana.Instruction, 0)
-			initOpIx, err := timelock.NewInitializeOperationInstruction(
-				nonExecutableOp.OperationID(),
-				nonExecutableOp.Predecessor,
-				nonExecutableOp.Salt,
-				uint32(len(nonExecutableOp.instructions)),
-				config.TimelockConfigPDA,
-				operationPDA,
-				signer.PublicKey(),
-				signer.PublicKey(), // proposer - direct schedule batch here
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			ixs = append(ixs, initOpIx)
+			ixs, prierr := TimelockPreloadOperationIxs(ctx, nonExecutableOp, nonProposer.PublicKey(), solanaGoClient)
+			require.NoError(t, prierr)
+			for _, ix := range ixs {
+				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
+			}
 
-			appendIxIx, err := timelock.NewAppendInstructionsInstruction(
-				nonExecutableOp.OperationID(),
-				nonExecutableOp.ToInstructionData(),
-				operationPDA,
-				signer.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			ixs = append(ixs, appendIxIx)
-
-			finIxIx, err := timelock.NewFinalizeOperationInstruction(
-				nonExecutableOp.OperationID(),
-				operationPDA,
-				signer.PublicKey(),
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			ixs = append(ixs, finIxIx)
-
-			utils.SendAndConfirm(ctx, t, solanaGoClient, ixs, signer, config.DefaultCommitment)
-
-			ix, err := timelock.NewScheduleBatchInstruction(
+			ix, scerr := timelock.NewScheduleBatchInstruction(
 				nonExecutableOp.OperationID(),
 				nonExecutableOp.Delay,
+				nonExecutableOp.OperationPDA(),
 				config.TimelockConfigPDA,
-				operationPDA,
 				ac.PublicKey(),
-				signer.PublicKey(),
+				nonProposer.PublicKey(),
 			).ValidateAndBuild()
+			require.NoError(t, scerr)
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+		})
 
-			require.NoError(t, err)
+		t.Run("rbac: Should able to schedule tx with proposer role", func(t *testing.T) {
+			proposer := roleMap[timelock.Proposer_Role].RandomPick()
+			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
-			require.NotNil(t, result)
+			t.Run("rbac: when proposer's access is removed, it should not be able to schedule", func(t *testing.T) {
+				raIx, raerr := access_controller.NewRemoveAccessInstruction(
+					ac.PublicKey(),
+					admin.PublicKey(),
+					proposer.PublicKey(), // remove access of proposer
+				).ValidateAndBuild()
+				require.NoError(t, raerr)
+				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
+
+				found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, ac.PublicKey(), proposer.PublicKey(), config.DefaultCommitment)
+				require.NoError(t, ferr)
+				require.False(t, found, "Account %s should not be in the AccessList", proposer.PublicKey())
+
+				ix, scerr := timelock.NewScheduleBatchInstruction(
+					nonExecutableOp.OperationID(),
+					nonExecutableOp.Delay,
+					nonExecutableOp.OperationPDA(),
+					config.TimelockConfigPDA,
+					ac.PublicKey(),
+					proposer.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, scerr)
+				utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			})
+
+			raIx, raerr := access_controller.NewAddAccessInstruction(
+				ac.PublicKey(),
+				admin.PublicKey(),
+				proposer.PublicKey(), // add access of proposer again
+			).ValidateAndBuild()
+			require.NoError(t, raerr)
+			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
+
+			found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, ac.PublicKey(), proposer.PublicKey(), config.DefaultCommitment)
+			require.NoError(t, ferr)
+			require.True(t, found, "Account %s should be in the AccessList", proposer.PublicKey())
+
+			salt, serr := mcmsUtils.SimpleSalt()
+			require.NoError(t, serr)
+			nonExecutableOp2 := TimelockOperation{
+				Predecessor: config.TimelockEmptyOpID,
+				Salt:        salt,
+				Delay:       uint64(1),
+			}
+			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
+			nonExecutableOp2.AddInstruction(ix, []solana.PublicKey{})
+
+			ixs, prerr := TimelockPreloadOperationIxs(ctx, nonExecutableOp2, proposer.PublicKey(), solanaGoClient)
+			require.NoError(t, prerr)
+			for _, ix := range ixs {
+				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
+			}
+
+			sbix, sberr := timelock.NewScheduleBatchInstruction(
+				nonExecutableOp2.OperationID(),
+				nonExecutableOp2.Delay,
+				nonExecutableOp2.OperationPDA(), // formerly uploaded
+				config.TimelockConfigPDA,
+				ac.PublicKey(),
+				proposer.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, sberr)
+
+			tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{sbix}, proposer, config.DefaultCommitment)
+			require.NotNil(t, tx)
+
+			parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
+				[]utils.EventMapping{
+					utils.EventMappingFor[CallScheduled]("CallScheduled"),
+				},
+			)
+
+			for i, ixx := range nonExecutableOp2.ToInstructionData() {
+				event := parsedLogs[0].EventData[i].Data.(*CallScheduled)
+				require.Equal(t, nonExecutableOp2.OperationID(), event.ID)
+				require.Equal(t, uint64(i), event.Index)
+				require.Equal(t, ixx.ProgramId, event.Target)
+				require.Equal(t, nonExecutableOp2.Predecessor, event.Predecessor)
+				require.Equal(t, nonExecutableOp2.Salt, event.Salt)
+				require.Equal(t, nonExecutableOp2.Delay, event.Delay)
+				require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+			}
 
 			var opAccount timelock.Operation
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment, &opAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
 
 			require.Equal(t,
-				result.BlockTime.Time().Add(time.Duration(nonExecutableOp.Delay)*time.Second).Unix(),
+				tx.BlockTime.Time().Add(time.Duration(nonExecutableOp2.Delay)*time.Second).Unix(),
 				int64(opAccount.Timestamp),
 				"Scheduled Times don't match",
 			)
 			require.Equal(t,
-				id,
+				nonExecutableOp2.OperationID(),
 				opAccount.Id,
 				"Ids don't match",
 			)
-		})
 
-		t.Run("rbac: cancel scheduled tx", func(t *testing.T) {
-			t.Run("fail: should feed the right role access controller", func(t *testing.T) {
-				signer := roleMap[timelock.Canceller_Role].RandomPick()
-				ac := roleMap[timelock.Proposer_Role].AccessController
+			t.Run("rbac: cancel scheduled tx", func(t *testing.T) {
+				t.Run("fail: should feed the right role access controller", func(t *testing.T) {
+					signer := roleMap[timelock.Canceller_Role].RandomPick()
+					ac := roleMap[timelock.Proposer_Role].AccessController
 
-				ix, err := timelock.NewCancelInstruction(
-					id,
-					config.TimelockConfigPDA,
-					operationPDA,
-					ac.PublicKey(),
-					signer.PublicKey(),
-				).ValidateAndBuild()
+					ix, cerr := timelock.NewCancelInstruction(
+						nonExecutableOp2.OperationID(),
+						nonExecutableOp2.OperationPDA(),
+						config.TimelockConfigPDA,
+						ac.PublicKey(),
+						signer.PublicKey(),
+					).ValidateAndBuild()
 
-				require.NoError(t, err)
+					require.NoError(t, cerr)
 
-				result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + "InvalidAccessController."})
-				require.NotNil(t, result)
-			})
+					result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + "InvalidAccessController."})
+					require.NotNil(t, result)
+				})
 
-			t.Run("fail: unauthorized on cancel attempt from non-canceller(proposer)", func(t *testing.T) {
-				signer := roleMap[timelock.Proposer_Role].RandomPick()
-				ac := roleMap[timelock.Canceller_Role].AccessController
+				t.Run("fail: unauthorized on cancel attempt from non-canceller(proposer)", func(t *testing.T) {
+					signer := roleMap[timelock.Proposer_Role].RandomPick()
+					ac := roleMap[timelock.Canceller_Role].AccessController
 
-				ix, err := timelock.NewCancelInstruction(
-					id,
-					config.TimelockConfigPDA,
-					operationPDA,
-					ac.PublicKey(),
-					signer.PublicKey(),
-				).ValidateAndBuild()
-				require.NoError(t, err)
+					ix, cerr := timelock.NewCancelInstruction(
+						nonExecutableOp2.OperationID(),
+						nonExecutableOp2.OperationPDA(),
+						config.TimelockConfigPDA,
+						ac.PublicKey(),
+						signer.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, cerr)
 
-				result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + timelock.Unauthorized_TimelockError.String()})
-				require.NotNil(t, result)
-			})
+					result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+					require.NotNil(t, result)
+				})
 
-			t.Run("success: Should able to cancel scheduled tx: PDA closed", func(t *testing.T) {
-				signer := roleMap[timelock.Canceller_Role].RandomPick()
-				ac := roleMap[timelock.Canceller_Role].AccessController
+				t.Run("success: Should able to cancel scheduled tx: PDA closed", func(t *testing.T) {
+					signer := roleMap[timelock.Canceller_Role].RandomPick()
+					ac := roleMap[timelock.Canceller_Role].AccessController
 
-				ix, err := timelock.NewCancelInstruction(
-					id,
+					ix, cerr := timelock.NewCancelInstruction(
+						nonExecutableOp2.OperationID(),
+						nonExecutableOp2.OperationPDA(),
+						config.TimelockConfigPDA,
+						ac.PublicKey(),
+						signer.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, cerr)
 
-					config.TimelockConfigPDA,
-					operationPDA,
+					tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+					require.NotNil(t, tx)
 
-					ac.PublicKey(),
-					signer.PublicKey(),
-				).ValidateAndBuild()
+					parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
+						[]utils.EventMapping{
+							utils.EventMappingFor[Cancelled]("Cancelled"),
+						},
+					)
 
-				require.NoError(t, err)
+					for i := range nonExecutableOp2.ToInstructionData() {
+						event := parsedLogs[0].EventData[i].Data.(*Cancelled)
+						require.Equal(t, nonExecutableOp2.OperationID(), event.ID)
+					}
 
-				result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
-				require.NotNil(t, result)
-
-				utils.AssertClosedAccount(ctx, t, solanaGoClient, operationPDA, config.DefaultCommitment)
+					utils.AssertClosedAccount(ctx, t, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment)
+				})
 			})
 		})
 	})
@@ -413,20 +468,26 @@ func TestTimelockRBAC(t *testing.T) {
 		t.Run("fail: only admin can call functions with only_admin macro", func(t *testing.T) {
 			signer := roleMap[timelock.Proposer_Role].RandomPick()
 
-			ix, err := timelock.NewUpdateDelayInstruction(
+			ix, ierr := timelock.NewUpdateDelayInstruction(
 				newMinDelay,
 				config.TimelockConfigPDA,
 				signer.PublicKey(),
 			).ValidateAndBuild()
-			require.NoError(t, err)
+			require.NoError(t, ierr)
 
-			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + timelock.Unauthorized_TimelockError.String()})
+			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
 			require.NotNil(t, result)
 		})
 
 		t.Run("success: only admin can call functions with only_admin macro", func(t *testing.T) {
 			signer := admin
 
+			var oldConfigAccount timelock.Config
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &oldConfigAccount)
+			if err != nil {
+				require.NoError(t, err, "failed to get account info")
+			}
+
 			ix, err := timelock.NewUpdateDelayInstruction(
 				newMinDelay,
 				config.TimelockConfigPDA,
@@ -434,15 +495,25 @@ func TestTimelockRBAC(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
-			require.NotNil(t, result)
+			tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+			require.NotNil(t, tx)
 
-			var configAccount timelock.Config
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
+				[]utils.EventMapping{
+					utils.EventMappingFor[MinDelayChange]("MinDelayChange"),
+				},
+			)
+
+			event := parsedLogs[0].EventData[0].Data.(*MinDelayChange)
+			require.Equal(t, oldConfigAccount.MinDelay, event.OldDuration)
+			require.Equal(t, newMinDelay, event.NewDuration)
+
+			var newConfigAccount timelock.Config
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &newConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
-			require.Equal(t, newMinDelay, configAccount.MinDelay, "MinDelay is not updated")
+			require.Equal(t, newMinDelay, newConfigAccount.MinDelay, "MinDelay is not updated")
 		})
 	})
 }

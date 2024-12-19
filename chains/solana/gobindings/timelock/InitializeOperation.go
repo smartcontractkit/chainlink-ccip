@@ -17,22 +17,20 @@ type InitializeOperation struct {
 	Salt             *[32]uint8
 	InstructionCount *uint32
 
-	// [0] = [] config
+	// [0] = [WRITE] operation
 	//
-	// [1] = [WRITE] operation
+	// [1] = [] config
 	//
 	// [2] = [WRITE, SIGNER] authority
 	//
-	// [3] = [] proposer
-	//
-	// [4] = [] systemProgram
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewInitializeOperationInstructionBuilder creates a new `InitializeOperation` instruction builder.
 func NewInitializeOperationInstructionBuilder() *InitializeOperation {
 	nd := &InitializeOperation{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 5),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -61,25 +59,25 @@ func (inst *InitializeOperation) SetInstructionCount(instructionCount uint32) *I
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *InitializeOperation) SetConfigAccount(config ag_solanago.PublicKey) *InitializeOperation {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
-	return inst
-}
-
-// GetConfigAccount gets the "config" account.
-func (inst *InitializeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetOperationAccount sets the "operation" account.
 func (inst *InitializeOperation) SetOperationAccount(operation ag_solanago.PublicKey) *InitializeOperation {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(operation).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(operation).WRITE()
 	return inst
 }
 
 // GetOperationAccount gets the "operation" account.
 func (inst *InitializeOperation) GetOperationAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+// SetConfigAccount sets the "config" account.
+func (inst *InitializeOperation) SetConfigAccount(config ag_solanago.PublicKey) *InitializeOperation {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *InitializeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -94,26 +92,15 @@ func (inst *InitializeOperation) GetAuthorityAccount() *ag_solanago.AccountMeta 
 	return inst.AccountMetaSlice[2]
 }
 
-// SetProposerAccount sets the "proposer" account.
-func (inst *InitializeOperation) SetProposerAccount(proposer ag_solanago.PublicKey) *InitializeOperation {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(proposer)
-	return inst
-}
-
-// GetProposerAccount gets the "proposer" account.
-func (inst *InitializeOperation) GetProposerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
-}
-
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *InitializeOperation) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *InitializeOperation {
-	inst.AccountMetaSlice[4] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *InitializeOperation) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[4]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst InitializeOperation) Build() *Instruction {
@@ -153,18 +140,15 @@ func (inst *InitializeOperation) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.Operation is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Operation is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
-			return errors.New("accounts.Proposer is not set")
-		}
-		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -188,12 +172,11 @@ func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=5]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    operation", inst.AccountMetaSlice[1]))
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("    operation", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("     proposer", inst.AccountMetaSlice[3]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -254,19 +237,17 @@ func NewInitializeOperationInstruction(
 	salt [32]uint8,
 	instructionCount uint32,
 	// Accounts:
-	config ag_solanago.PublicKey,
 	operation ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
-	proposer ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitializeOperation {
 	return NewInitializeOperationInstructionBuilder().
 		SetId(id).
 		SetPredecessor(predecessor).
 		SetSalt(salt).
 		SetInstructionCount(instructionCount).
-		SetConfigAccount(config).
 		SetOperationAccount(operation).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
-		SetProposerAccount(proposer).
 		SetSystemProgramAccount(systemProgram)
 }

@@ -343,9 +343,11 @@ func (p *Plugin) validateReport(
 	seqNr uint64,
 	r ocr3types.ReportWithInfo[[]byte],
 ) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
+	lggr := logger.With(p.lggr, "seqNr", seqNr)
+
 	// Just a safety check, should never happen.
 	if r.Report == nil {
-		p.lggr.Warn("skipping nil report", "seqNr", seqNr)
+		lggr.Warn("skipping nil report")
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
@@ -355,7 +357,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Info("skipping empty report", "seqNr", seqNr)
+		lggr.Infow("skipping empty report")
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
@@ -366,7 +368,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures", "seqNr", seqNr)
+		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
@@ -376,10 +378,9 @@ func (p *Plugin) validateReport(
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
+		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
-			"seqNr", seqNr,
 		)
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
@@ -396,7 +397,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
+		p.lggr.Infow("report is not accepted", "seqNr", seqNr)
 		return false, nil
 	}
 
@@ -419,7 +420,10 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	p.lggr.Info("ShouldAcceptAttestedReport returns true, report accepted")
+	p.lggr.Infow("ShouldAcceptAttestedReport returns true, report accepted",
+		"seqNr", seqNr,
+		"reports", decodedReport.ChainReports,
+	)
 	return true, nil
 }
 
@@ -432,11 +436,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
+		p.lggr.Infow("report not accepted for transmit", "seqNr", seqNr)
 		return false, nil
 	}
 
-	p.lggr.Infow("transmitting report", "reports", decodedReport.ChainReports)
+	p.lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",
+		"seqNr", seqNr,
+		"reports", decodedReport.ChainReports,
+	)
 	return true, nil
 }
 

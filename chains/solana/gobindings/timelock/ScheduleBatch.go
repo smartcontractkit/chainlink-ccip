@@ -15,9 +15,9 @@ type ScheduleBatch struct {
 	Id    *[32]uint8
 	Delay *uint64
 
-	// [0] = [] config
+	// [0] = [WRITE] operation
 	//
-	// [1] = [WRITE] operation
+	// [1] = [] config
 	//
 	// [2] = [] roleAccessController
 	//
@@ -45,25 +45,25 @@ func (inst *ScheduleBatch) SetDelay(delay uint64) *ScheduleBatch {
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *ScheduleBatch) SetConfigAccount(config ag_solanago.PublicKey) *ScheduleBatch {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
-	return inst
-}
-
-// GetConfigAccount gets the "config" account.
-func (inst *ScheduleBatch) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
 // SetOperationAccount sets the "operation" account.
 func (inst *ScheduleBatch) SetOperationAccount(operation ag_solanago.PublicKey) *ScheduleBatch {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(operation).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(operation).WRITE()
 	return inst
 }
 
 // GetOperationAccount gets the "operation" account.
 func (inst *ScheduleBatch) GetOperationAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[0]
+}
+
+// SetConfigAccount sets the "config" account.
+func (inst *ScheduleBatch) SetConfigAccount(config ag_solanago.PublicKey) *ScheduleBatch {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *ScheduleBatch) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -120,10 +120,10 @@ func (inst *ScheduleBatch) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
+			return errors.New("accounts.Operation is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Operation is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.RoleAccessController is not set")
@@ -151,8 +151,8 @@ func (inst *ScheduleBatch) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[3]))
 					})
@@ -193,15 +193,15 @@ func NewScheduleBatchInstruction(
 	id [32]uint8,
 	delay uint64,
 	// Accounts:
-	config ag_solanago.PublicKey,
 	operation ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ScheduleBatch {
 	return NewScheduleBatchInstructionBuilder().
 		SetId(id).
 		SetDelay(delay).
-		SetConfigAccount(config).
 		SetOperationAccount(operation).
+		SetConfigAccount(config).
 		SetRoleAccessControllerAccount(roleAccessController).
 		SetAuthorityAccount(authority)
 }

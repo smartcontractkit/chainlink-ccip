@@ -7,13 +7,12 @@ pub struct ConfigSigners {
     pub signer_addresses: Vec<[u8; 20]>,
     pub total_signers: u8,
     pub is_finalized: bool,
-    pub bump: u8,
 }
 
 impl ConfigSigners {
-    // 8 (discriminator) + 4 (vec len) + (20 * total_signers) +1(total_signers) + 1 (is_finalized) + 1 (bump)
+    // 8 (discriminator) + 4 (vec len) + (20 * total_signers) +1(total_signers) + 1 (is_finalized)
     pub const fn space(total_signers: usize) -> usize {
-        8 + 4 + (20 * total_signers) + 1 + 1 + 1
+        8 + 4 + (20 * total_signers) + 1 + 1
     }
 }
 
@@ -37,7 +36,7 @@ pub struct MultisigConfig {
 
     // Keep variable-length data at the end of the account struct
     // https://solana.com/developers/courses/program-optimization/program-architecture#data-order
-    pub signers: Vec<McmSigner>, // unable to store as hashmap in Solana
+    pub signers: Vec<McmSigner>,
 }
 
 impl MultisigConfig {
