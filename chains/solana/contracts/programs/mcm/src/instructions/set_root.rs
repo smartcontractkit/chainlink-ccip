@@ -21,7 +21,12 @@ pub fn set_root(
     );
 
     // verify ECDSA signatures on (root, validUntil) and ensure that the root group is successful
-    let verified = verify_ecdsa_signatures(&ctx, &root, valid_until);
+    let verified = verify_ecdsa_signatures(
+        &ctx.accounts.root_signatures.signatures,
+        &ctx.accounts.multisig_config,
+        &root,
+        valid_until,
+    );
     #[allow(clippy::unnecessary_unwrap)]
     if verified.is_err() {
         return Err(verified.unwrap_err());
@@ -32,8 +37,8 @@ pub fn set_root(
         McmError::ValidUntilHasAlreadyPassed
     );
 
+    // verify metadataProof
     {
-        // verify metadataProof
         let calculated_root = calculate_merkle_root(metadata_proof.clone(), &metadata.hash_leaf());
         require!(root == calculated_root, McmError::ProofCannotBeVerified);
     }
@@ -109,16 +114,14 @@ pub fn set_root(
 }
 
 fn verify_ecdsa_signatures(
-    ctx: &Context<SetRoot>,
+    signatures: &Vec<Signature>,
+    multisig_config: &MultisigConfig,
     root: &[u8; 32],
     valid_until: u32,
 ) -> Result<()> {
     let signed_hash = compute_eth_message_hash(root, valid_until);
-    // get preloaded signatures
-    let signatures = &ctx.accounts.root_signatures.signatures;
     let mut previous_addr: [u8; EVM_ADDRESS_BYTES] = [0; EVM_ADDRESS_BYTES];
     let mut group_vote_counts: [u8; NUM_GROUPS] = [0; NUM_GROUPS];
-    let multisig_config = &ctx.accounts.multisig_config;
     for sig in signatures {
         let signer_addr = ecdsa_recover_evm_addr(&signed_hash.to_bytes(), sig);
 
@@ -166,7 +169,7 @@ fn verify_ecdsa_signatures(
         McmError::MissingConfig
     );
 
-    // did the root group reach its quorum?
+    // check if the root group reach its quorum
     require!(
         group_vote_counts[0] >= multisig_config.group_quorums[0],
         McmError::InsufficientSigners
@@ -183,7 +186,6 @@ pub fn init_signatures(
     total_signatures: u8,
 ) -> Result<()> {
     let signatures_account = &mut ctx.accounts.signatures;
-    signatures_account.bump = ctx.bumps.signatures;
     signatures_account.total_signatures = total_signatures;
 
     // Note: is_finalized stays false until finalization
@@ -212,13 +214,13 @@ pub fn append_signatures(
 }
 
 pub fn clear_signatures(
-    ctx: Context<ClearSignatures>,
+    _ctx: Context<ClearSignatures>,
     _multisig_name: [u8; MULTISIG_NAME_PADDED],
     _root: [u8; 32],
     _valid_until: u32,
 ) -> Result<()> {
-    let signatures_account = &mut ctx.accounts.signatures;
-    signatures_account.signatures.clear();
+    // NOTE: ctx.accounts.signatures is closed to be able to re-initialized,
+    // also allow finalized signatures_account to be cleared
     Ok(())
 }
 
@@ -321,7 +323,7 @@ pub struct ClearSignatures<'info> {
         mut,
         seeds = [ROOT_SIGNATURES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump,
-        constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized,
+        close = authority // close so that it can be re-initialized
     )]
     pub signatures: Account<'info, RootSignatures>,
 

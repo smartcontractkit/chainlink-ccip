@@ -28,14 +28,16 @@ type SetOcrConfig struct {
 
 	// [0] = [WRITE] config
 	//
-	// [1] = [SIGNER] authority
+	// [1] = [WRITE] state
+	//
+	// [2] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetOcrConfigInstructionBuilder creates a new `SetOcrConfig` instruction builder.
 func NewSetOcrConfigInstructionBuilder() *SetOcrConfig {
 	nd := &SetOcrConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -75,15 +77,26 @@ func (inst *SetOcrConfig) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetStateAccount sets the "state" account.
+func (inst *SetOcrConfig) SetStateAccount(state ag_solanago.PublicKey) *SetOcrConfig {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(state).WRITE()
+	return inst
+}
+
+// GetStateAccount gets the "state" account.
+func (inst *SetOcrConfig) GetStateAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetOcrConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetOcrConfig {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetOcrConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst SetOcrConfig) Build() *Instruction {
@@ -126,6 +139,9 @@ func (inst *SetOcrConfig) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.State is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -149,9 +165,10 @@ func (inst *SetOcrConfig) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    state", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -213,6 +230,7 @@ func NewSetOcrConfigInstruction(
 	transmitters []ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
+	state ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetOcrConfig {
 	return NewSetOcrConfigInstructionBuilder().
 		SetPluginType(pluginType).
@@ -220,5 +238,6 @@ func NewSetOcrConfigInstruction(
 		SetSigners(signers).
 		SetTransmitters(transmitters).
 		SetConfigAccount(config).
+		SetStateAccount(state).
 		SetAuthorityAccount(authority)
 }

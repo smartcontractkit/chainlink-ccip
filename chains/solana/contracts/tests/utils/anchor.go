@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -47,6 +45,12 @@ func To28BytesLE(value uint64) [28]byte {
 	le := make([]byte, 28)
 	binary.LittleEndian.PutUint64(le, value)
 	return [28]byte(le)
+}
+
+func To28BytesBE(value uint64) [28]byte {
+	be := make([]byte, 28)
+	binary.BigEndian.PutUint64(be[20:], value)
+	return [28]byte(be)
 }
 
 func Map[T, V any](ts []T, fn func(T) V) []V {
@@ -181,128 +185,6 @@ func ParseMultipleEvents[T any](logs []string, event string, shouldPrint bool) (
 	return results, nil
 }
 
-type AnchorInstruction struct {
-	Name         string
-	ProgramID    string
-	Logs         []string
-	ComputeUnits int
-	InnerCalls   []*AnchorInstruction
-}
-
-// Parses the log messages from an Anchor program and returns a list of AnchorInstructions.
-func ParseLogMessages(logMessages []string) []*AnchorInstruction {
-	var instructions []*AnchorInstruction
-	var stack []*AnchorInstruction
-	var currentInstruction *AnchorInstruction
-
-	programInvokeRegex := regexp.MustCompile(`Program (\w+) invoke`)
-	programSuccessRegex := regexp.MustCompile(`Program (\w+) success`)
-	computeUnitsRegex := regexp.MustCompile(`Program (\w+) consumed (\d+) of \d+ compute units`)
-
-	for _, line := range logMessages {
-		line = strings.TrimSpace(line)
-
-		// Program invocation - push to stack
-		if match := programInvokeRegex.FindStringSubmatch(line); len(match) > 1 {
-			newInstruction := &AnchorInstruction{
-				ProgramID:    match[1],
-				Name:         "",
-				Logs:         []string{},
-				ComputeUnits: 0,
-				InnerCalls:   []*AnchorInstruction{},
-			}
-
-			if len(stack) == 0 {
-				instructions = append(instructions, newInstruction)
-			} else {
-				stack[len(stack)-1].InnerCalls = append(stack[len(stack)-1].InnerCalls, newInstruction)
-			}
-
-			stack = append(stack, newInstruction)
-			currentInstruction = newInstruction
-			continue
-		}
-
-		// Program success - pop from stack
-		if match := programSuccessRegex.FindStringSubmatch(line); len(match) > 1 {
-			if len(stack) > 0 {
-				stack = stack[:len(stack)-1] // pop
-				if len(stack) > 0 {
-					currentInstruction = stack[len(stack)-1]
-				} else {
-					currentInstruction = nil
-				}
-			}
-			continue
-		}
-
-		// Instruction name
-		if strings.Contains(line, "Instruction:") {
-			if currentInstruction != nil {
-				currentInstruction.Name = strings.TrimSpace(strings.Split(line, "Instruction:")[1])
-			}
-			continue
-		}
-
-		// Program logs
-		if strings.HasPrefix(line, "Program log:") {
-			if currentInstruction != nil {
-				logMessage := strings.TrimSpace(strings.TrimPrefix(line, "Program log:"))
-				currentInstruction.Logs = append(currentInstruction.Logs, logMessage)
-			}
-			continue
-		}
-
-		// Compute units
-		if match := computeUnitsRegex.FindStringSubmatch(line); len(match) > 1 {
-			programID := match[1]
-			computeUnits, _ := strconv.Atoi(match[2])
-
-			// Find the instruction in the stack that matches this program ID
-			for i := len(stack) - 1; i >= 0; i-- {
-				if stack[i].ProgramID == programID {
-					stack[i].ComputeUnits = computeUnits
-					break
-				}
-			}
-		}
-	}
-
-	return instructions
-}
-
-// Pretty prints the given Anchor instructions.
-// Example usage:
-// parsed := utils.ParseLogMessages(result.Meta.LogMessages)
-// output := utils.PrintInstructions(parsed)
-// t.Logf("Parsed Instructions: %s", output)
-func PrintInstructions(instructions []*AnchorInstruction) string {
-	var output strings.Builder
-
-	var printInstruction func(*AnchorInstruction, int, string)
-	printInstruction = func(instruction *AnchorInstruction, index int, indent string) {
-		output.WriteString(fmt.Sprintf("%sInstruction %d: %s\n", indent, index, instruction.Name))
-		output.WriteString(fmt.Sprintf("%s  Program ID: %s\n", indent, instruction.ProgramID))
-		output.WriteString(fmt.Sprintf("%s  Compute Units: %d\n", indent, instruction.ComputeUnits))
-		output.WriteString(fmt.Sprintf("%s  Logs:\n", indent))
-		for _, log := range instruction.Logs {
-			output.WriteString(fmt.Sprintf("%s    %s\n", indent, log))
-		}
-		if len(instruction.InnerCalls) > 0 {
-			output.WriteString(fmt.Sprintf("%s  Inner Calls:\n", indent))
-			for i, innerCall := range instruction.InnerCalls {
-				printInstruction(innerCall, i+1, indent+"    ")
-			}
-		}
-	}
-
-	for i, instruction := range instructions {
-		printInstruction(instruction, i+1, "")
-	}
-
-	return output.String()
-}
-
 func GetBlockTime(ctx context.Context, client *rpc.Client, commitment rpc.CommitmentType) (*solana.UnixTimeSeconds, error) {
 	block, err := client.GetBlockHeight(ctx, commitment)
 	if err != nil {
@@ -315,4 +197,39 @@ func GetBlockTime(ctx context.Context, client *rpc.Client, commitment rpc.Commit
 	}
 
 	return blockTime, nil
+}
+
+func WaitForTheNextBlock(client *rpc.Client, timeout time.Duration, commitment rpc.CommitmentType) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return WaitForNewBlock(ctx, client, 1, commitment)
+}
+
+func WaitForNewBlock(ctx context.Context, client *rpc.Client, height uint64, commitment rpc.CommitmentType) error {
+	initialHeight, err := client.GetBlockHeight(ctx, commitment)
+	if err != nil {
+		return fmt.Errorf("failed to get initial block height: %w", err)
+	}
+
+	targetFinalHeight := initialHeight + height
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			currentHeight, err := client.GetBlockHeight(ctx, commitment)
+			if err != nil {
+				return fmt.Errorf("failed to get current block height: %w", err)
+			}
+
+			if currentHeight >= targetFinalHeight {
+				return nil
+			}
+		}
+	}
 }

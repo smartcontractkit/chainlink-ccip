@@ -30,20 +30,20 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 	solanaGoClient := utils.DeployAllPrograms(t, utils.PathToAnchorConfig, admin)
 
 	// mcm multisig 1
-	TestMsigName1, err := mcmsUtils.PadString32("test_mcm_instance_1")
+	testMsigName1, err := mcmsUtils.PadString32("test_mcm_instance_1")
 	require.NoError(t, err)
-	MultisigConfigPDA1 := McmConfigAddress(TestMsigName1)
-	RootMetadataPDA1 := RootMetadataAddress(TestMsigName1)
-	ExpiringRootAndOpCountPDA1 := ExpiringRootAndOpCountAddress(TestMsigName1)
-	ConfigSignersPDA1 := McmConfigSignersAddress(TestMsigName1)
+	multisigConfigPDA1 := McmConfigAddress(testMsigName1)
+	rootMetadataPDA1 := RootMetadataAddress(testMsigName1)
+	expiringRootAndOpCountPDA1 := ExpiringRootAndOpCountAddress(testMsigName1)
+	configSignersPDA1 := McmConfigSignersAddress(testMsigName1)
 
 	// mcm multisig 2
-	TestMsigName2, err := mcmsUtils.PadString32("test_mcm_instance_2")
+	testMsigName2, err := mcmsUtils.PadString32("test_mcm_instance_2")
 	require.NoError(t, err)
-	MultisigConfigPDA2 := McmConfigAddress(TestMsigName2)
-	RootMetadataPDA2 := RootMetadataAddress(TestMsigName2)
-	ExpiringRootAndOpCountPDA2 := ExpiringRootAndOpCountAddress(TestMsigName2)
-	ConfigSignersPDA2 := McmConfigSignersAddress(TestMsigName2)
+	multisigConfigPDA2 := McmConfigAddress(testMsigName2)
+	rootMetadataPDA2 := RootMetadataAddress(testMsigName2)
+	expiringRootAndOpCountPDA2 := ExpiringRootAndOpCountAddress(testMsigName2)
+	configSignersPDA2 := McmConfigSignersAddress(testMsigName2)
 
 	t.Run("setup:funding", func(t *testing.T) {
 		utils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
@@ -57,7 +57,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			})
 			require.NoError(t, accErr)
 
-			// decode program data
+			// decode program data∑´
 			var programData struct {
 				DataType uint32
 				Address  solana.PublicKey
@@ -66,21 +66,21 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			ix, err := mcm.NewInitializeInstruction(
 				config.TestChainID,
-				TestMsigName1,
-				MultisigConfigPDA1,
+				testMsigName1,
+				multisigConfigPDA1,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.McmProgram,
 				programData.Address,
-				RootMetadataPDA1,
-				ExpiringRootAndOpCountPDA1,
+				rootMetadataPDA1,
+				expiringRootAndOpCountPDA1,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, MultisigConfigPDA1, config.DefaultCommitment, &configAccount)
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -102,7 +102,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
 			mcmConfig, err := mcmsUtils.NewValidMcmConfig(
-				TestMsigName1,
+				testMsigName1,
 				signerPrivateKeys,
 				signerGroups,
 				groupQuorums,
@@ -120,10 +120,10 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				require.NoError(t, err)
 
 				initSignersIx, err := mcm.NewInitSignersInstruction(
-					TestMsigName1,
+					testMsigName1,
 					parsedTotalSigners,
-					MultisigConfigPDA1,
-					ConfigSignersPDA1,
+					multisigConfigPDA1,
+					configSignersPDA1,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -131,14 +131,14 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				require.NoError(t, err)
 				ixs = append(ixs, initSignersIx)
 
-				appendSignersIxs, err := AppendSignersIxs(signerAddresses, TestMsigName1, MultisigConfigPDA1, ConfigSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				appendSignersIxs, err := AppendSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, err)
 				ixs = append(ixs, appendSignersIxs...)
 
 				finalizeSignersIx, err := mcm.NewFinalizeSignersInstruction(
-					TestMsigName1,
-					MultisigConfigPDA1,
-					ConfigSignersPDA1,
+					testMsigName1,
+					multisigConfigPDA1,
+					configSignersPDA1,
 					admin.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, ConfigSignersPDA1, config.DefaultCommitment, &cfgSignersAccount)
+				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA1, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -162,13 +162,13 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			t.Run("success:set_config", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					TestMsigName1,
+					testMsigName1,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
 					mcmConfig.ClearRoot,
-					MultisigConfigPDA1,
-					ConfigSignersPDA1,
+					multisigConfigPDA1,
+					configSignersPDA1,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -180,7 +180,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, MultisigConfigPDA1, config.DefaultCommitment, &configAccount)
+				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -195,7 +195,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				// pda closed after set_config
-				utils.AssertClosedAccount(ctx, t, solanaGoClient, ConfigSignersPDA1, config.DefaultCommitment)
+				utils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA1, config.DefaultCommitment)
 			})
 		})
 	})
@@ -215,21 +215,21 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			ix, err := mcm.NewInitializeInstruction(
 				config.TestChainID,
-				TestMsigName2,
-				MultisigConfigPDA2,
+				testMsigName2,
+				multisigConfigPDA2,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.McmProgram,
 				programData.Address,
-				RootMetadataPDA2,
-				ExpiringRootAndOpCountPDA2,
+				rootMetadataPDA2,
+				expiringRootAndOpCountPDA2,
 			).ValidateAndBuild()
 			require.NoError(t, err)
 			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, MultisigConfigPDA2, config.DefaultCommitment, &configAccount)
+			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -250,7 +250,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
 			mcmConfig, err := mcmsUtils.NewValidMcmConfig(
-				TestMsigName2,
+				testMsigName2,
 				signerPrivateKeys,
 				signerGroups,
 				groupQuorums,
@@ -268,10 +268,10 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				require.NoError(t, err)
 
 				initSignersIx, err := mcm.NewInitSignersInstruction(
-					TestMsigName2,
+					testMsigName2,
 					parsedTotalSigners,
-					MultisigConfigPDA2,
-					ConfigSignersPDA2,
+					multisigConfigPDA2,
+					configSignersPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -279,14 +279,14 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				require.NoError(t, err)
 				ixs = append(ixs, initSignersIx)
 
-				appendSignersIxs, err := AppendSignersIxs(signerAddresses, TestMsigName2, MultisigConfigPDA2, ConfigSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				appendSignersIxs, err := AppendSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, err)
 				ixs = append(ixs, appendSignersIxs...)
 
 				finalizeSignersIx, err := mcm.NewFinalizeSignersInstruction(
-					TestMsigName2,
-					MultisigConfigPDA2,
-					ConfigSignersPDA2,
+					testMsigName2,
+					multisigConfigPDA2,
+					configSignersPDA2,
 					admin.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, err)
@@ -297,7 +297,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, ConfigSignersPDA2, config.DefaultCommitment, &cfgSignersAccount)
+				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA2, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -310,13 +310,13 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			t.Run("fail:set_config with invalid seeds", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					TestMsigName1,
+					testMsigName1,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
 					mcmConfig.ClearRoot,
-					MultisigConfigPDA2,
-					ConfigSignersPDA2,
+					multisigConfigPDA2,
+					configSignersPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -329,13 +329,13 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			t.Run("success:set_config", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					TestMsigName2,
+					testMsigName2,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
 					mcmConfig.ClearRoot,
-					MultisigConfigPDA2,
-					ConfigSignersPDA2,
+					multisigConfigPDA2,
+					configSignersPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -347,7 +347,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, MultisigConfigPDA2, config.DefaultCommitment, &configAccount)
+				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -362,7 +362,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				// pda closed after set_config
-				utils.AssertClosedAccount(ctx, t, solanaGoClient, ConfigSignersPDA2, config.DefaultCommitment)
+				utils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA2, config.DefaultCommitment)
 			})
 		})
 	})

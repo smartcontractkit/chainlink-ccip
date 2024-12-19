@@ -3,9 +3,10 @@ use anchor_lang::prelude::*;
 use access_controller::AccessController;
 
 use crate::constants::{ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED};
-use crate::error::TimelockError;
+use crate::error::AuthError;
 use crate::program::Timelock;
 use crate::state::{Config, Role};
+use crate::TimelockError;
 
 /// initialize Timelock config with owner(admin),
 /// role access controller keys and global configuration value.
@@ -69,7 +70,7 @@ pub struct Initialize<'info> {
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, Timelock>,
     // NOTE: initialization only allowed by program upgrade authority
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ TimelockError::Unauthorized)]
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ AuthError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 
     // access controller program and states per role

@@ -14,7 +14,7 @@ import (
 type BlockFunctionSelector struct {
 	Selector *[8]uint8
 
-	// [0] = [] config
+	// [0] = [WRITE] config
 	//
 	// [1] = [SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
@@ -36,7 +36,7 @@ func (inst *BlockFunctionSelector) SetSelector(selector [8]uint8) *BlockFunction
 
 // SetConfigAccount sets the "config" account.
 func (inst *BlockFunctionSelector) SetConfigAccount(config ag_solanago.PublicKey) *BlockFunctionSelector {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(config).WRITE()
 	return inst
 }
 

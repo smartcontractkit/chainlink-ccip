@@ -17,16 +17,18 @@ type AppendInstructions struct {
 
 	// [0] = [WRITE] operation
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] config
 	//
-	// [2] = [] systemProgram
+	// [2] = [WRITE, SIGNER] authority
+	//
+	// [3] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewAppendInstructionsInstructionBuilder creates a new `AppendInstructions` instruction builder.
 func NewAppendInstructionsInstructionBuilder() *AppendInstructions {
 	nd := &AppendInstructions{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
 }
@@ -54,26 +56,37 @@ func (inst *AppendInstructions) GetOperationAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *AppendInstructions) SetConfigAccount(config ag_solanago.PublicKey) *AppendInstructions {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *AppendInstructions) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *AppendInstructions) SetAuthorityAccount(authority ag_solanago.PublicKey) *AppendInstructions {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *AppendInstructions) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *AppendInstructions) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *AppendInstructions {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *AppendInstructions) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[3]
 }
 
 func (inst AppendInstructions) Build() *Instruction {
@@ -110,9 +123,12 @@ func (inst *AppendInstructions) Validate() error {
 			return errors.New("accounts.Operation is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -134,10 +150,11 @@ func (inst *AppendInstructions) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("    operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("       config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("    authority", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("systemProgram", inst.AccountMetaSlice[3]))
 					})
 				})
 		})
@@ -177,12 +194,14 @@ func NewAppendInstructionsInstruction(
 	instructionsBatch []InstructionData,
 	// Accounts:
 	operation ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AppendInstructions {
 	return NewAppendInstructionsInstructionBuilder().
 		SetId(id).
 		SetInstructionsBatch(instructionsBatch).
 		SetOperationAccount(operation).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
 }

@@ -160,3 +160,117 @@ func (obj *RootMetadataInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	return nil
 }
+
+type McmError ag_binary.BorshEnum
+
+const (
+	InvalidInputs_McmError McmError = iota
+	Overflow_McmError
+	WrongMultiSig_McmError
+	WrongChainId_McmError
+	InvalidSignature_McmError
+	FailedEcdsaRecover_McmError
+	InvalidRootLen_McmError
+	SignersNotFinalized_McmError
+	SignersAlreadyFinalized_McmError
+	SignaturesAlreadyFinalized_McmError
+	SignatureCountMismatch_McmError
+	TooManySignatures_McmError
+	SignaturesNotFinalized_McmError
+	SignaturesRootMismatch_McmError
+	SignaturesValidUntilMismatch_McmError
+	MismatchedInputSignerVectorsLength_McmError
+	OutOfBoundsNumOfSigners_McmError
+	MismatchedInputGroupArraysLength_McmError
+	GroupTreeNotWellFormed_McmError
+	SignerInDisabledGroup_McmError
+	OutOfBoundsGroupQuorum_McmError
+	SignersAddressesMustBeStrictlyIncreasing_McmError
+	SignedHashAlreadySeen_McmError
+	InvalidSigner_McmError
+	MissingConfig_McmError
+	InsufficientSigners_McmError
+	ValidUntilHasAlreadyPassed_McmError
+	ProofCannotBeVerified_McmError
+	PendingOps_McmError
+	WrongPreOpCount_McmError
+	WrongPostOpCount_McmError
+	PostOpCountReached_McmError
+	RootExpired_McmError
+	WrongNonce_McmError
+)
+
+func (value McmError) String() string {
+	switch value {
+	case InvalidInputs_McmError:
+		return "InvalidInputs"
+	case Overflow_McmError:
+		return "Overflow"
+	case WrongMultiSig_McmError:
+		return "WrongMultiSig"
+	case WrongChainId_McmError:
+		return "WrongChainId"
+	case InvalidSignature_McmError:
+		return "InvalidSignature"
+	case FailedEcdsaRecover_McmError:
+		return "FailedEcdsaRecover"
+	case InvalidRootLen_McmError:
+		return "InvalidRootLen"
+	case SignersNotFinalized_McmError:
+		return "SignersNotFinalized"
+	case SignersAlreadyFinalized_McmError:
+		return "SignersAlreadyFinalized"
+	case SignaturesAlreadyFinalized_McmError:
+		return "SignaturesAlreadyFinalized"
+	case SignatureCountMismatch_McmError:
+		return "SignatureCountMismatch"
+	case TooManySignatures_McmError:
+		return "TooManySignatures"
+	case SignaturesNotFinalized_McmError:
+		return "SignaturesNotFinalized"
+	case SignaturesRootMismatch_McmError:
+		return "SignaturesRootMismatch"
+	case SignaturesValidUntilMismatch_McmError:
+		return "SignaturesValidUntilMismatch"
+	case MismatchedInputSignerVectorsLength_McmError:
+		return "MismatchedInputSignerVectorsLength"
+	case OutOfBoundsNumOfSigners_McmError:
+		return "OutOfBoundsNumOfSigners"
+	case MismatchedInputGroupArraysLength_McmError:
+		return "MismatchedInputGroupArraysLength"
+	case GroupTreeNotWellFormed_McmError:
+		return "GroupTreeNotWellFormed"
+	case SignerInDisabledGroup_McmError:
+		return "SignerInDisabledGroup"
+	case OutOfBoundsGroupQuorum_McmError:
+		return "OutOfBoundsGroupQuorum"
+	case SignersAddressesMustBeStrictlyIncreasing_McmError:
+		return "SignersAddressesMustBeStrictlyIncreasing"
+	case SignedHashAlreadySeen_McmError:
+		return "SignedHashAlreadySeen"
+	case InvalidSigner_McmError:
+		return "InvalidSigner"
+	case MissingConfig_McmError:
+		return "MissingConfig"
+	case InsufficientSigners_McmError:
+		return "InsufficientSigners"
+	case ValidUntilHasAlreadyPassed_McmError:
+		return "ValidUntilHasAlreadyPassed"
+	case ProofCannotBeVerified_McmError:
+		return "ProofCannotBeVerified"
+	case PendingOps_McmError:
+		return "PendingOps"
+	case WrongPreOpCount_McmError:
+		return "WrongPreOpCount"
+	case WrongPostOpCount_McmError:
+		return "WrongPostOpCount"
+	case PostOpCountReached_McmError:
+		return "PostOpCountReached"
+	case RootExpired_McmError:
+		return "RootExpired"
+	case WrongNonce_McmError:
+		return "WrongNonce"
+	default:
+		return ""
+	}
+}

@@ -205,257 +205,6 @@ func (obj *MerkleRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	return nil
 }
 
-type Solana2AnyMessage struct {
-	Receiver     []byte
-	Data         []byte
-	TokenAmounts []SolanaTokenAmount
-	FeeToken     ag_solanago.PublicKey
-	ExtraArgs    ExtraArgsInput
-	TokenIndexes []byte
-}
-
-func (obj Solana2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Receiver` param:
-	err = encoder.Encode(obj.Receiver)
-	if err != nil {
-		return err
-	}
-	// Serialize `Data` param:
-	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	// Serialize `FeeToken` param:
-	err = encoder.Encode(obj.FeeToken)
-	if err != nil {
-		return err
-	}
-	// Serialize `ExtraArgs` param:
-	err = encoder.Encode(obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Solana2AnyMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Receiver`:
-	err = decoder.Decode(&obj.Receiver)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Data`:
-	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	// Deserialize `FeeToken`:
-	err = decoder.Decode(&obj.FeeToken)
-	if err != nil {
-		return err
-	}
-	// Deserialize `ExtraArgs`:
-	err = decoder.Decode(&obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type SolanaTokenAmount struct {
-	Token  ag_solanago.PublicKey
-	Amount uint64
-}
-
-func (obj SolanaTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Token` param:
-	err = encoder.Encode(obj.Token)
-	if err != nil {
-		return err
-	}
-	// Serialize `Amount` param:
-	err = encoder.Encode(obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SolanaTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Token`:
-	err = decoder.Decode(&obj.Token)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Amount`:
-	err = decoder.Decode(&obj.Amount)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type ExtraArgsInput struct {
-	GasLimit                 *ag_binary.Uint128 `bin:"optional"`
-	AllowOutOfOrderExecution *bool              `bin:"optional"`
-}
-
-func (obj ExtraArgsInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `GasLimit` param (optional):
-	{
-		if obj.GasLimit == nil {
-			err = encoder.WriteBool(false)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = encoder.WriteBool(true)
-			if err != nil {
-				return err
-			}
-			err = encoder.Encode(obj.GasLimit)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Serialize `AllowOutOfOrderExecution` param (optional):
-	{
-		if obj.AllowOutOfOrderExecution == nil {
-			err = encoder.WriteBool(false)
-			if err != nil {
-				return err
-			}
-		} else {
-			err = encoder.WriteBool(true)
-			if err != nil {
-				return err
-			}
-			err = encoder.Encode(obj.AllowOutOfOrderExecution)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `GasLimit` (optional):
-	{
-		ok, err := decoder.ReadBool()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.GasLimit)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	// Deserialize `AllowOutOfOrderExecution` (optional):
-	{
-		ok, err := decoder.ReadBool()
-		if err != nil {
-			return err
-		}
-		if ok {
-			err = decoder.Decode(&obj.AllowOutOfOrderExecution)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-type Any2SolanaMessage struct {
-	MessageId           [32]uint8
-	SourceChainSelector uint64
-	Sender              []byte
-	Data                []byte
-	TokenAmounts        []SolanaTokenAmount
-}
-
-func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MessageId` param:
-	err = encoder.Encode(obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourceChainSelector` param:
-	err = encoder.Encode(obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Sender` param:
-	err = encoder.Encode(obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Serialize `Data` param:
-	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MessageId`:
-	err = decoder.Decode(&obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourceChainSelector`:
-	err = decoder.Decode(&obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Sender`:
-	err = decoder.Decode(&obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Data`:
-	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type RampMessageHeader struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -665,12 +414,12 @@ func (obj *SolanaExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	return nil
 }
 
-type EvmExtraArgs struct {
+type AnyExtraArgs struct {
 	GasLimit                 ag_binary.Uint128
 	AllowOutOfOrderExecution bool
 }
 
-func (obj EvmExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+func (obj AnyExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `GasLimit` param:
 	err = encoder.Encode(obj.GasLimit)
 	if err != nil {
@@ -684,7 +433,7 @@ func (obj EvmExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 
-func (obj *EvmExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+func (obj *AnyExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `GasLimit`:
 	err = decoder.Decode(&obj.GasLimit)
 	if err != nil {
@@ -780,7 +529,7 @@ type Solana2AnyRampMessage struct {
 	Sender       ag_solanago.PublicKey
 	Data         []byte
 	Receiver     []byte
-	ExtraArgs    EvmExtraArgs
+	ExtraArgs    AnyExtraArgs
 	FeeToken     ag_solanago.PublicKey
 	TokenAmounts []Solana2AnyTokenTransfer
 }
@@ -1220,6 +969,257 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
+type Solana2AnyMessage struct {
+	Receiver     []byte
+	Data         []byte
+	TokenAmounts []SolanaTokenAmount
+	FeeToken     ag_solanago.PublicKey
+	ExtraArgs    ExtraArgsInput
+	TokenIndexes []byte
+}
+
+func (obj Solana2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Receiver` param:
+	err = encoder.Encode(obj.Receiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenAmounts` param:
+	err = encoder.Encode(obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeToken` param:
+	err = encoder.Encode(obj.FeeToken)
+	if err != nil {
+		return err
+	}
+	// Serialize `ExtraArgs` param:
+	err = encoder.Encode(obj.ExtraArgs)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenIndexes` param:
+	err = encoder.Encode(obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Solana2AnyMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Receiver`:
+	err = decoder.Decode(&obj.Receiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenAmounts`:
+	err = decoder.Decode(&obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeToken`:
+	err = decoder.Decode(&obj.FeeToken)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ExtraArgs`:
+	err = decoder.Decode(&obj.ExtraArgs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenIndexes`:
+	err = decoder.Decode(&obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SolanaTokenAmount struct {
+	Token  ag_solanago.PublicKey
+	Amount uint64
+}
+
+func (obj SolanaTokenAmount) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Token` param:
+	err = encoder.Encode(obj.Token)
+	if err != nil {
+		return err
+	}
+	// Serialize `Amount` param:
+	err = encoder.Encode(obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SolanaTokenAmount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Token`:
+	err = decoder.Decode(&obj.Token)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Amount`:
+	err = decoder.Decode(&obj.Amount)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type ExtraArgsInput struct {
+	GasLimit                 *ag_binary.Uint128 `bin:"optional"`
+	AllowOutOfOrderExecution *bool              `bin:"optional"`
+}
+
+func (obj ExtraArgsInput) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `GasLimit` param (optional):
+	{
+		if obj.GasLimit == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.GasLimit)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Serialize `AllowOutOfOrderExecution` param (optional):
+	{
+		if obj.AllowOutOfOrderExecution == nil {
+			err = encoder.WriteBool(false)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = encoder.WriteBool(true)
+			if err != nil {
+				return err
+			}
+			err = encoder.Encode(obj.AllowOutOfOrderExecution)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `GasLimit` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.GasLimit)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// Deserialize `AllowOutOfOrderExecution` (optional):
+	{
+		ok, err := decoder.ReadBool()
+		if err != nil {
+			return err
+		}
+		if ok {
+			err = decoder.Decode(&obj.AllowOutOfOrderExecution)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+type Any2SolanaMessage struct {
+	MessageId           [32]uint8
+	SourceChainSelector uint64
+	Sender              []byte
+	Data                []byte
+	TokenAmounts        []SolanaTokenAmount
+}
+
+func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `MessageId` param:
+	err = encoder.Encode(obj.MessageId)
+	if err != nil {
+		return err
+	}
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `Sender` param:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenAmounts` param:
+	err = encoder.Encode(obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `MessageId`:
+	err = decoder.Decode(&obj.MessageId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenAmounts`:
+	err = decoder.Decode(&obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ReportContext struct {
 	ByteWords [3][32]uint8
 }
@@ -1401,39 +1401,6 @@ func (obj SourceChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `MinSeqNr`:
 	err = decoder.Decode(&obj.MinSeqNr)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type SourceChain struct {
-	State  SourceChainState
-	Config SourceChainConfig
-}
-
-func (obj SourceChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `State` param:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return err
-	}
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
 	if err != nil {
 		return err
 	}
@@ -1665,39 +1632,6 @@ func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 	}
 	// Deserialize `ChainFamilySelector`:
 	err = decoder.Decode(&obj.ChainFamilySelector)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type DestChain struct {
-	State  DestChainState
-	Config DestChainConfig
-}
-
-func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `State` param:
-	err = encoder.Encode(obj.State)
-	if err != nil {
-		return err
-	}
-	// Serialize `Config` param:
-	err = encoder.Encode(obj.Config)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `State`:
-	err = decoder.Decode(&obj.State)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Config`:
-	err = decoder.Decode(&obj.Config)
 	if err != nil {
 		return err
 	}
@@ -2018,6 +1952,16 @@ const (
 	StaleCommitReport_CcipRouterError
 	DestinationChainDisabled_CcipRouterError
 	FeeTokenDisabled_CcipRouterError
+	MessageTooLarge_CcipRouterError
+	UnsupportedNumberOfTokens_CcipRouterError
+	UnsupportedChainFamilySelector_CcipRouterError
+	InvalidEVMAddress_CcipRouterError
+	InvalidEncoding_CcipRouterError
+	InvalidInputsAtaAddress_CcipRouterError
+	InvalidInputsAtaWritable_CcipRouterError
+	InvalidTokenPrice_CcipRouterError
+	StaleGasPrice_CcipRouterError
+	InsufficientLamports_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -2068,6 +2012,26 @@ func (value CcipRouterError) String() string {
 		return "DestinationChainDisabled"
 	case FeeTokenDisabled_CcipRouterError:
 		return "FeeTokenDisabled"
+	case MessageTooLarge_CcipRouterError:
+		return "MessageTooLarge"
+	case UnsupportedNumberOfTokens_CcipRouterError:
+		return "UnsupportedNumberOfTokens"
+	case UnsupportedChainFamilySelector_CcipRouterError:
+		return "UnsupportedChainFamilySelector"
+	case InvalidEVMAddress_CcipRouterError:
+		return "InvalidEVMAddress"
+	case InvalidEncoding_CcipRouterError:
+		return "InvalidEncoding"
+	case InvalidInputsAtaAddress_CcipRouterError:
+		return "InvalidInputsAtaAddress"
+	case InvalidInputsAtaWritable_CcipRouterError:
+		return "InvalidInputsAtaWritable"
+	case InvalidTokenPrice_CcipRouterError:
+		return "InvalidTokenPrice"
+	case StaleGasPrice_CcipRouterError:
+		return "StaleGasPrice"
+	case InsufficientLamports_CcipRouterError:
+		return "InsufficientLamports"
 	default:
 		return ""
 	}
