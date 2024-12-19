@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
@@ -138,14 +139,17 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 
 	for _, tc := range testCases {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
+
 		feedChain := cciptypes.ChainSelector(1)
-		tokenPricesReader := priceReader{
-			chainReaders: map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+		tokenPricesReader := NewPriceReader(
+			logger.Test(t),
+			map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				feedChain: contractReader,
 			},
-			tokenInfo: tc.tokenInfo,
-			feedChain: feedChain,
-		}
+			tc.tokenInfo,
+			nil,
+			feedChain,
+		)
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			result, err := tokenPricesReader.GetFeedPricesUSD(ctx, tc.inputTokens)
