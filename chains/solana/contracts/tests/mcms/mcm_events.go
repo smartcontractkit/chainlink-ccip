@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"github.com/gagliardetto/solana-go"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
 )
 
 // Events - temporary event struct to decode
@@ -25,10 +26,10 @@ const numGroups = 32
 
 // ConfigSet represents an event emitted when a new config is set
 type ConfigSet struct {
-	// Note: Rust comment indicates signers are omitted due to memory overflow
 	GroupParents  [numGroups]byte // group_parents
 	GroupQuorums  [numGroups]byte // group_quorums
 	IsRootCleared bool            // is_root_cleared
+	Signers       []mcm.McmSigner // data: Vec<u8>
 }
 
 // OpExecuted represents an event emitted when an op is successfully executed

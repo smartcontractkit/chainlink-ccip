@@ -16,6 +16,7 @@ pub fn set_config(
     group_parents: [u8; NUM_GROUPS],
     clear_root: bool,
 ) -> Result<()> {
+    let config = &mut ctx.accounts.multisig_config;
     // signer addresses are preloaded in the ConfigSigners account through InitSigners, AppendSigners and FinalizeSigners instructions
     let signer_addresses = &ctx.accounts.config_signers.signer_addresses;
 
@@ -28,86 +29,88 @@ pub fn set_config(
         signer_addresses.len() == signer_groups.len(),
         McmError::MismatchedInputSignerVectorsLength
     );
-
-    // count the number of children for each group while validating group structure
-    let mut group_children_counts = signer_groups.iter().try_fold(
-        [0u8; NUM_GROUPS],
-        |mut acc, &group| -> Result<[u8; NUM_GROUPS]> {
-            // make sure the specified signer group is in bound
-            require!(
-                (group as usize) < NUM_GROUPS,
-                McmError::MismatchedInputGroupArraysLength
-            );
-            acc[group as usize] = acc[group as usize]
-                .checked_add(1)
-                .ok_or(McmError::Overflow)?;
-
-            Ok(acc)
-        },
-    )?;
-
-    const ROOT_GROUP: usize = 0;
-    // check if the group structure is a tree
-    for i in (0..NUM_GROUPS).rev() {
-        // validate group structure in backwards(root is 0)
-
-        match i {
-            // root should have itself as parent
-            ROOT_GROUP => require!(
-                group_parents[ROOT_GROUP] == ROOT_GROUP as u8,
-                McmError::GroupTreeNotWellFormed
-            ),
-            // make sure the parent group is at a higher level(lower index) than the current group
-            _ => require!(group_parents[i] < i as u8, McmError::GroupTreeNotWellFormed),
-        }
-
-        let disabled: bool = group_quorums[i] == 0;
-
-        match disabled {
-            true => {
-                // validate disabled group has no children
+    {
+        // count the number of children for each group while validating group structure
+        let mut group_children_counts = signer_groups.iter().try_fold(
+            [0u8; NUM_GROUPS],
+            |mut acc, &group| -> Result<[u8; NUM_GROUPS]> {
+                // make sure the specified signer group is in bound
                 require!(
-                    group_children_counts[i] == 0,
-                    McmError::SignerInDisabledGroup
+                    (group as usize) < NUM_GROUPS,
+                    McmError::MismatchedInputGroupArraysLength
                 );
-            }
-            false => {
-                // ensure the group quorum can be met(i.e. have more signers than the quorum)
-                require!(
-                    group_children_counts[i] >= group_quorums[i],
-                    McmError::OutOfBoundsGroupQuorum
-                );
-
-                // increase the parent group's children count
-                let parent_index = group_parents[i] as usize;
-                group_children_counts[parent_index] = group_children_counts[parent_index]
+                acc[group as usize] = acc[group as usize]
                     .checked_add(1)
                     .ok_or(McmError::Overflow)?;
+
+                Ok(acc)
+            },
+        )?;
+
+        const ROOT_GROUP: usize = 0;
+        // check if the group structure is a tree
+        for i in (0..NUM_GROUPS).rev() {
+            // validate group structure in backwards(root is 0)
+
+            match i {
+                // root should have itself as parent
+                ROOT_GROUP => require!(
+                    group_parents[ROOT_GROUP] == ROOT_GROUP as u8,
+                    McmError::GroupTreeNotWellFormed
+                ),
+                // make sure the parent group is at a higher level(lower index) than the current group
+                _ => require!(group_parents[i] < i as u8, McmError::GroupTreeNotWellFormed),
+            }
+
+            let disabled: bool = group_quorums[i] == 0;
+
+            match disabled {
+                true => {
+                    // validate disabled group has no children
+                    require!(
+                        group_children_counts[i] == 0,
+                        McmError::SignerInDisabledGroup
+                    );
+                }
+                false => {
+                    // ensure the group quorum can be met(i.e. have more signers than the quorum)
+                    require!(
+                        group_children_counts[i] >= group_quorums[i],
+                        McmError::OutOfBoundsGroupQuorum
+                    );
+
+                    // increase the parent group's children count
+                    let parent_index = group_parents[i] as usize;
+                    group_children_counts[parent_index] = group_children_counts[parent_index]
+                        .checked_add(1)
+                        .ok_or(McmError::Overflow)?;
+                }
             }
         }
     }
 
-    let config = &mut ctx.accounts.multisig_config;
-    let mut signers: Vec<McmSigner> = Vec::with_capacity(signer_addresses.len());
-    let mut prev_signer = [0u8; EVM_ADDRESS_BYTES];
+    {
+        let mut signers: Vec<McmSigner> = Vec::with_capacity(signer_addresses.len());
+        let mut prev_signer = [0u8; EVM_ADDRESS_BYTES];
 
-    for (index, &evm_addr) in signer_addresses.iter().enumerate() {
-        require!(
-            evm_addr > prev_signer,
-            McmError::SignersAddressesMustBeStrictlyIncreasing
-        );
+        for (index, &evm_addr) in signer_addresses.iter().enumerate() {
+            require!(
+                evm_addr > prev_signer,
+                McmError::SignersAddressesMustBeStrictlyIncreasing
+            );
 
-        // update prev signer
-        prev_signer = evm_addr;
+            // update prev signer
+            prev_signer = evm_addr;
 
-        signers.push(McmSigner {
-            evm_address: evm_addr,
-            index: u8::try_from(index).unwrap(), // This is safe due to previous check on signer_addresses length
-            group: signer_groups[index],
-        })
+            signers.push(McmSigner {
+                evm_address: evm_addr,
+                index: u8::try_from(index).unwrap(), // This is safe due to previous check on signer_addresses length
+                group: signer_groups[index],
+            })
+        }
+        config.signers = signers;
     }
 
-    config.signers = signers;
     config.group_quorums = group_quorums;
     config.group_parents = group_parents;
 
@@ -125,8 +128,8 @@ pub fn set_config(
         expiring_root.op_count = current_op_count;
 
         // set root metadata to a cleared state
-        root_metadata.chain_id = ctx.accounts.multisig_config.chain_id;
-        root_metadata.multisig = ctx.accounts.multisig_config.key();
+        root_metadata.chain_id = config.chain_id;
+        root_metadata.multisig = config.key();
         root_metadata.pre_op_count = current_op_count;
         root_metadata.post_op_count = current_op_count;
         root_metadata.override_previous_root = true;
@@ -136,8 +139,7 @@ pub fn set_config(
         group_parents,
         group_quorums,
         is_root_cleared: clear_root,
-        // todo: memory inefficient, finding workaround
-        // signers: config.signers.clone(),
+        signers: config.signers.clone(),
     });
 
     Ok(())
