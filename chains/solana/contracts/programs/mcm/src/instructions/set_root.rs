@@ -56,6 +56,8 @@ pub fn set_root(
     );
 
     let current_op_count = ctx.accounts.expiring_root_and_op_count.op_count;
+    // don't allow a new root to be set if there are still outstanding ops that have not been
+    // executed, unless override_previous_root is set
     require!(
         current_op_count == ctx.accounts.root_metadata.post_op_count
             || metadata.override_previous_root,
