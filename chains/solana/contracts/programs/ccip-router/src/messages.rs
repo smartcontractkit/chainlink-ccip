@@ -585,7 +585,7 @@ pub(crate) mod tests {
                 sequence_number: 0,
                 usd_per_unit_gas: crate::TimestampedPackedU224 {
                     value: [0; 28],
-                    timestamp: 0,
+                    timestamp: 100,
                 },
             },
             config: crate::DestChainConfig {

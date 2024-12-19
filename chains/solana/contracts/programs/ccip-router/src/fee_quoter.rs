@@ -238,7 +238,6 @@ pub fn transfer_fee<'info>(
 mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
-        message,
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
@@ -393,6 +392,68 @@ mod tests {
         );
     }
 
+    #[test]
+    fn network_fee_for_a_supported_token_with_bps() {
+        let mut chain = sample_dest_chain();
+
+        // Will have no effect because we're not using the network fee
+        chain.config.network_fee_usdcents *= 0;
+        let (another_token_config, mut another_per_chain_per_token_config) =
+            sample_additional_token();
+
+        another_per_chain_per_token_config.billing.deci_bps = 100;
+
+        let mut message = sample_message();
+        message.token_amounts = vec![SolanaTokenAmount {
+            token: another_token_config.mint,
+            amount: 1,
+        }];
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &chain,
+                &[&sample_billing_config(), &another_token_config],
+                &[&another_per_chain_per_token_config]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                amount: 1
+            }
+        );
+    }
+
+    #[test]
+    fn network_fee_for_multiple_tokens() {
+        let (mut tokens, per_chains): (Vec<_>, Vec<_>) =
+            (0..4).map(|_| sample_additional_token()).unzip();
+
+        // Will have no effect because we're not using the network fee
+        let mut message = sample_message();
+        message.token_amounts = tokens
+            .iter()
+            .map(|t| SolanaTokenAmount {
+                token: t.mint,
+                amount: 1,
+            })
+            .collect();
+        tokens.push(sample_billing_config());
+
+        let tokens: Vec<_> = tokens.iter().collect();
+        let per_chains: Vec<_> = per_chains.iter().collect();
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(0, &message, &sample_dest_chain(), &tokens, &per_chains).unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                // Increases proportionally to the number of tokens
+                amount: 2
+            }
+        );
+    }
+
     fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
         let mint = Pubkey::new_unique();
         let mut usd_per_token = [0u8; 28];
@@ -403,7 +464,7 @@ mod tests {
                 mint,
                 usd_per_token: TimestampedPackedU224 {
                     value: usd_per_token,
-                    timestamp: 0,
+                    timestamp: 100,
                 },
                 premium_multiplier_wei_per_eth: 1,
             },
