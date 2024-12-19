@@ -1,168 +1,164 @@
 package cache
 
 import (
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInMemoryCache_Basic(t *testing.T) {
-	t.Run("never expire policy", func(t *testing.T) {
-		cache := NewInMemoryCache[string, int](NewNeverExpirePolicy())
+func TestCustomCache(t *testing.T) {
+	t.Run("basic operations without custom policy", func(t *testing.T) {
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
 
-		// Test Set - new entry
-		isNew := cache.Set("key1", 100)
-		assert.True(t, isNew, "should be a new entry")
-
-		// Test Set - update existing
-		isNew = cache.Set("key1", 200)
-		assert.False(t, isNew, "should be an update")
-
-		// Test Get - existing key
-		value, exists := cache.Get("key1")
-		assert.True(t, exists, "should exist")
-		assert.Equal(t, 200, value)
-
-		// Test Get - non-existing key
-		value, exists = cache.Get("non-existing")
-		assert.False(t, exists, "should not exist")
-		assert.Equal(t, 0, value)
-
-		// Test Delete - existing key
-		deleted := cache.Delete("key1")
-		assert.True(t, deleted, "should be deleted")
-
-		// Test Delete - non-existing key
-		deleted = cache.Delete("key1")
-		assert.False(t, deleted, "should not be deleted")
-	})
-}
-
-func TestInMemoryCache_TimeBased(t *testing.T) {
-	t.Run("time based policy", func(t *testing.T) {
-		cache := NewInMemoryCache[string, int](NewTimeBasedPolicy(100 * time.Millisecond))
-
-		cache.Set("key1", 100)
-
-		// Immediate get should succeed
-		value, exists := cache.Get("key1")
-		assert.True(t, exists)
+		// Test Set and Get
+		cache.Set("test1", 100, NoExpiration)
+		value, found := cache.Get("test1")
+		assert.True(t, found)
 		assert.Equal(t, 100, value)
 
-		// Wait for TTL to expire
-		time.Sleep(150 * time.Millisecond)
+		// Test non-existent key
+		_, found = cache.Get("nonexistent")
+		assert.False(t, found)
 
-		// Get after expiry should fail
-		value, exists = cache.Get("key1")
-		assert.False(t, exists)
-		assert.Equal(t, 0, value)
+		// Test Delete
+		cache.Delete("test1")
+		_, found = cache.Get("test1")
+		assert.False(t, found)
 	})
-}
 
-func TestInMemoryCache_Custom(t *testing.T) {
-	t.Run("custom policy", func(t *testing.T) {
-		// Custom policy that evicts odd numbers
-		cache := NewInMemoryCache[string, int](NewCustomPolicy(func(v interface{}) bool {
-			if val, ok := v.(int); ok {
-				return val%2 != 0
-			}
-			return false
-		}))
+	t.Run("custom policy eviction", func(t *testing.T) {
+		isEven := func(v int) bool {
+			return v%2 == 0
+		}
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, isEven)
 
-		// Even number should stay
-		cache.Set("even", 2)
-		value, exists := cache.Get("even")
-		assert.True(t, exists)
-		assert.Equal(t, 2, value)
+		// Even number should be evicted
+		cache.Set("even", 2, NoExpiration)
+		_, found := cache.Get("even")
+		assert.False(t, found)
 
-		// Odd number should be evicted on get
-		cache.Set("odd", 3)
-		value, exists = cache.Get("odd")
-		assert.False(t, exists)
-		assert.Equal(t, 0, value)
+		// Odd number should remain
+		cache.Set("odd", 3, NoExpiration)
+		value, found := cache.Get("odd")
+		assert.True(t, found)
+		assert.Equal(t, 3, value)
 	})
-}
 
-func TestInMemoryCache_Concurrent(t *testing.T) {
+	t.Run("time based expiration", func(t *testing.T) {
+		cache := NewCustomCache[string](1*time.Second, 1*time.Second, nil)
+
+		cache.Set("key", "value", 100*time.Millisecond)
+
+		// Should exist initially
+		value, found := cache.Get("key")
+		assert.True(t, found)
+		assert.Equal(t, "value", value)
+
+		// Should expire
+		time.Sleep(200 * time.Millisecond)
+		_, found = cache.Get("key")
+		assert.False(t, found)
+	})
+
+	t.Run("items retrieval", func(t *testing.T) {
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
+
+		cache.Set("one", 1, NoExpiration)
+		cache.Set("two", 2, NoExpiration)
+
+		items := cache.Items()
+		assert.Len(t, items, 2)
+		assert.Equal(t, 1, items["one"])
+		assert.Equal(t, 2, items["two"])
+	})
+
+	t.Run("flush operation", func(t *testing.T) {
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
+
+		cache.Set("one", 1, NoExpiration)
+		cache.Set("two", 2, NoExpiration)
+
+		cache.Flush()
+		items := cache.Items()
+		assert.Len(t, items, 0)
+	})
+
+	t.Run("type safety", func(t *testing.T) {
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
+
+		// Set with correct type
+		cache.Set("good", 123, NoExpiration)
+
+		// Simulate wrong type in underlying cache
+		cache.cache.Set("bad", "not an int", NoExpiration)
+
+		// Good type should work
+		value, found := cache.Get("good")
+		assert.True(t, found)
+		assert.Equal(t, 123, value)
+
+		// Bad type should fail safely
+		_, found = cache.Get("bad")
+		assert.False(t, found)
+	})
+
 	t.Run("concurrent access", func(t *testing.T) {
-		cache := NewInMemoryCache[int, int](NewNeverExpirePolicy())
-		var wg sync.WaitGroup
-		numGoroutines := 10
-		numOperations := 100
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
 
-		// Concurrent writes
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func(routine int) {
-				defer wg.Done()
-				for j := 0; j < numOperations; j++ {
-					key := routine*numOperations + j
-					cache.Set(key, key)
-				}
+		// Run multiple goroutines accessing the cache
+		done := make(chan bool)
+		for i := 0; i < 10; i++ {
+			go func(val int) {
+				cache.Set("key", val, NoExpiration)
+				_, _ = cache.Get("key")
+				done <- true
 			}(i)
 		}
 
-		// Concurrent reads
-		for i := 0; i < numGoroutines; i++ {
-			wg.Add(1)
-			go func(routine int) {
-				defer wg.Done()
-				for j := 0; j < numOperations; j++ {
-					key := routine*numOperations + j
-					_, _ = cache.Get(key)
-				}
-			}(i)
+		// Wait for all goroutines
+		for i := 0; i < 10; i++ {
+			<-done
 		}
 
-		wg.Wait()
+		// Should have a value at the end
+		_, found := cache.Get("key")
+		assert.True(t, found)
 	})
-}
 
-func TestInMemoryCache_Types(t *testing.T) {
-	t.Run("different types", func(t *testing.T) {
-		// String cache
-		stringCache := NewInMemoryCache[string, string](NewNeverExpirePolicy())
-		stringCache.Set("hello", "world")
-		val, exists := stringCache.Get("hello")
-		assert.True(t, exists)
-		assert.Equal(t, "world", val)
-
-		// Struct cache
-		type Person struct {
+	t.Run("complex types", func(t *testing.T) {
+		type ComplexType struct {
+			ID   int
 			Name string
-			Age  int
 		}
-		structCache := NewInMemoryCache[string, Person](NewNeverExpirePolicy())
-		structCache.Set("person", Person{Name: "John", Age: 30})
-		person, exists := structCache.Get("person")
-		assert.True(t, exists)
-		assert.Equal(t, "John", person.Name)
-		assert.Equal(t, 30, person.Age)
+
+		cache := NewCustomCache[ComplexType](5*time.Minute, 10*time.Minute, nil)
+
+		value := ComplexType{ID: 1, Name: "test"}
+		cache.Set("complex", value, NoExpiration)
+
+		retrieved, found := cache.Get("complex")
+		assert.True(t, found)
+		assert.Equal(t, value, retrieved)
 	})
-}
 
-func TestInMemoryCache_EdgeCases(t *testing.T) {
-	t.Run("edge cases", func(t *testing.T) {
-		cache := NewInMemoryCache[string, *string](NewNeverExpirePolicy())
+	t.Run("custom policy with nil value", func(t *testing.T) {
+		isNil := func(v *string) bool {
+			return v == nil
+		}
+		cache := NewCustomCache[*string](5*time.Minute, 10*time.Minute, isNil)
 
-		// Nil value
-		var nilStr *string
-		cache.Set("nil", nilStr)
-		val, exists := cache.Get("nil")
-		assert.True(t, exists)
-		assert.Nil(t, val)
+		str := "test"
+		cache.Set("nonnil", &str, NoExpiration)
+		cache.Set("nil", nil, NoExpiration)
 
-		// Empty string key
-		str := "value"
-		cache.Set("", &str)
-		val, exists = cache.Get("")
-		assert.True(t, exists)
-		assert.Equal(t, &str, val)
+		// Non-nil value should remain
+		value, found := cache.Get("nonnil")
+		assert.True(t, found)
+		assert.Equal(t, &str, value)
 
-		// Delete empty key
-		deleted := cache.Delete("")
-		assert.True(t, deleted)
+		// Nil value should be evicted
+		_, found = cache.Get("nil")
+		assert.False(t, found)
 	})
 }

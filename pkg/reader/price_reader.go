@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -11,9 +12,9 @@ import (
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 
+	"github.com/smartcontractkit/chainlink-ccip/internal/cache"
 	cachekeys "github.com/smartcontractkit/chainlink-ccip/internal/cache/keys"
 
-	"github.com/smartcontractkit/chainlink-ccip/internal/cache"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
@@ -44,7 +45,7 @@ type priceReader struct {
 	tokenInfo     map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
 	ccipReader    CCIPReader
 	feedChain     ccipocr3.ChainSelector
-	decimalsCache cache.Cache[string, uint8]
+	decimalsCache *cache.CustomCache[uint8]
 }
 
 func NewPriceReader(
@@ -60,7 +61,7 @@ func NewPriceReader(
 		tokenInfo:     tokenInfo,
 		ccipReader:    ccipReader,
 		feedChain:     feedChain,
-		decimalsCache: cache.NewInMemoryCache[string, uint8](cache.NewNeverExpirePolicy()),
+		decimalsCache: cache.NewCustomCache[uint8](cache.NoExpiration, 10*time.Minute, nil),
 	}
 }
 
@@ -221,12 +222,11 @@ func (pr *priceReader) getFeedDecimals(
 	}
 
 	// Store in cache and log whether it was a new entry
-	isNew := pr.decimalsCache.Set(cacheKey, decimals)
+	pr.decimalsCache.Set(cacheKey, decimals, cache.NoExpiration)
 	pr.lggr.Debugw("Cached token decimals",
 		"token", token,
 		"contract", boundContract.Address,
-		"decimals", decimals,
-		"isNewEntry", isNew)
+		"decimals", decimals)
 
 	return decimals, nil
 }

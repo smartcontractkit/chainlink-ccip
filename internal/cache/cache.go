@@ -3,134 +3,93 @@ package cache
 import (
 	"sync"
 	"time"
+
+	"github.com/patrickmn/go-cache"
 )
 
-// Cache defines the interface for cache operations
-type Cache[K comparable, V any] interface {
-	// Get retrieves a value from the cache
-	// Returns the value and true if found, zero value and false if not found
-	Get(key K) (V, bool)
+const (
+	NoExpiration = cache.NoExpiration
+)
 
-	// Set adds or updates a value in the cache
-	// Returns true if a new entry was created, false if an existing entry was updated
-	Set(key K, value V) bool
-
-	// Delete removes a value from the cache
-	// Returns true if an entry was deleted, false if the key wasn't found
-	Delete(key K) bool
+// CustomCache wraps go-cache with additional eviction policies
+type CustomCache[V any] struct {
+	cache        *cache.Cache
+	customPolicy func(V) bool
+	mutex        sync.RWMutex
 }
 
-// EvictionPolicy defines how entries should be evicted from the cache
-type EvictionPolicy interface {
-	// TODO: async process needed
-	ShouldEvict(entry *cacheEntry) bool
-}
-
-// cacheEntry represents a single entry in the cache
-type cacheEntry struct {
-	value     interface{}
-	createdAt time.Time
-}
-
-// inMemoryCache is an in-memory implementation of the Cache interface
-type inMemoryCache[K comparable, V any] struct {
-	data   map[K]*cacheEntry
-	policy EvictionPolicy
-	mutex  sync.RWMutex
-}
-
-// NewInMemoryCache creates a new cache with the specified eviction policy
-// The cache is thread-safe and can be used concurrently
-func NewInMemoryCache[K comparable, V any](policy EvictionPolicy) Cache[K, V] {
-	return &inMemoryCache[K, V]{
-		data:   make(map[K]*cacheEntry),
-		policy: policy,
+// NewCustomCache creates a new cache with both time-based and custom eviction policies
+func NewCustomCache[V any](
+	defaultExpiration time.Duration,
+	cleanupInterval time.Duration,
+	customPolicy func(V) bool,
+) *CustomCache[V] {
+	return &CustomCache[V]{
+		cache:        cache.New(defaultExpiration, cleanupInterval),
+		customPolicy: customPolicy,
 	}
 }
 
-// Set adds or updates a value in the cache
-func (c *inMemoryCache[K, V]) Set(key K, value V) bool {
+// Set adds an item to the cache
+func (c *CustomCache[V]) Set(key string, value V, expiration time.Duration) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-
-	_, exists := c.data[key]
-	c.data[key] = &cacheEntry{
-		value:     value,
-		createdAt: time.Now(),
-	}
-	return !exists
+	c.cache.Set(key, value, expiration)
 }
 
-// Get retrieves a value from the cache
-func (c *inMemoryCache[K, V]) Get(key K) (V, bool) {
+// Get retrieves an item from the cache, checking both time-based and custom policies
+func (c *CustomCache[V]) Get(key string) (V, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	entry, exists := c.data[key]
-	if !exists {
-		var zero V
+	var zero V
+	value, found := c.cache.Get(key)
+	if !found {
 		return zero, false
 	}
 
-	if c.policy.ShouldEvict(entry) {
-		var zero V
-		return zero, false
-	}
-
-	value, ok := entry.value.(V)
+	// Type assertion
+	typedValue, ok := value.(V)
 	if !ok {
-		var zero V
 		return zero, false
 	}
 
-	return value, true
+	// Check custom policy
+	if c.customPolicy != nil && c.customPolicy(typedValue) {
+		c.cache.Delete(key)
+		return zero, false
+	}
+
+	return typedValue, true
 }
 
-// Delete removes a value from the cache
-func (c *inMemoryCache[K, V]) Delete(key K) bool {
+// Delete removes an item from the cache
+func (c *CustomCache[V]) Delete(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	c.cache.Delete(key)
+}
 
-	_, exists := c.data[key]
-	if exists {
-		delete(c.data, key)
+// Items returns all items in the cache
+func (c *CustomCache[V]) Items() map[string]V {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	items := c.cache.Items()
+	result := make(map[string]V)
+
+	for k, v := range items {
+		if value, ok := v.Object.(V); ok {
+			result[k] = value
+		}
 	}
-	return exists
+
+	return result
 }
 
-// neverExpirePolicy implements EvictionPolicy for entries that should never expire
-type neverExpirePolicy struct{}
-
-func NewNeverExpirePolicy() EvictionPolicy {
-	return neverExpirePolicy{}
-}
-
-func (p neverExpirePolicy) ShouldEvict(_ *cacheEntry) bool {
-	return false
-}
-
-// timeBasedPolicy implements EvictionPolicy for time-based expiration
-type timeBasedPolicy struct {
-	ttl time.Duration
-}
-
-func NewTimeBasedPolicy(ttl time.Duration) EvictionPolicy {
-	return &timeBasedPolicy{ttl: ttl}
-}
-
-func (p timeBasedPolicy) ShouldEvict(entry *cacheEntry) bool {
-	return time.Since(entry.createdAt) > p.ttl
-}
-
-// customPolicy implements EvictionPolicy with a custom eviction function
-type customPolicy struct {
-	evictFunc func(interface{}) bool
-}
-
-func NewCustomPolicy(evictFunc func(interface{}) bool) EvictionPolicy {
-	return &customPolicy{evictFunc: evictFunc}
-}
-
-func (p customPolicy) ShouldEvict(entry *cacheEntry) bool {
-	return p.evictFunc(entry.value)
+// Flush removes all items from the cache
+func (c *CustomCache[V]) Flush() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.cache.Flush()
 }
