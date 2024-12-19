@@ -25,7 +25,7 @@ type ManuallyExecute struct {
 
 	// [0] = [] config
 	//
-	// [1] = [] chainState
+	// [1] = [] sourceChainState
 	//
 	// [2] = [WRITE] commitReport
 	//
@@ -66,14 +66,14 @@ func (inst *ManuallyExecute) GetConfigAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
-// SetChainStateAccount sets the "chainState" account.
-func (inst *ManuallyExecute) SetChainStateAccount(chainState ag_solanago.PublicKey) *ManuallyExecute {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(chainState)
+// SetSourceChainStateAccount sets the "sourceChainState" account.
+func (inst *ManuallyExecute) SetSourceChainStateAccount(sourceChainState ag_solanago.PublicKey) *ManuallyExecute {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(sourceChainState)
 	return inst
 }
 
-// GetChainStateAccount gets the "chainState" account.
-func (inst *ManuallyExecute) GetChainStateAccount() *ag_solanago.AccountMeta {
+// GetSourceChainStateAccount gets the "sourceChainState" account.
+func (inst *ManuallyExecute) GetSourceChainStateAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
@@ -174,7 +174,7 @@ func (inst *ManuallyExecute) Validate() error {
 			return errors.New("accounts.Config is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.ChainState is not set")
+			return errors.New("accounts.SourceChainState is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.CommitReport is not set")
@@ -214,7 +214,7 @@ func (inst *ManuallyExecute) EncodeToTree(parent ag_treeout.Branches) {
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=8]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("                 config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("             chainState", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("       sourceChainState", inst.AccountMetaSlice[1]))
 						accountsBranch.Child(ag_format.Meta("           commitReport", inst.AccountMetaSlice[2]))
 						accountsBranch.Child(ag_format.Meta("externalExecutionConfig", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("              authority", inst.AccountMetaSlice[4]))
@@ -249,7 +249,7 @@ func NewManuallyExecuteInstruction(
 	executionReport ExecutionReportSingleChain,
 	// Accounts:
 	config ag_solanago.PublicKey,
-	chainState ag_solanago.PublicKey,
+	sourceChainState ag_solanago.PublicKey,
 	commitReport ag_solanago.PublicKey,
 	externalExecutionConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -259,7 +259,7 @@ func NewManuallyExecuteInstruction(
 	return NewManuallyExecuteInstructionBuilder().
 		SetExecutionReport(executionReport).
 		SetConfigAccount(config).
-		SetChainStateAccount(chainState).
+		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).
 		SetExternalExecutionConfigAccount(externalExecutionConfig).
 		SetAuthorityAccount(authority).

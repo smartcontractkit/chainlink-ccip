@@ -17,9 +17,6 @@ pub fn cancel<'info>(_ctx: Context<'_, '_, '_, 'info, Cancel<'info>>, id: [u8; 3
 #[derive(Accounts)]
 #[instruction(id: [u8; 32])]
 pub struct Cancel<'info> {
-    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
-    pub config: Account<'info, Config>,
-
     #[account(
         mut,
         seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
@@ -29,6 +26,10 @@ pub struct Cancel<'info> {
         constraint = operation.is_pending() @ TimelockError::OperationNotCancellable,
     )]
     pub operation: Account<'info, Operation>,
+
+    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    pub config: Account<'info, Config>,
+
     // NOTE: access controller check happens in only_role_or_admin_role macro
     pub role_access_controller: AccountLoader<'info, AccessController>,
 

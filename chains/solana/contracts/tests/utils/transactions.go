@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"strconv"
-
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -43,7 +41,7 @@ func SendAndFailWith(ctx context.Context, t *testing.T, rpcClient *rpc.Client, i
 	txres := sendTransactionWithLookupTables(ctx, rpcClient, t, instructions, signer, commitment, true, emptyLookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
 
 	require.NotNil(t, txres.Meta)
-	require.NotNil(t, txres.Meta.Err)
+	require.NotNil(t, txres.Meta.Err, fmt.Sprintf("tx should have reverted with: %+v", expectedErrors))
 	logs := strings.Join(txres.Meta.LogMessages, " ")
 	for _, expectedError := range expectedErrors {
 		require.Contains(t, logs, expectedError, fmt.Sprintf("The logs did not contain '%s'. The logs were: %s", expectedError, logs))
@@ -108,6 +106,12 @@ func AddSigners(additionalSigners ...solana.PrivateKey) TxModifier {
 func AddComputeUnitLimit(v fees.ComputeUnitLimit) TxModifier {
 	return func(tx *solana.Transaction, _ map[solana.PublicKey]solana.PrivateKey) error {
 		return fees.SetComputeUnitLimit(tx, v)
+	}
+}
+
+func AddComputeUnitPrice(v fees.ComputeUnitPrice) TxModifier {
+	return func(tx *solana.Transaction, _ map[solana.PublicKey]solana.PrivateKey) error {
+		return fees.SetComputeUnitPrice(tx, v)
 	}
 }
 
@@ -199,6 +203,7 @@ func ExtractReturnValue(ctx context.Context, t *testing.T, logs []string, progra
 	if logs == nil {
 		return []byte{}
 	}
+
 	for _, log := range logs {
 		if strings.HasPrefix(log, "Program return: "+programID) {
 			parts := strings.Split(log, " ")
@@ -211,20 +216,17 @@ func ExtractReturnValue(ctx context.Context, t *testing.T, logs []string, progra
 	return []byte{}
 }
 
-func ExtractReturnedError(ctx context.Context, t *testing.T, logs []string, programID string) *int {
+func ExtractReturnedError(ctx context.Context, t *testing.T, logs []string, programID string) *string {
 	if logs == nil {
 		return nil
 	}
 
 	for _, log := range logs {
-		if strings.Contains(log, "Error Number: ") {
-			// extract error number from the string
-			parts := strings.Split(log, "Error Number: ")
+		if strings.Contains(log, "Error Code: ") {
+			parts := strings.Split(log, "Error Code: ")
 			if len(parts) > 1 {
-				numberPart := strings.Split(parts[1], ".")[0]
-				errorNumber, err := strconv.Atoi(strings.TrimSpace(numberPart))
-				require.NoError(t, err)
-				return &errorNumber
+				codePart := strings.Split(parts[1], ".")[0]
+				return &codePart
 			}
 		}
 	}

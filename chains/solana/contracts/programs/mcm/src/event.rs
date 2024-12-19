@@ -19,11 +19,11 @@ pub struct NewRoot {
 #[event]
 /// @dev Emitted when a new config is set.
 pub struct ConfigSet {
-    // todo: emitting all signers causes a memory overflow, need to find a way to emit them
-    // pub signers: Vec<McmSigner>,
     pub group_parents: [u8; NUM_GROUPS],
     pub group_quorums: [u8; NUM_GROUPS],
     pub is_root_cleared: bool,
+    // todo: emitting all signers causes a memory overflow, need to find a way to emit them
+    // pub signers: Vec<McmSigner>,
 }
 
 #[event]

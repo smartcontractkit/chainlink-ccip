@@ -14,13 +14,13 @@ import (
 type ExecuteBatch struct {
 	Id *[32]uint8
 
-	// [0] = [] config
+	// [0] = [WRITE] operation
 	//
-	// [1] = [] timelockSigner
+	// [1] = [] predecessorOperation
 	//
-	// [2] = [WRITE] operation
+	// [2] = [] config
 	//
-	// [3] = [] predecessorOperation
+	// [3] = [] timelockSigner
 	//
 	// [4] = [] roleAccessController
 	//
@@ -42,47 +42,47 @@ func (inst *ExecuteBatch) SetId(id [32]uint8) *ExecuteBatch {
 	return inst
 }
 
-// SetConfigAccount sets the "config" account.
-func (inst *ExecuteBatch) SetConfigAccount(config ag_solanago.PublicKey) *ExecuteBatch {
-	inst.AccountMetaSlice[0] = ag_solanago.Meta(config)
-	return inst
-}
-
-// GetConfigAccount gets the "config" account.
-func (inst *ExecuteBatch) GetConfigAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[0]
-}
-
-// SetTimelockSignerAccount sets the "timelockSigner" account.
-func (inst *ExecuteBatch) SetTimelockSignerAccount(timelockSigner ag_solanago.PublicKey) *ExecuteBatch {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(timelockSigner)
-	return inst
-}
-
-// GetTimelockSignerAccount gets the "timelockSigner" account.
-func (inst *ExecuteBatch) GetTimelockSignerAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
-}
-
 // SetOperationAccount sets the "operation" account.
 func (inst *ExecuteBatch) SetOperationAccount(operation ag_solanago.PublicKey) *ExecuteBatch {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(operation).WRITE()
+	inst.AccountMetaSlice[0] = ag_solanago.Meta(operation).WRITE()
 	return inst
 }
 
 // GetOperationAccount gets the "operation" account.
 func (inst *ExecuteBatch) GetOperationAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[0]
 }
 
 // SetPredecessorOperationAccount sets the "predecessorOperation" account.
 func (inst *ExecuteBatch) SetPredecessorOperationAccount(predecessorOperation ag_solanago.PublicKey) *ExecuteBatch {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(predecessorOperation)
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(predecessorOperation)
 	return inst
 }
 
 // GetPredecessorOperationAccount gets the "predecessorOperation" account.
 func (inst *ExecuteBatch) GetPredecessorOperationAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
+// SetConfigAccount sets the "config" account.
+func (inst *ExecuteBatch) SetConfigAccount(config ag_solanago.PublicKey) *ExecuteBatch {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *ExecuteBatch) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
+// SetTimelockSignerAccount sets the "timelockSigner" account.
+func (inst *ExecuteBatch) SetTimelockSignerAccount(timelockSigner ag_solanago.PublicKey) *ExecuteBatch {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(timelockSigner)
+	return inst
+}
+
+// GetTimelockSignerAccount gets the "timelockSigner" account.
+func (inst *ExecuteBatch) GetTimelockSignerAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }
 
@@ -136,16 +136,16 @@ func (inst *ExecuteBatch) Validate() error {
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
-			return errors.New("accounts.Config is not set")
-		}
-		if inst.AccountMetaSlice[1] == nil {
-			return errors.New("accounts.TimelockSigner is not set")
-		}
-		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Operation is not set")
 		}
-		if inst.AccountMetaSlice[3] == nil {
+		if inst.AccountMetaSlice[1] == nil {
 			return errors.New("accounts.PredecessorOperation is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
+			return errors.New("accounts.Config is not set")
+		}
+		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.TimelockSigner is not set")
 		}
 		if inst.AccountMetaSlice[4] == nil {
 			return errors.New("accounts.RoleAccessController is not set")
@@ -172,10 +172,10 @@ func (inst *ExecuteBatch) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("      timelockSigner", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta("predecessorOperation", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("           operation", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("predecessorOperation", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("              config", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("      timelockSigner", inst.AccountMetaSlice[3]))
 						accountsBranch.Child(ag_format.Meta("roleAccessController", inst.AccountMetaSlice[4]))
 						accountsBranch.Child(ag_format.Meta("           authority", inst.AccountMetaSlice[5]))
 					})
@@ -205,18 +205,18 @@ func NewExecuteBatchInstruction(
 	// Parameters:
 	id [32]uint8,
 	// Accounts:
-	config ag_solanago.PublicKey,
-	timelockSigner ag_solanago.PublicKey,
 	operation ag_solanago.PublicKey,
 	predecessorOperation ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
+	timelockSigner ag_solanago.PublicKey,
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ExecuteBatch {
 	return NewExecuteBatchInstructionBuilder().
 		SetId(id).
-		SetConfigAccount(config).
-		SetTimelockSignerAccount(timelockSigner).
 		SetOperationAccount(operation).
 		SetPredecessorOperationAccount(predecessorOperation).
+		SetConfigAccount(config).
+		SetTimelockSignerAccount(timelockSigner).
 		SetRoleAccessControllerAccount(roleAccessController).
 		SetAuthorityAccount(authority)
 }

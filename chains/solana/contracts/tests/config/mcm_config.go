@@ -26,7 +26,6 @@ var (
 	MaxNumSigners               = 200
 	MaxAppendSignerBatchSize    = 45
 	MaxAppendSignatureBatchSize = 13
-
 	// root related configs
 	// the following diagram shows the structure of the signers and groups:
 	// ref: https://github.com/smartcontractkit/ccip-owner-contracts/blob/56f1a8d2cd4ba5ef2b99d2185ffded53957dd410/src/ManyChainMultiSig.sol#L65

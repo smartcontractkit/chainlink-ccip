@@ -78,11 +78,7 @@ func TimelockBatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicK
 			authority.PublicKey(),
 		)
 		for _, address := range chunk {
-			ix.Append(&solana.AccountMeta{
-				PublicKey:  address,
-				IsSigner:   false,
-				IsWritable: false,
-			})
+			ix.Append(solana.Meta(address))
 		}
 		vIx, err := ix.ValidateAndBuild()
 		if err != nil {
@@ -90,6 +86,53 @@ func TimelockBatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicK
 		}
 		ixs = append(ixs, vIx)
 	}
+	return ixs, nil
+}
+
+// instructions builder for preloading instructions to timelock operation
+func TimelockPreloadOperationIxs(ctx context.Context, op TimelockOperation, authority solana.PublicKey, client *rpc.Client) ([]solana.Instruction, error) {
+	ixs := []solana.Instruction{}
+	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
+		op.OperationID(),
+		op.Predecessor,
+		op.Salt,
+		op.IxsCountU32(),
+		op.OperationPDA(),
+		config.TimelockConfigPDA,
+		authority,
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if ioErr != nil {
+		return nil, fmt.Errorf("failed to build initialize operation instruction: %w", ioErr)
+	}
+	ixs = append(ixs, initOpIx)
+
+	for _, instruction := range op.ToInstructionData() {
+		appendIxsIx, apErr := timelock.NewAppendInstructionsInstruction(
+			op.OperationID(),
+			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
+			op.OperationPDA(),
+			config.TimelockConfigPDA,
+			authority,
+			solana.SystemProgramID, // for reallocation
+		).ValidateAndBuild()
+		if apErr != nil {
+			return nil, fmt.Errorf("failed to build append instructions instruction: %w", apErr)
+		}
+		ixs = append(ixs, appendIxsIx)
+	}
+
+	finOpIx, foErr := timelock.NewFinalizeOperationInstruction(
+		op.OperationID(),
+		op.OperationPDA(),
+		config.TimelockConfigPDA,
+		authority,
+	).ValidateAndBuild()
+	if foErr != nil {
+		return nil, fmt.Errorf("failed to build finalize operation instruction: %w", foErr)
+	}
+	ixs = append(ixs, finOpIx)
+
 	return ixs, nil
 }
 
@@ -103,8 +146,8 @@ func (r RoleMultisigs) GetAnyMultisig() mcmsUtils.Multisig {
 	if len(r.Multisigs) == 0 {
 		panic("no multisigs to pick from")
 	}
-	maxN := big.NewInt(int64(len(r.Multisigs)))
-	n, err := crypto_rand.Int(crypto_rand.Reader, maxN)
+	maxCount := big.NewInt(int64(len(r.Multisigs)))
+	n, err := crypto_rand.Int(crypto_rand.Reader, maxCount)
 	if err != nil {
 		panic(err)
 	}
@@ -194,4 +237,30 @@ func WaitForOperationToBeReady(ctx context.Context, client *rpc.Client, opPDA so
 
 	return fmt.Errorf("operation not ready after %d attempts (scheduled for: %v, with buffer: %v)",
 		maxAttempts, scheduledTime.UTC(), scheduledTimeWithBuffer.UTC())
+}
+
+func GetBlockedFunctionSelectors(
+	ctx context.Context,
+	client *rpc.Client,
+	configPubKey solana.PublicKey,
+	commitment rpc.CommitmentType,
+) ([][]byte, error) {
+	var config timelock.Config
+	err := utils.GetAccountDataBorshInto(ctx, client, configPubKey, commitment, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch config account data: %w", err)
+	}
+
+	blockedCount := config.BlockedSelectors.Len
+	if blockedCount == 0 {
+		return nil, nil
+	}
+
+	// convert to [][]byte for easier comparison
+	selectors := make([][]byte, blockedCount)
+	for i := uint64(0); i < blockedCount; i++ {
+		selectors[i] = config.BlockedSelectors.Xs[i][:] // Convert [8]byte to []byte
+	}
+
+	return selectors, nil
 }

@@ -16,14 +16,16 @@ type FinalizeOperation struct {
 
 	// [0] = [WRITE] operation
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] config
+	//
+	// [2] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewFinalizeOperationInstructionBuilder creates a new `FinalizeOperation` instruction builder.
 func NewFinalizeOperationInstructionBuilder() *FinalizeOperation {
 	nd := &FinalizeOperation{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -45,15 +47,26 @@ func (inst *FinalizeOperation) GetOperationAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetConfigAccount sets the "config" account.
+func (inst *FinalizeOperation) SetConfigAccount(config ag_solanago.PublicKey) *FinalizeOperation {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(config)
+	return inst
+}
+
+// GetConfigAccount gets the "config" account.
+func (inst *FinalizeOperation) GetConfigAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *FinalizeOperation) SetAuthorityAccount(authority ag_solanago.PublicKey) *FinalizeOperation {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *FinalizeOperation) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst FinalizeOperation) Build() *Instruction {
@@ -87,6 +100,9 @@ func (inst *FinalizeOperation) Validate() error {
 			return errors.New("accounts.Operation is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.Config is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -107,9 +123,10 @@ func (inst *FinalizeOperation) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("operation", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   config", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -138,9 +155,11 @@ func NewFinalizeOperationInstruction(
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
+	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeOperation {
 	return NewFinalizeOperationInstructionBuilder().
 		SetId(id).
 		SetOperationAccount(operation).
+		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

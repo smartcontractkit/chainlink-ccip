@@ -7,6 +7,39 @@ import (
 	ag_solanago "github.com/gagliardetto/solana-go"
 )
 
+type BlockedSelectors struct {
+	Xs  [32][8]uint8
+	Len uint64
+}
+
+func (obj BlockedSelectors) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Xs` param:
+	err = encoder.Encode(obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Serialize `Len` param:
+	err = encoder.Encode(obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *BlockedSelectors) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Xs`:
+	err = decoder.Decode(&obj.Xs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Len`:
+	err = decoder.Decode(&obj.Len)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type InstructionData struct {
 	ProgramId ag_solanago.PublicKey
 	Data      []byte
@@ -98,8 +131,7 @@ func (obj *InstructionAccount) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 type TimelockError ag_binary.BorshEnum
 
 const (
-	Unauthorized_TimelockError TimelockError = iota
-	InvalidInput_TimelockError
+	InvalidInput_TimelockError TimelockError = iota
 	Overflow_TimelockError
 	InvalidId_TimelockError
 	OperationNotFinalized_TimelockError
@@ -110,14 +142,16 @@ const (
 	OperationNotCancellable_TimelockError
 	OperationNotReady_TimelockError
 	MissingDependency_TimelockError
-	BlockedSelector_TimelockError
 	InvalidAccessController_TimelockError
+	BlockedSelector_TimelockError
+	AlreadyBlocked_TimelockError
+	SelectorNotFound_TimelockError
+	InvalidInstructionData_TimelockError
+	MaxCapacityReached_TimelockError
 )
 
 func (value TimelockError) String() string {
 	switch value {
-	case Unauthorized_TimelockError:
-		return "Unauthorized"
 	case InvalidInput_TimelockError:
 		return "InvalidInput"
 	case Overflow_TimelockError:
@@ -140,10 +174,18 @@ func (value TimelockError) String() string {
 		return "OperationNotReady"
 	case MissingDependency_TimelockError:
 		return "MissingDependency"
-	case BlockedSelector_TimelockError:
-		return "BlockedSelector"
 	case InvalidAccessController_TimelockError:
 		return "InvalidAccessController"
+	case BlockedSelector_TimelockError:
+		return "BlockedSelector"
+	case AlreadyBlocked_TimelockError:
+		return "AlreadyBlocked"
+	case SelectorNotFound_TimelockError:
+		return "SelectorNotFound"
+	case InvalidInstructionData_TimelockError:
+		return "InvalidInstructionData"
+	case MaxCapacityReached_TimelockError:
+		return "MaxCapacityReached"
 	default:
 		return ""
 	}
