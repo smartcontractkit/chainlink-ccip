@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"github.com/gagliardetto/solana-go"
+
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
 )
 
