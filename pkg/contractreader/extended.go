@@ -18,7 +18,7 @@ import (
 
 var (
 	ErrFinalityViolated = errors.New("finality violated")
-	ErrTooManyBindings  = errors.New("contract binding not found")
+	ErrTooManyBindings  = errors.New("too many bindings")
 	ErrNoBindings       = errors.New("no bindings found")
 )
 
