@@ -149,8 +149,8 @@ pub fn set_config(
         expiring_root.op_count = current_op_count;
 
         // set root metadata to a cleared state
-        root_metadata.chain_id = ctx.accounts.multisig_config.chain_id;
-        root_metadata.multisig = ctx.accounts.multisig_config.key();
+        root_metadata.chain_id = config.chain_id;
+        root_metadata.multisig = config.key();
         root_metadata.pre_op_count = current_op_count;
         root_metadata.post_op_count = current_op_count;
         root_metadata.override_previous_root = true;
