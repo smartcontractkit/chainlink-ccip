@@ -149,7 +149,9 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// map types to the facade.
+	// Map contract readers to ContractReaderFacade:
+	// - Extended reader adds finality violation and contract binding management.
+	// - Observed reader adds metric reporting.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
 		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
