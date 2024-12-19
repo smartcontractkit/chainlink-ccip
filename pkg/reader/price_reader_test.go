@@ -140,7 +140,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
 		feedChain := cciptypes.ChainSelector(1)
 		tokenPricesReader := priceReader{
-			chainReaders: map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+			chainReaders: map[cciptypes.ChainSelector]contractreader.Extended{
 				feedChain: contractReader,
 			},
 			tokenInfo: tc.tokenInfo,
@@ -205,8 +205,8 @@ func createMockReader(
 	mockPrices map[cciptypes.UnknownEncodedAddress]*big.Int,
 	errorAccounts []cciptypes.UnknownEncodedAddress,
 	tokenInfo map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo,
-) *readermock.MockContractReaderFacade {
-	reader := readermock.NewMockContractReaderFacade(t)
+) *readermock.MockExtended {
+	reader := readermock.NewMockExtended(t)
 
 	// Create the expected batch request and results
 	expectedRequest := make(commontypes.BatchGetLatestValuesRequest)

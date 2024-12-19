@@ -35,6 +35,8 @@ var (
 	chainC = cciptypes.ChainSelector(3)
 )
 
+// TODO: test finality violation
+
 func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	sourceCRs := make(map[cciptypes.ChainSelector]*reader_mocks.MockContractReaderFacade)
 	for _, chain := range []cciptypes.ChainSelector{chainA, chainB} {
@@ -44,6 +46,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -67,10 +70,10 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainA: sourceCRs[chainA],
-			chainB: sourceCRs[chainB],
-			chainC: destCR,
+		map[cciptypes.ChainSelector]contractreader.Extended{
+			chainA: contractreader.NewExtendedContractReader(sourceCRs[chainA]),
+			chainB: contractreader.NewExtendedContractReader(sourceCRs[chainB]),
+			chainC: contractreader.NewExtendedContractReader(destCR),
 		}, nil, chainC, offrampAddress,
 	)
 
@@ -837,6 +840,7 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -861,8 +865,8 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainC: destCR,
+		map[cciptypes.ChainSelector]contractreader.Extended{
+			chainC: contractreader.NewExtendedContractReader(destCR),
 		}, nil, chainC, offrampAddress,
 	)
 
@@ -882,6 +886,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -907,8 +912,8 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	ccipReader := newCCIPChainReaderInternal(
 		tests.Context(t),
 		logger.Test(t),
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
-			chainC: destCR,
+		map[cciptypes.ChainSelector]contractreader.Extended{
+			chainC: contractreader.NewExtendedContractReader(destCR),
 		}, nil, chainC, offrampAddress,
 	)
 

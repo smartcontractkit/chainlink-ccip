@@ -208,7 +208,7 @@ func Test_USDC_CCTP_Flow(t *testing.T) {
 		tests.Context(t),
 		logger.Test(t),
 		config,
-		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+		map[cciptypes.ChainSelector]contractreader.Extended{
 			fujiChain:    fujiReader,
 			sepoliaChain: sepoliaReader,
 		})
@@ -446,7 +446,7 @@ func createToken(t *testing.T, nonce uint64, sourceDomain uint32, pool string) c
 	}
 }
 
-func mockReader(t *testing.T, contractAddress string, message []usdcMessage) *readermock.MockContractReaderFacade {
+func mockReader(t *testing.T, contractAddress string, message []usdcMessage) *readermock.MockExtended {
 	items := make([]types.Sequence, len(message))
 	for i, m := range message {
 		items[i] = types.Sequence{Data: newUSDCMessageEvent(t, m.eventPayload)}
@@ -457,7 +457,7 @@ func mockReader(t *testing.T, contractAddress string, message []usdcMessage) *re
 		Name:    consts.ContractNameCCTPMessageTransmitter,
 	}
 
-	r := readermock.NewMockContractReaderFacade(t)
+	r := readermock.NewMockExtended(t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,

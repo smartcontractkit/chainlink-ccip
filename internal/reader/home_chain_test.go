@@ -29,7 +29,7 @@ var (
 )
 
 func TestHomeChainConfigPoller_HealthReport(t *testing.T) {
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	homeChainReader := readermock.NewMockExtended(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -117,7 +117,7 @@ func Test_PollingWorking(t *testing.T) {
 		},
 	}
 
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	homeChainReader := readermock.NewMockExtended(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
@@ -168,7 +168,7 @@ func Test_PollingWorking(t *testing.T) {
 func Test_HomeChainPoller_GetOCRConfig(t *testing.T) {
 	donID := uint32(1)
 	pluginType := uint8(1) // execution
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	homeChainReader := readermock.NewMockExtended(t)
 	homeChainReader.On(
 		"GetLatestValue",
 		mock.Anything,
