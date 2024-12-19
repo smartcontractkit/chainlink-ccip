@@ -17,6 +17,8 @@ type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]ccipty
 
 type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
 
+type EncodedMsgAndTokenDataSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]int
+
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
 	var results []cciptypes.Message
@@ -41,6 +43,19 @@ func GetHashes(ctx context.Context, mo MessageObservations, hasher cciptypes.Mes
 		}
 	}
 	return hashes, nil
+}
+
+// GetEncodedMsgAndTokenDataSizes calculates the encoded sizes of messages and their token data counterpart.
+func GetEncodedMsgAndTokenDataSizes(mo MessageObservations, tds TokenDataObservations) EncodedMsgAndTokenDataSizes {
+	sizes := make(EncodedMsgAndTokenDataSizes)
+	for chain, msgs := range mo {
+		sizes[chain] = make(map[cciptypes.SeqNum]int)
+		for seq, msg := range msgs {
+			td := tds[chain][seq]
+			sizes[chain][seq] = msg.EncodedSize() + td.EncodedSize()
+		}
+	}
+	return sizes
 }
 
 // NonceObservations contain the latest nonce for senders in the previously observed messages.

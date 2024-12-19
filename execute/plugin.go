@@ -63,6 +63,7 @@ type Plugin struct {
 	estimateProvider      gas.EstimateProvider
 	lggr                  logger.Logger
 
+	observationOptimizer exectypes.ObservationOptimizer
 	// state
 	contractsInitialized bool
 }
@@ -114,7 +115,8 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
-		observer: metricsReporter,
+		observer:             metricsReporter,
+		observationOptimizer: exectypes.NewObservationOptimizer(maxObservationLength),
 	}
 }
 
