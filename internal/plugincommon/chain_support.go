@@ -87,7 +87,7 @@ func (c ccipChainSupport) SupportedChains(oracleID commontypes.OracleID) (mapset
 		return mapset.NewSet[cciptypes.ChainSelector](), fmt.Errorf("error getting supported chains: %w", err)
 	}
 
-	return supportedChains, nil
+	return supportedChains.Clone(), nil
 }
 
 // SupportsDestChain returns true if the given oracle supports the dest chain, returns false otherwise

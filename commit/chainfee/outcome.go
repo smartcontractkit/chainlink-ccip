@@ -50,11 +50,12 @@ func (p *processor) Outcome(
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 		usdPerFeeToken, ok := consensusObs.NativeTokenPrices[chain]
 		if !ok {
-			p.lggr.Warnw("missing native token price for chain",
+			p.lggr.Warnw("missing native token price for chain, chain fee will not be updated",
 				"chain", chain,
 			)
 			continue
 		}
+		p.lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
 
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18

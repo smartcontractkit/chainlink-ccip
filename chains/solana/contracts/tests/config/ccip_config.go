@@ -21,6 +21,7 @@ var (
 	Token2022Program           = solana.MustPublicKeyFromBase58("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")
 
 	RouterConfigPDA, _, _                    = solana.FindProgramAddress([][]byte{[]byte("config")}, CcipRouterProgram)
+	RouterStatePDA, _, _                     = solana.FindProgramAddress([][]byte{[]byte("state")}, CcipRouterProgram)
 	ExternalExecutionConfigPDA, _, _         = solana.FindProgramAddress([][]byte{[]byte("external_execution_config")}, CcipRouterProgram)
 	ExternalTokenPoolsSignerPDA, _, _        = solana.FindProgramAddress([][]byte{[]byte("external_token_pools_signer")}, CcipRouterProgram)
 	ReceiverTargetAccountPDA, _, _           = solana.FindProgramAddress([][]byte{[]byte("counter")}, CcipReceiverProgram)
@@ -32,23 +33,19 @@ var (
 
 	SolanaChainSelector uint64 = 15
 	EvmChainSelector    uint64 = 21
+	EvmChainLE                 = utils.Uint64ToLE(EvmChainSelector)
 
-	SolanaChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SolanaChainSelector)}, CcipRouterProgram)
-	EvmChainLE                = utils.Uint64ToLE(EvmChainSelector)
-	EvmChainStatePDA, _, _    = solana.FindProgramAddress([][]byte{[]byte("chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	SolanaSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SolanaChainSelector)}, CcipRouterProgram)
+	SolanaDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SolanaChainSelector)}, CcipRouterProgram)
+	EvmSourceChainStatePDA, _, _    = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	EvmDestChainStatePDA, _, _      = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	EnableExecutionAfter = int64(1800) // 30min
 
-	MaxOracles           = 16
-	OcrF           uint8 = 5
-	ConfigDigest         = utils.MakeRandom32ByteArray()
-	Empty24Byte          = [24]byte{}
-	ReportSequence       = uint64(8)
-	ReportContext        = [3][32]byte{
-		ConfigDigest,
-		[32]byte(binary.BigEndian.AppendUint64(Empty24Byte[:], ReportSequence)),
-		utils.MakeRandom32ByteArray(),
-	}
-	MaxSignersAndTransmitters = 16
+	MaxOracles                      = 16
+	OcrF                      uint8 = 5
+	ConfigDigest                    = utils.MakeRandom32ByteArray()
+	Empty24Byte                     = [24]byte{}
+	MaxSignersAndTransmitters       = 16
 )

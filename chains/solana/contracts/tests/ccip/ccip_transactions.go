@@ -36,9 +36,15 @@ func SignCommitReport(ctx [3][32]byte, report ccip_router.CommitInput, baseSigne
 	return sigs, nil
 }
 
-func getChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
+func GetSourceChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
 	chainSelectorLE := utils.Uint64ToLE(chainSelector)
-	p, _, err := solana.FindProgramAddress([][]byte{[]byte("chain_state"), chainSelectorLE}, config.CcipRouterProgram)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
+	return p, err
+}
+
+func GetDestChainStatePDA(chainSelector uint64) (solana.PublicKey, error) {
+	chainSelectorLE := utils.Uint64ToLE(chainSelector)
+	p, _, err := solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), chainSelectorLE}, config.CcipRouterProgram)
 	return p, err
 }
 

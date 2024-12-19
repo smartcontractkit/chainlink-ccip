@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use ethnum::U256;
 
 use crate::ocr3base::Ocr3Config;
 
@@ -20,11 +21,16 @@ pub struct Config {
     _padding2: [u8; 8],
 
     pub ocr3: [Ocr3Config; 2],
-
     // TODO: token pool global config
 
     // TODO: billing global configs'
-    _padding_before_billing: [u8; 8],
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct GlobalState {
+    // This holds global variables for the contract that are not manually set by the admin.
+    // They are auto-updated by the contract during regular usage of CCIP.
     pub latest_price_sequence_number: u64,
 }
 
@@ -40,9 +46,12 @@ pub struct SourceChainState {
     pub min_seq_nr: u64, // The min sequence number expected for future messages
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
+#[account]
+#[derive(InitSpace, Debug)]
 pub struct SourceChain {
-    pub state: SourceChainState,   // values that are updated automatically
+    // Config for Any2Solana
+    pub version: u8,
+    pub state: SourceChainState, // values that are updated automatically
     pub config: SourceChainConfig, // values configured by an admin
 }
 
@@ -76,18 +85,13 @@ pub struct DestChainConfig {
     pub chain_family_selector: [u8; 4], // Selector that identifies the destination chain's family. Used to determine the correct validations to perform for the dest chain.
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
-pub struct DestChain {
-    pub state: DestChainState,   // values that are updated automatically
-    pub config: DestChainConfig, // values configured by an admin
-}
-
 #[account]
 #[derive(InitSpace, Debug)]
-pub struct ChainState {
+pub struct DestChain {
+    // Config for Solana2Any
     pub version: u8,
-    pub source_chain: SourceChain, // Config for Any2Solana
-    pub dest_chain: DestChain,     // Config for Solana2Any
+    pub state: DestChainState,   // values that are updated automatically
+    pub config: DestChainConfig, // values configured by an admin
 }
 
 #[account]
@@ -214,6 +218,29 @@ pub struct BillingTokenConfigWrapper {
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64, // maintaining the type that Solana returns for the time (solana_program::clock::UnixTimestamp = i64)
+}
+
+impl TimestampedPackedU224 {
+    pub fn as_single(&self) -> U256 {
+        let mut u256_buffer = [0u8; 32];
+        u256_buffer[4..32].clone_from_slice(&self.value);
+        U256::from_be_bytes(u256_buffer)
+    }
+
+    pub fn unpack(&self) -> UnpackedDoubleU224 {
+        let mut u128_buffer = [0u8; 16];
+        u128_buffer[2..16].clone_from_slice(&self.value[14..]);
+        let high = u128::from_be_bytes(u128_buffer);
+        u128_buffer[2..16].clone_from_slice(&self.value[..14]);
+        let low = u128::from_be_bytes(u128_buffer);
+        UnpackedDoubleU224 { high, low }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnpackedDoubleU224 {
+    pub high: u128,
+    pub low: u128,
 }
 
 #[cfg(test)]

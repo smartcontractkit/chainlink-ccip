@@ -12,7 +12,6 @@ type ConfigSigners struct {
 	SignerAddresses [][20]uint8
 	TotalSigners    uint8
 	IsFinalized     bool
-	Bump            uint8
 }
 
 var ConfigSignersDiscriminator = [8]byte{147, 137, 80, 98, 50, 225, 190, 163}
@@ -35,11 +34,6 @@ func (obj ConfigSigners) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	}
 	// Serialize `IsFinalized` param:
 	err = encoder.Encode(obj.IsFinalized)
-	if err != nil {
-		return err
-	}
-	// Serialize `Bump` param:
-	err = encoder.Encode(obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -72,11 +66,6 @@ func (obj *ConfigSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 	}
 	// Deserialize `IsFinalized`:
 	err = decoder.Decode(&obj.IsFinalized)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Bump`:
-	err = decoder.Decode(&obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -195,7 +184,6 @@ type RootSignatures struct {
 	TotalSignatures uint8
 	Signatures      []Signature
 	IsFinalized     bool
-	Bump            uint8
 }
 
 var RootSignaturesDiscriminator = [8]byte{21, 186, 10, 33, 117, 215, 246, 76}
@@ -218,11 +206,6 @@ func (obj RootSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	}
 	// Serialize `IsFinalized` param:
 	err = encoder.Encode(obj.IsFinalized)
-	if err != nil {
-		return err
-	}
-	// Serialize `Bump` param:
-	err = encoder.Encode(obj.Bump)
 	if err != nil {
 		return err
 	}
@@ -255,11 +238,6 @@ func (obj *RootSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	}
 	// Deserialize `IsFinalized`:
 	err = decoder.Decode(&obj.IsFinalized)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Bump`:
-	err = decoder.Decode(&obj.Bump)
 	if err != nil {
 		return err
 	}

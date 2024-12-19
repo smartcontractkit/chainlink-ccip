@@ -100,13 +100,13 @@
       "name": "scheduleBatch",
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
+          "name": "operation",
+          "isMut": true,
           "isSigner": false
         },
         {
-          "name": "operation",
-          "isMut": true,
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -140,24 +140,19 @@
       "name": "initializeOperation",
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
+          "name": "operation",
+          "isMut": true,
           "isSigner": false
         },
         {
-          "name": "operation",
-          "isMut": true,
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
           "name": "authority",
           "isMut": true,
           "isSigner": true
-        },
-        {
-          "name": "proposer",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "systemProgram",
@@ -208,6 +203,11 @@
           "isSigner": false
         },
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -247,6 +247,11 @@
           "isSigner": false
         },
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -273,6 +278,11 @@
           "isSigner": false
         },
         {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -294,13 +304,13 @@
       "name": "cancel",
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
+          "name": "operation",
+          "isMut": true,
           "isSigner": false
         },
         {
-          "name": "operation",
-          "isMut": true,
+          "name": "config",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -330,22 +340,22 @@
       "name": "executeBatch",
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "timelockSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "operation",
           "isMut": true,
           "isSigner": false
         },
         {
           "name": "predecessorOperation",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "timelockSigner",
           "isMut": false,
           "isSigner": false
         },
@@ -376,6 +386,11 @@
       "name": "bypasserExecuteBatch",
       "accounts": [
         {
+          "name": "operation",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "config",
           "isMut": false,
           "isSigner": false
@@ -383,11 +398,6 @@
         {
           "name": "timelockSigner",
           "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "operation",
-          "isMut": true,
           "isSigner": false
         },
         {
@@ -439,7 +449,7 @@
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -465,7 +475,7 @@
       "accounts": [
         {
           "name": "config",
-          "isMut": false,
+          "isMut": true,
           "isSigner": false
         },
         {
@@ -557,6 +567,12 @@
           {
             "name": "minDelay",
             "type": "u64"
+          },
+          {
+            "name": "blockedSelectors",
+            "type": {
+              "defined": "BlockedSelectors"
+            }
           }
         ]
       }
@@ -623,6 +639,32 @@
   ],
   "types": [
     {
+      "name": "BlockedSelectors",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "xs",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    8
+                  ]
+                },
+                32
+              ]
+            }
+          },
+          {
+            "name": "len",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "InstructionData",
       "type": {
         "kind": "struct",
@@ -672,9 +714,6 @@
         "kind": "enum",
         "variants": [
           {
-            "name": "Unauthorized"
-          },
-          {
             "name": "InvalidInput"
           },
           {
@@ -708,10 +747,22 @@
             "name": "MissingDependency"
           },
           {
+            "name": "InvalidAccessController"
+          },
+          {
             "name": "BlockedSelector"
           },
           {
-            "name": "InvalidAccessController"
+            "name": "AlreadyBlocked"
+          },
+          {
+            "name": "SelectorNotFound"
+          },
+          {
+            "name": "InvalidInstructionData"
+          },
+          {
+            "name": "MaxCapacityReached"
           }
         ]
       }
@@ -765,11 +816,6 @@
           "index": false
         },
         {
-          "name": "data",
-          "type": "bytes",
-          "index": false
-        },
-        {
           "name": "predecessor",
           "type": {
             "array": [
@@ -792,6 +838,11 @@
         {
           "name": "delay",
           "type": "u64",
+          "index": false
+        },
+        {
+          "name": "data",
+          "type": "bytes",
           "index": false
         }
       ]
@@ -910,8 +961,8 @@
   "errors": [
     {
       "code": 6000,
-      "name": "Placeholder",
-      "msg": "Todo generate error type with anchor"
+      "name": "Unauthorized",
+      "msg": "The signer is unauthorized"
     }
   ]
 }

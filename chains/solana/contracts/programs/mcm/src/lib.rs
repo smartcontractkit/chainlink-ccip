@@ -39,13 +39,6 @@ pub mod mcm {
         config.chain_id = chain_id;
         config.multisig_name = multisig_name;
         config.owner = ctx.accounts.authority.key();
-
-        // convert bytes to string for logging
-        let name_str = String::from_utf8_lossy(&multisig_name)
-            .trim_end_matches(char::from(0))
-            .to_string();
-
-        msg!("Initialized MCM {} with chain_id {}", name_str, chain_id);
         Ok(())
     }
 
@@ -208,7 +201,7 @@ pub struct Initialize<'info> {
     #[account(constraint = program.programdata_address()? == Some(program_data.key()))]
     pub program: Program<'info, Mcm>,
     // initialization only allowed by program upgrade authority(in common cases, the initial deployer)
-    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ McmError::Unauthorized)]
+    #[account(constraint = program_data.upgrade_authority_address == Some(authority.key()) @ AuthError::Unauthorized)]
     pub program_data: Account<'info, ProgramData>,
 
     #[account(
@@ -236,7 +229,7 @@ pub struct TransferOwnership<'info> {
     #[account(mut, seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
     pub config: Account<'info, config::MultisigConfig>,
 
-    #[account(address = config.owner @ McmError::Unauthorized)]
+    #[account(address = config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }
 
@@ -246,6 +239,6 @@ pub struct AcceptOwnership<'info> {
     #[account(mut, seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
     pub config: Account<'info, config::MultisigConfig>,
 
-    #[account(address = config.proposed_owner @ McmError::Unauthorized)]
+    #[account(address = config.proposed_owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
 }

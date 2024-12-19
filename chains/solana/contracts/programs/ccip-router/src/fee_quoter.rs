@@ -1,46 +1,114 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface;
-use bytemuck::Zeroable;
-use spl_token_2022::native_mint;
-use token_interface::spl_token_2022;
+use anchor_spl::{token::spl_token::native_mint, token_interface};
+use ethnum::U256;
+use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
     BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage, SolanaTokenAmount,
-    FEE_BILLING_SIGNER_SEEDS,
+    UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
 // TODO change args and implement
 pub fn fee_for_msg(
     _dest_chain_selector: u64,
-    message: Solana2AnyMessage,
+    message: &Solana2AnyMessage,
     dest_chain: &DestChain,
     token_config: &BillingTokenConfig,
 ) -> Result<SolanaTokenAmount> {
-    let token = if message.fee_token == Pubkey::zeroed() {
+    // TODO: Add all validations from lib.rs over the message here as well
+    message.validate(dest_chain, token_config)?;
+
+    let token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
         message.fee_token
     };
 
-    require!(
-        dest_chain.config.is_enabled,
-        CcipRouterError::DestinationChainDisabled
-    );
-    require!(token_config.enabled, CcipRouterError::FeeTokenDisabled);
-
-    // TODO validate that dest_chain_selector is whitelisted and not cursed
-
-    //? /Users/tobi/dev/work/ccip/contracts/src/v0.8/ccip/FeeQuoter.sol:518
-    //? 1. Get dest chain config
-    //? 1. validate message
-    //? 1. retrieve fee token's current price
-    //? 1. retrieve gas price on the dest chain
-    //? 1. get cost of transfer _of each token in the message_ to the dest chain, including premium, gas, and bytes overhead
-    //? 1. get data availability cost on the dest chain
-    //? 1. Calculate and return the total fee
+    let token_price = get_validated_token_price(token_config)?;
+    let _packed_gas_price = get_validated_gas_price(dest_chain)?;
 
     // TODO un-hardcode
-    Ok(SolanaTokenAmount { amount: 1, token })
+    let network_fee = U256::new(1);
+    let execution_cost = U256::new(1);
+    let data_availability_cost = U256::new(1);
+
+    let amount = (network_fee + execution_cost + data_availability_cost) / token_price;
+    let amount: u64 = amount
+        .try_into()
+        .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
+
+    Ok(SolanaTokenAmount { amount, token })
+}
+
+pub struct PackedPrice {
+    pub execution_cost: u128,
+    pub gas_price: u128,
+}
+
+impl From<UnpackedDoubleU224> for PackedPrice {
+    fn from(value: UnpackedDoubleU224) -> Self {
+        Self {
+            execution_cost: value.low,
+            gas_price: value.high,
+        }
+    }
+}
+
+fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
+    let timestamp = dest_chain.state.usd_per_unit_gas.timestamp;
+    let price = dest_chain.state.usd_per_unit_gas.unpack().into();
+    let threshold = dest_chain.config.gas_price_staleness_threshold as i64;
+    let elapsed_time = Clock::get()?.unix_timestamp - timestamp;
+
+    require!(
+        threshold == 0 || threshold > elapsed_time,
+        CcipRouterError::StaleGasPrice
+    );
+
+    Ok(price)
+}
+
+fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<U256> {
+    let timestamp = token_config.usd_per_token.timestamp;
+    let price = token_config.usd_per_token.as_single();
+
+    // NOTE: There's no validation done with respect to token price staleness since data feeds are not
+    // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
+    // was set at least once.
+    require!(
+        price != 0 && timestamp != 0,
+        CcipRouterError::InvalidTokenPrice
+    );
+
+    Ok(price)
+}
+
+pub fn wrap_native_sol<'info>(
+    token_program: &AccountInfo<'info>,
+    from: &mut Signer<'info>,
+    to: &mut InterfaceAccount<'info, token_interface::TokenAccount>,
+    amount: u64,
+    signer_bump: u8,
+) -> Result<()> {
+    require!(
+        // guarantee that if caller is a PDA it won't get garbage-collected
+        *from.owner == System::id() || from.get_lamports() > amount,
+        CcipRouterError::InsufficientLamports
+    );
+
+    invoke_signed(
+        &system_instruction::transfer(&from.key(), &to.key(), amount),
+        &[from.to_account_info(), to.to_account_info()],
+        &[&[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]]],
+    )?;
+
+    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]];
+    let signer_seeds = &[&seeds[..]];
+    let account = to.to_account_info();
+    let sync: anchor_spl::token_2022::SyncNative = anchor_spl::token_2022::SyncNative { account };
+    let cpi_ctx = CpiContext::new_with_signer(token_program.to_account_info(), sync, signer_seeds);
+
+    token_interface::sync_native(cpi_ctx)
 }
 
 pub fn transfer_fee<'info>(
@@ -63,79 +131,73 @@ pub fn transfer_fee<'info>(
 
 #[cfg(test)]
 mod tests {
+    use solana_program::{
+        entrypoint::SUCCESS,
+        program_stubs::{set_syscall_stubs, SyscallStubs},
+    };
+
     use super::*;
-    use crate::DestChain;
+    use crate::tests::{sample_billing_config, sample_dest_chain, sample_message};
 
-    #[test]
-    fn fees_not_returned_for_disabled_destination_chain() {
-        let mut chain = sample_dest_chain();
-        chain.config.is_enabled = false;
+    struct TestStubs;
 
-        assert!(fee_for_msg(0, sample_message(), &chain, &sample_billing_config()).is_err());
+    impl SyscallStubs for TestStubs {
+        fn sol_get_clock_sysvar(&self, _var_addr: *mut u8) -> u64 {
+            // This causes the syscall to return a default-initialized
+            // clock when the build target is off-chain. Good enough for tests.
+            SUCCESS
+        }
     }
 
     #[test]
-    fn fees_not_returned_for_disabled_token() {
+    fn retrieving_fee_from_valid_message() {
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &sample_message(),
+                &sample_dest_chain(),
+                &sample_billing_config(),
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                amount: 1
+            }
+        );
+    }
+
+    #[test]
+    fn fee_cannot_be_retrieved_when_token_price_is_not_timestamped() {
         let mut billing_config = sample_billing_config();
-        billing_config.enabled = false;
-
-        assert!(fee_for_msg(0, sample_message(), &sample_dest_chain(), &billing_config).is_err());
+        billing_config.usd_per_token.timestamp = 0;
+        assert_eq!(
+            fee_for_msg(0, &sample_message(), &sample_dest_chain(), &billing_config).unwrap_err(),
+            CcipRouterError::InvalidTokenPrice.into()
+        );
     }
 
-    fn sample_message() -> Solana2AnyMessage {
-        Solana2AnyMessage {
-            receiver: vec![],
-            data: vec![],
-            token_amounts: vec![],
-            fee_token: Pubkey::new_unique(),
-            extra_args: crate::ExtraArgsInput {
-                gas_limit: None,
-                allow_out_of_order_execution: None,
-            },
-            token_indexes: vec![],
-        }
+    #[test]
+    fn fee_cannot_be_retrieved_when_token_price_is_zero() {
+        let mut billing_config = sample_billing_config();
+        billing_config.usd_per_token.value = [0u8; 28];
+        assert_eq!(
+            fee_for_msg(0, &sample_message(), &sample_dest_chain(), &billing_config).unwrap_err(),
+            CcipRouterError::InvalidTokenPrice.into()
+        );
     }
 
-    fn sample_billing_config() -> BillingTokenConfig {
-        BillingTokenConfig {
-            enabled: true,
-            mint: Pubkey::new_unique(),
-            usd_per_token: crate::TimestampedPackedU224 {
-                value: [0; 28],
-                timestamp: 0,
-            },
-            premium_multiplier_wei_per_eth: 0,
-        }
-    }
-
-    fn sample_dest_chain() -> DestChain {
-        DestChain {
-            state: crate::DestChainState {
-                sequence_number: 0,
-                usd_per_unit_gas: crate::TimestampedPackedU224 {
-                    value: [0; 28],
-                    timestamp: 0,
-                },
-            },
-            config: crate::DestChainConfig {
-                is_enabled: true,
-                max_number_of_tokens_per_msg: 0,
-                max_data_bytes: 0,
-                max_per_msg_gas_limit: 0,
-                dest_gas_overhead: 0,
-                dest_gas_per_payload_byte: 0,
-                dest_data_availability_overhead_gas: 0,
-                dest_gas_per_data_availability_byte: 0,
-                dest_data_availability_multiplier_bps: 0,
-                default_token_fee_usdcents: 0,
-                default_token_dest_gas_overhead: 0,
-                default_tx_gas_limit: 0,
-                gas_multiplier_wei_per_eth: 0,
-                network_fee_usdcents: 0,
-                gas_price_staleness_threshold: 0,
-                enforce_out_of_order: false,
-                chain_family_selector: [0; 4],
-            },
-        }
+    #[test]
+    fn fee_cannot_be_retrieved_when_gas_price_is_stale() {
+        // This will make the unix timestamp be zero, so we'll adjust
+        // the timestamp accordingly to a negative one.
+        set_syscall_stubs(Box::new(TestStubs));
+        let mut chain = sample_dest_chain();
+        chain.state.usd_per_unit_gas.timestamp =
+            -2 * chain.config.gas_price_staleness_threshold as i64;
+        assert_eq!(
+            fee_for_msg(0, &sample_message(), &chain, &sample_billing_config()).unwrap_err(),
+            CcipRouterError::StaleGasPrice.into()
+        );
     }
 }

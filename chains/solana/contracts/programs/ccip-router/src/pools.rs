@@ -46,7 +46,7 @@ pub fn calculate_token_pool_account_indices(
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
-    // pub token_billing_config: &'a AccountInfo<'a>, // TODO: enable with token billing
+    pub _token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
@@ -57,7 +57,7 @@ pub struct TokenAccounts<'a> {
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
-pub fn parse_token_accounts<'info>(
+pub fn validate_and_parse_token_accounts<'info>(
     user: Pubkey,
     chain_selector: u64,
     router: Pubkey,
@@ -155,7 +155,7 @@ pub fn parse_token_accounts<'info>(
             CcipRouterError::InvalidInputsConfigAccounts
         );
 
-        // Check Lookup Table Address
+        // Check Lookup Table Address configured in TokenAdminRegistry
         let token_admin_registry_account: Account<TokenAdminRegistry> =
             Account::try_from(token_admin_registry)?;
         require!(
@@ -196,7 +196,7 @@ pub fn parse_token_accounts<'info>(
 
     Ok(TokenAccounts {
         user_token_account,
-        // token_billing_config, // TODO: enable with token billing
+        _token_billing_config: token_billing_config,
         pool_chain_config,
         pool_program,
         pool_config,
