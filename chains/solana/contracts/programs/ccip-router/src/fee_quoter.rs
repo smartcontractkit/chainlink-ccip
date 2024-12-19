@@ -5,18 +5,17 @@ use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
     utils::{Exponential, Usd18Decimals},
-    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
-    SolanaTokenAmount, UnpackedDoubleU224, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
-    FEE_BILLING_SIGNER_SEEDS,
+    valid_version, BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
+    PerChainPerTokenConfig, Solana2AnyMessage, SolanaTokenAmount, UnpackedDoubleU224,
+    CCIP_LOCK_OR_BURN_V1_RET_BYTES, FEE_BILLING_SIGNER_SEEDS, MAX_TOKEN_AND_CHAIN_CONFIG_V,
 };
-
 // TODO change args and implement
 pub fn fee_for_msg(
     _dest_chain_selector: u64,
     message: &Solana2AnyMessage,
     dest_chain: &DestChain,
-    token_configs: &[&BillingTokenConfig],
-    token_configs_for_dest_chain: &[&PerChainPerTokenConfig],
+    token_configs: &[BillingTokenConfig],
+    token_configs_for_dest_chain: &[PerChainPerTokenConfig],
 ) -> Result<SolanaTokenAmount> {
     let token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
@@ -55,6 +54,60 @@ pub fn fee_for_msg(
     Ok(SolanaTokenAmount { amount, token })
 }
 
+pub fn get_accounts_for_fee_retrieval<'info>(
+    remaining_accounts: &'info [AccountInfo<'info>],
+    message: &Solana2AnyMessage,
+) -> Result<(Vec<BillingTokenConfig>, Vec<PerChainPerTokenConfig>)> {
+    let fee_token = if message.fee_token == Pubkey::default() {
+        native_mint::ID // Wrapped SOL
+    } else {
+        message.fee_token
+    };
+
+    let number_of_tokens_involved = if message.token_amounts.iter().any(|t| t.token == fee_token) {
+        message.token_amounts.len()
+    } else {
+        message.token_amounts.len() + 1
+    };
+
+    require_eq!(
+        remaining_accounts.len(),
+        2 * number_of_tokens_involved,
+        CcipRouterError::InvalidInputsTokenAccounts
+    );
+
+    let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+        remaining_accounts.split_at(number_of_tokens_involved);
+
+    let token_billing_config_accounts = token_billing_config_accounts
+        .iter()
+        .map(|a| {
+            let account = Account::<BillingTokenConfigWrapper>::try_from(a)?;
+            require!(
+                valid_version(account.version, 1),
+                CcipRouterError::InvalidInputs
+            );
+            Ok(account.into_inner().config)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
+        .iter()
+        .map(|a| {
+            let account = Account::<PerChainPerTokenConfig>::try_from(a)?;
+            require!(
+                valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+                CcipRouterError::InvalidInputs
+            );
+            Ok(account.into_inner())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok((
+        token_billing_config_accounts,
+        per_chain_per_token_config_accounts,
+    ))
+}
+
 struct NetworkFee {
     premium: Usd18Decimals,
     _token_transfer_gas: U256,
@@ -64,8 +117,8 @@ struct NetworkFee {
 fn network_fee(
     message: &Solana2AnyMessage,
     dest_chain: &DestChain,
-    token_configs: &[&BillingTokenConfig],
-    token_configs_for_dest_chain: &[&PerChainPerTokenConfig],
+    token_configs: &[BillingTokenConfig],
+    token_configs_for_dest_chain: &[PerChainPerTokenConfig],
 ) -> Result<NetworkFee> {
     if message.token_amounts.is_empty() {
         return Ok(NetworkFee {
@@ -105,7 +158,7 @@ fn network_fee(
 }
 
 fn token_network_fees(
-    token_configs: &[&BillingTokenConfig],
+    token_configs: &[BillingTokenConfig],
     token_amount: &SolanaTokenAmount,
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<(Usd18Decimals, U256, U256)> {
@@ -265,7 +318,7 @@ mod tests {
                 0,
                 &sample_message(),
                 &sample_dest_chain(),
-                &[&sample_billing_config()],
+                &[sample_billing_config()],
                 &[]
             )
             .unwrap(),
@@ -286,7 +339,7 @@ mod tests {
                 0,
                 &sample_message(),
                 &chain,
-                &[&sample_billing_config()],
+                &[sample_billing_config()],
                 &[]
             )
             .unwrap(),
@@ -311,7 +364,7 @@ mod tests {
                 0,
                 &message,
                 &sample_dest_chain(),
-                &[&sample_billing_config()],
+                &[sample_billing_config()],
                 &[]
             )
             .unwrap_err(),
@@ -346,8 +399,8 @@ mod tests {
                 0,
                 &message,
                 &chain,
-                &[&sample_billing_config()],
-                &[&per_chain_per_token]
+                &[sample_billing_config()],
+                &[per_chain_per_token]
             )
             .unwrap(),
             SolanaTokenAmount {
@@ -380,8 +433,8 @@ mod tests {
                 0,
                 &message,
                 &chain,
-                &[&sample_billing_config(), &another_token_config],
-                &[&another_per_chain_per_token_config]
+                &[sample_billing_config(), another_token_config],
+                &[another_per_chain_per_token_config]
             )
             .unwrap(),
             SolanaTokenAmount {
@@ -414,8 +467,8 @@ mod tests {
                 0,
                 &message,
                 &chain,
-                &[&sample_billing_config(), &another_token_config],
-                &[&another_per_chain_per_token_config]
+                &[sample_billing_config(), another_token_config],
+                &[another_per_chain_per_token_config]
             )
             .unwrap(),
             SolanaTokenAmount {
@@ -441,8 +494,8 @@ mod tests {
             .collect();
         tokens.push(sample_billing_config());
 
-        let tokens: Vec<_> = tokens.iter().collect();
-        let per_chains: Vec<_> = per_chains.iter().collect();
+        let tokens: Vec<_> = tokens.into_iter().collect();
+        let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
             fee_for_msg(0, &message, &sample_dest_chain(), &tokens, &per_chains).unwrap(),
@@ -493,7 +546,7 @@ mod tests {
                 0,
                 &sample_message(),
                 &sample_dest_chain(),
-                &[&billing_config],
+                &[billing_config],
                 &[]
             )
             .unwrap_err(),
@@ -510,7 +563,7 @@ mod tests {
                 0,
                 &sample_message(),
                 &sample_dest_chain(),
-                &[&billing_config],
+                &[billing_config],
                 &[]
             )
             .unwrap_err(),
@@ -531,7 +584,7 @@ mod tests {
                 0,
                 &sample_message(),
                 &chain,
-                &[&sample_billing_config()],
+                &[sample_billing_config()],
                 &[]
             )
             .unwrap_err(),

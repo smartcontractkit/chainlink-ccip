@@ -657,19 +657,19 @@ pub mod ccip_router {
     /// # Returns
     ///
     /// The fee amount in u64.
-    pub fn get_fee(
-        ctx: Context<GetFee>,
+    pub fn get_fee<'info>(
+        ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<u64> {
-        let accounts = ctx.remaining_accounts;
-
+        let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+            get_accounts_for_fee_retrieval(&ctx.remaining_accounts, &message)?;
         Ok(fee_for_msg(
             dest_chain_selector,
             &message,
             &ctx.accounts.dest_chain_state,
-            &[&ctx.accounts.billing_token_config.config],
-            &[],
+            &token_billing_config_accounts,
+            &per_chain_per_token_config_accounts,
         )?
         .amount)
     }
@@ -697,13 +697,17 @@ pub mod ccip_router {
         let config = ctx.accounts.config.load()?;
 
         let dest_chain = &mut ctx.accounts.dest_chain_state;
-        let fee_token_config = &ctx.accounts.fee_token_config.config;
+
+        // TODO this is grossly invalid, just putting it here for now to typecheck. These will come from elsewhere (see below how these accounts are retrieved)
+        let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+            get_accounts_for_fee_retrieval(&ctx.remaining_accounts, &message)?;
+
         let fee = fee_for_msg(
             dest_chain_selector,
             &message,
             dest_chain,
-            &[&fee_token_config],
-            &[],
+            &token_billing_config_accounts,
+            &per_chain_per_token_config_accounts,
         )?;
 
         let is_paying_with_native_sol = message.fee_token == Pubkey::zeroed();

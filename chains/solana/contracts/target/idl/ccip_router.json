@@ -998,11 +998,6 @@
           "name": "destChainState",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "billingTokenConfig",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
