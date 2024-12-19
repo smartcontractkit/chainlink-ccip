@@ -12,8 +12,10 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
 func TestTokenPool(t *testing.T) {
@@ -27,7 +29,7 @@ func TestTokenPool(t *testing.T) {
 	require.NoError(t, err)
 	ctx := tests.Context(t)
 
-	solanaGoClient := utils.DeployAllPrograms(t, utils.PathToAnchorConfig, admin)
+	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 	getBalance := func(account solana.PublicKey) string {
 		balanceRes, err := solanaGoClient.GetTokenAccountBalance(ctx, account, config.DefaultCommitment)
 		require.NoError(t, err)
@@ -38,7 +40,7 @@ func TestTokenPool(t *testing.T) {
 	remoteToken := []byte{4, 5, 6}
 
 	t.Run("setup:funding", func(t *testing.T) {
-		utils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin}, solanaGoClient, t)
+		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin}, solanaGoClient, t)
 	})
 
 	// test functionality with token & token-2022 standards
@@ -55,40 +57,40 @@ func TestTokenPool(t *testing.T) {
 			amount := uint64(1000)
 
 			for _, poolType := range []token_pool.PoolType{token_pool.LockAndRelease_PoolType, token_pool.BurnAndMint_PoolType} {
-				p, err := NewTokenPool(v.tokenProgram)
+				p, err := tokens.NewTokenPool(v.tokenProgram)
 				require.NoError(t, err)
 				mint := p.Mint.PublicKey()
 
 				t.Run("setup:token", func(t *testing.T) {
 					// create token
-					instructions, err := utils.CreateToken(ctx, v.tokenProgram, mint, admin.PublicKey(), decimals, solanaGoClient, config.DefaultCommitment)
+					instructions, err := tokens.CreateToken(ctx, v.tokenProgram, mint, admin.PublicKey(), decimals, solanaGoClient, config.DefaultCommitment)
 					require.NoError(t, err)
 
 					// create admin associated token account
-					createI, tokenAccount, err := utils.CreateAssociatedTokenAccount(v.tokenProgram, mint, admin.PublicKey(), admin.PublicKey())
+					createI, tokenAccount, err := tokens.CreateAssociatedTokenAccount(v.tokenProgram, mint, admin.PublicKey(), admin.PublicKey())
 					require.NoError(t, err)
 					p.User[admin.PublicKey()] = tokenAccount // set admin token account
 
 					// mint tokens to admin
-					mintToI, err := utils.MintTo(amount, v.tokenProgram, mint, tokenAccount, admin.PublicKey())
+					mintToI, err := tokens.MintTo(amount, v.tokenProgram, mint, tokenAccount, admin.PublicKey())
 					require.NoError(t, err)
 
 					instructions = append(instructions, createI, mintToI)
-					utils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, utils.AddSigners(p.Mint))
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, instructions, admin, config.DefaultCommitment, common.AddSigners(p.Mint))
 
 					// validate
-					outDec, outVal, err := utils.TokenBalance(ctx, solanaGoClient, p.User[admin.PublicKey()], config.DefaultCommitment)
+					outDec, outVal, err := tokens.TokenBalance(ctx, solanaGoClient, p.User[admin.PublicKey()], config.DefaultCommitment)
 					require.NoError(t, err)
 					require.Equal(t, int(amount), outVal)
 					require.Equal(t, decimals, outDec)
 				})
 
 				t.Run("pool:"+poolType.String(), func(t *testing.T) {
-					poolConfig, err := TokenPoolConfigAddress(mint)
+					poolConfig, err := tokens.TokenPoolConfigAddress(mint)
 					require.NoError(t, err)
-					poolSigner, err := TokenPoolSignerAddress(mint)
+					poolSigner, err := tokens.TokenPoolSignerAddress(mint)
 					require.NoError(t, err)
-					createI, poolTokenAccount, err := utils.CreateAssociatedTokenAccount(v.tokenProgram, mint, poolSigner, admin.PublicKey())
+					createI, poolTokenAccount, err := tokens.CreateAssociatedTokenAccount(v.tokenProgram, mint, poolSigner, admin.PublicKey())
 					require.NoError(t, err)
 
 					// LockAndRelease => [Lock, Release]
@@ -103,7 +105,7 @@ func TestTokenPool(t *testing.T) {
 						require.NoError(t, err)
 
 						// make pool mint_authority for token (required for burn/mint)
-						authI, err := utils.SetTokenMintAuthority(v.tokenProgram, poolSigner, mint, admin.PublicKey())
+						authI, err := tokens.SetTokenMintAuthority(v.tokenProgram, poolSigner, mint, admin.PublicKey())
 						require.NoError(t, err)
 
 						// set pool config
@@ -125,23 +127,23 @@ func TestTokenPool(t *testing.T) {
 						}, poolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, createI, authI, ixConfigure, ixRates}, admin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{poolInitI, createI, authI, ixConfigure, ixRates}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
 						var configAccount token_pool.Config
-						require.NoError(t, utils.GetAccountDataBorshInto(ctx, solanaGoClient, poolConfig, config.DefaultCommitment, &configAccount))
+						require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, poolConfig, config.DefaultCommitment, &configAccount))
 						require.Equal(t, poolTokenAccount, configAccount.PoolTokenAccount)
 
-						eventConfigured := EventChainConfigured{}
-						require.NoError(t, utils.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
+						eventConfigured := tokens.EventChainConfigured{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainConfigured", &eventConfigured, config.PrintEvents))
 						require.Equal(t, config.EvmChainSelector, eventConfigured.ChainSelector)
 						require.Equal(t, remotePool, eventConfigured.PoolAddress)
 						require.Equal(t, 0, len(eventConfigured.PreviousPoolAddress))
 						require.Equal(t, remoteToken, eventConfigured.Token)
 						require.Equal(t, 0, len(eventConfigured.PreviousToken))
 
-						eventRateLimit := EventRateLimitConfigured{}
-						require.NoError(t, utils.ParseEvent(res.Meta.LogMessages, "RateLimitConfigured", &eventRateLimit, config.PrintEvents))
+						eventRateLimit := tokens.EventRateLimitConfigured{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RateLimitConfigured", &eventRateLimit, config.PrintEvents))
 						require.Equal(t, config.EvmChainSelector, eventRateLimit.ChainSelector)
 						require.Equal(t, true, eventRateLimit.InboundRateLimit.Enabled)
 						require.Equal(t, amount, eventRateLimit.InboundRateLimit.Capacity)
@@ -159,7 +161,7 @@ func TestTokenPool(t *testing.T) {
 							admin.PublicKey(),
 						).ValidateAndBuild()
 						require.NoError(t, err)
-						result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+						result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 						require.NotNil(t, result)
 
 						// Successfully accept ownership
@@ -169,14 +171,14 @@ func TestTokenPool(t *testing.T) {
 							anotherAdmin.PublicKey(),
 						).ValidateAndBuild()
 						require.NoError(t, err)
-						result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
+						result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 						require.NotNil(t, result)
 					})
 
 					t.Run(lockOrBurn, func(t *testing.T) {
 						require.Equal(t, fmt.Sprintf("%d", amount), getBalance(p.User[admin.PublicKey()]))
 
-						transferI, err := utils.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
+						transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{})
 						require.NoError(t, err)
 
 						lbI, err := token_pool.NewLockOrBurnTokensInstruction(token_pool.LockOrBurnInV1{
@@ -186,11 +188,11 @@ func TestTokenPool(t *testing.T) {
 						}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector]).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, lbI}, admin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, lbI}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
-						event := EventBurnLock{}
-						require.NoError(t, utils.ParseEvent(res.Meta.LogMessages, MethodToEvent(lockOrBurn), &event))
+						event := tokens.EventBurnLock{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, tokens.MethodToEvent(lockOrBurn), &event))
 						require.Equal(t, admin.PublicKey(), event.Sender)
 						require.Equal(t, amount, event.Amount)
 
@@ -209,17 +211,17 @@ func TestTokenPool(t *testing.T) {
 						rmI, err := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
 							LocalToken:          mint,
 							SourcePoolAddress:   remotePool,
-							Amount:              utils.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
+							Amount:              tokens.ToLittleEndianU256(amount * 1e9), // scale to proper decimals
 							Receiver:            admin.PublicKey(),
 							RemoteChainSelector: config.EvmChainSelector,
 						}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
-						event := EventMintRelease{}
-						require.NoError(t, utils.ParseEvent(res.Meta.LogMessages, MethodToEvent(releaseOrMint), &event))
+						event := tokens.EventMintRelease{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, tokens.MethodToEvent(releaseOrMint), &event))
 						require.Equal(t, admin.PublicKey(), event.Recipient)
 						require.Equal(t, poolSigner, event.Sender)
 						require.Equal(t, amount, event.Amount)
@@ -283,7 +285,7 @@ func TestTokenPool(t *testing.T) {
 									ixRates, err := token_pool.NewSetChainRateLimitInstruction(config.EvmChainSelector, p.Mint.PublicKey(), cfg.c, token_pool.RateLimitConfig{}, poolConfig, p.Chain[config.EvmChainSelector], anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 									require.NoError(t, err)
 
-									utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, anotherAdmin, config.DefaultCommitment, []string{cfg.errStr})
+									testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ixRates}, anotherAdmin, config.DefaultCommitment, []string{cfg.errStr})
 								})
 							}
 						})
@@ -295,27 +297,27 @@ func TestTokenPool(t *testing.T) {
 							rmI, err := token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool,
-								Amount:              utils.ToLittleEndianU256(amount * amount * 1e9),
+								Amount:              tokens.ToLittleEndianU256(amount * amount * 1e9),
 								Receiver:            admin.PublicKey(),
 								RemoteChainSelector: config.EvmChainSelector,
 							}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 							require.NoError(t, err)
-							utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"max capacity exceeded"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment, []string{"max capacity exceeded"})
 
 							// exceed rate limit of transfer
 							// request two release/mint of max capacity
 							// if first does not exceed limit, the second one should
-							transferI, err := utils.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{}) // ensure pool is funded
+							transferI, err := tokens.TokenTransferChecked(amount, decimals, v.tokenProgram, p.User[admin.PublicKey()], mint, poolTokenAccount, admin.PublicKey(), solana.PublicKeySlice{}) // ensure pool is funded
 							require.NoError(t, err)
 							rmI, err = token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool,
-								Amount:              utils.ToLittleEndianU256(amount * 1e9),
+								Amount:              tokens.ToLittleEndianU256(amount * 1e9),
 								Receiver:            admin.PublicKey(),
 								RemoteChainSelector: config.EvmChainSelector,
 							}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 							require.NoError(t, err)
-							utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{transferI, rmI, rmI}, admin, config.DefaultCommitment, []string{"rate limit reached"})
+							testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{transferI, rmI, rmI}, admin, config.DefaultCommitment, []string{"rate limit reached"})
 
 							// pool should refill automatically, but slowly
 							// small amount should pass
@@ -323,12 +325,12 @@ func TestTokenPool(t *testing.T) {
 							rmI, err = token_pool.NewReleaseOrMintTokensInstruction(token_pool.ReleaseOrMintInV1{
 								LocalToken:          mint,
 								SourcePoolAddress:   remotePool,
-								Amount:              utils.ToLittleEndianU256(1e9),
+								Amount:              tokens.ToLittleEndianU256(1e9),
 								Receiver:            admin.PublicKey(),
 								RemoteChainSelector: config.EvmChainSelector,
 							}, admin.PublicKey(), poolConfig, v.tokenProgram, mint, poolSigner, poolTokenAccount, p.Chain[config.EvmChainSelector], p.User[admin.PublicKey()]).ValidateAndBuild()
 							require.NoError(t, err)
-							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, rmI}, admin, config.DefaultCommitment)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{transferI, rmI}, admin, config.DefaultCommitment)
 						})
 					})
 
@@ -339,15 +341,15 @@ func TestTokenPool(t *testing.T) {
 						ixRouterChange, err := token_pool.NewSetRampAuthorityInstruction(config.ExternalTokenPoolsSignerPDA, poolConfig, anotherAdmin.PublicKey()).ValidateAndBuild()
 						require.NoError(t, err)
 
-						res := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixDelete, ixRouterChange}, anotherAdmin, config.DefaultCommitment)
+						res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixDelete, ixRouterChange}, anotherAdmin, config.DefaultCommitment)
 						require.NotNil(t, res)
 
-						eventDelete := EventChainRemoved{}
-						require.NoError(t, utils.ParseEvent(res.Meta.LogMessages, "RemoteChainRemoved", &eventDelete, config.PrintEvents))
+						eventDelete := tokens.EventChainRemoved{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RemoteChainRemoved", &eventDelete, config.PrintEvents))
 						require.Equal(t, config.EvmChainSelector, eventDelete.ChainSelector)
 
-						eventRouter := EventRouterUpdated{}
-						require.NoError(t, utils.ParseEvent(res.Meta.LogMessages, "RouterUpdated", &eventRouter, config.PrintEvents))
+						eventRouter := tokens.EventRouterUpdated{}
+						require.NoError(t, common.ParseEvent(res.Meta.LogMessages, "RouterUpdated", &eventRouter, config.PrintEvents))
 						require.Equal(t, config.ExternalTokenPoolsSignerPDA, eventRouter.NewAuthority)
 						require.Equal(t, admin.PublicKey(), eventRouter.OldAuthority)
 					})
@@ -359,19 +361,19 @@ func TestTokenPool(t *testing.T) {
 	// test functionality with arbitrary wrapped program
 	t.Run("Wrapped", func(t *testing.T) {
 		t.Parallel()
-		p, err := NewTokenPool(solana.TokenProgramID)
+		p, err := tokens.NewTokenPool(solana.TokenProgramID)
 		require.NoError(t, err)
 		mint := p.Mint.PublicKey()
 
 		t.Run("setup:pool", func(t *testing.T) {
 			var err error
-			p.PoolConfig, err = TokenPoolConfigAddress(mint)
+			p.PoolConfig, err = tokens.TokenPoolConfigAddress(mint)
 			require.NoError(t, err)
-			p.PoolSigner, err = TokenPoolSignerAddress(mint)
+			p.PoolSigner, err = tokens.TokenPoolSignerAddress(mint)
 			require.NoError(t, err)
 
 			// create token
-			instructions, err := utils.CreateToken(ctx, solana.TokenProgramID, mint, admin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
+			instructions, err := tokens.CreateToken(ctx, solana.TokenProgramID, mint, admin.PublicKey(), 0, solanaGoClient, config.DefaultCommitment)
 			require.NoError(t, err)
 
 			// create pool
@@ -380,7 +382,7 @@ func TestTokenPool(t *testing.T) {
 
 			// create pool token account
 			var createI solana.Instruction
-			createI, p.PoolTokenAccount, err = utils.CreateAssociatedTokenAccount(solana.TokenProgramID, mint, p.PoolSigner, admin.PublicKey())
+			createI, p.PoolTokenAccount, err = tokens.CreateAssociatedTokenAccount(solana.TokenProgramID, mint, p.PoolSigner, admin.PublicKey())
 			require.NoError(t, err)
 
 			// set pool config
@@ -390,7 +392,7 @@ func TestTokenPool(t *testing.T) {
 			}, p.PoolConfig, p.Chain[config.EvmChainSelector], admin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := utils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createI, configureI), admin, config.DefaultCommitment, utils.AddSigners(p.Mint))
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, append(instructions, poolInitI, createI, configureI), admin, config.DefaultCommitment, common.AddSigners(p.Mint))
 			require.NotNil(t, res)
 		})
 
@@ -400,7 +402,7 @@ func TestTokenPool(t *testing.T) {
 			lbI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment)
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{lbI}, admin, config.DefaultCommitment)
 			require.NotNil(t, res)
 			require.Contains(t, strings.Join(res.Meta.LogMessages, "\n"), "Called `ccip_token_lock_burn`")
 		})
@@ -411,13 +413,13 @@ func TestTokenPool(t *testing.T) {
 				SourcePoolAddress:   remotePool,
 				Receiver:            p.PoolSigner,
 				RemoteChainSelector: config.EvmChainSelector,
-				Amount:              utils.ToLittleEndianU256(1),
+				Amount:              tokens.ToLittleEndianU256(1),
 			}, admin.PublicKey(), p.PoolConfig, solana.TokenProgramID, mint, p.PoolSigner, p.PoolTokenAccount, p.Chain[config.EvmChainSelector], p.PoolTokenAccount)
 			raw.AccountMetaSlice = append(raw.AccountMetaSlice, solana.NewAccountMeta(config.CcipReceiverProgram, false, false))
 			rmI, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			res := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
+			res := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rmI}, admin, config.DefaultCommitment)
 			require.NotNil(t, res)
 			require.Contains(t, strings.Join(res.Meta.LogMessages, "\n"), "Called `ccip_token_release_mint`")
 		})
