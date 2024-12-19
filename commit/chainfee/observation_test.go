@@ -1,8 +1,10 @@
 package chainfee
 
 import (
+	"golang.org/x/exp/maps"
 	"math/big"
 	"math/rand"
+	"sort"
 	"testing"
 	"time"
 
@@ -32,11 +34,15 @@ func Test_processor_Observation(t *testing.T) {
 		fChain                       map[ccipocr3.ChainSelector]int
 		expectedChainFeePriceUpdates map[ccipocr3.ChainSelector]Update
 
-		expErr bool
+		dstChain ccipocr3.ChainSelector
+
+		expErr   bool
+		emptyObs bool
 	}{
 		{
-			name:            "two chains",
-			supportedChains: []ccipocr3.ChainSelector{1},
+			name:            "two chains excluding dest",
+			supportedChains: []ccipocr3.ChainSelector{1, 2, 3},
+			dstChain:        3,
 			chainFeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
 				1: {
 					ExecutionFee:        big.NewInt(10),
@@ -86,8 +92,15 @@ func Test_processor_Observation(t *testing.T) {
 			fChain: map[ccipocr3.ChainSelector]int{
 				1: 1,
 				2: 2,
+				3: 1,
 			},
 			expErr: false,
+		},
+		{
+			name:            "only dest chain",
+			supportedChains: []ccipocr3.ChainSelector{1},
+			dstChain:        1,
+			emptyObs:        true,
 		},
 	}
 
@@ -103,25 +116,32 @@ func Test_processor_Observation(t *testing.T) {
 			p := &processor{
 				lggr:            lggr,
 				chainSupport:    cs,
+				destChain:       tc.dstChain,
 				ccipReader:      ccipReader,
 				oracleID:        oracleID,
 				homeChain:       homeChain,
 				metricsReporter: NoopMetrics{},
 			}
 
+			supportedSet := mapset.NewSet(tc.supportedChains...)
+			cs.EXPECT().DestChain().Return(tc.dstChain).Maybe()
 			cs.EXPECT().SupportedChains(oracleID).
-				Return(mapset.NewSet(tc.supportedChains...), nil)
+				Return(supportedSet, nil).Maybe()
 
-			ccipReader.EXPECT().GetChainsFeeComponents(ctx, tc.supportedChains).
-				Return(tc.chainFeeComponents)
+			supportedSet.Remove(tc.dstChain)
+			slicesWithoutDst := supportedSet.ToSlice()
+			sort.Slice(slicesWithoutDst, func(i, j int) bool { return slicesWithoutDst[i] < slicesWithoutDst[j] })
 
-			ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(ctx, tc.supportedChains).
-				Return(tc.nativeTokenPrices)
+			ccipReader.EXPECT().GetChainsFeeComponents(ctx, slicesWithoutDst).
+				Return(tc.chainFeeComponents).Maybe()
 
-			ccipReader.EXPECT().GetChainFeePriceUpdate(ctx, tc.supportedChains).
-				Return(tc.existingChainFeePriceUpdates)
+			ccipReader.EXPECT().GetWrappedNativeTokenPriceUSD(ctx, slicesWithoutDst).
+				Return(tc.nativeTokenPrices).Maybe()
 
-			homeChain.EXPECT().GetFChain().Return(tc.fChain, nil)
+			ccipReader.EXPECT().GetChainFeePriceUpdate(ctx, slicesWithoutDst).
+				Return(tc.existingChainFeePriceUpdates).Maybe()
+
+			homeChain.EXPECT().GetFChain().Return(tc.fChain, nil).Maybe()
 
 			tStart := time.Now()
 			obs, err := p.Observation(ctx, Outcome{}, Query{})
@@ -130,13 +150,20 @@ func Test_processor_Observation(t *testing.T) {
 				require.Error(t, err)
 				return
 			}
+			if tc.emptyObs {
+				require.Empty(t, obs)
+				return
+			}
 
 			require.NoError(t, err)
 			require.GreaterOrEqual(t, obs.TimestampNow.UnixNano(), tStart.UnixNano())
 			require.LessOrEqual(t, obs.TimestampNow.UnixNano(), tEnd.UnixNano())
 			require.Equal(t, tc.chainFeeComponents, obs.FeeComponents)
+			require.Equal(t, maps.Keys(tc.chainFeeComponents), slicesWithoutDst)
 			require.Equal(t, tc.nativeTokenPrices, obs.NativeTokenPrices)
+			require.Equal(t, maps.Keys(tc.nativeTokenPrices), slicesWithoutDst)
 			require.Equal(t, tc.expectedChainFeePriceUpdates, obs.ChainFeeUpdates)
+			require.Equal(t, maps.Keys(tc.expectedChainFeePriceUpdates), slicesWithoutDst)
 			require.Equal(t, tc.fChain, obs.FChain)
 		})
 	}
