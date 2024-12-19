@@ -117,7 +117,7 @@ func TestPluginReports(t *testing.T) {
 							MerkleRoot:    ccipocr3.Bytes32{1, 2, 3, 4, 5, 6},
 						},
 					},
-					RMNRemoteCfg: rmntypes.RemoteConfig{F: 123},
+					RMNRemoteCfg: rmntypes.RemoteConfig{FSign: 123},
 				},
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: []ccipocr3.TokenPrice{
