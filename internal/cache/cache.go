@@ -57,15 +57,13 @@ func NewCustomCache[V any](
 
 // Set adds an item to the cache
 func (c *CustomCache[V]) Set(key string, value V, expiration time.Duration) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	c.cache.Set(key, value, expiration)
 }
 
 // Get retrieves an item from the cache, checking both time-based and custom policies
 func (c *CustomCache[V]) Get(key string) (V, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	var zero V
 	value, found := c.cache.Get(key)
@@ -90,8 +88,6 @@ func (c *CustomCache[V]) Get(key string) (V, bool) {
 
 // Delete removes an item from the cache
 func (c *CustomCache[V]) Delete(key string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	c.cache.Delete(key)
 }
 
@@ -114,7 +110,5 @@ func (c *CustomCache[V]) Items() map[string]V {
 
 // Flush removes all items from the cache
 func (c *CustomCache[V]) Flush() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
 	c.cache.Flush()
 }
