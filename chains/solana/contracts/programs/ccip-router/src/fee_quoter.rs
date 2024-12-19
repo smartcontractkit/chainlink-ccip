@@ -90,6 +90,12 @@ pub fn wrap_native_sol<'info>(
     amount: u64,
     signer_bump: u8,
 ) -> Result<()> {
+    require!(
+        // guarantee that if caller is a PDA it won't get garbage-collected
+        *from.owner == System::id() || from.get_lamports() > amount,
+        CcipRouterError::InsufficientLamports
+    );
+
     invoke_signed(
         &system_instruction::transfer(&from.key(), &to.key(), amount),
         &[from.to_account_info(), to.to_account_info()],
