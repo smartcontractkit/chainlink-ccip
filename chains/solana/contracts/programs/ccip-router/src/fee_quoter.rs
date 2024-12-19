@@ -40,13 +40,14 @@ pub fn fee_for_msg(
     )?;
 
     // TODO un-hardcode
-    let execution_cost = U256::new(1);
-    let data_availability_cost = U256::new(1);
+    let execution_cost = 1u32.e(18);
+    let data_availability_cost = 1u32.e(18);
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
-    let amount =
-        (network_fee.premium.0 * premium_multiplier + execution_cost + data_availability_cost)
-            / fee_token_price.0;
+    let amount = (dbg!(network_fee.premium.0) * dbg!(premium_multiplier)
+        + execution_cost
+        + data_availability_cost)
+        / dbg!(fee_token_price.0);
     let amount: u64 = amount
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;

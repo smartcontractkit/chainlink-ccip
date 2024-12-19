@@ -412,6 +412,8 @@ impl Solana2AnyMessage {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use crate::utils::Exponential;
+
     use super::*;
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
@@ -564,7 +566,7 @@ pub(crate) mod tests {
 
     pub fn sample_billing_config() -> BillingTokenConfig {
         let mut value = [0; 28];
-        value[27] = 3;
+        value.clone_from_slice(&3u32.e(18).to_be_bytes()[4..]);
         BillingTokenConfig {
             enabled: true,
             mint: native_mint::ID,
@@ -572,7 +574,7 @@ pub(crate) mod tests {
                 value,
                 timestamp: 100,
             },
-            premium_multiplier_wei_per_eth: 0,
+            premium_multiplier_wei_per_eth: 1,
         }
     }
 
@@ -596,11 +598,11 @@ pub(crate) mod tests {
                 dest_data_availability_overhead_gas: 0,
                 dest_gas_per_data_availability_byte: 0,
                 dest_data_availability_multiplier_bps: 0,
-                default_token_fee_usdcents: 0,
+                default_token_fee_usdcents: 100,
                 default_token_dest_gas_overhead: 0,
                 default_tx_gas_limit: 0,
                 gas_multiplier_wei_per_eth: 0,
-                network_fee_usdcents: 0,
+                network_fee_usdcents: 100,
                 gas_price_staleness_threshold: 10,
                 enforce_out_of_order: false,
                 chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),
