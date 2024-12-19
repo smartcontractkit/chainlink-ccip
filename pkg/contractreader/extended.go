@@ -131,17 +131,20 @@ func (e *extendedContractReader) QueryKey(
 	limitAndSort query.LimitAndSort,
 	sequenceDataType any,
 ) ([]types.Sequence, error) {
-	if e.hasFinalityViolation() {
-		return nil, ErrFinalityViolated
-	}
-
-	return e.reader.QueryKey(
+	result, err := e.reader.QueryKey(
 		ctx,
 		contract,
 		filter,
 		limitAndSort,
 		sequenceDataType,
 	)
+
+	// reads may update the reader health, so check for violations after every read.
+	if e.hasFinalityViolation() {
+		return nil, ErrFinalityViolated
+	}
+
+	return result, err
 }
 
 func (e *extendedContractReader) ExtendedQueryKey(
@@ -171,17 +174,20 @@ func (e *extendedContractReader) GetLatestValue(
 	confidenceLevel primitives.ConfidenceLevel,
 	params, returnVal any,
 ) error {
-	if e.hasFinalityViolation() {
-		return ErrFinalityViolated
-	}
-
-	return e.reader.GetLatestValue(
+	err := e.reader.GetLatestValue(
 		ctx,
 		readIdentifier,
 		confidenceLevel,
 		params,
 		returnVal,
 	)
+
+	// reads may update the reader health, so check for violations after every read.
+	if e.hasFinalityViolation() {
+		return ErrFinalityViolated
+	}
+
+	return err
 }
 
 func (e *extendedContractReader) ExtendedGetLatestValue(
@@ -209,11 +215,14 @@ func (e *extendedContractReader) BatchGetLatestValues(
 	ctx context.Context,
 	request types.BatchGetLatestValuesRequest,
 ) (types.BatchGetLatestValuesResult, error) {
+	result, err := e.reader.BatchGetLatestValues(ctx, request)
+
+	// reads may update the reader health, so check for violations after every read.
 	if e.hasFinalityViolation() {
 		return nil, ErrFinalityViolated
 	}
 
-	return e.reader.BatchGetLatestValues(ctx, request)
+	return result, err
 }
 
 func (e *extendedContractReader) ExtendedBatchGetLatestValues(
@@ -286,6 +295,9 @@ func (e *extendedContractReader) bindingExists(b types.BoundContract) bool {
 	return false
 }
 
+// hasFinalityViolation checks the reader's HealthReport for a finality violated error.
+// The report is based on the current known state, it does not proactively check for new errors.
+// The state is typically updated as the LogPoller reads events from an rpc.
 func (e *extendedContractReader) hasFinalityViolation() bool {
 	report := e.reader.HealthReport()
 	return services.ContainsError(
