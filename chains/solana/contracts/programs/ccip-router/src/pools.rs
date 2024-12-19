@@ -17,6 +17,7 @@ use crate::{
 };
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
+pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
 const MIN_TOKEN_POOL_ACCOUNTS: usize = 11; // see TokenAccounts struct for all required accounts
 
 pub fn calculate_token_pool_account_indices(

@@ -520,7 +520,7 @@ pub mod ccip_router {
         ctx: Context<SetTokenBillingConfig>,
         _chain_selector: u64,
         _mint: Pubkey,
-        cfg: TokenBilling,
+        cfg: TokenTransferFeeConfig,
     ) -> Result<()> {
         ctx.accounts.per_chain_per_token_config.billing = cfg;
         Ok(())
@@ -668,7 +668,7 @@ pub mod ccip_router {
             dest_chain_selector,
             &message,
             &ctx.accounts.dest_chain_state,
-            &ctx.accounts.billing_token_config.config,
+            &[&ctx.accounts.billing_token_config.config],
             &[],
         )?
         .amount)
@@ -702,7 +702,7 @@ pub mod ccip_router {
             dest_chain_selector,
             &message,
             dest_chain,
-            fee_token_config,
+            &[&fee_token_config],
             &[],
         )?;
 
@@ -1614,6 +1614,8 @@ pub enum CcipRouterError {
     StaleGasPrice,
     #[msg("Insufficient lamports")]
     InsufficientLamports,
+    #[msg("Unsupported token")]
+    UnsupportedToken,
 }
 
 // TODO: Refactor this to use the same structure as messages: execution_report.validate(..)

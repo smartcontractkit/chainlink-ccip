@@ -414,6 +414,7 @@ impl Solana2AnyMessage {
 pub(crate) mod tests {
     use super::*;
     use anchor_lang::solana_program::pubkey::Pubkey;
+    use anchor_spl::token::spl_token::native_mint;
     use bytemuck::Zeroable;
 
     /// Builds a message and hash it, it's compared with a known hash
@@ -566,7 +567,7 @@ pub(crate) mod tests {
         value[27] = 3;
         BillingTokenConfig {
             enabled: true,
-            mint: Pubkey::new_unique(),
+            mint: native_mint::ID,
             usd_per_token: crate::TimestampedPackedU224 {
                 value,
                 timestamp: 100,
