@@ -28,6 +28,13 @@ func TestDecodeExecuteReportInfo(t *testing.T) {
 		_, err := DecodeExecuteReportInfo(data)
 		require.ErrorContains(t, err, "object") // not super helpful...
 	}
+
+	// empty
+	{
+		ri, err := DecodeExecuteReportInfo(nil)
+		require.NoError(t, err)
+		require.Equal(t, ExecuteReportInfo{}, ri)
+	}
 }
 
 func TestExecuteReportInfo_EncodeDecode(t *testing.T) {
