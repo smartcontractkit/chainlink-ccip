@@ -180,7 +180,7 @@ func TestExtendedBatchGetLatestValues(t *testing.T) {
 
 			// Create extended reader with mock
 			extendedReader := &extendedContractReader{
-				ContractReaderFacade:   mockReader,
+				reader:                 mockReader,
 				contractBindingsByName: tt.bindings,
 				mu:                     &sync.RWMutex{},
 			}
@@ -210,4 +210,8 @@ func (m *mockContractReader) BatchGetLatestValues(
 	_ types.BatchGetLatestValuesRequest,
 ) (types.BatchGetLatestValuesResult, error) {
 	return m.BatchGetLatestValuesResponse, nil
+}
+
+func (m *mockContractReader) HealthReport() map[string]error {
+	return nil
 }

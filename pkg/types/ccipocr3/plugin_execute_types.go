@@ -33,6 +33,10 @@ func (eri ExecuteReportInfo) Encode() ([]byte, error) {
 // DecodeExecuteReportInfo is a version aware decode function for the execute
 // report info bytes.
 func DecodeExecuteReportInfo(data []byte) (ExecuteReportInfo, error) {
+	if len(data) == 0 {
+		return ExecuteReportInfo{}, nil
+	}
+
 	switch data[0] {
 	case 1:
 		var result ExecuteReportInfo

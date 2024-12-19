@@ -183,6 +183,53 @@ func (_c *MockContractReaderFacade_GetLatestValue_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// HealthReport provides a mock function with given fields:
+func (_m *MockContractReaderFacade) HealthReport() map[string]error {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for HealthReport")
+	}
+
+	var r0 map[string]error
+	if rf, ok := ret.Get(0).(func() map[string]error); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]error)
+		}
+	}
+
+	return r0
+}
+
+// MockContractReaderFacade_HealthReport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'HealthReport'
+type MockContractReaderFacade_HealthReport_Call struct {
+	*mock.Call
+}
+
+// HealthReport is a helper method to define mock.On call
+func (_e *MockContractReaderFacade_Expecter) HealthReport() *MockContractReaderFacade_HealthReport_Call {
+	return &MockContractReaderFacade_HealthReport_Call{Call: _e.mock.On("HealthReport")}
+}
+
+func (_c *MockContractReaderFacade_HealthReport_Call) Run(run func()) *MockContractReaderFacade_HealthReport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContractReaderFacade_HealthReport_Call) Return(_a0 map[string]error) *MockContractReaderFacade_HealthReport_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContractReaderFacade_HealthReport_Call) RunAndReturn(run func() map[string]error) *MockContractReaderFacade_HealthReport_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryKey provides a mock function with given fields: ctx, contract, filter, limitAndSort, sequenceDataType
 func (_m *MockContractReaderFacade) QueryKey(ctx context.Context, contract types.BoundContract, filter query.KeyFilter, limitAndSort query.LimitAndSort, sequenceDataType interface{}) ([]types.Sequence, error) {
 	ret := _m.Called(ctx, contract, filter, limitAndSort, sequenceDataType)
