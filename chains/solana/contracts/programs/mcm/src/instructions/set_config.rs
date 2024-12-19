@@ -16,7 +16,6 @@ pub fn set_config(
     group_parents: [u8; NUM_GROUPS],
     clear_root: bool,
 ) -> Result<()> {
-    let config = &mut ctx.accounts.multisig_config;
     // signer addresses are preloaded in the ConfigSigners account through InitSigners, AppendSigners and FinalizeSigners instructions
     let signer_addresses = &ctx.accounts.config_signers.signer_addresses;
 
@@ -89,6 +88,10 @@ pub fn set_config(
         }
     }
 
+    let config = &mut ctx.accounts.multisig_config;
+    config.group_quorums = group_quorums;
+    config.group_parents = group_parents;
+
     {
         let mut signers: Vec<McmSigner> = Vec::with_capacity(signer_addresses.len());
         let mut prev_signer = [0u8; EVM_ADDRESS_BYTES];
@@ -110,9 +113,6 @@ pub fn set_config(
         }
         config.signers = signers;
     }
-
-    config.group_quorums = group_quorums;
-    config.group_parents = group_parents;
 
     // clear_root is equivalent to overriding with a completely empty root
     if clear_root {
