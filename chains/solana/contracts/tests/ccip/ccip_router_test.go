@@ -2908,6 +2908,139 @@ func TestCCIPRouter(t *testing.T) {
 		})
 	})
 
+	///////////////////////////
+	// Withdraw billed funds //
+	////////////////////.......
+	t.Run("Withdraw billed funds", func(t *testing.T) {
+		t.Run("Preconditions", func(t *testing.T) {
+			require.Greater(t, getBalance(wsol.billingATA), uint64(0))
+			require.Greater(t, getBalance(token2022.billingATA), uint64(0))
+		})
+
+		t.Run("When an non-admin user tries to withdraw funds from a billing token account, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.userATA, // send them to the user's account (just because, it could be any wallet)
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				user.PublicKey(), // wrong user here
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+		})
+
+		t.Run("When withdrawing funds but sending them to the wrong token account, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				token2022.userATA, // wrong token account
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputs_CcipRouterError.String()})
+		})
+
+		t.Run("When trying to withdraw more funds than what's available, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				false,                         // withdraw all
+				getBalance(wsol.billingATA)+1, // amount (more than what's available)
+				wsol.mint,
+				wsol.billingATA,
+				wsol.userATA,
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
+		})
+
+		t.Run("When withdrawing a specific amount of funds, it succeeds", func(t *testing.T) {
+			funds := getBalance(token2022.billingATA)
+			require.Greater(t, funds, uint64(0))
+
+			initialUserBalance := getBalance(token2022.userATA)
+
+			amount := uint64(2)
+
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				false,  // withdraw all
+				amount, // amount
+				token2022.mint,
+				token2022.billingATA,
+				token2022.userATA, // send them to the user's account (just because, it could be any wallet)
+				token2022.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
+
+			require.Equal(t, funds-amount, getBalance(token2022.billingATA))           // empty
+			require.Equal(t, amount, getBalance(token2022.userATA)-initialUserBalance) // increased by exact amount
+		})
+
+		t.Run("When withdrawing all funds, it succeeds", func(t *testing.T) {
+			funds := getBalance(wsol.billingATA)
+			require.Greater(t, funds, uint64(0))
+
+			initialUserBalance := getBalance(wsol.userATA)
+
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.userATA, // send them to the user's account (just because, it could be any wallet)
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
+
+			require.Equal(t, uint64(0), getBalance(wsol.billingATA))             // empty
+			require.Equal(t, funds, getBalance(wsol.userATA)-initialUserBalance) // increased by exact amount
+		})
+
+		t.Run("When withdrawing all funds but the accumulator account is already empty (no balance), it fails", func(t *testing.T) {
+			funds := getBalance(wsol.billingATA)
+			require.Equal(t, uint64(0), funds)
+
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.userATA, // send them to the user's account (just because, it could be any wallet)
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
+		})
+	})
+
 	//////////////////////////
 	//        OffRamp       //
 	//////////////////////////
