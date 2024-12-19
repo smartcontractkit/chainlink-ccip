@@ -1102,6 +1102,15 @@
           "name": "isRootCleared",
           "type": "bool",
           "index": false
+        },
+        {
+          "name": "signers",
+          "type": {
+            "vec": {
+              "defined": "McmSigner"
+            }
+          },
+          "index": false
         }
       ]
     },
