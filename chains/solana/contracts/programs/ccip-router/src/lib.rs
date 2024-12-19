@@ -520,7 +520,7 @@ pub mod ccip_router {
         ctx: Context<SetTokenBillingConfig>,
         _chain_selector: u64,
         _mint: Pubkey,
-        cfg: TokenTransferFeeConfig,
+        cfg: TokenBilling,
     ) -> Result<()> {
         ctx.accounts.per_chain_per_token_config.billing = cfg;
         Ok(())

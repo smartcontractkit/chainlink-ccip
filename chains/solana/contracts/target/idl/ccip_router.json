@@ -2729,6 +2729,9 @@
           },
           {
             "name": "InsufficientLamports"
+          },
+          {
+            "name": "UnsupportedToken"
           }
         ]
       }

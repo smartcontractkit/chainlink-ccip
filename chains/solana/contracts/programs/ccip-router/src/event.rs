@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::{
     context::MerkleRoot, DestChainConfig, MessageExecutionState, PriceUpdates,
-    Solana2AnyRampMessage, SourceChainConfig, TokenTransferFeeConfig,
+    Solana2AnyRampMessage, SourceChainConfig, TokenBilling,
 };
 
 #[event]
@@ -98,7 +98,7 @@ pub struct UsdPerTokenUpdated {
 pub struct TokenTransferFeeConfigUpdated {
     pub dest_chain_selector: u64,
     pub token: Pubkey,
-    pub token_transfer_fee_config: TokenTransferFeeConfig,
+    pub token_transfer_fee_config: TokenBilling,
 }
 
 #[event]
