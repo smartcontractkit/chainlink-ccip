@@ -33,7 +33,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
-	roles, roleMap := timelockutil.TestRoleAccounts(t, config.NumAccountsPerRole)
+	roles, roleMap := timelockutil.TestRoleAccounts(config.NumAccountsPerRole)
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	allowance := struct {
@@ -72,7 +72,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			initAccIxs, initAccIxsErr := timelockutil.InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
 			require.NoError(t, initAccIxsErr)
 
-			common.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
 
 			var ac access_controller.AccessController
 			acAccErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
@@ -111,7 +111,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		).ValidateAndBuild()
 		require.NoError(t, initErr)
 
-		common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
+		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
 		cfgErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
@@ -133,11 +133,11 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			for _, account := range data.Accounts {
 				addresses = append(addresses, account.PublicKey())
 			}
-			batchAddAccessIxs, batchAddAccessIxsErr := timelockutil.TimelockBatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+			batchAddAccessIxs, batchAddAccessIxsErr := timelockutil.BatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 			require.NoError(t, batchAddAccessIxsErr)
 
 			for _, ix := range batchAddAccessIxs {
-				common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
 			for _, account := range data.Accounts {
@@ -183,7 +183,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			)
 			require.NoError(t, aiErr)
 
-			result := common.SendAndConfirm(ctx, t, solanaGoClient,
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 				[]solana.Instruction{createAdminATAIx, wrapSolIx, syncNativeIx, fundPDAIx, approveIx},
 				admin, config.DefaultCommitment)
 			require.NotNil(t, result)
@@ -209,7 +209,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		t.Run("success: schedule and execute batch instructions", func(t *testing.T) {
 			salt, err := mcms.SimpleSalt()
 			require.NoError(t, err)
-			op := timelockutil.TimelockOperation{
+			op := timelockutil.Operation{
 				Predecessor: config.TimelockEmptyOpID,
 				Salt:        salt,
 				Delay:       uint64(1000),
@@ -244,10 +244,10 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			operationPDA := op.OperationPDA()
 			signer := roleMap[timelock.Proposer_Role].RandomPick()
 
-			ixs, err := timelockutil.TimelockPreloadOperationIxs(ctx, op, signer.PublicKey(), solanaGoClient)
+			ixs, err := timelockutil.PreloadOperationIxs(ctx, op, signer.PublicKey(), solanaGoClient)
 			require.NoError(t, err)
 			for _, ix := range ixs {
-				common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
 			}
 
 			var opAccount timelock.Operation
@@ -279,7 +279,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
-				tx := common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, signer, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, signer, config.DefaultCommitment)
 				require.NotNil(t, tx)
 
 				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,

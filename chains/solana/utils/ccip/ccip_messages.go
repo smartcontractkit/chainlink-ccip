@@ -6,12 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"testing"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
@@ -67,20 +65,21 @@ func NextCommitReportContext() [3][32]byte {
 	return CreateReportContext(reportSequence)
 }
 
-func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client, t *testing.T) (ccip_router.Any2SolanaRampMessage, [32]byte) {
-	nextSeq := NextSequenceNumber(ctx, solanaGoClient, config.EvmSourceChainStatePDA, t)
+func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client) (ccip_router.Any2SolanaRampMessage, [32]byte, error) {
+	nextSeq, err := NextSequenceNumber(ctx, solanaGoClient, config.EvmSourceChainStatePDA)
+	if err != nil {
+		return ccip_router.Any2SolanaRampMessage{}, [32]byte{}, err
+	}
 	msg := CreateDefaultMessageWith(config.EvmChainSelector, nextSeq)
 
 	hash, err := HashEvmToSolanaMessage(msg, config.OnRampAddress)
-	require.NoError(t, err)
-	return msg, [32]byte(hash)
+	return msg, [32]byte(hash), err
 }
 
-func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceChainStatePDA solana.PublicKey, t *testing.T) uint64 {
+func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceChainStatePDA solana.PublicKey) (uint64, error) {
 	var chainStateAccount ccip_router.SourceChain
 	err := common.GetAccountDataBorshInto(ctx, solanaGoClient, sourceChainStatePDA, config.DefaultCommitment, &chainStateAccount)
-	require.NoError(t, err)
-	return chainStateAccount.State.MinSeqNr
+	return chainStateAccount.State.MinSeqNr, err
 }
 
 func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64) ccip_router.Any2SolanaRampMessage {
@@ -111,16 +110,15 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 	return message
 }
 
-func MakeEvmToSolanaMessage(t *testing.T, ccipReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte) {
+func MakeEvmToSolanaMessage(ccipReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte, error) {
 	msg := CreateDefaultMessageWith(evmChainSelector, 1)
 	msg.Header.DestChainSelector = solanaChainSelector
 	msg.Receiver = ccipReceiver
 	msg.Data = data
 
 	hash, err := HashEvmToSolanaMessage(msg, config.OnRampAddress)
-	require.NoError(t, err)
 	msg.Header.MessageId = [32]byte(hash)
-	return msg, msg.Header.MessageId
+	return msg, msg.Header.MessageId, err
 }
 
 func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress []byte) ([]byte, error) {

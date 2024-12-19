@@ -57,7 +57,7 @@ func InitAccessControllersIxs(ctx context.Context, roleAcAccount solana.PublicKe
 }
 
 // instructions builder for adding access to a role
-func TimelockBatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicKey, role timelock.Role, addresses []solana.PublicKey, authority solana.PrivateKey, chunkSize int, client *rpc.Client) ([]solana.Instruction, error) {
+func BatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicKey, role timelock.Role, addresses []solana.PublicKey, authority solana.PrivateKey, chunkSize int, client *rpc.Client) ([]solana.Instruction, error) {
 	var ac access_controller.AccessController
 	err := common.GetAccountDataBorshInto(ctx, client, roleAcAccount, config.DefaultCommitment, &ac)
 	if err != nil {
@@ -90,7 +90,7 @@ func TimelockBatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicK
 }
 
 // instructions builder for preloading instructions to timelock operation
-func TimelockPreloadOperationIxs(ctx context.Context, op TimelockOperation, authority solana.PublicKey, client *rpc.Client) ([]solana.Instruction, error) {
+func PreloadOperationIxs(ctx context.Context, op Operation, authority solana.PublicKey, client *rpc.Client) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
 		op.OperationID(),

@@ -48,10 +48,10 @@ func TestSolanaLookupTables(t *testing.T) {
 			slot,
 		)
 		require.NoError(t, ierr)
-		common.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
+		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{instruction}, sender, rpc.CommitmentConfirmed)
 
 		// add entries to lookup table
-		common.SendAndConfirm(ctx, t, c, []solana.Instruction{
+		testutils.SendAndConfirm(ctx, t, c, []solana.Instruction{
 			common.NewExtendLookupTableInstruction(
 				table, sender.PublicKey(), sender.PublicKey(),
 				k,

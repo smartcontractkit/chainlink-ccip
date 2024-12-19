@@ -67,7 +67,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 		// fund the signer pda
 		fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), msigSignerPDA).Build()
-		result := common.SendAndConfirm(ctx, t, solanaGoClient,
+		result := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 			[]solana.Instruction{fundPDAIx},
 			admin, config.DefaultCommitment)
 		require.NotNil(t, result)
@@ -194,7 +194,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				expiringRootAndOpCountPDA,
 			).ValidateAndBuild()
 			require.NoError(t, initErr)
-			result := common.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + mcms.UnauthorizedMcmError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{"Error Code: " + mcms.UnauthorizedMcmError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -224,7 +224,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				expiringRootAndOpCountPDA,
 			).ValidateAndBuild()
 			require.NoError(t, initErr)
-			common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
@@ -293,7 +293,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				ixs = append(ixs, finalizeSignersIx)
 
 				for _, ix := range ixs {
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
@@ -323,7 +323,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			require.NoError(t, configErr)
 
-			result := common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			// get config and validate
@@ -392,14 +392,14 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				).ValidateAndBuild()
 
 				require.NoError(t, isErr)
-				common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
 
 				appendSigsIxs, asErr := mcms.AppendSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// partially register signatures
 				for _, ix := range appendSigsIxs[:3] {
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				// clear uploaded signatures(this closes the account)
@@ -412,8 +412,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, cErr)
 
-				common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, admin, config.DefaultCommitment)
-				common.AssertClosedAccount(ctx, t, solanaGoClient, signaturesPDA, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, admin, config.DefaultCommitment)
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, signaturesPDA, config.DefaultCommitment)
 
 				reInitSigsIx, rIsErr := mcm.NewInitSignaturesInstruction(
 					testMsigName,
@@ -426,11 +426,11 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				).ValidateAndBuild()
 
 				require.NoError(t, rIsErr)
-				common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reInitSigsIx}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reInitSigsIx}, admin, config.DefaultCommitment)
 
 				// register all signatures again
 				for _, ix := range appendSigsIxs {
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				finalizeSigsIx, fsErr := mcm.NewFinalizeSignaturesInstruction(
@@ -442,7 +442,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				).ValidateAndBuild()
 
 				require.NoError(t, fsErr)
-				common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSigsIx}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSigsIx}, admin, config.DefaultCommitment)
 
 				var sigAccount mcm.RootSignatures
 				queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
@@ -473,7 +473,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, setRootIxErr)
 
-			tx := common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
 			require.NotNil(t, tx)
 
 			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -536,7 +536,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				vIx, vIxErr := ix.ValidateAndBuild()
 				require.NoError(t, vIxErr)
 
-				tx := common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
 				require.NotNil(t, tx.Meta)
 				require.Nil(t, tx.Meta.Err, fmt.Sprintf("tx failed with: %+v", tx.Meta))
 				parsedInstructions := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -734,7 +734,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				// fund the signer pda
 				fundPDAIx, err := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), multisigSignerPDA).ValidateAndBuild()
 				require.NoError(t, err)
-				result := common.SendAndConfirm(ctx, t, solanaGoClient,
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 					[]solana.Instruction{fundPDAIx},
 					admin, config.DefaultCommitment)
 				require.NotNil(t, result)
@@ -765,7 +765,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						expiringRootAndOpCountPDA,
 					).ValidateAndBuild()
 					require.NoError(t, initErr)
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 					// get config and validate
 					var configAccount mcm.MultisigConfig
@@ -817,7 +817,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					ixs = append(ixs, finalizeSignersIx)
 
 					for _, ix := range ixs {
-						common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 					}
 
 					var cfgSignersAccount mcm.ConfigSigners
@@ -846,7 +846,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 					require.NoError(t, configErr)
 
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 					// get config and validate
 					var configAccount mcm.MultisigConfig
@@ -989,7 +989,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				for _, tx := range txs {
 					if tx.Stage == tt.failureStage {
 						// this stage should fail
-						result := common.SendAndFailWith(ctx, t, solanaGoClient,
+						result := testutils.SendAndFailWith(ctx, t, solanaGoClient,
 							tx.Instructions,
 							admin,
 							rpc.CommitmentConfirmed,
@@ -1000,7 +1000,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					}
 
 					// all other instructions should succeed
-					common.SendAndConfirm(ctx, t, solanaGoClient,
+					testutils.SendAndConfirm(ctx, t, solanaGoClient,
 						tx.Instructions,
 						admin,
 						config.DefaultCommitment,

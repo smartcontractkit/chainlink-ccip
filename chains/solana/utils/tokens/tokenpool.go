@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"strings"
-	"testing"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
@@ -87,13 +86,15 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	return p, nil
 }
 
-func (tp *TokenPool) SetupLookupTable(ctx context.Context, t *testing.T, client *rpc.Client, admin solana.PrivateKey) error {
-	table, err := common.CreateLookupTable(ctx, t, client, admin)
+func (tp *TokenPool) SetupLookupTable(ctx context.Context, client *rpc.Client, admin solana.PrivateKey) error {
+	table, err := common.CreateLookupTable(ctx, client, admin)
 	if err != nil {
 		return err
 	}
 	tp.PoolLookupTable = table // the LUT entries will include this, so set it before adding the addresses to the LUT
-	common.ExtendLookupTable(ctx, t, client, table, admin, tp.ToTokenPoolEntries())
+	if err = common.ExtendLookupTable(ctx, client, table, admin, tp.ToTokenPoolEntries()); err != nil {
+		return err
+	}
 	return common.AwaitSlotChange(ctx, client)
 }
 

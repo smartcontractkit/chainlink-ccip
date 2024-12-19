@@ -1,4 +1,4 @@
-package common
+package testutils
 
 import (
 	cryptorand "crypto/rand"

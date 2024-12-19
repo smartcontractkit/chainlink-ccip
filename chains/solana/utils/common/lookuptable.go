@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"encoding/binary"
-	"testing"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
@@ -77,9 +76,7 @@ func NewExtendLookupTableInstruction(
 	)
 }
 
-// TODO remove dependency on all methods on *testing.T once SendAndConfirm no longer requires it
-
-func CreateLookupTable(ctx context.Context, t *testing.T, client *rpc.Client, admin solana.PrivateKey) (solana.PublicKey, error) {
+func CreateLookupTable(ctx context.Context, client *rpc.Client, admin solana.PrivateKey) (solana.PublicKey, error) {
 	slot, serr := client.GetSlot(ctx, rpc.CommitmentFinalized)
 	if serr != nil {
 		return solana.PublicKey{}, serr
@@ -94,13 +91,12 @@ func CreateLookupTable(ctx context.Context, t *testing.T, client *rpc.Client, ad
 		return solana.PublicKey{}, ierr
 	}
 
-	SendAndConfirm(ctx, t, client, []solana.Instruction{instruction}, admin, rpc.CommitmentConfirmed)
-
-	return table, nil
+	_, err := SendAndConfirm(ctx, client, []solana.Instruction{instruction}, admin, rpc.CommitmentConfirmed)
+	return table, err
 }
 
-func ExtendLookupTable(ctx context.Context, t *testing.T, client *rpc.Client, table solana.PublicKey, admin solana.PrivateKey, entries []solana.PublicKey) {
-	SendAndConfirm(ctx, t, client, []solana.Instruction{
+func ExtendLookupTable(ctx context.Context, client *rpc.Client, table solana.PublicKey, admin solana.PrivateKey, entries []solana.PublicKey) error {
+	_, err := SendAndConfirm(ctx, client, []solana.Instruction{
 		NewExtendLookupTableInstruction(
 			table,
 			admin.PublicKey(),
@@ -108,6 +104,7 @@ func ExtendLookupTable(ctx context.Context, t *testing.T, client *rpc.Client, ta
 			entries,
 		),
 	}, admin, rpc.CommitmentConfirmed)
+	return err
 }
 
 func AwaitSlotChange(ctx context.Context, client *rpc.Client) error {
@@ -126,13 +123,16 @@ func AwaitSlotChange(ctx context.Context, client *rpc.Client) error {
 	return nil
 }
 
-func SetupLookupTable(ctx context.Context, t *testing.T, client *rpc.Client, admin solana.PrivateKey, entries []solana.PublicKey) (solana.PublicKey, error) {
-	table, err := CreateLookupTable(ctx, t, client, admin)
+func SetupLookupTable(ctx context.Context, client *rpc.Client, admin solana.PrivateKey, entries []solana.PublicKey) (solana.PublicKey, error) {
+	table, err := CreateLookupTable(ctx, client, admin)
 	if err != nil {
 		return solana.PublicKey{}, err
 	}
 
-	ExtendLookupTable(ctx, t, client, table, admin, entries)
+	err = ExtendLookupTable(ctx, client, table, admin, entries)
+	if err != nil {
+		return solana.PublicKey{}, err
+	}
 
 	// Address lookup tables have to "warm up" for at least 1 slot before they can be used.
 	// So, we wait for a new slot to be produced before returning the table, so it's available

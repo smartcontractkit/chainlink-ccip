@@ -3,10 +3,8 @@ package timelock
 import (
 	crypto_rand "crypto/rand"
 	"math/big"
-	"testing"
 
 	"github.com/gagliardetto/solana-go"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 )
@@ -34,27 +32,27 @@ func (r RoleAccounts) RandomPick() solana.PrivateKey {
 	return r.Accounts[n.Int64()]
 }
 
-func TestRoleAccounts(t *testing.T, numAccounts int) ([]RoleAccounts, RoleMap) {
+func TestRoleAccounts(numAccounts int) ([]RoleAccounts, RoleMap) {
 	roles := []RoleAccounts{
 		{
 			Role:             timelock.Proposer_Role,
-			Accounts:         createRoleAccounts(t, numAccounts),
-			AccessController: getPrivateKey(t),
+			Accounts:         mustCreateRoleAccounts(numAccounts),
+			AccessController: mustPrivateKey(),
 		},
 		{
 			Role:             timelock.Executor_Role,
-			Accounts:         createRoleAccounts(t, numAccounts),
-			AccessController: getPrivateKey(t),
+			Accounts:         mustCreateRoleAccounts(numAccounts),
+			AccessController: mustPrivateKey(),
 		},
 		{
 			Role:             timelock.Canceller_Role,
-			Accounts:         createRoleAccounts(t, numAccounts),
-			AccessController: getPrivateKey(t),
+			Accounts:         mustCreateRoleAccounts(numAccounts),
+			AccessController: mustPrivateKey(),
 		},
 		{
 			Role:             timelock.Bypasser_Role,
-			Accounts:         createRoleAccounts(t, numAccounts),
-			AccessController: getPrivateKey(t),
+			Accounts:         mustCreateRoleAccounts(numAccounts),
+			AccessController: mustPrivateKey(),
 		},
 	}
 
@@ -65,21 +63,21 @@ func TestRoleAccounts(t *testing.T, numAccounts int) ([]RoleAccounts, RoleMap) {
 	return roles, roleMap
 }
 
-func createRoleAccounts(t *testing.T, num int) []solana.PrivateKey {
+func mustCreateRoleAccounts(num int) []solana.PrivateKey {
 	if num < 1 || num > 64 {
 		panic("num should be between 1 and 64")
 	}
 	accounts := make([]solana.PrivateKey, num)
 	for i := 0; i < num; i++ {
-		account, err := solana.NewRandomPrivateKey()
-		require.NoError(t, err)
-		accounts[i] = account
+		accounts[i] = mustPrivateKey()
 	}
 	return accounts
 }
 
-func getPrivateKey(t *testing.T) solana.PrivateKey {
+func mustPrivateKey() solana.PrivateKey {
 	key, err := solana.NewRandomPrivateKey()
-	require.NoError(t, err)
+	if err != nil {
+		panic(err)
+	}
 	return key
 }

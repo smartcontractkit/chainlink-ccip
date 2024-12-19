@@ -5,88 +5,97 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
-	"testing"
 	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
 )
 
-func SendAndConfirm(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) *rpc.GetTransactionResult {
+func SendAndConfirm(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
 	emptyLookupTables := map[solana.PublicKey]solana.PublicKeySlice{}
-	txres := sendTransactionWithLookupTables(ctx, rpcClient, t, instructions, signer, commitment, false, emptyLookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
-
-	require.NotNil(t, txres.Meta)
-	require.Nil(t, txres.Meta.Err, fmt.Sprintf("tx failed with: %+v", txres.Meta)) // tx should not err, print meta if it does (contains logs)
-	return txres
+	return SendAndConfirmWithLookupTables(ctx, rpcClient, instructions, signer, commitment, emptyLookupTables, opts...)
 }
 
-func SendAndConfirmWithLookupTables(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) *rpc.GetTransactionResult {
-	txres := sendTransactionWithLookupTables(ctx, rpcClient, t, instructions, signer, commitment, false, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
+func SendAndConfirmWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, false, lookupTables, opts...) // do not skipPreflight when expected to pass, preflight can help debug
+	if err != nil {
+		return nil, err
+	}
 
-	require.NotNil(t, txres.Meta)
-	require.Nil(t, txres.Meta.Err, fmt.Sprintf("tx failed with: %+v", txres.Meta)) // tx should not err, print meta if it does (contains logs)
-	return txres
+	if txres.Meta == nil {
+		return nil, fmt.Errorf("txres.Meta == nil")
+	}
+
+	if txres.Meta.Err != nil {
+		return nil, fmt.Errorf("tx failed with: %+v", txres.Meta) // tx should not err, print meta if it does (contains logs)
+	}
+	return txres, nil
 }
 
-func SendAndFailWith(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string, opts ...TxModifier) *rpc.GetTransactionResult {
+func SendAndFailWith(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
 	emptyLookupTables := map[solana.PublicKey]solana.PublicKeySlice{}
-	txres := sendTransactionWithLookupTables(ctx, rpcClient, t, instructions, signer, commitment, true, emptyLookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
+	return SendAndFailWithLookupTables(ctx, rpcClient, instructions, signer, commitment, emptyLookupTables, expectedErrors, opts...)
+}
 
-	require.NotNil(t, txres.Meta)
-	require.NotNil(t, txres.Meta.Err, fmt.Sprintf("tx should have reverted with: %+v", expectedErrors))
+func SendAndFailWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, expectedErrors []string, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
+	txres, err := sendTransactionWithLookupTables(ctx, rpcClient, instructions, signer, commitment, true, lookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
+	if err != nil {
+		return nil, err
+	}
+
+	if txres.Meta == nil || txres.Meta.Err == nil {
+		return nil, fmt.Errorf("txres.Meta == nil || txres.Meta.Err == nil")
+	}
 	logs := strings.Join(txres.Meta.LogMessages, " ")
 	for _, expectedError := range expectedErrors {
-		require.Contains(t, logs, expectedError, fmt.Sprintf("The logs did not contain '%s'. The logs were: %s", expectedError, logs))
+		if !strings.Contains(logs, expectedError) {
+			return nil, fmt.Errorf("The logs did not contain '%s'. The logs were: %s", expectedError, logs)
+		}
 	}
-	return txres
+	return txres, nil
 }
 
-func SendAndFailWithLookupTables(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, lookupTables map[solana.PublicKey]solana.PublicKeySlice, expectedErrors []string, opts ...TxModifier) *rpc.GetTransactionResult {
-	txres := sendTransactionWithLookupTables(ctx, rpcClient, t, instructions, signer, commitment, true, lookupTables, opts...) // skipPreflight when expected to fail so revert captured onchain
-
-	require.NotNil(t, txres.Meta)
-	require.NotNil(t, txres.Meta.Err)
-	logs := strings.Join(txres.Meta.LogMessages, " ")
-	for _, expectedError := range expectedErrors {
-		require.Contains(t, logs, expectedError, fmt.Sprintf("The logs did not contain '%s'. The logs were: %s", expectedError, logs))
-	}
-	return txres
-}
-
-func SendAndFailWithRPCError(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string) {
+func SendAndFailWithRPCError(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string) error {
 	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	tx, err := solana.NewTransaction(
 		instructions,
 		hashRes.Value.Blockhash,
 		solana.TransactionPayer(signer.PublicKey()),
 	)
-	require.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
-	_, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
+	if _, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
 		return &signer
-	})
-	require.NoError(t, err)
+	}); err != nil {
+		return err
+	}
 
 	_, err = rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: false, PreflightCommitment: rpc.CommitmentProcessed})
-	require.NotNil(t, err)
+	if err == nil {
+		return fmt.Errorf("expected RPC error - none found")
+	}
 
 	errStr := err.Error()
-
 	for _, expectedError := range expectedErrors {
-		require.Contains(t, errStr, expectedError)
+		if !strings.Contains(errStr, expectedError) {
+			return fmt.Errorf("The error did not contain '%s'. The error was: %s", expectedError, errStr)
+		}
 	}
+	return nil
 }
 
 // TxModifier is a dynamic function used to flexibly add components to a transaction such as additional signers, and compute budget parameters
@@ -115,10 +124,12 @@ func AddComputeUnitPrice(v fees.ComputeUnitPrice) TxModifier {
 	}
 }
 
-func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client, t *testing.T, instructions []solana.Instruction,
-	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, skipPreflight bool, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) *rpc.GetTransactionResult {
+func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signerAndPayer solana.PrivateKey, commitment rpc.CommitmentType, skipPreflight bool, lookupTables map[solana.PublicKey]solana.PublicKeySlice, opts ...TxModifier) (*rpc.GetTransactionResult, error) {
 	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	tx, err := solana.NewTransaction(
 		instructions,
@@ -126,8 +137,9 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 		solana.TransactionAddressTables(lookupTables),
 		solana.TransactionPayer(signerAndPayer.PublicKey()),
 	)
-
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	// build signers map
 	signers := map[solana.PublicKey]solana.PrivateKey{}
@@ -135,88 +147,91 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 
 	// set options before signing transaction
 	for _, o := range opts {
-		require.NoError(t, o(tx, signers))
+		if err = o(tx, signers); err != nil {
+			return nil, err
+		}
 	}
 
-	_, err = tx.Sign(func(pub solana.PublicKey) *solana.PrivateKey {
+	if _, err = tx.Sign(func(pub solana.PublicKey) *solana.PrivateKey {
 		priv, ok := signers[pub]
-		require.True(t, ok, fmt.Sprintf("Missing signer private key for %s", pub))
+		if !ok {
+			fmt.Printf("ERROR: Missing signer private key for %s\n", pub)
+		}
 		return &priv
-	})
-	require.NoError(t, err)
+	}); err != nil {
+		return nil, err
+	}
 
 	txsig, err := rpcClient.SendTransactionWithOpts(ctx, tx, rpc.TransactionOpts{SkipPreflight: skipPreflight, PreflightCommitment: rpc.CommitmentProcessed})
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	var txStatus rpc.ConfirmationStatusType
 	count := 0
 	for txStatus != rpc.ConfirmationStatusConfirmed && txStatus != rpc.ConfirmationStatusFinalized {
 		count++
 		statusRes, sigErr := rpcClient.GetSignatureStatuses(ctx, true, txsig)
-		require.NoError(t, sigErr)
+		if sigErr != nil {
+			return nil, sigErr
+		}
 		if statusRes != nil && len(statusRes.Value) > 0 && statusRes.Value[0] != nil {
 			txStatus = statusRes.Value[0].ConfirmationStatus
 		}
 		time.Sleep(50 * time.Millisecond)
 		if count > 500 {
-			require.NoError(t, fmt.Errorf("unable to find transaction within timeout"))
+			return nil, fmt.Errorf("unable to find transaction within timeout")
 		}
 	}
 
 	v := uint64(0)
-	txres, err := rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
+	return rpcClient.GetTransaction(ctx, txsig, &rpc.GetTransactionOpts{
 		Commitment:                     commitment,
 		MaxSupportedTransactionVersion: &v,
 	})
-	require.NoError(t, err)
-	return txres
 }
 
-func SimulateTransaction(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction, signer solana.PrivateKey) *rpc.SimulateTransactionResponse {
-	simRes, err := simulateTransaction(ctx, t, rpcClient, instructions, signer)
-	require.NoError(t, err)
-
-	return simRes
-}
-
-func simulateTransaction(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
+func SimulateTransaction(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
 	signer solana.PrivateKey) (*rpc.SimulateTransactionResponse, error) {
 	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	tx, err := solana.NewTransaction(
 		instructions,
 		hashRes.Value.Blockhash,
 		solana.TransactionPayer(signer.PublicKey()),
 	)
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
-	_, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
+	if _, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
 		return &signer
-	})
-	require.NoError(t, err)
+	}); err != nil {
+		return nil, err
+	}
 
 	return rpcClient.SimulateTransaction(ctx, tx)
 }
 
-func ExtractReturnValue(ctx context.Context, t *testing.T, logs []string, programID string) []byte {
+func ExtractReturnValue(ctx context.Context, logs []string, programID string) ([]byte, error) {
 	if logs == nil {
-		return []byte{}
+		return []byte{}, nil
 	}
 
 	for _, log := range logs {
 		if strings.HasPrefix(log, "Program return: "+programID) {
 			parts := strings.Split(log, " ")
 			encoded := parts[len(parts)-1]
-			ret, err := base64.StdEncoding.DecodeString(encoded)
-			require.NoError(t, err)
-			return ret
+			return base64.StdEncoding.DecodeString(encoded)
 		}
 	}
-	return []byte{}
+	return []byte{}, nil
 }
 
-func ExtractReturnedError(ctx context.Context, t *testing.T, logs []string, programID string) *string {
+func ExtractReturnedError(ctx context.Context, logs []string, programID string) *string {
 	if logs == nil {
 		return nil
 	}
@@ -233,9 +248,9 @@ func ExtractReturnedError(ctx context.Context, t *testing.T, logs []string, prog
 	return nil
 }
 
-func ExtractTypedReturnValue[T any](ctx context.Context, t *testing.T, logs []string, programID string, decoderFn func([]byte) T) T {
-	bytes := ExtractReturnValue(ctx, t, logs, programID)
-	return decoderFn(bytes)
+func ExtractTypedReturnValue[T any](ctx context.Context, logs []string, programID string, decoderFn func([]byte) T) (T, error) {
+	bytes, err := ExtractReturnValue(ctx, logs, programID)
+	return decoderFn(bytes), err
 }
 
 func GetAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, account solana.PublicKey, commitment rpc.CommitmentType, data interface{}) error {
@@ -253,9 +268,9 @@ func GetAccountDataBorshInto(ctx context.Context, solanaGoClient *rpc.Client, ac
 	return bin.NewBorshDecoder(resp.Value.Data.GetBinary()).Decode(data)
 }
 
-func AssertClosedAccount(ctx context.Context, t *testing.T, solanaGoClient *rpc.Client, accountKey solana.PublicKey, commitment rpc.CommitmentType) {
+func IsClosedAccount(ctx context.Context, solanaGoClient *rpc.Client, accountKey solana.PublicKey, commitment rpc.CommitmentType) bool {
 	_, err := solanaGoClient.GetAccountInfoWithOpts(ctx, accountKey, &rpc.GetAccountInfoOpts{
 		Commitment: commitment,
 	})
-	require.Error(t, err)
+	return err != nil
 }

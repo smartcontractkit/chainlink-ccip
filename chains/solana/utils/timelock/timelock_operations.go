@@ -12,21 +12,21 @@ import (
 )
 
 // represents a single instruction with its required accounts
-type TimelockInstruction struct {
+type Instruction struct {
 	Ix       solana.Instruction   // instruction to be scheduled / executed
 	Accounts []solana.AccountMeta // required accounts for the instruction(should be provided in execute stage)
 }
 
 // represents a batch of instructions that having atomicy to be scheduled and executed via timelock
-type TimelockOperation struct {
-	Predecessor  [32]byte              // hashed id of the previous operation
-	Salt         [32]byte              // random salt for the operation
-	Delay        uint64                // delay in seconds
-	instructions []TimelockInstruction // instruction data slice, use Add method to add instructions and accounts
+type Operation struct {
+	Predecessor  [32]byte      // hashed id of the previous operation
+	Salt         [32]byte      // random salt for the operation
+	Delay        uint64        // delay in seconds
+	instructions []Instruction // instruction data slice, use Add method to add instructions and accounts
 }
 
 // add instruction and required accounts to operation
-func (op *TimelockOperation) AddInstruction(ix solana.Instruction, additionalPrograms []solana.PublicKey) {
+func (op *Operation) AddInstruction(ix solana.Instruction, additionalPrograms []solana.PublicKey) {
 	accounts := make([]solana.AccountMeta, len(ix.Accounts()))
 	// anchor ix builder doesn't include program
 	for _, program := range additionalPrograms {
@@ -40,13 +40,13 @@ func (op *TimelockOperation) AddInstruction(ix solana.Instruction, additionalPro
 		// 	i, acc.PublicKey, acc.IsSigner, acc.IsWritable)
 	}
 
-	op.instructions = append(op.instructions, TimelockInstruction{
+	op.instructions = append(op.instructions, Instruction{
 		Ix:       ix,
 		Accounts: accounts,
 	})
 }
 
-func (op *TimelockOperation) IxsCountU32() uint32 {
+func (op *Operation) IxsCountU32() uint32 {
 	ixsCount, err := mcms.SafeToUint32(len(op.instructions))
 	if err != nil {
 		panic(err)
@@ -55,7 +55,7 @@ func (op *TimelockOperation) IxsCountU32() uint32 {
 }
 
 // convert operation to timelock instruction data slice
-func (op *TimelockOperation) ToInstructionData() []timelock.InstructionData {
+func (op *Operation) ToInstructionData() []timelock.InstructionData {
 	ixs := make([]timelock.InstructionData, len(op.instructions))
 	for i, ix := range op.instructions {
 		ixData, err := convertToInstructionData(ix.Ix)
@@ -69,7 +69,7 @@ func (op *TimelockOperation) ToInstructionData() []timelock.InstructionData {
 
 // get required accounts for the operation
 // it merges the required accounts of all instructions and removes duplicates
-func (op *TimelockOperation) RemainingAccounts() []*solana.AccountMeta {
+func (op *Operation) RemainingAccounts() []*solana.AccountMeta {
 	accountMap := make(map[string]*solana.AccountMeta)
 	for _, instr := range op.instructions {
 		for _, acc := range instr.Accounts {
@@ -93,11 +93,11 @@ func (op *TimelockOperation) RemainingAccounts() []*solana.AccountMeta {
 }
 
 // hash the operation and return operation id
-func (op *TimelockOperation) OperationID() [32]byte {
+func (op *Operation) OperationID() [32]byte {
 	return hashOperation(op.ToInstructionData(), op.Predecessor, op.Salt)
 }
 
-func (op *TimelockOperation) OperationPDA() solana.PublicKey {
+func (op *Operation) OperationPDA() solana.PublicKey {
 	id := op.OperationID()
 	return config.TimelockOperationPDA(id)
 }

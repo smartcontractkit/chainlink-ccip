@@ -77,7 +77,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				expiringRootAndOpCountPDA1,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
@@ -146,7 +146,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				ixs = append(ixs, finalizeSignersIx)
 
 				for _, ix := range ixs {
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
@@ -176,7 +176,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				// get config and validate
@@ -196,7 +196,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				// pda closed after set_config
-				common.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA1, config.DefaultCommitment)
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA1, config.DefaultCommitment)
 			})
 		})
 	})
@@ -226,7 +226,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				expiringRootAndOpCountPDA2,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
@@ -294,7 +294,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				ixs = append(ixs, finalizeSignersIx)
 
 				for _, ix := range ixs {
-					common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
@@ -324,7 +324,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := common.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + "ConstraintSeeds"})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + "ConstraintSeeds"})
 				require.NotNil(t, result)
 			})
 
@@ -343,7 +343,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := common.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				// get config and validate
@@ -363,7 +363,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				// pda closed after set_config
-				common.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA2, config.DefaultCommitment)
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA2, config.DefaultCommitment)
 			})
 		})
 	})
