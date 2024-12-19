@@ -98,6 +98,47 @@ func NewMcmMultisig(name [32]byte) mcmsUtils.Multisig {
 	}
 }
 
+// instructions builder for preloading signers
+func McmPreloadSignersIxs(signerAddresses [][20]uint8, msigName [32]byte, multisigCfgPDA solana.PublicKey, cfgSignersPDA solana.PublicKey, authority solana.PublicKey, appendChunkSize int) ([]solana.Instruction, error) {
+	ixs := make([]solana.Instruction, 0)
+
+	parsedTotalSigners, pErr := mcmsUtils.SafeToUint8(len(signerAddresses))
+	if pErr != nil {
+		return nil, pErr
+	}
+	initSignersIx, isErr := mcm.NewInitSignersInstruction(
+		msigName,
+		parsedTotalSigners,
+		multisigCfgPDA,
+		cfgSignersPDA,
+		authority,
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if isErr != nil {
+		return nil, isErr
+	}
+	ixs = append(ixs, initSignersIx)
+
+	appendSignersIxs, asErr := AppendSignersIxs(signerAddresses, msigName, multisigCfgPDA, cfgSignersPDA, authority, appendChunkSize)
+	if asErr != nil {
+		return nil, asErr
+	}
+	ixs = append(ixs, appendSignersIxs...)
+
+	finalizeSignersIx, fsErr := mcm.NewFinalizeSignersInstruction(
+		msigName,
+		multisigCfgPDA,
+		cfgSignersPDA,
+		authority,
+	).ValidateAndBuild()
+	if fsErr != nil {
+		return nil, fsErr
+	}
+	ixs = append(ixs, finalizeSignersIx)
+
+	return ixs, nil
+}
+
 // get chunked append instructions to preload signers to pda, required before set_config
 func AppendSignersIxs(signerAddresses [][20]uint8, msigName [32]byte, multisigCfgPDA solana.PublicKey, cfgSignersPDA solana.PublicKey, authority solana.PublicKey, chunkSize int) ([]solana.Instruction, error) {
 	if chunkSize > config.MaxAppendSignerBatchSize {
@@ -121,6 +162,51 @@ func AppendSignersIxs(signerAddresses [][20]uint8, msigName [32]byte, multisigCf
 		}
 		ixs = append(ixs, appendIx)
 	}
+	return ixs, nil
+}
+
+// instructions builder for preloading signatures
+func McmPreloadSignaturesIxs(signatures []mcm.Signature, msigName [32]byte, root [32]uint8, validUntil uint32, signaturesPDA solana.PublicKey, authority solana.PublicKey, appendChunkSize int) ([]solana.Instruction, error) {
+	ixs := make([]solana.Instruction, 0)
+
+	parsedTotalSigs, pErr := mcmsUtils.SafeToUint8(len(signatures))
+	if pErr != nil {
+		return nil, pErr
+	}
+
+	initSigsIx, isErr := mcm.NewInitSignaturesInstruction(
+		msigName,
+		root,
+		validUntil,
+		parsedTotalSigs,
+		signaturesPDA,
+		authority,
+		solana.SystemProgramID,
+	).ValidateAndBuild()
+	if isErr != nil {
+		return nil, isErr
+	}
+	ixs = append(ixs, initSigsIx)
+
+	appendSigsIxs, asErr := AppendSignaturesIxs(signatures, msigName, root, validUntil, signaturesPDA, authority, appendChunkSize)
+	if asErr != nil {
+		return nil, asErr
+	}
+
+	ixs = append(ixs, appendSigsIxs...)
+
+	finalizeSigsIx, fsErr := mcm.NewFinalizeSignaturesInstruction(
+		msigName,
+		root,
+		validUntil,
+		signaturesPDA,
+		authority,
+	).ValidateAndBuild()
+	if fsErr != nil {
+		return nil, fsErr
+	}
+	ixs = append(ixs, finalizeSigsIx)
+
 	return ixs, nil
 }
 

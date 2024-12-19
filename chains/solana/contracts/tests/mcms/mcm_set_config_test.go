@@ -207,36 +207,10 @@ func TestMcmSetConfig(t *testing.T) {
 		signerAddresses := mcmConfig.SignerAddresses
 
 		t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-			ixs := make([]solana.Instruction, 0)
-			parsedTotalSigners, err := mcmsUtils.SafeToUint8(len(signerAddresses))
-			require.NoError(t, err)
+			preloadIxs, pierr := McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+			require.NoError(t, pierr)
 
-			initSignersIx, err := mcm.NewInitSignersInstruction(
-				testMsigName,
-				parsedTotalSigners,
-				multisigConfigPDA,
-				configSignersPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-
-			require.NoError(t, err)
-			ixs = append(ixs, initSignersIx)
-
-			appendSignersIxs, err := AppendSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
-			require.NoError(t, err)
-			ixs = append(ixs, appendSignersIxs...)
-
-			finalizeSignersIx, err := mcm.NewFinalizeSignersInstruction(
-				testMsigName,
-				multisigConfigPDA,
-				configSignersPDA,
-				admin.PublicKey(),
-			).ValidateAndBuild()
-			require.NoError(t, err)
-			ixs = append(ixs, finalizeSignersIx)
-
-			for _, ix := range ixs {
+			for _, ix := range preloadIxs {
 				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
@@ -262,6 +236,8 @@ func TestMcmSetConfig(t *testing.T) {
 					mcmConfig.ClearRoot,
 					multisigConfigPDA,
 					configSignersPDA,
+					rootMetadataPDA,
+					expiringRootAndOpCountPDA,
 					user.PublicKey(), // unauthorized user
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -281,6 +257,8 @@ func TestMcmSetConfig(t *testing.T) {
 					mcmConfig.ClearRoot,
 					multisigConfigPDA,
 					configSignersPDA,
+					rootMetadataPDA,
+					expiringRootAndOpCountPDA,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -388,32 +366,13 @@ func TestMcmSetConfig(t *testing.T) {
 			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, admin, config.DefaultCommitment)
 			utils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA, config.DefaultCommitment)
 
-			reInitSignersIx, err := mcm.NewInitSignersInstruction(
-				testMsigName,
-				parsedTotalSigners,
-				multisigConfigPDA,
-				configSignersPDA,
-				admin.PublicKey(),
-				solana.SystemProgramID,
-			).ValidateAndBuild()
+			// preload signers again
+			preloadIxs, pierr := McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+			require.NoError(t, pierr)
 
-			require.NoError(t, err)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reInitSignersIx}, admin, config.DefaultCommitment)
-			// register all signers
-			for _, ix := range appendSignersIxs {
+			for _, ix := range preloadIxs {
 				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
-
-			// finalize registration
-			finalizeSignersIx, err := mcm.NewFinalizeSignersInstruction(
-				testMsigName,
-				multisigConfigPDA,
-				configSignersPDA,
-				admin.PublicKey(),
-			).ValidateAndBuild()
-
-			require.NoError(t, err)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSignersIx}, admin, config.DefaultCommitment)
 
 			var cfgSignersAccount mcm.ConfigSigners
 			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
@@ -436,6 +395,8 @@ func TestMcmSetConfig(t *testing.T) {
 				mcmConfig.ClearRoot,
 				multisigConfigPDA,
 				configSignersPDA,
+				rootMetadataPDA,
+				expiringRootAndOpCountPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -655,6 +616,8 @@ func TestMcmSetConfig(t *testing.T) {
 					cfg.ClearRoot,
 					failMultisigConfigPDA,
 					failConfigSignersPDA,
+					failRootMetadataPDA,
+					failExpiringRootAndOpCountPDA,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
