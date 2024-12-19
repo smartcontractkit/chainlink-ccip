@@ -7,68 +7,21 @@ import (
 	"github.com/patrickmn/go-cache"
 )
 
-// Package cache provides a generic caching implementation that wraps the go-cache library
-// with additional support for custom eviction policies. It allows both time-based expiration
-// (inherited from go-cache) and custom eviction rules through user-defined policies.
-//
-// The cache is type-safe through Go generics, thread-safe through mutex locks, and supports
-// all basic cache operations. Keys are strings, and values can be of any type. Each cached
-// value stores its insertion timestamp, allowing for time-based validation in custom policies.
-//
-// Example usage with contract reader:
-//  type Object {
-//			Value interface{}
-//	}
-//
-//	type Event struct {
-//	    Timestamp int64
-//	    Data      string
-//	}
-//
-//	type ContractReader interface {
-//	    QueryEvents(ctx context.Context, filter QueryFilter) ([]Event, error)
-//	}
-//
-//	reader := NewContractReader()
-//
-//	// Create cache with contract reader in closure
-//	cache := NewCustomCache[Object](
-//	    5*time.Minute,     // Default expiration
-//	    10*time.Minute,    // Cleanup interval
-//	    func(o Event, storedAt time.Time) bool {
-//	        ctx := context.Background()
-//	        filter := QueryFilter{
-//	            FromTimestamp: storedAt.Unix(),
-//	            Confidence:   Finalized,
-//	        }
-//
-//	        // Query for any events after our cache insertion time
-//	        newEvents, err := reader.QueryEvents(ctx, filter)
-//	        if err != nil {
-//	            return false // Keep cache on error
-//	        }
-//
-//	        // Evict if new events exist after our cache time
-//	        return len(newEvents) > 0
-//	    },
-//	)
-//
-//	// Cache an object
-//	o := Object{Data: "..."}
-//	cache.Set("key", o, NoExpiration)
-//
-//	// Later: event will be evicted if newer ones exist on chain
-//	o, found := cache.Get("key")
-//
-// The cache ensures data freshness through:
-//   - Automatic time-based expiration from go-cache
-//   - Custom eviction policies with access to storage timestamps
-//   - Thread-safe operations for concurrent access
-//   - Type safety through Go generics
-
 const (
 	NoExpiration = cache.NoExpiration
 )
+
+// Cache defines the interface for cache operations
+type Cache[V any] interface {
+	// Set adds an item to the cache with an expiration time
+	Set(key string, value V, expiration time.Duration)
+	// Get retrieves an item from the cache
+	Get(key string) (V, bool)
+	// Delete removes an item from the cache
+	Delete(key string)
+	// Items returns all items in the cache
+	Items() map[string]V
+}
 
 // timestampedValue wraps a value with its storage timestamp
 type timestampedValue[V any] struct {
@@ -129,6 +82,11 @@ func (c *CustomCache[V]) Get(key string) (V, bool) {
 	return wrapped.Value, true
 }
 
+// Delete removes an item from the cache
+func (c *CustomCache[V]) Delete(key string) {
+	c.Cache.Delete(key)
+}
+
 // Items returns all items in the cache
 func (c *CustomCache[V]) Items() map[string]V {
 	c.mutex.RLock()
@@ -145,3 +103,61 @@ func (c *CustomCache[V]) Items() map[string]V {
 
 	return result
 }
+
+// Package documentation
+/*
+Package cache provides a generic caching implementation that wraps the go-cache library
+with additional support for custom eviction policies. It allows both time-based expiration
+(inherited from go-cache) and custom eviction rules through user-defined policies.
+
+The cache is type-safe through Go generics, thread-safe through mutex locks, and supports
+all basic cache operations. Keys are strings, and values can be of any type. Each cached
+value stores its insertion timestamp, allowing for time-based validation in custom policies.
+
+Example usage with contract reader:
+    type Event struct {
+        Timestamp int64
+        Data      string
+    }
+
+    type ContractReader interface {
+        QueryEvents(ctx context.Context, filter QueryFilter) ([]Event, error)
+    }
+
+    reader := NewContractReader()
+
+    // Create cache with contract reader in closure
+    cache := NewCustomCache[Event](
+        5*time.Minute,     // Default expiration
+        10*time.Minute,    // Cleanup interval
+        func(ev Event, _ time.Time) bool {
+            ctx := context.Background()
+            filter := QueryFilter{
+                FromTimestamp: ev.Timestamp(),
+                Confidence:   Finalized,
+            }
+
+            // Query for any events after our cache insertion time
+            newEvents, err := reader.QueryEvents(ctx, filter)
+            if err != nil {
+                return false // Keep cache on error
+            }
+
+            // Evict if new events exist after our cache time
+            return len(newEvents) > 0
+        },
+    )
+
+    // Cache an event
+    ev := Event{Timestamp: time.Now().Unix(), Data: "..."}
+    cache.Set("key", ev, NoExpiration)
+
+    // Later: event will be evicted if newer ones exist on chain
+    ev, found := cache.Get("key")
+
+The cache ensures data freshness through:
+  - Automatic time-based expiration from go-cache
+  - Custom eviction policies with access to storage timestamps
+  - Thread-safe operations for concurrent access
+  - Type safety through Go generics
+*/
