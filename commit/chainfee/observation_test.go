@@ -1,12 +1,13 @@
 package chainfee
 
 import (
-	"golang.org/x/exp/maps"
 	"math/big"
 	"math/rand"
 	"sort"
 	"testing"
 	"time"
+
+	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
