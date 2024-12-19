@@ -123,7 +123,7 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 		// That is because using encoded sizes is not 100% accurate and there are some missing bytes in the calculation.
 		encodedObs, err = obs.Encode()
 		if err != nil {
-			return Observation{}, nil
+			return Observation{}, err
 		}
 		encodedObsSize = len(encodedObs)
 	}
