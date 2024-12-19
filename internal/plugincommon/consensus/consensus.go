@@ -31,7 +31,7 @@ func GetConsensusMap[K comparable, T any](
 			items = minObservations.GetValid()
 			if len(items) != 1 {
 				// TODO: metrics
-				lggr.Warnf("failed to reach consensus on a %s's for key %+v "+
+				lggr.Debugf("failed to reach consensus on a %s's for key %+v "+
 					"because no single item was observed more than the expected min (%d) times, "+
 					"all observed items: %v",
 					objectName, key, minThresh, items)
@@ -60,7 +60,7 @@ func GetConsensusMapAggregator[K comparable, T any](
 
 	for key, values := range items {
 		if thresh, ok := f.Get(key); ok && len(values) < int(thresh) {
-			lggr.Warnf("could not reach consensus on %s for key %v", objectName, key)
+			lggr.Debugf("could not reach consensus on %s for key %v", objectName, key)
 			continue
 		}
 		consensus[key] = agg(values)

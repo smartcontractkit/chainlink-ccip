@@ -1,6 +1,7 @@
 package commit
 
 import (
+	rand2 "math/rand"
 	"testing"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -198,4 +199,56 @@ func TestPluginReports_InvalidOutcome(t *testing.T) {
 	p := Plugin{lggr: lggr}
 	_, err := p.Reports(tests.Context(t), 0, []byte("invalid json"))
 	require.Error(t, err)
+}
+
+func Test_Plugin_isStaleReport(t *testing.T) {
+	testCases := []struct {
+		name           string
+		onChainSeqNum  uint64
+		reportSeqNum   uint64
+		lenMerkleRoots int
+		shouldBeStale  bool
+	}{
+		{
+			name:           "report is not stale when merkle roots exist no matter the seq nums",
+			onChainSeqNum:  rand2.Uint64(),
+			reportSeqNum:   rand2.Uint64(),
+			lenMerkleRoots: 1,
+			shouldBeStale:  false,
+		},
+		{
+			name:           "report is stale when onChainSeqNum is equal to report seq num",
+			onChainSeqNum:  33,
+			reportSeqNum:   33,
+			lenMerkleRoots: 0,
+			shouldBeStale:  true,
+		},
+		{
+			name:           "report is stale when onChainSeqNum is greater than report seq num",
+			onChainSeqNum:  34,
+			reportSeqNum:   33,
+			lenMerkleRoots: 0,
+			shouldBeStale:  true,
+		},
+		{
+			name:           "report is not stale when onChainSeqNum is less than report seq num",
+			onChainSeqNum:  32,
+			reportSeqNum:   33,
+			lenMerkleRoots: 0,
+			shouldBeStale:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := Plugin{
+				lggr: logger.Test(t),
+			}
+			report := ccipocr3.CommitPluginReport{
+				MerkleRoots: make([]ccipocr3.MerkleRootChain, tc.lenMerkleRoots),
+			}
+			stale := p.isStaleReport(tc.reportSeqNum, tc.onChainSeqNum, report)
+			require.Equal(t, tc.shouldBeStale, stale)
+		})
+	}
 }

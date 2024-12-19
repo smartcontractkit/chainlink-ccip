@@ -1,0 +1,26 @@
+[package]
+name = "timelock"
+version = "0.0.1-dev"
+description = "Solana implementation of RBAC Timelock"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "timelock"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+access-controller = { version = "1.0.1", path = "../access-controller", default-features = false, features = ["cpi"] }
+bytemuck = "1.7"
+static_assertions = "1.1.0"
+arrayvec = { version = "1.0.0", path = "../../crates/arrayvec" }
+
+[dev-dependencies]
+hex = "0.4.3"

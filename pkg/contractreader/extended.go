@@ -44,7 +44,16 @@ type Extended interface {
 		confidenceLevel primitives.ConfidenceLevel,
 		params, returnVal any,
 	) error
+
+	// ExtendedBatchGetLatestValues performs automatic binding from contractNames to bound contracts, and
+	// contructs a BatchGetLatestValuesRequest with the resolved bindings.
+	ExtendedBatchGetLatestValues(
+		ctx context.Context,
+		request ExtendedBatchGetLatestValuesRequest,
+	) (types.BatchGetLatestValuesResult, error)
 }
+
+type ExtendedBatchGetLatestValuesRequest map[string]types.ContractBatch
 
 type ExtendedBoundContract struct {
 	BoundAt time.Time
@@ -120,6 +129,28 @@ func (e *extendedContractReader) ExtendedGetLatestValue(
 		params,
 		returnVal,
 	)
+}
+
+func (e *extendedContractReader) ExtendedBatchGetLatestValues(
+	ctx context.Context,
+	request ExtendedBatchGetLatestValuesRequest,
+) (types.BatchGetLatestValuesResult, error) {
+	// Convert the request from contract names to BoundContracts
+	convertedRequest := make(types.BatchGetLatestValuesRequest)
+
+	for contractName, batch := range request {
+		// Get the binding for this contract name
+		binding, err := e.getOneBinding(contractName)
+		if err != nil {
+			return nil, fmt.Errorf("BatchGetLatestValues: failed to get binding for contract %s: %w", contractName, err)
+		}
+
+		// Use the resolved binding for the request
+		convertedRequest[binding.Binding] = batch
+	}
+
+	// Call the underlying BatchGetLatestValues with the converted request
+	return e.ContractReaderFacade.BatchGetLatestValues(ctx, convertedRequest)
 }
 
 func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.BoundContract) error {
