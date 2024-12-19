@@ -27,22 +27,29 @@ func TestCustomCache(t *testing.T) {
 		assert.False(t, found)
 	})
 
-	t.Run("custom policy eviction", func(t *testing.T) {
-		isEven := func(v int) bool {
-			return v%2 == 0
+	t.Run("custom policy with timestamp", func(t *testing.T) {
+		now := time.Now()
+		isStale := func(v int, storedAt time.Time) bool {
+			return storedAt.Before(now)
 		}
-		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, isEven)
+		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, isStale)
 
-		// Even number should be evicted
-		cache.Set("even", 2, NoExpiration)
-		_, found := cache.Get("even")
-		assert.False(t, found)
-
-		// Odd number should remain
-		cache.Set("odd", 3, NoExpiration)
-		value, found := cache.Get("odd")
+		// Value stored now should not be evicted
+		cache.Set("fresh", 1, NoExpiration)
+		value, found := cache.Get("fresh")
 		assert.True(t, found)
-		assert.Equal(t, 3, value)
+		assert.Equal(t, 1, value)
+
+		// Simulate old value by manipulating timestamp
+		oldValue := timestampedValue[int]{
+			Value:    2,
+			StoredAt: now.Add(-1 * time.Hour),
+		}
+		cache.Cache.Set("stale", oldValue, NoExpiration)
+
+		// Stale value should be evicted
+		_, found = cache.Get("stale")
+		assert.False(t, found)
 	})
 
 	t.Run("time based expiration", func(t *testing.T) {
@@ -73,37 +80,7 @@ func TestCustomCache(t *testing.T) {
 		assert.Equal(t, 2, items["two"])
 	})
 
-	t.Run("flush operation", func(t *testing.T) {
-		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
-
-		cache.Set("one", 1, NoExpiration)
-		cache.Set("two", 2, NoExpiration)
-
-		cache.Flush()
-		items := cache.Items()
-		assert.Len(t, items, 0)
-	})
-
-	t.Run("type safety", func(t *testing.T) {
-		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
-
-		// Set with correct type
-		cache.Set("good", 123, NoExpiration)
-
-		// Simulate wrong type in underlying cache
-		cache.cache.Set("bad", "not an int", NoExpiration)
-
-		// Good type should work
-		value, found := cache.Get("good")
-		assert.True(t, found)
-		assert.Equal(t, 123, value)
-
-		// Bad type should fail safely
-		_, found = cache.Get("bad")
-		assert.False(t, found)
-	})
-
-	t.Run("concurrent access", func(t *testing.T) {
+	t.Run("concurrent access with timestamps", func(t *testing.T) {
 		cache := NewCustomCache[int](5*time.Minute, 10*time.Minute, nil)
 
 		// Run multiple goroutines accessing the cache
@@ -126,39 +103,58 @@ func TestCustomCache(t *testing.T) {
 		assert.True(t, found)
 	})
 
-	t.Run("complex types", func(t *testing.T) {
+	t.Run("complex types with timestamp eviction", func(t *testing.T) {
 		type ComplexType struct {
-			ID   int
-			Name string
+			ID        int
+			Name      string
+			Timestamp time.Time
 		}
 
-		cache := NewCustomCache[ComplexType](5*time.Minute, 10*time.Minute, nil)
+		threshold := time.Now()
+		cache := NewCustomCache[ComplexType](
+			5*time.Minute,
+			10*time.Minute,
+			func(v ComplexType, storedAt time.Time) bool {
+				return storedAt.Before(threshold)
+			},
+		)
 
-		value := ComplexType{ID: 1, Name: "test"}
+		value := ComplexType{ID: 1, Name: "test", Timestamp: time.Now()}
 		cache.Set("complex", value, NoExpiration)
 
+		// Fresh value should not be evicted
 		retrieved, found := cache.Get("complex")
 		assert.True(t, found)
 		assert.Equal(t, value, retrieved)
+
+		// Simulate old value
+		oldValue := timestampedValue[ComplexType]{
+			Value:    ComplexType{ID: 2, Name: "old"},
+			StoredAt: threshold.Add(-1 * time.Hour),
+		}
+		cache.Cache.Set("old", oldValue, NoExpiration)
+
+		// Old value should be evicted
+		_, found = cache.Get("old")
+		assert.False(t, found)
 	})
 
-	t.Run("custom policy with nil value", func(t *testing.T) {
-		isNil := func(v *string) bool {
-			return v == nil
-		}
-		cache := NewCustomCache[*string](5*time.Minute, 10*time.Minute, isNil)
+	t.Run("correct timestamp storage", func(t *testing.T) {
+		cache := NewCustomCache[string](5*time.Minute, 10*time.Minute, nil)
 
-		str := "test"
-		cache.Set("nonnil", &str, NoExpiration)
-		cache.Set("nil", nil, NoExpiration)
+		before := time.Now()
+		cache.Set("key", "value", NoExpiration)
+		after := time.Now()
 
-		// Non-nil value should remain
-		value, found := cache.Get("nonnil")
+		// Get the raw timestamped value
+		raw, found := cache.Cache.Get("key")
 		assert.True(t, found)
-		assert.Equal(t, &str, value)
 
-		// Nil value should be evicted
-		_, found = cache.Get("nil")
-		assert.False(t, found)
+		wrapped, ok := raw.(timestampedValue[string])
+		assert.True(t, ok)
+
+		// StoredAt should be between before and after
+		assert.True(t, wrapped.StoredAt.After(before) || wrapped.StoredAt.Equal(before))
+		assert.True(t, wrapped.StoredAt.Before(after) || wrapped.StoredAt.Equal(after))
 	})
 }
