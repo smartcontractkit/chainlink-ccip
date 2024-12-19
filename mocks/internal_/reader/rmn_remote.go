@@ -22,12 +22,12 @@ func (_m *MockRMNRemote) EXPECT() *MockRMNRemote_Expecter {
 	return &MockRMNRemote_Expecter{mock: &_m.Mock}
 }
 
-// GetF provides a mock function with given fields:
-func (_m *MockRMNRemote) GetF() uint64 {
+// GetFSign provides a mock function with given fields:
+func (_m *MockRMNRemote) GetFSign() uint64 {
 	ret := _m.Called()
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetF")
+		panic("no return value specified for GetFSign")
 	}
 
 	var r0 uint64
@@ -40,29 +40,29 @@ func (_m *MockRMNRemote) GetF() uint64 {
 	return r0
 }
 
-// MockRMNRemote_GetF_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetF'
-type MockRMNRemote_GetF_Call struct {
+// MockRMNRemote_GetFSign_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFSign'
+type MockRMNRemote_GetFSign_Call struct {
 	*mock.Call
 }
 
-// GetF is a helper method to define mock.On call
-func (_e *MockRMNRemote_Expecter) GetF() *MockRMNRemote_GetF_Call {
-	return &MockRMNRemote_GetF_Call{Call: _e.mock.On("GetF")}
+// GetFSign is a helper method to define mock.On call
+func (_e *MockRMNRemote_Expecter) GetFSign() *MockRMNRemote_GetFSign_Call {
+	return &MockRMNRemote_GetFSign_Call{Call: _e.mock.On("GetFSign")}
 }
 
-func (_c *MockRMNRemote_GetF_Call) Run(run func()) *MockRMNRemote_GetF_Call {
+func (_c *MockRMNRemote_GetFSign_Call) Run(run func()) *MockRMNRemote_GetFSign_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run()
 	})
 	return _c
 }
 
-func (_c *MockRMNRemote_GetF_Call) Return(_a0 uint64) *MockRMNRemote_GetF_Call {
+func (_c *MockRMNRemote_GetFSign_Call) Return(_a0 uint64) *MockRMNRemote_GetFSign_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRMNRemote_GetF_Call) RunAndReturn(run func() uint64) *MockRMNRemote_GetF_Call {
+func (_c *MockRMNRemote_GetFSign_Call) RunAndReturn(run func() uint64) *MockRMNRemote_GetFSign_Call {
 	_c.Call.Return(run)
 	return _c
 }
