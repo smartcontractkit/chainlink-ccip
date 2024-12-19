@@ -2785,7 +2785,7 @@ func TestCCIPRouter(t *testing.T) {
 			}
 		})
 
-		t.Run("hen sending a Valid CCIP Message but the user does not have enough funds of the fee token, it fails", func(t *testing.T) {
+		t.Run("When sending a Valid CCIP Message but the user does not have enough funds of the fee token, it fails", func(t *testing.T) {
 			message := ccip_router.Solana2AnyMessage{
 				FeeToken: token2022.mint,
 				Receiver: validReceiverAddress[:],
