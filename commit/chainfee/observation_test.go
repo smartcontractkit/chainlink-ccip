@@ -1,13 +1,12 @@
 package chainfee
 
 import (
+	"golang.org/x/exp/maps"
 	"math/big"
 	"math/rand"
 	"sort"
 	"testing"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
@@ -160,11 +159,11 @@ func Test_processor_Observation(t *testing.T) {
 			require.GreaterOrEqual(t, obs.TimestampNow.UnixNano(), tStart.UnixNano())
 			require.LessOrEqual(t, obs.TimestampNow.UnixNano(), tEnd.UnixNano())
 			require.Equal(t, tc.chainFeeComponents, obs.FeeComponents)
-			require.Equal(t, slicesWithoutDst, maps.Keys(obs.FeeComponents))
+			require.ElementsMatch(t, slicesWithoutDst, maps.Keys(obs.FeeComponents))
 			require.Equal(t, tc.nativeTokenPrices, obs.NativeTokenPrices)
-			require.Equal(t, slicesWithoutDst, maps.Keys(obs.NativeTokenPrices))
+			require.ElementsMatch(t, slicesWithoutDst, maps.Keys(obs.NativeTokenPrices))
 			require.Equal(t, tc.expectedChainFeePriceUpdates, obs.ChainFeeUpdates)
-			require.Equal(t, slicesWithoutDst, maps.Keys(obs.ChainFeeUpdates))
+			require.ElementsMatch(t, slicesWithoutDst, maps.Keys(obs.ChainFeeUpdates))
 			require.Equal(t, tc.fChain, obs.FChain)
 		})
 	}
