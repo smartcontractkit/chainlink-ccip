@@ -59,7 +59,7 @@ type IntTest struct {
 	ccipReader          *inmem.InMemoryCCIPReader
 	server              *ConfigurableAttestationServer
 	tokenObserverConfig []pluginconfig.TokenDataObserverConfig
-	tokenChainReader    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade
+	tokenChainReader    map[cciptypes.ChainSelector]contractreader.Extended
 	feeCalculator       *costlymessages.CCIPMessageFeeUSD18Calculator
 	execCostCalculator  *costlymessages.StaticMessageExecCostUSD18Calculator
 }
@@ -85,7 +85,7 @@ func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector 
 		dstSelector:         dstSelector,
 		ccipReader:          &ccipReader,
 		tokenObserverConfig: []pluginconfig.TokenDataObserverConfig{},
-		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{},
+		tokenChainReader:    map[cciptypes.ChainSelector]contractreader.Extended{},
 	}
 }
 
@@ -194,7 +194,7 @@ func (it *IntTest) WithUSDC(
 		usdcEvents[i] = types.Sequence{Data: e}
 	}
 
-	r := readermock.NewMockContractReaderFacade(it.t)
+	r := readermock.NewMockExtended(it.t)
 	r.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil).Maybe()
 	r.EXPECT().QueryKey(
 		mock.Anything,
@@ -204,7 +204,7 @@ func (it *IntTest) WithUSDC(
 		mock.Anything,
 	).Return(usdcEvents, nil).Maybe()
 
-	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
+	it.tokenChainReader = map[cciptypes.ChainSelector]contractreader.Extended{
 		it.srcSelector: r,
 		it.dstSelector: r,
 	}
@@ -511,7 +511,7 @@ func setupHomeChainPoller(
 ) reader.HomeChain {
 	const ccipConfigAddress = "0xCCIPConfigFakeAddress"
 
-	homeChainReader := readermock.NewMockContractReaderFacade(t)
+	homeChainReader := readermock.NewMockExtended(t)
 	var firstCall = true
 	homeChainReader.On(
 		"GetLatestValue",

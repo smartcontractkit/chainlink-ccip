@@ -35,7 +35,7 @@ type PriceReader interface {
 
 type priceReader struct {
 	lggr         logger.Logger
-	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
+	chainReaders map[ccipocr3.ChainSelector]contractreader.Extended
 	tokenInfo    map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
 	ccipReader   CCIPReader
 	feedChain    ccipocr3.ChainSelector
@@ -43,7 +43,7 @@ type priceReader struct {
 
 func NewPriceReader(
 	lggr logger.Logger,
-	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade,
+	chainReaders map[ccipocr3.ChainSelector]contractreader.Extended,
 	tokenInfo map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo,
 	ccipReader CCIPReader,
 	feedChain ccipocr3.ChainSelector,
@@ -275,7 +275,7 @@ func (pr *priceReader) validatePrices(prices []*big.Int) error {
 	return nil
 }
 
-func (pr *priceReader) feedChainReader() contractreader.ContractReaderFacade {
+func (pr *priceReader) feedChainReader() contractreader.Extended {
 	return pr.chainReaders[pr.feedChain]
 }
 
