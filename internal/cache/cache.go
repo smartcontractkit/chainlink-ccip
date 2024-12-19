@@ -11,7 +11,32 @@ const (
 	NoExpiration = cache.NoExpiration
 )
 
-// CustomCache wraps go-cache with additional eviction policies
+// Package cache provides a generic caching implementation that wraps the go-cache library
+// with additional support for custom eviction policies. It allows both time-based expiration
+// (inherited from go-cache) and custom eviction rules through user-defined policies.
+//
+// The cache is type-safe through Go generics, thread-safe through mutex locks, and supports
+// all basic cache operations (Get, Set, Delete, Flush). Keys are strings, and values can
+// be of any type.
+//
+// Example usage:
+//
+//	// Create a cache with custom eviction policy
+//	cache := cache.NewCustomCache[int](
+//	    5*time.Minute,            // Default expiration
+//	    10*time.Minute,           // Cleanup interval
+//	    func(v int) bool {
+//	        return v < 0          // Evict negative numbers
+//	    },
+//	)
+//
+//	// Use NoExpiration for items that shouldn't expire
+//	cache.Set("key", 42, cache.NoExpiration)
+//
+// The cache can be used with any value type while maintaining type safety:
+//   - Time-based expiration is handled by the underlying go-cache
+//   - Custom policies can implement domain-specific eviction logic
+//   - Thread-safe operations for concurrent access
 type CustomCache[V any] struct {
 	cache        *cache.Cache
 	customPolicy func(V) bool
