@@ -1,6 +1,7 @@
-package exectypes
+package optimizers
 
 import (
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,19 +14,19 @@ func Test_truncateLastCommit(t *testing.T) {
 	tests := []struct {
 		name        string
 		chain       cciptypes.ChainSelector
-		observation Observation
-		expected    Observation
+		observation exectypes.Observation
+		expected    exectypes.Observation
 	}{
 		{
 			name:  "no commits to truncate",
 			chain: 1,
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {},
 				},
 			},
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {},
 				},
 			},
@@ -33,8 +34,8 @@ func Test_truncateLastCommit(t *testing.T) {
 		{
 			name:  "truncate last commit",
 			chain: 1,
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
@@ -46,16 +47,16 @@ func Test_truncateLastCommit(t *testing.T) {
 						11: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x02}}},
 					},
 				},
-				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData{
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
 					1: {
-						1:  NewMessageTokenData(),
-						11: NewMessageTokenData(),
+						1:  exectypes.NewMessageTokenData(),
+						11: exectypes.NewMessageTokenData(),
 					},
 				},
 				CostlyMessages: []cciptypes.Bytes32{{0x02}},
 			},
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 					},
@@ -65,9 +66,9 @@ func Test_truncateLastCommit(t *testing.T) {
 						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
 					},
 				},
-				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData{
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
 					1: {
-						1: NewMessageTokenData(),
+						1: exectypes.NewMessageTokenData(),
 					},
 				},
 				CostlyMessages: []cciptypes.Bytes32{},
@@ -88,14 +89,14 @@ func Test_truncateChain(t *testing.T) {
 	tests := []struct {
 		name        string
 		chain       cciptypes.ChainSelector
-		observation Observation
-		expected    Observation
+		observation exectypes.Observation
+		expected    exectypes.Observation
 	}{
 		{
 			name:  "truncate chain data",
 			chain: 1,
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(11, 20)},
@@ -106,25 +107,25 @@ func Test_truncateChain(t *testing.T) {
 						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
 					},
 				},
-				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData{
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
 					1: {
-						1: NewMessageTokenData(),
+						1: exectypes.NewMessageTokenData(),
 					},
 				},
 				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
-			expected: Observation{
-				CommitReports:  map[cciptypes.ChainSelector][]CommitData{},
+			expected: exectypes.Observation{
+				CommitReports:  map[cciptypes.ChainSelector][]exectypes.CommitData{},
 				Messages:       map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message{},
-				TokenData:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData{},
+				TokenData:      map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{},
 				CostlyMessages: []cciptypes.Bytes32{},
 			},
 		},
 		{
 			name:  "truncate non existent chain",
 			chain: 2, // non existent chain
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 					},
@@ -134,15 +135,15 @@ func Test_truncateChain(t *testing.T) {
 						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
 					},
 				},
-				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData{
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
 					1: {
-						1: NewMessageTokenData(),
+						1: exectypes.NewMessageTokenData(),
 					},
 				},
 				CostlyMessages: []cciptypes.Bytes32{{0x01}},
 			},
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 					},
@@ -152,9 +153,9 @@ func Test_truncateChain(t *testing.T) {
 						1: {Header: cciptypes.RampMessageHeader{MessageID: cciptypes.Bytes32{0x01}}},
 					},
 				},
-				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]MessageTokenData{
+				TokenData: map[cciptypes.ChainSelector]map[cciptypes.SeqNum]exectypes.MessageTokenData{
 					1: {
-						1: NewMessageTokenData(),
+						1: exectypes.NewMessageTokenData(),
 					},
 				},
 				CostlyMessages: []cciptypes.Bytes32{{0x01}},
@@ -174,24 +175,24 @@ func Test_truncateChain(t *testing.T) {
 func Test_truncateObservation(t *testing.T) {
 	tests := []struct {
 		name        string
-		observation Observation
+		observation exectypes.Observation
 		maxSize     int
-		expected    Observation
+		expected    exectypes.Observation
 		deletedMsgs map[cciptypes.ChainSelector]map[cciptypes.SeqNum]struct{}
 		wantErr     bool
 	}{
 		{
 			name: "no truncation needed",
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 					},
 				},
 			},
 			maxSize: 1000,
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 					},
@@ -200,8 +201,8 @@ func Test_truncateObservation(t *testing.T) {
 		},
 		{
 			name: "truncate last commit",
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
@@ -215,8 +216,8 @@ func Test_truncateObservation(t *testing.T) {
 				),
 			},
 			maxSize: 2600, // this number is calculated by checking encoded sizes for the observation we expect
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
 					},
@@ -232,8 +233,8 @@ func Test_truncateObservation(t *testing.T) {
 		},
 		{
 			name: "truncate entire chain",
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
 					},
@@ -250,8 +251,8 @@ func Test_truncateObservation(t *testing.T) {
 				),
 			},
 			maxSize: 1789,
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					2: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(3, 4)},
 					},
@@ -260,8 +261,8 @@ func Test_truncateObservation(t *testing.T) {
 		},
 		{
 			name: "truncate one message from first chain",
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
 					},
@@ -278,8 +279,8 @@ func Test_truncateObservation(t *testing.T) {
 				),
 			},
 			maxSize: 3159, // chain 1, message 1 will be truncated
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 2)},
 					},
@@ -296,8 +297,8 @@ func Test_truncateObservation(t *testing.T) {
 		},
 		{
 			name: "truncate all",
-			observation: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{
+			observation: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{
 					1: {
 						{SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10)},
 					},
@@ -313,8 +314,8 @@ func Test_truncateObservation(t *testing.T) {
 				),
 			},
 			maxSize: 50, // less than what can fit a single commit report for single chain
-			expected: Observation{
-				CommitReports: map[cciptypes.ChainSelector][]CommitData{},
+			expected: exectypes.Observation{
+				CommitReports: map[cciptypes.ChainSelector][]exectypes.CommitData{},
 			},
 		},
 	}
@@ -349,9 +350,9 @@ func Test_truncateObservation(t *testing.T) {
 
 func makeMessageObservation(
 	srcToSeqNumRange map[cciptypes.ChainSelector]cciptypes.SeqNumRange,
-	opts ...msgOption) MessageObservations {
+	opts ...msgOption) exectypes.MessageObservations {
 
-	obs := make(MessageObservations)
+	obs := make(exectypes.MessageObservations)
 	for src, seqNumRng := range srcToSeqNumRange {
 		obs[src] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		for i := seqNumRng.Start(); i <= seqNumRng.End(); i++ {
@@ -372,12 +373,12 @@ func makeMessageObservation(
 	return obs
 }
 
-func makeNoopTokenDataObservations(msgs MessageObservations) TokenDataObservations {
-	tokenData := make(TokenDataObservations)
+func makeNoopTokenDataObservations(msgs exectypes.MessageObservations) exectypes.TokenDataObservations {
+	tokenData := make(exectypes.TokenDataObservations)
 	for src, seqNumToMsg := range msgs {
-		tokenData[src] = make(map[cciptypes.SeqNum]MessageTokenData)
+		tokenData[src] = make(map[cciptypes.SeqNum]exectypes.MessageTokenData)
 		for seq := range seqNumToMsg {
-			tokenData[src][seq] = NewMessageTokenData()
+			tokenData[src][seq] = exectypes.NewMessageTokenData()
 		}
 	}
 	return tokenData

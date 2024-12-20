@@ -3,7 +3,7 @@ package exectypes
 import (
 	"context"
 	"encoding/json"
-
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -52,7 +52,7 @@ func GetEncodedMsgAndTokenDataSizes(mo MessageObservations, tds TokenDataObserva
 		sizes[chain] = make(map[cciptypes.SeqNum]int)
 		for seq, msg := range msgs {
 			td := tds[chain][seq]
-			sizes[chain][seq] = EncodedSize(msg) + EncodedSize(td)
+			sizes[chain][seq] = internal.EncodedSize(msg) + internal.EncodedSize(td)
 		}
 	}
 	return sizes

@@ -1,8 +1,9 @@
-package exectypes
+package optimizers
 
 import (
-	"encoding/json"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	"sort"
 
 	"golang.org/x/exp/maps"
@@ -30,14 +31,14 @@ type EmptyEncodeSizes struct {
 
 func NewEmptyEncodeSizes() EmptyEncodeSizes {
 	emptyMsg := cciptypes.Message{}
-	emptyTokenData := MessageTokenData{}
-	emptyCommitData := CommitData{}
-	emptySeqNrSize := EncodedSize(make(map[cciptypes.SeqNum]cciptypes.Message))
+	emptyTokenData := exectypes.MessageTokenData{}
+	emptyCommitData := exectypes.CommitData{}
+	emptySeqNrSize := internal.EncodedSize(make(map[cciptypes.SeqNum]cciptypes.Message))
 
 	return EmptyEncodeSizes{
-		MessageAndTokenData: EncodedSize(emptyMsg) + EncodedSize(emptyTokenData),
-		CommitData:          EncodedSize(emptyCommitData), // 305
-		SeqNumMap:           emptySeqNrSize,               // 2
+		MessageAndTokenData: internal.EncodedSize(emptyMsg) + internal.EncodedSize(emptyTokenData),
+		CommitData:          internal.EncodedSize(emptyCommitData), // 305
+		SeqNumMap:           emptySeqNrSize,                        // 2
 	}
 }
 
@@ -50,11 +51,11 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 // exclude messages from one chain only.
 // Keep repeating this process until the encoded observation fits within the op.maxEncodedSize
 // Important Note: We can't delete messages completely from single reports as we need them to create merkle proofs.
-func (op ObservationOptimizer) TruncateObservation(observation Observation) (Observation, error) {
+func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observation) (exectypes.Observation, error) {
 	obs := observation
 	encodedObs, err := obs.Encode()
 	if err != nil {
-		return Observation{}, err
+		return exectypes.Observation{}, err
 	}
 	encodedObsSize := len(encodedObs)
 	if encodedObsSize <= op.maxEncodedSize {
@@ -66,7 +67,7 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 		return chains[i] < chains[j]
 	})
 
-	messageAndTokenDataEncodedSizes := GetEncodedMsgAndTokenDataSizes(obs.Messages, obs.TokenData)
+	messageAndTokenDataEncodedSizes := exectypes.GetEncodedMsgAndTokenDataSizes(obs.Messages, obs.TokenData)
 	// While the encoded obs is too large, continue filtering data.
 	for encodedObsSize > op.maxEncodedSize {
 		// go through each chain and truncate observations for the final commit report.
@@ -80,10 +81,10 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
 				if _, ok := obs.Messages[chain][seqNum]; !ok {
-					return Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
+					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
 				}
 				obs.Messages[chain][seqNum] = cciptypes.Message{}
-				obs.TokenData[chain][seqNum] = NewMessageTokenData()
+				obs.TokenData[chain][seqNum] = exectypes.NewMessageTokenData()
 				// Subtract the removed message and token size
 				encodedObsSize -= messageAndTokenDataEncodedSizes[chain][seqNum]
 				// Add empty message and token encoded size
@@ -118,7 +119,7 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 		// That is because using encoded sizes is not 100% accurate and there are some missing bytes in the calculation.
 		encodedObs, err = obs.Encode()
 		if err != nil {
-			return Observation{}, err
+			return exectypes.Observation{}, err
 		}
 		encodedObsSize = len(encodedObs)
 	}
@@ -129,9 +130,9 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 // truncateLastCommit removes the last commit from the observation.
 // returns observation and the number of bytes truncated.
 func (op ObservationOptimizer) truncateLastCommit(
-	obs Observation,
+	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
-) (Observation, int) {
+) (exectypes.Observation, int) {
 	observation := obs
 	bytesTruncated := 0
 	commits := observation.CommitReports[chain]
@@ -171,9 +172,9 @@ func (op ObservationOptimizer) truncateLastCommit(
 // truncateChain removes all data related to the given chain from the observation.
 // returns true if the chain was found and truncated, false otherwise.
 func (op ObservationOptimizer) truncateChain(
-	obs Observation,
+	obs exectypes.Observation,
 	chain cciptypes.ChainSelector,
-) Observation {
+) exectypes.Observation {
 	observation := obs
 	if _, ok := observation.CommitReports[chain]; !ok {
 		return observation
@@ -201,12 +202,4 @@ func (op ObservationOptimizer) truncateChain(
 	deleteCostlyMessages()
 
 	return observation
-}
-
-func EncodedSize[T any](obj T) int {
-	enc, err := json.Marshal(obj)
-	if err != nil {
-		return 0
-	}
-	return len(enc)
 }
