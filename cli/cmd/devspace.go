@@ -225,7 +225,6 @@ var checkEnvVarsCmd = &cobra.Command{
 			"DEVSPACE_IMAGE",
 			"DEVSPACE_INGRESS_CIDRS",
 			"DEVSPACE_INGRESS_BASE_DOMAIN",
-			"DEVSPACE_INGRESS_CERT_ARN",
 			"DEVSPACE_K8S_POD_WAIT_TIMEOUT",
 		}
 
@@ -243,7 +242,7 @@ var checkEnvVarsCmd = &cobra.Command{
 		}
 
 		if viper.GetString("PROVIDER") == "aws" {
-			for _, name := range []string{"DEVSPACE_INGRESS_CERT_ARN", "CHAINLINK_PRODUCT", "CHAINLINK_TEAM"} {
+			for _, name := range []string{"CHAINLINK_PRODUCT", "CHAINLINK_TEAM"} {
 				value := os.Getenv(name)
 				logger.Debug("reading env var", slog.String("name", name), slog.String("value", value))
 				if value == "" {

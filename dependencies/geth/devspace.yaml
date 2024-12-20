@@ -36,7 +36,7 @@ deployments:
       releaseName: "geth"
       chart:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-geth"
-        version: "0.2.x"
+        version: "0.3.0"
       # for simplicity, we define all the values here
       # they can be defined the same way in values.yml
       # devspace merges these "values" with the "values.yaml" before deploy
@@ -57,11 +57,9 @@ deployments:
           - networkId: 2337
         blocktime: 1
 
-        # These ingresses create AWS ALB resources and Route 53 Records.
+        # These ingresses create Route 53 Records.
         ingress:
           enabled: true
-          annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
-          annotation_group_name: ${DEVSPACE_NAMESPACE}
           hosts:
             - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
               http:
@@ -171,7 +169,10 @@ profiles:
               statefulSet:
                 enabled: true
               ingress:
-                ingressClassName: alb
+                ingressClassName: nginx-internal
+                extra_annotations:
+                  nginx.ingress.kubernetes.io/backend-protocol: HTTP
+                  external-dns.alpha.kubernetes.io/ttl: "120"
   - name: kind
     activation:
       - vars:

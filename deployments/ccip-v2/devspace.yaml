@@ -105,9 +105,6 @@ profiles:
           CCIP_TOOLING_VERSION:
             source: env
             default: v2
-          INGRESS_CERT_ARN:
-            source: env
-            default: ${DEVSPACE_INGRESS_CERT_ARN}
       - op: add
         path: dependencies
         value:

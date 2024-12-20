@@ -23,15 +23,13 @@ common:
 
   ingress:
     enabled: true
-    ingressClassName: alb
+    ingressClassName: nginx-internal
     annotations:
-      alb.ingress.kubernetes.io/certificate-arn: 'arn:aws:acm:us-west-2:389435844244:certificate/b8586286-56fb-4f3f-be7d-7af9c1ac03b0'
-      alb.ingress.kubernetes.io/group.name: sandbox
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}, {"HTTP":80}]'
-      alb.ingress.kubernetes.io/ssl-redirect: '443'
+      nginx.ingress.kubernetes.io/use-regex: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     hosts:
       - host: "%s.nodeops.sand.cldev.sh"
         paths:
-          - path: /*
-            pathType: ImplementationSpecific
+          - path: /
+            pathType: Prefix
         useNodeName: true
