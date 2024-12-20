@@ -1,5 +1,11 @@
 # @chainlink/crib
 
+## 1.3.0
+
+### Minor Changes
+
+- [#334](https://github.com/smartcontractkit/crib/pull/334) [`30e93f5`](https://github.com/smartcontractkit/crib/commit/30e93f57349176caad7ee52eb35aadb4a90feec6) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - cli command `devspace ingress-check` now supports Infra Platform managed ingress classes `nginx-internal` and `nginx-external`
+
 ## 1.2.0
 
 ### Minor Changes
