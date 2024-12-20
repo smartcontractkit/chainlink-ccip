@@ -100,11 +100,11 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 				}
 			}
 
-			var sizeDelta int
+			var bytesTruncated int
 			// Reaching here means that all messages in the report are truncated, truncate the last commit
-			obs, sizeDelta = op.truncateLastCommit(obs, chain)
+			obs, bytesTruncated = op.truncateLastCommit(obs, chain)
 
-			encodedObsSize += sizeDelta
+			encodedObsSize -= bytesTruncated
 
 			if len(obs.CommitReports[chain]) == 0 {
 				// If the last commit report was truncated, truncate the chain
@@ -133,23 +133,23 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 }
 
 // truncateLastCommit removes the last commit from the observation.
-// errors if there are no commits to truncate.
+// returns observation and the number of bytes truncated.
 func (op ObservationOptimizer) truncateLastCommit(
 	obs Observation,
 	chain cciptypes.ChainSelector,
 ) (Observation, int) {
 	observation := obs
-	sizeDelta := 0
+	bytesTruncated := 0
 	commits := observation.CommitReports[chain]
 	if len(commits) == 0 {
-		return observation, sizeDelta
+		return observation, bytesTruncated
 	}
 	lastCommit := commits[len(commits)-1]
 	// Remove the last commit from the list.
 	commits = commits[:len(commits)-1]
 	observation.CommitReports[chain] = commits
 	// Remove from the encoded size.
-	sizeDelta = sizeDelta - op.emptyEncodedSizes.CommitData - 4 // brackets, and commas
+	bytesTruncated = bytesTruncated + op.emptyEncodedSizes.CommitData + 4 // brackets, and commas
 	for seqNum, msg := range observation.Messages[chain] {
 		if lastCommit.SequenceNumberRange.Contains(seqNum) {
 			// Remove the message from the observation.
@@ -158,9 +158,9 @@ func (op ObservationOptimizer) truncateLastCommit(
 			delete(observation.TokenData[chain], seqNum)
 			//delete(observation.Hashes[chain], seqNum)
 			// Remove the encoded size of the message and token data.
-			sizeDelta -= op.emptyEncodedSizes.MessageAndTokenData
-			sizeDelta -= 2 * op.emptyEncodedSizes.SeqNumMap
-			sizeDelta -= 4 // for brackets and commas
+			bytesTruncated += op.emptyEncodedSizes.MessageAndTokenData
+			bytesTruncated = bytesTruncated + 2*op.emptyEncodedSizes.SeqNumMap
+			bytesTruncated += 4 // for brackets and commas
 			// Remove costly messages
 			for i, costlyMessage := range observation.CostlyMessages {
 				if costlyMessage == msg.Header.MessageID {
@@ -171,7 +171,7 @@ func (op ObservationOptimizer) truncateLastCommit(
 		}
 	}
 
-	return observation, sizeDelta
+	return observation, bytesTruncated
 }
 
 // truncateChain removes all data related to the given chain from the observation.
