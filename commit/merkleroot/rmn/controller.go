@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -364,7 +365,7 @@ func (c *controller) sendObservationRequests(
 		}
 
 		req := &rmnpb.Request{
-			RequestId: newRequestID(),
+			RequestId: newRequestID(c.lggr),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: &rmnpb.ObservationRequest{
 					LaneDest:                    destChain,
@@ -810,7 +811,7 @@ func (c *controller) sendReportSignatureRequest(
 		}
 
 		req := &rmnpb.Request{
-			RequestId: newRequestID(),
+			RequestId: newRequestID(c.lggr),
 			Request: &rmnpb.Request_ReportSignatureRequest{
 				ReportSignatureRequest: reportSigReq,
 			},
@@ -908,7 +909,7 @@ func (c *controller) listenForRmnReportSignatures(
 					continue
 				}
 				req := &rmnpb.Request{
-					RequestId: newRequestID(),
+					RequestId: newRequestID(c.lggr),
 					Request: &rmnpb.Request_ReportSignatureRequest{
 						ReportSignatureRequest: reportSigReq,
 					},
@@ -1072,11 +1073,24 @@ func randomShuffle[T any](s []T) []T {
 	return ret
 }
 
-func newRequestID() uint64 {
+var (
+	// atomicCounter is used to generate unique request IDs.
+	atomicCounter = &atomic.Int64{}
+)
+
+// newRequestID generates a new unique request ID.
+func newRequestID(lggr logger.Logger) uint64 {
 	b := make([]byte, 8)
 	_, err := crand.Read(b)
 	if err != nil {
-		panic(err)
+		// fallback to time-based id in the very rare scenario that the random number generator fails
+		lggr.Warnw("failed to generate random request id, falling back to time based",
+			"err", err,
+			"atomicCounter", atomicCounter.Load(),
+		)
+		t := time.Now().UTC().UnixNano()
+		c := atomicCounter.Add(1)
+		return uint64(t + c)
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64
