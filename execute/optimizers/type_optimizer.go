@@ -78,7 +78,7 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 			}
 			lastCommit := &commits[len(commits)-1]
 			seqNum := lastCommit.SequenceNumberRange.Start()
-
+			// Remove messages one by one starting from the last message of the last commit report.
 			for seqNum <= lastCommit.SequenceNumberRange.End() {
 				if _, ok := obs.Messages[chain][seqNum]; !ok {
 					return exectypes.Observation{}, fmt.Errorf("missing message with seqNr %d from chain %d", seqNum, chain)
@@ -159,7 +159,7 @@ func (op ObservationOptimizer) truncateLastCommit(
 			// Remove costly messages
 			for i, costlyMessage := range observation.CostlyMessages {
 				if costlyMessage == msg.Header.MessageID {
-					observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
+					observation.CostlyMessages = internal.RemoveIthElement(observation.CostlyMessages, i)
 				}
 			}
 			// Leaving Nonces untouched

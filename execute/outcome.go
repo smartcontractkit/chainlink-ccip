@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
@@ -158,7 +159,7 @@ func (p *Plugin) getMessagesOutcome(
 		}
 		if len(report.Messages) == 0 {
 			// If there are no messages, remove the commit report.
-			commitReports = append(commitReports[:i], commitReports[i+1:]...)
+			commitReports = internal.RemoveIthElement(commitReports, i)
 		}
 		commitReports = append(commitReports, report)
 	}

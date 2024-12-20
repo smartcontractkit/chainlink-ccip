@@ -9,3 +9,9 @@ func EncodedSize[T any](obj T) int {
 	}
 	return len(enc)
 }
+
+func RemoveIthElement[T any](slice []T, i int) []T {
+	newSlice := make([]T, 0, len(slice)-1)
+	newSlice = append(newSlice, slice[:i]...)
+	return append(newSlice, slice[i+1:]...)
+}
