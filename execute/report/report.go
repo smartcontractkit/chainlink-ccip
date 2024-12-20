@@ -236,7 +236,7 @@ func (b *execReportBuilder) checkMessageNonce(
 		}
 
 		chainNonces := b.sendersNonce[execReport.SourceChain]
-		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(b.destChainSelector))
+		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
 		if _, ok := chainNonces[sender]; !ok {
 			b.lggr.Errorw("Skipping message - missing nonce",
 				"messageID", msg.Header.MessageID,
