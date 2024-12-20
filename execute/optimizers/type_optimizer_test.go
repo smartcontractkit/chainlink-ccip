@@ -1,8 +1,9 @@
 package optimizers
 
 import (
-	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 
 	"github.com/stretchr/testify/require"
 

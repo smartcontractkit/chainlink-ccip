@@ -2,9 +2,10 @@ package optimizers
 
 import (
 	"fmt"
+	"sort"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
-	"sort"
 
 	"golang.org/x/exp/maps"
 
