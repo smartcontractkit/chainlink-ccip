@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, Ids};
+use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{get_associated_token_address_with_program_id, AssociatedToken};
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
