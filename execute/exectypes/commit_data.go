@@ -1,7 +1,6 @@
 package exectypes
 
 import (
-	"encoding/json"
 	"time"
 
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -44,12 +43,4 @@ type CommitData struct {
 	// TokenData for each message.
 	// Length of this slice should equal to the length of Messages slice.
 	MessageTokenData []MessageTokenData `json:"messageTokenData"`
-}
-
-func (cd CommitData) EncodedSize() int {
-	enc, err := json.Marshal(cd)
-	if err != nil {
-		return 0
-	}
-	return len(enc)
 }

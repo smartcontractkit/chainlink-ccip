@@ -146,14 +146,6 @@ func (m Message) IsEmpty() bool {
 		m.Header.DestChainSelector == 0 && m.Header.SequenceNumber == 0 && m.Header.Nonce == 0
 }
 
-func (m Message) EncodedSize() int {
-	enc, err := json.Marshal(m)
-	if err != nil {
-		return 0
-	}
-	return len(enc)
-}
-
 // RampMessageHeader is the family-agnostic header for OnRamp and OffRamp messages.
 // The MessageID is not expected to match MsgHash, since it may originate from a different
 // ramp family.

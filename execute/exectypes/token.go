@@ -1,7 +1,6 @@
 package exectypes
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -144,12 +143,4 @@ func TokenDataHash(td TokenData) [32]byte {
 
 func (td TokenData) IsReady() bool {
 	return td.Ready
-}
-
-func (mtd MessageTokenData) EncodedSize() int {
-	enc, err := json.Marshal(mtd)
-	if err != nil {
-		return 0
-	}
-	return len(enc)
 }

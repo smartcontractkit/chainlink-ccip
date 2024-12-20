@@ -52,7 +52,7 @@ func GetEncodedMsgAndTokenDataSizes(mo MessageObservations, tds TokenDataObserva
 		sizes[chain] = make(map[cciptypes.SeqNum]int)
 		for seq, msg := range msgs {
 			td := tds[chain][seq]
-			sizes[chain][seq] = msg.EncodedSize() + td.EncodedSize()
+			sizes[chain][seq] = EncodedSize(msg) + EncodedSize(td)
 		}
 	}
 	return sizes

@@ -32,18 +32,12 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 	emptyMsg := cciptypes.Message{}
 	emptyTokenData := MessageTokenData{}
 	emptyCommitData := CommitData{}
-	emptySeqNr := make(map[cciptypes.SeqNum]cciptypes.Message)
-	emptySeqNrSize := 0
-
-	enc, err := json.Marshal(emptySeqNr)
-	if err == nil {
-		emptySeqNrSize = len(enc)
-	}
+	emptySeqNrSize := EncodedSize(make(map[cciptypes.SeqNum]cciptypes.Message))
 
 	return EmptyEncodeSizes{
-		MessageAndTokenData: emptyMsg.EncodedSize() + emptyTokenData.EncodedSize(), // 397 + 18 = 415
-		CommitData:          emptyCommitData.EncodedSize(),                         // 305
-		SeqNumMap:           emptySeqNrSize,                                        // 2
+		MessageAndTokenData: EncodedSize(emptyMsg) + EncodedSize(emptyTokenData),
+		CommitData:          EncodedSize(emptyCommitData), // 305
+		SeqNumMap:           emptySeqNrSize,               // 2
 	}
 }
 
@@ -207,4 +201,12 @@ func (op ObservationOptimizer) truncateChain(
 	deleteCostlyMessages()
 
 	return observation
+}
+
+func EncodedSize[T any](obj T) int {
+	enc, err := json.Marshal(obj)
+	if err != nil {
+		return 0
+	}
+	return len(enc)
 }
