@@ -733,6 +733,16 @@ func Test_controller_validateSignedObservationResponse(t *testing.T) {
 	}
 }
 
+func Test_newRequestID(t *testing.T) {
+	ids := map[uint64]struct{}{}
+	for i := 0; i < 1000; i++ {
+		id := newRequestID(logger.Test(t))
+		_, ok := ids[id]
+		assert.False(t, ok)
+		ids[id] = struct{}{}
+	}
+}
+
 func (ts *testSetup) waitForObservationRequestsToBeSent(
 	rmnClient *mockPeerClient,
 	homeF int,
