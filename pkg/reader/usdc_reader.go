@@ -21,7 +21,7 @@ import (
 )
 
 type USDCMessageReader interface {
-	MessageHashes(ctx context.Context,
+	MessagesByTokenID(ctx context.Context,
 		source, dest cciptypes.ChainSelector,
 		tokens map[MessageTokenID]cciptypes.RampTokenAmount,
 	) (map[MessageTokenID]cciptypes.Bytes, error)
@@ -133,7 +133,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	return destDomains
 }
 
-func (u usdcMessageReader) MessageHashes(
+func (u usdcMessageReader) MessagesByTokenID(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
@@ -207,7 +207,7 @@ func (u usdcMessageReader) MessageHashes(
 	// 3. Remapping database events to the proper MessageTokenID
 	out := make(map[MessageTokenID]cciptypes.Bytes)
 	for tokenID, messageID := range eventIDs {
-		messageHash, ok1 := messageSentEvents[messageID]
+		message, ok1 := messageSentEvents[messageID]
 		if !ok1 {
 			// Token not available in the source chain, it should never happen at this stage
 			u.lggr.Warnw("Message not found in the source chain",
@@ -217,7 +217,7 @@ func (u usdcMessageReader) MessageHashes(
 			)
 			continue
 		}
-		out[tokenID] = messageHash
+		out[tokenID] = message
 	}
 
 	return out, nil
@@ -323,7 +323,7 @@ func NewFakeUSDCMessageReader(messages map[MessageTokenID]cciptypes.Bytes) FakeU
 	return FakeUSDCMessageReader{Messages: messages}
 }
 
-func (f FakeUSDCMessageReader) MessageHashes(
+func (f FakeUSDCMessageReader) MessagesByTokenID(
 	_ context.Context,
 	_, _ cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
