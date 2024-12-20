@@ -1077,7 +1077,7 @@ func randomShuffle[T any](s []T) []T {
 func newRequestID(lggr logger.Logger) uint64 {
 	b := make([]byte, 8)
 	_, err := crand.Read(b)
-	if err == nil {
+	if err != nil {
 		// fallback to time-based id in the very rare scenario that the random number generator fails
 		lggr.Warnw("failed to generate random request id, falling back to golang.org/x/exp/rand",
 			"err", err,
