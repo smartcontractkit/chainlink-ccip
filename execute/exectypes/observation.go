@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -16,6 +17,8 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
 type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
+
+type EncodedMsgAndTokenDataSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]int
 
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
@@ -41,6 +44,19 @@ func GetHashes(ctx context.Context, mo MessageObservations, hasher cciptypes.Mes
 		}
 	}
 	return hashes, nil
+}
+
+// GetEncodedMsgAndTokenDataSizes calculates the encoded sizes of messages and their token data counterpart.
+func GetEncodedMsgAndTokenDataSizes(mo MessageObservations, tds TokenDataObservations) EncodedMsgAndTokenDataSizes {
+	sizes := make(EncodedMsgAndTokenDataSizes)
+	for chain, msgs := range mo {
+		sizes[chain] = make(map[cciptypes.SeqNum]int)
+		for seq, msg := range msgs {
+			td := tds[chain][seq]
+			sizes[chain][seq] = internal.EncodedSize(msg) + internal.EncodedSize(td)
+		}
+	}
+	return sizes
 }
 
 // NonceObservations contain the latest nonce for senders in the previously observed messages.
