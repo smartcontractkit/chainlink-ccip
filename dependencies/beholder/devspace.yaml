@@ -104,17 +104,17 @@ deployments:
                       value: "${OTEL_TRACE_SAMPLE_RATIO}"
                     - name: OTEL_GO_X_CARDINALITY_LIMIT
                       value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
-                    - name: OTEL_EMITTER_EXPORT_TIMEOUT 
+                    - name: OTEL_EMITTER_EXPORT_TIMEOUT
                       value: "${OTEL_EMITTER_EXPORT_TIMEOUT}"
                     - name: OTEL_EMITTER_EXPORT_INTERVAL
                       value: "${OTEL_EMITTER_EXPORT_INTERVAL}"
-                    - name: OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE  
+                    - name: OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE
                       value: "${OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE}"
                     - name: OTEL_EMITTER_MAX_QUEUE_SIZE
                       value: "${OTEL_EMITTER_MAX_QUEUE_SIZE}"
                     - name: OTEL_LOG_EXPORT_TIMEOUT
                       value: "${OTEL_LOG_EXPORT_TIMEOUT}"
-                    - name: OTEL_LOG_EXPORT_INTERVAL 
+                    - name: OTEL_LOG_EXPORT_INTERVAL
                       value: "${OTE_LOG_EXPORT_INTERVAL}"
                     - name: OTEL_LOG_EXPORT_MAX_BATCH_SIZE
                       value: "${OTEL_LOG_EXPORT_MAX_BATCH_SIZE}"
@@ -417,14 +417,14 @@ profiles:
                 service:
                   pipelines:
                     traces:
-                      receivers: [ otlp ]
-                      exporters: [ otlphttp ]
+                      receivers: [otlp]
+                      exporters: [otlphttp]
                     metrics:
-                      receivers: [ otlp ]
-                      exporters: [ otlphttp ]
+                      receivers: [otlp]
+                      exporters: [otlphttp]
                     logs:
-                      receivers: [ otlp ]
-                      exporters: [ otlphttp ]
+                      receivers: [otlp]
+                      exporters: [otlphttp]
               resources:
                 requests:
                   memory: "3Gi"
