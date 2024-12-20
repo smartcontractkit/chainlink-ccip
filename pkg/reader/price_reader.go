@@ -181,6 +181,9 @@ func (pr *priceReader) GetFeedPricesUSD(
 		if err != nil {
 			return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
 		}
+		if priceResult == nil {
+			return nil, fmt.Errorf("priceResult value is nil for contract %s", boundContract.Address
+		}
 		latestRoundData, ok := priceResult.(*LatestRoundData)
 		if !ok {
 			return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
@@ -191,11 +194,17 @@ func (pr *priceReader) GetFeedPricesUSD(
 		if err != nil {
 			return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
 		}
+		if decimalResult == nil {
+			return nil, fmt.Errorf("decimalResult value is nil for contract %s", boundContract.Address)
+		}
 		decimals, ok := decimalResult.(*uint8)
 		if !ok {
 			return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
 		}
 
+		if latestRoundData.Answer == nil {
+			return nil, fmt.Errorf("latestRoundData.Answer is nil for contract %s", boundContract.Address)
+		}
 		// Normalize price for this contract
 		normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
 

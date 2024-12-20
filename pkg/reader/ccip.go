@@ -1033,6 +1033,9 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 
 	price := timestampedPrice.Value
 
+	if price == nil {
+		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is nil,  addr: %v", tokenAddr)
+	}
 	if price.Cmp(big.NewInt(0)) == 0 {
 		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
 	}
