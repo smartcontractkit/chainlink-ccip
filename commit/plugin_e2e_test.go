@@ -438,11 +438,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 	nodes := make([]ocr3types.ReportingPlugin[[]byte], len(oracleIDs))
 
 	newFeeComponents, newNativePrice, packedGasPrice := newRandomFees()
-	expectedChainFeeOutcome := chainfee.Outcome{
+	expectedChain1FeeOutcome := chainfee.Outcome{
 		GasPrices: []ccipocr3.GasPriceChain{
 			{
 				GasPrice: packedGasPrice,
-				ChainSel: destChain,
+				ChainSel: sourceChain1,
 			},
 		},
 	}
@@ -466,10 +466,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
 							GasPrice: packedGasPrice,
-							ChainSel: destChain,
-						},
-						{
-							GasPrice: packedGasPrice,
 							ChainSel: sourceChain1,
 						},
 						{
@@ -485,7 +481,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain:    newFeeComponents,
 							sourceChain1: newFeeComponents,
 							sourceChain2: newFeeComponents,
 						})
@@ -493,7 +488,6 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						destChain:    newNativePrice,
 						sourceChain1: newNativePrice,
 						sourceChain2: newNativePrice,
 					})
@@ -504,7 +498,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			prevOutcome: committypes.Outcome{},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChainFeeOutcome,
+				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -512,13 +506,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: newFeeComponents,
+							sourceChain1: newFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						destChain:    newNativePrice,
 						sourceChain1: newNativePrice,
 						sourceChain2: newNativePrice,
 					})
@@ -528,11 +521,11 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			name: "fee components should not be updated within deviation",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChainFeeOutcome,
+				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
-				ChainFeeOutcome:   expectedChainFeeOutcome,
+				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -540,13 +533,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: newFeeComponents,
+							sourceChain1: newFeeComponents,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						destChain: newNativePrice,
+						sourceChain1: newNativePrice,
 					})
 			},
 		},
@@ -554,7 +547,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			name: "fresh fees (timestamped) should not be updated, even outside of deviation",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChainFeeOutcome,
+				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
@@ -562,7 +555,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
 							GasPrice: newPackedGasPrice2,
-							ChainSel: destChain,
+							ChainSel: sourceChain1,
 						},
 					},
 				},
@@ -573,13 +566,13 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: newFeeComponents2,
+							sourceChain1: newFeeComponents2,
 						})
 
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						destChain: newNativePrice2,
+						sourceChain1: newNativePrice2,
 					})
 			},
 		},
@@ -587,7 +580,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			name: "stale fees should be updated",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
-				ChainFeeOutcome:   expectedChainFeeOutcome,
+				ChainFeeOutcome:   expectedChain1FeeOutcome,
 			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
@@ -595,7 +588,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GasPrices: []ccipocr3.GasPriceChain{
 						{
 							GasPrice: newPackedGasPrice2,
-							ChainSel: destChain,
+							ChainSel: sourceChain1,
 						},
 					},
 				},
@@ -606,12 +599,12 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 					GetChainsFeeComponents(params.ctx, mock.Anything).
 					Return(
 						map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-							destChain: newFeeComponents2,
+							sourceChain1: newFeeComponents2,
 						})
 				m.EXPECT().
 					GetWrappedNativeTokenPriceUSD(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						destChain: newNativePrice2,
+						sourceChain1: newNativePrice2,
 					})
 
 				m.EXPECT().GetChainFeePriceUpdate(params.ctx, mock.Anything).Unset()
@@ -621,9 +614,9 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 				m.EXPECT().
 					GetChainFeePriceUpdate(params.ctx, mock.Anything).
 					Return(map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
-						destChain: {
+						sourceChain1: {
 							Timestamp: t,
-							Value:     expectedChainFeeOutcome.GasPrices[0].GasPrice,
+							Value:     expectedChain1FeeOutcome.GasPrices[0].GasPrice,
 						},
 					})
 			},
