@@ -29,8 +29,6 @@ type WithdrawBilledFunds struct {
 	// [2] = [WRITE] recipient
 	//
 	// [3] = [] tokenProgram
-	// ··········· type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-	// ··········· with a constraint enforcing that it is one of the two allowed programs.
 	//
 	// [4] = [] feeBillingSigner
 	//
@@ -94,16 +92,12 @@ func (inst *WithdrawBilledFunds) GetRecipientAccount() *ag_solanago.AccountMeta 
 }
 
 // SetTokenProgramAccount sets the "tokenProgram" account.
-// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-// with a constraint enforcing that it is one of the two allowed programs.
 func (inst *WithdrawBilledFunds) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *WithdrawBilledFunds {
 	inst.AccountMetaSlice[3] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
 // GetTokenProgramAccount gets the "tokenProgram" account.
-// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-// with a constraint enforcing that it is one of the two allowed programs.
 func (inst *WithdrawBilledFunds) GetTokenProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[3]
 }

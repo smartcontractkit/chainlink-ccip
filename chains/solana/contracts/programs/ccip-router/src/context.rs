@@ -160,13 +160,7 @@ pub struct WithdrawBilledFunds<'info> {
     )]
     pub recipient: InterfaceAccount<'info, TokenAccount>,
 
-    /// CHECK: This is the token program OR the token-2022 program. Given that there are 2 options, this can't have the
-    /// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-    /// with a constraint enforcing that it is one of the two allowed programs.
-    #[account(
-        constraint = TokenInterface::ids().contains(&token_program.key()) @ CcipRouterError::InvalidInputs,
-    )]
-    pub token_program: UncheckedAccount<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
 
     /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
     #[account(
