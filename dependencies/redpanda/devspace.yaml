@@ -127,3 +127,18 @@ deployments:
     kubectl:
       manifests:
         - ./k8s/beholder/create-topic-job.yaml
+
+profiles:
+  # This profile is used to set the resorces for the redpanda deployment in the case of a load test
+  - name: load-test
+    merge:
+      deployments:
+        redpanda:
+          helm:
+            values:
+              resources:
+                cpu:
+                  cores: 4
+                memory:
+                  container:
+                    max: 10Gi

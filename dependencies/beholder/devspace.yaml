@@ -84,6 +84,8 @@ deployments:
         metadata:
           name: beholder-load-tester
         spec:
+          completions: ${NUMBER_OF_LOAD_TESTERS}  # Total number of pods to complete
+          parallelism: ${NUMBER_OF_LOAD_TESTERS}  # Number of pods to run simultaneously
           template:
             metadata:
               labels:
@@ -91,7 +93,7 @@ deployments:
             spec:
               containers:
                 - name: beholder-load-tester
-                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:qa-latest
+                  image: 804282218731.dkr.ecr.us-west-2.amazonaws.com/atlas-beholder-load-tester:${LOAD_TESTER_TAG}
                   imagePullPolicy: Always
                   env:
                     - name: OTEL_COLLECTOR_GRPC_ENDPOINT
@@ -100,6 +102,24 @@ deployments:
                       value: "${OTEL_METRICS_READER_INTERVAL}"
                     - name: OTEL_TRACE_SAMPLE_RATIO
                       value: "${OTEL_TRACE_SAMPLE_RATIO}"
+                    - name: OTEL_GO_X_CARDINALITY_LIMIT
+                      value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
+                    - name: OTEL_EMITTER_EXPORT_TIMEOUT
+                      value: "${OTEL_EMITTER_EXPORT_TIMEOUT}"
+                    - name: OTEL_EMITTER_EXPORT_INTERVAL
+                      value: "${OTEL_EMITTER_EXPORT_INTERVAL}"
+                    - name: OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE
+                      value: "${OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE}"
+                    - name: OTEL_EMITTER_MAX_QUEUE_SIZE
+                      value: "${OTEL_EMITTER_MAX_QUEUE_SIZE}"
+                    - name: OTEL_LOG_EXPORT_TIMEOUT
+                      value: "${OTEL_LOG_EXPORT_TIMEOUT}"
+                    - name: OTEL_LOG_EXPORT_INTERVAL
+                      value: "${OTE_LOG_EXPORT_INTERVAL}"
+                    - name: OTEL_LOG_EXPORT_MAX_BATCH_SIZE
+                      value: "${OTEL_LOG_EXPORT_MAX_BATCH_SIZE}"
+                    - name: OTEL_LOG_MAX_QUEUE_SIZE
+                      value: "${OTEL-LOG_MAX_QUEUE_SIZE}"
                     - name: METRICS_ENABLED
                       value: "${METRICS_ENABLED}"
                     - name: METRICS_NUMBER
@@ -110,10 +130,10 @@ deployments:
                       value: "${METRICS_GAUGE_ATTRIBUTES_POOL_COUNT}"
                     - name: METRICS_BYTES_PER_ATTRIBUTE
                       value: "${METRICS_BYTES_PER_ATTRIBUTE}"
-                    - name: OTEL_GO_X_CARDINALITY_LIMIT
-                      value: "${OTEL_GO_X_CARDINALITY_LIMIT}"
                     - name: TRACES_ENABLED
                       value: "${TRACES_ENABLED}"
+                    - name: TRACES_POOL_SIZE
+                      value: "${TRACES_POOL_SIZE}"
                     - name: TRACES_TRACE_DEPTH
                       value: "${TRACES_TRACE_DEPTH}"
                     - name: TRACES_ATTRIBUTES_COUNT
@@ -141,11 +161,17 @@ deployments:
                   securityContext:
                     runAsUser: 65534
                     runAsGroup: 65534
+                  resources:
+                    requests:
+                      memory: "2048Mi"
+                      cpu: "1500m"
+                    limits:
+                      memory: "2048Mi"
+                      cpu: "1500m"
               restartPolicy: OnFailure
               securityContext:
                 fsGroup: 65534
           backoffLimit: 4  # Number of retries before considering the job as failed
-
 
   beholder-otel-collector-agent:
     updateImageTags: false
@@ -282,28 +308,17 @@ deployments:
             service:
               pipelines:
                 logs:
-                  exporters:
-                    - debug
-                    - beholder_kafka
-                  processors:
-                    - batch
-                  receivers:
-                    - otlp
+                  exporters: [debug, beholder_kafka]
+                  processors: [batch]
+                  receivers: [otlp]
                 metrics:
-                  exporters:
-                    - debug
-#                    - otlphttp
-                  processors:
-                    - batch
-                  receivers:
-                    - otlp
+                  exporters: [debug]
+                  processors: [batch]
+                  receivers: [otlp]
                 traces:
-                  exporters:
-                    - debug
-                  processors:
-                    - batch
-                  receivers:
-                    - otlp
+                  exporters: [debug]
+                  processors: [batch]
+                  receivers: [otlp]
               telemetry:
                 metrics:
                   address: 0.0.0.0:8888
@@ -390,14 +405,73 @@ profiles:
               version: null
 
   - name: load-test
+    merge:
+      deployments:
+        beholder-otel-collector-agent:
+          helm:
+            values:
+              config:
+                exporters:
+                  debug:
+                    verbosity: normal
+                service:
+                  pipelines:
+                    traces:
+                      receivers: [otlp]
+                      exporters: [otlphttp]
+                    metrics:
+                      receivers: [otlp]
+                      exporters: [otlphttp]
+                    logs:
+                      receivers: [otlp]
+                      exporters: [otlphttp]
+              resources:
+                requests:
+                  memory: "3Gi"
+                  cpu: "4000m"
+                limits:
+                  memory: "3.5Gi"
+                  cpu: "4500m"
+        beholder-otel-collector-gateway:
+          helm:
+            values:
+              deployment:
+                replicas: 1
+                resources:
+                  limits:
+                    cpu: '1'
+                    memory: 512Mi
+                  requests:
+                    cpu: '1'
+                    memory: 512Mi
     patches:
       - op: add
         path: vars
         value:
+          NUMBER_OF_LOAD_TESTERS:
+            default: "1"
+          LOAD_TESTER_TAG:
+            default: "qa-latest"
           OTEL_METRICS_READER_INTERVAL:
             default: "1s"
           OTEL_TRACE_SAMPLE_RATIO:
             default: "1.0"
+          OTEL_EMITTER_EXPORT_TIMEOUT:
+            default: "5s"
+          OTEL_EMITTER_EXPORT_INTERVAL:
+            default: "1s"
+          OTEL_EMITTER_EXPORT_MAX_BATCH_SIZE:
+            default: "512"
+          OTEL_EMITTER_MAX_QUEUE_SIZE:
+            default: "2048"
+          OTEL_LOG_EXPORT_TIMEOUT:
+            default: "30s"
+          OTEL_LOG_EXPORT_INTERVAL:
+            default: "1s"
+          OTEL_LOG_EXPORT_MAX_BATCH_SIZE:
+            default: "512"
+          OTEL_LOG_MAX_QUEUE_SIZE:
+            default: "2048"
           METRICS_ENABLED:
             default: "true"
           METRICS_NUMBER:
@@ -412,6 +486,8 @@ profiles:
             default: "50"
           TRACES_ENABLED:
             default: "true"
+          TRACES_POOL_SIZE:
+            default: "20"
           TRACES_TRACE_DEPTH:
             default: "5"
           TRACES_ATTRIBUTES_COUNT:
@@ -436,6 +512,10 @@ profiles:
             default: ""
           LOKI_URL:
             default: ""
+      - op: add
+        path: dependencies.redpanda.profiles
+        value:
+          - load-test
 
   - name: git-charts
     merge:
