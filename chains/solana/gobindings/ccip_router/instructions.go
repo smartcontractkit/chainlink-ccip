@@ -276,6 +276,16 @@ var (
 	// The fee amount in u64.
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
+	// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
+	// Only the CCIP Admin can withdraw billed funds.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the transfer of billed fees.
+	// * `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.
+	// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
+	Instruction_WithdrawBilledFunds = ag_binary.TypeID([8]byte{16, 116, 73, 38, 77, 232, 6, 28})
+
 	// ON RAMP FLOW
 	// Sends a message to the destination chain.
 	//
@@ -403,6 +413,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "RemoveBillingTokenConfig"
 	case Instruction_GetFee:
 		return "GetFee"
+	case Instruction_WithdrawBilledFunds:
+		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
 		return "CcipSend"
 	case Instruction_Commit:
@@ -499,6 +511,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"get_fee", (*GetFee)(nil),
+		},
+		{
+			"withdraw_billed_funds", (*WithdrawBilledFunds)(nil),
 		},
 		{
 			"ccip_send", (*CcipSend)(nil),

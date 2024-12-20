@@ -1020,6 +1020,66 @@
       "returns": "u64"
     },
     {
+      "name": "withdrawBilledFunds",
+      "docs": [
+        "Transfers the accumulated billed fees in a particular token to an arbitrary token account.",
+        "Only the CCIP Admin can withdraw billed funds.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer of billed fees.",
+        "* `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.",
+        "* `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0."
+      ],
+      "accounts": [
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenAccum",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "transferAll",
+          "type": "bool"
+        },
+        {
+          "name": "desiredAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "ccipSend",
       "docs": [
         "ON RAMP FLOW",
@@ -2729,6 +2789,9 @@
           },
           {
             "name": "InsufficientLamports"
+          },
+          {
+            "name": "InsufficientFunds"
           }
         ]
       }
