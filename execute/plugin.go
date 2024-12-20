@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
@@ -63,6 +65,7 @@ type Plugin struct {
 	estimateProvider      gas.EstimateProvider
 	lggr                  logger.Logger
 
+	observationOptimizer optimizers.ObservationOptimizer
 	// state
 	contractsInitialized bool
 }
@@ -114,7 +117,8 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
-		observer: metricsReporter,
+		observer:             metricsReporter,
+		observationOptimizer: optimizers.NewObservationOptimizer(maxObservationLength),
 	}
 }
 
