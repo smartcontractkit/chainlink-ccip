@@ -174,6 +174,7 @@ func (op ObservationOptimizer) truncateLastCommit(
 			for i, costlyMessage := range observation.CostlyMessages {
 				if costlyMessage == msg.Header.MessageID {
 					observation.CostlyMessages = internal.RemoveIthElement(observation.CostlyMessages, i)
+					break
 				}
 			}
 			// Leaving Nonces untouched

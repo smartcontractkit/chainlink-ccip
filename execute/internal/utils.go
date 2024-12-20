@@ -11,6 +11,9 @@ func EncodedSize[T any](obj T) int {
 }
 
 func RemoveIthElement[T any](slice []T, i int) []T {
+	if i < 0 || i >= len(slice) {
+		return slice // Return the original slice if index is out of bounds
+	}
 	newSlice := make([]T, 0, len(slice)-1)
 	newSlice = append(newSlice, slice[:i]...)
 	return append(newSlice, slice[i+1:]...)
