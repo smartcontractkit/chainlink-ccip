@@ -12,11 +12,11 @@ import (
 	"fmt"
 	"math/rand"
 	"sort"
-	"sync/atomic"
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
+	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -1073,24 +1073,17 @@ func randomShuffle[T any](s []T) []T {
 	return ret
 }
 
-var (
-	// atomicCounter is used to generate unique request IDs.
-	atomicCounter = &atomic.Int64{}
-)
-
 // newRequestID generates a new unique request ID.
 func newRequestID(lggr logger.Logger) uint64 {
 	b := make([]byte, 8)
 	_, err := crand.Read(b)
-	if err != nil {
+	if err == nil {
 		// fallback to time-based id in the very rare scenario that the random number generator fails
-		lggr.Warnw("failed to generate random request id, falling back to time based",
+		lggr.Warnw("failed to generate random request id, falling back to golang.org/x/exp/rand",
 			"err", err,
-			"atomicCounter", atomicCounter.Load(),
 		)
-		t := time.Now().UTC().UnixNano()
-		c := atomicCounter.Add(1)
-		return uint64(t + c)
+		rand2.Seed(uint64(time.Now().UnixNano()))
+		return rand2.Uint64()
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64
