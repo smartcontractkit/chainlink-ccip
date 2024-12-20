@@ -91,7 +91,9 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 				// Add empty message and token encoded size
 				encodedObsSize += op.emptyEncodedSizes.MessageAndTokenData
 				seqNum++
-				if encodedObsSize <= op.maxEncodedSize {
+				// Once we assert the estimation is less than the max size we double-check with actual encoding size.
+				// Otherwise, we short circuit after checking the estimation only
+				if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(obs, op.maxEncodedSize) {
 					return obs, nil
 				}
 			}
@@ -107,10 +109,11 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 				obs = op.truncateChain(obs, chain)
 			}
 
-			if encodedObsSize <= op.maxEncodedSize {
+			// Once we assert the estimation is less than the max size we double-check with actual encoding size.
+			// Otherwise, we short circuit after checking the estimation only
+			if encodedObsSize <= op.maxEncodedSize && fitsWithinSize(obs, op.maxEncodedSize) {
 				return obs, nil
 			}
-			chains = maps.Keys(obs.CommitReports)
 		}
 		// Truncated all chains. Return obs as is. (it has other data like contract discovery)
 		if len(obs.CommitReports) == 0 {
@@ -126,6 +129,14 @@ func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observa
 	}
 
 	return obs, nil
+}
+
+func fitsWithinSize(obs exectypes.Observation, maxEncodedSize int) bool {
+	encodedObs, err := obs.Encode()
+	if err != nil {
+		return false
+	}
+	return len(encodedObs) <= maxEncodedSize
 }
 
 // truncateLastCommit removes the last commit from the observation.
