@@ -177,23 +177,15 @@ func (pr *priceReader) GetFeedPricesUSD(
 		}
 
 		// Get price data
-		priceResult, err := contractResults[0].GetResult()
+		latestRoundData, err := pr.getPriceData(contractResults[0], boundContract)
 		if err != nil {
-			return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
-		}
-		latestRoundData, ok := priceResult.(*LatestRoundData)
-		if !ok {
-			return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
+			return nil, err
 		}
 
 		// Get decimals
-		decimalResult, err := contractResults[1].GetResult()
+		decimals, err := pr.getDecimals(contractResults[1], boundContract)
 		if err != nil {
-			return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
-		}
-		decimals, ok := decimalResult.(*uint8)
-		if !ok {
-			return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
+			return nil, err
 		}
 
 		// Normalize price for this contract
@@ -213,6 +205,42 @@ func (pr *priceReader) GetFeedPricesUSD(
 	}
 
 	return prices, nil
+}
+
+func (pr *priceReader) getPriceData(
+	result commontypes.BatchReadResult,
+	boundContract commontypes.BoundContract,
+) (*LatestRoundData, error) {
+	priceResult, err := result.GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
+	}
+	if priceResult == nil {
+		return nil, fmt.Errorf("priceResult value is nil for contract %s", boundContract.Address)
+	}
+	latestRoundData, ok := priceResult.(*LatestRoundData)
+	if !ok {
+		return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
+	}
+	return latestRoundData, nil
+}
+
+func (pr *priceReader) getDecimals(
+	result commontypes.BatchReadResult,
+	boundContract commontypes.BoundContract,
+) (*uint8, error) {
+	decimalResult, err := result.GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
+	}
+	if decimalResult == nil {
+		return nil, fmt.Errorf("decimalResult value is nil for contract %s", boundContract.Address)
+	}
+	decimals, ok := decimalResult.(*uint8)
+	if !ok {
+		return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
+	}
+	return decimals, nil
 }
 
 // prepareBatchRequest creates a batch request grouped by contract and returns the mapping of contracts to token indices

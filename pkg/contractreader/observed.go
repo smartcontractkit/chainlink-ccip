@@ -90,6 +90,11 @@ func NewObserverReader(
 	}
 }
 
+func (o *Observed) HealthReport() map[string]error {
+	// Health report doesn't seem to be an IO operation, so no need to observe.
+	return o.ContractReaderFacade.HealthReport()
+}
+
 func (o *Observed) GetLatestValue(
 	ctx context.Context,
 	readIdentifier string,

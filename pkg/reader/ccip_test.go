@@ -44,6 +44,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -837,6 +838,7 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -882,6 +884,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
