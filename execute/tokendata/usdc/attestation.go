@@ -131,10 +131,10 @@ func (f FakeAttestationClient) Attestations(
 ) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus, error) {
 	outcome := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus)
 
-	for chainSelector, messagesByTokenId := range messagesByChain {
+	for chainSelector, messagesByTokenID := range messagesByChain {
 		outcome[chainSelector] = make(map[reader.MessageTokenID]AttestationStatus)
 
-		for tokenID, message := range messagesByTokenId {
+		for tokenID, message := range messagesByTokenID {
 			outcome[chainSelector][tokenID] = f.Data[string(message)]
 		}
 	}
