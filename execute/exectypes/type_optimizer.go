@@ -73,7 +73,7 @@ func (op ObservationOptimizer) TruncateObservation(observation Observation) (Obs
 	})
 
 	messageAndTokenDataEncodedSizes := GetEncodedMsgAndTokenDataSizes(obs.Messages, obs.TokenData)
-	// If the encoded obs is too large, start filtering data.
+	// While the encoded obs is too large, continue filtering data.
 	for encodedObsSize > op.maxEncodedSize {
 		for _, chain := range chains {
 			commits := obs.CommitReports[chain]
