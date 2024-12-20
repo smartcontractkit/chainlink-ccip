@@ -729,6 +729,16 @@ func Test_controller_validateSignedObservationResponse(t *testing.T) {
 	}
 }
 
+func Test_newRequestID(t *testing.T) {
+	ids := map[uint64]struct{}{}
+	for i := 0; i < 1000; i++ {
+		id := newRequestID(logger.Test(t))
+		_, ok := ids[id]
+		assert.False(t, ok)
+		ids[id] = struct{}{}
+	}
+}
+
 func getDeterministicPubKey(t *testing.T) *ed25519.PublicKey {
 	// deterministically create a public key by seeding with a 32char string.
 	publicKey, _, err := ed25519.GenerateKey(
