@@ -61,13 +61,13 @@ func (u *TokenDataObserver) Observe(
 	usdcMessages := u.pickOnlyUSDCMessages(messages)
 
 	// 2. Fetch USDC messages by token id based on the `MessageSent (bytes message)` event
-	usdcMessagesByTokenId, err := u.fetchUSDCEventMessages(ctx, usdcMessages)
+	usdcMessagesByTokenID, err := u.fetchUSDCEventMessages(ctx, usdcMessages)
 	if err != nil {
 		return nil, err
 	}
 
 	// 3. Fetch attestations for USDC messages
-	attestations, err := u.fetchAttestations(ctx, usdcMessagesByTokenId)
+	attestations, err := u.fetchAttestations(ctx, usdcMessagesByTokenID)
 	if err != nil {
 		return nil, err
 	}
