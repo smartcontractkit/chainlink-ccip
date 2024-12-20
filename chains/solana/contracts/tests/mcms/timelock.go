@@ -90,7 +90,7 @@ func TimelockBatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicK
 }
 
 // instructions builder for preloading instructions to timelock operation
-func TimelockPreloadOperationIxs(ctx context.Context, op TimelockOperation, authority solana.PublicKey, client *rpc.Client) ([]solana.Instruction, error) {
+func TimelockPreloadOperationIxs(op TimelockOperation, authority solana.PublicKey) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
 		op.OperationID(),
