@@ -435,7 +435,7 @@ func (r *ccipChainReader) Nonces(
 	responses := make([]uint64, len(addresses))
 
 	for i, address := range addresses {
-		sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
+		sender, err := typeconv.AddressStringToBytes(address, uint64(sourceChainSelector))
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 		}
