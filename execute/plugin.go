@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"

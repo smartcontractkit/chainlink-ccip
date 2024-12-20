@@ -3,8 +3,9 @@ package execute
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	"sort"
+
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
