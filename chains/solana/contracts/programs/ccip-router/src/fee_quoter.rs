@@ -91,8 +91,8 @@ pub fn wrap_native_sol<'info>(
     signer_bump: u8,
 ) -> Result<()> {
     require!(
-        // guarantee that if caller is a PDA it won't get garbage-collected
-        *from.owner == System::id() || from.get_lamports() > amount,
+        // guarantee that if caller is a PDA with data it won't get garbage-collected
+        from.data_is_empty() || from.get_lamports() > amount,
         CcipRouterError::InsufficientLamports
     );
 
