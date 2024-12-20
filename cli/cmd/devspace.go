@@ -437,6 +437,10 @@ var ingressCheckCmd = &cobra.Command{
 			switch *ingress.Spec.IngressClassName {
 			case "alb":
 				ingressSuffix = ".elb.amazonaws.com"
+			// classes nginx-internal and nginx-external are managed by the Infra Platform team
+			// see: https://github.com/smartcontractkit/infra-k8s/tree/main/projects/ops/files/ingress-nginx-external
+			case "nginx-internal", "nginx-external":
+				ingressSuffix = ".elb.us-west-2.amazonaws.com"
 			case "nginx":
 				ingressSuffix = "localhost"
 			default:
