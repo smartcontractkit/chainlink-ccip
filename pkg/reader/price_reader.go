@@ -182,7 +182,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 			return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
 		}
 		if priceResult == nil {
-			return nil, fmt.Errorf("priceResult value is nil for contract %s", boundContract.Address
+			return nil, fmt.Errorf("priceResult value is nil for contract %s", boundContract.Address)
 		}
 		latestRoundData, ok := priceResult.(*LatestRoundData)
 		if !ok {
