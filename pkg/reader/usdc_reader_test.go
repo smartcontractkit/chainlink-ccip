@@ -114,7 +114,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 	}
 }
 
-func Test_USDCMessageReader_MessageHashes(t *testing.T) {
+func Test_USDCMessageReader_MessagesByTokenId(t *testing.T) {
 	ctx := tests.Context(t)
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
 	emptyReader := reader.NewMockContractReaderFacade(t)
@@ -227,7 +227,7 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			hashes, err1 := usdcReader.MessageHashes(
+			messages, err1 := usdcReader.MessagesByTokenId(
 				tests.Context(t),
 				tc.sourceSelector,
 				tc.destSelector,
@@ -239,8 +239,8 @@ func Test_USDCMessageReader_MessageHashes(t *testing.T) {
 				require.ErrorContains(t, err1, tc.errorMessage)
 			} else {
 				require.NoError(t, err)
-				require.NotNil(t, hashes)
-				require.Equal(t, tc.expectedMsgIDs, maps.Keys(hashes))
+				require.NotNil(t, messages)
+				require.Equal(t, tc.expectedMsgIDs, maps.Keys(messages))
 			}
 		})
 	}

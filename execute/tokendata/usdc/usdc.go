@@ -60,14 +60,14 @@ func (u *TokenDataObserver) Observe(
 	// 1. Pick only messages that contain USDC tokens
 	usdcMessages := u.pickOnlyUSDCMessages(messages)
 
-	// 2. Fetch USDC messages hashes based on the `MessageSent (bytes message)` event
-	usdcMessageHashes, err := u.fetchUSDCMessageHashes(ctx, usdcMessages)
+	// 2. Fetch USDC messages by token id based on the `MessageSent (bytes message)` event
+	usdcMessagesByTokenId, err := u.fetchUSDCEventMessages(ctx, usdcMessages)
 	if err != nil {
 		return nil, err
 	}
 
 	// 3. Fetch attestations for USDC messages
-	attestations, err := u.fetchAttestations(ctx, usdcMessageHashes)
+	attestations, err := u.fetchAttestations(ctx, usdcMessagesByTokenId)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (u *TokenDataObserver) pickOnlyUSDCMessages(
 	return usdcMessages
 }
 
-func (u *TokenDataObserver) fetchUSDCMessageHashes(
+func (u *TokenDataObserver) fetchUSDCEventMessages(
 	ctx context.Context,
 	usdcMessages map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.RampTokenAmount,
 ) (map[cciptypes.ChainSelector]map[reader.MessageTokenID]cciptypes.Bytes, error) {
@@ -128,7 +128,7 @@ func (u *TokenDataObserver) fetchUSDCMessageHashes(
 		}
 
 		// TODO Sequential reading USDC messages from the source chain
-		usdcHashes, err := u.usdcMessageReader.MessageHashes(ctx, chainSelector, u.destChainSelector, messages)
+		msgByTokenId, err := u.usdcMessageReader.MessagesByTokenId(ctx, chainSelector, u.destChainSelector, messages)
 		if err != nil {
 			u.lggr.Errorw(
 				"Failed fetching USDC events from the source chain",
@@ -139,7 +139,7 @@ func (u *TokenDataObserver) fetchUSDCMessageHashes(
 			)
 			return nil, err
 		}
-		output[chainSelector] = usdcHashes
+		output[chainSelector] = msgByTokenId
 	}
 	return output, nil
 }
