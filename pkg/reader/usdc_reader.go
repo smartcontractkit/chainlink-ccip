@@ -21,7 +21,7 @@ import (
 )
 
 type USDCMessageReader interface {
-	MessagesByTokenId(ctx context.Context,
+	MessagesByTokenID(ctx context.Context,
 		source, dest cciptypes.ChainSelector,
 		tokens map[MessageTokenID]cciptypes.RampTokenAmount,
 	) (map[MessageTokenID]cciptypes.Bytes, error)
@@ -133,7 +133,7 @@ func AllAvailableDomains() map[uint64]uint32 {
 	return destDomains
 }
 
-func (u usdcMessageReader) MessagesByTokenId(
+func (u usdcMessageReader) MessagesByTokenID(
 	ctx context.Context,
 	source, dest cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,
@@ -323,7 +323,7 @@ func NewFakeUSDCMessageReader(messages map[MessageTokenID]cciptypes.Bytes) FakeU
 	return FakeUSDCMessageReader{Messages: messages}
 }
 
-func (f FakeUSDCMessageReader) MessagesByTokenId(
+func (f FakeUSDCMessageReader) MessagesByTokenID(
 	_ context.Context,
 	_, _ cciptypes.ChainSelector,
 	tokens map[MessageTokenID]cciptypes.RampTokenAmount,

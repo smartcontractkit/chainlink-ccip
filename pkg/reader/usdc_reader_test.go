@@ -114,7 +114,7 @@ func Test_USDCMessageReader_New(t *testing.T) {
 	}
 }
 
-func Test_USDCMessageReader_MessagesByTokenId(t *testing.T) {
+func Test_USDCMessageReader_MessagesByTokenID(t *testing.T) {
 	ctx := tests.Context(t)
 	emptyChain := cciptypes.ChainSelector(sel.ETHEREUM_MAINNET.Selector)
 	emptyReader := reader.NewMockContractReaderFacade(t)
@@ -227,7 +227,7 @@ func Test_USDCMessageReader_MessagesByTokenId(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			messages, err1 := usdcReader.MessagesByTokenId(
+			messages, err1 := usdcReader.MessagesByTokenID(
 				tests.Context(t),
 				tc.sourceSelector,
 				tc.destSelector,

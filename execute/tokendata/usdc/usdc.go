@@ -128,7 +128,7 @@ func (u *TokenDataObserver) fetchUSDCEventMessages(
 		}
 
 		// TODO Sequential reading USDC messages from the source chain
-		msgByTokenId, err := u.usdcMessageReader.MessagesByTokenId(ctx, chainSelector, u.destChainSelector, messages)
+		msgByTokenID, err := u.usdcMessageReader.MessagesByTokenID(ctx, chainSelector, u.destChainSelector, messages)
 		if err != nil {
 			u.lggr.Errorw(
 				"Failed fetching USDC events from the source chain",
@@ -139,7 +139,7 @@ func (u *TokenDataObserver) fetchUSDCEventMessages(
 			)
 			return nil, err
 		}
-		output[chainSelector] = msgByTokenId
+		output[chainSelector] = msgByTokenID
 	}
 	return output, nil
 }
