@@ -837,11 +837,7 @@
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount",
-            "with a constraint enforcing that it is one of the two allowed programs."
-          ]
+          "isSigner": false
         },
         {
           "name": "feeTokenMint",
@@ -944,11 +940,7 @@
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount",
-            "with a constraint enforcing that it is one of the two allowed programs."
-          ]
+          "isSigner": false
         },
         {
           "name": "feeTokenMint",
@@ -1066,11 +1058,7 @@
         {
           "name": "feeTokenProgram",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount",
-            "with a constraint enforcing that it is one of the two allowed programs."
-          ]
+          "isSigner": false
         },
         {
           "name": "feeTokenMint",

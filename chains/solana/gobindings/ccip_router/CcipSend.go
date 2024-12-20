@@ -39,8 +39,6 @@ type CcipSend struct {
 	// [4] = [] systemProgram
 	//
 	// [5] = [] feeTokenProgram
-	// ··········· type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-	// ··········· with a constraint enforcing that it is one of the two allowed programs.
 	//
 	// [6] = [] feeTokenMint
 	//
@@ -134,16 +132,12 @@ func (inst *CcipSend) GetSystemProgramAccount() *ag_solanago.AccountMeta {
 }
 
 // SetFeeTokenProgramAccount sets the "feeTokenProgram" account.
-// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-// with a constraint enforcing that it is one of the two allowed programs.
 func (inst *CcipSend) SetFeeTokenProgramAccount(feeTokenProgram ag_solanago.PublicKey) *CcipSend {
 	inst.AccountMetaSlice[5] = ag_solanago.Meta(feeTokenProgram)
 	return inst
 }
 
 // GetFeeTokenProgramAccount gets the "feeTokenProgram" account.
-// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-// with a constraint enforcing that it is one of the two allowed programs.
 func (inst *CcipSend) GetFeeTokenProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[5]
 }
