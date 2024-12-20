@@ -52,6 +52,8 @@ func NewEmptyEncodeSizes() EmptyEncodeSizes {
 // exclude messages from one chain only.
 // Keep repeating this process until the encoded observation fits within the op.maxEncodedSize
 // Important Note: We can't delete messages completely from single reports as we need them to create merkle proofs.
+//
+//nolint:gocyclo
 func (op ObservationOptimizer) TruncateObservation(observation exectypes.Observation) (exectypes.Observation, error) {
 	obs := observation
 	encodedObs, err := obs.Encode()
