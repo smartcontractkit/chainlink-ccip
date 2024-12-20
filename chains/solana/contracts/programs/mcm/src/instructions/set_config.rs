@@ -135,27 +135,6 @@ pub fn set_config(
         root_metadata.override_previous_root = true;
     }
 
-    // clear_root is equivalent to overriding with a completely empty root
-    if clear_root {
-        let expiring_root = &mut ctx.accounts.expiring_root_and_op_count;
-        let root_metadata = &mut ctx.accounts.root_metadata;
-
-        // preserve the current op_count
-        let current_op_count = expiring_root.op_count;
-
-        // clear the expiring root while preserving op_count
-        expiring_root.root = [0u8; 32]; // clear root (equivalent to bytes32(0) in Solidity)
-        expiring_root.valid_until = 0; // clear timestamp
-        expiring_root.op_count = current_op_count;
-
-        // set root metadata to a cleared state
-        root_metadata.chain_id = config.chain_id;
-        root_metadata.multisig = config.key();
-        root_metadata.pre_op_count = current_op_count;
-        root_metadata.post_op_count = current_op_count;
-        root_metadata.override_previous_root = true;
-    }
-
     emit!(ConfigSet {
         group_parents,
         group_quorums,
