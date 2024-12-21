@@ -54,3 +54,50 @@ func TestTokenDecimals(t *testing.T) {
 		})
 	}
 }
+
+func TestFeeQuoterTokenUpdate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		token       ccipocr3.UnknownEncodedAddress
+		chain       ccipocr3.ChainSelector
+		expectedKey string
+	}{
+		{
+			name:        "basic key generation",
+			token:       ccipocr3.UnknownEncodedAddress("0x1234"),
+			chain:       1,
+			expectedKey: "fee-quoter-update:1:0x1234",
+		},
+		{
+			name:        "empty token address",
+			token:       ccipocr3.UnknownEncodedAddress(""),
+			chain:       1,
+			expectedKey: "fee-quoter-update:1:",
+		},
+		{
+			name:        "zero chain selector",
+			token:       ccipocr3.UnknownEncodedAddress("0x1234"),
+			chain:       0,
+			expectedKey: "fee-quoter-update:0:0x1234",
+		},
+		{
+			name:        "empty token and zero chain",
+			token:       ccipocr3.UnknownEncodedAddress(""),
+			chain:       0,
+			expectedKey: "fee-quoter-update:0:",
+		},
+		{
+			name:        "long token address and large chain id",
+			token:       ccipocr3.UnknownEncodedAddress("0x1234567890abcdef1234567890abcdef12345678"),
+			chain:       999999999,
+			expectedKey: "fee-quoter-update:999999999:0x1234567890abcdef1234567890abcdef12345678",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			key := FeeQuoterTokenUpdate(tc.token, tc.chain)
+			assert.Equal(t, tc.expectedKey, key)
+		})
+	}
+}

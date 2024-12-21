@@ -4,17 +4,24 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
-	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
-
+	"github.com/smartcontractkit/chainlink-ccip/internal/cache"
+	"github.com/smartcontractkit/chainlink-ccip/internal/cache/cachekeys"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
+)
+
+const (
+	defaultCacheExpiration = 1 * time.Minute
+	cleanupInterval        = 10 * time.Minute
 )
 
 type PriceReader interface {
@@ -34,11 +41,13 @@ type PriceReader interface {
 }
 
 type priceReader struct {
-	lggr         logger.Logger
-	chainReaders map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
-	tokenInfo    map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
-	ccipReader   CCIPReader
-	feedChain    ccipocr3.ChainSelector
+	lggr           logger.Logger
+	chainReaders   map[ccipocr3.ChainSelector]contractreader.ContractReaderFacade
+	tokenInfo      map[ccipocr3.UnknownEncodedAddress]pluginconfig.TokenInfo
+	ccipReader     CCIPReader
+	feedChain      ccipocr3.ChainSelector
+	priceCache     cache.Cache[*big.Int]
+	feeQuoterCache cache.Cache[plugintypes.TimestampedBig]
 }
 
 func NewPriceReader(
@@ -49,11 +58,13 @@ func NewPriceReader(
 	feedChain ccipocr3.ChainSelector,
 ) PriceReader {
 	return &priceReader{
-		lggr:         lggr,
-		chainReaders: chainReaders,
-		tokenInfo:    tokenInfo,
-		ccipReader:   ccipReader,
-		feedChain:    feedChain,
+		lggr:           lggr,
+		chainReaders:   chainReaders,
+		tokenInfo:      tokenInfo,
+		ccipReader:     ccipReader,
+		feedChain:      feedChain,
+		priceCache:     cache.NewCustomCache[*big.Int](defaultCacheExpiration, cleanupInterval, nil),
+		feeQuoterCache: cache.NewCustomCache[plugintypes.TimestampedBig](defaultCacheExpiration, cleanupInterval, nil),
 	}
 }
 
@@ -69,9 +80,6 @@ type LatestRoundData struct {
 	AnsweredInRound *big.Int
 }
 
-// ContractTokenMap maps contracts to their token indices
-type ContractTokenMap map[commontypes.BoundContract][]int
-
 // Number of batch operations performed (getLatestRoundData and getDecimals)
 const priceReaderOperationCount = 2
 
@@ -80,23 +88,40 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	tokens []ccipocr3.UnknownEncodedAddress,
 	chain ccipocr3.ChainSelector,
 ) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error) {
-	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
 	updateMap := make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig)
 
-	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
-	if err != nil {
-		pr.lggr.Debugw("failed to get fee quoter address.", "chain", chain, "err", err)
+	// Check cache first and collect uncached tokens
+	var uncachedTokens []ccipocr3.UnknownEncodedAddress
+	for _, token := range tokens {
+		cacheKey := cachekeys.FeeQuoterTokenUpdate(token, chain)
+		if cached, found := pr.feeQuoterCache.Get(cacheKey); found {
+			updateMap[token] = cached
+			continue
+		}
+		uncachedTokens = append(uncachedTokens, token)
+	}
+
+	// If all tokens were in cache, return early
+	if len(uncachedTokens) == 0 {
 		return updateMap, nil
 	}
 
-	pr.lggr.Infow("getting fee quoter token updates",
-		"tokens", tokens,
+	// Get fee quoter address for uncached tokens
+	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
+	if err != nil {
+		pr.lggr.Debugw("failed to get fee quoter address", "chain", chain, "err", err)
+		return updateMap, nil
+	}
+
+	pr.lggr.Infow("getting fee quoter token updates for uncached tokens",
+		"tokens", uncachedTokens,
 		"chain", chain,
 		"feeQuoterAddress", typeconv.AddressBytesToString(feeQuoterAddress, uint64(chain)),
 	)
 
-	byteTokens := make([][]byte, 0, len(tokens))
-	for _, token := range tokens {
+	// Convert uncached tokens to byte format
+	byteTokens := make([][]byte, 0, len(uncachedTokens))
+	for _, token := range uncachedTokens {
 		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
 		if err != nil {
 			pr.lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
@@ -114,25 +139,26 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	cr, ok := pr.chainReaders[chain]
 	if !ok {
 		pr.lggr.Warnw("contract reader not found", "chain", chain)
-		return nil, nil
+		return updateMap, nil
 	}
-	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
-	// a timestamp and price of 0 if the token is not found
-	if err :=
-		cr.GetLatestValue(
-			ctx,
-			boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
-			primitives.Unconfirmed,
-			map[string]any{
-				"tokens": byteTokens,
-			},
-			&updates,
-		); err != nil {
+
+	// Get updates for uncached tokens
+	updates := make([]plugintypes.TimestampedUnixBig, len(byteTokens))
+	if err := cr.GetLatestValue(
+		ctx,
+		boundContract.ReadIdentifier(consts.MethodNameFeeQuoterGetTokenPrices),
+		primitives.Unconfirmed,
+		map[string]any{
+			"tokens": byteTokens,
+		},
+		&updates,
+	); err != nil {
 		return nil, fmt.Errorf("failed to get fee quoter token updates: %w", err)
 	}
 
-	for i, token := range tokens {
-		// token not available on fee quoter
+	// Process results and update cache
+	for i, token := range uncachedTokens {
+		// Skip empty updates
 		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
 			pr.lggr.Debugw("empty fee quoter update found",
 				"chain", chain,
@@ -140,7 +166,14 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 			)
 			continue
 		}
-		updateMap[token] = plugintypes.TimeStampedBigFromUnix(updates[i])
+
+		// Convert and store update
+		update := plugintypes.TimeStampedBigFromUnix(updates[i])
+		updateMap[token] = update
+
+		// Cache the result
+		cacheKey := cachekeys.FeeQuoterTokenUpdate(token, chain)
+		pr.feeQuoterCache.Set(cacheKey, update, cache.NoExpiration) // Use default expiration
 	}
 
 	return updateMap, nil
@@ -157,75 +190,50 @@ func (pr *priceReader) GetFeedPricesUSD(
 		return prices, nil
 	}
 
-	// Create batch request grouped by contract
-	batchRequest, contractTokenMap, err := pr.prepareBatchRequest(tokens)
-	if err != nil {
-		return nil, fmt.Errorf("prepare batch request: %w", err)
+	uncachedTokens, uncachedIndices := pr.collectUncachedTokens(tokens, prices)
+
+	// If all tokens were in cache, return early
+	if len(uncachedTokens) == 0 {
+		return prices, nil
 	}
 
-	// Execute batch request
-	results, err := pr.feedChainReader().BatchGetLatestValues(ctx, batchRequest)
-	if err != nil {
-		return nil, fmt.Errorf("batch request failed: %w", err)
-	}
-
-	// Process results by contract
-	for boundContract, tokenIndices := range contractTokenMap {
-		contractResults, ok := results[boundContract]
-		if !ok || len(contractResults) != priceReaderOperationCount {
-			return nil, fmt.Errorf("invalid results for contract %s", boundContract.Address)
-		}
-
-		// Get price data
-		priceResult, err := contractResults[0].GetResult()
-		if err != nil {
-			return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
-		}
-		latestRoundData, ok := priceResult.(*LatestRoundData)
-		if !ok {
-			return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
-		}
-
-		// Get decimals
-		decimalResult, err := contractResults[1].GetResult()
-		if err != nil {
-			return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
-		}
-		decimals, ok := decimalResult.(*uint8)
-		if !ok {
-			return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
-		}
-
-		// Normalize price for this contract
-		normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
-
-		// Apply the normalized price to all tokens using this contract
-		for _, tokenIdx := range tokenIndices {
-			token := tokens[tokenIdx]
-			tokenInfo := pr.tokenInfo[token]
-			prices[tokenIdx] = calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals)
-		}
-	}
-
-	// Verify no nil prices
-	if err := pr.validatePrices(prices); err != nil {
+	if err := pr.fetchAndProcessPrices(ctx, uncachedTokens, uncachedIndices, prices); err != nil {
 		return nil, err
 	}
 
 	return prices, nil
 }
 
+func (pr *priceReader) collectUncachedTokens(
+	tokens []ccipocr3.UnknownEncodedAddress,
+	prices []*big.Int,
+) ([]ccipocr3.UnknownEncodedAddress, map[int]int) {
+	var uncachedTokens []ccipocr3.UnknownEncodedAddress
+	uncachedIndices := make(map[int]int)
+
+	for i, token := range tokens {
+		cacheKey := cachekeys.FeedPricesUSD(token)
+		if cached, found := pr.priceCache.Get(cacheKey); found {
+			prices[i] = cached
+		} else {
+			uncachedIndices[len(uncachedTokens)] = i
+			uncachedTokens = append(uncachedTokens, token)
+		}
+	}
+
+	return uncachedTokens, uncachedIndices
+}
+
 // prepareBatchRequest creates a batch request grouped by contract and returns the mapping of contracts to token indices
 func (pr *priceReader) prepareBatchRequest(
 	tokens []ccipocr3.UnknownEncodedAddress,
-) (commontypes.BatchGetLatestValuesRequest, ContractTokenMap, error) {
+) (commontypes.BatchGetLatestValuesRequest, error) {
 	batchRequest := make(commontypes.BatchGetLatestValuesRequest)
-	contractTokenMap := make(ContractTokenMap)
 
-	for i, token := range tokens {
+	for _, token := range tokens {
 		tokenInfo, ok := pr.tokenInfo[token]
 		if !ok {
-			return nil, nil, fmt.Errorf("get tokenInfo for %s: missing token info", token)
+			return nil, fmt.Errorf("get tokenInfo for %s: missing token info", token)
 		}
 
 		boundContract := commontypes.BoundContract{
@@ -247,12 +255,92 @@ func (pr *priceReader) prepareBatchRequest(
 				ReturnVal: new(uint8),
 			}
 		}
-
-		// Track which tokens use this contract
-		contractTokenMap[boundContract] = append(contractTokenMap[boundContract], i)
 	}
 
-	return batchRequest, contractTokenMap, nil
+	return batchRequest, nil
+}
+
+func (pr *priceReader) fetchAndProcessPrices(
+	ctx context.Context,
+	uncachedTokens []ccipocr3.UnknownEncodedAddress,
+	uncachedIndices map[int]int,
+	prices []*big.Int,
+) error {
+	batchRequest, err := pr.prepareBatchRequest(uncachedTokens)
+	if err != nil {
+		return fmt.Errorf("prepare batch request: %w", err)
+	}
+
+	results, err := pr.feedChainReader().BatchGetLatestValues(ctx, batchRequest)
+	if err != nil {
+		return fmt.Errorf("batch request failed: %w", err)
+	}
+
+	if err := pr.processPriceResults(uncachedTokens, uncachedIndices, results, prices); err != nil {
+		return err
+	}
+
+	return pr.validatePrices(prices)
+}
+
+func (pr *priceReader) processPriceResults(
+	uncachedTokens []ccipocr3.UnknownEncodedAddress,
+	uncachedIndices map[int]int,
+	results commontypes.BatchGetLatestValuesResult,
+	prices []*big.Int,
+) error {
+	for i, token := range uncachedTokens {
+		price, err := pr.getPriceFromResult(token, results)
+		if err != nil {
+			return err
+		}
+
+		originalIdx := uncachedIndices[i]
+		prices[originalIdx] = price
+
+		cacheKey := cachekeys.FeedPricesUSD(token)
+		pr.priceCache.Set(cacheKey, price, cache.NoExpiration)
+	}
+	return nil
+}
+
+func (pr *priceReader) getPriceFromResult(
+	token ccipocr3.UnknownEncodedAddress,
+	results commontypes.BatchGetLatestValuesResult,
+) (*big.Int, error) {
+	tokenInfo := pr.tokenInfo[token]
+	boundContract := commontypes.BoundContract{
+		Address: string(tokenInfo.AggregatorAddress),
+		Name:    consts.ContractNamePriceAggregator,
+	}
+
+	contractResults, ok := results[boundContract]
+	if !ok || len(contractResults) != priceReaderOperationCount {
+		return nil, fmt.Errorf("invalid results for contract %s", boundContract.Address)
+	}
+
+	// Get price data
+	priceResult, err := contractResults[0].GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
+	}
+	latestRoundData, ok := priceResult.(*LatestRoundData)
+	if !ok {
+		return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
+	}
+
+	// Get decimals
+	decimalResult, err := contractResults[1].GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
+	}
+	decimals, ok := decimalResult.(*uint8)
+	if !ok {
+		return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
+	}
+
+	normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
+	return calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals), nil
 }
 
 func (pr *priceReader) normalizePrice(price *big.Int, decimals uint8) *big.Int {
