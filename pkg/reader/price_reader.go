@@ -321,27 +321,55 @@ func (pr *priceReader) getPriceFromResult(
 	}
 
 	// Get price data
-	priceResult, err := contractResults[0].GetResult()
+	latestRoundData, err := pr.getPriceData(contractResults[0], boundContract)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get decimals
+	decimals, err := pr.getDecimals(contractResults[1], boundContract)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
+	return calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals), nil
+}
+
+func (pr *priceReader) getPriceData(
+	result commontypes.BatchReadResult,
+	boundContract commontypes.BoundContract,
+) (*LatestRoundData, error) {
+	priceResult, err := result.GetResult()
 	if err != nil {
 		return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
+	}
+	if priceResult == nil {
+		return nil, fmt.Errorf("priceResult value is nil for contract %s", boundContract.Address)
 	}
 	latestRoundData, ok := priceResult.(*LatestRoundData)
 	if !ok {
 		return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
 	}
+	return latestRoundData, nil
+}
 
-	// Get decimals
-	decimalResult, err := contractResults[1].GetResult()
+func (pr *priceReader) getDecimals(
+	result commontypes.BatchReadResult,
+	boundContract commontypes.BoundContract,
+) (*uint8, error) {
+	decimalResult, err := result.GetResult()
 	if err != nil {
 		return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
+	}
+	if decimalResult == nil {
+		return nil, fmt.Errorf("decimalResult value is nil for contract %s", boundContract.Address)
 	}
 	decimals, ok := decimalResult.(*uint8)
 	if !ok {
 		return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
 	}
-
-	normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
-	return calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals), nil
+	return decimals, nil
 }
 
 func (pr *priceReader) normalizePrice(price *big.Int, decimals uint8) *big.Int {

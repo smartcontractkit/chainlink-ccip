@@ -114,7 +114,7 @@ type CCIPReader interface {
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
-	// it must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
+	// it must be encoding according to the source chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
 		source, dest cciptypes.ChainSelector,
