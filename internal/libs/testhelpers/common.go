@@ -40,7 +40,7 @@ func CreateRMNRemoteCfg() rmntypes.RemoteConfig {
 			{OnchainPublicKey: append(rand.RandomBytes(20), byte(1)), NodeIndex: 1},
 			{OnchainPublicKey: append(rand.RandomBytes(20), byte(2)), NodeIndex: 2},
 		},
-		F:                1,
+		FSign:            1,
 		ConfigVersion:    rand.RandomUint32(),
 		RmnReportVersion: rand.RandomReportVersion(),
 	}

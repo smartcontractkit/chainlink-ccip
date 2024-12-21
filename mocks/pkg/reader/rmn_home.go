@@ -129,12 +129,12 @@ func (_c *MockRMNHome_GetAllConfigDigests_Call) RunAndReturn(run func() (ccipocr
 	return _c
 }
 
-// GetF provides a mock function with given fields: configDigest
-func (_m *MockRMNHome) GetF(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error) {
+// GetFObserve provides a mock function with given fields: configDigest
+func (_m *MockRMNHome) GetFObserve(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error) {
 	ret := _m.Called(configDigest)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetF")
+		panic("no return value specified for GetFObserve")
 	}
 
 	var r0 map[ccipocr3.ChainSelector]int
@@ -159,30 +159,30 @@ func (_m *MockRMNHome) GetF(configDigest ccipocr3.Bytes32) (map[ccipocr3.ChainSe
 	return r0, r1
 }
 
-// MockRMNHome_GetF_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetF'
-type MockRMNHome_GetF_Call struct {
+// MockRMNHome_GetFObserve_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFObserve'
+type MockRMNHome_GetFObserve_Call struct {
 	*mock.Call
 }
 
-// GetF is a helper method to define mock.On call
+// GetFObserve is a helper method to define mock.On call
 //   - configDigest ccipocr3.Bytes32
-func (_e *MockRMNHome_Expecter) GetF(configDigest interface{}) *MockRMNHome_GetF_Call {
-	return &MockRMNHome_GetF_Call{Call: _e.mock.On("GetF", configDigest)}
+func (_e *MockRMNHome_Expecter) GetFObserve(configDigest interface{}) *MockRMNHome_GetFObserve_Call {
+	return &MockRMNHome_GetFObserve_Call{Call: _e.mock.On("GetFObserve", configDigest)}
 }
 
-func (_c *MockRMNHome_GetF_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockRMNHome_GetF_Call {
+func (_c *MockRMNHome_GetFObserve_Call) Run(run func(configDigest ccipocr3.Bytes32)) *MockRMNHome_GetFObserve_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(ccipocr3.Bytes32))
 	})
 	return _c
 }
 
-func (_c *MockRMNHome_GetF_Call) Return(_a0 map[ccipocr3.ChainSelector]int, _a1 error) *MockRMNHome_GetF_Call {
+func (_c *MockRMNHome_GetFObserve_Call) Return(_a0 map[ccipocr3.ChainSelector]int, _a1 error) *MockRMNHome_GetFObserve_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRMNHome_GetF_Call) RunAndReturn(run func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error)) *MockRMNHome_GetF_Call {
+func (_c *MockRMNHome_GetFObserve_Call) RunAndReturn(run func(ccipocr3.Bytes32) (map[ccipocr3.ChainSelector]int, error)) *MockRMNHome_GetFObserve_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -933,7 +933,7 @@ func Test_shouldSkipRMNVerification(t *testing.T) {
 
 			prevOutcome := Outcome{}
 			if !tc.rmnRemoteConfigEmpty {
-				prevOutcome.RMNRemoteCfg = rmntypes.RemoteConfig{F: 1}
+				prevOutcome.RMNRemoteCfg = rmntypes.RemoteConfig{FSign: 1}
 			}
 
 			shouldSkip, err := shouldSkipRMNVerification(tc.nextProcessorState, q, prevOutcome)
