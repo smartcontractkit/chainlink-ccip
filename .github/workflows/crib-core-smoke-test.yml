@@ -79,7 +79,7 @@ jobs:
       - name: Deploy and validate CRIB Environment for Core
         if: steps.check-prereqs-for-running.outputs.should_run == 'true'
         id: deploy
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@99747b298ad960374b47b6315175a349d06579d7 # crib-deploy-environment@7.3.0        
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@99747b298ad960374b47b6315175a349d06579d7 # crib-deploy-environment@7.3.0
         with:
           aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
           aws-region: ${{ secrets.AWS_REGION }}
