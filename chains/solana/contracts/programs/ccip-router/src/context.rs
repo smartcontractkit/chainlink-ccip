@@ -124,6 +124,7 @@ pub struct GetFee<'info> {
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub dest_chain_state: Account<'info, DestChain>,
+
     #[account(
         seeds = [FEE_BILLING_TOKEN_CONFIG,
             if message.fee_token == Pubkey::default() {

@@ -1030,7 +1030,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.Equal(t, token0Config.PremiumMultiplierWeiPerEth, final.Config.PremiumMultiplierWeiPerEth)
 			})
 
-
 		})
 	})
 
@@ -1838,9 +1837,9 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			feeResult := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+			feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
-			fee := utils.ExtractTypedReturnValue(ctx, t, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
+			fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
 			require.Equal(t, uint64(1), fee)
 		})
 
@@ -1864,7 +1863,7 @@ func TestCCIPRouter(t *testing.T) {
 			token0PerChainPerConfigPda := getPerChainPerTokenConfigBillingPDA(token0.Mint.PublicKey())
 			ix, err := ccip_router.NewSetTokenBillingInstruction(config.EvmChainSelector, token0.Mint.PublicKey(), billing, config.RouterConfigPDA, token0PerChainPerConfigPda, anotherAdmin.PublicKey(), solana.SystemProgramID).ValidateAndBuild()
 			require.NoError(t, err)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
 
 			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
@@ -1872,9 +1871,9 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			feeResult := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
+			feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
-			fee := utils.ExtractTypedReturnValue(ctx, t, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
+			fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
 			require.Equal(t, uint64(3), fee)
 		})
 
@@ -2721,9 +2720,9 @@ func TestCCIPRouter(t *testing.T) {
 					ix, err := rawGetFeeIx.ValidateAndBuild()
 					require.NoError(t, err)
 
-					feeResult := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
+					feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment)
 					require.NotNil(t, feeResult)
-					fee := utils.ExtractTypedReturnValue(ctx, t, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
+					fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
 					require.Equal(t, uint64(1), fee)
 
 					initialBalance := getBalance(token.billingATA)
@@ -5086,98 +5085,98 @@ func TestCCIPRouter(t *testing.T) {
 	//     Cleanup tests    //
 	//////////////////////////
 
-	t.Run("Cleanup", func(t<<<<<<< HEAD
-			t.Run("Can remove token config", func(t *testing.T) {
-				token0BillingPDA := getTokenConfigPDA(token0.Mint.PublicKey())
+	t.Run("Cleanup", func(t *testing.T) {
+		t.Run("Can remove token config", func(t *testing.T) {
+			token0BillingPDA := getTokenConfigPDA(token0.Mint.PublicKey())
 
-				var initial ccip_router.BillingTokenConfigWrapper
-				ierr := common.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingPDA, config.DefaultCommitment, &initial)
-				require.NoError(t, ierr) // it exists, initially
+			var initial ccip_router.BillingTokenConfigWrapper
+			ierr := common.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingPDA, config.DefaultCommitment, &initial)
+			require.NoError(t, ierr) // it exists, initially
 
-				receiver, _, aerr := tokens.FindAssociatedTokenAddress(token0.Program, token0.Mint.PublicKey(), config.BillingSignerPDA)
-				require.NoError(t, aerr)
+			receiver, _, aerr := tokens.FindAssociatedTokenAddress(token0.Program, token0.Mint.PublicKey(), config.BillingSignerPDA)
+			require.NoError(t, aerr)
 
-				ixConfig, cerr := ccip_router.NewRemoveBillingTokenConfigInstruction(
-					config.RouterConfigPDA,
-					token0BillingPDA,
-					token0.Program,
-					token0.Mint.PublicKey(),
-					receiver,
-					config.BillingSignerPDA,
-					anotherAdmin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, cerr)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
+			ixConfig, cerr := ccip_router.NewRemoveBillingTokenConfigInstruction(
+				config.RouterConfigPDA,
+				token0BillingPDA,
+				token0.Program,
+				token0.Mint.PublicKey(),
+				receiver,
+				config.BillingSignerPDA,
+				anotherAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, cerr)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
 
-				var final ccip_router.BillingTokenConfigWrapper
-				ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingPDA, rpc.CommitmentProcessed, &final)
-				require.EqualError(t, ferr, "not found") // it no longer exists
-			})
+			var final ccip_router.BillingTokenConfigWrapper
+			ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingPDA, rpc.CommitmentProcessed, &final)
+			require.EqualError(t, ferr, "not found") // it no longer exists
+		})
 
-			t.Run("Can remove a pre-2022 token too", func(t *testing.T) {
-				mintPriv, kerr := solana.NewRandomPrivateKey()
-				require.NoError(t, kerr)
-				mint := mintPriv.PublicKey()
+		t.Run("Can remove a pre-2022 token too", func(t *testing.T) {
+			mintPriv, kerr := solana.NewRandomPrivateKey()
+			require.NoError(t, kerr)
+			mint := mintPriv.PublicKey()
 
-				// use old (pre-2022) token program
-				ixToken, terr := tokens.CreateToken(ctx, solana.TokenProgramID, mint, admin.PublicKey(), 9, solanaGoClient, config.DefaultCommitment)
-				require.NoError(t, terr)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
+			// use old (pre-2022) token program
+			ixToken, terr := tokens.CreateToken(ctx, solana.TokenProgramID, mint, admin.PublicKey(), 9, solanaGoClient, config.DefaultCommitment)
+			require.NoError(t, terr)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, ixToken, admin, config.DefaultCommitment, common.AddSigners(mintPriv))
 
-				configPDA, _, perr := solana.FindProgramAddress([][]byte{config.BillingTokenConfigPrefix, mint.Bytes()}, ccip_router.ProgramID)
-				require.NoError(t, perr)
-				receiver, _, terr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, config.BillingSignerPDA)
-				require.NoError(t, terr)
+			configPDA, _, perr := solana.FindProgramAddress([][]byte{config.BillingTokenConfigPrefix, mint.Bytes()}, ccip_router.ProgramID)
+			require.NoError(t, perr)
+			receiver, _, terr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, mint, config.BillingSignerPDA)
+			require.NoError(t, terr)
 
-				tokenConfig := ccip_router.BillingTokenConfig{
-					Enabled:                    true,
-					Mint:                       mint,
-					UsdPerToken:                ccip_router.TimestampedPackedU224{},
-					PremiumMultiplierWeiPerEth: 0,
-				}
+			tokenConfig := ccip_router.BillingTokenConfig{
+				Enabled:                    true,
+				Mint:                       mint,
+				UsdPerToken:                ccip_router.TimestampedPackedU224{},
+				PremiumMultiplierWeiPerEth: 0,
+			}
 
-				// add it first
-				ixConfig, cerr := ccip_router.NewAddBillingTokenConfigInstruction(
-					tokenConfig,
-					config.RouterConfigPDA,
-					configPDA,
-					solana.TokenProgramID,
-					mint,
-					receiver,
-					anotherAdmin.PublicKey(),
-					config.BillingSignerPDA,
-					tokens.AssociatedTokenProgramID,
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, cerr)
+			// add it first
+			ixConfig, cerr := ccip_router.NewAddBillingTokenConfigInstruction(
+				tokenConfig,
+				config.RouterConfigPDA,
+				configPDA,
+				solana.TokenProgramID,
+				mint,
+				receiver,
+				anotherAdmin.PublicKey(),
+				config.BillingSignerPDA,
+				tokens.AssociatedTokenProgramID,
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, cerr)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
 
-				var tokenConfigAccount ccip_router.BillingTokenConfigWrapper
-				aerr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configPDA, config.DefaultCommitment, &tokenConfigAccount)
-				require.NoError(t, aerr)
+			var tokenConfigAccount ccip_router.BillingTokenConfigWrapper
+			aerr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configPDA, config.DefaultCommitment, &tokenConfigAccount)
+			require.NoError(t, aerr)
 
-				require.Equal(t, tokenConfig, tokenConfigAccount.Config)
+			require.Equal(t, tokenConfig, tokenConfigAccount.Config)
 
-				// now, remove the added pre-2022 token, which has a balance of 0 in the receiver
-				ixConfig, cerr = ccip_router.NewRemoveBillingTokenConfigInstruction(
-					config.RouterConfigPDA,
-					configPDA,
-					solana.TokenProgramID,
-					mint,
-					receiver,
-					config.BillingSignerPDA,
-					anotherAdmin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, cerr)
+			// now, remove the added pre-2022 token, which has a balance of 0 in the receiver
+			ixConfig, cerr = ccip_router.NewRemoveBillingTokenConfigInstruction(
+				config.RouterConfigPDA,
+				configPDA,
+				solana.TokenProgramID,
+				mint,
+				receiver,
+				config.BillingSignerPDA,
+				anotherAdmin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, cerr)
 
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixConfig}, anotherAdmin, config.DefaultCommitment)
 
-				var final ccip_router.BillingTokenConfigWrapper
-				ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configPDA, rpc.CommitmentProcessed, &final)
-				require.EqualError(t, ferr, "not found") // it no longer exists
-			})
+			var final ccip_router.BillingTokenConfigWrapper
+			ferr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configPDA, rpc.CommitmentProcessed, &final)
+			require.EqualError(t, ferr, "not found") // it no longer exists
+		})
 	})
 }
