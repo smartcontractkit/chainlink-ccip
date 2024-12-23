@@ -21,6 +21,7 @@ mkShell' {
     libiconv
 
     curl
+    grpcurl
 
     # Tooling
     actionlint
