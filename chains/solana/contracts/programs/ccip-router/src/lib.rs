@@ -711,7 +711,7 @@ pub mod ccip_router {
 
         Ok(fee_for_msg(
             dest_chain_selector,
-            &message,
+            message,
             &ctx.accounts.dest_chain_state,
             &ctx.accounts.billing_token_config.config,
             &token_billing_config_accounts,

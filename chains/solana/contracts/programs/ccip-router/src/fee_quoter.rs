@@ -26,7 +26,7 @@ pub fn fee_for_msg(
     };
     message.validate(dest_chain, fee_token_config)?;
 
-    let fee_token_price = get_validated_token_price(&fee_token_config)?;
+    let fee_token_price = get_validated_token_price(fee_token_config)?;
     let _packed_gas_price = get_validated_gas_price(dest_chain)?;
 
     let network_fee = network_fee(
@@ -111,7 +111,7 @@ fn token_network_fees(
         .ok_or(CcipRouterError::UnsupportedToken)?;
 
     let bps_fee = if config_for_dest_chain.billing.deci_bps > 0 {
-        let token_price = get_validated_token_price(&config)?;
+        let token_price = get_validated_token_price(config)?;
         // Calculate token transfer value, then apply fee ratio
         // ratio represents multiples of 0.1bps, or 1e-5
         Usd18Decimals(
