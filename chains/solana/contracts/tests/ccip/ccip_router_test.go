@@ -1029,7 +1029,6 @@ func TestCCIPRouter(t *testing.T) {
 				require.NotEqual(t, initial.Config.PremiumMultiplierWeiPerEth, final.Config.PremiumMultiplierWeiPerEth) // it was updated
 				require.Equal(t, token0Config.PremiumMultiplierWeiPerEth, final.Config.PremiumMultiplierWeiPerEth)
 			})
-
 		})
 	})
 
