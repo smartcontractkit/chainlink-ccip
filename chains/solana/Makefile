@@ -16,9 +16,17 @@ gomods: ## Install gomods
 gomodtidy: gomods
 	gomods tidy
 
+.PHONY: format-contracts
+format-contracts:
+	cd ./contracts && cargo fmt && go fmt ./...
+
 .PHONY: lint-go
 lint-go:
 	golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 15m --out-format checkstyle:golangci-lint-report.xml run
+
+.PHONY: lint-go-fix
+lint-go-fix:
+	golangci-lint --max-issues-per-linter 0 --max-same-issues 0 --color=always --exclude=dot-imports --timeout 15m run --verbose --fix
 
 .PHONY: anchor-go-gen
 anchor-go-gen:

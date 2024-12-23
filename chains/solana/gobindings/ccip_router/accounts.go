@@ -437,6 +437,8 @@ func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Deco
 
 type CommitReport struct {
 	Version         uint8
+	ChainSelector   uint64
+	MerkleRoot      [32]uint8
 	Timestamp       int64
 	MinMsgNr        uint64
 	MaxMsgNr        uint64
@@ -453,6 +455,16 @@ func (obj CommitReport) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `MerkleRoot` param:
+	err = encoder.Encode(obj.MerkleRoot)
 	if err != nil {
 		return err
 	}
@@ -495,6 +507,16 @@ func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MerkleRoot`:
+	err = decoder.Decode(&obj.MerkleRoot)
 	if err != nil {
 		return err
 	}
