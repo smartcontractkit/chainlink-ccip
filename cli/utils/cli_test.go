@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/crib/cli/utils"
 	"github.com/smartcontractkit/crib/cli/wrappers"
 	wrappermocks "github.com/smartcontractkit/crib/cli/wrappers/mocks"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -749,6 +750,11 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 
 	defaultWaitTimeout := 3 * time.Second
 	defaultsleepBetweenAttempts := 100 * time.Millisecond
+	// Set only the required environment variables
+	viper.Set("CHAINLINK_TEAM", "CRIB")
+	viper.Set("CHAINLINK_PRODUCT", "TestProduct")
+	viper.Set("CHAINLINK_COMPONENT", "CRIB")
+	viper.Set("CHAINLINK_COST_CENTER", "CRIB")
 
 	testCases := []struct {
 		name                    string
@@ -772,6 +778,9 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 				m.EXPECT().
 					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
 					Return(nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/cost-center": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
+					Return(nil)
 			},
 			expectedErr: nil,
 		},
@@ -787,6 +796,9 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 					Return(false, nil)
 				m.EXPECT().
 					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/cost-center": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
 					Return(nil)
 			},
 			expectedErr: nil,
@@ -832,6 +844,25 @@ func TestEnsureCribNamespaceReady(t *testing.T) {
 					Return(errors.New("timed out waiting for resource crib-test-crib-poweruser"))
 			},
 			expectedErr: fmt.Errorf("failed to wait for crib-power-user role binding to be created: %w", errors.New("timed out waiting for resource crib-test-crib-poweruser")),
+		},
+		{
+			name:                 "LabelNamespaceFails",
+			namespace:            "crib-test",
+			provider:             "aws",
+			waitTimeout:          &defaultWaitTimeout,
+			sleepBetweenAttempts: &defaultsleepBetweenAttempts,
+			applyK8sClientMockCalls: func(m *wrappermocks.K8sCLI) {
+				m.EXPECT().
+					EnsureNamespaceExists(context.TODO(), "crib-test").
+					Return(false, nil)
+				m.EXPECT().
+					WaitForResource(context.TODO(), mock.Anything, "crib-test-crib-poweruser", defaultsleepBetweenAttempts, defaultWaitTimeout).
+					Return(nil)
+				m.EXPECT().
+					LabelNamespace(context.TODO(), "crib-test", map[string]string{"chain.link/component": "CRIB", "chain.link/cost-center": "CRIB", "chain.link/product": "TestProduct", "chain.link/team": "CRIB"}).
+					Return(errors.New("LabelNamespace failed"))
+			},
+			expectedErr: errors.New("failed to label namespace: LabelNamespace failed"),
 		},
 	}
 
@@ -959,6 +990,89 @@ func TestPrintIngressHosts(t *testing.T) {
 
 			for _, host := range tc.expectedHosts {
 				assert.Contains(t, capturedOutput, host)
+			}
+		})
+	}
+}
+
+// nolint: paralleltest, nolintlint
+// TestGetNamespaceLabels tests the GetNamespaceLabels function
+func TestGetNamespaceLabels(t *testing.T) {
+	tests := []struct {
+		name           string
+		envVars        map[string]string
+		expectedLabels map[string]string
+		expectedErr    error
+	}{
+		{
+			name: "All required ENVs provided",
+			envVars: map[string]string{
+				"CHAINLINK_TEAM":        "infra",
+				"CHAINLINK_PRODUCT":     "kubernetes",
+				"CHAINLINK_COMPONENT":   "gap",
+				"CHAINLINK_COST_CENTER": "platform",
+			},
+			expectedLabels: map[string]string{
+				"chain.link/team":        "infra",
+				"chain.link/product":     "kubernetes",
+				"chain.link/component":   "gap",
+				"chain.link/cost-center": "platform",
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "Missing optional ENVs",
+			envVars: map[string]string{
+				"CHAINLINK_TEAM":    "infra",
+				"CHAINLINK_PRODUCT": "kubernetes",
+			},
+			expectedLabels: map[string]string{
+				"chain.link/team":        "infra",
+				"chain.link/product":     "kubernetes",
+				"chain.link/component":   "crib", // Default value
+				"chain.link/cost-center": "crib", // Default value
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "Missing required ENVs",
+			envVars: map[string]string{
+				"CHAINLINK_COMPONENT":   "gap",
+				"CHAINLINK_COST_CENTER": "platform",
+			},
+			expectedLabels: nil,
+			expectedErr:    fmt.Errorf("one or more required environment variables are missing: CHAINLINK_TEAM, CHAINLINK_PRODUCT"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset Viper before each test
+			viper.Reset()
+
+			// Set environment variables
+			for key, value := range tt.envVars {
+				os.Setenv(key, value)
+			}
+
+			// Tell Viper to read from environment variables
+			viper.AutomaticEnv()
+
+			// Call the function
+			labels, err := utils.GetNamespaceLabels()
+
+			// Cleanup environment variables
+			for key := range tt.envVars {
+				os.Unsetenv(key)
+			}
+
+			// Check for errors
+			if tt.expectedErr != nil {
+				assert.Error(t, err)
+				assert.EqualError(t, err, tt.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedLabels, labels)
 			}
 		})
 	}

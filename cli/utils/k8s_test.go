@@ -281,7 +281,7 @@ func TestLabelNamespace(t *testing.T) {
 					Patch(
 						context.TODO(),
 						namespace,
-						types.MergePatchType,
+						types.StrategicMergePatchType,
 						[]byte(`{"metadata":{"labels":{"test-key":"test-value"}}}`),
 						metav1.PatchOptions{},
 					).Return(&v1.Namespace{}, nil).Times(1)
@@ -295,12 +295,12 @@ func TestLabelNamespace(t *testing.T) {
 					Patch(
 						context.TODO(),
 						namespace,
-						types.MergePatchType,
+						types.StrategicMergePatchType,
 						[]byte(`{"metadata":{"labels":{"test-key":"test-value"}}}`),
 						metav1.PatchOptions{},
 					).Return(nil, fmt.Errorf("some error")).Times(1)
 			},
-			expectErr: "some error",
+			expectErr: "failed to patch namespace test-namespace: some error",
 		},
 	}
 
@@ -321,7 +321,10 @@ func TestLabelNamespace(t *testing.T) {
 			k8sClient, err := wrappers.NewK8sClient(configFlags, mockClientset)
 			require.NoError(t, err)
 
-			err = k8sClient.LabelNamespace(context.TODO(), namespace, labelKey, labelValue)
+			labels := map[string]string{
+				labelKey: labelValue,
+			}
+			err = k8sClient.LabelNamespace(context.TODO(), namespace, labels)
 			if tt.expectErr != "" {
 				require.Error(t, err)
 				assert.Equal(t, tt.expectErr, err.Error())
