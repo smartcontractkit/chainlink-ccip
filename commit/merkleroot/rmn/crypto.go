@@ -47,6 +47,12 @@ func verifyObservationSignature(
 	msg := append([]byte(signedObservationPrefix), observationBytesSha256[:]...)
 	msgSha256 := sha256.Sum256(msg)
 
+	if rmnNode.OffchainPublicKey == nil {
+		return fmt.Errorf("node %d has no offchain public key", rmnNode.ID)
+	}
+	if len(*rmnNode.OffchainPublicKey) != ed25519.PublicKeySize {
+		return fmt.Errorf("node %d has an invalid offchain public key", rmnNode.ID)
+	}
 	isValid := verifier.Verify(*rmnNode.OffchainPublicKey, msgSha256[:], signedObs.Signature)
 	if !isValid {
 		return fmt.Errorf("observation signature does not match node %d public key", rmnNode.ID)

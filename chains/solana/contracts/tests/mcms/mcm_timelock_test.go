@@ -13,13 +13,16 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
-	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
+	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
 
 func TestMcmWithTimelock(t *testing.T) {
@@ -37,19 +40,19 @@ func TestMcmWithTimelock(t *testing.T) {
 	anyone, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
-	solanaGoClient := utils.DeployAllPrograms(t, utils.PathToAnchorConfig, admin)
+	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
-	msigs := map[timelock.Role]RoleMultisigs{
-		timelock.Proposer_Role:  CreateRoleMultisigs(timelock.Proposer_Role, 1),
-		timelock.Canceller_Role: CreateRoleMultisigs(timelock.Canceller_Role, 1),
-		timelock.Executor_Role:  CreateRoleMultisigs(timelock.Executor_Role, 1),
-		timelock.Bypasser_Role:  CreateRoleMultisigs(timelock.Bypasser_Role, 1),
+	msigs := map[timelock.Role]timelockutil.RoleMultisigs{
+		timelock.Proposer_Role:  timelockutil.CreateRoleMultisigs(timelock.Proposer_Role, 1),
+		timelock.Canceller_Role: timelockutil.CreateRoleMultisigs(timelock.Canceller_Role, 1),
+		timelock.Executor_Role:  timelockutil.CreateRoleMultisigs(timelock.Executor_Role, 1),
+		timelock.Bypasser_Role:  timelockutil.CreateRoleMultisigs(timelock.Bypasser_Role, 1),
 	}
 
 	require.NoError(t, err)
 
 	t.Run("setup:funding", func(t *testing.T) {
-		utils.FundAccounts(ctx, []solana.PrivateKey{admin, anyone}, solanaGoClient, t)
+		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anyone}, solanaGoClient, t)
 
 		// fund msig PDA signers
 		for _, roleMsigs := range msigs {
@@ -58,13 +61,13 @@ func TestMcmWithTimelock(t *testing.T) {
 				fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), msig.SignerPDA).Build()
 				ixs = append(ixs, fundPDAIx)
 			}
-			utils.SendAndConfirm(ctx, t, solanaGoClient,
+			testutils.SendAndConfirm(ctx, t, solanaGoClient,
 				ixs,
 				admin, config.DefaultCommitment)
 		}
 		// fund timelock signer
 		fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
-		utils.SendAndConfirm(ctx, t, solanaGoClient,
+		testutils.SendAndConfirm(ctx, t, solanaGoClient,
 			[]solana.Instruction{fundPDAIx},
 			admin, config.DefaultCommitment)
 	})
@@ -72,7 +75,7 @@ func TestMcmWithTimelock(t *testing.T) {
 	t.Run("setup: initialize mcm multisigs", func(t *testing.T) {
 		for role, roleMsigs := range msigs {
 			for _, msig := range roleMsigs.Multisigs {
-				t.Run(fmt.Sprintf("init mcm for role %s with multisig %s", role.String(), mcmsUtils.UnpadString32(msig.PaddedName)), func(t *testing.T) {
+				t.Run(fmt.Sprintf("init mcm for role %s with multisig %s", role.String(), mcms.UnpadString32(msig.PaddedName)), func(t *testing.T) {
 					// get program data account
 					data, accErr := solanaGoClient.GetAccountInfoWithOpts(ctx, config.McmProgram, &rpc.GetAccountInfoOpts{
 						Commitment: config.DefaultCommitment,
@@ -98,11 +101,11 @@ func TestMcmWithTimelock(t *testing.T) {
 						msig.ExpiringRootAndOpCountPDA,
 					).ValidateAndBuild()
 					require.NoError(t, initIxErr)
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 					// get config and validate
 					var configAccount mcm.MultisigConfig
-					err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 					require.NoError(t, err, "failed to get account info")
 
 					require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -116,13 +119,13 @@ func TestMcmWithTimelock(t *testing.T) {
 	t.Run("setup: set_config for each mcm multisigs", func(t *testing.T) {
 		for role, roleMsigs := range msigs {
 			for _, msig := range roleMsigs.Multisigs {
-				t.Run(fmt.Sprintf("set_config of role %s with multisig %s", role.String(), mcmsUtils.UnpadString32(msig.PaddedName)), func(t *testing.T) {
+				t.Run(fmt.Sprintf("set_config of role %s with multisig %s", role.String(), mcms.UnpadString32(msig.PaddedName)), func(t *testing.T) {
 					signerAddresses := msig.RawConfig.SignerAddresses
 
 					t.Run("preload signers on PDA", func(t *testing.T) {
 						ixs := make([]solana.Instruction, 0)
 
-						parsedTotalSigners, parseErr := mcmsUtils.SafeToUint8(len(signerAddresses))
+						parsedTotalSigners, parseErr := mcms.SafeToUint8(len(signerAddresses))
 						require.NoError(t, parseErr)
 
 						initSignersIx, initSignersIxErr := mcm.NewInitSignersInstruction(
@@ -136,7 +139,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.NoError(t, initSignersIxErr)
 						ixs = append(ixs, initSignersIx)
 
-						appendSignersIxs, appendSignersIxsErr := AppendSignersIxs(signerAddresses, msig.PaddedName, msig.ConfigPDA, msig.ConfigSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+						appendSignersIxs, appendSignersIxsErr := mcms.AppendSignersIxs(signerAddresses, msig.PaddedName, msig.ConfigPDA, msig.ConfigSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 						require.NoError(t, appendSignersIxsErr)
 						ixs = append(ixs, appendSignersIxs...)
 
@@ -150,11 +153,11 @@ func TestMcmWithTimelock(t *testing.T) {
 						ixs = append(ixs, finalizeSignersIx)
 
 						for _, ix := range ixs {
-							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 						}
 
 						var cfgSignersAccount mcm.ConfigSigners
-						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -182,16 +185,16 @@ func TestMcmWithTimelock(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, setConfigErr)
 
-						tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 						require.NotNil(t, tx)
 
-						parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-							[]utils.EventMapping{
-								utils.EventMappingFor[ConfigSet]("ConfigSet"),
+						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+							[]common.EventMapping{
+								common.EventMappingFor[mcms.ConfigSet]("ConfigSet"),
 							},
 						)
 
-						event := parsedLogs[0].EventData[0].Data.(*ConfigSet)
+						event := parsedLogs[0].EventData[0].Data.(*mcms.ConfigSet)
 						require.Equal(t, msig.RawConfig.GroupParents, event.GroupParents)
 						require.Equal(t, msig.RawConfig.GroupQuorums, event.GroupQuorums)
 						require.Equal(t, msig.RawConfig.ClearRoot, event.IsRootCleared)
@@ -203,7 +206,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 						// get config and validate
 						var configAccount mcm.MultisigConfig
-						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -218,7 +221,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						}
 
 						// pda closed after set_config
-						utils.AssertClosedAccount(ctx, t, solanaGoClient, msig.ConfigSignersPDA, config.DefaultCommitment)
+						testutils.AssertClosedAccount(ctx, t, solanaGoClient, msig.ConfigSignersPDA, config.DefaultCommitment)
 					})
 				})
 			}
@@ -228,13 +231,13 @@ func TestMcmWithTimelock(t *testing.T) {
 	t.Run("setup: timelock", func(t *testing.T) {
 		for role, roleMsigs := range msigs {
 			t.Run(fmt.Sprintf("init access controller for role %s", role.String()), func(t *testing.T) {
-				initAccIxs, initAccErr := InitAccessControllersIxs(ctx, roleMsigs.AccessController.PublicKey(), admin, solanaGoClient)
+				initAccIxs, initAccErr := timelockutil.InitAccessControllersIxs(ctx, roleMsigs.AccessController.PublicKey(), admin, solanaGoClient)
 				require.NoError(t, initAccErr)
 
-				utils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, utils.AddSigners(roleMsigs.AccessController))
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(roleMsigs.AccessController))
 
 				var ac access_controller.AccessController
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, roleMsigs.AccessController.PublicKey(), config.DefaultCommitment, &ac)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, roleMsigs.AccessController.PublicKey(), config.DefaultCommitment, &ac)
 				if err != nil {
 					require.NoError(t, err, "failed to get account info")
 				}
@@ -270,10 +273,10 @@ func TestMcmWithTimelock(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, initTimelockErr)
 
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 			var configAccount timelock.Config
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -294,11 +297,11 @@ func TestMcmWithTimelock(t *testing.T) {
 					for _, msig := range roleMsigs.Multisigs {
 						addresses = append(addresses, msig.SignerPDA)
 					}
-					batchAddAccessIxs, batchAddAccessErr := TimelockBatchAddAccessIxs(ctx, roleMsigs.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+					batchAddAccessIxs, batchAddAccessErr := timelockutil.BatchAddAccessIxs(ctx, roleMsigs.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 					require.NoError(t, batchAddAccessErr)
 
 					for _, ix := range batchAddAccessIxs {
-						utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 					}
 
 					for _, msig := range roleMsigs.Multisigs {
@@ -314,7 +317,7 @@ func TestMcmWithTimelock(t *testing.T) {
 	t.Run("setup: transfer ownership multisigs to timelock signer", func(t *testing.T) {
 		for role, roleMsigs := range msigs {
 			for _, msig := range roleMsigs.Multisigs {
-				t.Run(fmt.Sprintf("transfer ownership of role %s multisig %s to timelock signer", role.String(), mcmsUtils.UnpadString32(msig.PaddedName)), func(t *testing.T) {
+				t.Run(fmt.Sprintf("transfer ownership of role %s multisig %s to timelock signer", role.String(), mcms.UnpadString32(msig.PaddedName)), func(t *testing.T) {
 					t.Parallel()
 					ix, transferOwnershipErr := mcm.NewTransferOwnershipInstruction(
 						msig.PaddedName,
@@ -324,10 +327,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, transferOwnershipErr)
 
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 					var configAccount mcm.MultisigConfig
-					err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 					if err != nil {
 						require.NoError(t, err, "failed to get account info")
 					}
@@ -341,9 +344,9 @@ func TestMcmWithTimelock(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, acceptOwnershipixErr)
 
-					salt, sErr := mcmsUtils.SimpleSalt()
+					salt, sErr := mcms.SimpleSalt()
 					require.NoError(t, sErr)
-					acceptOwnershipOp := TimelockOperation{
+					acceptOwnershipOp := timelockutil.Operation{
 						Predecessor: config.TimelockEmptyOpID,
 						Salt:        salt,
 						Delay:       uint64(1),
@@ -354,10 +357,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					id := acceptOwnershipOp.OperationID()
 					operationPDA := acceptOwnershipOp.OperationPDA()
 
-					ixs, ierr := TimelockPreloadOperationIxs(acceptOwnershipOp, admin.PublicKey())
+					ixs, ierr := timelockutil.PreloadOperationIxs(acceptOwnershipOp, admin.PublicKey())
 					require.NoError(t, ierr)
 					for _, ix := range ixs {
-						utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 					}
 
 					scheduleBatchIx, scErr := timelock.NewScheduleBatchInstruction(
@@ -370,22 +373,22 @@ func TestMcmWithTimelock(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, scErr)
 
-					tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleBatchIx}, admin, config.DefaultCommitment)
-					parsed := utils.ParseLogMessages(tx.Meta.LogMessages,
-						[]utils.EventMapping{
-							utils.EventMappingFor[CallScheduled]("CallScheduled"),
+					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleBatchIx}, admin, config.DefaultCommitment)
+					parsed := common.ParseLogMessages(tx.Meta.LogMessages,
+						[]common.EventMapping{
+							common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
 						},
 					)
 
 					for _, ixx := range acceptOwnershipOp.ToInstructionData() {
-						event := parsed[0].EventData[0].Data.(*CallScheduled)
+						event := parsed[0].EventData[0].Data.(*timelockutil.CallScheduled)
 						require.Equal(t, acceptOwnershipOp.OperationID(), event.ID)
 						require.Equal(t, acceptOwnershipOp.Salt, event.Salt)
 						require.Equal(t, ixx.Data, event.Data)
 					}
 
 					var opAccount timelock.Operation
-					err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, operationPDA, config.DefaultCommitment, &opAccount)
 					if err != nil {
 						require.NoError(t, err, "failed to get account info")
 					}
@@ -415,22 +418,22 @@ func TestMcmWithTimelock(t *testing.T) {
 					vIx, vIxErr := bypassExeIx.ValidateAndBuild()
 					require.NoError(t, vIxErr)
 
-					acceptTx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+					acceptTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
 
-					parsedLogs := utils.ParseLogMessages(acceptTx.Meta.LogMessages,
-						[]utils.EventMapping{
-							utils.EventMappingFor[BypasserCallExecuted]("BypasserCallExecuted"),
+					parsedLogs := common.ParseLogMessages(acceptTx.Meta.LogMessages,
+						[]common.EventMapping{
+							common.EventMappingFor[timelockutil.BypasserCallExecuted]("BypasserCallExecuted"),
 						},
 					)
 
 					for i, ixx := range acceptOwnershipOp.ToInstructionData() {
-						event := parsedLogs[0].EventData[i].Data.(*BypasserCallExecuted)
+						event := parsedLogs[0].EventData[i].Data.(*timelockutil.BypasserCallExecuted)
 						require.Equal(t, uint64(i), event.Index)
 						require.Equal(t, ixx.ProgramId, event.Target)
-						require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+						require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 					}
 
-					err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
+					err = common.GetAccountDataBorshInto(ctx, solanaGoClient, msig.ConfigPDA, config.DefaultCommitment, &configAccount)
 					if err != nil {
 						require.NoError(t, err, "failed to get account info")
 					}
@@ -462,7 +465,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				// Use CreateToken utility to get initialization instructions
 				// NOTE: can't create token with cpi(mint signature required)
-				createTokenIxs, createTokenErr := utils.CreateToken(
+				createTokenIxs, createTokenErr := tokens.CreateToken(
 					ctx,
 					v.tokenProgram,    // token program
 					mint,              // mint account
@@ -474,7 +477,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				require.NoError(t, createTokenErr)
 
 				for _, ix := range createTokenIxs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, utils.AddSigners(mintKeypair))
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, common.AddSigners(mintKeypair))
 				}
 
 				t.Run("mint ixs", func(t *testing.T) {
@@ -488,26 +491,26 @@ func TestMcmWithTimelock(t *testing.T) {
 					recipient, kerr := solana.NewRandomPrivateKey()
 					require.NoError(t, kerr)
 
-					rIxATA, rAta, rAtaIxErr := utils.CreateAssociatedTokenAccount(v.tokenProgram, mint, recipient.PublicKey(), admin.PublicKey())
+					rIxATA, rAta, rAtaIxErr := tokens.CreateAssociatedTokenAccount(v.tokenProgram, mint, recipient.PublicKey(), admin.PublicKey())
 					require.NoError(t, rAtaIxErr)
 
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rIxATA}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{rIxATA}, admin, config.DefaultCommitment)
 
-					_, rInitBal, bErr := utils.TokenBalance(ctx, solanaGoClient, rAta, config.DefaultCommitment)
+					_, rInitBal, bErr := tokens.TokenBalance(ctx, solanaGoClient, rAta, config.DefaultCommitment)
 					require.NoError(t, bErr)
 					require.Equal(t, 0, rInitBal)
 
 					// mint authority to timelock
-					authIx, aErr := utils.SetTokenMintAuthority(v.tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
+					authIx, aErr := tokens.SetTokenMintAuthority(v.tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
 					require.NoError(t, aErr)
 
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{authIx}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{authIx}, admin, config.DefaultCommitment)
 
 					numMintIxs := 18
 
-					salt, sErr := mcmsUtils.SimpleSalt()
+					salt, sErr := mcms.SimpleSalt()
 					require.NoError(t, sErr)
-					opToSchedule := TimelockOperation{
+					opToSchedule := timelockutil.Operation{
 						Predecessor: config.TimelockEmptyOpID, // no predecessor
 						Salt:        salt,
 						Delay:       uint64(1),
@@ -515,17 +518,17 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					for i := 0; i < numMintIxs; i++ {
 						// timelock signer can mint token (transferred authority)
-						ix, mIxErr := utils.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, config.TimelockSignerPDA)
+						ix, mIxErr := tokens.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, config.TimelockSignerPDA)
 						require.NoError(t, mIxErr)
 
 						// add instruction to timelock operation
 						opToSchedule.AddInstruction(ix, []solana.PublicKey{v.tokenProgram})
 					}
 
-					ixs, ierr := TimelockPreloadOperationIxs(opToSchedule, admin.PublicKey())
+					ixs, ierr := timelockutil.PreloadOperationIxs(opToSchedule, admin.PublicKey())
 					require.NoError(t, ierr)
 					for _, ix := range ixs {
-						utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 					}
 
 					// Schedule the operation
@@ -539,12 +542,12 @@ func TestMcmWithTimelock(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, scErr)
 
-					node, cErr := IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, uint64(currentOpCount)) // operation nonce
+					node, cErr := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, uint64(currentOpCount)) // operation nonce
 					require.NoError(t, cErr)
-					mcmOpNodes := []mcmsUtils.McmOpNode{node} // only one mcm op node
+					mcmOpNodes := []mcms.McmOpNode{node} // only one mcm op node
 					validUntil := uint32(0xffffffff)
 
-					rootValidationData, rErr := CreateMcmRootData(McmRootInput{
+					rootValidationData, rErr := mcms.CreateMcmRootData(mcms.McmRootInput{
 						Multisig:             proposerMsig.ConfigPDA,
 						Operations:           mcmOpNodes,
 						PreOpCount:           uint64(currentOpCount),
@@ -556,20 +559,20 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					currentOpCount += len(mcmOpNodes)
 
-					signatures, bulkSignErr := BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
+					signatures, bulkSignErr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 					require.NoError(t, bulkSignErr)
 					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 					t.Run("mcm:preload signatures", func(t *testing.T) {
-						preloadIxs, plerr := McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+						preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 						require.NoError(t, plerr)
 
 						for _, ix := range preloadIxs {
-							utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 						}
 
 						var sigAccount mcm.RootSignatures
-						queryErr := utils.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
+						queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
 						require.NoError(t, queryErr, "failed to get account info")
 
 						require.Equal(t, true, sigAccount.IsFinalized)
@@ -590,7 +593,7 @@ func TestMcmWithTimelock(t *testing.T) {
 							rootValidationData.MetadataProof,
 							signaturesPDA,
 							proposerMsig.RootMetadataPDA,
-							SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+							mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 							proposerMsig.ExpiringRootAndOpCountPDA,
 							proposerMsig.ConfigPDA,
 							admin.PublicKey(),
@@ -598,15 +601,15 @@ func TestMcmWithTimelock(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, setRootIxErr)
 
-						tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, utils.AddComputeUnitLimit(1_400_000))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
 						require.NotNil(t, tx)
 
-						parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-							[]utils.EventMapping{
-								utils.EventMappingFor[NewRoot]("NewRoot"),
+						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+							[]common.EventMapping{
+								common.EventMappingFor[mcms.NewRoot]("NewRoot"),
 							},
 						)
-						event := parsedLogs[0].EventData[0].Data.(*NewRoot)
+						event := parsedLogs[0].EventData[0].Data.(*mcms.NewRoot)
 						require.Equal(t, rootValidationData.Root, event.Root)
 						require.Equal(t, validUntil, event.ValidUntil)
 						require.Equal(t, rootValidationData.Metadata.ChainId, event.MetadataChainID)
@@ -617,7 +620,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 						var newRootAndOpCount mcm.ExpiringRootAndOpCount
 
-						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, rootValidationData.Root, newRootAndOpCount.Root)
@@ -625,7 +628,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.Equal(t, rootValidationData.Metadata.PreOpCount, newRootAndOpCount.OpCount)
 
 						var newRootMetadata mcm.RootMetadata
-						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
 						require.NoError(t, err, "failed to get account info")
 
 						require.Equal(t, rootValidationData.Metadata.ChainId, newRootMetadata.ChainId)
@@ -668,40 +671,40 @@ func TestMcmWithTimelock(t *testing.T) {
 							vIx, vIxErr := ix.ValidateAndBuild()
 							require.NoError(t, vIxErr)
 
-							tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
+							tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
 							require.NotNil(t, tx.Meta)
 							require.Nil(t, tx.Meta.Err, fmt.Sprintf("tx failed with: %+v", tx.Meta))
 
-							parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-								[]utils.EventMapping{
-									utils.EventMappingFor[OpExecuted]("OpExecuted"),
-									utils.EventMappingFor[CallScheduled]("CallScheduled"),
+							parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+								[]common.EventMapping{
+									common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
+									common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
 								},
 							)
 
 							// check opExecuted event
-							event := parsedLogs[0].EventData[0].Data.(*OpExecuted)
+							event := parsedLogs[0].EventData[0].Data.(*mcms.OpExecuted)
 							require.Equal(t, op.Nonce, event.Nonce)
 							require.Equal(t, op.To, event.To)
-							require.Equal(t, op.Data, utils.NormalizeData(event.Data))
+							require.Equal(t, op.Data, common.NormalizeData(event.Data))
 
 							// check inner CallScheduled events
 							opIxData := opToSchedule.ToInstructionData()
 							require.Equal(t, len(opIxData), len(parsedLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation")
 
 							for j, ix := range opIxData {
-								timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*CallScheduled)
+								timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
 								require.Equal(t, opToSchedule.OperationID(), timelockEvent.ID, "ID does not match")
 								require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
 								require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
 								require.Equal(t, opToSchedule.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
 								require.Equal(t, opToSchedule.Salt, timelockEvent.Salt, "Salt does not match")
 								require.Equal(t, opToSchedule.Delay, timelockEvent.Delay, "Delay does not match")
-								require.Equal(t, ix.Data, utils.NormalizeData(timelockEvent.Data), "Data does not match")
+								require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
 							}
 
 							var opAccount timelock.Operation
-							err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment, &opAccount)
+							err = common.GetAccountDataBorshInto(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment, &opAccount)
 							if err != nil {
 								require.NoError(t, err, "failed to get account info")
 							}
@@ -721,7 +724,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					})
 
 					t.Run("success: wait for operations to be ready", func(t *testing.T) {
-						wErr := WaitForOperationToBeReady(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment)
+						wErr := timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment)
 						require.NoError(t, wErr)
 					})
 
@@ -741,25 +744,25 @@ func TestMcmWithTimelock(t *testing.T) {
 						vIx, vErr := ix.ValidateAndBuild()
 						require.NoError(t, vErr)
 
-						tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, utils.AddComputeUnitLimit(1_400_000))
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
 						require.NotNil(t, tx)
 
-						parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-							[]utils.EventMapping{
-								utils.EventMappingFor[CallExecuted]("CallExecuted"),
+						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+							[]common.EventMapping{
+								common.EventMappingFor[timelockutil.CallExecuted]("CallExecuted"),
 							},
 						)
 
 						for i, ixx := range opToSchedule.ToInstructionData() {
-							event := parsedLogs[0].EventData[i].Data.(*CallExecuted)
+							event := parsedLogs[0].EventData[i].Data.(*timelockutil.CallExecuted)
 							require.Equal(t, opToSchedule.OperationID(), event.ID)
 							require.Equal(t, uint64(i), event.Index)
 							require.Equal(t, ixx.ProgramId, event.Target)
-							require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+							require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 						}
 
 						var opAccount timelock.Operation
-						err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment, &opAccount)
+						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, opToSchedule.OperationPDA(), config.DefaultCommitment, &opAccount)
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}
@@ -770,7 +773,7 @@ func TestMcmWithTimelock(t *testing.T) {
 							"Executed operation's time should be 1(DONE_TIMESTAMP)",
 						)
 
-						_, rInitBal, bErr := utils.TokenBalance(ctx, solanaGoClient, rAta, config.DefaultCommitment)
+						_, rInitBal, bErr := tokens.TokenBalance(ctx, solanaGoClient, rAta, config.DefaultCommitment)
 						require.NoError(t, bErr)
 						require.Equal(t, numMintIxs*int(solana.LAMPORTS_PER_SOL), rInitBal)
 					})
@@ -779,7 +782,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		}
 
 		var rootAccount mcm.ExpiringRootAndOpCount
-		err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &rootAccount)
+		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &rootAccount)
 		require.NoError(t, err, "failed to get account info")
 
 		require.Equal(t, uint64(currentOpCount), rootAccount.OpCount)
@@ -797,7 +800,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		// Use CreateToken utility to get initialization instructions
 		// NOTE: can't create token with cpi(mint signature required)
-		createTokenIxs, err := utils.CreateToken(
+		createTokenIxs, err := tokens.CreateToken(
 			ctx,
 			tokenProgram,      // token program
 			mint,              // mint account
@@ -808,12 +811,12 @@ func TestMcmWithTimelock(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		authIx, err := utils.SetTokenMintAuthority(tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
+		authIx, err := tokens.SetTokenMintAuthority(tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
 		require.NoError(t, err)
 
 		setupIxs := append(createTokenIxs, authIx)
 
-		utils.SendAndConfirm(ctx, t, solanaGoClient, setupIxs, admin, config.DefaultCommitment, utils.AddSigners(mintKeypair))
+		testutils.SendAndConfirm(ctx, t, solanaGoClient, setupIxs, admin, config.DefaultCommitment, common.AddSigners(mintKeypair))
 
 		/////////////////////////////////////////
 		// Timelock Operation 1 - Initial Mint //
@@ -821,15 +824,15 @@ func TestMcmWithTimelock(t *testing.T) {
 		treasury, kerr := solana.NewRandomPrivateKey()
 		require.NoError(t, kerr)
 
-		ix1, treasuryATA, err := utils.CreateAssociatedTokenAccount(tokenProgram, mint, treasury.PublicKey(), config.TimelockSignerPDA)
+		ix1, treasuryATA, err := tokens.CreateAssociatedTokenAccount(tokenProgram, mint, treasury.PublicKey(), config.TimelockSignerPDA)
 		require.NoError(t, err)
 
-		ix2, err := utils.MintTo(1000*solana.LAMPORTS_PER_SOL, tokenProgram, mint, treasuryATA, config.TimelockSignerPDA)
+		ix2, err := tokens.MintTo(1000*solana.LAMPORTS_PER_SOL, tokenProgram, mint, treasuryATA, config.TimelockSignerPDA)
 		require.NoError(t, err)
 
-		salt1, err := mcmsUtils.SimpleSalt()
+		salt1, err := mcms.SimpleSalt()
 		require.NoError(t, err)
-		op1 := TimelockOperation{
+		op1 := timelockutil.Operation{
 			Predecessor: config.TimelockEmptyOpID, // no predecessor
 			Salt:        salt1,
 			Delay:       uint64(1),
@@ -847,27 +850,27 @@ func TestMcmWithTimelock(t *testing.T) {
 		team3, err := solana.NewRandomPrivateKey()
 		require.NoError(t, err)
 
-		ix3, team1ATA, err := utils.CreateAssociatedTokenAccount(
+		ix3, team1ATA, err := tokens.CreateAssociatedTokenAccount(
 			tokenProgram, mint, team1.PublicKey(),
 			config.TimelockSignerPDA,
 		)
 		require.NoError(t, err)
 
-		ix4, team2ATA, err := utils.CreateAssociatedTokenAccount(
+		ix4, team2ATA, err := tokens.CreateAssociatedTokenAccount(
 			tokenProgram, mint, team2.PublicKey(),
 			config.TimelockSignerPDA,
 		)
 		require.NoError(t, err)
 
-		ix5, team3ATA, err := utils.CreateAssociatedTokenAccount(
+		ix5, team3ATA, err := tokens.CreateAssociatedTokenAccount(
 			tokenProgram, mint, team3.PublicKey(),
 			config.TimelockSignerPDA,
 		)
 		require.NoError(t, err)
 
-		salt2, err := mcmsUtils.SimpleSalt()
+		salt2, err := mcms.SimpleSalt()
 		require.NoError(t, err)
-		op2 := TimelockOperation{
+		op2 := timelockutil.Operation{
 			Predecessor: op1.OperationID(), // must happen after initial mint
 			Salt:        salt2,
 			Delay:       uint64(1),
@@ -879,17 +882,17 @@ func TestMcmWithTimelock(t *testing.T) {
 		//////////////////////////////////////////////////////////////
 		// Timelock Operation 3 - Schedule team token distribution //
 		//////////////////////////////////////////////////////////////
-		ix6, err := utils.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+		ix6, err := tokens.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, config.TimelockSignerPDA, []solana.PublicKey{})
 		require.NoError(t, err)
-		ix7, err := utils.TokenTransferChecked(200*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+		ix7, err := tokens.TokenTransferChecked(200*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, config.TimelockSignerPDA, []solana.PublicKey{})
 		require.NoError(t, err)
-		ix8, err := utils.TokenTransferChecked(300*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+		ix8, err := tokens.TokenTransferChecked(300*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, config.TimelockSignerPDA, []solana.PublicKey{})
 		require.NoError(t, err)
 
 		// add all team distribution instructions
-		salt3, err := mcmsUtils.SimpleSalt()
+		salt3, err := mcms.SimpleSalt()
 		require.NoError(t, err)
-		op3 := TimelockOperation{
+		op3 := timelockutil.Operation{
 			Predecessor: op2.OperationID(), // must happen after ata creation
 			Salt:        salt3,
 			Delay:       uint64(1),
@@ -905,15 +908,15 @@ func TestMcmWithTimelock(t *testing.T) {
 		////////////////////////////////////////
 		// Pre-create Timelock Operation PDAs //
 		////////////////////////////////////////
-		opNodes := []mcmsUtils.McmOpNode{}
-		timelockOps := []TimelockOperation{op1, op2, op3}
+		opNodes := []mcms.McmOpNode{}
+		timelockOps := []timelockutil.Operation{op1, op2, op3}
 
 		for i, op := range timelockOps {
 			t.Run(fmt.Sprintf("prepare mcm op node %d with timelock::schedule_batch ix", i), func(t *testing.T) {
-				ixs, ierr := TimelockPreloadOperationIxs(op, admin.PublicKey())
+				ixs, ierr := timelockutil.PreloadOperationIxs(op, admin.PublicKey())
 				require.NoError(t, ierr)
 				for _, ix := range ixs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				scheduleOpIx, scErr := timelock.NewScheduleBatchInstruction(
@@ -926,7 +929,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, scErr)
 
-				opNode, cErr := IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleOpIx, uint64(currentOpCount+i))
+				opNode, cErr := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleOpIx, uint64(currentOpCount+i))
 				require.NoError(t, cErr)
 				// fmt.Println("opNode", opNode)
 				opNodes = append(opNodes, opNode)
@@ -938,7 +941,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		//////////////////////////////////
 		validUntil := uint32(0xffffffff)
 
-		rootValidationData, err := CreateMcmRootData(McmRootInput{
+		rootValidationData, err := mcms.CreateMcmRootData(mcms.McmRootInput{
 			Multisig:             proposerMsig.ConfigPDA,
 			Operations:           opNodes,
 			PreOpCount:           uint64(currentOpCount),
@@ -953,21 +956,21 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		t.Run("offchain: bulk sign on root and upload signatures", func(t *testing.T) {
 			// sign the root
-			signatures, signErr := BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
+			signatures, signErr := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 			require.NoError(t, signErr)
 
 			////////////////////////////////////////////////
 			// mcm::set_root - with preloading signatures //
 			////////////////////////////////////////////////
-			preloadIxs, plerr := McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+			preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 			require.NoError(t, plerr)
 
 			for _, ix := range preloadIxs {
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
 			var sigAccount mcm.RootSignatures
-			queryErr := utils.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), config.DefaultCommitment, &sigAccount)
+			queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), config.DefaultCommitment, &sigAccount)
 			require.NoError(t, queryErr, "failed to get account info")
 
 			require.Equal(t, true, sigAccount.IsFinalized)
@@ -988,7 +991,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				rootValidationData.MetadataProof,
 				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil),
 				proposerMsig.RootMetadataPDA,
-				SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+				mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 				proposerMsig.ExpiringRootAndOpCountPDA,
 				proposerMsig.ConfigPDA,
 				admin.PublicKey(),
@@ -996,15 +999,15 @@ func TestMcmWithTimelock(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, setRootIxErr)
 
-			tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, utils.AddComputeUnitLimit(1_400_000))
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
 			require.NotNil(t, tx)
 
-			parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-				[]utils.EventMapping{
-					utils.EventMappingFor[NewRoot]("NewRoot"),
+			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+				[]common.EventMapping{
+					common.EventMappingFor[mcms.NewRoot]("NewRoot"),
 				},
 			)
-			event := parsedLogs[0].EventData[0].Data.(*NewRoot)
+			event := parsedLogs[0].EventData[0].Data.(*mcms.NewRoot)
 			require.Equal(t, rootValidationData.Root, event.Root)
 			require.Equal(t, validUntil, event.ValidUntil)
 			require.Equal(t, rootValidationData.Metadata.ChainId, event.MetadataChainID)
@@ -1015,7 +1018,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			var newRootAndOpCount mcm.ExpiringRootAndOpCount
 
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.ExpiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, rootValidationData.Root, newRootAndOpCount.Root)
@@ -1024,7 +1027,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			// get config and validate
 			var newRootMetadata mcm.RootMetadata
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, rootValidationData.Metadata.ChainId, newRootMetadata.ChainId)
@@ -1058,41 +1061,41 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, vIxErr := ix.ValidateAndBuild()
 				require.NoError(t, vIxErr)
 
-				tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
 
-				parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[OpExecuted]("OpExecuted"),
-						utils.EventMappingFor[CallScheduled]("CallScheduled"),
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
+						common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
 					},
 				)
 
 				// check opExecuted event
-				event := parsedLogs[0].EventData[0].Data.(*OpExecuted)
+				event := parsedLogs[0].EventData[0].Data.(*mcms.OpExecuted)
 				require.Equal(t, op.Nonce, event.Nonce)
 				require.Equal(t, op.To, event.To)
-				require.Equal(t, op.Data, utils.NormalizeData(event.Data))
+				require.Equal(t, op.Data, common.NormalizeData(event.Data))
 
 				// check inner CallScheduled events
-				currentOp := timelockOps[i] // match the TimelockOperation with the current opNode
+				currentOp := timelockOps[i] // match the Operation with the current opNode
 				opIxData := currentOp.ToInstructionData()
 
 				require.Equal(t, len(opIxData), len(parsedLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation %d", i)
 
 				for j, ix := range opIxData {
-					timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*CallScheduled)
+					timelockEvent := parsedLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
 					require.Equal(t, currentOp.OperationID(), timelockEvent.ID, "ID does not match")
 					require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
 					require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
 					require.Equal(t, currentOp.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
 					require.Equal(t, currentOp.Salt, timelockEvent.Salt, "Salt does not match")
 					require.Equal(t, currentOp.Delay, timelockEvent.Delay, "Delay does not match")
-					require.Equal(t, ix.Data, utils.NormalizeData(timelockEvent.Data), "Data does not match")
+					require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
 				}
 			}
 		})
 
-		var newOp3 TimelockOperation
+		var newOp3 timelockutil.Operation
 
 		t.Run("cancel and reschedule token distribution with corrected amounts", func(t *testing.T) {
 			t.Run("cancel existing distribution operation through multisig", func(t *testing.T) {
@@ -1109,14 +1112,14 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				// create MCM operation node for the cancel instruction
 				// NOTE: nonce is 0 since it's the first operation
-				node, err := IxToMcmTestOpNode(canceller.ConfigPDA, canceller.SignerPDA, cancelIx, uint64(0))
+				node, err := mcms.IxToMcmTestOpNode(canceller.ConfigPDA, canceller.SignerPDA, cancelIx, uint64(0))
 				require.NoError(t, err)
 
-				cancleOpNodes := []mcmsUtils.McmOpNode{node}
+				cancleOpNodes := []mcms.McmOpNode{node}
 
 				// create and validate root data for the cancel operation
 				validUntil := uint32(0xffffffff)
-				rootValidationData, err := CreateMcmRootData(McmRootInput{
+				rootValidationData, err := mcms.CreateMcmRootData(mcms.McmRootInput{
 					Multisig:             canceller.ConfigPDA,
 					Operations:           cancleOpNodes,
 					PreOpCount:           uint64(0),
@@ -1126,16 +1129,16 @@ func TestMcmWithTimelock(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				signatures, err := BulkSignOnMsgHash(canceller.Signers, rootValidationData.EthMsgHash)
+				signatures, err := mcms.BulkSignOnMsgHash(canceller.Signers, rootValidationData.EthMsgHash)
 				require.NoError(t, err)
 
 				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
-				preloadIxs, plerr := McmPreloadSignaturesIxs(signatures, canceller.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, canceller.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 
 				for _, ix := range preloadIxs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				setRootIx, err := mcm.NewSetRootInstruction(
@@ -1146,7 +1149,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					rootValidationData.MetadataProof,
 					signaturesPDA,
 					canceller.RootMetadataPDA,
-					SeenSignedHashesAddress(canceller.PaddedName, rootValidationData.Root, validUntil),
+					mcms.SeenSignedHashesAddress(canceller.PaddedName, rootValidationData.Root, validUntil),
 					canceller.ExpiringRootAndOpCountPDA,
 					canceller.ConfigPDA,
 					admin.PublicKey(),
@@ -1154,15 +1157,15 @@ func TestMcmWithTimelock(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
 				require.NotNil(t, tx)
 
-				parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[NewRoot]("NewRoot"),
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.NewRoot]("NewRoot"),
 					},
 				)
-				event := parsedLogs[0].EventData[0].Data.(*NewRoot)
+				event := parsedLogs[0].EventData[0].Data.(*mcms.NewRoot)
 				require.Equal(t, rootValidationData.Root, event.Root)
 				require.Equal(t, validUntil, event.ValidUntil)
 				require.Equal(t, rootValidationData.Metadata.ChainId, event.MetadataChainID)
@@ -1193,43 +1196,43 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := executeIx.ValidateAndBuild()
 				require.NoError(t, err)
 
-				exeTx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
+				exeTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
 				require.NotNil(t, exeTx)
 
-				parsedExeLogs := utils.ParseLogMessages(exeTx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[OpExecuted]("OpExecuted"),
-						utils.EventMappingFor[Cancelled]("Cancelled"),
+				parsedExeLogs := common.ParseLogMessages(exeTx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
+						common.EventMappingFor[timelockutil.Cancelled]("Cancelled"),
 					},
 				)
 
 				// check opExecuted event
-				exeEvent := parsedExeLogs[0].EventData[0].Data.(*OpExecuted)
+				exeEvent := parsedExeLogs[0].EventData[0].Data.(*mcms.OpExecuted)
 				require.Equal(t, node.Nonce, exeEvent.Nonce)
 				require.Equal(t, node.To, exeEvent.To)
-				require.Equal(t, node.Data, utils.NormalizeData(exeEvent.Data))
+				require.Equal(t, node.Data, common.NormalizeData(exeEvent.Data))
 
 				// check inner Cancelled event
-				timelockEvent := parsedExeLogs[0].InnerCalls[0].EventData[0].Data.(*Cancelled)
+				timelockEvent := parsedExeLogs[0].InnerCalls[0].EventData[0].Data.(*timelockutil.Cancelled)
 				require.Equal(t, op3.OperationID(), timelockEvent.ID, "ID does not match")
 
 				// check if operation pda is closed
-				utils.AssertClosedAccount(ctx, t, solanaGoClient, op3.OperationPDA(), config.DefaultCommitment)
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, op3.OperationPDA(), config.DefaultCommitment)
 			})
 
 			t.Run("create new operation with corrected amounts", func(t *testing.T) {
 				// Create corrected transfer instructions with new amounts
-				ix1, err := utils.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+				ix1, err := tokens.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, config.TimelockSignerPDA, []solana.PublicKey{})
 				require.NoError(t, err)
-				ix2, err := utils.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+				ix2, err := tokens.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, config.TimelockSignerPDA, []solana.PublicKey{})
 				require.NoError(t, err)
-				ix3, err := utils.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+				ix3, err := tokens.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, config.TimelockSignerPDA, []solana.PublicKey{})
 				require.NoError(t, err)
 
 				// Create new operation
-				salt, err := mcmsUtils.SimpleSalt()
+				salt, err := mcms.SimpleSalt()
 				require.NoError(t, err)
-				newOp3 = TimelockOperation{
+				newOp3 = timelockutil.Operation{
 					Predecessor: op2.OperationID(),
 					Salt:        salt,
 					Delay:       uint64(1),
@@ -1239,10 +1242,10 @@ func TestMcmWithTimelock(t *testing.T) {
 				newOp3.AddInstruction(ix2, []solana.PublicKey{tokenProgram})
 				newOp3.AddInstruction(ix3, []solana.PublicKey{tokenProgram})
 
-				ixs, err := TimelockPreloadOperationIxs(newOp3, admin.PublicKey())
+				ixs, err := timelockutil.PreloadOperationIxs(newOp3, admin.PublicKey())
 				require.NoError(t, err)
 				for _, ix := range ixs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				// Create mcm operation node for scheduling
@@ -1256,14 +1259,14 @@ func TestMcmWithTimelock(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				opNode, err := IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, uint64(currentOpCount))
+				opNode, err := mcms.IxToMcmTestOpNode(proposerMsig.ConfigPDA, proposerMsig.SignerPDA, scheduleIx, uint64(currentOpCount))
 				require.NoError(t, err)
 
-				newOpNodes := []mcmsUtils.McmOpNode{opNode}
+				newOpNodes := []mcms.McmOpNode{opNode}
 
 				// Create and validate root data
 				validUntil := uint32(0xffffffff)
-				rootValidationData, err := CreateMcmRootData(McmRootInput{
+				rootValidationData, err := mcms.CreateMcmRootData(mcms.McmRootInput{
 					Multisig:             proposerMsig.ConfigPDA,
 					Operations:           newOpNodes,
 					PreOpCount:           uint64(currentOpCount),
@@ -1276,16 +1279,16 @@ func TestMcmWithTimelock(t *testing.T) {
 				currentOpCount++
 
 				// Sign and set root
-				signatures, err := BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
+				signatures, err := mcms.BulkSignOnMsgHash(proposerMsig.Signers, rootValidationData.EthMsgHash)
 				require.NoError(t, err)
 
 				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 				// preload signatures
-				preloadIxs, plerr := McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 				for _, ix := range preloadIxs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				// Set root
@@ -1297,7 +1300,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					rootValidationData.MetadataProof,
 					signaturesPDA,
 					proposerMsig.RootMetadataPDA,
-					SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+					mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 					proposerMsig.ExpiringRootAndOpCountPDA,
 					proposerMsig.ConfigPDA,
 					admin.PublicKey(),
@@ -1305,15 +1308,15 @@ func TestMcmWithTimelock(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{setRootIx}, admin, config.DefaultCommitment)
 				require.NotNil(t, tx)
 
-				parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[NewRoot]("NewRoot"),
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.NewRoot]("NewRoot"),
 					},
 				)
-				event := parsedLogs[0].EventData[0].Data.(*NewRoot)
+				event := parsedLogs[0].EventData[0].Data.(*mcms.NewRoot)
 				require.Equal(t, rootValidationData.Root, event.Root)
 				require.Equal(t, validUntil, event.ValidUntil)
 				require.Equal(t, rootValidationData.Metadata.ChainId, event.MetadataChainID)
@@ -1344,19 +1347,19 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := executeIx.ValidateAndBuild()
 				require.NoError(t, err)
 
-				exeTx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
+				exeTx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, anyone, config.DefaultCommitment)
 				require.NotNil(t, exeTx)
 
-				parsedExeLogs := utils.ParseLogMessages(exeTx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[OpExecuted]("OpExecuted"),
-						utils.EventMappingFor[CallScheduled]("CallScheduled"),
+				parsedExeLogs := common.ParseLogMessages(exeTx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.OpExecuted]("OpExecuted"),
+						common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
 					},
 				)
-				exeEvent := parsedExeLogs[0].EventData[0].Data.(*OpExecuted)
+				exeEvent := parsedExeLogs[0].EventData[0].Data.(*mcms.OpExecuted)
 				require.Equal(t, opNode.Nonce, exeEvent.Nonce)
 				require.Equal(t, opNode.To, exeEvent.To)
-				require.Equal(t, opNode.Data, utils.NormalizeData(exeEvent.Data))
+				require.Equal(t, opNode.Data, common.NormalizeData(exeEvent.Data))
 
 				// check inner CallScheduled events
 				opIxData := newOp3.ToInstructionData()
@@ -1364,24 +1367,24 @@ func TestMcmWithTimelock(t *testing.T) {
 				require.Equal(t, len(opIxData), len(parsedExeLogs[0].InnerCalls[0].EventData), "Number of actual CallScheduled events does not match expected for operation")
 
 				for j, ix := range opIxData {
-					timelockEvent := parsedExeLogs[0].InnerCalls[0].EventData[j].Data.(*CallScheduled)
+					timelockEvent := parsedExeLogs[0].InnerCalls[0].EventData[j].Data.(*timelockutil.CallScheduled)
 					require.Equal(t, newOp3.OperationID(), timelockEvent.ID, "ID does not match")
 					require.Equal(t, uint64(j), timelockEvent.Index, "Index does not match")
 					require.Equal(t, ix.ProgramId, timelockEvent.Target, "Target does not match")
 					require.Equal(t, newOp3.Predecessor, timelockEvent.Predecessor, "Predecessor does not match")
 					require.Equal(t, newOp3.Salt, timelockEvent.Salt, "Salt does not match")
 					require.Equal(t, newOp3.Delay, timelockEvent.Delay, "Delay does not match")
-					require.Equal(t, ix.Data, utils.NormalizeData(timelockEvent.Data), "Data does not match")
+					require.Equal(t, ix.Data, common.NormalizeData(timelockEvent.Data), "Data does not match")
 				}
 			})
 		})
 
 		t.Run("execute timelock operations", func(t *testing.T) {
 			// Wait for operations to be ready
-			err := WaitForOperationToBeReady(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment)
+			err := timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment)
 			require.NoError(t, err)
 
-			rErr := WaitForOperationToBeReady(ctx, solanaGoClient, op2.OperationPDA(), config.DefaultCommitment)
+			rErr := timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op2.OperationPDA(), config.DefaultCommitment)
 			require.NoError(t, rErr)
 
 			t.Run("op2: cannot be executed before op1", func(t *testing.T) {
@@ -1399,7 +1402,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
-				utils.SendAndFailWith(ctx, t, solanaGoClient,
+				testutils.SendAndFailWith(ctx, t, solanaGoClient,
 					[]solana.Instruction{vIx},
 					admin,
 					config.DefaultCommitment,
@@ -1422,34 +1425,34 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
-				tx := utils.SendAndConfirm(ctx, t, solanaGoClient,
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 					[]solana.Instruction{vIx},
 					admin,
 					config.DefaultCommitment,
-					utils.AddComputeUnitLimit(1_400_000),
+					common.AddComputeUnitLimit(1_400_000),
 				)
 				require.NotNil(t, tx)
-				parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[CallExecuted]("CallExecuted"),
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[timelockutil.CallExecuted]("CallExecuted"),
 					},
 				)
 				for i, ix := range op1.ToInstructionData() {
-					event := parsedLogs[0].EventData[i].Data.(*CallExecuted)
+					event := parsedLogs[0].EventData[i].Data.(*timelockutil.CallExecuted)
 					require.Equal(t, op1.OperationID(), event.ID)
 					require.Equal(t, uint64(i), event.Index)
 					require.Equal(t, ix.ProgramId, event.Target)
-					require.Equal(t, ix.Data, utils.NormalizeData(event.Data))
+					require.Equal(t, ix.Data, common.NormalizeData(event.Data))
 				}
 
 				// Verify operation status
 				var opAccount timelock.Operation
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &opAccount)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, op1.OperationPDA(), config.DefaultCommitment, &opAccount)
 				require.NoError(t, err)
 				require.Equal(t, config.TimelockOpDoneTimestamp, opAccount.Timestamp, "Op1 should be marked as executed")
 
 				// Verify treasury balance
-				_, treasuryBalance, err := utils.TokenBalance(ctx, solanaGoClient, treasuryATA, config.DefaultCommitment)
+				_, treasuryBalance, err := tokens.TokenBalance(ctx, solanaGoClient, treasuryATA, config.DefaultCommitment)
 				require.NoError(t, err)
 				require.Equal(t, 1000*int(solana.LAMPORTS_PER_SOL), treasuryBalance,
 					"Treasury should have received 1000 tokens")
@@ -1464,10 +1467,10 @@ func TestMcmWithTimelock(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, err)
 
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{fundIx}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{fundIx}, admin, config.DefaultCommitment)
 
 				// approve can't be deligated to timelock authority(security - CPI Guard)
-				approveIx, err := utils.TokenApproveChecked(
+				approveIx, err := tokens.TokenApproveChecked(
 					600*solana.LAMPORTS_PER_SOL,
 					9,
 					tokenProgram,
@@ -1478,7 +1481,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					nil,
 				)
 				require.NoError(t, err)
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{approveIx}, treasury, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{approveIx}, treasury, config.DefaultCommitment)
 			})
 
 			t.Run("op2: should provide the correct predecessor pda address", func(t *testing.T) {
@@ -1496,7 +1499,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
-				utils.SendAndFailWith(ctx, t, solanaGoClient,
+				testutils.SendAndFailWith(ctx, t, solanaGoClient,
 					[]solana.Instruction{vIx},
 					admin,
 					config.DefaultCommitment,
@@ -1519,29 +1522,29 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
-				tx := utils.SendAndConfirm(ctx, t, solanaGoClient,
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 					[]solana.Instruction{vIx},
 					admin,
 					config.DefaultCommitment,
-					utils.AddComputeUnitLimit(1_400_000),
+					common.AddComputeUnitLimit(1_400_000),
 				)
 				require.NotNil(t, tx)
-				parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-					[]utils.EventMapping{
-						utils.EventMappingFor[CallExecuted]("CallExecuted"),
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[timelockutil.CallExecuted]("CallExecuted"),
 					},
 				)
 				for i, ix := range op2.ToInstructionData() {
-					event := parsedLogs[0].EventData[i].Data.(*CallExecuted)
+					event := parsedLogs[0].EventData[i].Data.(*timelockutil.CallExecuted)
 					require.Equal(t, op2.OperationID(), event.ID)
 					require.Equal(t, uint64(i), event.Index)
 					require.Equal(t, ix.ProgramId, event.Target)
-					require.Equal(t, ix.Data, utils.NormalizeData(event.Data))
+					require.Equal(t, ix.Data, common.NormalizeData(event.Data))
 				}
 
 				// verify operation status
 				var opAccount timelock.Operation
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, op2.OperationPDA(), config.DefaultCommitment, &opAccount)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, op2.OperationPDA(), config.DefaultCommitment, &opAccount)
 				require.NoError(t, err)
 				require.Equal(t, config.TimelockOpDoneTimestamp, opAccount.Timestamp, "Op2 should be marked as executed")
 			})
@@ -1549,7 +1552,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		t.Run("op3: team token distribution", func(t *testing.T) {
 			// Wait for delay and execute the timelock operation
-			werr := WaitForOperationToBeReady(ctx, solanaGoClient, newOp3.OperationPDA(), config.DefaultCommitment)
+			werr := timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, newOp3.OperationPDA(), config.DefaultCommitment)
 			require.NoError(t, werr)
 
 			executeTimelockIx := timelock.NewExecuteBatchInstruction(
@@ -1566,38 +1569,38 @@ func TestMcmWithTimelock(t *testing.T) {
 			vTimelockIx, err := executeTimelockIx.ValidateAndBuild()
 			require.NoError(t, err)
 
-			tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vTimelockIx}, admin, config.DefaultCommitment)
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vTimelockIx}, admin, config.DefaultCommitment)
 			require.NotNil(t, tx)
-			parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-				[]utils.EventMapping{
-					utils.EventMappingFor[CallExecuted]("CallExecuted"),
+			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+				[]common.EventMapping{
+					common.EventMappingFor[timelockutil.CallExecuted]("CallExecuted"),
 				},
 			)
 			for i, ix := range newOp3.ToInstructionData() {
-				event := parsedLogs[0].EventData[i].Data.(*CallExecuted)
+				event := parsedLogs[0].EventData[i].Data.(*timelockutil.CallExecuted)
 				require.NotEqual(t, op3.OperationID(), event.ID)
 				require.Equal(t, newOp3.OperationID(), event.ID)
 				require.Equal(t, uint64(i), event.Index)
 				require.Equal(t, ix.ProgramId, event.Target)
-				require.Equal(t, ix.Data, utils.NormalizeData(event.Data))
+				require.Equal(t, ix.Data, common.NormalizeData(event.Data))
 			}
 			// Verify final balances
-			_, treasuryBalance, err := utils.TokenBalance(ctx, solanaGoClient, treasuryATA, config.DefaultCommitment)
+			_, treasuryBalance, err := tokens.TokenBalance(ctx, solanaGoClient, treasuryATA, config.DefaultCommitment)
 			require.NoError(t, err)
 			require.Equal(t, 600*int(solana.LAMPORTS_PER_SOL), treasuryBalance,
 				"Treasury should have 600 tokens remaining after distributions")
 
-			_, team1Balance, err := utils.TokenBalance(ctx, solanaGoClient, team1ATA, config.DefaultCommitment)
+			_, team1Balance, err := tokens.TokenBalance(ctx, solanaGoClient, team1ATA, config.DefaultCommitment)
 			require.NoError(t, err)
 			require.Equal(t, 150*int(solana.LAMPORTS_PER_SOL), team1Balance,
 				"Team1 should have received 150 tokens")
 
-			_, team2Balance, err := utils.TokenBalance(ctx, solanaGoClient, team2ATA, config.DefaultCommitment)
+			_, team2Balance, err := tokens.TokenBalance(ctx, solanaGoClient, team2ATA, config.DefaultCommitment)
 			require.NoError(t, err)
 			require.Equal(t, 150*int(solana.LAMPORTS_PER_SOL), team2Balance,
 				"Team2 should have received 150 tokens")
 
-			_, team3Balance, err := utils.TokenBalance(ctx, solanaGoClient, team3ATA, config.DefaultCommitment)
+			_, team3Balance, err := tokens.TokenBalance(ctx, solanaGoClient, team3ATA, config.DefaultCommitment)
 			require.NoError(t, err)
 			require.Equal(t, 100*int(solana.LAMPORTS_PER_SOL), team3Balance,
 				"Team3 should have received 100 tokens")
