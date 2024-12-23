@@ -1878,32 +1878,6 @@ func TestCCIPRouter(t *testing.T) {
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
-			// // TESTBLOCK accounts exist
-			// {
-			// 	deserializedTokenConfigPda := ccip_router.BillingTokenConfigWrapper{}
-			// 	deserializedBillingPda := ccip_router.PerChainPerTokenConfig{}
-			// 	deserializedEvmDestChainStatePda := ccip_router.DestChainState{}
-
-			// 	err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.billingConfigPDA, config.DefaultCommitment, &deserializedTokenConfigPda)
-			// 	require.NoError(t, err)
-			// 	t.Log(deserializedTokenConfigPda)
-			// 	err := utils.GetAccountDataBorshInto(ctx, solanaGoClient, token0BillingConfigPda, config.DefaultCommitment, &deserializedTokenConfigPda)
-			// 	require.NoError(t, err)
-			// 	t.Log(deserializedTokenConfigPda)
-
-			// 	err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, wsol.perChainPerTokenConfigPDA, config.DefaultCommitment, &deserializedBillingPda)
-			// 	require.NoError(t, err)
-			// 	t.Log(deserializedBillingPda)
-			// 	err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, token0PerChainPerConfigPda, config.DefaultCommitment, &deserializedBillingPda)
-			// 	require.NoError(t, err)
-			// 	t.Log(deserializedBillingPda)
-
-			// 	err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &deserializedEvmDestChainStatePda)
-			// 	require.NoError(t, err)
-			// 	t.Log(deserializedEvmDestChainStatePda)
-
-			// }
-
 			feeResult := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
 			t.Log(feeResult.Meta.LogMessages)
@@ -2071,8 +2045,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
@@ -2134,8 +2106,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
@@ -2198,8 +2168,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
@@ -2261,8 +2229,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(token2022.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(token2022.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
@@ -2321,8 +2287,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -2356,8 +2320,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -2391,8 +2353,7 @@ func TestCCIPRouter(t *testing.T) {
 			)
 
 			// do NOT mark the user ATA as writable
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
+
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
@@ -2439,8 +2400,6 @@ func TestCCIPRouter(t *testing.T) {
 											config.ExternalTokenPoolsSignerPDA,
 										)
 										raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-										raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-										raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 										instruction, err := raw.ValidateAndBuild()
 										require.NoError(t, err)
 
@@ -2483,8 +2442,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(token2022.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(token2022.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherUser, config.DefaultCommitment, []string{ccip_router.InvalidInputs_CcipRouterError.String()})
@@ -2518,8 +2475,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(token2022.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(token2022.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherUser, config.DefaultCommitment)

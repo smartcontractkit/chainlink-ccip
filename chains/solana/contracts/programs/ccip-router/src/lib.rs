@@ -696,16 +696,6 @@ pub mod ccip_router {
     /// The message will be sent to the receiver on the destination chain selector.
     /// This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
     ///
-    /// # Additional accounts
-    ///
-    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
-    /// the following accounts must be provided:
-    ///
-    /// * First, the billing token config accounts for each token involved, including the
-    ///   fee token, sequentially.
-    /// * Then, the per chain / per token config of those tokens, sequentially in the same
-    ///   order, for the destination chain.
-    ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for sending the message.
@@ -721,6 +711,8 @@ pub mod ccip_router {
 
         let dest_chain = &mut ctx.accounts.dest_chain_state;
 
+        // TODO this is incorrect and breaks when transfering a token. Derive these accounts
+        // from the lookup table instead.
         let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
             get_accounts_for_fee_retrieval(&ctx.remaining_accounts, &message)?;
         let fee = fee_for_msg(
