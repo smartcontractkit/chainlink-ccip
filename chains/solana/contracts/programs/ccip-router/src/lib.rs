@@ -662,10 +662,9 @@ pub mod ccip_router {
     /// In addition to the fixed amount of accounts defined in the `GetFee` context,
     /// the following accounts must be provided:
     ///
-    /// * First, the billing token config accounts for each token sent, starting with the
-    ///   fee token, sequentially.
+    /// * First, the billing token config accounts for each token sent with the message, sequentially.
     /// * Then, the per chain / per token config of every token sent with the message, sequentially
-    ///   in the same order, for the destination chain.
+    ///   in the same order.
     ///
     /// # Returns
     ///
