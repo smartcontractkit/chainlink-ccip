@@ -124,6 +124,17 @@ pub struct GetFee<'info> {
         constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
     )]
     pub dest_chain_state: Account<'info, DestChain>,
+    #[account(
+        seeds = [FEE_BILLING_TOKEN_CONFIG,
+            if message.fee_token == Pubkey::default() {
+                native_mint::ID.as_ref() // pre-2022 WSOL
+            } else {
+                message.fee_token.as_ref()
+            }
+        ],
+        bump,
+    )]
+    pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 }
 
 #[derive(Accounts)]

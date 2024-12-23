@@ -1834,15 +1834,12 @@ func TestCCIPRouter(t *testing.T) {
 				FeeToken: wsol.mint,
 			}
 
-			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA)
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
+			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
 			feeResult := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
-			t.Log(feeResult.Meta.LogMessages)
 			fee := utils.ExtractTypedReturnValue(ctx, t, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
 			require.Equal(t, uint64(1), fee)
 		})
@@ -1869,18 +1866,14 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
 
-			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA)
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
+			raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			raw.AccountMetaSlice.Append(solana.Meta(token0BillingConfigPda))
-
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			raw.AccountMetaSlice.Append(solana.Meta(token0PerChainPerConfigPda))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 
 			feeResult := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
-			t.Log(feeResult.Meta.LogMessages)
 			fee := utils.ExtractTypedReturnValue(ctx, t, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
 			require.Equal(t, uint64(3), fee)
 		})
@@ -1897,14 +1890,10 @@ func TestCCIPRouter(t *testing.T) {
 			for _, address := range [][32]byte{tooBigAddress, tooSmallAddress} {
 				message := ccip_router.Solana2AnyMessage{
 					Receiver: address[:],
-					FeeToken: token0.Mint.PublicKey(),
+					FeeToken: wsol.mint,
 				}
 
-				tokenConfigPda := getTokenConfigPDA(token0.Mint.PublicKey())
-				tokenBillingPda := getPerChainPerTokenConfigBillingPDA(token0.Mint.PublicKey())
-				raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA)
-				raw.AccountMetaSlice.Append(solana.Meta(tokenConfigPda))
-				raw.AccountMetaSlice.Append(solana.Meta(tokenBillingPda))
+				raw := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 				instruction, err := raw.ValidateAndBuild()
 				require.NoError(t, err)
 
@@ -1945,8 +1934,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 
 			require.NoError(t, err)
@@ -1980,8 +1967,6 @@ func TestCCIPRouter(t *testing.T) {
 				config.ExternalTokenPoolsSignerPDA,
 			)
 			raw.GetFeeTokenUserAssociatedAccountAccount().WRITE()
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.billingConfigPDA))
-			raw.AccountMetaSlice.Append(solana.Meta(wsol.perChainPerTokenConfigPDA))
 			instruction, err := raw.ValidateAndBuild()
 			require.NoError(t, err)
 			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
@@ -2666,13 +2651,18 @@ func TestCCIPRouter(t *testing.T) {
 					errorStr:    ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 				{
+					name:     "invalid fee token config",
+					index:    11,
+					errorStr: ccip_router.InvalidInputsConfigAccounts_CcipRouterError,
+				},
+				{
 					name:     "extra accounts not in lookup table",
 					index:    1_000, // large number to indicate append
 					errorStr: ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 				{
 					name:     "remaining accounts mismatch",
-					index:    11, // only works with token0
+					index:    12, // only works with token0
 					errorStr: ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 			}
@@ -2727,12 +2717,7 @@ func TestCCIPRouter(t *testing.T) {
 						Receiver: validReceiverAddress[:],
 						Data:     []byte{4, 5, 6},
 					}
-					// getFee
-					tokenConfigPda := getTokenConfigPDA(token.mint)
-					perChainPerTokenConfigBillingPda := getPerChainPerTokenConfigBillingPDA(token.mint)
-					rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA)
-					rawGetFeeIx.AccountMetaSlice.Append(solana.Meta(tokenConfigPda))
-					rawGetFeeIx.AccountMetaSlice.Append(solana.Meta(perChainPerTokenConfigBillingPda))
+					rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, token.billingConfigPDA)
 					ix, err := rawGetFeeIx.ValidateAndBuild()
 					require.NoError(t, err)
 
@@ -2823,11 +2808,7 @@ func TestCCIPRouter(t *testing.T) {
 			}
 
 			// getFee
-			tokenConfigPda := getTokenConfigPDA(zeroPubkey)
-			perChainPerTokenConfigBillingPda := getPerChainPerTokenConfigBillingPDA(zeroPubkey)
-			rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA)
-			rawGetFeeIx.AccountMetaSlice.Append(solana.Meta(tokenConfigPda))
-			rawGetFeeIx.AccountMetaSlice.Append(solana.Meta(perChainPerTokenConfigBillingPda))
+			rawGetFeeIx := ccip_router.NewGetFeeInstruction(config.EvmChainSelector, message, config.EvmDestChainStatePDA, wsol.billingConfigPDA)
 			ix, err := rawGetFeeIx.ValidateAndBuild()
 			require.NoError(t, err)
 

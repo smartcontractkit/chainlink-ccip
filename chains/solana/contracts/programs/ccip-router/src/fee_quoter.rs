@@ -5,9 +5,9 @@ use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
     utils::{Exponential, Usd18Decimals},
-    valid_version, BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    PerChainPerTokenConfig, Solana2AnyMessage, SolanaTokenAmount, UnpackedDoubleU224,
-    CCIP_LOCK_OR_BURN_V1_RET_BYTES, FEE_BILLING_SIGNER_SEEDS, MAX_TOKEN_AND_CHAIN_CONFIG_V,
+    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
+    SolanaTokenAmount, UnpackedDoubleU224, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
+    FEE_BILLING_SIGNER_SEEDS,
 };
 
 // TODO change args and implement
@@ -15,18 +15,15 @@ pub fn fee_for_msg(
     _dest_chain_selector: u64,
     message: &Solana2AnyMessage,
     dest_chain: &DestChain,
-    token_configs: &[BillingTokenConfig],
-    token_configs_for_dest_chain: &[PerChainPerTokenConfig],
+    fee_token_config: &BillingTokenConfig,
+    additional_token_configs: &[BillingTokenConfig],
+    additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
 ) -> Result<SolanaTokenAmount> {
     let token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
         message.fee_token
     };
-    let fee_token_config = token_configs
-        .iter()
-        .find(|c| c.mint == token)
-        .ok_or(CcipRouterError::UnsupportedToken)?;
     message.validate(dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(&fee_token_config)?;
@@ -35,8 +32,8 @@ pub fn fee_for_msg(
     let network_fee = network_fee(
         message,
         dest_chain,
-        token_configs,
-        token_configs_for_dest_chain,
+        additional_token_configs,
+        additional_token_configs_for_dest_chain,
     )?;
 
     // TODO un-hardcode
@@ -52,66 +49,6 @@ pub fn fee_for_msg(
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
 
     Ok(SolanaTokenAmount { amount, token })
-}
-
-/// Parses and validates the account slice in the order expected by `get_fees`:
-///
-/// * First, the billing token config accounts for each token involved, including the
-///   fee token, sequentially.
-/// * Then, the per chain / per token config of those tokens, sequentially in the same
-///   order, for the destination chain.
-pub fn get_accounts_for_fee_retrieval<'info>(
-    remaining_accounts: &'info [AccountInfo<'info>],
-    message: &Solana2AnyMessage,
-) -> Result<(Vec<BillingTokenConfig>, Vec<PerChainPerTokenConfig>)> {
-    let fee_token = if message.fee_token == Pubkey::default() {
-        native_mint::ID // Wrapped SOL
-    } else {
-        message.fee_token
-    };
-
-    let number_of_tokens_involved = if message.token_amounts.iter().any(|t| t.token == fee_token) {
-        message.token_amounts.len()
-    } else {
-        message.token_amounts.len() + 1
-    };
-
-    require_eq!(
-        remaining_accounts.len(),
-        2 * number_of_tokens_involved,
-        CcipRouterError::InvalidInputsTokenAccounts
-    );
-
-    let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
-        remaining_accounts.split_at(number_of_tokens_involved);
-
-    let token_billing_config_accounts = token_billing_config_accounts
-        .iter()
-        .map(|a| {
-            let account = Account::<BillingTokenConfigWrapper>::try_from(a)?;
-            require!(
-                valid_version(account.version, 1),
-                CcipRouterError::InvalidInputs
-            );
-            Ok(account.into_inner().config)
-        })
-        .collect::<Result<Vec<_>>>()?;
-    let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
-        .iter()
-        .map(|a| {
-            let account = Account::<PerChainPerTokenConfig>::try_from(a)?;
-            require!(
-                valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
-                CcipRouterError::InvalidInputs
-            );
-            Ok(account.into_inner())
-        })
-        .collect::<Result<Vec<_>>>()?;
-
-    Ok((
-        token_billing_config_accounts,
-        per_chain_per_token_config_accounts,
-    ))
 }
 
 struct NetworkFee {
@@ -324,7 +261,8 @@ mod tests {
                 0,
                 &sample_message(),
                 &sample_dest_chain(),
-                &[sample_billing_config()],
+                &sample_billing_config(),
+                &[],
                 &[]
             )
             .unwrap(),
@@ -345,7 +283,8 @@ mod tests {
                 0,
                 &sample_message(),
                 &chain,
-                &[sample_billing_config()],
+                &sample_billing_config(),
+                &[],
                 &[]
             )
             .unwrap(),
@@ -370,7 +309,8 @@ mod tests {
                 0,
                 &message,
                 &sample_dest_chain(),
-                &[sample_billing_config()],
+                &sample_billing_config(),
+                &[],
                 &[]
             )
             .unwrap_err(),
@@ -385,7 +325,7 @@ mod tests {
         // Will have no effect because we're not using the network fee
         chain.config.network_fee_usdcents *= 0;
 
-        let (_, mut per_chain_per_token) = sample_additional_token();
+        let (token_config, mut per_chain_per_token) = sample_additional_token();
 
         // Not enabled == no overrides
         per_chain_per_token.billing.is_enabled = false;
@@ -405,7 +345,8 @@ mod tests {
                 0,
                 &message,
                 &chain,
-                &[sample_billing_config()],
+                &sample_billing_config(),
+                &[token_config],
                 &[per_chain_per_token]
             )
             .unwrap(),
@@ -439,7 +380,8 @@ mod tests {
                 0,
                 &message,
                 &chain,
-                &[sample_billing_config(), another_token_config],
+                &sample_billing_config(),
+                &[another_token_config],
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
@@ -473,7 +415,8 @@ mod tests {
                 0,
                 &message,
                 &chain,
-                &[sample_billing_config(), another_token_config],
+                &sample_billing_config(),
+                &[another_token_config],
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
@@ -504,7 +447,15 @@ mod tests {
         let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
-            fee_for_msg(0, &message, &sample_dest_chain(), &tokens, &per_chains).unwrap(),
+            fee_for_msg(
+                0,
+                &message,
+                &sample_dest_chain(),
+                &sample_billing_config(),
+                &tokens,
+                &per_chains
+            )
+            .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
@@ -552,7 +503,8 @@ mod tests {
                 0,
                 &sample_message(),
                 &sample_dest_chain(),
-                &[billing_config],
+                &billing_config,
+                &[],
                 &[]
             )
             .unwrap_err(),
@@ -569,7 +521,8 @@ mod tests {
                 0,
                 &sample_message(),
                 &sample_dest_chain(),
-                &[billing_config],
+                &billing_config,
+                &[],
                 &[]
             )
             .unwrap_err(),
@@ -590,7 +543,8 @@ mod tests {
                 0,
                 &sample_message(),
                 &chain,
-                &[sample_billing_config()],
+                &sample_billing_config(),
+                &[],
                 &[]
             )
             .unwrap_err(),

@@ -662,10 +662,10 @@ pub mod ccip_router {
     /// In addition to the fixed amount of accounts defined in the `GetFee` context,
     /// the following accounts must be provided:
     ///
-    /// * First, the billing token config accounts for each token involved, including the
+    /// * First, the billing token config accounts for each token sent, starting with the
     ///   fee token, sequentially.
-    /// * Then, the per chain / per token config of those tokens, sequentially in the same
-    ///   order, for the destination chain.
+    /// * Then, the per chain / per token config of every token sent with the message, sequentially
+    ///   in the same order, for the destination chain.
     ///
     /// # Returns
     ///
@@ -675,12 +675,45 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<u64> {
+        let remaining_accounts = &ctx.remaining_accounts;
+        let message = &message;
+        require_eq!(
+            remaining_accounts.len(),
+            2 * message.token_amounts.len(),
+            CcipRouterError::InvalidInputsTokenAccounts
+        );
+
         let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
-            get_accounts_for_fee_retrieval(&ctx.remaining_accounts, &message)?;
+            remaining_accounts.split_at(message.token_amounts.len());
+
+        let token_billing_config_accounts = token_billing_config_accounts
+            .iter()
+            .map(|a| {
+                let account = Account::<BillingTokenConfigWrapper>::try_from(a)?;
+                require!(
+                    valid_version(account.version, 1),
+                    CcipRouterError::InvalidInputs
+                );
+                Ok(account.into_inner().config)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
+            .iter()
+            .map(|a| {
+                let account = Account::<PerChainPerTokenConfig>::try_from(a)?;
+                require!(
+                    valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+                    CcipRouterError::InvalidInputs
+                );
+                Ok(account.into_inner())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         Ok(fee_for_msg(
             dest_chain_selector,
             &message,
             &ctx.accounts.dest_chain_state,
+            &ctx.accounts.billing_token_config.config,
             &token_billing_config_accounts,
             &per_chain_per_token_config_accounts,
         )?
@@ -711,14 +744,60 @@ pub mod ccip_router {
 
         let dest_chain = &mut ctx.accounts.dest_chain_state;
 
-        // TODO this is incorrect and breaks when transfering a token. Derive these accounts
-        // from the lookup table instead.
-        let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
-            get_accounts_for_fee_retrieval(&ctx.remaining_accounts, &message)?;
+        let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
+
+        for (i, token_amount) in message.token_amounts.iter().enumerate() {
+            require!(
+                token_amount.amount != 0,
+                CcipRouterError::InvalidInputsTokenAmount
+            );
+
+            // Calculate the indexes for the additional accounts of the current token index `i`
+            let (start, end) = calculate_token_pool_account_indices(
+                i,
+                &message.token_indexes,
+                ctx.remaining_accounts.len(),
+            )?;
+
+            let current_token_accounts = validate_and_parse_token_accounts(
+                ctx.accounts.authority.key(),
+                dest_chain_selector,
+                ctx.program_id.key(),
+                &ctx.remaining_accounts[start..end],
+            )?;
+
+            accounts_per_sent_token.push(current_token_accounts);
+        }
+
+        let token_billing_config_accounts = accounts_per_sent_token
+            .iter()
+            .map(|a| {
+                let account = Account::<BillingTokenConfigWrapper>::try_from(a.fee_token_config)?;
+                require!(
+                    valid_version(account.version, 1),
+                    CcipRouterError::InvalidInputs
+                );
+                Ok(account.into_inner().config)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let per_chain_per_token_config_accounts = accounts_per_sent_token
+            .iter()
+            .map(|a| {
+                let account = Account::<PerChainPerTokenConfig>::try_from(a.token_billing_config)?;
+                require!(
+                    valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+                    CcipRouterError::InvalidInputs
+                );
+                Ok(account.into_inner())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         let fee = fee_for_msg(
             dest_chain_selector,
             &message,
             dest_chain,
+            &ctx.accounts.fee_token_config.config,
             &token_billing_config_accounts,
             &per_chain_per_token_config_accounts,
         )?;
@@ -790,30 +869,12 @@ pub mod ccip_router {
         };
 
         let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-        for (i, token_amount) in message.token_amounts.iter().enumerate() {
-            require!(
-                token_amount.amount != 0,
-                CcipRouterError::InvalidInputsTokenAmount
-            );
-
-            // Calculate the indexes for the additional accounts of the current token index `i`
-            let (start, end) = calculate_token_pool_account_indices(
-                i,
-                &message.token_indexes,
-                ctx.remaining_accounts.len(),
-            )?;
-
-            let current_token_accounts = validate_and_parse_token_accounts(
-                ctx.accounts.authority.key(),
-                dest_chain_selector,
-                ctx.program_id.key(),
-                &ctx.remaining_accounts[start..end],
-            )?;
-
+        for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
+            .iter()
+            .zip(message.token_amounts.iter())
+            .enumerate()
+        {
             let router_token_pool_signer = &ctx.accounts.token_pools_signer;
-
-            let _token_billing_config = &current_token_accounts._token_billing_config;
-            // TODO: Implement charging depending on the token transfer
 
             // CPI: transfer token amount from user to token pool
             transfer_token(

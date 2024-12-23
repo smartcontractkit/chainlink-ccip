@@ -15,8 +15,9 @@ import (
 
 type TokenPool struct {
 	// token details
-	Program solana.PublicKey
-	Mint    solana.PrivateKey
+	Program        solana.PublicKey
+	Mint           solana.PrivateKey
+	FeeTokenConfig solana.PublicKey
 
 	// admin registry PDA
 	AdminRegistry solana.PublicKey
@@ -47,6 +48,7 @@ func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 		tp.PoolSigner,
 		tp.Program,
 		tp.Mint.PublicKey(),
+		tp.FeeTokenConfig,
 	}
 	return append(list, tp.AdditionalAccounts...)
 }
@@ -71,10 +73,15 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	if err != nil {
 		return TokenPool{}, err
 	}
+	tokenConfigPda, _, err := solana.FindProgramAddress([][]byte{[]byte("fee_billing_token_config"), mint.PublicKey().Bytes()}, config.CcipRouterProgram)
+	if err != nil {
+		return TokenPool{}, err
+	}
 
 	p := TokenPool{
 		Program:         program,
 		Mint:            mint,
+		FeeTokenConfig:  tokenConfigPda,
 		AdminRegistry:   tokenAdminRegistryPDA,
 		PoolLookupTable: solana.PublicKey{},
 		User:            map[solana.PublicKey]solana.PublicKey{},
@@ -179,6 +186,7 @@ func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenP
 		solana.Meta(lookupTableEntries[5]),         // PoolSigner
 		solana.Meta(lookupTableEntries[6]),         // TokenProgram
 		solana.Meta(lookupTableEntries[7]).WRITE(), // Mint
+		solana.Meta(lookupTableEntries[8]),         // FeeTokenConfig
 	}
 
 	for _, v := range token.AdditionalAccounts {

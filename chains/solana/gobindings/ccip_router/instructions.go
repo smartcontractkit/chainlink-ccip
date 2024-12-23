@@ -276,10 +276,10 @@ var (
 	// In addition to the fixed amount of accounts defined in the `GetFee` context,
 	// the following accounts must be provided:
 	//
-	// * First, the billing token config accounts for each token involved, including the
+	// * First, the billing token config accounts for each token sent, starting with the
 	// fee token, sequentially.
-	// * Then, the per chain / per token config of those tokens, sequentially in the same
-	// order, for the destination chain.
+	// * Then, the per chain / per token config of every token sent with the message, sequentially
+	// in the same order, for the destination chain.
 	//
 	// # Returns
 	//
