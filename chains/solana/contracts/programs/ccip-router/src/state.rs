@@ -51,6 +51,7 @@ pub struct SourceChainState {
 pub struct SourceChain {
     // Config for Any2Solana
     pub version: u8,
+    pub chain_selector: u64, // Chain selector used for the seed
     pub state: SourceChainState, // values that are updated automatically
     pub config: SourceChainConfig, // values configured by an admin
 }
@@ -90,6 +91,7 @@ pub struct DestChainConfig {
 pub struct DestChain {
     // Config for Solana2Any
     pub version: u8,
+    pub chain_selector: u64, // Chain selector used for the seed
     pub state: DestChainState,   // values that are updated automatically
     pub config: DestChainConfig, // values configured by an admin
 }

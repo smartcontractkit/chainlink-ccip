@@ -152,6 +152,7 @@ pub mod ccip_router {
         let source_chain_state = &mut ctx.accounts.source_chain_state;
         validate_source_chain_config(new_chain_selector, &source_chain_config)?;
         source_chain_state.version = 1;
+        source_chain_state.chain_selector = new_chain_selector;
         source_chain_state.config = source_chain_config.clone();
         source_chain_state.state = SourceChainState { min_seq_nr: 1 };
 
@@ -159,6 +160,7 @@ pub mod ccip_router {
         let dest_chain_state = &mut ctx.accounts.dest_chain_state;
         validate_dest_chain_config(new_chain_selector, &dest_chain_config)?;
         dest_chain_state.version = 1;
+        dest_chain_state.chain_selector = new_chain_selector;
         dest_chain_state.config = dest_chain_config.clone();
         dest_chain_state.state = DestChainState {
             sequence_number: 0,
