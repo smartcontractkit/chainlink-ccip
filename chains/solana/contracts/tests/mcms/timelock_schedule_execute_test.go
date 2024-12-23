@@ -292,7 +292,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("success: schedule all operations", func(t *testing.T) {
 					for _, op := range []timelockutil.Operation{op1, op2, op3} {
-						invalidIxs, ierr := timelockutil.PreloadOperationIxs(ctx, op, proposer.PublicKey(), solanaGoClient)
+						invalidIxs, ierr := timelockutil.PreloadOperationIxs(op, proposer.PublicKey())
 						require.NoError(t, ierr)
 						for _, ix := range invalidIxs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
@@ -314,7 +314,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						})
 
 						// re-preload instructions
-						ixs, err := timelockutil.PreloadOperationIxs(ctx, op, proposer.PublicKey(), solanaGoClient)
+						ixs, err := timelockutil.PreloadOperationIxs(op, proposer.PublicKey())
 						require.NoError(t, err)
 						for _, ix := range ixs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
@@ -587,7 +587,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		id := op.OperationID()
 		operationPDA := op.OperationPDA()
 
-		ixs, err := timelockutil.PreloadOperationIxs(ctx, op, proposer.PublicKey(), solanaGoClient)
+		ixs, err := timelockutil.PreloadOperationIxs(op, proposer.PublicKey())
 		require.NoError(t, err)
 		for _, ix := range ixs {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)

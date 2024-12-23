@@ -5,6 +5,7 @@ use crate::constant::*;
 use crate::error::*;
 use crate::eth_utils::*;
 use crate::event::*;
+use crate::state::root::*;
 
 /// Set the configuration for the multisig instance after validating the input
 pub fn set_config(
@@ -109,6 +110,27 @@ pub fn set_config(
     config.signers = signers;
     config.group_quorums = group_quorums;
     config.group_parents = group_parents;
+
+    // clear_root is equivalent to overriding with a completely empty root
+    if clear_root {
+        let expiring_root = &mut ctx.accounts.expiring_root_and_op_count;
+        let root_metadata = &mut ctx.accounts.root_metadata;
+
+        // preserve the current op_count
+        let current_op_count = expiring_root.op_count;
+
+        // clear the expiring root while preserving op_count
+        expiring_root.root = [0u8; 32]; // clear root (equivalent to bytes32(0) in Solidity)
+        expiring_root.valid_until = 0; // clear timestamp
+        expiring_root.op_count = current_op_count;
+
+        // set root metadata to a cleared state
+        root_metadata.chain_id = ctx.accounts.multisig_config.chain_id;
+        root_metadata.multisig = ctx.accounts.multisig_config.key();
+        root_metadata.pre_op_count = current_op_count;
+        root_metadata.post_op_count = current_op_count;
+        root_metadata.override_previous_root = true;
+    }
 
     emit!(ConfigSet {
         group_parents,
@@ -217,6 +239,12 @@ pub struct SetConfig<'info> {
         close = authority // close after config set
     )]
     pub config_signers: Account<'info, ConfigSigners>, // preloaded signers account
+
+    #[account(mut, seeds = [ROOT_METADATA_SEED, multisig_name.as_ref()], bump)]
+    pub root_metadata: Account<'info, RootMetadata>,
+
+    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_name.as_ref()], bump)]
+    pub expiring_root_and_op_count: Account<'info, ExpiringRootAndOpCount>,
 
     #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
     pub authority: Signer<'info>,
