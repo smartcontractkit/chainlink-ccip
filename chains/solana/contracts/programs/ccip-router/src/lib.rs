@@ -680,7 +680,7 @@ pub mod ccip_router {
     pub fn withdraw_billed_funds(
         ctx: Context<WithdrawBilledFunds>,
         transfer_all: bool,
-        desired_amount: u64, // send 0 if transfer_all is false
+        desired_amount: u64, // if transfer_all is false, this value must be 0
     ) -> Result<()> {
         let transfer = token_interface::TransferChecked {
             from: ctx.accounts.fee_token_accum.to_account_info(),
