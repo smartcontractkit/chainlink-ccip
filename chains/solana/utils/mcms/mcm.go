@@ -101,7 +101,7 @@ func NewMcmMultisig(name [32]byte) Multisig {
 func McmPreloadSignersIxs(signerAddresses [][20]uint8, msigName [32]byte, multisigCfgPDA solana.PublicKey, cfgSignersPDA solana.PublicKey, authority solana.PublicKey, appendChunkSize int) ([]solana.Instruction, error) {
 	ixs := make([]solana.Instruction, 0)
 
-	parsedTotalSigners, pErr := mcmsUtils.SafeToUint8(len(signerAddresses))
+	parsedTotalSigners, pErr := SafeToUint8(len(signerAddresses))
 	if pErr != nil {
 		return nil, pErr
 	}
@@ -168,7 +168,7 @@ func AppendSignersIxs(signerAddresses [][20]uint8, msigName [32]byte, multisigCf
 func McmPreloadSignaturesIxs(signatures []mcm.Signature, msigName [32]byte, root [32]uint8, validUntil uint32, signaturesPDA solana.PublicKey, authority solana.PublicKey, appendChunkSize int) ([]solana.Instruction, error) {
 	ixs := make([]solana.Instruction, 0)
 
-	parsedTotalSigs, pErr := mcmsUtils.SafeToUint8(len(signatures))
+	parsedTotalSigs, pErr := SafeToUint8(len(signatures))
 	if pErr != nil {
 		return nil, pErr
 	}
