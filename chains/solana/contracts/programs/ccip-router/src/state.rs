@@ -256,6 +256,8 @@ mod tests {
     fn test_set_state() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
             timestamp: 0,
             min_msg_nr: 0,
             max_msg_nr: 64,
@@ -283,6 +285,8 @@ mod tests {
     fn test_set_state_out_of_bounds() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
@@ -296,6 +300,8 @@ mod tests {
     fn test_get_state() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
@@ -330,6 +336,8 @@ mod tests {
     fn test_get_state_out_of_bounds() {
         let commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,

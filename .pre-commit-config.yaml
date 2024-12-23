@@ -36,9 +36,9 @@ repos:
         stages: [pre-commit]
         files: ^chains/solana/
         verbose: true
-      - id: e2e-tests-ts
-        name: Run Typescript E2E tests
-        entry: bash -c "echo 'Running Anchor Tests'; cd ./chains/solana/contracts && SUITE=upgrade anchor test"
+      - id: rust-tests
+        name: Run Rust tests
+        entry: bash -c "echo 'Running Rust Tests'; cd ./chains/solana/contracts && make rust-tests"
         language: system
         stages: [pre-commit]
         files: ^chains/solana/
