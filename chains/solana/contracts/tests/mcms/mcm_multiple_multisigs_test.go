@@ -12,10 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/eth"
-	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/mcm"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 )
 
 func TestMcmMultipleMultisigs(t *testing.T) {
@@ -27,26 +28,26 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 	admin, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
-	solanaGoClient := utils.DeployAllPrograms(t, utils.PathToAnchorConfig, admin)
+	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	// mcm multisig 1
-	testMsigName1, err := mcmsUtils.PadString32("test_mcm_instance_1")
+	testMsigName1, err := mcms.PadString32("test_mcm_instance_1")
 	require.NoError(t, err)
-	multisigConfigPDA1 := McmConfigAddress(testMsigName1)
-	rootMetadataPDA1 := RootMetadataAddress(testMsigName1)
-	expiringRootAndOpCountPDA1 := ExpiringRootAndOpCountAddress(testMsigName1)
-	configSignersPDA1 := McmConfigSignersAddress(testMsigName1)
+	multisigConfigPDA1 := mcms.McmConfigAddress(testMsigName1)
+	rootMetadataPDA1 := mcms.RootMetadataAddress(testMsigName1)
+	expiringRootAndOpCountPDA1 := mcms.ExpiringRootAndOpCountAddress(testMsigName1)
+	configSignersPDA1 := mcms.McmConfigSignersAddress(testMsigName1)
 
 	// mcm multisig 2
-	testMsigName2, err := mcmsUtils.PadString32("test_mcm_instance_2")
+	testMsigName2, err := mcms.PadString32("test_mcm_instance_2")
 	require.NoError(t, err)
-	multisigConfigPDA2 := McmConfigAddress(testMsigName2)
-	rootMetadataPDA2 := RootMetadataAddress(testMsigName2)
-	expiringRootAndOpCountPDA2 := ExpiringRootAndOpCountAddress(testMsigName2)
-	configSignersPDA2 := McmConfigSignersAddress(testMsigName2)
+	multisigConfigPDA2 := mcms.McmConfigAddress(testMsigName2)
+	rootMetadataPDA2 := mcms.RootMetadataAddress(testMsigName2)
+	expiringRootAndOpCountPDA2 := mcms.ExpiringRootAndOpCountAddress(testMsigName2)
+	configSignersPDA2 := mcms.McmConfigSignersAddress(testMsigName2)
 
 	t.Run("setup:funding", func(t *testing.T) {
-		utils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
+		testutils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
 	})
 
 	t.Run("setup:test_mcm_instance_1", func(t *testing.T) {
@@ -76,11 +77,11 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				expiringRootAndOpCountPDA1,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -101,7 +102,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			groupQuorums := []uint8{1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
 			groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
-			mcmConfig, err := mcmsUtils.NewValidMcmConfig(
+			mcmConfig, err := mcms.NewValidMcmConfig(
 				testMsigName1,
 				signerPrivateKeys,
 				signerGroups,
@@ -114,15 +115,15 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				preloadIxs, pierr := McmPreloadSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA1, config.DefaultCommitment, &cfgSignersAccount)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA1, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -150,12 +151,12 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA1, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -170,7 +171,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				// pda closed after set_config
-				utils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA1, config.DefaultCommitment)
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA1, config.DefaultCommitment)
 			})
 		})
 	})
@@ -200,11 +201,11 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				expiringRootAndOpCountPDA2,
 			).ValidateAndBuild()
 			require.NoError(t, err)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
 			require.NoError(t, err, "failed to get account info")
 
 			require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -224,7 +225,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			groupQuorums := []uint8{1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
 			groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
-			mcmConfig, err := mcmsUtils.NewValidMcmConfig(
+			mcmConfig, err := mcms.NewValidMcmConfig(
 				testMsigName2,
 				signerPrivateKeys,
 				signerGroups,
@@ -237,15 +238,15 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				preloadIxs, pierr := McmPreloadSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
-					utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				var cfgSignersAccount mcm.ConfigSigners
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA2, config.DefaultCommitment, &cfgSignersAccount)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA2, config.DefaultCommitment, &cfgSignersAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, true, cfgSignersAccount.IsFinalized)
@@ -273,7 +274,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + "ConstraintSeeds"})
+				result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment, []string{"Error Code: " + "ConstraintSeeds"})
 				require.NotNil(t, result)
 			})
 
@@ -294,12 +295,12 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 				require.NoError(t, err)
 
-				result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				require.NotNil(t, result)
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig
-				err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA2, config.DefaultCommitment, &configAccount)
 				require.NoError(t, err, "failed to get account info")
 
 				require.Equal(t, config.TestChainID, configAccount.ChainId)
@@ -314,7 +315,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 				}
 
 				// pda closed after set_config
-				utils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA2, config.DefaultCommitment)
+				testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA2, config.DefaultCommitment)
 			})
 		})
 	})
