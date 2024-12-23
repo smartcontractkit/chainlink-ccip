@@ -537,6 +537,11 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.Equal(t, newMcmConfig.GroupParents, event.GroupParents)
 				require.Equal(t, newMcmConfig.GroupQuorums, event.GroupQuorums)
 				require.Equal(t, true, event.IsRootCleared)
+				for i, signer := range event.Signers {
+					require.Equal(t, newMcmConfig.SignerAddresses[i], signer.EvmAddress)
+					require.Equal(t, uint8(i), signer.Index)
+					require.Equal(t, newMcmConfig.SignerGroups[i], signer.Group)
+				}
 
 				// get config and validate
 				var configAccount mcm.MultisigConfig

@@ -280,6 +280,12 @@ func TestMcmSetConfig(t *testing.T) {
 				require.Equal(t, mcmConfig.GroupQuorums, event.GroupQuorums)
 				require.Equal(t, mcmConfig.ClearRoot, event.IsRootCleared)
 
+				for i, signer := range event.Signers {
+					require.Equal(t, mcmConfig.SignerAddresses[i], signer.EvmAddress)
+					require.Equal(t, uint8(i), signer.Index)
+					require.Equal(t, mcmConfig.SignerGroups[i], signer.Group)
+				}
+
 				// get config and validate
 				var configAccount mcm.MultisigConfig
 				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
@@ -417,6 +423,11 @@ func TestMcmSetConfig(t *testing.T) {
 			require.Equal(t, mcmConfig.GroupParents, event.GroupParents)
 			require.Equal(t, mcmConfig.GroupQuorums, event.GroupQuorums)
 			require.Equal(t, mcmConfig.ClearRoot, event.IsRootCleared)
+			for i, signer := range event.Signers {
+				require.Equal(t, mcmConfig.SignerAddresses[i], signer.EvmAddress)
+				require.Equal(t, uint8(i), signer.Index)
+				require.Equal(t, mcmConfig.SignerGroups[i], signer.Group)
+			}
 
 			// get config and validate
 			var configAccount mcm.MultisigConfig

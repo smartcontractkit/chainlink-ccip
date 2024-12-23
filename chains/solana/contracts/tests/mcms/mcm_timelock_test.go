@@ -198,6 +198,11 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.Equal(t, msig.RawConfig.GroupParents, event.GroupParents)
 						require.Equal(t, msig.RawConfig.GroupQuorums, event.GroupQuorums)
 						require.Equal(t, msig.RawConfig.ClearRoot, event.IsRootCleared)
+						for i, signer := range event.Signers {
+							require.Equal(t, msig.RawConfig.SignerAddresses[i], signer.EvmAddress)
+							require.Equal(t, uint8(i), signer.Index)
+							require.Equal(t, msig.RawConfig.SignerGroups[i], signer.Group)
+						}
 
 						// get config and validate
 						var configAccount mcm.MultisigConfig
