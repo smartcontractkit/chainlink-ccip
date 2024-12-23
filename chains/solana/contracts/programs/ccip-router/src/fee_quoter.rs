@@ -9,6 +9,7 @@ use crate::{
     PerChainPerTokenConfig, Solana2AnyMessage, SolanaTokenAmount, UnpackedDoubleU224,
     CCIP_LOCK_OR_BURN_V1_RET_BYTES, FEE_BILLING_SIGNER_SEEDS, MAX_TOKEN_AND_CHAIN_CONFIG_V,
 };
+
 // TODO change args and implement
 pub fn fee_for_msg(
     _dest_chain_selector: u64,
@@ -43,10 +44,9 @@ pub fn fee_for_msg(
     let data_availability_cost = 1u32.e(18);
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
-    let amount = (dbg!(network_fee.premium.0) * dbg!(premium_multiplier)
-        + execution_cost
-        + data_availability_cost)
-        / dbg!(fee_token_price.0);
+    let amount =
+        (network_fee.premium.0 * premium_multiplier + execution_cost + data_availability_cost)
+            / fee_token_price.0;
     let amount: u64 = amount
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
@@ -54,6 +54,12 @@ pub fn fee_for_msg(
     Ok(SolanaTokenAmount { amount, token })
 }
 
+/// Parses and validates the account slice in the order expected by `get_fees`:
+///
+/// * First, the billing token config accounts for each token involved, including the
+///   fee token, sequentially.
+/// * Then, the per chain / per token config of those tokens, sequentially in the same
+///   order, for the destination chain.
 pub fn get_accounts_for_fee_retrieval<'info>(
     remaining_accounts: &'info [AccountInfo<'info>],
     message: &Solana2AnyMessage,

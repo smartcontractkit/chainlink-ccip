@@ -19,6 +19,16 @@ import (
 // The message will be sent to the receiver on the destination chain selector.
 // This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
 //
+// # Additional accounts
+//
+// In addition to the fixed amount of accounts defined in the `GetFee` context,
+// the following accounts must be provided:
+//
+// * First, the billing token config accounts for each token involved, including the
+// fee token, sequentially.
+// * Then, the per chain / per token config of those tokens, sequentially in the same
+// order, for the destination chain.
+//
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for sending the message.

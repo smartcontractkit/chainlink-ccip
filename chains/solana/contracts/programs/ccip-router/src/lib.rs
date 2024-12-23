@@ -518,11 +518,14 @@ pub mod ccip_router {
     /// * `cfg` - The token billing configuration.
     pub fn set_token_billing(
         ctx: Context<SetTokenBillingConfig>,
-        _chain_selector: u64,
-        _mint: Pubkey,
+        chain_selector: u64,
+        mint: Pubkey,
         cfg: TokenBilling,
     ) -> Result<()> {
+        ctx.accounts.per_chain_per_token_config.version = 1; // update this if we change the account struct
         ctx.accounts.per_chain_per_token_config.billing = cfg;
+        ctx.accounts.per_chain_per_token_config.chain_selector = chain_selector;
+        ctx.accounts.per_chain_per_token_config.mint = mint;
         Ok(())
     }
 
@@ -654,6 +657,16 @@ pub mod ccip_router {
     /// * `dest_chain_selector` - The chain selector for the destination chain.
     /// * `message` - The message to be sent.
     ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token involved, including the
+    ///   fee token, sequentially.
+    /// * Then, the per chain / per token config of those tokens, sequentially in the same
+    ///   order, for the destination chain.
+    ///
     /// # Returns
     ///
     /// The fee amount in u64.
@@ -683,6 +696,16 @@ pub mod ccip_router {
     /// The message will be sent to the receiver on the destination chain selector.
     /// This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
     ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token involved, including the
+    ///   fee token, sequentially.
+    /// * Then, the per chain / per token config of those tokens, sequentially in the same
+    ///   order, for the destination chain.
+    ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for sending the message.
@@ -698,10 +721,8 @@ pub mod ccip_router {
 
         let dest_chain = &mut ctx.accounts.dest_chain_state;
 
-        // TODO this is grossly invalid, just putting it here for now to typecheck. These will come from elsewhere (see below how these accounts are retrieved)
         let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
             get_accounts_for_fee_retrieval(&ctx.remaining_accounts, &message)?;
-
         let fee = fee_for_msg(
             dest_chain_selector,
             &message,

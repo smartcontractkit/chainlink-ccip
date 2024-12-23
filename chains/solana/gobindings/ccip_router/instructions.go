@@ -271,6 +271,16 @@ var (
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent.
 	//
+	// # Additional accounts
+	//
+	// In addition to the fixed amount of accounts defined in the `GetFee` context,
+	// the following accounts must be provided:
+	//
+	// * First, the billing token config accounts for each token involved, including the
+	// fee token, sequentially.
+	// * Then, the per chain / per token config of those tokens, sequentially in the same
+	// order, for the destination chain.
+	//
 	// # Returns
 	//
 	// The fee amount in u64.
@@ -284,6 +294,16 @@ var (
 	// This function is called by the CCIP Sender Contract (or final user) to send a message to the CCIP Router.
 	// The message will be sent to the receiver on the destination chain selector.
 	// This message emits the event CCIPSendRequested with all the necessary data to be retrieved by the OffChain Code
+	//
+	// # Additional accounts
+	//
+	// In addition to the fixed amount of accounts defined in the `GetFee` context,
+	// the following accounts must be provided:
+	//
+	// * First, the billing token config accounts for each token involved, including the
+	// fee token, sequentially.
+	// * Then, the per chain / per token config of those tokens, sequentially in the same
+	// order, for the destination chain.
 	//
 	// # Arguments
 	//
