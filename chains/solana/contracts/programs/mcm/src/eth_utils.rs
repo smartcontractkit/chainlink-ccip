@@ -4,7 +4,8 @@ use anchor_lang::solana_program::secp256k1_recover::{
     secp256k1_recover, Secp256k1Pubkey, Secp256k1RecoverError,
 };
 
-use crate::{error::*, RootMetadataInput};
+use crate::error::*;
+use crate::state::root::RootMetadataInput;
 
 // Domain separators & evm constants
 // NOTE: chain-specific mcm contract should has its own domain separator to avoid ambiguity
@@ -27,10 +28,11 @@ pub fn ecdsa_recover_evm_addr(
     sig: &Signature,
 ) -> Result<[u8; EVM_ADDRESS_BYTES]> {
     // retrieve signer public key
-    let public_key = sig.secp256k1_recover_from(eth_signed_msg_hash);
-    require!(public_key.is_ok(), McmError::FailedEcdsaRecover);
+    let public_key = sig
+        .secp256k1_recover_from(eth_signed_msg_hash)
+        .map_err(|_| McmError::FailedEcdsaRecover)?;
 
-    let public_key_bytes = &public_key.unwrap().to_bytes();
+    let public_key_bytes = &public_key.to_bytes();
 
     // return last 20 bytes of hashed public key as the recovered ethereum address
     let evm_addr: [u8; EVM_ADDRESS_BYTES] = hash(public_key_bytes).to_bytes()
@@ -69,13 +71,8 @@ fn hash_pair(a: &[u8; HASH_BYTES], b: &[u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
 }
 
 fn _left_pad_vec(input: &[u8], num_bytes: usize) -> Vec<u8> {
-    let len = input.len();
-    if len >= num_bytes {
-        return input.to_vec();
-    };
-    let bytes_to_pad = num_bytes - len;
     let mut padded: Vec<u8> = Vec::with_capacity(num_bytes);
-    padded.resize(bytes_to_pad, 0);
+    padded.resize(num_bytes - input.len(), 0);
     padded.extend_from_slice(input);
     padded
 }
@@ -96,7 +93,7 @@ impl Signature {
         &self,
         eth_signed_msg_hash: &[u8; HASH_BYTES],
     ) -> std::result::Result<Secp256k1Pubkey, Secp256k1RecoverError> {
-        // See https://github.com/anza-xyz/agave/blob/c8685ce0e1bb9b26014f1024de2cd2b8c308cbde/curves/secp256k1-recover/src/lib.rs#L106-L115
+        // Ref: https://github.com/anza-xyz/agave/blob/c8685ce0e1bb9b26014f1024de2cd2b8c308cbde/curves/secp256k1-recover/src/lib.rs#L106-L115
         let v = self
             .v
             .checked_sub(27)

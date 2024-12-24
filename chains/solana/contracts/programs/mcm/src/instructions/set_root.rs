@@ -26,11 +26,7 @@ pub fn set_root(
         &ctx.accounts.multisig_config,
         &root,
         valid_until,
-    );
-    #[allow(clippy::unnecessary_unwrap)]
-    if verified.is_err() {
-        return Err(verified.unwrap_err());
-    }
+    )?;
 
     require!(
         Clock::get()?.unix_timestamp <= valid_until.into(),
@@ -125,20 +121,14 @@ fn verify_ecdsa_signatures(
     let mut previous_addr: [u8; EVM_ADDRESS_BYTES] = [0; EVM_ADDRESS_BYTES];
     let mut group_vote_counts: [u8; NUM_GROUPS] = [0; NUM_GROUPS];
     for sig in signatures {
-        let signer_addr = ecdsa_recover_evm_addr(&signed_hash.to_bytes(), sig);
-
-        #[allow(clippy::unnecessary_unwrap)]
-        // Clippy's alternatives cause problems with conditionally returning (early exit of the fn)
-        if signer_addr.is_err() {
-            return Err(signer_addr.unwrap_err());
-        }
-        let signer_addr = signer_addr.unwrap();
-
-        require!(
-            signer_addr.gt(&previous_addr),
-            McmError::SignersAddressesMustBeStrictlyIncreasing
-        );
-
+        let signer_addr = {
+            let recovered = ecdsa_recover_evm_addr(&signed_hash.to_bytes(), sig)?;
+            require!(
+                recovered.gt(&previous_addr),
+                McmError::SignersAddressesMustBeStrictlyIncreasing
+            );
+            recovered
+        };
         previous_addr = signer_addr;
 
         let signer_idx = multisig_config
