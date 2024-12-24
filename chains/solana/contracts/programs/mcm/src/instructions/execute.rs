@@ -183,13 +183,7 @@ impl Op {
 }
 
 fn bools_to_byte(b1: bool, b2: bool) -> Vec<u8> {
-    let byte = match (b1, b2) {
-        (false, false) => 0x00,
-        (false, true) => 0x01,
-        (true, false) => 0x02,
-        (true, true) => 0x03,
-    };
-    vec![byte]
+    vec![(u8::from(b1) << 1) + u8::from(b2)]
 }
 
 #[cfg(test)]
