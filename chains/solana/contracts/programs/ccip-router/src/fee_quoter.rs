@@ -1,3 +1,5 @@
+use std::ops::AddAssign;
+
 use anchor_lang::prelude::*;
 use anchor_spl::{token::spl_token::native_mint, token_interface};
 use ethnum::U256;
@@ -58,7 +60,7 @@ pub fn fee_for_msg(
     let execution_gas = U256::new(dest_chain.config.dest_gas_overhead as u128)
         + U256::new(message.data.len() as u128)
             * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
-        + network_fee.token_transfer_gas;
+        + network_fee.transfer_gas;
 
     let execution_cost = execution_gas_price
         * execution_gas
@@ -67,7 +69,7 @@ pub fn fee_for_msg(
     let data_availability_cost = data_availability_cost(
         data_availability_gas_price,
         message,
-        network_fee.token_transfer_bytes_overhead,
+        network_fee.transfer_bytes_overhead,
         dest_chain,
     );
 
@@ -106,10 +108,19 @@ fn data_availability_cost(
         * 1u32.e(14)
 }
 
+#[derive(Clone, Default, Debug)]
 struct NetworkFee {
     premium: Usd18Decimals,
-    token_transfer_gas: U256,
-    token_transfer_bytes_overhead: U256,
+    transfer_gas: U256,
+    transfer_bytes_overhead: U256,
+}
+
+impl AddAssign for NetworkFee {
+    fn add_assign(&mut self, rhs: Self) {
+        self.premium += rhs.premium;
+        self.transfer_gas += rhs.transfer_gas;
+        self.transfer_bytes_overhead += rhs.transfer_bytes_overhead;
+    }
 }
 
 fn network_fee(
@@ -121,14 +132,12 @@ fn network_fee(
     if message.token_amounts.is_empty() {
         return Ok(NetworkFee {
             premium: Usd18Decimals::from_usd_cents(dest_chain.config.network_fee_usdcents),
-            token_transfer_gas: U256::ZERO,
-            token_transfer_bytes_overhead: U256::ZERO,
+            transfer_gas: U256::ZERO,
+            transfer_bytes_overhead: U256::ZERO,
         });
     }
 
-    let mut premium = Usd18Decimals::default();
-    let mut token_transfer_gas = U256::ZERO;
-    let mut token_transfer_bytes_overhead = U256::ZERO;
+    let mut fee = NetworkFee::default();
 
     for token_amount in &message.token_amounts {
         let config_for_dest_chain = token_configs_for_dest_chain
@@ -136,30 +145,24 @@ fn network_fee(
             .find(|c| c.mint == token_amount.token)
             .ok_or(CcipRouterError::UnsupportedToken)?;
 
-        let (token_fee, token_gas, token_overhead) = if config_for_dest_chain.billing.is_enabled {
+        let token_network_fee = if config_for_dest_chain.billing.is_enabled {
             token_network_fees(token_configs, token_amount, config_for_dest_chain)?
         } else {
             // If the token has no specific overrides configured, we use the global defaults.
             global_network_fees(dest_chain)
         };
 
-        premium += token_fee;
-        token_transfer_gas += token_gas;
-        token_transfer_bytes_overhead += token_overhead;
+        fee += token_network_fee;
     }
 
-    Ok(NetworkFee {
-        premium,
-        token_transfer_gas,
-        token_transfer_bytes_overhead,
-    })
+    Ok(fee)
 }
 
 fn token_network_fees(
     token_configs: &[Option<BillingTokenConfig>],
     token_amount: &SolanaTokenAmount,
     config_for_dest_chain: &PerChainPerTokenConfig,
-) -> Result<(Usd18Decimals, U256, U256)> {
+) -> Result<NetworkFee> {
     let billing_config = token_configs
         .iter()
         .filter_map(|c| c.as_ref())
@@ -181,21 +184,29 @@ fn token_network_fees(
 
     let min_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.min_fee_usdcents);
     let max_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.max_fee_usdcents);
-    let (token_fee, token_gas, token_overhead) = (
+    let (premium, token_transfer_gas, token_transfer_bytes_overhead) = (
         bps_fee.clamp(min_fee, max_fee),
         U256::new(config_for_dest_chain.billing.dest_gas_overhead.into()),
         U256::new(config_for_dest_chain.billing.dest_bytes_overhead.into()),
     );
-    Ok((token_fee, token_gas, token_overhead))
+    Ok(NetworkFee {
+        premium,
+        transfer_gas: token_transfer_gas,
+        transfer_bytes_overhead: token_transfer_bytes_overhead,
+    })
 }
 
-fn global_network_fees(dest_chain: &DestChain) -> (Usd18Decimals, U256, U256) {
-    let (global_fee, global_gas, global_overhead) = (
+fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
+    let (premium, global_gas, global_overhead) = (
         Usd18Decimals::from_usd_cents(dest_chain.config.default_token_fee_usdcents.into()),
         U256::new(dest_chain.config.default_token_dest_gas_overhead.into()),
         U256::new(CCIP_LOCK_OR_BURN_V1_RET_BYTES.into()),
     );
-    (global_fee, global_gas, global_overhead)
+    NetworkFee {
+        premium,
+        transfer_gas: global_gas,
+        transfer_bytes_overhead: global_overhead,
+    }
 }
 
 pub struct PackedPrice {
