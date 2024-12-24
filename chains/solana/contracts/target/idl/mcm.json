@@ -135,6 +135,16 @@
           "isSigner": false
         },
         {
+          "name": "rootMetadata",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "expiringRootAndOpCount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "authority",
           "isMut": true,
           "isSigner": true
@@ -1091,6 +1101,15 @@
         {
           "name": "isRootCleared",
           "type": "bool",
+          "index": false
+        },
+        {
+          "name": "signers",
+          "type": {
+            "vec": {
+              "defined": "McmSigner"
+            }
+          },
           "index": false
         }
       ]
