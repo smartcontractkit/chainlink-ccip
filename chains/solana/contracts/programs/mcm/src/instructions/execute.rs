@@ -223,7 +223,7 @@ mod tests {
             };
 
             // op in hex:
-            // 08d275622006c4ca82d03f498e90163cafd53c663a48470c3b52ac8bfbd9f52c  separator
+            // fb98816ff3c5138a68abfd40b8d8fbc22972fea1dd89757331327e6e0a9440b7  separator
             // 0000000000000000000000000000000000000000000000001266a21317e30848  chain_id
             // eceeab9f961bbf0050babcbf22663ee37905749830f41cd5096fbc9b158f8b13  multisig
             // 0000000000000000000000000000000000000000000000000000000000000000  nonce
@@ -231,10 +231,9 @@ mod tests {
             // 0000000000000000000000000000000000000000000000000800000000000000  data_len
             // d62c04f70c29d96e                                                  data
             // 0000000000000000000000000000000000000000000000000000000000000000  remaining_accounts_len
-
             assert_eq!(
                 op.hash_leaf(),
-                decode32("98ab3312f47d75a0173f23f50ba6042748e07bea064ae297982efebae3ecec9b")
+                decode32("0145195c134f5cec64fba146648763c2a7ac9bdb2c2efbc31a72bf9fb5f4246c")
             );
         }
 
@@ -254,7 +253,7 @@ mod tests {
             };
 
             // Raw Buffers
-            // Buffer[0]: 08d275622006c4ca82d03f498e90163cafd53c663a48470c3b52ac8bfbd9f52c
+            // Buffer[0]: fb98816ff3c5138a68abfd40b8d8fbc22972fea1dd89757331327e6e0a9440b7
             // Buffer[1]: 0000000000000000000000000000000000000000000000001266a21317e30848
             // Buffer[2]: eceeab9f961bbf0050babcbf22663ee37905749830f41cd5096fbc9b158f8b13
             // Buffer[3]: 0000000000000000000000000000000000000000000000000100000000000000
@@ -265,7 +264,7 @@ mod tests {
 
             assert_eq!(
                 op.hash_leaf(),
-                decode32("a23f9edc9ab94e247f6273d36633dced27525727b6a50aee95f14fd92aadb6e0")
+                decode32("d0dade6731524fbf07bf67fb9d250bc10b6e22adcd5e04ad9d6f515c75ac4951")
             );
         }
     }
