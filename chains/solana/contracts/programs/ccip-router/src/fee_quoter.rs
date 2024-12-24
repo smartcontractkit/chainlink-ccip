@@ -10,7 +10,22 @@ use crate::{
     FEE_BILLING_SIGNER_SEEDS,
 };
 
-// TODO change args and implement
+/// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
+/// Each variable array takes 1 more slot to store its length.
+/// When abi encoded, excluding array contents,
+/// Any2EVMMessage takes up a fixed number of 13 slots, 32 bytes each.
+/// For structs that contain arrays, 1 more slot is added to the front, reaching a total of 14.
+/// The fixed bytes does not cover struct data (this is represented by ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
+pub const ANY_2_EVM_MESSAGE_FIXED_BYTES: U256 = U256::new(32 * 14);
+
+/// Each token transfer adds 1 RampTokenAmount
+/// RampTokenAmount has 5 fields, 2 of which are bytes type, 1 Address, 1 uint256 and 1 uint32.
+/// Each bytes type takes 1 slot for length, 1 slot for data and 1 slot for the offset.
+/// address
+/// uint256 amount takes 1 slot.
+/// uint32 destGasAmount takes 1 slot.
+pub const ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3) + 3));
+
 pub fn fee_for_msg(
     _dest_chain_selector: u64,
     message: &Solana2AnyMessage,
@@ -19,7 +34,7 @@ pub fn fee_for_msg(
     additional_token_configs: &[BillingTokenConfig],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
 ) -> Result<SolanaTokenAmount> {
-    let token = if message.fee_token == Pubkey::default() {
+    let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
         message.fee_token
@@ -27,7 +42,10 @@ pub fn fee_for_msg(
     message.validate(dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
-    let _packed_gas_price = get_validated_gas_price(dest_chain)?;
+    let PackedPrice {
+        execution_gas_price,
+        data_availability_gas_price,
+    } = get_validated_gas_price(dest_chain)?;
 
     let network_fee = network_fee(
         message,
@@ -36,25 +54,62 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain,
     )?;
 
-    // TODO un-hardcode
-    let execution_cost = 1u32.e(18);
-    let data_availability_cost = 1u32.e(18);
+    // TODO consider extra args
+    let execution_gas = U256::new(dest_chain.config.dest_gas_overhead as u128)
+        + U256::new(message.data.len() as u128)
+            * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
+        + network_fee.token_transfer_gas;
+
+    let execution_cost = execution_gas_price
+        * execution_gas
+        * U256::new(dest_chain.config.gas_multiplier_wei_per_eth as u128);
+
+    let data_availability_cost = data_availability_cost(
+        data_availability_gas_price,
+        message,
+        network_fee.token_transfer_bytes_overhead,
+        dest_chain,
+    );
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
-    let amount =
-        (network_fee.premium.0 * premium_multiplier + execution_cost + data_availability_cost)
-            / fee_token_price.0;
-    let amount: u64 = amount
-        .try_into()
-        .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
+    let fee_token_value =
+        network_fee.premium * premium_multiplier + execution_cost + data_availability_cost;
+    SolanaTokenAmount::amount(fee_token, fee_token_value, fee_token_price)
+}
 
-    Ok(SolanaTokenAmount { amount, token })
+fn data_availability_cost(
+    data_availability_gas_price: Usd18Decimals,
+    message: &Solana2AnyMessage,
+    token_transfer_bytes_overhead: U256,
+    dest_chain: &DestChain,
+) -> Usd18Decimals {
+    // Sums up byte lengths of fixed message fields and dynamic message fields.
+    // Fixed message fields do account for the offset and length slot of the dynamic fields.
+    let data_availability_length_bytes = ANY_2_EVM_MESSAGE_FIXED_BYTES
+        + U256::new(message.data.len() as u128)
+        + (U256::new(message.token_amounts.len() as u128)
+            * ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN)
+        + token_transfer_bytes_overhead;
+
+    // dest_data_availability_overhead_gas is a separate config value for flexibility to be updated
+    // independently of message cost. Its value is determined by CCIP lane implementation, e.g.
+    // the overhead data posted for OCR.
+    let data_availability_gas = data_availability_length_bytes
+        * U256::new(dest_chain.config.dest_gas_per_data_availability_byte as u128)
+        + U256::new(dest_chain.config.dest_data_availability_overhead_gas as u128);
+
+    // // data_availability_gas_price is in 18 decimals, dest_data_availability_multiplier_bps is in 4 decimals
+    // // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
+    data_availability_gas_price
+        * data_availability_gas
+        * U256::new(dest_chain.config.dest_data_availability_multiplier_bps as u128)
+        * 1u32.e(14)
 }
 
 struct NetworkFee {
     premium: Usd18Decimals,
-    _token_transfer_gas: U256,
-    _token_transfer_bytes_overhead: U256,
+    token_transfer_gas: U256,
+    token_transfer_bytes_overhead: U256,
 }
 
 fn network_fee(
@@ -66,8 +121,8 @@ fn network_fee(
     if message.token_amounts.is_empty() {
         return Ok(NetworkFee {
             premium: Usd18Decimals::from_usd_cents(dest_chain.config.network_fee_usdcents),
-            _token_transfer_gas: U256::ZERO,
-            _token_transfer_bytes_overhead: U256::ZERO,
+            token_transfer_gas: U256::ZERO,
+            token_transfer_bytes_overhead: U256::ZERO,
         });
     }
 
@@ -95,8 +150,8 @@ fn network_fee(
 
     Ok(NetworkFee {
         premium,
-        _token_transfer_gas: token_transfer_gas,
-        _token_transfer_bytes_overhead: token_transfer_bytes_overhead,
+        token_transfer_gas,
+        token_transfer_bytes_overhead,
     })
 }
 
@@ -142,15 +197,17 @@ fn global_network_fees(dest_chain: &DestChain) -> (Usd18Decimals, U256, U256) {
 }
 
 pub struct PackedPrice {
-    pub execution_cost: u128,
-    pub gas_price: u128,
+    // L1 gas price (encoded in the lower 112 bits)
+    pub execution_gas_price: Usd18Decimals,
+    // L2 gas price (encoded in the higher 112 bits)
+    pub data_availability_gas_price: Usd18Decimals,
 }
 
 impl From<UnpackedDoubleU224> for PackedPrice {
     fn from(value: UnpackedDoubleU224) -> Self {
         Self {
-            execution_cost: value.low,
-            gas_price: value.high,
+            execution_gas_price: Usd18Decimals(value.low.into()),
+            data_availability_gas_price: Usd18Decimals(value.high.into()),
         }
     }
 }
@@ -486,8 +543,8 @@ mod tests {
                     min_fee_usdcents: 100,
                     max_fee_usdcents: 300,
                     deci_bps: 0,
-                    dest_gas_overhead: 100,
-                    dest_bytes_overhead: 100,
+                    dest_gas_overhead: 0,
+                    dest_bytes_overhead: 0,
                     is_enabled: true,
                 },
             },

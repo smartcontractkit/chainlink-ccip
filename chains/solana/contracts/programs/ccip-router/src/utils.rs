@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign};
+use std::ops::{Add, AddAssign, Mul};
 
 use anchor_lang::prelude::*;
 use ethnum::U256;
@@ -39,12 +39,21 @@ impl AddAssign for Usd18Decimals {
     }
 }
 
+impl Mul<U256> for Usd18Decimals {
+    type Output = Self;
+
+    fn mul(mut self, rhs: U256) -> Self::Output {
+        self.0 *= rhs;
+        self
+    }
+}
+
 impl SolanaTokenAmount {
     pub fn value(&self, price: &Usd18Decimals) -> Usd18Decimals {
         Usd18Decimals((U256::new(self.amount.into()) * price.0) / 1u32.e(18))
     }
 
-    pub fn amount(token: Pubkey, value: &Usd18Decimals, price: &Usd18Decimals) -> Result<Self> {
+    pub fn amount(token: Pubkey, value: Usd18Decimals, price: Usd18Decimals) -> Result<Self> {
         Ok(Self {
             token,
             amount: ((value.0 * 1u32.e(18)) / price.0)

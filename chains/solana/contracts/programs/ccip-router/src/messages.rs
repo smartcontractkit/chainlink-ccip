@@ -579,12 +579,17 @@ pub(crate) mod tests {
     }
 
     pub fn sample_dest_chain() -> DestChain {
+        let mut value = [0; 28];
+        // L1 gas price
+        value[0..14].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
+        // L2 gas price
+        value[14..].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
         DestChain {
             version: 1,
             state: crate::DestChainState {
                 sequence_number: 0,
                 usd_per_unit_gas: crate::TimestampedPackedU224 {
-                    value: [0; 28],
+                    value,
                     timestamp: 100,
                 },
             },
@@ -593,7 +598,7 @@ pub(crate) mod tests {
                 max_number_of_tokens_per_msg: 5,
                 max_data_bytes: 200,
                 max_per_msg_gas_limit: 0,
-                dest_gas_overhead: 0,
+                dest_gas_overhead: 1,
                 dest_gas_per_payload_byte: 0,
                 dest_data_availability_overhead_gas: 0,
                 dest_gas_per_data_availability_byte: 0,
@@ -601,7 +606,7 @@ pub(crate) mod tests {
                 default_token_fee_usdcents: 100,
                 default_token_dest_gas_overhead: 0,
                 default_tx_gas_limit: 0,
-                gas_multiplier_wei_per_eth: 0,
+                gas_multiplier_wei_per_eth: 1,
                 network_fee_usdcents: 100,
                 gas_price_staleness_threshold: 10,
                 enforce_out_of_order: false,
