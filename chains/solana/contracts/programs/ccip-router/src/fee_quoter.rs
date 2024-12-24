@@ -73,7 +73,7 @@ pub fn fee_for_msg(
 
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
     let fee_token_value =
-        network_fee.premium * premium_multiplier + execution_cost + data_availability_cost;
+        (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
     SolanaTokenAmount::amount(fee_token, fee_token_value, fee_token_price)
 }
 
@@ -100,7 +100,7 @@ fn data_availability_cost(
 
     // // data_availability_gas_price is in 18 decimals, dest_data_availability_multiplier_bps is in 4 decimals
     // // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    data_availability_gas_price
+    dbg!(data_availability_gas_price)
         * data_availability_gas
         * U256::new(dest_chain.config.dest_data_availability_multiplier_bps as u128)
         * 1u32.e(14)
@@ -325,7 +325,7 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 1
+                amount: 995200000000000000
             }
         );
     }
@@ -348,7 +348,7 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
-                amount: 4
+                amount: 4661866666666666666
             }
         );
     }
@@ -409,7 +409,7 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 1
+                amount: 1229866666666666666
             }
         );
     }
@@ -445,7 +445,7 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
-                amount: 3
+                amount: 3539733333333333333
             }
         );
     }
@@ -479,7 +479,7 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 1
+                amount: 1206400000000000000
             }
         );
     }
@@ -516,7 +516,7 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
-                amount: 2
+                amount: 2840000000000000000
             }
         );
     }

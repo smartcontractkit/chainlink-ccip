@@ -583,7 +583,7 @@ pub(crate) mod tests {
         // L1 gas price
         value[0..14].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
         // L2 gas price
-        value[14..].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
+        value[14..].clone_from_slice(&U256::new(22u128).to_be_bytes()[18..]);
         DestChain {
             version: 1,
             state: crate::DestChainState {
@@ -601,8 +601,8 @@ pub(crate) mod tests {
                 dest_gas_overhead: 1,
                 dest_gas_per_payload_byte: 0,
                 dest_data_availability_overhead_gas: 0,
-                dest_gas_per_data_availability_byte: 0,
-                dest_data_availability_multiplier_bps: 0,
+                dest_gas_per_data_availability_byte: 1,
+                dest_data_availability_multiplier_bps: 1,
                 default_token_fee_usdcents: 100,
                 default_token_dest_gas_overhead: 0,
                 default_tx_gas_limit: 0,
