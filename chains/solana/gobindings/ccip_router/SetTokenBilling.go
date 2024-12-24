@@ -17,8 +17,8 @@ import (
 // # Arguments
 //
 // * `ctx` - The context containing the accounts required for setting the token billing configuration.
-// * `_chain_selector` - The chain selector.
-// * `_mint` - The public key of the token mint.
+// * `chain_selector` - The chain selector.
+// * `mint` - The public key of the token mint.
 // * `cfg` - The token billing configuration.
 type SetTokenBilling struct {
 	ChainSelector *uint64

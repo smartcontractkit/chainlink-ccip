@@ -170,7 +170,7 @@ fn token_network_fees(
 
     let bps_fee = match billing_config {
         Some(config) if config_for_dest_chain.billing.deci_bps > 0 => {
-            let token_price = get_validated_token_price(&config)?;
+            let token_price = get_validated_token_price(config)?;
             // Calculate token transfer value, then apply fee ratio
             // ratio represents multiples of 0.1bps, or 1e-5
             Usd18Decimals(
