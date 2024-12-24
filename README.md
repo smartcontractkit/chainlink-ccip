@@ -65,7 +65,7 @@ the `main` branch of chainlink-ccip. You can do this by:
 ## Pre commit hook
 
 You should install [pre-commit](https://pre-commit.com/) so that automated linting and formatting checks are performed before each commit.
-Currently, this pre-commit configuration only runs when modifiying Solana Files under `./solana` folder.
+Currently, this pre-commit configuration only runs when modifying Solana Files under `./solana` folder.
 
 Run:
 
