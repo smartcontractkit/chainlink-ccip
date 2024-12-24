@@ -1,5 +1,5 @@
 // Business-logic constants
-pub const MAX_NUM_SIGNERS: usize = 200; // This has to be below u8 limit (255). Value copied from EVM reference contract
+pub const MAX_NUM_SIGNERS: usize = 180; // maximum number of signers supported
 pub const NUM_GROUPS: usize = 32; // Value copied from EVM reference contract
 
 // fixed size msig name for distinguishing different multisig instances
