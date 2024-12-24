@@ -108,8 +108,8 @@ fn data_availability_cost(
         * U256::new(dest_chain.config.dest_gas_per_data_availability_byte as u128)
         + U256::new(dest_chain.config.dest_data_availability_overhead_gas as u128);
 
-    // // data_availability_gas_price is in 18 decimals, dest_data_availability_multiplier_bps is in 4 decimals
-    // // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
+    // data_availability_gas_price is in 18 decimals, dest_data_availability_multiplier_bps is in 4 decimals
+    // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
     data_availability_gas_price
         * data_availability_gas
         * U256::new(dest_chain.config.dest_data_availability_multiplier_bps as u128)
