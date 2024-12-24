@@ -2743,6 +2743,9 @@
           },
           {
             "name": "UnsupportedToken"
+          },
+          {
+            "name": "InvalidInputsMissingTokenConfig"
           }
         ]
       }

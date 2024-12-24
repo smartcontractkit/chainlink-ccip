@@ -41,6 +41,14 @@ pub fn fee_for_msg(
     } else {
         message.fee_token
     };
+    require!(
+        additional_token_configs.len() == message.token_amounts.len(),
+        CcipRouterError::InvalidInputsMissingTokenConfig
+    );
+    require!(
+        additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
+        CcipRouterError::InvalidInputsMissingTokenConfig
+    );
     message.validate(dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
@@ -139,14 +147,10 @@ fn network_fee(
 
     let mut fee = NetworkFee::default();
 
-    for token_amount in &message.token_amounts {
-        let config_for_dest_chain = token_configs_for_dest_chain
-            .iter()
-            .find(|c| c.mint == token_amount.token)
-            .ok_or(CcipRouterError::UnsupportedToken)?;
-
+    for (i, token_amount) in message.token_amounts.iter().enumerate() {
+        let config_for_dest_chain = &token_configs_for_dest_chain[i];
         let token_network_fee = if config_for_dest_chain.billing.is_enabled {
-            token_network_fees(token_configs, token_amount, config_for_dest_chain)?
+            token_network_fees(&token_configs[i], token_amount, config_for_dest_chain)?
         } else {
             // If the token has no specific overrides configured, we use the global defaults.
             global_network_fees(dest_chain)
@@ -159,15 +163,10 @@ fn network_fee(
 }
 
 fn token_network_fees(
-    token_configs: &[Option<BillingTokenConfig>],
+    billing_config: &Option<BillingTokenConfig>,
     token_amount: &SolanaTokenAmount,
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<NetworkFee> {
-    let billing_config = token_configs
-        .iter()
-        .filter_map(|c| c.as_ref())
-        .find(|c| c.mint == token_amount.token);
-
     let bps_fee = match billing_config {
         Some(config) if config_for_dest_chain.billing.deci_bps > 0 => {
             let token_price = get_validated_token_price(config)?;
@@ -384,7 +383,7 @@ mod tests {
                 &[]
             )
             .unwrap_err(),
-            CcipRouterError::UnsupportedToken.into()
+            CcipRouterError::InvalidInputsMissingTokenConfig.into()
         );
     }
 
@@ -551,7 +550,7 @@ mod tests {
 
     #[test]
     fn network_fee_for_multiple_tokens() {
-        let (mut tokens, per_chains): (Vec<_>, Vec<_>) =
+        let (tokens, per_chains): (Vec<_>, Vec<_>) =
             (0..4).map(|_| sample_additional_token()).unzip();
 
         let mut message = sample_message();
@@ -562,7 +561,6 @@ mod tests {
                 amount: 1,
             })
             .collect();
-        tokens.push(sample_billing_config());
 
         let tokens: Vec<_> = tokens.into_iter().map(|t| Some(t)).collect();
         let per_chains: Vec<_> = per_chains.into_iter().collect();

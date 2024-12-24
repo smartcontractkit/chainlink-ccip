@@ -1681,6 +1681,8 @@ pub enum CcipRouterError {
     InsufficientLamports,
     #[msg("Unsupported token")]
     UnsupportedToken,
+    #[msg("Inputs are missing token configuration")]
+    InvalidInputsMissingTokenConfig,
 }
 
 // TODO: Refactor this to use the same structure as messages: execution_report.validate(..)
