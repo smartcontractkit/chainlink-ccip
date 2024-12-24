@@ -9,13 +9,14 @@ use crate::{error::*, RootMetadataInput};
 // Domain separators & evm constants
 // NOTE: chain-specific mcm contract should has its own domain separator to avoid ambiguity
 // https://github.com/smartcontractkit/ccip-owner-contracts#porting
-pub const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA: &[u8; HASH_BYTES] = &[
-    // result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA")
+//
+// result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA")
+pub const METADATA_DOMAIN_SEPARATOR: &[u8; HASH_BYTES] = &[
     0x47, 0xfd, 0xed, 0x70, 0x90, 0x1d, 0x27, 0x3, 0x83, 0x94, 0xdb, 0x90, 0x5a, 0x72, 0x56, 0x3c,
     0xad, 0x6f, 0x7, 0x58, 0x1d, 0xbc, 0xdd, 0x14, 0x72, 0xcc, 0xd2, 0xf7, 0x42, 0xaf, 0x63, 0x60,
 ];
-pub const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP: &[u8; HASH_BYTES] = &[
-    // result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA")
+// result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA")
+pub const OP_DOMAIN_SEPARATOR: &[u8; HASH_BYTES] = &[
     0xfb, 0x98, 0x81, 0x6f, 0xf3, 0xc5, 0x13, 0x8a, 0x68, 0xab, 0xfd, 0x40, 0xb8, 0xd8, 0xfb, 0xc2,
     0x29, 0x72, 0xfe, 0xa1, 0xdd, 0x89, 0x75, 0x73, 0x31, 0x32, 0x7e, 0x6e, 0xa, 0x94, 0x40, 0xb7,
 ];
@@ -115,7 +116,7 @@ impl RootMetadataInput {
         let override_previous_root_bytes = left_pad_vec(override_previous_root);
 
         hashv(&[
-            MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA,
+            METADATA_DOMAIN_SEPARATOR,
             chain_id.as_slice(),
             &self.multisig.to_bytes(),
             pre_op_count.as_slice(),
@@ -144,6 +145,21 @@ mod tests {
 
     fn decode20(s: &str) -> [u8; EVM_ADDRESS_BYTES] {
         _decode::<EVM_ADDRESS_BYTES>(s)
+    }
+
+    mod domain_separators {
+        use anchor_lang::solana_program::keccak;
+
+        use super::*;
+
+        #[test]
+        fn verify_domain_separators() {
+            let metadata =
+                keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA".as_bytes());
+            assert_eq!(&metadata.to_bytes(), METADATA_DOMAIN_SEPARATOR);
+            let op = keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA".as_bytes());
+            assert_eq!(&op.to_bytes(), OP_DOMAIN_SEPARATOR);
+        }
     }
 
     mod test_hash_pair {

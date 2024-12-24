@@ -146,7 +146,7 @@ impl Op {
         let remaining_accounts_len = left_pad_vec(&self.remaining_accounts.len().to_le_bytes());
 
         hashv(&[
-            MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP,
+            OP_DOMAIN_SEPARATOR,
             chain_id.as_slice(),
             &self.multisig.to_bytes(),
             nonce.as_slice(),
