@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::ocr3base::Ocr3Config;
+use crate::{
+    ocr3base::Ocr3Config, valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG,
+    MAX_TOKEN_AND_CHAIN_CONFIG_V, TOKEN_POOL_BILLING_SEED,
+};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -174,6 +177,30 @@ pub struct PerChainPerTokenConfig {
     pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
 }
 
+impl PerChainPerTokenConfig {
+    pub fn safe_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+        dest_chain_selector: u64,
+    ) -> Result<Self> {
+        let (expected, _) = Pubkey::find_program_address(
+            &[
+                TOKEN_POOL_BILLING_SEED,
+                dest_chain_selector.to_le_bytes().as_ref(),
+                token.key().as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+        require!(
+            valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(account.into_inner())
+    }
+}
+
 #[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenBilling {
     pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
@@ -205,6 +232,20 @@ pub struct BillingTokenConfig {
     pub usd_per_token: TimestampedPackedU224,
     // billing configs
     pub premium_multiplier_wei_per_eth: u64,
+}
+
+impl BillingTokenConfig {
+    pub fn safe_try_from<'info>(account: &'info AccountInfo<'info>, token: Pubkey) -> Result<Self> {
+        let (expected, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
+        require!(
+            valid_version(account.version, 1),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(account.into_inner().config)
+    }
 }
 
 #[account]

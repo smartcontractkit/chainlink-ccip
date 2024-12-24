@@ -513,8 +513,8 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-    /// * `_chain_selector` - The chain selector.
-    /// * `_mint` - The public key of the token mint.
+    /// * `chain_selector` - The chain selector.
+    /// * `mint` - The public key of the token mint.
     /// * `cfg` - The token billing configuration.
     pub fn set_token_billing(
         ctx: Context<SetTokenBillingConfig>,
@@ -687,24 +687,16 @@ pub mod ccip_router {
 
         let token_billing_config_accounts = token_billing_config_accounts
             .iter()
-            .map(|a| {
-                let account = Account::<BillingTokenConfigWrapper>::try_from(a)?;
-                require!(
-                    valid_version(account.version, 1),
-                    CcipRouterError::InvalidInputs
-                );
-                Ok(account.into_inner().config)
+            .zip(message.token_amounts.iter())
+            .map(|(a, SolanaTokenAmount { token, .. })| {
+                BillingTokenConfig::safe_try_from(a, *token)
             })
             .collect::<Result<Vec<_>>>()?;
         let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
             .iter()
-            .map(|a| {
-                let account = Account::<PerChainPerTokenConfig>::try_from(a)?;
-                require!(
-                    valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
-                    CcipRouterError::InvalidInputs
-                );
-                Ok(account.into_inner())
+            .zip(message.token_amounts.iter())
+            .map(|(a, SolanaTokenAmount { token, .. })| {
+                PerChainPerTokenConfig::safe_try_from(a, *token, dest_chain_selector)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -770,25 +762,17 @@ pub mod ccip_router {
 
         let token_billing_config_accounts = accounts_per_sent_token
             .iter()
-            .map(|a| {
-                let account = Account::<BillingTokenConfigWrapper>::try_from(a.fee_token_config)?;
-                require!(
-                    valid_version(account.version, 1),
-                    CcipRouterError::InvalidInputs
-                );
-                Ok(account.into_inner().config)
-            })
+            .map(|accs| BillingTokenConfig::safe_try_from(accs.fee_token_config, accs.mint.key()))
             .collect::<Result<Vec<_>>>()?;
 
         let per_chain_per_token_config_accounts = accounts_per_sent_token
             .iter()
-            .map(|a| {
-                let account = Account::<PerChainPerTokenConfig>::try_from(a.token_billing_config)?;
-                require!(
-                    valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
-                    CcipRouterError::InvalidInputs
-                );
-                Ok(account.into_inner())
+            .map(|accs| {
+                PerChainPerTokenConfig::safe_try_from(
+                    accs.token_billing_config,
+                    accs.mint.key(),
+                    dest_chain_selector,
+                )
             })
             .collect::<Result<Vec<_>>>()?;
 
