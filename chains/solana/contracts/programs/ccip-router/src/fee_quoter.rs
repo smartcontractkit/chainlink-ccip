@@ -102,7 +102,7 @@ fn data_availability_cost(
 
     // // data_availability_gas_price is in 18 decimals, dest_data_availability_multiplier_bps is in 4 decimals
     // // We pad 14 decimals to bring the result to 36 decimals, in line with token bps and execution fee.
-    dbg!(data_availability_gas_price)
+    data_availability_gas_price
         * data_availability_gas
         * U256::new(dest_chain.config.dest_data_availability_multiplier_bps as u128)
         * 1u32.e(14)
@@ -174,8 +174,8 @@ fn token_network_fees(
             // Calculate token transfer value, then apply fee ratio
             // ratio represents multiples of 0.1bps, or 1e-5
             Usd18Decimals(
-                token_amount.value(&token_price).0
-                    * U256::new(config_for_dest_chain.billing.deci_bps.into())
+                (token_amount.value(&token_price).0
+                    * U256::new(config_for_dest_chain.billing.deci_bps.into()))
                     / 1u32.e(5),
             )
         }
@@ -477,7 +477,7 @@ mod tests {
         let mut message = sample_message();
         message.token_amounts = vec![SolanaTokenAmount {
             token: another_token_config.mint,
-            amount: 1,
+            amount: 15_000_000_000_000_000,
         }];
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
@@ -492,7 +492,59 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 1206400000000000000
+                amount: 923066666666666666
+            }
+        );
+    }
+
+    #[test]
+    fn network_fee_for_a_supported_token_with_no_fee_token_config() {
+        let mut chain = sample_dest_chain();
+
+        chain.config.network_fee_usdcents *= 0;
+        let (_, mut another_per_chain_per_token_config) = sample_additional_token();
+
+        // Will have no effect, as we cannot know the price of the token
+        another_per_chain_per_token_config.billing.deci_bps = 100;
+
+        let mut message = sample_message();
+        message.token_amounts = vec![SolanaTokenAmount {
+            token: another_per_chain_per_token_config.mint,
+            amount: 15_000_000_000_000_000,
+        }];
+        set_syscall_stubs(Box::new(TestStubs));
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &chain,
+                &sample_billing_config(),
+                &[None],
+                &[another_per_chain_per_token_config.clone()]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                amount: 906400000000000000
+            }
+        );
+
+        // Will have no effect, as we cannot know the price of the token
+        another_per_chain_per_token_config.billing.deci_bps = 2500;
+
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &chain,
+                &sample_billing_config(),
+                &[None],
+                &[another_per_chain_per_token_config.clone()]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                amount: 906400000000000000
             }
         );
     }
@@ -502,7 +554,6 @@ mod tests {
         let (mut tokens, per_chains): (Vec<_>, Vec<_>) =
             (0..4).map(|_| sample_additional_token()).unzip();
 
-        // Will have no effect because we're not using the network fee
         let mut message = sample_message();
         message.token_amounts = tokens
             .iter()
@@ -529,7 +580,7 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
-                amount: 2840000000000000000
+                amount: 1640000000000000000
             }
         );
     }
@@ -537,7 +588,7 @@ mod tests {
     fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
         let mint = Pubkey::new_unique();
         let mut usd_per_token = [0u8; 28];
-        usd_per_token.clone_from_slice(&1u32.e(16).to_be_bytes()[4..]);
+        usd_per_token.clone_from_slice(&1_000_000u32.e(16).to_be_bytes()[4..]);
         (
             BillingTokenConfig {
                 enabled: true,
@@ -553,8 +604,8 @@ mod tests {
                 chain_selector: 0,
                 mint,
                 billing: TokenBilling {
-                    min_fee_usdcents: 100,
-                    max_fee_usdcents: 300,
+                    min_fee_usdcents: 10,
+                    max_fee_usdcents: 20,
                     deci_bps: 0,
                     dest_gas_overhead: 0,
                     dest_bytes_overhead: 0,
