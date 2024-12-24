@@ -96,17 +96,16 @@ impl Signature {
         eth_signed_msg_hash: &[u8; HASH_BYTES],
     ) -> std::result::Result<Secp256k1Pubkey, Secp256k1RecoverError> {
         // See https://github.com/anza-xyz/agave/blob/c8685ce0e1bb9b26014f1024de2cd2b8c308cbde/curves/secp256k1-recover/src/lib.rs#L106-L115
-        if self.v < 27 {
-            return Err(Secp256k1RecoverError::InvalidRecoveryId);
-        }
-        let v = self.v - 27;
+        let v = self
+            .v
+            .checked_sub(27)
+            .ok_or(Secp256k1RecoverError::InvalidRecoveryId)?;
         let rs = [self.r, self.s].concat();
         secp256k1_recover(eth_signed_msg_hash, v, rs.as_slice())
     }
 }
 
 impl RootMetadataInput {
-    // computes keccak256(abi.encode(MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA, metadata))
     pub fn hash_leaf(&self) -> [u8; HASH_BYTES] {
         let chain_id = left_pad_vec(&self.chain_id.to_le_bytes());
         let pre_op_count = left_pad_vec(&self.pre_op_count.to_le_bytes());
