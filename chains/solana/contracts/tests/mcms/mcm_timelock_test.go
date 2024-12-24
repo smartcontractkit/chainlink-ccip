@@ -178,6 +178,8 @@ func TestMcmWithTimelock(t *testing.T) {
 							msig.RawConfig.ClearRoot,
 							msig.ConfigPDA,
 							msig.ConfigSignersPDA,
+							msig.RootMetadataPDA,
+							msig.ExpiringRootAndOpCountPDA,
 							admin.PublicKey(),
 							solana.SystemProgramID,
 						).ValidateAndBuild()
@@ -196,6 +198,11 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.Equal(t, msig.RawConfig.GroupParents, event.GroupParents)
 						require.Equal(t, msig.RawConfig.GroupQuorums, event.GroupQuorums)
 						require.Equal(t, msig.RawConfig.ClearRoot, event.IsRootCleared)
+						for i, signer := range event.Signers {
+							require.Equal(t, msig.RawConfig.SignerAddresses[i], signer.EvmAddress)
+							require.Equal(t, uint8(i), signer.Index)
+							require.Equal(t, msig.RawConfig.SignerGroups[i], signer.Group)
+						}
 
 						// get config and validate
 						var configAccount mcm.MultisigConfig
@@ -350,7 +357,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					id := acceptOwnershipOp.OperationID()
 					operationPDA := acceptOwnershipOp.OperationPDA()
 
-					ixs, ierr := timelockutil.PreloadOperationIxs(ctx, acceptOwnershipOp, admin.PublicKey(), solanaGoClient)
+					ixs, ierr := timelockutil.PreloadOperationIxs(acceptOwnershipOp, admin.PublicKey())
 					require.NoError(t, ierr)
 					for _, ix := range ixs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -518,7 +525,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						opToSchedule.AddInstruction(ix, []solana.PublicKey{v.tokenProgram})
 					}
 
-					ixs, ierr := timelockutil.PreloadOperationIxs(ctx, opToSchedule, admin.PublicKey(), solanaGoClient)
+					ixs, ierr := timelockutil.PreloadOperationIxs(opToSchedule, admin.PublicKey())
 					require.NoError(t, ierr)
 					for _, ix := range ixs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -557,39 +564,10 @@ func TestMcmWithTimelock(t *testing.T) {
 					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 					t.Run("mcm:preload signatures", func(t *testing.T) {
-						parsedTotalSigs, pErr := mcms.SafeToUint8(len(signatures))
-						require.NoError(t, pErr)
+						preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+						require.NoError(t, plerr)
 
-						ixs := make([]solana.Instruction, 0)
-
-						initSigsIx, isErr := mcm.NewInitSignaturesInstruction(
-							proposerMsig.PaddedName,
-							rootValidationData.Root,
-							validUntil,
-							parsedTotalSigs,
-							signaturesPDA,
-							admin.PublicKey(), // auth from someone who call set_root
-							solana.SystemProgramID,
-						).ValidateAndBuild()
-
-						require.NoError(t, isErr)
-						ixs = append(ixs, initSigsIx)
-
-						appendSigsIxs, asErr := mcms.AppendSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
-						require.NoError(t, asErr)
-						ixs = append(ixs, appendSigsIxs...)
-
-						finalizeSigsIx, fsErr := mcm.NewFinalizeSignaturesInstruction(
-							proposerMsig.PaddedName,
-							rootValidationData.Root,
-							validUntil,
-							signaturesPDA,
-							admin.PublicKey(),
-						).ValidateAndBuild()
-						require.NoError(t, fsErr)
-						ixs = append(ixs, finalizeSigsIx)
-
-						for _, ix := range ixs {
+						for _, ix := range preloadIxs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 						}
 
@@ -649,7 +627,6 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.Equal(t, validUntil, newRootAndOpCount.ValidUntil)
 						require.Equal(t, rootValidationData.Metadata.PreOpCount, newRootAndOpCount.OpCount)
 
-						// get config and validate
 						var newRootMetadata mcm.RootMetadata
 						err = common.GetAccountDataBorshInto(ctx, solanaGoClient, proposerMsig.RootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
 						require.NoError(t, err, "failed to get account info")
@@ -936,7 +913,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		for i, op := range timelockOps {
 			t.Run(fmt.Sprintf("prepare mcm op node %d with timelock::schedule_batch ix", i), func(t *testing.T) {
-				ixs, ierr := timelockutil.PreloadOperationIxs(ctx, op, admin.PublicKey(), solanaGoClient)
+				ixs, ierr := timelockutil.PreloadOperationIxs(op, admin.PublicKey())
 				require.NoError(t, ierr)
 				for _, ix := range ixs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -985,39 +962,10 @@ func TestMcmWithTimelock(t *testing.T) {
 			////////////////////////////////////////////////
 			// mcm::set_root - with preloading signatures //
 			////////////////////////////////////////////////
-			parsedTotalSigs, pErr := mcms.SafeToUint8(len(signatures))
-			require.NoError(t, pErr)
+			preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+			require.NoError(t, plerr)
 
-			ixs := make([]solana.Instruction, 0)
-
-			initSigsIx, isErr := mcm.NewInitSignaturesInstruction(
-				proposerMsig.PaddedName,
-				rootValidationData.Root,
-				validUntil,
-				parsedTotalSigs,
-				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil),
-				admin.PublicKey(), // auth from someone who call set_root
-				solana.SystemProgramID,
-			).ValidateAndBuild()
-
-			require.NoError(t, isErr)
-			ixs = append(ixs, initSigsIx)
-
-			appendSigsIxs, asErr := mcms.AppendSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
-			require.NoError(t, asErr)
-			ixs = append(ixs, appendSigsIxs...)
-
-			finalizeSigsIx, fsErr := mcm.NewFinalizeSignaturesInstruction(
-				proposerMsig.PaddedName,
-				rootValidationData.Root,
-				validUntil,
-				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil),
-				admin.PublicKey(),
-			).ValidateAndBuild()
-			require.NoError(t, fsErr)
-			ixs = append(ixs, finalizeSigsIx)
-
-			for _, ix := range ixs {
+			for _, ix := range preloadIxs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
@@ -1186,44 +1134,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
-				parsedTotalSigs, err := mcms.SafeToUint8(len(signatures))
-				require.NoError(t, err)
+				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, canceller.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				require.NoError(t, plerr)
 
-				initSigsIx, err := mcm.NewInitSignaturesInstruction(
-					canceller.PaddedName,
-					rootValidationData.Root,
-					validUntil,
-					parsedTotalSigs,
-					signaturesPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
-
-				appendSigsIxs, err := mcms.AppendSignaturesIxs(
-					signatures,
-					canceller.PaddedName,
-					rootValidationData.Root,
-					validUntil,
-					signaturesPDA,
-					admin.PublicKey(),
-					config.MaxAppendSignatureBatchSize,
-				)
-				require.NoError(t, err)
-				for _, ix := range appendSigsIxs {
+				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
-
-				finalizeSigsIx, err := mcm.NewFinalizeSignaturesInstruction(
-					canceller.PaddedName,
-					rootValidationData.Root,
-					validUntil,
-					signaturesPDA,
-					admin.PublicKey(),
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSigsIx}, admin, config.DefaultCommitment)
 
 				setRootIx, err := mcm.NewSetRootInstruction(
 					canceller.PaddedName,
@@ -1326,7 +1242,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				newOp3.AddInstruction(ix2, []solana.PublicKey{tokenProgram})
 				newOp3.AddInstruction(ix3, []solana.PublicKey{tokenProgram})
 
-				ixs, err := timelockutil.PreloadOperationIxs(ctx, newOp3, admin.PublicKey(), solanaGoClient)
+				ixs, err := timelockutil.PreloadOperationIxs(newOp3, admin.PublicKey())
 				require.NoError(t, err)
 				for _, ix := range ixs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -1368,47 +1284,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
-				// Initialize signatures
-				parsedTotalSigs, err := mcms.SafeToUint8(len(signatures))
-				require.NoError(t, err)
-
-				initSigsIx, err := mcm.NewInitSignaturesInstruction(
-					proposerMsig.PaddedName,
-					rootValidationData.Root,
-					validUntil,
-					parsedTotalSigs,
-					signaturesPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
-
-				// Append signatures
-				appendSigsIxs, err := mcms.AppendSignaturesIxs(
-					signatures,
-					proposerMsig.PaddedName,
-					rootValidationData.Root,
-					validUntil,
-					signaturesPDA,
-					admin.PublicKey(),
-					config.MaxAppendSignatureBatchSize,
-				)
-				require.NoError(t, err)
-				for _, ix := range appendSigsIxs {
+				// preload signatures
+				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				require.NoError(t, plerr)
+				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
-
-				// Finalize signatures
-				finalizeSigsIx, err := mcm.NewFinalizeSignaturesInstruction(
-					proposerMsig.PaddedName,
-					rootValidationData.Root,
-					validUntil,
-					signaturesPDA,
-					admin.PublicKey(),
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSigsIx}, admin, config.DefaultCommitment)
 
 				// Set root
 				setRootIx, err := mcm.NewSetRootInstruction(

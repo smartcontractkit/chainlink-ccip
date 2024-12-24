@@ -273,7 +273,7 @@ func TestTimelockRBAC(t *testing.T) {
 			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			ixs, prierr := timelockutil.PreloadOperationIxs(ctx, nonExecutableOp, nonProposer.PublicKey(), solanaGoClient)
+			ixs, prierr := timelockutil.PreloadOperationIxs(nonExecutableOp, nonProposer.PublicKey())
 			require.NoError(t, prierr)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
@@ -342,7 +342,7 @@ func TestTimelockRBAC(t *testing.T) {
 			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
 			nonExecutableOp2.AddInstruction(ix, []solana.PublicKey{})
 
-			ixs, prerr := timelockutil.PreloadOperationIxs(ctx, nonExecutableOp2, proposer.PublicKey(), solanaGoClient)
+			ixs, prerr := timelockutil.PreloadOperationIxs(nonExecutableOp2, proposer.PublicKey())
 			require.NoError(t, prerr)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
