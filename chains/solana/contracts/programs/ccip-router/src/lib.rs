@@ -663,6 +663,8 @@ pub mod ccip_router {
     /// the following accounts must be provided:
     ///
     /// * First, the billing token config accounts for each token sent with the message, sequentially.
+    ///   For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
+    ///   tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
     /// * Then, the per chain / per token config of every token sent with the message, sequentially
     ///   in the same order.
     ///
@@ -689,14 +691,14 @@ pub mod ccip_router {
             .iter()
             .zip(message.token_amounts.iter())
             .map(|(a, SolanaTokenAmount { token, .. })| {
-                BillingTokenConfig::safe_try_from(a, *token)
+                BillingTokenConfig::validated_try_from(a, *token)
             })
             .collect::<Result<Vec<_>>>()?;
         let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
             .iter()
             .zip(message.token_amounts.iter())
             .map(|(a, SolanaTokenAmount { token, .. })| {
-                PerChainPerTokenConfig::safe_try_from(a, *token, dest_chain_selector)
+                PerChainPerTokenConfig::validated_try_from(a, *token, dest_chain_selector)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -762,13 +764,15 @@ pub mod ccip_router {
 
         let token_billing_config_accounts = accounts_per_sent_token
             .iter()
-            .map(|accs| BillingTokenConfig::safe_try_from(accs.fee_token_config, accs.mint.key()))
+            .map(|accs| {
+                BillingTokenConfig::validated_try_from(accs.fee_token_config, accs.mint.key())
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let per_chain_per_token_config_accounts = accounts_per_sent_token
             .iter()
             .map(|accs| {
-                PerChainPerTokenConfig::safe_try_from(
+                PerChainPerTokenConfig::validated_try_from(
                     accs.token_billing_config,
                     accs.mint.key(),
                     dest_chain_selector,

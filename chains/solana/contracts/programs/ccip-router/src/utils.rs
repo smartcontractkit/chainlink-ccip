@@ -20,6 +20,8 @@ impl<T: Into<u32>> Exponential for T {
 pub struct Usd18Decimals(pub U256);
 
 impl Usd18Decimals {
+    pub const ZERO: Self = Self(U256::ZERO);
+
     pub fn from_usd_cents(cents: u32) -> Self {
         Self(U256::new(cents.into()) * 1u32.e(16))
     }

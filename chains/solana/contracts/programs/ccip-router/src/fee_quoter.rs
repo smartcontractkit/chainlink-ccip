@@ -31,7 +31,7 @@ pub fn fee_for_msg(
     message: &Solana2AnyMessage,
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
-    additional_token_configs: &[BillingTokenConfig],
+    additional_token_configs: &[Option<BillingTokenConfig>],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
 ) -> Result<SolanaTokenAmount> {
     let fee_token = if message.fee_token == Pubkey::default() {
@@ -115,7 +115,7 @@ struct NetworkFee {
 fn network_fee(
     message: &Solana2AnyMessage,
     dest_chain: &DestChain,
-    token_configs: &[BillingTokenConfig],
+    token_configs: &[Option<BillingTokenConfig>],
     token_configs_for_dest_chain: &[PerChainPerTokenConfig],
 ) -> Result<NetworkFee> {
     if message.token_amounts.is_empty() {
@@ -156,27 +156,29 @@ fn network_fee(
 }
 
 fn token_network_fees(
-    token_configs: &[BillingTokenConfig],
+    token_configs: &[Option<BillingTokenConfig>],
     token_amount: &SolanaTokenAmount,
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<(Usd18Decimals, U256, U256)> {
-    let config = token_configs
+    let billing_config = token_configs
         .iter()
-        .find(|c| c.mint == token_amount.token)
-        .ok_or(CcipRouterError::UnsupportedToken)?;
+        .filter_map(|c| c.as_ref())
+        .find(|c| c.mint == token_amount.token);
 
-    let bps_fee = if config_for_dest_chain.billing.deci_bps > 0 {
-        let token_price = get_validated_token_price(config)?;
-        // Calculate token transfer value, then apply fee ratio
-        // ratio represents multiples of 0.1bps, or 1e-5
-        Usd18Decimals(
-            token_amount.value(&token_price).0
-                * U256::new(config_for_dest_chain.billing.deci_bps.into())
-                / 1u32.e(5),
-        )
-    } else {
-        Usd18Decimals::default()
+    let bps_fee = match billing_config {
+        Some(config) if config_for_dest_chain.billing.deci_bps > 0 => {
+            let token_price = get_validated_token_price(&config)?;
+            // Calculate token transfer value, then apply fee ratio
+            // ratio represents multiples of 0.1bps, or 1e-5
+            Usd18Decimals(
+                token_amount.value(&token_price).0
+                    * U256::new(config_for_dest_chain.billing.deci_bps.into())
+                    / 1u32.e(5),
+            )
+        }
+        _ => Usd18Decimals::ZERO,
     };
+
     let min_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.min_fee_usdcents);
     let max_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.max_fee_usdcents);
     let (token_fee, token_gas, token_overhead) = (
@@ -403,7 +405,7 @@ mod tests {
                 &message,
                 &chain,
                 &sample_billing_config(),
-                &[token_config],
+                &[Some(token_config)],
                 &[per_chain_per_token]
             )
             .unwrap(),
@@ -438,7 +440,7 @@ mod tests {
                 &message,
                 &chain,
                 &sample_billing_config(),
-                &[another_token_config],
+                &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
@@ -473,7 +475,7 @@ mod tests {
                 &message,
                 &chain,
                 &sample_billing_config(),
-                &[another_token_config],
+                &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
@@ -500,7 +502,7 @@ mod tests {
             .collect();
         tokens.push(sample_billing_config());
 
-        let tokens: Vec<_> = tokens.into_iter().collect();
+        let tokens: Vec<_> = tokens.into_iter().map(|t| Some(t)).collect();
         let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(

@@ -178,7 +178,7 @@ pub struct PerChainPerTokenConfig {
 }
 
 impl PerChainPerTokenConfig {
-    pub fn safe_try_from<'info>(
+    pub fn validated_try_from<'info>(
         account: &'info AccountInfo<'info>,
         token: Pubkey,
         dest_chain_selector: u64,
@@ -235,7 +235,16 @@ pub struct BillingTokenConfig {
 }
 
 impl BillingTokenConfig {
-    pub fn safe_try_from<'info>(account: &'info AccountInfo<'info>, token: Pubkey) -> Result<Self> {
+    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
+    // specifying a token that has no Billing config.
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+    ) -> Result<Option<Self>> {
+        if account.key() == Pubkey::default() {
+            return Ok(None);
+        }
+
         let (expected, _) =
             Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
         require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
@@ -244,7 +253,7 @@ impl BillingTokenConfig {
             valid_version(account.version, 1),
             CcipRouterError::InvalidInputs
         );
-        Ok(account.into_inner().config)
+        Ok(Some(account.into_inner().config))
     }
 }
 
