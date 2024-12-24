@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
@@ -263,36 +264,10 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:preload signers", func(t *testing.T) {
-				ixs := make([]solana.Instruction, 0)
+				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				require.NoError(t, pierr)
 
-				parsedTotalSigners, pErr := mcms.SafeToUint8(len(signerAddresses))
-				require.NoError(t, pErr)
-				initSignersIx, isErr := mcm.NewInitSignersInstruction(
-					testMsigName,
-					parsedTotalSigners,
-					multisigConfigPDA,
-					configSignersPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-
-				require.NoError(t, isErr)
-				ixs = append(ixs, initSignersIx)
-
-				appendSignersIxs, asErr := mcms.AppendSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
-				require.NoError(t, asErr)
-				ixs = append(ixs, appendSignersIxs...)
-
-				finalizeSignersIx, fsErr := mcm.NewFinalizeSignersInstruction(
-					testMsigName,
-					multisigConfigPDA,
-					configSignersPDA,
-					admin.PublicKey(),
-				).ValidateAndBuild()
-				require.NoError(t, fsErr)
-				ixs = append(ixs, finalizeSignersIx)
-
-				for _, ix := range ixs {
+				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
@@ -317,6 +292,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				mcmConfig.ClearRoot,
 				multisigConfigPDA,
 				configSignersPDA,
+				rootMetadataPDA,
+				expiringRootAndOpCountPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
 			).ValidateAndBuild()
@@ -343,9 +320,9 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			}
 		})
 
-		var opNodes []mcms.McmOpNode
+		t.Run("mcm set_root", func(t *testing.T) {
+			var opNodes []mcms.McmOpNode
 
-		t.Run("mcm set_root happy path", func(t *testing.T) {
 			for i, op := range stupProgramTestMcmOps {
 				node := mcms.McmOpNode{
 					Nonce:             uint64(i),
@@ -415,34 +392,13 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{clearIx}, admin, config.DefaultCommitment)
 				testutils.AssertClosedAccount(ctx, t, solanaGoClient, signaturesPDA, config.DefaultCommitment)
 
-				reInitSigsIx, rIsErr := mcm.NewInitSignaturesInstruction(
-					testMsigName,
-					rootValidationData.Root,
-					validUntil,
-					parsedTotalSigs,
-					signaturesPDA,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
+				// preload again
+				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				require.NoError(t, plerr)
 
-				require.NoError(t, rIsErr)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{reInitSigsIx}, admin, config.DefaultCommitment)
-
-				// register all signatures again
-				for _, ix := range appendSigsIxs {
+				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
-
-				finalizeSigsIx, fsErr := mcm.NewFinalizeSignaturesInstruction(
-					testMsigName,
-					rootValidationData.Root,
-					validUntil,
-					signaturesPDA,
-					admin.PublicKey(),
-				).ValidateAndBuild()
-
-				require.NoError(t, fsErr)
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{finalizeSigsIx}, admin, config.DefaultCommitment)
 
 				var sigAccount mcm.RootSignatures
 				queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
@@ -509,6 +465,228 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			require.Equal(t, rootValidationData.Metadata.PreOpCount, newRootMetadata.PreOpCount)
 			require.Equal(t, rootValidationData.Metadata.PostOpCount, newRootMetadata.PostOpCount)
 			require.Equal(t, rootValidationData.Metadata.OverridePreviousRoot, newRootMetadata.OverridePreviousRoot)
+		})
+
+		var opNodes []mcms.McmOpNode
+
+		t.Run("change config scenario, clear root and set a new root", func(t *testing.T) {
+			// keep current op count
+			var prevRootAndOpCount mcm.ExpiringRootAndOpCount
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &prevRootAndOpCount)
+			require.NoError(t, err, "failed to get account info")
+			currentOpCount := prevRootAndOpCount.OpCount
+
+			// new config with clear_root
+			newMcmConfig, configErr := mcms.NewValidMcmConfig(
+				testMsigName,
+				config.SignerPrivateKeys,
+				config.SignerGroups,
+				config.GroupQuorums,
+				config.GroupParents,
+				true, // clear_root
+			)
+			require.NoError(t, configErr)
+
+			signerAddresses := newMcmConfig.SignerAddresses
+
+			t.Run("preload signers", func(t *testing.T) {
+				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				require.NoError(t, pierr)
+
+				for _, ix := range preloadIxs {
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				}
+
+				var cfgSignersAccount mcm.ConfigSigners
+				queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, configSignersPDA, config.DefaultCommitment, &cfgSignersAccount)
+				require.NoError(t, queryErr, "failed to get account info")
+				require.Equal(t, true, cfgSignersAccount.IsFinalized)
+				// check if the addresses are registered correctly
+				for i, signer := range cfgSignersAccount.SignerAddresses {
+					require.Equal(t, signerAddresses[i], signer)
+				}
+			})
+
+			t.Run("set_config with clear_root", func(t *testing.T) {
+				ix, configErr := mcm.NewSetConfigInstruction(
+					newMcmConfig.MultisigName,
+					newMcmConfig.SignerGroups,
+					newMcmConfig.GroupQuorums,
+					newMcmConfig.GroupParents,
+					newMcmConfig.ClearRoot,
+					multisigConfigPDA,
+					configSignersPDA,
+					rootMetadataPDA,
+					expiringRootAndOpCountPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+
+				require.NoError(t, configErr)
+
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				require.NotNil(t, tx)
+
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.ConfigSet]("ConfigSet"),
+					},
+				)
+
+				event := parsedLogs[0].EventData[0].Data.(*mcms.ConfigSet)
+				require.Equal(t, newMcmConfig.GroupParents, event.GroupParents)
+				require.Equal(t, newMcmConfig.GroupQuorums, event.GroupQuorums)
+				require.Equal(t, true, event.IsRootCleared)
+				for i, signer := range event.Signers {
+					require.Equal(t, newMcmConfig.SignerAddresses[i], signer.EvmAddress)
+					require.Equal(t, uint8(i), signer.Index)
+					require.Equal(t, newMcmConfig.SignerGroups[i], signer.Group)
+				}
+
+				// get config and validate
+				var configAccount mcm.MultisigConfig
+				configErr = common.GetAccountDataBorshInto(ctx, solanaGoClient, multisigConfigPDA, config.DefaultCommitment, &configAccount)
+				require.NoError(t, configErr, "failed to get account info")
+
+				require.Equal(t, config.TestChainID, configAccount.ChainId)
+				require.Equal(t, reflect.DeepEqual(configAccount.GroupParents, newMcmConfig.GroupParents), true)
+				require.Equal(t, reflect.DeepEqual(configAccount.GroupQuorums, newMcmConfig.GroupQuorums), true)
+
+				// check if the McmSigner struct is correct
+				for i, signer := range configAccount.Signers {
+					require.Equal(t, signer.EvmAddress, newMcmConfig.SignerAddresses[i])
+					require.Equal(t, signer.Index, uint8(i))
+					require.Equal(t, signer.Group, newMcmConfig.SignerGroups[i])
+				}
+
+				// get root, metadata and validate
+				var clearedRootAndOpCount mcm.ExpiringRootAndOpCount
+
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &clearedRootAndOpCount)
+				require.NoError(t, err, "failed to get account info")
+
+				require.Equal(t, config.McmEmptyRoot, clearedRootAndOpCount.Root)
+				require.Equal(t, config.McmEmptyTimestamp, clearedRootAndOpCount.ValidUntil)
+				require.Equal(t, currentOpCount, clearedRootAndOpCount.OpCount)
+
+				var clearedRootMetadata mcm.RootMetadata
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &clearedRootMetadata)
+				require.NoError(t, err, "failed to get account info")
+
+				require.Equal(t, configAccount.ChainId, clearedRootMetadata.ChainId) // reset to config.chainid
+				require.Equal(t, multisigConfigPDA, clearedRootMetadata.Multisig)    // should be the same multisig
+				require.Equal(t, currentOpCount, clearedRootMetadata.PreOpCount)     // preserve op count
+				require.Equal(t, currentOpCount, clearedRootMetadata.PostOpCount)    // preserve op count
+				require.Equal(t, true, clearedRootMetadata.OverridePreviousRoot)     // should be true
+			})
+
+			t.Run("mcm set_root on new config", func(t *testing.T) {
+				for i, op := range stupProgramTestMcmOps {
+					node := mcms.McmOpNode{
+						Nonce:             uint64(i),
+						Multisig:          multisigConfigPDA,
+						To:                config.ExternalCpiStubProgram,
+						Data:              op.Data,
+						RemainingAccounts: op.RemainingAccounts,
+					}
+					opNodes = append(opNodes, node)
+				}
+				// should be different timestamp from previous root(seen_signed_hash)
+				validUntil := uint32(time.Now().Add(1 * time.Hour).Unix())
+
+				rootValidationData, rvErr := mcms.CreateMcmRootData(
+					mcms.McmRootInput{
+						Multisig:             multisigConfigPDA,
+						Operations:           opNodes,
+						PreOpCount:           0,
+						PostOpCount:          uint64(len(opNodes)),
+						ValidUntil:           validUntil,
+						OverridePreviousRoot: false,
+					},
+				)
+				require.NoError(t, rvErr)
+				signaturesPDA := mcms.RootSignaturesAddress(testMsigName, rootValidationData.Root, validUntil)
+
+				t.Run("preload signatures", func(t *testing.T) {
+					signers, getSignerErr := eth.GetEvmSigners(config.SignerPrivateKeys)
+					require.NoError(t, getSignerErr, "Failed to get signers")
+
+					signatures, sigsErr := mcms.BulkSignOnMsgHash(signers, rootValidationData.EthMsgHash)
+					require.NoError(t, sigsErr)
+
+					preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+					require.NoError(t, plerr)
+
+					for _, ix := range preloadIxs {
+						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+					}
+
+					var sigAccount mcm.RootSignatures
+					queryErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, signaturesPDA, config.DefaultCommitment, &sigAccount)
+					require.NoError(t, queryErr, "failed to get account info")
+
+					require.Equal(t, true, sigAccount.IsFinalized)
+					require.Equal(t, true, sigAccount.TotalSignatures == uint8(len(signatures)))
+
+					// check if the sigs are registered correctly
+					for i, sig := range sigAccount.Signatures {
+						require.Equal(t, signatures[i], sig)
+					}
+				})
+
+				newIx, setRootIxErr := mcm.NewSetRootInstruction(
+					testMsigName,
+					rootValidationData.Root,
+					validUntil,
+					rootValidationData.Metadata,
+					rootValidationData.MetadataProof,
+					signaturesPDA,
+					rootMetadataPDA,
+					mcms.SeenSignedHashesAddress(testMsigName, rootValidationData.Root, validUntil),
+					expiringRootAndOpCountPDA,
+					multisigConfigPDA,
+					admin.PublicKey(),
+					solana.SystemProgramID,
+				).ValidateAndBuild()
+				require.NoError(t, setRootIxErr)
+
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+				require.NotNil(t, tx)
+
+				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+					[]common.EventMapping{
+						common.EventMappingFor[mcms.NewRoot]("NewRoot"),
+					},
+				)
+				event := parsedLogs[0].EventData[0].Data.(*mcms.NewRoot)
+				require.Equal(t, rootValidationData.Root, event.Root)
+				require.Equal(t, validUntil, event.ValidUntil)
+				require.Equal(t, rootValidationData.Metadata.ChainId, event.MetadataChainID)
+				require.Equal(t, multisigConfigPDA, event.MetadataMultisig)
+				require.Equal(t, rootValidationData.Metadata.PreOpCount, event.MetadataPreOpCount)
+				require.Equal(t, rootValidationData.Metadata.PostOpCount, event.MetadataPostOpCount)
+				require.Equal(t, rootValidationData.Metadata.OverridePreviousRoot, event.MetadataOverridePreviousRoot)
+
+				var newRootAndOpCount mcm.ExpiringRootAndOpCount
+
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, expiringRootAndOpCountPDA, config.DefaultCommitment, &newRootAndOpCount)
+				require.NoError(t, err, "failed to get account info")
+
+				require.Equal(t, rootValidationData.Root, newRootAndOpCount.Root)
+				require.Equal(t, validUntil, newRootAndOpCount.ValidUntil)
+				require.Equal(t, rootValidationData.Metadata.PreOpCount, newRootAndOpCount.OpCount)
+
+				// get config and validate
+				var newRootMetadata mcm.RootMetadata
+				err = common.GetAccountDataBorshInto(ctx, solanaGoClient, rootMetadataPDA, config.DefaultCommitment, &newRootMetadata)
+				require.NoError(t, err, "failed to get account info")
+
+				require.Equal(t, rootValidationData.Metadata.ChainId, newRootMetadata.ChainId)
+				require.Equal(t, rootValidationData.Metadata.Multisig, newRootMetadata.Multisig)
+				require.Equal(t, rootValidationData.Metadata.PreOpCount, newRootMetadata.PreOpCount)
+				require.Equal(t, rootValidationData.Metadata.PostOpCount, newRootMetadata.PostOpCount)
+				require.Equal(t, rootValidationData.Metadata.OverridePreviousRoot, newRootMetadata.OverridePreviousRoot)
+			})
 		})
 
 		t.Run("mcm execute happy path", func(t *testing.T) {
@@ -787,36 +965,10 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, configErr)
 
 				t.Run("setup: load signers and set_config", func(t *testing.T) {
-					ixs := make([]solana.Instruction, 0)
+					preloadIxs, pierr := mcms.McmPreloadSignersIxs(mcmConfig.SignerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+					require.NoError(t, pierr)
 
-					parsedTotalSigners, pErr := mcms.SafeToUint8(len(mcmConfig.SignerAddresses))
-					require.NoError(t, pErr)
-					initSignersIx, isErr := mcm.NewInitSignersInstruction(
-						testMsigName,
-						parsedTotalSigners,
-						multisigConfigPDA,
-						configSignersPDA,
-						admin.PublicKey(),
-						solana.SystemProgramID,
-					).ValidateAndBuild()
-
-					require.NoError(t, isErr)
-					ixs = append(ixs, initSignersIx)
-
-					appendSignersIxs, asErr := mcms.AppendSignersIxs(mcmConfig.SignerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
-					require.NoError(t, asErr)
-					ixs = append(ixs, appendSignersIxs...)
-
-					finalizeSignersIx, fsErr := mcm.NewFinalizeSignersInstruction(
-						testMsigName,
-						multisigConfigPDA,
-						configSignersPDA,
-						admin.PublicKey(),
-					).ValidateAndBuild()
-					require.NoError(t, fsErr)
-					ixs = append(ixs, finalizeSignersIx)
-
-					for _, ix := range ixs {
+					for _, ix := range preloadIxs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 					}
 
@@ -840,6 +992,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						mcmConfig.ClearRoot,
 						multisigConfigPDA,
 						configSignersPDA,
+						rootMetadataPDA,
+						expiringRootAndOpCountPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
 					).ValidateAndBuild()

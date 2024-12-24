@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config" // todo: make utils pure
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 )
 
 func TestMcmMerkle(t *testing.T) {
