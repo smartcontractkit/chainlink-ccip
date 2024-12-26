@@ -141,6 +141,11 @@
           }
         }
       ]
+    },
+    {
+      "name": "tobiBackend",
+      "accounts": [],
+      "args": []
     }
   ],
   "accounts": [
@@ -161,6 +166,54 @@
       "type": {
         "kind": "struct",
         "fields": []
+      }
+    },
+    {
+      "name": "DestChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": "DestChainState"
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "DestChainConfig"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChain",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": "SourceChainState"
+            }
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": "SourceChainConfig"
+            }
+          }
+        ]
       }
     }
   ],
@@ -297,6 +350,166 @@
           }
         ]
       }
+    },
+    {
+      "name": "SourceChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "onRamp",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SourceChainState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "minSeqNr",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sequenceNumber",
+            "type": "u64"
+          },
+          {
+            "name": "usdPerUnitGas",
+            "type": {
+              "defined": "TimestampedPackedU224"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "DestChainConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "isEnabled",
+            "type": "bool"
+          },
+          {
+            "name": "maxNumberOfTokensPerMsg",
+            "type": "u16"
+          },
+          {
+            "name": "maxDataBytes",
+            "type": "u32"
+          },
+          {
+            "name": "maxPerMsgGasLimit",
+            "type": "u32"
+          },
+          {
+            "name": "destGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerPayloadByte",
+            "type": "u16"
+          },
+          {
+            "name": "destDataAvailabilityOverheadGas",
+            "type": "u32"
+          },
+          {
+            "name": "destGasPerDataAvailabilityByte",
+            "type": "u16"
+          },
+          {
+            "name": "destDataAvailabilityMultiplierBps",
+            "type": "u16"
+          },
+          {
+            "name": "defaultTokenFeeUsdcents",
+            "type": "u16"
+          },
+          {
+            "name": "defaultTokenDestGasOverhead",
+            "type": "u32"
+          },
+          {
+            "name": "defaultTxGasLimit",
+            "type": "u32"
+          },
+          {
+            "name": "gasMultiplierWeiPerEth",
+            "type": "u64"
+          },
+          {
+            "name": "networkFeeUsdcents",
+            "type": "u32"
+          },
+          {
+            "name": "gasPriceStalenessThreshold",
+            "type": "u32"
+          },
+          {
+            "name": "enforceOutOfOrder",
+            "type": "bool"
+          },
+          {
+            "name": "chainFamilySelector",
+            "type": {
+              "array": [
+                "u8",
+                4
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TimestampedPackedU224",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "value",
+            "type": {
+              "array": [
+                "u8",
+                28
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AccountNotSigner",
+      "msg": "Account is not signer"
+    },
+    {
+      "code": 6001,
+      "name": "AccountNotWritable",
+      "msg": "Account is not writable"
     }
   ]
 }

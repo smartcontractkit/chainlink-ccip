@@ -2,6 +2,7 @@ package testutils
 
 import (
 	"bytes"
+	"fmt"
 	"os/exec"
 	"strconv"
 	"testing"
@@ -42,6 +43,8 @@ func SetupLocalSolNodeWithFlags(t *testing.T, flags ...string) (string, string) 
 		"--faucet-port", faucetPort,
 		"--ledger", t.TempDir(),
 	}, flags...)
+
+	fmt.Printf("Starting solana-test-validator with args: %v\n", args)
 
 	cmd := exec.Command("solana-test-validator", args...)
 

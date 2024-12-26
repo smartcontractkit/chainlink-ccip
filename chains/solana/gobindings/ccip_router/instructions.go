@@ -276,6 +276,9 @@ var (
 	// The fee amount in u64.
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
+	// TODO remove
+	Instruction_TobiProxy = ag_binary.TypeID([8]byte{140, 9, 39, 217, 95, 238, 10, 0})
+
 	// ON RAMP FLOW
 	// Sends a message to the destination chain.
 	//
@@ -403,6 +406,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "RemoveBillingTokenConfig"
 	case Instruction_GetFee:
 		return "GetFee"
+	case Instruction_TobiProxy:
+		return "TobiProxy"
 	case Instruction_CcipSend:
 		return "CcipSend"
 	case Instruction_Commit:
@@ -499,6 +504,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"get_fee", (*GetFee)(nil),
+		},
+		{
+			"tobi_proxy", (*TobiProxy)(nil),
 		},
 		{
 			"ccip_send", (*CcipSend)(nil),

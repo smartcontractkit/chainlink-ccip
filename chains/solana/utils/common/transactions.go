@@ -140,6 +140,7 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("Transaction: %+v\n", tx)
 
 	// build signers map
 	signers := map[solana.PublicKey]solana.PrivateKey{}

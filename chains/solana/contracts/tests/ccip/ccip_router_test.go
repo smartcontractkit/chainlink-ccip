@@ -802,6 +802,32 @@ func TestCCIPRouter(t *testing.T) {
 		})
 	})
 
+	//////////
+	// Tobi //
+	//////////
+	t.Run("Tobi", func(t *testing.T) {
+		var initial ccip_receiver.DestChain
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &initial))
+
+		fmt.Printf("Initial: %+v\n", initial)
+
+		raw := ccip_router.NewTobiProxyInstruction(config.EvmChainSelector, config.EvmDestChainStatePDA)
+		// raw.AccountMetaSlice.Append(solana.Meta(ccip_receiver.ProgramID))
+		ix, err := raw.ValidateAndBuild()
+		require.NoError(t, err)
+		tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
+		fmt.Printf("Tobi tx: %+v\n", tx)
+		stx, _ := tx.Transaction.GetTransaction()
+		fmt.Printf("Tobi tx: %+v\n", stx)
+
+		var final ccip_receiver.DestChain
+		require.NoError(t, common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &final))
+
+		fmt.Printf("Final: %+v\n", final)
+
+		require.Equal(t, initial.State.SequenceNumber+1, final.State.SequenceNumber)
+	})
+
 	//////////////////////////
 	// Billing Config Tests //
 	//////////////////////////

@@ -275,3 +275,322 @@ func (obj *ReleaseOrMintInV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	return nil
 }
+
+type SourceChainConfig struct {
+	IsEnabled bool
+	OnRamp    []byte
+}
+
+func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `IsEnabled` param:
+	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `OnRamp` param:
+	err = encoder.Encode(obj.OnRamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SourceChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `IsEnabled`:
+	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OnRamp`:
+	err = decoder.Decode(&obj.OnRamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SourceChainState struct {
+	MinSeqNr uint64
+}
+
+func (obj SourceChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `MinSeqNr` param:
+	err = encoder.Encode(obj.MinSeqNr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SourceChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `MinSeqNr`:
+	err = decoder.Decode(&obj.MinSeqNr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type DestChainState struct {
+	SequenceNumber uint64
+	UsdPerUnitGas  TimestampedPackedU224
+}
+
+func (obj DestChainState) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `SequenceNumber` param:
+	err = encoder.Encode(obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Serialize `UsdPerUnitGas` param:
+	err = encoder.Encode(obj.UsdPerUnitGas)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DestChainState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `SequenceNumber`:
+	err = decoder.Decode(&obj.SequenceNumber)
+	if err != nil {
+		return err
+	}
+	// Deserialize `UsdPerUnitGas`:
+	err = decoder.Decode(&obj.UsdPerUnitGas)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type DestChainConfig struct {
+	IsEnabled                         bool
+	MaxNumberOfTokensPerMsg           uint16
+	MaxDataBytes                      uint32
+	MaxPerMsgGasLimit                 uint32
+	DestGasOverhead                   uint32
+	DestGasPerPayloadByte             uint16
+	DestDataAvailabilityOverheadGas   uint32
+	DestGasPerDataAvailabilityByte    uint16
+	DestDataAvailabilityMultiplierBps uint16
+	DefaultTokenFeeUsdcents           uint16
+	DefaultTokenDestGasOverhead       uint32
+	DefaultTxGasLimit                 uint32
+	GasMultiplierWeiPerEth            uint64
+	NetworkFeeUsdcents                uint32
+	GasPriceStalenessThreshold        uint32
+	EnforceOutOfOrder                 bool
+	ChainFamilySelector               [4]uint8
+}
+
+func (obj DestChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `IsEnabled` param:
+	err = encoder.Encode(obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxNumberOfTokensPerMsg` param:
+	err = encoder.Encode(obj.MaxNumberOfTokensPerMsg)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxDataBytes` param:
+	err = encoder.Encode(obj.MaxDataBytes)
+	if err != nil {
+		return err
+	}
+	// Serialize `MaxPerMsgGasLimit` param:
+	err = encoder.Encode(obj.MaxPerMsgGasLimit)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasOverhead` param:
+	err = encoder.Encode(obj.DestGasOverhead)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerPayloadByte` param:
+	err = encoder.Encode(obj.DestGasPerPayloadByte)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestDataAvailabilityOverheadGas` param:
+	err = encoder.Encode(obj.DestDataAvailabilityOverheadGas)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestGasPerDataAvailabilityByte` param:
+	err = encoder.Encode(obj.DestGasPerDataAvailabilityByte)
+	if err != nil {
+		return err
+	}
+	// Serialize `DestDataAvailabilityMultiplierBps` param:
+	err = encoder.Encode(obj.DestDataAvailabilityMultiplierBps)
+	if err != nil {
+		return err
+	}
+	// Serialize `DefaultTokenFeeUsdcents` param:
+	err = encoder.Encode(obj.DefaultTokenFeeUsdcents)
+	if err != nil {
+		return err
+	}
+	// Serialize `DefaultTokenDestGasOverhead` param:
+	err = encoder.Encode(obj.DefaultTokenDestGasOverhead)
+	if err != nil {
+		return err
+	}
+	// Serialize `DefaultTxGasLimit` param:
+	err = encoder.Encode(obj.DefaultTxGasLimit)
+	if err != nil {
+		return err
+	}
+	// Serialize `GasMultiplierWeiPerEth` param:
+	err = encoder.Encode(obj.GasMultiplierWeiPerEth)
+	if err != nil {
+		return err
+	}
+	// Serialize `NetworkFeeUsdcents` param:
+	err = encoder.Encode(obj.NetworkFeeUsdcents)
+	if err != nil {
+		return err
+	}
+	// Serialize `GasPriceStalenessThreshold` param:
+	err = encoder.Encode(obj.GasPriceStalenessThreshold)
+	if err != nil {
+		return err
+	}
+	// Serialize `EnforceOutOfOrder` param:
+	err = encoder.Encode(obj.EnforceOutOfOrder)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainFamilySelector` param:
+	err = encoder.Encode(obj.ChainFamilySelector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DestChainConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `IsEnabled`:
+	err = decoder.Decode(&obj.IsEnabled)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxNumberOfTokensPerMsg`:
+	err = decoder.Decode(&obj.MaxNumberOfTokensPerMsg)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxDataBytes`:
+	err = decoder.Decode(&obj.MaxDataBytes)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MaxPerMsgGasLimit`:
+	err = decoder.Decode(&obj.MaxPerMsgGasLimit)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasOverhead`:
+	err = decoder.Decode(&obj.DestGasOverhead)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerPayloadByte`:
+	err = decoder.Decode(&obj.DestGasPerPayloadByte)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestDataAvailabilityOverheadGas`:
+	err = decoder.Decode(&obj.DestDataAvailabilityOverheadGas)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestGasPerDataAvailabilityByte`:
+	err = decoder.Decode(&obj.DestGasPerDataAvailabilityByte)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DestDataAvailabilityMultiplierBps`:
+	err = decoder.Decode(&obj.DestDataAvailabilityMultiplierBps)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultTokenFeeUsdcents`:
+	err = decoder.Decode(&obj.DefaultTokenFeeUsdcents)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultTokenDestGasOverhead`:
+	err = decoder.Decode(&obj.DefaultTokenDestGasOverhead)
+	if err != nil {
+		return err
+	}
+	// Deserialize `DefaultTxGasLimit`:
+	err = decoder.Decode(&obj.DefaultTxGasLimit)
+	if err != nil {
+		return err
+	}
+	// Deserialize `GasMultiplierWeiPerEth`:
+	err = decoder.Decode(&obj.GasMultiplierWeiPerEth)
+	if err != nil {
+		return err
+	}
+	// Deserialize `NetworkFeeUsdcents`:
+	err = decoder.Decode(&obj.NetworkFeeUsdcents)
+	if err != nil {
+		return err
+	}
+	// Deserialize `GasPriceStalenessThreshold`:
+	err = decoder.Decode(&obj.GasPriceStalenessThreshold)
+	if err != nil {
+		return err
+	}
+	// Deserialize `EnforceOutOfOrder`:
+	err = decoder.Decode(&obj.EnforceOutOfOrder)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainFamilySelector`:
+	err = decoder.Decode(&obj.ChainFamilySelector)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type TimestampedPackedU224 struct {
+	Value     [28]uint8
+	Timestamp int64
+}
+
+func (obj TimestampedPackedU224) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `Value` param:
+	err = encoder.Encode(obj.Value)
+	if err != nil {
+		return err
+	}
+	// Serialize `Timestamp` param:
+	err = encoder.Encode(obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *TimestampedPackedU224) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `Value`:
+	err = decoder.Decode(&obj.Value)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Timestamp`:
+	err = decoder.Decode(&obj.Timestamp)
+	if err != nil {
+		return err
+	}
+	return nil
+}

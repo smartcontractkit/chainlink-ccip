@@ -1020,6 +1020,25 @@
       "returns": "u64"
     },
     {
+      "name": "tobiProxy",
+      "docs": [
+        "TODO remove"
+      ],
+      "accounts": [
+        {
+          "name": "destChainState",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "destChainSelector",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "ccipSend",
       "docs": [
         "ON RAMP FLOW",

@@ -465,6 +465,20 @@ pub struct RemoveBillingTokenConfig<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(destination_chain_selector: u64)]
+pub struct Tobi<'info> {
+    #[account(
+        mut,
+        seeds = [DEST_CHAIN_STATE_SEED, destination_chain_selector.to_le_bytes().as_ref()],
+        bump,
+        constraint = valid_version(dest_chain_state.version, MAX_CHAINSTATE_V) @ CcipRouterError::InvalidInputs, // validate state version
+    )]
+    pub dest_chain_state: Account<'info, DestChain>,
+    // pub authority: Signer<'info>,
+    // pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction(destination_chain_selector: u64, message: Solana2AnyMessage)]
 pub struct CcipSend<'info> {
     #[account(

@@ -51,6 +51,8 @@ declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
 pub mod ccip_router {
     #![warn(missing_docs)]
 
+    use std::str::FromStr;
+
     use super::*;
 
     /// Initializes the CCIP Router.
@@ -667,6 +669,49 @@ pub mod ccip_router {
             &ctx.accounts.billing_token_config.config,
         )?
         .amount)
+    }
+
+    /// TODO remove
+    pub fn tobi_proxy(ctx: Context<Tobi>, dest_chain_selector: u64) -> Result<()> {
+        let acc_infos = ctx.accounts.dest_chain_state.to_account_infos();
+
+        let data: [u8; 8] = (0xcd0a2d85227ededb as u64).to_be_bytes();
+        // let data: [u8; 8] = [205, 10, 45, 133, 34, 126, 222, 219];
+
+        // let acc_metas: Vec<AccountMeta> = acc_infos
+        //     .to_vec()
+        //     .iter()
+        //     .flat_map(|acc_info| {
+        //         // Check signer from PDA External Execution config
+        //         let is_signer = acc_info.key() == ctx.accounts.dest_chain_state.key();
+        //         acc_info.to_account_metas(Some(is_signer))
+        //     })
+        //     .collect();
+
+        let acc_metas = ctx.accounts.dest_chain_state.to_account_metas(Some(true));
+
+        let instruction = Instruction {
+            program_id: Pubkey::from_str("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(), // The receiver Program Id that will handle the ccip_receive message
+            accounts: acc_metas,
+            data: data.to_vec(),
+        };
+
+        let x = dest_chain_selector.to_le_bytes();
+
+        let seeds = &[
+            DEST_CHAIN_STATE_SEED,
+            x.as_ref(),
+            &[ctx.bumps.dest_chain_state],
+        ];
+        let signer = &[&seeds[..]];
+
+        // let acc_infos2 = &[
+        //     ctx.remaining_accounts[0].to_account_info(),
+        //     ctx.accounts.dest_chain_state.to_account_info(),
+        // ];
+
+        invoke_signed(&instruction, &acc_infos, signer)?;
+        Ok(())
     }
 
     /// ON RAMP FLOW

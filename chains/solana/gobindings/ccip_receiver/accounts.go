@@ -78,3 +78,131 @@ func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Deco
 	}
 	return nil
 }
+
+type DestChain struct {
+	Version uint8
+	State   DestChainState
+	Config  DestChainConfig
+}
+
+var DestChainDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
+
+func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(DestChainDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return err
+	}
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(DestChainDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[77 18 241 132 212 54 218 16]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type SourceChain struct {
+	Version uint8
+	State   SourceChainState
+	Config  SourceChainConfig
+}
+
+var SourceChainDiscriminator = [8]byte{242, 235, 220, 98, 252, 121, 191, 216}
+
+func (obj SourceChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Write account discriminator:
+	err = encoder.WriteBytes(SourceChainDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `Version` param:
+	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `State` param:
+	err = encoder.Encode(obj.State)
+	if err != nil {
+		return err
+	}
+	// Serialize `Config` param:
+	err = encoder.Encode(obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Read and check account discriminator:
+	{
+		discriminator, err := decoder.ReadTypeID()
+		if err != nil {
+			return err
+		}
+		if !discriminator.Equal(SourceChainDiscriminator[:]) {
+			return fmt.Errorf(
+				"wrong discriminator: wanted %s, got %s",
+				"[242 235 220 98 252 121 191 216]",
+				fmt.Sprint(discriminator[:]))
+		}
+	}
+	// Deserialize `Version`:
+	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `State`:
+	err = decoder.Decode(&obj.State)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Config`:
+	err = decoder.Decode(&obj.Config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
