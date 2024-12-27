@@ -51,7 +51,8 @@ pub struct SourceChainState {
 pub struct SourceChain {
     // Config for Any2Solana
     pub version: u8,
-    pub state: SourceChainState, // values that are updated automatically
+    pub chain_selector: u64,       // Chain selector used for the seed
+    pub state: SourceChainState,   // values that are updated automatically
     pub config: SourceChainConfig, // values configured by an admin
 }
 
@@ -90,6 +91,7 @@ pub struct DestChainConfig {
 pub struct DestChain {
     // Config for Solana2Any
     pub version: u8,
+    pub chain_selector: u64,     // Chain selector used for the seed
     pub state: DestChainState,   // values that are updated automatically
     pub config: DestChainConfig, // values configured by an admin
 }
@@ -109,6 +111,8 @@ pub struct ExternalExecutionConfig {}
 #[derive(InitSpace)]
 pub struct CommitReport {
     pub version: u8,
+    pub chain_selector: u64,
+    pub merkle_root: [u8; 32],
     pub timestamp: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     pub min_msg_nr: u64,
     pub max_msg_nr: u64, // TODO: Change this to [u128; 2] when supporting commit reports with 256 messages
@@ -252,6 +256,8 @@ mod tests {
     fn test_set_state() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
             timestamp: 0,
             min_msg_nr: 0,
             max_msg_nr: 64,
@@ -279,6 +285,8 @@ mod tests {
     fn test_set_state_out_of_bounds() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
@@ -292,6 +300,8 @@ mod tests {
     fn test_get_state() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
@@ -326,6 +336,8 @@ mod tests {
     fn test_get_state_out_of_bounds() {
         let commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
