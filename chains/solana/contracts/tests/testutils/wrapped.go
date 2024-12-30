@@ -72,6 +72,8 @@ func GetRequiredCU(ctx context.Context, t *testing.T, client *rpc.Client, ixs []
 	})
 	require.NoError(t, err)
 	require.Nil(t, feeResult.Value.Err)
+	// maximum cu is 1_400_000, so we can safely cast to uint32
+	//nolint:gosec
 	return fees.ComputeUnitLimit(*feeResult.Value.UnitsConsumed)
 }
 
