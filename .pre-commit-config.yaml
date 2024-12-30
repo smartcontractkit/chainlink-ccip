@@ -1,65 +1,10 @@
 repos:
   - repo: local
     hooks:
-      - id: cargo-clippy
-        name: Run cargo clippy
-        entry: bash -c "echo 'Running cargo clippy '; cargo clippy --manifest-path ./chains/solana/contracts/programs/ccip-router/Cargo.toml"
+      - id: solana-checks
+        name: Run Solana checks
+        entry: bash -c "echo 'Running make solana-checks'; make -C ./chains/solana solana-checks"
         language: system
         stages: [pre-commit]
         files: ^chains/solana/
-        verbose: true
-      - id: anchor-go-gen
-        name: Generate Anchor Go Contract Interfaces
-        entry: bash -c "echo 'Running make anchor-go-gen'; make -C ./chains/solana anchor-go-gen"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: format-contracts
-        name: Format Rust Solana Contracts and Typescript tests
-        entry: bash -c "echo 'Running make format-contracts'; make -C ./chains/solana format-contracts"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: gomodtidy
-        name: Run Go Mod Tidy
-        entry: bash -c "echo 'Running make gomodtidy'; make -C ./chains/solana gomodtidy"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: lint-go
-        name: Run Go Linter and fix if possible
-        entry: bash -c "echo 'Running make lint-go-fix'; make -C ./chains/solana lint-go-fix"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: rust-tests
-        name: Run Rust tests
-        entry: bash -c "echo 'Running Rust Tests'; cd ./chains/solana/contracts && make rust-tests"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: e2e-tests-go
-        name: Run Go E2E tests
-        entry: bash -c "echo 'Running Go E2E Tests'; cd ./chains/solana && make go-tests"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: generate-idl
-        name: Generate Solana IDL
-        entry: bash -c "echo 'Running make generate-idl'; make -C ./chains/solana generate-idl"
-        language: system
-        stages: [pre-commit]
-        files: ^chains/solana/
-        verbose: true
-      - id: tap-yubikey
-        name: Reminder
-        entry: bash -c "echo 'Remember to tap your Yubikey!'"
-        language: system
-        stages: [pre-commit]
         verbose: true
