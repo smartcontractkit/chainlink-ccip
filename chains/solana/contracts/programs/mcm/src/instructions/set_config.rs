@@ -89,8 +89,6 @@ pub fn set_config(
     }
 
     let config = &mut ctx.accounts.multisig_config;
-    config.group_quorums = group_quorums;
-    config.group_parents = group_parents;
 
     {
         let mut signers: Vec<McmSigner> = Vec::with_capacity(signer_addresses.len());
@@ -111,7 +109,13 @@ pub fn set_config(
                 group: signer_groups[index],
             })
         }
-        config.signers = signers;
+
+        config.set_inner(MultisigConfig {
+            group_parents,
+            group_quorums,
+            signers,
+            ..**config
+        });
     }
 
     // clear_root is equivalent to overriding with a completely empty root

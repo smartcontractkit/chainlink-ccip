@@ -191,8 +191,9 @@ func sendTransactionWithLookupTables(ctx context.Context, rpcClient *rpc.Client,
 	})
 }
 
-func SimulateTransaction(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey) (*rpc.SimulateTransactionResponse, error) {
+// shared function for transaction simulation
+func buildSignedTx(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey) (*solana.Transaction, error) {
 	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return nil, err
@@ -213,7 +214,25 @@ func SimulateTransaction(ctx context.Context, rpcClient *rpc.Client, instruction
 		return nil, err
 	}
 
+	return tx, err
+}
+
+func SimulateTransaction(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey) (*rpc.SimulateTransactionResponse, error) {
+	tx, err := buildSignedTx(ctx, rpcClient, instructions, signer)
+	if err != nil {
+		return nil, err
+	}
 	return rpcClient.SimulateTransaction(ctx, tx)
+}
+
+func SimulateTransactionWithOpts(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
+	signer solana.PrivateKey, opts rpc.SimulateTransactionOpts) (*rpc.SimulateTransactionResponse, error) {
+	tx, err := buildSignedTx(ctx, rpcClient, instructions, signer)
+	if err != nil {
+		return nil, err
+	}
+	return rpcClient.SimulateTransactionWithOpts(ctx, tx, &opts)
 }
 
 func ExtractReturnValue(ctx context.Context, logs []string, programID string) ([]byte, error) {
