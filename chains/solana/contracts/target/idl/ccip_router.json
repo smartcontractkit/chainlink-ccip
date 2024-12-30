@@ -1455,6 +1455,10 @@
             "type": "u8"
           },
           {
+            "name": "chainSelector",
+            "type": "u64"
+          },
+          {
             "name": "state",
             "type": {
               "defined": "SourceChainState"
@@ -1477,6 +1481,10 @@
           {
             "name": "version",
             "type": "u8"
+          },
+          {
+            "name": "chainSelector",
+            "type": "u64"
           },
           {
             "name": "state",
@@ -1524,6 +1532,19 @@
           {
             "name": "version",
             "type": "u8"
+          },
+          {
+            "name": "chainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "merkleRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "timestamp",

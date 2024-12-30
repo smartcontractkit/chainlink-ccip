@@ -21,7 +21,7 @@ go install github.com/gagliardetto/anchor-go@v0.2.3
 anchor build
 
 # go bindings need to be regenerated if contract changes were made
-./scrips/anchor-go-gen.sh
+./scripts/anchor-go-gen.sh
 
 # test contracts
 go test ./... -v -count=1 -failfast
