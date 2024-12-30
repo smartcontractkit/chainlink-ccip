@@ -8,6 +8,10 @@ export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 anchor_version:
 	@echo "${ANCHOR_VERSION}"
 
+.PHONY: clippy
+clippy:
+	cargo clippy --manifest-path ./contracts/programs/ccip-router/Cargo.toml
+
 .PHONY: gomods
 gomods: ## Install gomods
 	go install github.com/jmank88/gomods@v0.1.3
@@ -49,12 +53,4 @@ generate-idl:
 	cd ./contracts && anchor build
 
 .PHONY: solana-checks
-solana-checks:
-	bash -c "echo 'Running cargo clippy'; cargo clippy --manifest-path ./contracts/programs/ccip-router/Cargo.toml" && \
-	bash -c "echo 'Running make anchor-go-gen'; make anchor-go-gen" && \
-	bash -c "echo 'Running make format'; make format" && \
-	bash -c "echo 'Running make gomodtidy'; make gomodtidy" && \
-	bash -c "echo 'Running make lint-go'; make lint-go" && \
-	bash -c "echo 'Running Rust Tests'; cd ./contracts && make rust-tests" && \
-	bash -c "echo 'Running Go E2E Tests'; make go-tests" && \
-	bash -c "echo 'Running make generate-idl'; make generate-idl"
+solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests generate-idl
