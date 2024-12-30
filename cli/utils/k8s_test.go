@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
@@ -104,9 +105,10 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 	got, err := clientcmd.LoadFromFile(nonExistingKubeConfig)
 	require.NoError(t, err)
 
+	authInfoArn := fmt.Sprintf("%s/%s", strings.Split(eksClusterArn, "/")[0], eksClusterAlias)
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			eksClusterArn: {
+			authInfoArn: {
 				Exec: &clientcmdapi.ExecConfig{
 					Command: "aws",
 					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
@@ -127,7 +129,7 @@ func TestSetupKubeConfigNonExisting(t *testing.T) {
 		Contexts: map[string]*clientcmdapi.Context{
 			eksClusterAlias: {
 				Cluster:  eksClusterArn,
-				AuthInfo: eksClusterArn,
+				AuthInfo: authInfoArn,
 			},
 		},
 		CurrentContext: eksClusterAlias,
@@ -216,15 +218,24 @@ users:
 	got, err := clientcmd.LoadFromFile(mockedKubeConfig.Name())
 	require.NoError(t, err)
 
+	authInfoArn := fmt.Sprintf("%s/%s", strings.Split(eksClusterArn, "/")[0], eksClusterAlias)
 	want := &clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			eksClusterArn: {
+			authInfoArn: {
 				Exec: &clientcmdapi.ExecConfig{
 					Command: "aws",
 					Args:    []string{"--region", "ap-southeast-1", "eks", "get-token", "--cluster-name", eksClusterName, "--output", "json"},
 					Env: []clientcmdapi.ExecEnvVar{
 						{Name: "AWS_PROFILE", Value: "profile-test"},
 					},
+					APIVersion:      "client.authentication.k8s.io/v1beta1",
+					InteractiveMode: "IfAvailable",
+				},
+			},
+			"arn:aws:eks:ap-southeast-1:123456789000:cluster/test-eks-cluster": {
+				Exec: &clientcmdapi.ExecConfig{
+					Command:         "aws",
+					Args:            []string{"eks", "get-token", "--cluster-name", "wrong-eks-cluster"},
 					APIVersion:      "client.authentication.k8s.io/v1beta1",
 					InteractiveMode: "IfAvailable",
 				},
@@ -247,7 +258,7 @@ users:
 		Contexts: map[string]*clientcmdapi.Context{
 			eksClusterAlias: {
 				Cluster:  eksClusterArn,
-				AuthInfo: eksClusterArn,
+				AuthInfo: authInfoArn,
 			},
 			"context-we-should-not-touch": {
 				Cluster:  "arn:aws:eks:us-east-1:123456789000:cluster/cluster-we-should-not-touch",

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	"github.com/smartcontractkit/crib/cli/wrappers"
@@ -70,7 +71,8 @@ func SetupKubeConfig(input *SetupKubeConfigInput) error {
 
 	// clientcmdapi.ExecConfig based on current state of aws eks update-kubeconfig
 	// see: https://github.com/aws/aws-cli/blob/497a62cd38df982eb8dd3c06db447fb534cea009/awscli/customizations/eks/update_kubeconfig.py#L308-L327
-	newConfig.AuthInfos[eksClusterArn] = &clientcmdapi.AuthInfo{
+	authInfoArn := fmt.Sprintf("%s/%s", strings.Split(eksClusterArn, "/")[0], input.EksAliasName)
+	newConfig.AuthInfos[authInfoArn] = &clientcmdapi.AuthInfo{
 		Exec: &clientcmdapi.ExecConfig{
 			APIVersion: "client.authentication.k8s.io/v1beta1",
 			Env: []clientcmdapi.ExecEnvVar{
@@ -85,7 +87,7 @@ func SetupKubeConfig(input *SetupKubeConfigInput) error {
 
 	newConfig.Contexts[input.EksAliasName] = &clientcmdapi.Context{
 		Cluster:   eksClusterArn,
-		AuthInfo:  eksClusterArn,
+		AuthInfo:  authInfoArn,
 		Namespace: input.CribNamespace,
 	}
 
