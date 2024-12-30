@@ -50,5 +50,15 @@ func (p *processor) ValidateObservation(
 		}
 	}
 
+	for _, update := range obs.ChainFeeUpdates {
+		if update.ChainFee.ExecutionFeePriceUSD == nil || update.ChainFee.ExecutionFeePriceUSD.Cmp(zero) <= 0 {
+			return fmt.Errorf("nil or non-positive %s", "execution fee price")
+		}
+
+		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(zero) < 0 {
+			return fmt.Errorf("nil or negative %s", "data availability fee price")
+		}
+	}
+
 	return nil
 }
