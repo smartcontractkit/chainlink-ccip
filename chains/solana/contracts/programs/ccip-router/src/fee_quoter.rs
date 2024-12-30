@@ -40,6 +40,7 @@ pub fn fee_for_msg(
     Ok(SolanaTokenAmount { amount, token })
 }
 
+#[allow(dead_code)]
 pub struct PackedPrice {
     pub execution_cost: u128,
     pub gas_price: u128,
