@@ -108,7 +108,6 @@ impl RootMetadataInput {
         let chain_id = left_pad_vec(&self.chain_id.to_le_bytes());
         let pre_op_count = left_pad_vec(&self.pre_op_count.to_le_bytes());
         let post_op_count = left_pad_vec(&self.post_op_count.to_le_bytes());
-
         let override_previous_root: &[u8] = &[if self.override_previous_root { 1 } else { 0 }];
         let override_previous_root_bytes = left_pad_vec(override_previous_root);
 
