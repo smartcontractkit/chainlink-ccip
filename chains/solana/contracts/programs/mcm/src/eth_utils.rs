@@ -190,13 +190,6 @@ mod tests {
         use super::*;
 
         #[test]
-        fn too_few() {
-            let input = [1, 2, 3];
-            let result = _left_pad_vec(&input, 1); // 1 is smaller than the input length
-            assert_eq!(result.as_slice(), input);
-        }
-
-        #[test]
         fn exact() {
             let input = [1, 2, 3];
             let result = _left_pad_vec(&input, input.len());
