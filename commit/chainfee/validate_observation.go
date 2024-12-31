@@ -2,8 +2,9 @@ package chainfee
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"math/big"
+
+	"github.com/pkg/errors"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
@@ -26,14 +27,12 @@ func (p *processor) ValidateObservation(
 		return errors.Wrap(err, "failed to validate observed chains")
 	}
 
-	for _, feeComponent := range obs.FeeComponents {
-		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(zero) <= 0 {
-			return fmt.Errorf("nil or non-positive %s", "execution fee")
-		}
+	if err := validateFeeComponents(ao); err != nil {
+		return errors.Wrap(err, "failed to validate fee components")
+	}
 
-		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(zero) < 0 {
-			return fmt.Errorf("nil or negative %s", "data availability fee")
-		}
+	if err := validateChainFeeUpdates(ao); err != nil {
+		return errors.Wrap(err, "failed to validate chain fee updates")
 	}
 
 	for _, token := range obs.NativeTokenPrices {
@@ -42,16 +41,36 @@ func (p *processor) ValidateObservation(
 		}
 	}
 
-	for _, update := range obs.ChainFeeUpdates {
-		if update.ChainFee.ExecutionFeePriceUSD == nil || update.ChainFee.ExecutionFeePriceUSD.Cmp(zero) <= 0 {
+	return nil
+}
+
+func validateChainFeeUpdates(
+	ao plugincommon.AttributedObservation[Observation],
+) error {
+	for _, update := range ao.Observation.ChainFeeUpdates {
+		if update.ChainFee.ExecutionFeePriceUSD == nil || update.ChainFee.ExecutionFeePriceUSD.Cmp(big.NewInt(0)) <= 0 {
 			return fmt.Errorf("nil or non-positive %s", "execution fee price")
 		}
 
-		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(zero) < 0 {
+		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
 			return fmt.Errorf("nil or negative %s", "data availability fee price")
 		}
 	}
+	return nil
+}
 
+func validateFeeComponents(
+	ao plugincommon.AttributedObservation[Observation],
+) error {
+	for _, feeComponent := range ao.Observation.FeeComponents {
+		if feeComponent.ExecutionFee == nil || feeComponent.ExecutionFee.Cmp(big.NewInt(0)) <= 0 {
+			return fmt.Errorf("nil or non-positive %s", "execution fee")
+		}
+
+		if feeComponent.DataAvailabilityFee == nil || feeComponent.DataAvailabilityFee.Cmp(big.NewInt(0)) < 0 {
+			return fmt.Errorf("nil or negative %s", "data availability fee")
+		}
+	}
 	return nil
 }
 
