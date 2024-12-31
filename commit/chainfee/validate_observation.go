@@ -2,6 +2,7 @@ package chainfee
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
@@ -21,17 +22,8 @@ func (p *processor) ValidateObservation(
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
 
-	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
-	if err != nil {
-		return fmt.Errorf("failed to get supported chains: %w", err)
-	}
-
-	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
-
-	for _, chain := range observedChains {
-		if !observerSupportedChains.Contains(chain) {
-			return fmt.Errorf("chain %d is not supported by observer", chain)
-		}
+	if err := p.ValidateObservedChains(ao); err != nil {
+		return errors.Wrap(err, "failed to validate observed chains")
 	}
 
 	for _, feeComponent := range obs.FeeComponents {
@@ -57,6 +49,26 @@ func (p *processor) ValidateObservation(
 
 		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(zero) < 0 {
 			return fmt.Errorf("nil or negative %s", "data availability fee price")
+		}
+	}
+
+	return nil
+}
+
+func (p *processor) ValidateObservedChains(
+	ao plugincommon.AttributedObservation[Observation],
+) error {
+	obs := ao.Observation
+	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get supported chains")
+	}
+
+	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
+	observedChains = append(observedChains, maps.Keys(obs.ChainFeeUpdates)...)
+	for _, chain := range observedChains {
+		if !observerSupportedChains.Contains(chain) {
+			return fmt.Errorf("chain %d is not supported by observer", chain)
 		}
 	}
 
