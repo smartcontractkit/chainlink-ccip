@@ -34,6 +34,10 @@ func TestSeqNumRange(t *testing.T) {
 		assert.Equal(t, "[1 -> 2]", NewSeqNumRange(1, 2).String())
 		assert.Equal(t, "[0 -> 0]", SeqNumRange{}.String())
 	})
+
+	t.Run("end before start", func(t *testing.T) {
+		assert.Equal(t, NewSeqNumRange(10, 20), NewSeqNumRange(20, 10))
+	})
 }
 
 func TestSeqNumRange_Overlap(t *testing.T) {
@@ -118,10 +122,10 @@ func TestSeqNumRangeLimit(t *testing.T) {
 			want: NewSeqNumRange(0, 0),
 		},
 		{
-			name: "wrong range",
+			name: "wrong range is repaired",
 			rng:  NewSeqNumRange(20, 15),
 			n:    3,
-			want: NewSeqNumRange(20, 15),
+			want: NewSeqNumRange(15, 17),
 		},
 	}
 
