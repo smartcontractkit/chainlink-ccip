@@ -601,7 +601,8 @@ func TestMcmWithTimelock(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, setRootIxErr)
 
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment)
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 						require.NotNil(t, tx)
 
 						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -744,7 +745,8 @@ func TestMcmWithTimelock(t *testing.T) {
 						vIx, vErr := ix.ValidateAndBuild()
 						require.NoError(t, vErr)
 
-						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
+						tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 						require.NotNil(t, tx)
 
 						parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -999,7 +1001,8 @@ func TestMcmWithTimelock(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, setRootIxErr)
 
-			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment)
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 			require.NotNil(t, tx)
 
 			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -1425,11 +1428,12 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
+				cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 					[]solana.Instruction{vIx},
 					admin,
 					config.DefaultCommitment,
-					common.AddComputeUnitLimit(1_400_000),
+					common.AddComputeUnitLimit(cu),
 				)
 				require.NotNil(t, tx)
 				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -1522,11 +1526,12 @@ func TestMcmWithTimelock(t *testing.T) {
 				vIx, err := ix.ValidateAndBuild()
 				require.NoError(t, err)
 
+				cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{vIx}, admin, config.DefaultCommitment)
 				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient,
 					[]solana.Instruction{vIx},
 					admin,
 					config.DefaultCommitment,
-					common.AddComputeUnitLimit(1_400_000),
+					common.AddComputeUnitLimit(cu),
 				)
 				require.NotNil(t, tx)
 				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
