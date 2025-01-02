@@ -21,6 +21,8 @@ on:
       - "!.gitignore"
       # Exclude changesets version bumps
       - "!package.json"
+      # Exclude CODEOWNERS
+      - CODEOWNERS
     types:
       - opened
       - reopened
@@ -44,6 +46,8 @@ on:
       - "!.gitignore"
       # Exclude changesets version bumps
       - "!package.json"
+      # Exclude CODEOWNERS
+      - CODEOWNERS
   workflow_dispatch:
     inputs:
       debug:
