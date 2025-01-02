@@ -124,10 +124,10 @@ pub fn transfer_fee<'info>(
         CcipRouterError::InvalidInputs
     ); // TODO use more specific error
 
-    do_transfer(token_program, transfer, fee.amount, decimals, signer_bump)
+    do_billing_transfer(token_program, transfer, fee.amount, decimals, signer_bump)
 }
 
-pub fn do_transfer<'info>(
+pub fn do_billing_transfer<'info>(
     token_program: AccountInfo<'info>,
     transfer: token_interface::TransferChecked<'info>,
     amount: u64,

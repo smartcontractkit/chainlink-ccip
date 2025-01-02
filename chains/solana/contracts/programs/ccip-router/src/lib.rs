@@ -726,7 +726,7 @@ pub mod ccip_router {
             desired_amount
         };
 
-        do_transfer(
+        do_billing_transfer(
             ctx.accounts.token_program.to_account_info(),
             transfer,
             amount,
