@@ -16,7 +16,7 @@ pub fn execute<'info>(
     chain_id: u64,
     nonce: u64,
     data: Vec<u8>,
-    proof: Vec<[u8; 32]>,
+    proof: Vec<[u8; HASH_BYTES]>,
 ) -> Result<()> {
     let Execute {
         root_metadata,
@@ -128,11 +128,6 @@ pub struct Execute<'info> {
     pub authority: Signer<'info>,
 }
 
-const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP: &[u8] = &[
-    0x08, 0xd2, 0x75, 0x62, 0x20, 0x06, 0xc4, 0xca, 0x82, 0xd0, 0x3f, 0x49, 0x8e, 0x90, 0x16, 0x3c,
-    0xaf, 0xd5, 0x3c, 0x66, 0x3a, 0x48, 0x47, 0x0c, 0x3b, 0x52, 0xac, 0x8b, 0xfb, 0xd9, 0xf5, 0x2c,
-];
-
 #[derive(Debug)]
 pub struct Op {
     pub chain_id: u64,    // network identification
@@ -188,13 +183,7 @@ impl Op {
 }
 
 fn bools_to_byte(b1: bool, b2: bool) -> Vec<u8> {
-    let byte = match (b1, b2) {
-        (false, false) => 0x00,
-        (false, true) => 0x01,
-        (true, false) => 0x02,
-        (true, true) => 0x03,
-    };
-    vec![byte]
+    vec![(u8::from(b1) << 1) + u8::from(b2)]
 }
 
 #[cfg(test)]
@@ -228,7 +217,7 @@ mod tests {
             };
 
             // op in hex:
-            // 08d275622006c4ca82d03f498e90163cafd53c663a48470c3b52ac8bfbd9f52c  separator
+            // fb98816ff3c5138a68abfd40b8d8fbc22972fea1dd89757331327e6e0a9440b7  separator
             // 0000000000000000000000000000000000000000000000001266a21317e30848  chain_id
             // eceeab9f961bbf0050babcbf22663ee37905749830f41cd5096fbc9b158f8b13  multisig
             // 0000000000000000000000000000000000000000000000000000000000000000  nonce
@@ -236,10 +225,9 @@ mod tests {
             // 0000000000000000000000000000000000000000000000000800000000000000  data_len
             // d62c04f70c29d96e                                                  data
             // 0000000000000000000000000000000000000000000000000000000000000000  remaining_accounts_len
-
             assert_eq!(
                 op.hash_leaf(),
-                decode32("98ab3312f47d75a0173f23f50ba6042748e07bea064ae297982efebae3ecec9b")
+                decode32("0145195c134f5cec64fba146648763c2a7ac9bdb2c2efbc31a72bf9fb5f4246c")
             );
         }
 
@@ -259,7 +247,7 @@ mod tests {
             };
 
             // Raw Buffers
-            // Buffer[0]: 08d275622006c4ca82d03f498e90163cafd53c663a48470c3b52ac8bfbd9f52c
+            // Buffer[0]: fb98816ff3c5138a68abfd40b8d8fbc22972fea1dd89757331327e6e0a9440b7
             // Buffer[1]: 0000000000000000000000000000000000000000000000001266a21317e30848
             // Buffer[2]: eceeab9f961bbf0050babcbf22663ee37905749830f41cd5096fbc9b158f8b13
             // Buffer[3]: 0000000000000000000000000000000000000000000000000100000000000000
@@ -270,7 +258,7 @@ mod tests {
 
             assert_eq!(
                 op.hash_leaf(),
-                decode32("a23f9edc9ab94e247f6273d36633dced27525727b6a50aee95f14fd92aadb6e0")
+                decode32("d0dade6731524fbf07bf67fb9d250bc10b6e22adcd5e04ad9d6f515c75ac4951")
             );
         }
     }

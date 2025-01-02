@@ -578,6 +578,7 @@ pub(crate) mod tests {
     pub fn sample_dest_chain() -> DestChain {
         DestChain {
             version: 1,
+            chain_selector: 1,
             state: crate::DestChainState {
                 sequence_number: 0,
                 usd_per_unit_gas: crate::TimestampedPackedU224 {
