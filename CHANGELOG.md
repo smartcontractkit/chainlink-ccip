@@ -1,5 +1,17 @@
 # @chainlink/crib
 
+## 1.4.0
+
+### Minor Changes
+
+- [#315](https://github.com/smartcontractkit/crib/pull/315) [`42e3ac0`](https://github.com/smartcontractkit/crib/commit/42e3ac0f5f6abf3425caebe49300e294835b1cb5) Thanks [@njegosrailic](https://github.com/njegosrailic)! - Adding support for labeling CRIB namespaces from the CLI for cost attribution
+
+### Patch Changes
+
+- [#339](https://github.com/smartcontractkit/crib/pull/339) [`0e527f8`](https://github.com/smartcontractkit/crib/commit/0e527f8f31e800df81707b4bbc82b21ca5200d74) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - grpcurl available on the nix shell
+
+- [#340](https://github.com/smartcontractkit/crib/pull/340) [`4b96521`](https://github.com/smartcontractkit/crib/commit/4b96521d98f97dcddb4baebce61cae52e797759b) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - fix utils.SetupKubeConfig authInfo handling (prevents overwriting non-CRIB related entries)
+
 ## 1.3.0
 
 ### Minor Changes

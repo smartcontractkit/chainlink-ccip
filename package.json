@@ -1,6 +1,6 @@
 {
   "name": "@chainlink/crib",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "CRIB stands for 'Chainlink Running-in-a-Box'",
   "private": true,
   "engines": {
