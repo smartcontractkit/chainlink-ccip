@@ -48,9 +48,9 @@ format:
 go-tests:
 	go test -v ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
-.PHONY: generate-idl
-generate-idl:
+.PHONY: build-contracts
+build-contracts:
 	cd ./contracts && anchor build
 
 .PHONY: solana-checks
-solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests generate-idl
+solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
