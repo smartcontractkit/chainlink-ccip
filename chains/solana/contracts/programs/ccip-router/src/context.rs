@@ -155,8 +155,9 @@ pub struct WithdrawBilledFunds<'info> {
 
     #[account(
         mut,
-        owner = token_program.key() @ CcipRouterError::InvalidInputs,
-        constraint = recipient.mint == fee_token_mint.key() @ CcipRouterError::InvalidInputs,
+        constraint = recipient.key() == get_associated_token_address_with_program_id(
+            &config.load()?.fee_aggregator.key(), &fee_token_mint.key(), &token_program.key()
+        ) @ CcipRouterError::InvalidInputs,
     )]
     pub recipient: InterfaceAccount<'info, TokenAccount>,
 

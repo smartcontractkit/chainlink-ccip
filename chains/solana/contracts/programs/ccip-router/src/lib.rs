@@ -70,6 +70,7 @@ pub mod ccip_router {
         default_gas_limit: u128,
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
+        fee_aggregator: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
@@ -83,6 +84,8 @@ pub mod ccip_router {
         }
 
         config.owner = ctx.accounts.authority.key();
+
+        config.fee_aggregator = fee_aggregator;
 
         config.ocr3 = [
             Ocr3Config::new(OcrPluginType::Commit as u8),
@@ -127,6 +130,22 @@ pub mod ccip_router {
         let mut config = ctx.accounts.config.load_mut()?;
         config.owner = std::mem::take(&mut config.proposed_owner);
         config.proposed_owner = Pubkey::new_from_array([0; 32]);
+        Ok(())
+    }
+
+    /// Updates the fee aggregator in the router configuration.
+    /// The Admin is the only one able to update the fee aggregator.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
+    pub fn update_fee_aggregator(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        fee_aggregator: Pubkey,
+    ) -> Result<()> {
+        let mut config = ctx.accounts.config.load_mut()?;
+        config.fee_aggregator = fee_aggregator;
         Ok(())
     }
 

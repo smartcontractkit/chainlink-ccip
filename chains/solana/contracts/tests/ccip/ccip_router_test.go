@@ -51,6 +51,8 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 	anotherTokenPoolAdmin, gerr := solana.NewRandomPrivateKey()
 	require.NoError(t, gerr)
+	feeAggregator, gerr := solana.NewRandomPrivateKey()
+	require.NoError(t, gerr)
 
 	var nonceEvmPDA solana.PublicKey
 
@@ -64,6 +66,7 @@ func TestCCIPRouter(t *testing.T) {
 		anotherUserATA   solana.PublicKey
 		tokenlessUserATA solana.PublicKey
 		billingConfigPDA solana.PublicKey
+		feeAggregatorATA solana.PublicKey
 		// add other accounts as needed
 	}
 	wsol := AccountsPerToken{name: "WSOL (pre-2022)"}
@@ -130,7 +133,7 @@ func TestCCIPRouter(t *testing.T) {
 
 	t.Run("setup", func(t *testing.T) {
 		t.Run("funding", func(t *testing.T) {
-			testutils.FundAccounts(ctx, append(transmitters, user, anotherUser, tokenlessUser, admin, anotherAdmin, tokenPoolAdmin, anotherTokenPoolAdmin), solanaGoClient, t)
+			testutils.FundAccounts(ctx, append(transmitters, user, anotherUser, tokenlessUser, admin, anotherAdmin, tokenPoolAdmin, anotherTokenPoolAdmin, feeAggregator), solanaGoClient, t)
 		})
 
 		t.Run("receiver", func(t *testing.T) {
@@ -231,6 +234,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, auerr)
 			wsolTokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, tokenlessUser.PublicKey())
 			require.NoError(t, tuerr)
+			wsolFeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, feeAggregator.PublicKey())
+			require.NoError(t, fuerr)
 
 			// persist the WSOL config for later use
 			wsol.program = solana.TokenProgramID
@@ -240,6 +245,7 @@ func TestCCIPRouter(t *testing.T) {
 			wsol.anotherUserATA = wsolAnotherUserATA
 			wsol.tokenlessUserATA = wsolTokenlessUserATA
 			wsol.billingATA = wsolReceiver
+			wsol.feeAggregatorATA = wsolFeeAggregatorATA
 
 			///////////////
 			// Token2022 //
@@ -264,6 +270,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, auerr)
 			token2022TokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(config.Token2022Program, mintPubK, tokenlessUser.PublicKey())
 			require.NoError(t, tuerr)
+			token2022FeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(config.Token2022Program, mintPubK, feeAggregator.PublicKey())
+			require.NoError(t, fuerr)
 
 			// persist the Token2022 billing config for later use
 			token2022.program = config.Token2022Program
@@ -273,6 +281,7 @@ func TestCCIPRouter(t *testing.T) {
 			token2022.anotherUserATA = token2022AnotherUserATA
 			token2022.tokenlessUserATA = token2022TokenlessUserATA
 			token2022.billingATA = token2022Receiver
+			token2022.feeAggregatorATA = token2022FeeAggregatorATA
 		})
 
 		t.Run("Commit price updates address lookup table", func(t *testing.T) {
@@ -332,6 +341,7 @@ func TestCCIPRouter(t *testing.T) {
 				defaultGasLimit,
 				allowOutOfOrderExecution,
 				config.EnableExecutionAfter,
+				feeAggregator.PublicKey(),
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
 				admin.PublicKey(),
@@ -891,6 +901,16 @@ func TestCCIPRouter(t *testing.T) {
 					shouldFund: false, // do not fund tokenless user
 				},
 			}
+
+			feeAggrAtaIx := make([]solana.Instruction, len(billingTokens))
+			for i, token := range billingTokens {
+				// create ATA for fee aggregator
+				ixAtaFeeAggr, addrFeeAggr, uerr := tokens.CreateAssociatedTokenAccount(token.program, token.mint, feeAggregator.PublicKey(), feeAggregator.PublicKey())
+				require.NoError(t, uerr)
+				require.Equal(t, token.feeAggregatorATA, addrFeeAggr, fmt.Sprintf("ATA for feeAggregator and token %s", token.name))
+				feeAggrAtaIx[i] = ixAtaFeeAggr
+			}
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, feeAggrAtaIx, feeAggregator, config.DefaultCommitment)
 
 			for _, it := range list {
 				for _, token := range billingTokens {
@@ -2929,7 +2949,7 @@ func TestCCIPRouter(t *testing.T) {
 				uint64(0), // amount
 				wsol.mint,
 				wsol.billingATA,
-				wsol.userATA, // send them to the user's account (just because, it could be any wallet)
+				wsol.feeAggregatorATA,
 				wsol.program,
 				config.BillingSignerPDA,
 				config.RouterConfigPDA,
@@ -2940,13 +2960,30 @@ func TestCCIPRouter(t *testing.T) {
 			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
 		})
 
-		t.Run("When withdrawing funds but sending them to the wrong token account, it fails", func(t *testing.T) {
+		t.Run("When withdrawing funds but sending them to the token account for a wrong token, it fails", func(t *testing.T) {
 			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
 				true,      // withdraw all
 				uint64(0), // amount
 				wsol.mint,
 				wsol.billingATA,
-				token2022.userATA, // wrong token account
+				token2022.feeAggregatorATA, // wrong token account
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputs_CcipRouterError.String()})
+		})
+
+		t.Run("When withdrawing funds but sending them to a non-whitelisted token account, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.userATA, // wrong destination, sending to user account instead of fee aggregator's
 				wsol.program,
 				config.BillingSignerPDA,
 				config.RouterConfigPDA,
@@ -2963,7 +3000,7 @@ func TestCCIPRouter(t *testing.T) {
 				getBalance(wsol.billingATA)+1, // amount (more than what's available)
 				wsol.mint,
 				wsol.billingATA,
-				wsol.userATA,
+				wsol.feeAggregatorATA,
 				wsol.program,
 				config.BillingSignerPDA,
 				config.RouterConfigPDA,
@@ -2978,7 +3015,7 @@ func TestCCIPRouter(t *testing.T) {
 			funds := getBalance(token2022.billingATA)
 			require.Greater(t, funds, uint64(0))
 
-			initialUserBalance := getBalance(token2022.userATA)
+			initialAggrBalance := getBalance(token2022.feeAggregatorATA)
 
 			amount := uint64(2)
 
@@ -2987,7 +3024,7 @@ func TestCCIPRouter(t *testing.T) {
 				amount, // amount
 				token2022.mint,
 				token2022.billingATA,
-				token2022.userATA, // send them to the user's account (just because, it could be any wallet)
+				token2022.feeAggregatorATA,
 				token2022.program,
 				config.BillingSignerPDA,
 				config.RouterConfigPDA,
@@ -2997,22 +3034,22 @@ func TestCCIPRouter(t *testing.T) {
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
 
-			require.Equal(t, funds-amount, getBalance(token2022.billingATA))           // empty
-			require.Equal(t, amount, getBalance(token2022.userATA)-initialUserBalance) // increased by exact amount
+			require.Equal(t, funds-amount, getBalance(token2022.billingATA))                    // empty
+			require.Equal(t, amount, getBalance(token2022.feeAggregatorATA)-initialAggrBalance) // increased by exact amount
 		})
 
 		t.Run("When withdrawing all funds, it succeeds", func(t *testing.T) {
 			funds := getBalance(wsol.billingATA)
 			require.Greater(t, funds, uint64(0))
 
-			initialUserBalance := getBalance(wsol.userATA)
+			initialAggrBalance := getBalance(wsol.feeAggregatorATA)
 
 			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
 				true,      // withdraw all
 				uint64(0), // amount
 				wsol.mint,
 				wsol.billingATA,
-				wsol.userATA, // send them to the user's account (just because, it could be any wallet)
+				wsol.feeAggregatorATA,
 				wsol.program,
 				config.BillingSignerPDA,
 				config.RouterConfigPDA,
@@ -3022,8 +3059,8 @@ func TestCCIPRouter(t *testing.T) {
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
 
-			require.Equal(t, uint64(0), getBalance(wsol.billingATA))             // empty
-			require.Equal(t, funds, getBalance(wsol.userATA)-initialUserBalance) // increased by exact amount
+			require.Equal(t, uint64(0), getBalance(wsol.billingATA))                      // empty
+			require.Equal(t, funds, getBalance(wsol.feeAggregatorATA)-initialAggrBalance) // increased by exact amount
 		})
 
 		t.Run("When withdrawing all funds but the accumulator account is already empty (no balance), it fails", func(t *testing.T) {
@@ -3035,7 +3072,7 @@ func TestCCIPRouter(t *testing.T) {
 				uint64(0), // amount
 				wsol.mint,
 				wsol.billingATA,
-				wsol.userATA, // send them to the user's account (just because, it could be any wallet)
+				wsol.feeAggregatorATA,
 				wsol.program,
 				config.BillingSignerPDA,
 				config.RouterConfigPDA,

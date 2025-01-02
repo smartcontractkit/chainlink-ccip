@@ -91,6 +91,10 @@
         {
           "name": "enableExecutionAfter",
           "type": "i64"
+        },
+        {
+          "name": "feeAggregator",
+          "type": "publicKey"
         }
       ]
     },
@@ -150,6 +154,41 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "updateFeeAggregator",
+      "docs": [
+        "Updates the fee aggregator in the router configuration.",
+        "The Admin is the only one able to update the fee aggregator.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token)."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "feeAggregator",
+          "type": "publicKey"
+        }
+      ]
     },
     {
       "name": "addChainSelector",
@@ -1501,6 +1540,10 @@
                 2
               ]
             }
+          },
+          {
+            "name": "feeAggregator",
+            "type": "publicKey"
           }
         ]
       }

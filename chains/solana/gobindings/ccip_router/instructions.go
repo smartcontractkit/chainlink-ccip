@@ -66,6 +66,15 @@ var (
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	// Updates the fee aggregator in the router configuration.
+	// The Admin is the only one able to update the fee aggregator.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
+	Instruction_UpdateFeeAggregator = ag_binary.TypeID([8]byte{85, 112, 115, 60, 22, 95, 230, 56})
+
 	// Adds a new chain selector to the router.
 	//
 	// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
@@ -373,6 +382,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_UpdateFeeAggregator:
+		return "UpdateFeeAggregator"
 	case Instruction_AddChainSelector:
 		return "AddChainSelector"
 	case Instruction_DisableSourceChainSelector:
@@ -451,6 +462,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
+		},
+		{
+			"update_fee_aggregator", (*UpdateFeeAggregator)(nil),
 		},
 		{
 			"add_chain_selector", (*AddChainSelector)(nil),
