@@ -22,7 +22,7 @@ on:
       # Exclude changesets version bumps
       - "!package.json"
       # Exclude CODEOWNERS
-      - CODEOWNERS
+      - "CODEOWNERS"
     types:
       - opened
       - reopened
@@ -47,7 +47,7 @@ on:
       # Exclude changesets version bumps
       - "!package.json"
       # Exclude CODEOWNERS
-      - CODEOWNERS
+      - "CODEOWNERS"
   workflow_dispatch:
     inputs:
       debug:
