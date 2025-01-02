@@ -1,4 +1,4 @@
 * @smartcontractkit/crib @skudasov
 
-deployments/ccip-v2 @smartcontractkit/ccip
-dependencies/ccip-v2-scripts @smartcontractkit/ccip
+deployments/ccip-v2 @smartcontractkit/crib @smartcontractkit/ccip
+dependencies/ccip-v2-scripts @smartcontractkit/crib @smartcontractkit/ccip
