@@ -61,17 +61,3 @@ the `main` branch of chainlink-ccip. You can do this by:
 4. Once your chainlink-ccip PR is approved, merge it.
 5. Go back to your chainlink PR and bump the chainlink-ccip version to the latest main.
 6. Once the integration test passes, merge your chainlink PR into `develop`.
-
-## Pre commit hook
-
-You should install [pre-commit](https://pre-commit.com/) so that automated linting and formatting checks are performed before each commit.
-Currently, this pre-commit configuration only runs when modifying Solana Files under `./solana` folder.
-
-Run:
-
-```bash
-pip3 install pre-commit
-pre-commit install
-```
-
-If you need to commit something quickly without running the pre-commit checks, you can use the `--no-verify` flag.
