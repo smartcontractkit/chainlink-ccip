@@ -341,7 +341,7 @@ func TestCCIPRouter(t *testing.T) {
 				defaultGasLimit,
 				allowOutOfOrderExecution,
 				config.EnableExecutionAfter,
-				feeAggregator.PublicKey(),
+				anotherUser.PublicKey(), // fee aggregator address, will be changed in later test
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
 				admin.PublicKey(),
@@ -750,6 +750,39 @@ func TestCCIPRouter(t *testing.T) {
 				require.NoError(t, err, "failed to get account info")
 				require.Equal(t, updated, final.Config)
 			})
+		})
+
+		t.Run("When an unauthorized user tries to update the fee aggregator, it fails", func(t *testing.T) {
+			instruction, err := ccip_router.NewUpdateFeeAggregatorInstruction(
+				user.PublicKey(), // updating to some other address
+				config.RouterConfigPDA,
+				user.PublicKey(), // wrong user
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			require.NotNil(t, result)
+		})
+
+		t.Run("When an authorized user tries updates the fee aggregator, it succeeds", func(t *testing.T) {
+			var configAccount ccip_router.Config
+			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			require.NoError(t, err, "failed to get account info")
+			require.NotEqual(t, feeAggregator.PublicKey(), configAccount.FeeAggregator) // at this point, the fee aggregator is different
+
+			instruction, err := ccip_router.NewUpdateFeeAggregatorInstruction(
+				feeAggregator.PublicKey(), // updating to some other address
+				config.RouterConfigPDA,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			require.NoError(t, err, "failed to get account info")
+			require.Equal(t, feeAggregator.PublicKey(), configAccount.FeeAggregator) // now the fee aggregator is updated
 		})
 
 		t.Run("Can transfer ownership", func(t *testing.T) {
