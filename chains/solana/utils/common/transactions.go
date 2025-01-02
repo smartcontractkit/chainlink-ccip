@@ -89,12 +89,8 @@ func SendAndFailWithRPCError(ctx context.Context, rpcClient *rpc.Client, instruc
 		}
 	}
 
-	if _, err = tx.Sign(func(pub solana.PublicKey) *solana.PrivateKey {
-		priv, ok := signers[pub]
-		if !ok {
-			fmt.Printf("ERROR: Missing signer private key for %s\n", pub)
-		}
-		return &priv
+	if _, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
+		return &signer
 	}); err != nil {
 		return err
 	}
