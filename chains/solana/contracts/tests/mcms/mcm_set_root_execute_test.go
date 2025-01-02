@@ -429,7 +429,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, setRootIxErr)
 
-			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+			cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment)
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 			require.NotNil(t, tx)
 
 			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -650,7 +651,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				).ValidateAndBuild()
 				require.NoError(t, setRootIxErr)
 
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(1_400_000))
+				cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{newIx}, admin, config.DefaultCommitment, common.AddComputeUnitLimit(cu))
 				require.NotNil(t, tx)
 
 				parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
@@ -1104,7 +1106,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, err)
 
 				// set compute budget for signature verification
-				cuIx, err := computebudget.NewSetComputeUnitLimitInstruction(uint32(1_400_000)).ValidateAndBuild()
+				cuIx, err := computebudget.NewSetComputeUnitLimitInstruction(uint32(computebudget.MAX_COMPUTE_UNIT_LIMIT)).ValidateAndBuild()
 				require.NoError(t, err)
 
 				txs = append(txs, TxWithStage{Instructions: []solana.Instruction{cuIx, setRootIx}, Stage: SetRoot})
