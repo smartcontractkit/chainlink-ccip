@@ -63,7 +63,7 @@ func SendAndFailWithLookupTables(ctx context.Context, rpcClient *rpc.Client, ins
 }
 
 func SendAndFailWithRPCError(ctx context.Context, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string) error {
+	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string, opts ...TxModifier) error {
 	hashRes, err := rpcClient.GetLatestBlockhash(ctx, rpc.CommitmentFinalized)
 	if err != nil {
 		return err
@@ -78,8 +78,23 @@ func SendAndFailWithRPCError(ctx context.Context, rpcClient *rpc.Client, instruc
 		return err
 	}
 
-	if _, err = tx.Sign(func(_ solana.PublicKey) *solana.PrivateKey {
-		return &signer
+	// build signers map
+	signers := map[solana.PublicKey]solana.PrivateKey{}
+	signers[signer.PublicKey()] = signer
+
+	// set options before signing transaction
+	for _, o := range opts {
+		if err = o(tx, signers); err != nil {
+			return err
+		}
+	}
+
+	if _, err = tx.Sign(func(pub solana.PublicKey) *solana.PrivateKey {
+		priv, ok := signers[pub]
+		if !ok {
+			fmt.Printf("ERROR: Missing signer private key for %s\n", pub)
+		}
+		return &priv
 	}); err != nil {
 		return err
 	}
