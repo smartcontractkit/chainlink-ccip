@@ -17,10 +17,6 @@ vars:
   DEVSPACE_INGRESS_BASE_DOMAIN:
     source: env
     default: "main.stage.cldev.sh"
-  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
-  DEVSPACE_INGRESS_CERT_ARN:
-    source: env
-    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
   DEPENDENCIES_DIR:
     source: env
     default: "../../dependencies"

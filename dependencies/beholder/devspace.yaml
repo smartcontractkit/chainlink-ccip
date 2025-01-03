@@ -227,13 +227,9 @@ deployments:
                 exporters: [debug, otlphttp]
         ingress:
           enabled: true
-          ingressClassName: "alb"
+          ingressClassName: nginx-internal
           annotations:
-            alb.ingress.kubernetes.io/backend-protocol: HTTP
-            alb.ingress.kubernetes.io/certificate-arn: "${DEVSPACE_INGRESS_CERT_ARN}"
-            alb.ingress.kubernetes.io/group.name: "${DEVSPACE_NAMESPACE}"
-            alb.ingress.kubernetes.io/scheme: internal
-            alb.ingress.kubernetes.io/target-type: ip
+            nginx.ingress.kubernetes.io/backend-protocol: HTTP
             external-dns.alpha.kubernetes.io/ttl: "120"
           hosts:
             - host: ${DEVSPACE_NAMESPACE}-beholder-otel-collector-agent-http.${DEVSPACE_INGRESS_BASE_DOMAIN}

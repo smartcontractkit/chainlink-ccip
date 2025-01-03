@@ -101,13 +101,9 @@ deployments:
                   refreshInterval: 5m
           ingress:
             enabled: true
-            className: "alb"
+            className: nginx-internal
             annotations:
-              alb.ingress.kubernetes.io/backend-protocol: HTTP
-              alb.ingress.kubernetes.io/certificate-arn: "${DEVSPACE_INGRESS_CERT_ARN}"
-              alb.ingress.kubernetes.io/group.name: "${DEVSPACE_NAMESPACE}"
-              alb.ingress.kubernetes.io/scheme: internal
-              alb.ingress.kubernetes.io/target-type: ip
+              nginx.ingress.kubernetes.io/backend-protocol: HTTP
               external-dns.alpha.kubernetes.io/ttl: "120"
             hosts:
               - host: ${DEVSPACE_NAMESPACE}-redpanda-console.${DEVSPACE_INGRESS_BASE_DOMAIN}

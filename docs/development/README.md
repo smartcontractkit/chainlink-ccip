@@ -143,7 +143,7 @@ In the `devspace yaml`, you would specify, which helm chart to deploy and the he
 
 Some of the values will be parametrized based on the `DEVSPACE` built-in variables like `DEVSPACE_NAMESPACE` or CRIB GLOBAL variables. To see the list of the CRIB global variables you can navigate to `deployments/chainlink` dir and run `devspace list vars` , you can also inspect global variables which are specific to a given profile e.g. `devspace list vars -p ccip`
 
-The good example of a CRIB global variable that you would want to reuse is `INGRESS_CERT_ARN` which is required to configure CRIB ingresses - [example](https://github.com/smartcontractkit/crib/blob/main/dependencies/job-distributor/devspace.yaml#L65C64-L65C69).
+The good example of a CRIB global variable that you would want to reuse is `DEVSPACE_INGRESS_BASE_DOMAIN` which is required to configure CRIB ingresses - [example](https://github.com/smartcontractkit/crib/blob/main/dependencies/job-distributor/devspace.yaml#L65C64-L65C69).
 
 #### Adding devspace pipeline in the main devspace.yaml
 
@@ -253,7 +253,6 @@ Configuring Ingress in kubernetes is required to expose services to be accessibl
 Ideally you should define Ingress resource in the kubernetes chart for an app.
 You should make it configurable, so we can pass CRIB specific configuration options. They include following CRIB global vars
 
-* DEVSPACE_INGRESS_CERT_ARN
 * DEVSPACE_INGRESS_CIDRS
 * DEVSPACE_INGRESS_BASE_DOMAIN
 
@@ -321,7 +320,7 @@ On top of that CRIB adds similar "built-in" GLOBAL variables, which are applicab
 
 The list of CRIB global variable include:
 * `PROVIDER` refers to infrastructure provider can be either `kind` or `aws`.
-* Global settings for Ingress, like `DEVSPACE_INGRESS_CERT_ARN` or `DEVSPACE_INGRESS_BASE_DOMAIN`
+* Global settings for Ingress, like `DEVSPACE_INGRESS_BASE_DOMAIN`
 * `CHAINLINK_CODE_DIR`, used for referencing local directories in your workspace, read more details [here](../../deployments/chainlink/devspace.yaml#L19).
 * `DEPENDENCIES_DIR`, `IMPORTS_DIR`, provide the base path for dependencies and imports
 * `CHAINLINK_HELM_REGISTRY_URI`, provides a default URI for internal chainlink charts prod registry

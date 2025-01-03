@@ -20,10 +20,6 @@ vars:
   LOCAL_VALUES_DIR:
     source: env
     default: ./values
-  # Required for deploying ingress on AWS based setup
-  INGRESS_CERT_ARN:
-    source: env
-    default: ""
   # Infrastructure Provider, either kind or aws
   PROVIDER:
     source: env
@@ -206,7 +202,6 @@ profiles:
     merge: |-
       $(
         DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
-        INGRESS_CERT_ARN=${INGRESS_CERT_ARN} \
         gomplate \
           --config ${LOCAL_TEMPLATES_DIR}/chainlink-don.env.crib-staging.yaml
       )

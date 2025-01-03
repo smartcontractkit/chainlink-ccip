@@ -11,10 +11,6 @@ vars:
   DEVSPACE_INGRESS_BASE_DOMAIN:
     source: env
     default: "main.stage.cldev.sh"
-  # This is the ARN of the AWS ACM certificate that will be used for the ingress.
-  DEVSPACE_INGRESS_CERT_ARN:
-    source: env
-    default: "arn:aws:acm:us-west-2:323150190480:certificate/edd19542-7c7c-42dc-ba00-507c4b962ed3"
 
 dependencies:
   postgres:
@@ -109,16 +105,9 @@ profiles:
                   service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8081"
                   service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /healthz
               ingress:
-                className: "alb"
+                className: nginx-internal
                 annotations:
-                  alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
-                  alb.ingress.kubernetes.io/ssl-redirect: "443"
-                  alb.ingress.kubernetes.io/backend-protocol-version: "GRPC"
-                  alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
-                  alb.ingress.kubernetes.io/certificate-arn: ${DEVSPACE_INGRESS_CERT_ARN}
-                  alb.ingress.kubernetes.io/group.name: ${DEVSPACE_NAMESPACE}
-                  alb.ingress.kubernetes.io/scheme: internal
-                  alb.ingress.kubernetes.io/target-type: ip
+                  nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
   - name: kind
     activation:
       - vars:

@@ -15,7 +15,7 @@ deployments:
       releaseName: "mockserver"
       chart:
         name: "${CHAINLINK_HELM_REGISTRY_URI}/crib-mockserver"
-        version: "0.1.0"
+        version: "0.2.0"
       values:
         podSecurityContext:
           fsGroup: 999
@@ -35,8 +35,10 @@ deployments:
         prometheusMonitor: true
         ingress:
           enabled: true
-          annotation_certificate_arn: ${DEVSPACE_INGRESS_CERT_ARN}
-          annotation_group_name: ${DEVSPACE_NAMESPACE}
+          ingressClassName: nginx-internal
+          extra_annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: HTTP
+            external-dns.alpha.kubernetes.io/ttl: "120"
           hosts:
             - host: ${DEVSPACE_NAMESPACE}-mockserver.${DEVSPACE_INGRESS_BASE_DOMAIN}
               http:
