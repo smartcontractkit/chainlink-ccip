@@ -139,6 +139,49 @@ pub struct GetFee<'info> {
 }
 
 #[derive(Accounts)]
+pub struct WithdrawBilledFunds<'info> {
+    #[account(
+        owner = token_program.key() @ CcipRouterError::InvalidInputs,
+    )]
+    pub fee_token_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = fee_token_mint,
+        associated_token::authority = fee_billing_signer,
+        associated_token::token_program = token_program,
+    )]
+    pub fee_token_accum: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        constraint = recipient.key() == get_associated_token_address_with_program_id(
+            &config.load()?.fee_aggregator.key(), &fee_token_mint.key(), &token_program.key()
+        ) @ CcipRouterError::InvalidInputs,
+    )]
+    pub recipient: InterfaceAccount<'info, TokenAccount>,
+
+    pub token_program: Interface<'info, TokenInterface>,
+
+    /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
+    #[account(
+        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        bump
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct InitializeCCIPRouter<'info> {
     #[account(
         init,

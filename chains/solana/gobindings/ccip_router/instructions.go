@@ -66,6 +66,15 @@ var (
 	// The new owner must be a signer of the transaction.
 	Instruction_AcceptOwnership = ag_binary.TypeID([8]byte{172, 23, 43, 13, 238, 213, 85, 150})
 
+	// Updates the fee aggregator in the router configuration.
+	// The Admin is the only one able to update the fee aggregator.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for updating the configuration.
+	// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
+	Instruction_UpdateFeeAggregator = ag_binary.TypeID([8]byte{85, 112, 115, 60, 22, 95, 230, 56})
+
 	// Adds a new chain selector to the router.
 	//
 	// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
@@ -276,6 +285,16 @@ var (
 	// The fee amount in u64.
 	Instruction_GetFee = ag_binary.TypeID([8]byte{115, 195, 235, 161, 25, 219, 60, 29})
 
+	// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
+	// Only the CCIP Admin can withdraw billed funds.
+	//
+	// # Arguments
+	//
+	// * `ctx` - The context containing the accounts required for the transfer of billed fees.
+	// * `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.
+	// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
+	Instruction_WithdrawBilledFunds = ag_binary.TypeID([8]byte{16, 116, 73, 38, 77, 232, 6, 28})
+
 	// ON RAMP FLOW
 	// Sends a message to the destination chain.
 	//
@@ -363,6 +382,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "TransferOwnership"
 	case Instruction_AcceptOwnership:
 		return "AcceptOwnership"
+	case Instruction_UpdateFeeAggregator:
+		return "UpdateFeeAggregator"
 	case Instruction_AddChainSelector:
 		return "AddChainSelector"
 	case Instruction_DisableSourceChainSelector:
@@ -403,6 +424,8 @@ func InstructionIDToName(id ag_binary.TypeID) string {
 		return "RemoveBillingTokenConfig"
 	case Instruction_GetFee:
 		return "GetFee"
+	case Instruction_WithdrawBilledFunds:
+		return "WithdrawBilledFunds"
 	case Instruction_CcipSend:
 		return "CcipSend"
 	case Instruction_Commit:
@@ -439,6 +462,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"accept_ownership", (*AcceptOwnership)(nil),
+		},
+		{
+			"update_fee_aggregator", (*UpdateFeeAggregator)(nil),
 		},
 		{
 			"add_chain_selector", (*AddChainSelector)(nil),
@@ -499,6 +525,9 @@ var InstructionImplDef = ag_binary.NewVariantDefinition(
 		},
 		{
 			"get_fee", (*GetFee)(nil),
+		},
+		{
+			"withdraw_billed_funds", (*WithdrawBilledFunds)(nil),
 		},
 		{
 			"ccip_send", (*CcipSend)(nil),
