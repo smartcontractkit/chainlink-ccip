@@ -98,6 +98,7 @@ jobs:
           chainlink-team: releng
           chainlink-product: crib
           k8s-api-endpoint: ${{ secrets.K8S_API_ENDPOINT_STAGE }}
+          main-dns-zone: ${{ secrets.MAIN_DNS_ZONE_STAGE_PUBLIC }}
 
       - name: Destroy CRIB Environment
         id: destroy
