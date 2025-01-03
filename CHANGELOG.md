@@ -1,5 +1,11 @@
 # @chainlink/crib
 
+## 2.0.0
+
+### Major Changes
+
+- [#336](https://github.com/smartcontractkit/crib/pull/336) [`9343940`](https://github.com/smartcontractkit/crib/commit/93439405b1b5ffe855563eecc866fa1711d38c54) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - Changed all ingresses from class `alb` to Infra-Platform provided `nginx-internal`, for cost savings purposes. Versioned as major as it's a somewhat big change in the underlying infra of every CRIB setup, even though every component has been tested and proven to work with the new setup in a backwards-compatible way.
+
 ## 1.4.0
 
 ### Minor Changes
