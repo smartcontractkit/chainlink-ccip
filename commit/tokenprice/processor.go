@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
@@ -65,6 +66,9 @@ func (p *processor) Outcome(
 	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
 		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
 		return Outcome{}, nil
+	}
+	if len(aos) == 0 {
+		return Outcome{}, fmt.Errorf("no observations to process")
 	}
 
 	consensusObservation, err := p.getConsensusObservation(aos)
