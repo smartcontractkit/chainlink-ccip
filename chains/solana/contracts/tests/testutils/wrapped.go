@@ -50,8 +50,8 @@ func SendAndFailWithLookupTables(ctx context.Context, t *testing.T, rpcClient *r
 }
 
 func SendAndFailWithRPCError(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction,
-	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string) {
-	require.NoError(t, common.SendAndFailWithRPCError(ctx, rpcClient, instructions, signer, commitment, expectedErrors))
+	signer solana.PrivateKey, commitment rpc.CommitmentType, expectedErrors []string, opts ...common.TxModifier) {
+	require.NoError(t, common.SendAndFailWithRPCError(ctx, rpcClient, instructions, signer, commitment, expectedErrors, opts...))
 }
 
 func SimulateTransaction(ctx context.Context, t *testing.T, rpcClient *rpc.Client, instructions []solana.Instruction, signer solana.PrivateKey) *rpc.SimulateTransactionResponse {
