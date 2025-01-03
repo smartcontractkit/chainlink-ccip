@@ -447,7 +447,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		rmnRemoteCfg := rmntypes.RemoteConfig{
 			ContractAddress: []byte{1, 2, 3},
 			ConfigDigest:    cciptypes.Bytes32{0x1, 0x2, 0x3},
-			F:               2,
+			FSign:           2,
 			Signers: []rmntypes.RemoteSignerInfo{
 				{
 					OnchainPublicKey: []byte{1, 2, 3},
@@ -493,7 +493,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 	t.Run("empty lane update request", func(t *testing.T) {
 		ts := newTestSetup(t)
 
-		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetFObserve", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
@@ -511,7 +511,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts := newTestSetup(t)
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
-		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetFObserve", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2, chainD1: 2}, nil)
 		go func() {
 			requestIDs, requestedChains := ts.waitForObservationRequestsToBeSent(
@@ -522,7 +522,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 
 			requestIDs = ts.waitForReportSignatureRequestsToBeSent(
 				t, ts.peerClient,
-				int(ts.remoteRMNCfg.F)+1,
+				int(ts.remoteRMNCfg.FSign)+1,
 				ts.homeF,
 			)
 
@@ -537,7 +537,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F+1))
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.FSign+1))
 		// Make sure signature are in ascending signer address order
 		for i := 1; i < len(sigs.Signatures); i++ {
 			assert.True(t, sigs.Signatures[i].R[0] > sigs.Signatures[i-1].R[0])
@@ -552,7 +552,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		ts.rmnController.reportsInitialRequestTimerDuration = time.Nanosecond
 
 		ts.rmnHomeMock.On("GetRMNNodesInfo", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(ts.rmnNodes, nil)
-		ts.rmnHomeMock.On("GetF", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
+		ts.rmnHomeMock.On("GetFObserve", cciptypes.Bytes32{0x1, 0x2, 0x3}).Return(
 			map[cciptypes.ChainSelector]int{chainS1: 2, chainS2: 2}, nil)
 
 		go func() {
@@ -578,7 +578,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 			t.Logf("requestIDs: %v", requestIDs)
 
 			// requests should be sent to more than F+1 nodes, since we hit the timer timeout
-			assert.Greater(t, len(requestIDs), int(ts.remoteRMNCfg.F)+1)
+			assert.Greater(t, len(requestIDs), int(ts.remoteRMNCfg.FSign)+1)
 
 			ts.nodesRespondToTheSignatureRequests(ts.peerClient, requestIDs)
 		}()
@@ -591,7 +591,7 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		assert.Len(t, sigs.LaneUpdates, len(ts.updateRequests))
-		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.F+1))
+		assert.Len(t, sigs.Signatures, int(ts.remoteRMNCfg.FSign+1))
 	})
 }
 
