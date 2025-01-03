@@ -1141,7 +1141,6 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
 	var resp selectorsAndConfigs
-	//var resp map[string]any
 	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -1197,13 +1196,6 @@ type offRampDynamicChainConfig struct {
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
 	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
 	MessageInterceptor                      []byte `json:"messageInterceptor"`
-}
-
-//nolint:unused // it will be used soon // TODO: Remove nolint
-type offRampDestChainConfig struct {
-	SequenceNumber   uint64 `json:"sequenceNumber"`
-	AllowListEnabled bool   `json:"allowListEnabled"`
-	Router           []byte `json:"router"`
 }
 
 // getData returns data for a single reader.
