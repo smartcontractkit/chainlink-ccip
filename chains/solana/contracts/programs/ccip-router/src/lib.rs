@@ -112,6 +112,10 @@ pub mod ccip_router {
             CcipRouterError::InvalidInputs
         );
         config.proposed_owner = proposed_owner;
+        emit!(OwnershipTransferRequested {
+            from: config.owner,
+            to: proposed_owner,
+        });
         Ok(())
     }
 
@@ -125,6 +129,10 @@ pub mod ccip_router {
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
         let mut config = ctx.accounts.config.load_mut()?;
+        emit!(OwnershipTransferred {
+            from: config.owner,
+            to: config.proposed_owner,
+        });
         config.owner = std::mem::take(&mut config.proposed_owner);
         config.proposed_owner = Pubkey::new_from_array([0; 32]);
         Ok(())

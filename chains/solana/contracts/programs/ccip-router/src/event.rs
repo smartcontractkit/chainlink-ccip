@@ -136,3 +136,15 @@ pub struct AdministratorRegistered {
     pub token_mint: Pubkey,
     pub administrator: Pubkey,
 }
+
+#[event]
+pub struct OwnershipTransferRequested {
+    pub from: Pubkey,
+    pub to: Pubkey,
+}
+
+#[event]
+pub struct OwnershipTransferred {
+    pub from: Pubkey,
+    pub to: Pubkey,
+}
