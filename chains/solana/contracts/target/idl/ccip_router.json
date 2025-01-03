@@ -3128,6 +3128,36 @@
       ]
     },
     {
+      "name": "OwnershipTransferRequested",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
       "name": "ConfigSet",
       "fields": [
         {

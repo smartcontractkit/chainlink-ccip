@@ -762,6 +762,14 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
+			transferLogs := common.ParseLogMessages(result.Meta.LogMessages,
+				[]common.EventMapping{
+					common.EventMappingFor[ccip.OwnershipTransferRequested]("OwnershipTransferRequested"),
+				},
+			)
+			transferEv := transferLogs[0].EventData[0].Data.(*ccip.OwnershipTransferRequested)
+			require.Equal(t, admin.PublicKey(), transferEv.From)
+			require.Equal(t, anotherAdmin.PublicKey(), transferEv.To)
 
 			// Fail to accept ownership when not proposed_owner
 			instruction, err = ccip_router.NewAcceptOwnershipInstruction(
@@ -781,6 +789,14 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err)
 			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
+			acceptLogs := common.ParseLogMessages(result.Meta.LogMessages,
+				[]common.EventMapping{
+					common.EventMappingFor[ccip.OwnershipTransferred]("OwnershipTransferred"),
+				},
+			)
+			acceptEv := acceptLogs[0].EventData[0].Data.(*ccip.OwnershipTransferred)
+			require.Equal(t, admin.PublicKey(), acceptEv.From)
+			require.Equal(t, anotherAdmin.PublicKey(), acceptEv.To)
 
 			// Current owner cannot propose self
 			instruction, err = ccip_router.NewTransferOwnershipInstruction(
