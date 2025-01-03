@@ -20,6 +20,7 @@ type Config struct {
 	EnableManualExecutionAfter      int64
 	Padding2                        [8]uint8
 	Ocr3                            [2]Ocr3Config
+	FeeAggregator                   ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -82,6 +83,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Ocr3` param:
 	err = encoder.Encode(obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeAggregator` param:
+	err = encoder.Encode(obj.FeeAggregator)
 	if err != nil {
 		return err
 	}
@@ -154,6 +160,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	}
 	// Deserialize `Ocr3`:
 	err = decoder.Decode(&obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeAggregator`:
+	err = decoder.Decode(&obj.FeeAggregator)
 	if err != nil {
 		return err
 	}
