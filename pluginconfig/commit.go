@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	chain_selectors "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
@@ -43,6 +45,9 @@ type TokenInfo struct {
 
 	// Decimals is the number of decimals for the token (NOT the feed).
 	Decimals uint8 `json:"decimals"`
+
+	// ChainFamily is the chain family the token is deployed on.
+	ChainFamily string `json:"chainFamily"`
 }
 
 func (a TokenInfo) Validate() error {
@@ -50,13 +55,21 @@ func (a TokenInfo) Validate() error {
 		return errors.New("aggregatorAddress not set")
 	}
 
-	// aggregator must be an ethereum address
-	decoded, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(string(a.AggregatorAddress), "0x")))
-	if err != nil {
-		return fmt.Errorf("aggregatorAddress must be a valid ethereum address (i.e hex encoded 20 bytes): %w", err)
-	}
-	if len(decoded) != 20 {
-		return fmt.Errorf("aggregatorAddress must be a valid ethereum address, got %d bytes expected 20", len(decoded))
+	switch a.ChainFamily {
+	case chain_selectors.FamilySolana:
+		// solana validation
+	case chain_selectors.FamilyEVM:
+		// EVM is the default case
+		fallthrough
+	default:
+		// aggregator must be an ethereum address
+		decoded, err := hex.DecodeString(strings.ToLower(strings.TrimPrefix(string(a.AggregatorAddress), "0x")))
+		if err != nil {
+			return fmt.Errorf("aggregatorAddress must be a valid ethereum address (i.e hex encoded 20 bytes): %w", err)
+		}
+		if len(decoded) != 20 {
+			return fmt.Errorf("aggregatorAddress must be a valid ethereum address, got %d bytes expected 20", len(decoded))
+		}
 	}
 
 	if a.DeviationPPB.Int.Cmp(big.NewInt(0)) <= 0 {
