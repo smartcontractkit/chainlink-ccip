@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::get_associated_token_address_with_program_id,
-    token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint},
-    token_interface::TokenAccount,
-};
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint};
+use anchor_spl::token_interface::TokenAccount;
 use solana_program::{
     address_lookup_table::state::AddressLookupTable, instruction::Instruction,
     program::invoke_signed,

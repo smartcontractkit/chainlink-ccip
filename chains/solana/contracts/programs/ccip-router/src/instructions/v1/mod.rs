@@ -1,5 +1,15 @@
+////////////////////
+// Public modules //
+////////////////////
 pub mod admin;
-pub use admin::*;
-
+pub mod offramp;
+pub mod onramp;
 pub mod tokens;
-pub use tokens::*;
+
+/////////////////////
+// Private modules //
+/////////////////////
+mod fee_quoter;
+mod merkle;
+mod messages;
+mod pools;

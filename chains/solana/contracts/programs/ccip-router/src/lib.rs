@@ -1,10 +1,5 @@
-use std::cell::Ref;
-
 use anchor_lang::error_code;
 use anchor_lang::prelude::*;
-use anchor_spl::token_interface;
-use bytemuck::Zeroable;
-use solana_program::{instruction::Instruction, program::invoke_signed};
 
 mod context;
 use crate::context::*;
@@ -18,22 +13,14 @@ use crate::state::*;
 mod event;
 use crate::event::*;
 
-mod merkle;
-use crate::merkle::*;
-
 mod messages;
 use crate::messages::*;
-
-mod pools;
-use crate::pools::*;
 
 mod ocr3base;
 use crate::ocr3base::*;
 
-mod fee_quoter;
-use crate::fee_quoter::*;
-
 mod instructions;
+use crate::instructions::*;
 
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
@@ -111,7 +98,7 @@ pub mod ccip_router {
         ctx: Context<TransferOwnership>,
         proposed_owner: Pubkey,
     ) -> Result<()> {
-        instructions::v1::transfer_ownership(ctx, proposed_owner)
+        v1::admin::transfer_ownership(ctx, proposed_owner)
     }
 
     /// Accepts the ownership of the router by the proposed owner.
@@ -123,7 +110,7 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for accepting ownership.
     /// The new owner must be a signer of the transaction.
     pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
-        instructions::v1::accept_ownership(ctx)
+        v1::admin::accept_ownership(ctx)
     }
 
     /// Updates the fee aggregator in the router configuration.
@@ -137,7 +124,7 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         fee_aggregator: Pubkey,
     ) -> Result<()> {
-        instructions::v1::update_fee_aggregator(ctx, fee_aggregator)
+        v1::admin::update_fee_aggregator(ctx, fee_aggregator)
     }
 
     /// Adds a new chain selector to the router.
@@ -158,7 +145,7 @@ pub mod ccip_router {
         source_chain_config: SourceChainConfig,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        instructions::v1::add_chain_selector(
+        v1::admin::add_chain_selector(
             ctx,
             new_chain_selector,
             source_chain_config,
@@ -178,7 +165,7 @@ pub mod ccip_router {
         ctx: Context<UpdateSourceChainSelectorConfig>,
         source_chain_selector: u64,
     ) -> Result<()> {
-        instructions::v1::disable_source_chain_selector(ctx, source_chain_selector)
+        v1::admin::disable_source_chain_selector(ctx, source_chain_selector)
     }
 
     /// Disables the destination chain selector.
@@ -193,7 +180,7 @@ pub mod ccip_router {
         ctx: Context<UpdateDestChainSelectorConfig>,
         dest_chain_selector: u64,
     ) -> Result<()> {
-        instructions::v1::disable_dest_chain_selector(ctx, dest_chain_selector)
+        v1::admin::disable_dest_chain_selector(ctx, dest_chain_selector)
     }
 
     /// Updates the configuration of the source chain selector.
@@ -210,11 +197,7 @@ pub mod ccip_router {
         source_chain_selector: u64,
         source_chain_config: SourceChainConfig,
     ) -> Result<()> {
-        instructions::v1::update_source_chain_config(
-            ctx,
-            source_chain_selector,
-            source_chain_config,
-        )
+        v1::admin::update_source_chain_config(ctx, source_chain_selector, source_chain_config)
     }
 
     /// Updates the configuration of the destination chain selector.
@@ -231,7 +214,7 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         dest_chain_config: DestChainConfig,
     ) -> Result<()> {
-        instructions::v1::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
+        v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
     }
 
     /// Updates the Solana chain selector in the router configuration.
@@ -246,7 +229,7 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        instructions::v1::update_solana_chain_selector(ctx, new_chain_selector)
+        v1::admin::update_solana_chain_selector(ctx, new_chain_selector)
     }
 
     /// Updates the default gas limit in the router configuration.
@@ -262,7 +245,7 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_gas_limit: u128,
     ) -> Result<()> {
-        instructions::v1::update_default_gas_limit(ctx, new_gas_limit)
+        v1::admin::update_default_gas_limit(ctx, new_gas_limit)
     }
 
     /// Updates the default setting for allowing out-of-order execution for other destination chains.
@@ -276,7 +259,7 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_allow_out_of_order_execution: bool,
     ) -> Result<()> {
-        instructions::v1::update_default_allow_out_of_order_execution(
+        v1::admin::update_default_allow_out_of_order_execution(
             ctx,
             new_allow_out_of_order_execution,
         )
@@ -295,10 +278,7 @@ pub mod ccip_router {
         ctx: Context<UpdateConfigCCIPRouter>,
         new_enable_manual_execution_after: i64,
     ) -> Result<()> {
-        instructions::v1::update_enable_manual_execution_after(
-            ctx,
-            new_enable_manual_execution_after,
-        )
+        v1::admin::update_enable_manual_execution_after(ctx, new_enable_manual_execution_after)
     }
 
     /// Registers the Token Admin Registry via the CCIP Admin
@@ -313,7 +293,7 @@ pub mod ccip_router {
         mint: Pubkey, // should we validate that this is a real token program?
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        instructions::v1::register_token_admin_registry_via_get_ccip_admin(
+        v1::tokens::register_token_admin_registry_via_get_ccip_admin(
             ctx,
             mint,
             token_admin_registry_admin,
@@ -330,7 +310,7 @@ pub mod ccip_router {
     pub fn register_token_admin_registry_via_owner(
         ctx: Context<RegisterTokenAdminRegistryViaOwner>,
     ) -> Result<()> {
-        instructions::v1::register_token_admin_registry_via_owner(ctx)
+        v1::tokens::register_token_admin_registry_via_owner(ctx)
     }
 
     /// Sets the pool lookup table for a given token mint.
@@ -347,7 +327,7 @@ pub mod ccip_router {
         mint: Pubkey,
         pool_lookup_table: Pubkey,
     ) -> Result<()> {
-        instructions::v1::set_pool(ctx, mint, pool_lookup_table)
+        v1::tokens::set_pool(ctx, mint, pool_lookup_table)
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.
@@ -364,7 +344,7 @@ pub mod ccip_router {
         mint: Pubkey,
         new_admin: Pubkey,
     ) -> Result<()> {
-        instructions::v1::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
+        v1::tokens::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
     }
 
     /// Accepts the admin role of the token admin registry.
@@ -379,7 +359,7 @@ pub mod ccip_router {
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
         mint: Pubkey,
     ) -> Result<()> {
-        instructions::v1::accept_admin_role_token_admin_registry(ctx, mint)
+        v1::tokens::accept_admin_role_token_admin_registry(ctx, mint)
     }
 
     /// Sets the token billing configuration.
@@ -398,7 +378,7 @@ pub mod ccip_router {
         mint: Pubkey,
         cfg: TokenBilling,
     ) -> Result<()> {
-        instructions::v1::set_token_billing(ctx, chain_selector, mint, cfg)
+        v1::admin::set_token_billing(ctx, chain_selector, mint, cfg)
     }
 
     /// Sets the OCR configuration.
@@ -418,7 +398,7 @@ pub mod ccip_router {
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
-        instructions::v1::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
+        v1::admin::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
     }
 
     /// Adds a billing token configuration.
@@ -432,7 +412,7 @@ pub mod ccip_router {
         ctx: Context<AddBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        instructions::v1::add_billing_token_config(ctx, config)
+        v1::admin::add_billing_token_config(ctx, config)
     }
 
     /// Updates the billing token configuration.
@@ -446,7 +426,7 @@ pub mod ccip_router {
         ctx: Context<UpdateBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        instructions::v1::update_billing_token_config(ctx, config)
+        v1::admin::update_billing_token_config(ctx, config)
     }
 
     /// Removes the billing token configuration.
@@ -456,7 +436,7 @@ pub mod ccip_router {
     ///
     /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
     pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-        instructions::v1::remove_billing_token_config(ctx)
+        v1::admin::remove_billing_token_config(ctx)
     }
 
     /// Calculates the fee for sending a message to the destination chain.
@@ -475,13 +455,7 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<u64> {
-        Ok(fee_for_msg(
-            dest_chain_selector,
-            &message,
-            &ctx.accounts.dest_chain_state,
-            &ctx.accounts.billing_token_config.config,
-        )?
-        .amount)
+        v1::onramp::get_fee(ctx, dest_chain_selector, message)
     }
 
     /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
@@ -497,7 +471,7 @@ pub mod ccip_router {
         transfer_all: bool,
         desired_amount: u64, // if transfer_all is false, this value must be 0
     ) -> Result<()> {
-        instructions::v1::withdraw_billed_funds(ctx, transfer_all, desired_amount)
+        v1::admin::withdraw_billed_funds(ctx, transfer_all, desired_amount)
     }
 
     /// ON RAMP FLOW
@@ -519,169 +493,7 @@ pub mod ccip_router {
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<()> {
-        // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
-        let config = ctx.accounts.config.load()?;
-
-        let dest_chain = &mut ctx.accounts.dest_chain_state;
-        let fee_token_config = &ctx.accounts.fee_token_config.config;
-        let fee = fee_for_msg(dest_chain_selector, &message, dest_chain, fee_token_config)?;
-
-        let is_paying_with_native_sol = message.fee_token == Pubkey::zeroed();
-        if is_paying_with_native_sol {
-            wrap_native_sol(
-                &ctx.accounts.fee_token_program.to_account_info(),
-                &mut ctx.accounts.authority,
-                &mut ctx.accounts.fee_token_receiver,
-                fee.amount,
-                ctx.bumps.fee_billing_signer,
-            )?;
-        } else {
-            let transfer = token_interface::TransferChecked {
-                from: ctx
-                    .accounts
-                    .fee_token_user_associated_account
-                    .to_account_info(),
-                to: ctx.accounts.fee_token_receiver.to_account_info(),
-                mint: ctx.accounts.fee_token_mint.to_account_info(),
-                authority: ctx.accounts.fee_billing_signer.to_account_info(),
-            };
-
-            transfer_fee(
-                fee,
-                ctx.accounts.fee_token_program.to_account_info(),
-                transfer,
-                ctx.accounts.fee_token_mint.decimals,
-                ctx.bumps.fee_billing_signer,
-            )?;
-        }
-
-        let overflow_add = dest_chain.state.sequence_number.checked_add(1);
-        require!(
-            overflow_add.is_some(),
-            CcipRouterError::ReachedMaxSequenceNumber
-        );
-        dest_chain.state.sequence_number = overflow_add.unwrap();
-
-        let sender = ctx.accounts.authority.key.to_owned();
-        let receiver = message.receiver.clone();
-        let source_chain_selector = config.solana_chain_selector;
-        let extra_args = extra_args_or_default(config, message.extra_args);
-
-        let nonce_counter_account: &mut Account<'info, Nonce> = &mut ctx.accounts.nonce;
-        let final_nonce = bump_nonce(nonce_counter_account, extra_args).unwrap();
-
-        let token_count = message.token_amounts.len();
-        require!(
-            message.token_indexes.len() == token_count,
-            CcipRouterError::InvalidInputs,
-        );
-
-        let mut new_message: Solana2AnyRampMessage = Solana2AnyRampMessage {
-            sender,
-            receiver,
-            data: message.data,
-            header: RampMessageHeader {
-                message_id: [0; 32],
-                source_chain_selector,
-                dest_chain_selector,
-                sequence_number: dest_chain.state.sequence_number,
-                nonce: final_nonce,
-            },
-            extra_args,
-            fee_token: message.fee_token,
-            token_amounts: vec![Solana2AnyTokenTransfer::default(); token_count],
-        };
-
-        let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-        for (i, token_amount) in message.token_amounts.iter().enumerate() {
-            require!(
-                token_amount.amount != 0,
-                CcipRouterError::InvalidInputsTokenAmount
-            );
-
-            // Calculate the indexes for the additional accounts of the current token index `i`
-            let (start, end) = calculate_token_pool_account_indices(
-                i,
-                &message.token_indexes,
-                ctx.remaining_accounts.len(),
-            )?;
-
-            let current_token_accounts = validate_and_parse_token_accounts(
-                ctx.accounts.authority.key(),
-                dest_chain_selector,
-                ctx.program_id.key(),
-                &ctx.remaining_accounts[start..end],
-            )?;
-
-            let router_token_pool_signer = &ctx.accounts.token_pools_signer;
-
-            let _token_billing_config = &current_token_accounts._token_billing_config;
-            // TODO: Implement charging depending on the token transfer
-
-            // CPI: transfer token amount from user to token pool
-            transfer_token(
-                token_amount.amount,
-                current_token_accounts.token_program,
-                current_token_accounts.mint,
-                current_token_accounts.user_token_account,
-                current_token_accounts.pool_token_account,
-                router_token_pool_signer,
-                seeds,
-            )?;
-
-            // CPI: call lockOrBurn on token pool
-            {
-                let lock_or_burn = LockOrBurnInV1 {
-                    receiver: message.receiver.clone(),
-                    remote_chain_selector: dest_chain_selector,
-                    original_sender: ctx.accounts.authority.key(),
-                    amount: token_amount.amount,
-                    local_token: token_amount.token,
-                };
-
-                let mut acc_infos = router_token_pool_signer.to_account_infos();
-                acc_infos.extend_from_slice(&[
-                    current_token_accounts.pool_config.to_account_info(),
-                    current_token_accounts.token_program.to_account_info(),
-                    current_token_accounts.mint.to_account_info(),
-                    current_token_accounts.pool_signer.to_account_info(),
-                    current_token_accounts.pool_token_account.to_account_info(),
-                    current_token_accounts.pool_chain_config.to_account_info(),
-                ]);
-                acc_infos.extend_from_slice(current_token_accounts.remaining_accounts);
-
-                let return_data = interact_with_pool(
-                    current_token_accounts.pool_program.key(),
-                    router_token_pool_signer.key(),
-                    acc_infos,
-                    lock_or_burn,
-                    seeds,
-                )?;
-
-                let data = LockOrBurnOutV1::try_from_slice(&return_data)?;
-                new_message.token_amounts[i] = Solana2AnyTokenTransfer {
-                    source_pool_address: current_token_accounts.pool_config.key(),
-                    dest_token_address: data.dest_token_address,
-                    extra_data: data.dest_pool_data,
-                    amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
-                    dest_exec_data: vec![0; 0],                  // TODO: Implement this
-                                                                 // Destination chain specific execution data encoded in bytes
-                                                                 // for an EVM destination, it consists of the amount of gas available for the releaseOrMint
-                                                                 // and transfer calls made by the offRamp
-                };
-            }
-        }
-
-        let message_id = &new_message.hash();
-        new_message.header.message_id.clone_from(message_id);
-
-        emit!(CCIPMessageSent {
-            dest_chain_selector,
-            sequence_number: new_message.header.sequence_number,
-            message: new_message,
-        });
-
-        Ok(())
+        v1::onramp::ccip_send(ctx, dest_chain_selector, message)
     }
 
     /// OFF RAMP FLOW
@@ -713,161 +525,7 @@ pub mod ccip_router {
         report: CommitInput,
         signatures: Vec<[u8; 65]>,
     ) -> Result<()> {
-        let report_context = ReportContext::from_byte_words(report_context_byte_words);
-
-        // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
-        let config = ctx.accounts.config.load()?;
-
-        // Check if the report contains price updates
-        let empty_token_price_updates = report.price_updates.token_price_updates.is_empty();
-        let empty_gas_price_updates = report.price_updates.gas_price_updates.is_empty();
-
-        if empty_token_price_updates && empty_gas_price_updates {
-            // If the report does not contain any price updates, then there is nothing to update.
-            // Thus, as no price accounts have to be updated, the remaining accounts must be empty.
-            require_eq!(
-                ctx.remaining_accounts.len(),
-                0,
-                CcipRouterError::InvalidInputs
-            );
-        } else {
-            // There are price updates in the report.
-            // Remaining accounts represent:
-            // - The state account to store the price sequence updates
-            // - the accounts to update BillingTokenConfig for token prices
-            // - the accounts to update DestChain for gas prices
-            // They must be in order:
-            // 1. state_account
-            // 2. token_accounts[]
-            // 3. gas_accounts[]
-            // matching the order of the price updates in the CommitInput.
-            // They must also all be writable so they can be updated.
-            let minimum_remaining_accounts = 1
-                + report.price_updates.token_price_updates.len()
-                + report.price_updates.gas_price_updates.len();
-            require_eq!(
-                ctx.remaining_accounts.len(),
-                minimum_remaining_accounts,
-                CcipRouterError::InvalidInputs
-            );
-
-            let ocr_sequence_number = report_context.sequence_number();
-
-            // The Global state PDA is sent as a remaining_account as it is optional to avoid having the lock when not modifying it, so all validations need to be done manually
-            let (expected_state_key, _) = Pubkey::find_program_address(&[STATE_SEED], &crate::ID);
-            require_keys_eq!(
-                ctx.remaining_accounts[0].key(),
-                expected_state_key,
-                CcipRouterError::InvalidInputs
-            );
-            require!(
-                ctx.remaining_accounts[0].is_writable,
-                CcipRouterError::InvalidInputs
-            );
-
-            let mut global_state: Account<GlobalState> =
-                Account::try_from(&ctx.remaining_accounts[0])?;
-
-            if global_state.latest_price_sequence_number < ocr_sequence_number {
-                // Update the persisted sequence number
-                global_state.latest_price_sequence_number = ocr_sequence_number;
-                global_state.exit(&crate::ID)?; // as it is manually loaded, it also has to be manually written back
-
-                // For each token price update, unpack the corresponding remaining_account and update the price.
-                // Keep in mind that the remaining_accounts are sorted in the same order as tokens and gas price updates in the report.
-                for (i, update) in report.price_updates.token_price_updates.iter().enumerate() {
-                    apply_token_price_update(update, &ctx.remaining_accounts[i + 1])?;
-                }
-
-                // Skip the first state account and the ones for token updates
-                let offset = report.price_updates.token_price_updates.len() + 1;
-
-                // Do the same for gas price updates
-                for (i, update) in report.price_updates.gas_price_updates.iter().enumerate() {
-                    apply_gas_price_update(update, &ctx.remaining_accounts[i + offset])?;
-                }
-            } else {
-                // TODO check if this is really necessary. EVM has this validation checking that the
-                // array of merkle roots in the report is not empty. But here, considering we only have 1 root per report,
-                // this check is just validating that the root is not zeroed
-                // (which should never happen anyway, so it may be redundant).
-                require!(
-                    report.merkle_root.source_chain_selector > 0,
-                    CcipRouterError::StaleCommitReport
-                );
-            }
-        }
-
-        // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-        let source_chain_state = &mut ctx.accounts.source_chain_state;
-
-        require!(
-            source_chain_state.config.is_enabled,
-            CcipRouterError::UnsupportedSourceChainSelector
-        );
-
-        // The Commit Report Account stores the information of 1 Commit Report:
-        // - Merkle Root
-        // - Timestamp of the Commit Report
-        // - Interval of Messages: The min and max seq num of the messages in the Merkle Tree
-        // - Execution State per each Message: 0 for Untouched, 1 for InProgress, 2 for Success and 3 for Failure
-        let commit_report = &mut ctx.accounts.commit_report;
-        let root = &report.merkle_root;
-
-        require!(
-            root.min_seq_nr <= root.max_seq_nr,
-            CcipRouterError::InvalidSequenceInterval
-        );
-        require!(
-            root.max_seq_nr
-                .to_owned()
-                .checked_sub(root.min_seq_nr)
-                .map_or_else(|| false, |seq_size| seq_size <= 64),
-            CcipRouterError::InvalidSequenceInterval
-        ); // As we have 64 slots to store the execution state
-        require!(
-            source_chain_state.state.min_seq_nr == root.min_seq_nr,
-            CcipRouterError::InvalidSequenceInterval
-        );
-        require!(root.merkle_root != [0; 32], CcipRouterError::InvalidProof);
-        require!(
-            commit_report.timestamp == 0,
-            CcipRouterError::ExistingMerkleRoot
-        );
-
-        let next_seq_nr = root.max_seq_nr.checked_add(1);
-
-        require!(
-            next_seq_nr.is_some(),
-            CcipRouterError::ReachedMaxSequenceNumber
-        );
-
-        source_chain_state.state.min_seq_nr = next_seq_nr.unwrap();
-
-        let clock: Clock = Clock::get()?;
-        commit_report.version = 1;
-        commit_report.chain_selector = report.merkle_root.source_chain_selector;
-        commit_report.merkle_root = report.merkle_root.merkle_root;
-        commit_report.timestamp = clock.unix_timestamp;
-        commit_report.execution_states = 0;
-        commit_report.min_msg_nr = root.min_seq_nr;
-        commit_report.max_msg_nr = root.max_seq_nr;
-
-        emit!(CommitReportAccepted {
-            merkle_root: root.clone(),
-            price_updates: report.price_updates.clone(),
-        });
-
-        config.ocr3[OcrPluginType::Commit as usize].transmit(
-            &ctx.accounts.sysvar_instructions,
-            ctx.accounts.authority.key(),
-            OcrPluginType::Commit as u8,
-            report_context,
-            &report,
-            &signatures,
-        )?;
-
-        Ok(())
+        v1::offramp::commit(ctx, report_context_byte_words, report, signatures)
     }
 
     /// OFF RAMP FLOW
@@ -897,21 +555,7 @@ pub mod ccip_router {
         execution_report: ExecutionReportSingleChain,
         report_context_byte_words: [[u8; 32]; 3],
     ) -> Result<()> {
-        let report_context = ReportContext::from_byte_words(report_context_byte_words);
-        // limit borrowing of ctx
-        {
-            let config = ctx.accounts.config.load()?;
-            config.ocr3[OcrPluginType::Execution as usize].transmit(
-                &ctx.accounts.sysvar_instructions,
-                ctx.accounts.authority.key(),
-                OcrPluginType::Execution as u8,
-                report_context,
-                &execution_report,
-                &[],
-            )?;
-        }
-
-        internal_execute(ctx, execution_report)
+        v1::offramp::execute(ctx, execution_report, report_context_byte_words)
     }
 
     /// Manually executes a report to the router.
@@ -928,417 +572,8 @@ pub mod ccip_router {
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
     ) -> Result<()> {
-        // limit borrowing of ctx
-        {
-            let config = ctx.accounts.config.load()?;
-
-            // validate time has passed
-            let clock: Clock = Clock::get()?;
-            let current_timestamp = clock.unix_timestamp;
-            require!(
-                current_timestamp - ctx.accounts.commit_report.timestamp
-                    > config.enable_manual_execution_after,
-                CcipRouterError::ManualExecutionNotAllowed
-            );
-        }
-        internal_execute(ctx, execution_report)
+        v1::offramp::manually_execute(ctx, execution_report)
     }
-}
-
-fn apply_token_price_update<'info>(
-    token_update: &TokenPriceUpdate,
-    token_config_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[FEE_BILLING_TOKEN_CONFIG, token_update.source_token.as_ref()],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        token_config_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        token_config_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    let token_config_account: &mut Account<BillingTokenConfigWrapper> =
-        &mut Account::try_from(token_config_account_info)?;
-
-    require!(
-        token_config_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    token_config_account.config.usd_per_token = TimestampedPackedU224 {
-        value: token_update.usd_per_token,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(UsdPerTokenUpdated {
-        token: token_config_account.config.mint,
-        value: token_config_account.config.usd_per_token.value,
-        timestamp: token_config_account.config.usd_per_token.timestamp,
-    });
-
-    // As the account is manually loaded from the AccountInfo, it also needs to be manually
-    // written back to so the changes are persisted.
-    token_config_account.exit(&crate::ID)
-}
-
-fn apply_gas_price_update<'info>(
-    gas_update: &GasPriceUpdate,
-    dest_chain_state_account_info: &'info AccountInfo<'info>,
-) -> Result<()> {
-    let (expected, _) = Pubkey::find_program_address(
-        &[
-            DEST_CHAIN_STATE_SEED,
-            gas_update.dest_chain_selector.to_le_bytes().as_ref(),
-        ],
-        &crate::ID,
-    );
-    require_keys_eq!(
-        dest_chain_state_account_info.key(),
-        expected,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        dest_chain_state_account_info.is_writable,
-        CcipRouterError::InvalidInputs
-    );
-
-    // The passed-in chain_state account may refer to the same chain but it only corresponds to source.
-    // To update the price that values correspond to the destination, which is a different account.
-    // As the account is sent as additional accounts, then Anchor won't automatically (de)serialize the account
-    // as it is not the one in the context, so we have to do it manually load it and write it back
-    let dest_chain_state_account = &mut Account::try_from(dest_chain_state_account_info)?;
-    update_chain_state_gas_price(dest_chain_state_account, gas_update)?;
-    dest_chain_state_account.exit(&crate::ID)?;
-    Ok(())
-}
-
-fn update_chain_state_gas_price(
-    chain_state_account: &mut Account<DestChain>,
-    gas_update: &GasPriceUpdate,
-) -> Result<()> {
-    require!(
-        chain_state_account.version == 1,
-        CcipRouterError::InvalidInputs
-    );
-
-    chain_state_account.state.usd_per_unit_gas = TimestampedPackedU224 {
-        value: gas_update.usd_per_unit_gas,
-        timestamp: Clock::get()?.unix_timestamp,
-    };
-
-    emit!(UsdPerUnitGasUpdated {
-        dest_chain: gas_update.dest_chain_selector,
-        value: chain_state_account.state.usd_per_unit_gas.value,
-        timestamp: chain_state_account.state.usd_per_unit_gas.timestamp,
-    });
-
-    Ok(())
-}
-
-// internal_execute is the base execution logic without any additional validation
-fn internal_execute<'info>(
-    ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
-    execution_report: ExecutionReportSingleChain,
-) -> Result<()> {
-    // TODO: Limit send size data to 256
-
-    // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
-    let config = ctx.accounts.config.load()?;
-    let solana_chain_selector = config.solana_chain_selector;
-
-    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &ctx.accounts.source_chain_state;
-    let on_ramp_address = &source_chain_state.config.on_ramp;
-
-    // The Commit Report Account stores the information of 1 Commit Report:
-    // - Merkle Root
-    // - Timestamp of the Commit Report
-    // - Interval of Messages: The min and max seq num of the messages in the Merkle Tree
-    // - Execution State per each Message: 0 for Untouched, 1 for InProgress, 2 for Success and 3 for Failure
-    let commit_report = &mut ctx.accounts.commit_report;
-
-    let message_header = execution_report.message.header;
-
-    validate_execution_report(
-        &execution_report,
-        source_chain_state,
-        commit_report,
-        &message_header,
-        solana_chain_selector,
-    )?;
-
-    let original_state = commit_report.get_state(message_header.sequence_number);
-
-    if original_state == MessageExecutionState::Success {
-        emit!(SkippedAlreadyExecutedMessage {
-            source_chain_selector: message_header.source_chain_selector,
-            sequence_number: message_header.sequence_number,
-        });
-        return Ok(());
-    }
-
-    let hashed_leaf = verify_merkle_root(&execution_report, on_ramp_address)?;
-
-    // send tokens any -> SOL
-    require!(
-        execution_report.token_indexes.len() == execution_report.message.token_amounts.len()
-            && execution_report.token_indexes.len() == execution_report.offchain_token_data.len(),
-        CcipRouterError::InvalidInputs,
-    );
-    let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-    let mut token_amounts =
-        vec![SolanaTokenAmount::default(); execution_report.token_indexes.len()];
-
-    // handle tokens
-    // note: indexes are used instead of counts in case more accounts need to be passed in remaining_accounts before token accounts
-    // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
-    for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
-        let (start, end) = calculate_token_pool_account_indices(
-            i,
-            &execution_report.token_indexes,
-            ctx.remaining_accounts.len(),
-        )?;
-        let acc_list = &ctx.remaining_accounts[start..end];
-        let accs = validate_and_parse_token_accounts(
-            execution_report.message.receiver,
-            execution_report.message.header.source_chain_selector,
-            ctx.program_id.key(),
-            acc_list,
-        )?;
-        let router_token_pool_signer = &ctx.accounts.token_pools_signer;
-
-        let init_bal = get_balance(accs.user_token_account)?;
-
-        // CPI: call lockOrBurn on token pool
-        let release_or_mint = ReleaseOrMintInV1 {
-            original_sender: execution_report.message.sender.clone(),
-            receiver: execution_report.message.receiver,
-            amount: token_amount.amount,
-            local_token: token_amount.dest_token_address,
-            remote_chain_selector: execution_report.message.header.source_chain_selector,
-            source_pool_address: token_amount.source_pool_address.clone(),
-            source_pool_data: token_amount.extra_data.clone(),
-            offchain_token_data: execution_report.offchain_token_data[i].clone(),
-        };
-        let mut acc_infos = router_token_pool_signer.to_account_infos();
-        acc_infos.extend_from_slice(&[
-            accs.pool_config.to_account_info(),
-            accs.token_program.to_account_info(),
-            accs.mint.to_account_info(),
-            accs.pool_signer.to_account_info(),
-            accs.pool_token_account.to_account_info(),
-            accs.pool_chain_config.to_account_info(),
-            accs.user_token_account.to_account_info(),
-        ]);
-        acc_infos.extend_from_slice(accs.remaining_accounts);
-        let return_data = interact_with_pool(
-            accs.pool_program.key(),
-            router_token_pool_signer.key(),
-            acc_infos,
-            release_or_mint,
-            seeds,
-        )?;
-
-        require!(
-            return_data.len() == CCIP_POOL_V1_RET_BYTES,
-            CcipRouterError::OfframpInvalidDataLength
-        );
-
-        token_amounts[i] = SolanaTokenAmount {
-            token: accs.mint.key(),
-            amount: ReleaseOrMintOutV1::try_from_slice(&return_data)?.destination_amount,
-        };
-
-        let post_bal = get_balance(accs.user_token_account)?;
-        require!(
-            post_bal >= init_bal && post_bal - init_bal == token_amounts[i].amount,
-            CcipRouterError::OfframpReleaseMintBalanceMismatch
-        );
-    }
-
-    let message = Any2SolanaMessage {
-        message_id: execution_report.message.header.message_id,
-        source_chain_selector: execution_report.source_chain_selector,
-        sender: execution_report.message.sender,
-        data: execution_report.message.data,
-        token_amounts,
-    };
-
-    // handle CPI call if there are extra accounts
-    // case: no tokens, but there are remaining_accounts passed in
-    // case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-    if should_execute_messaging(
-        &execution_report.token_indexes,
-        ctx.remaining_accounts.is_empty(),
-    ) {
-        let (msg_program, msg_accounts) = parse_messaging_accounts(
-            &execution_report.token_indexes,
-            execution_report.message.receiver,
-            execution_report.message.extra_args.accounts,
-            ctx.remaining_accounts,
-        )?;
-
-        // The External Execution Config Account is used to sign the CPI instruction
-        let external_execution_config = &ctx.accounts.external_execution_config;
-
-        // The accounts of the user that will be used in the CPI instruction, none of them are signers
-        // They need to specify if mutable or not, but none of them is allowed to init, realloc or close
-        // note: CPI signer is always first account
-        let mut acc_infos = external_execution_config.to_account_infos();
-        acc_infos.extend_from_slice(msg_accounts);
-
-        let acc_metas: Vec<AccountMeta> = acc_infos
-            .to_vec()
-            .iter()
-            .flat_map(|acc_info| {
-                // Check signer from PDA External Execution config
-                let is_signer = acc_info.key() == external_execution_config.key();
-                acc_info.to_account_metas(Some(is_signer))
-            })
-            .collect();
-
-        let data = build_receiver_discriminator_and_data(message)?;
-
-        let instruction = Instruction {
-            program_id: msg_program.key(), // The receiver Program Id that will handle the ccip_receive message
-            accounts: acc_metas,
-            data,
-        };
-
-        let seeds = &[
-            EXTERNAL_EXECUTION_CONFIG_SEED,
-            &[ctx.bumps.external_execution_config],
-        ];
-        let signer = &[&seeds[..]];
-
-        invoke_signed(&instruction, &acc_infos, signer)?;
-    }
-
-    let new_state = MessageExecutionState::Success;
-    commit_report.set_state(message_header.sequence_number, new_state.to_owned());
-
-    emit!(ExecutionStateChanged {
-        source_chain_selector: message_header.source_chain_selector,
-        sequence_number: message_header.sequence_number,
-        message_id: message_header.message_id, // Unique identifier for the message, generated with the source chain's encoding scheme
-        message_hash: hashed_leaf,             // Hash of the message using Solana encoding
-        state: new_state,
-    });
-
-    Ok(())
-}
-
-// should_execute_messaging checks if there remaining_accounts that are not being used for token pools
-// case: no tokens, but there are remaining_accounts passed in
-// case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-fn should_execute_messaging(token_indexes: &[u8], remaining_accounts_empty: bool) -> bool {
-    (token_indexes.is_empty() && !remaining_accounts_empty)
-        || (!token_indexes.is_empty() && token_indexes[0] != 0)
-}
-
-/// parse_message_accounts returns all the accounts needed to execute the CPI instruction
-/// It also validates that the accounts sent in the message match the ones sent in the source chain
-///
-/// # Arguments
-/// * `token_indexes` - start indexes of token pool accounts, used to determine ending index for arbitrary messaging accounts
-/// * `receiver` - receiver address from x-chain message, used to validate `accounts`
-/// * `source_accounts` - arbitrary messaging accounts from the x-chain message, used to validate `accounts`. expected order is: [program, ...additional message accounts]
-/// * `accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [program, receiver, ...additional message accounts]
-fn parse_messaging_accounts<'info>(
-    token_indexes: &[u8],
-    receiver: Pubkey,
-    source_accounts: Vec<SolanaAccountMeta>,
-    accounts: &'info [AccountInfo<'info>],
-) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
-    let end_ind = if token_indexes.is_empty() {
-        accounts.len()
-    } else {
-        token_indexes[0] as usize
-    };
-
-    let msg_program = &accounts[0];
-    let msg_accounts = &accounts[1..end_ind];
-
-    let source_program = &source_accounts[0];
-    let source_msg_accounts = &source_accounts[1..source_accounts.len()];
-
-    require!(
-        source_program.pubkey == msg_program.key(),
-        CcipRouterError::InvalidInputs,
-    );
-
-    require!(
-        msg_accounts[0].key() == receiver,
-        CcipRouterError::InvalidInputs
-    );
-
-    // assert same number of accounts passed from message and transaction (not including program)
-    // source_msg_accounts + 1 to account for separately passed receiver address
-    require!(
-        source_msg_accounts.len() + 1 == msg_accounts.len(),
-        CcipRouterError::InvalidInputs
-    );
-
-    // Validate the addresses of all the accounts match the ones in source chain
-    if msg_accounts.len() > 1 {
-        // Ignore the first account as it's the receiver
-        let accounts_to_validate = &msg_accounts[1..msg_accounts.len()];
-        require!(
-            accounts_to_validate.len() == source_msg_accounts.len(),
-            CcipRouterError::InvalidInputs
-        );
-        for (i, acc) in source_msg_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i + 1];
-            require!(
-                acc.pubkey == current_acc.key(),
-                CcipRouterError::InvalidInputs
-            );
-            require!(
-                acc.is_writable == current_acc.is_writable,
-                CcipRouterError::InvalidInputs
-            );
-        }
-    }
-
-    Ok((msg_program, msg_accounts))
-}
-
-fn extra_args_or_default(default_config: Ref<Config>, extra_args: ExtraArgsInput) -> AnyExtraArgs {
-    let mut result_args = AnyExtraArgs {
-        gas_limit: default_config.default_gas_limit.to_owned(),
-        allow_out_of_order_execution: default_config.default_allow_out_of_order_execution != 0,
-    };
-
-    if let Some(gas_limit) = extra_args.gas_limit {
-        gas_limit.clone_into(&mut result_args.gas_limit)
-    }
-
-    if let Some(allow_out_of_order_execution) = extra_args.allow_out_of_order_execution {
-        allow_out_of_order_execution.clone_into(&mut result_args.allow_out_of_order_execution)
-    }
-
-    result_args
-}
-
-/// Build the instruction data (discriminator + any other data)
-fn build_receiver_discriminator_and_data(ramp_message: Any2SolanaMessage) -> Result<Vec<u8>> {
-    let m: std::result::Result<Vec<u8>, std::io::Error> = ramp_message.try_to_vec();
-    require!(m.is_ok(), CcipRouterError::InvalidMessage);
-    let message = m.unwrap();
-
-    let mut data = Vec::with_capacity(8);
-    data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
-    data.extend_from_slice(&message);
-
-    Ok(data)
 }
 
 #[error_code]
@@ -1411,77 +646,4 @@ pub enum CcipRouterError {
     InsufficientLamports,
     #[msg("Insufficient funds")]
     InsufficientFunds,
-}
-
-// TODO: Refactor this to use the same structure as messages: execution_report.validate(..)
-pub fn validate_execution_report<'info>(
-    execution_report: &ExecutionReportSingleChain,
-    source_chain_state: &Account<'info, SourceChain>,
-    commit_report: &Account<'info, CommitReport>,
-    message_header: &RampMessageHeader,
-    solana_chain_selector: u64,
-) -> Result<()> {
-    require!(
-        execution_report.message.header.nonce == 0,
-        CcipRouterError::InvalidInputs
-    );
-
-    require!(
-        source_chain_state.config.is_enabled,
-        CcipRouterError::UnsupportedSourceChainSelector
-    );
-
-    require!(
-        execution_report.message.header.sequence_number >= commit_report.min_msg_nr
-            && execution_report.message.header.sequence_number <= commit_report.max_msg_nr,
-        CcipRouterError::InvalidSequenceInterval
-    );
-
-    require!(
-        message_header.source_chain_selector == execution_report.source_chain_selector,
-        CcipRouterError::UnsupportedSourceChainSelector
-    );
-    require!(
-        message_header.dest_chain_selector == solana_chain_selector,
-        CcipRouterError::UnsupportedDestinationChainSelector
-    );
-    require!(
-        commit_report.timestamp != 0,
-        CcipRouterError::RootNotCommitted
-    );
-
-    Ok(())
-}
-
-pub fn verify_merkle_root(
-    execution_report: &ExecutionReportSingleChain,
-    on_ramp_address: &[u8],
-) -> Result<[u8; 32]> {
-    let hashed_leaf = execution_report.message.hash(on_ramp_address);
-    let verified_root: std::result::Result<[u8; 32], MerkleError> =
-        calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
-    require!(
-        verified_root.is_ok() && verified_root.unwrap() == execution_report.root,
-        CcipRouterError::InvalidProof
-    );
-    Ok(hashed_leaf)
-}
-
-fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraArgs) -> Result<u64> {
-    // Avoid Re-initialization attack as the account is init_if_needed
-    // https://solana.com/developers/courses/program-security/reinitialization-attacks#add-is-initialized-check
-    if nonce_counter_account.version == 0 {
-        // The authority must be the owner of the PDA, as it's their Public Key in the seed
-        // If the account is not initialized, initialize it
-        nonce_counter_account.version = 1;
-        nonce_counter_account.counter = 0;
-    }
-
-    // TODO: Require config.enforce_out_of_order => extra_args.allow_out_of_order_execution
-    let mut final_nonce = 0;
-    if !extra_args.allow_out_of_order_execution {
-        nonce_counter_account.counter = nonce_counter_account.counter.checked_add(1).unwrap();
-        final_nonce = nonce_counter_account.counter;
-    }
-    Ok(final_nonce)
 }

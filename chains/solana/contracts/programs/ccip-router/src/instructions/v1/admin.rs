@@ -2,15 +2,17 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::{
-    do_billing_transfer, AcceptOwnership, AddBillingTokenConfig, AddChainSelector,
-    BillingTokenConfig, CcipRouterError, DestChainAdded, DestChainConfig, DestChainConfigUpdated,
-    DestChainState, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved,
-    Ocr3ConfigInfo, OcrPluginType, RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig,
-    SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated, SourceChainState,
-    TimestampedPackedU224, TokenBilling, TransferOwnership, UpdateBillingTokenConfig,
-    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig,
-    WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
+    AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
+    DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
+    FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
+    RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig, SourceChainAdded,
+    SourceChainConfig, SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224,
+    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
+    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
+    FEE_BILLING_SIGNER_SEEDS,
 };
+
+use super::fee_quoter::do_billing_transfer;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
