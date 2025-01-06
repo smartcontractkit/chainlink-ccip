@@ -37,6 +37,9 @@ declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
 /// This is the Collapsed Router Program for CCIP.
 /// As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.
 /// This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.
+///
+/// NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,
+/// thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface.
 pub mod ccip_router {
     #![warn(missing_docs)]
 
