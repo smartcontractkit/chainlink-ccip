@@ -293,7 +293,7 @@ pub mod ccip_router {
         mint: Pubkey, // should we validate that this is a real token program?
         token_admin_registry_admin: Pubkey,
     ) -> Result<()> {
-        v1::tokens::register_token_admin_registry_via_get_ccip_admin(
+        v1::token_admin_registry::register_token_admin_registry_via_get_ccip_admin(
             ctx,
             mint,
             token_admin_registry_admin,
@@ -310,7 +310,7 @@ pub mod ccip_router {
     pub fn register_token_admin_registry_via_owner(
         ctx: Context<RegisterTokenAdminRegistryViaOwner>,
     ) -> Result<()> {
-        v1::tokens::register_token_admin_registry_via_owner(ctx)
+        v1::token_admin_registry::register_token_admin_registry_via_owner(ctx)
     }
 
     /// Sets the pool lookup table for a given token mint.
@@ -327,7 +327,7 @@ pub mod ccip_router {
         mint: Pubkey,
         pool_lookup_table: Pubkey,
     ) -> Result<()> {
-        v1::tokens::set_pool(ctx, mint, pool_lookup_table)
+        v1::token_admin_registry::set_pool(ctx, mint, pool_lookup_table)
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.
@@ -344,7 +344,7 @@ pub mod ccip_router {
         mint: Pubkey,
         new_admin: Pubkey,
     ) -> Result<()> {
-        v1::tokens::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
+        v1::token_admin_registry::transfer_admin_role_token_admin_registry(ctx, mint, new_admin)
     }
 
     /// Accepts the admin role of the token admin registry.
@@ -359,7 +359,7 @@ pub mod ccip_router {
         ctx: Context<AcceptAdminRoleTokenAdminRegistry>,
         mint: Pubkey,
     ) -> Result<()> {
-        v1::tokens::accept_admin_role_token_admin_registry(ctx, mint)
+        v1::token_admin_registry::accept_admin_role_token_admin_registry(ctx, mint)
     }
 
     /// Sets the token billing configuration.
