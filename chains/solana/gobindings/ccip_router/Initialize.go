@@ -26,6 +26,7 @@ type Initialize struct {
 	DefaultGasLimit                 *ag_binary.Uint128
 	DefaultAllowOutOfOrderExecution *bool
 	EnableExecutionAfter            *int64
+	FeeAggregator                   *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
 	//
@@ -74,6 +75,12 @@ func (inst *Initialize) SetDefaultAllowOutOfOrderExecution(defaultAllowOutOfOrde
 // SetEnableExecutionAfter sets the "enableExecutionAfter" parameter.
 func (inst *Initialize) SetEnableExecutionAfter(enableExecutionAfter int64) *Initialize {
 	inst.EnableExecutionAfter = &enableExecutionAfter
+	return inst
+}
+
+// SetFeeAggregator sets the "feeAggregator" parameter.
+func (inst *Initialize) SetFeeAggregator(feeAggregator ag_solanago.PublicKey) *Initialize {
+	inst.FeeAggregator = &feeAggregator
 	return inst
 }
 
@@ -197,6 +204,9 @@ func (inst *Initialize) Validate() error {
 		if inst.EnableExecutionAfter == nil {
 			return errors.New("EnableExecutionAfter parameter is not set")
 		}
+		if inst.FeeAggregator == nil {
+			return errors.New("FeeAggregator parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -238,11 +248,12 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("            SolanaChainSelector", *inst.SolanaChainSelector))
 						paramsBranch.Child(ag_format.Param("                DefaultGasLimit", *inst.DefaultGasLimit))
 						paramsBranch.Child(ag_format.Param("DefaultAllowOutOfOrderExecution", *inst.DefaultAllowOutOfOrderExecution))
 						paramsBranch.Child(ag_format.Param("           EnableExecutionAfter", *inst.EnableExecutionAfter))
+						paramsBranch.Child(ag_format.Param("                  FeeAggregator", *inst.FeeAggregator))
 					})
 
 					// Accounts of the instruction:
@@ -281,6 +292,11 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Serialize `FeeAggregator` param:
+	err = encoder.Encode(obj.FeeAggregator)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -304,6 +320,11 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
+	// Deserialize `FeeAggregator`:
+	err = decoder.Decode(&obj.FeeAggregator)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -314,6 +335,7 @@ func NewInitializeInstruction(
 	defaultGasLimit ag_binary.Uint128,
 	defaultAllowOutOfOrderExecution bool,
 	enableExecutionAfter int64,
+	feeAggregator ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	state ag_solanago.PublicKey,
@@ -328,6 +350,7 @@ func NewInitializeInstruction(
 		SetDefaultGasLimit(defaultGasLimit).
 		SetDefaultAllowOutOfOrderExecution(defaultAllowOutOfOrderExecution).
 		SetEnableExecutionAfter(enableExecutionAfter).
+		SetFeeAggregator(feeAggregator).
 		SetConfigAccount(config).
 		SetStateAccount(state).
 		SetAuthorityAccount(authority).
