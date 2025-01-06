@@ -1,4 +1,4 @@
-use anchor_lang::{prelude::*, Ids};
+use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{get_associated_token_address_with_program_id, AssociatedToken};
 use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
@@ -136,6 +136,49 @@ pub struct GetFee<'info> {
         bump,
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawBilledFunds<'info> {
+    #[account(
+        owner = token_program.key() @ CcipRouterError::InvalidInputs,
+    )]
+    pub fee_token_mint: InterfaceAccount<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = fee_token_mint,
+        associated_token::authority = fee_billing_signer,
+        associated_token::token_program = token_program,
+    )]
+    pub fee_token_accum: InterfaceAccount<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        constraint = recipient.key() == get_associated_token_address_with_program_id(
+            &config.load()?.fee_aggregator.key(), &fee_token_mint.key(), &token_program.key()
+        ) @ CcipRouterError::InvalidInputs,
+    )]
+    pub recipient: InterfaceAccount<'info, TokenAccount>,
+
+    pub token_program: Interface<'info, TokenInterface>,
+
+    /// CHECK: This is the signer for the billing CPIs, used here to close the receiver token account
+    #[account(
+        seeds = [FEE_BILLING_SIGNER_SEEDS],
+        bump
+    )]
+    pub fee_billing_signer: UncheckedAccount<'info>,
+
+    #[account(
+        seeds = [CONFIG_SEED],
+        bump,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs, // validate state version
+    )]
+    pub config: AccountLoader<'info, Config>,
+
+    #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -346,13 +389,7 @@ pub struct AddBillingTokenConfig<'info> {
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 
-    /// CHECK: This is the token program OR the token-2022 program. Given that there are 2 options, this can't have the
-    /// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-    /// with a constraint enforcing that it is one of the two allowed programs.
-    #[account(
-        constraint = TokenInterface::ids().contains(&token_program.key()) @ CcipRouterError::InvalidInputs,
-    )]
-    pub token_program: UncheckedAccount<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
 
     #[account(
         owner = token_program.key() @ CcipRouterError::InvalidInputs,
@@ -425,13 +462,7 @@ pub struct RemoveBillingTokenConfig<'info> {
     )]
     pub billing_token_config: Account<'info, BillingTokenConfigWrapper>,
 
-    /// CHECK: This is the token program OR the token-2022 program. Given that there are 2 options, this can't have the
-    /// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-    /// with a constraint enforcing that it is one of the two allowed programs.
-    #[account(
-        constraint = TokenInterface::ids().contains(&token_program.key()) @ CcipRouterError::InvalidInputs,
-    )]
-    pub token_program: UncheckedAccount<'info>,
+    pub token_program: Interface<'info, TokenInterface>,
 
     #[account(
         owner = token_program.key() @ CcipRouterError::InvalidInputs,
@@ -497,13 +528,7 @@ pub struct CcipSend<'info> {
     // billing token //
     ///////////////////
     // TODO improve all usages of CcipRouterError::InvalidInputs to be more specific
-    /// CHECK: This is the token program OR the token-2022 program. Given that there are 2 options, this can't have the
-    /// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-    /// with a constraint enforcing that it is one of the two allowed programs.
-    #[account(
-        constraint = TokenInterface::ids().contains(&fee_token_program.key()) @ CcipRouterError::InvalidInputs,
-    )]
-    pub fee_token_program: UncheckedAccount<'info>,
+    pub fee_token_program: Interface<'info, TokenInterface>,
 
     #[account(
         owner = fee_token_program.key() @ CcipRouterError::InvalidInputs,

@@ -4,24 +4,35 @@ use anchor_lang::solana_program::secp256k1_recover::{
     secp256k1_recover, Secp256k1Pubkey, Secp256k1RecoverError,
 };
 
-use crate::{error::*, RootMetadataInput};
+use crate::error::*;
+use crate::state::root::RootMetadataInput;
 
-pub const EVM_ADDRESS_BYTES: usize = 20;
-const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA: &[u8; HASH_BYTES] = &[
-    // result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA")
-    0xe6, 0xb8, 0x2b, 0xe9, 0x89, 0x10, 0x1b, 0x4e, 0xb5, 0x19, 0x77, 0x01, 0x14, 0xb9, 0x97, 0xb9,
-    0x7b, 0x3c, 0x87, 0x07, 0x51, 0x52, 0x86, 0x74, 0x8a, 0x87, 0x17, 0x17, 0xf0, 0xe4, 0xea, 0x1c,
+// Domain separators & evm constants
+// NOTE: chain-specific mcm contract should has its own domain separator to avoid ambiguity
+// https://github.com/smartcontractkit/ccip-owner-contracts#porting
+//
+// result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA")
+pub const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA: &[u8; HASH_BYTES] = &[
+    0x47, 0xfd, 0xed, 0x70, 0x90, 0x1d, 0x27, 0x3, 0x83, 0x94, 0xdb, 0x90, 0x5a, 0x72, 0x56, 0x3c,
+    0xad, 0x6f, 0x7, 0x58, 0x1d, 0xbc, 0xdd, 0x14, 0x72, 0xcc, 0xd2, 0xf7, 0x42, 0xaf, 0x63, 0x60,
 ];
+// result of keccak256("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA")
+pub const MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP: &[u8; HASH_BYTES] = &[
+    0xfb, 0x98, 0x81, 0x6f, 0xf3, 0xc5, 0x13, 0x8a, 0x68, 0xab, 0xfd, 0x40, 0xb8, 0xd8, 0xfb, 0xc2,
+    0x29, 0x72, 0xfe, 0xa1, 0xdd, 0x89, 0x75, 0x73, 0x31, 0x32, 0x7e, 0x6e, 0xa, 0x94, 0x40, 0xb7,
+];
+pub const EVM_ADDRESS_BYTES: usize = 20;
 
 pub fn ecdsa_recover_evm_addr(
     eth_signed_msg_hash: &[u8; HASH_BYTES],
     sig: &Signature,
 ) -> Result<[u8; EVM_ADDRESS_BYTES]> {
     // retrieve signer public key
-    let public_key = sig.secp256k1_recover_from(eth_signed_msg_hash);
-    require!(public_key.is_ok(), McmError::FailedEcdsaRecover);
+    let public_key = sig
+        .secp256k1_recover_from(eth_signed_msg_hash)
+        .map_err(|_| McmError::FailedEcdsaRecover)?;
 
-    let public_key_bytes = &public_key.unwrap().to_bytes();
+    let public_key_bytes = &public_key.to_bytes();
 
     // return last 20 bytes of hashed public key as the recovered ethereum address
     let evm_addr: [u8; EVM_ADDRESS_BYTES] = hash(public_key_bytes).to_bytes()
@@ -60,13 +71,8 @@ fn hash_pair(a: &[u8; HASH_BYTES], b: &[u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
 }
 
 fn _left_pad_vec(input: &[u8], num_bytes: usize) -> Vec<u8> {
-    let len = input.len();
-    if len >= num_bytes {
-        return input.to_vec();
-    };
-    let bytes_to_pad = num_bytes - len;
     let mut padded: Vec<u8> = Vec::with_capacity(num_bytes);
-    padded.resize(bytes_to_pad, 0);
+    padded.resize(num_bytes - input.len(), 0);
     padded.extend_from_slice(input);
     padded
 }
@@ -87,23 +93,21 @@ impl Signature {
         &self,
         eth_signed_msg_hash: &[u8; HASH_BYTES],
     ) -> std::result::Result<Secp256k1Pubkey, Secp256k1RecoverError> {
-        // See https://github.com/anza-xyz/agave/blob/c8685ce0e1bb9b26014f1024de2cd2b8c308cbde/curves/secp256k1-recover/src/lib.rs#L106-L115
-        if self.v < 27 {
-            return Err(Secp256k1RecoverError::InvalidRecoveryId);
-        }
-        let v = self.v - 27;
+        // Ref: https://github.com/anza-xyz/agave/blob/c8685ce0e1bb9b26014f1024de2cd2b8c308cbde/curves/secp256k1-recover/src/lib.rs#L106-L115
+        let v = self
+            .v
+            .checked_sub(27)
+            .ok_or(Secp256k1RecoverError::InvalidRecoveryId)?;
         let rs = [self.r, self.s].concat();
         secp256k1_recover(eth_signed_msg_hash, v, rs.as_slice())
     }
 }
 
 impl RootMetadataInput {
-    // computes keccak256(abi.encode(MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA, metadata))
     pub fn hash_leaf(&self) -> [u8; HASH_BYTES] {
         let chain_id = left_pad_vec(&self.chain_id.to_le_bytes());
         let pre_op_count = left_pad_vec(&self.pre_op_count.to_le_bytes());
         let post_op_count = left_pad_vec(&self.post_op_count.to_le_bytes());
-
         let override_previous_root: &[u8] = &[if self.override_previous_root { 1 } else { 0 }];
         let override_previous_root_bytes = left_pad_vec(override_previous_root);
 
@@ -139,6 +143,24 @@ mod tests {
         _decode::<EVM_ADDRESS_BYTES>(s)
     }
 
+    mod domain_separators {
+        use anchor_lang::solana_program::keccak;
+
+        use super::*;
+
+        #[test]
+        fn verify_domain_separators() {
+            let metadata =
+                keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA".as_bytes());
+            assert_eq!(
+                &metadata.to_bytes(),
+                MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA
+            );
+            let op = keccak::hash("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA".as_bytes());
+            assert_eq!(&op.to_bytes(), MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP);
+        }
+    }
+
     mod test_hash_pair {
         use super::*;
 
@@ -169,13 +191,6 @@ mod tests {
 
     mod test_left_pad_vec {
         use super::*;
-
-        #[test]
-        fn too_few() {
-            let input = [1, 2, 3];
-            let result = _left_pad_vec(&input, 1); // 1 is smaller than the input length
-            assert_eq!(result.as_slice(), input);
-        }
 
         #[test]
         fn exact() {
@@ -289,19 +304,18 @@ mod tests {
                 post_op_count: 1,
                 override_previous_root: false,
             };
-
             assert_eq!(
                 md.hash_leaf(),
-                decode32("5b0c13f119b512c6b4de4c3fa2486a8261de1386d72e4535b7508e201fdb4826")
+                decode32("c31496e313ba769f8c9f061dd35c6aa06c1c51ec9111f54be7be307a0de6b556")
             );
 
             // This is the metadata in hex:
-            // e6b82be989101b4eb519770114b997b97b3c8707515286748a871717f0e4ea1c
-            // 0000000000000000000000000000000000000000000000001266a21317e30848
-            // b870e12dd379891561d2e9fa8f26431834eb736f2f24fc2a2a4dff1fd5dca4df
-            // 0000000000000000000000000000000000000000000000000000000000000000
-            // 0000000000000000000000000000000000000000000000000100000000000000
-            // 0000000000000000000000000000000000000000000000000000000000000000
+            // 47fded70901d27038394db905a72563cad6f07581dbcdd1472ccd2f742af6360 <-- METADATA_DOMAIN_SEPARATOR
+            // 0000000000000000000000000000000000000000000000001266a21317e30848 <-- chain_id
+            // b870e12dd379891561d2e9fa8f26431834eb736f2f24fc2a2a4dff1fd5dca4df <-- multisig
+            // 0000000000000000000000000000000000000000000000000000000000000000 <-- pre_op_count
+            // 0000000000000000000000000000000000000000000000000100000000000000 <-- post_op_count
+            // 0000000000000000000000000000000000000000000000000000000000000000 <-- override_previous_root
         }
     }
 

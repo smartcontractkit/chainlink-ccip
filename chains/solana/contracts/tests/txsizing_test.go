@@ -10,8 +10,8 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
 func mustRandomPubkey() solana.PublicKey {
@@ -57,7 +57,7 @@ func TestTransactionSizing(t *testing.T) {
 		"mint":                  mustRandomPubkey(),
 	}
 
-	run := func(name string, ix solana.Instruction, tables map[solana.PublicKey]solana.PublicKeySlice, opts ...utils.TxModifier) string {
+	run := func(name string, ix solana.Instruction, tables map[solana.PublicKey]solana.PublicKeySlice, opts ...common.TxModifier) string {
 		tx, err := solana.NewTransaction([]solana.Instruction{ix}, solana.Hash{1}, solana.TransactionAddressTables(tables))
 		require.NoError(t, err)
 
@@ -319,9 +319,9 @@ func TestTransactionSizing(t *testing.T) {
 
 			outputs = append(outputs,
 				run(p.name+l, p.ix, tables),
-				run(p.name+l+" +cuLimit", p.ix, tables, utils.AddComputeUnitLimit(0)),
-				run(p.name+l+" +cuPrice", p.ix, tables, utils.AddComputeUnitPrice(0)),
-				run(p.name+l+" +cuPrice +cuLimit", p.ix, tables, utils.AddComputeUnitLimit(0), utils.AddComputeUnitPrice(0)),
+				run(p.name+l+" +cuLimit", p.ix, tables, common.AddComputeUnitLimit(0)),
+				run(p.name+l+" +cuPrice", p.ix, tables, common.AddComputeUnitPrice(0)),
+				run(p.name+l+" +cuPrice +cuLimit", p.ix, tables, common.AddComputeUnitLimit(0), common.AddComputeUnitPrice(0)),
 				divider,
 			)
 		}

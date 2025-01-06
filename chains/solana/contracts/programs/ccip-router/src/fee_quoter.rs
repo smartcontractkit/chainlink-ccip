@@ -40,6 +40,7 @@ pub fn fee_for_msg(
     Ok(SolanaTokenAmount { amount, token })
 }
 
+#[allow(dead_code)]
 pub struct PackedPrice {
     pub execution_cost: u128,
     pub gas_price: u128,
@@ -91,8 +92,8 @@ pub fn wrap_native_sol<'info>(
     signer_bump: u8,
 ) -> Result<()> {
     require!(
-        // guarantee that if caller is a PDA it won't get garbage-collected
-        *from.owner == System::id() || from.get_lamports() > amount,
+        // guarantee that if caller is a PDA with data it won't get garbage-collected
+        from.data_is_empty() || from.get_lamports() > amount,
         CcipRouterError::InsufficientLamports
     );
 
@@ -123,10 +124,20 @@ pub fn transfer_fee<'info>(
         CcipRouterError::InvalidInputs
     ); // TODO use more specific error
 
+    do_billing_transfer(token_program, transfer, fee.amount, decimals, signer_bump)
+}
+
+pub fn do_billing_transfer<'info>(
+    token_program: AccountInfo<'info>,
+    transfer: token_interface::TransferChecked<'info>,
+    amount: u64,
+    decimals: u8,
+    signer_bump: u8,
+) -> Result<()> {
     let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[signer_bump]];
     let signer_seeds = &[&seeds[..]];
     let cpi_ctx = CpiContext::new_with_signer(token_program, transfer, signer_seeds);
-    token_interface::transfer_checked(cpi_ctx, fee.amount, decimals)
+    token_interface::transfer_checked(cpi_ctx, amount, decimals)
 }
 
 #[cfg(test)]
