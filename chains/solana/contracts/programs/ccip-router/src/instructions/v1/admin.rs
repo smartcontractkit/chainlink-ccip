@@ -2,14 +2,14 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use crate::{
-    AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
-    DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
-    FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
-    RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig, SourceChainAdded,
-    SourceChainConfig, SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224,
-    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
-    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
-    FEE_BILLING_SIGNER_SEEDS,
+    v1::ocr3::ocr3_set, AcceptOwnership, AddBillingTokenConfig, AddChainSelector,
+    BillingTokenConfig, CcipRouterError, DestChainAdded, DestChainConfig, DestChainConfigUpdated,
+    DestChainState, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved,
+    Ocr3ConfigInfo, OcrPluginType, RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig,
+    SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated, SourceChainState,
+    TimestampedPackedU224, TokenBilling, TransferOwnership, UpdateBillingTokenConfig,
+    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig,
+    WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -217,7 +217,8 @@ pub fn set_ocr_config(
 
     let is_commit = plugin_type == OcrPluginType::Commit as u8;
 
-    config.ocr3[plugin_type as usize].set(
+    ocr3_set(
+        &mut config.ocr3[plugin_type as usize],
         plugin_type,
         Ocr3ConfigInfo {
             config_digest: config_info.config_digest,

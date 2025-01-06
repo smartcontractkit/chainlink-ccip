@@ -1980,6 +1980,28 @@
       }
     },
     {
+      "name": "ReportContext",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "byteWords",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                3
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "RampMessageHeader",
       "type": {
         "kind": "struct",
@@ -2377,23 +2399,30 @@
       }
     },
     {
-      "name": "ReportContext",
+      "name": "Ocr3ConfigInfo",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "byteWords",
+            "name": "configDigest",
             "type": {
               "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                3
+                "u8",
+                32
               ]
             }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "n",
+            "type": "u8"
+          },
+          {
+            "name": "isSignatureVerificationEnabled",
+            "type": "u8"
           }
         ]
       }
@@ -2440,35 +2469,6 @@
                 16
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Ocr3ConfigInfo",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "configDigest",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "f",
-            "type": "u8"
-          },
-          {
-            "name": "n",
-            "type": "u8"
-          },
-          {
-            "name": "isSignatureVerificationEnabled",
-            "type": "u8"
           }
         ]
       }

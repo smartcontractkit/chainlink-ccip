@@ -12,4 +12,5 @@ pub mod token_admin_registry;
 mod fee_quoter;
 mod merkle;
 mod messages;
+mod ocr3;
 mod pools;

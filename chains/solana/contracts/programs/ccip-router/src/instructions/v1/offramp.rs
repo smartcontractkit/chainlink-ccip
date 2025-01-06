@@ -3,20 +3,21 @@ use solana_program::{instruction::Instruction, program::invoke_signed};
 
 use super::merkle::{calculate_merkle_root, MerkleError};
 use super::messages::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
+use super::ocr3::{ocr3_transmit, Ocr3ReportForExecutionReportSingleChain, ReportContext};
 use super::pools::{
     calculate_token_pool_account_indices, get_balance, interact_with_pool,
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::ocr3::Ocr3ReportForCommit;
 use crate::{
     Any2SolanaMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
     CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
     ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, ReportContext,
-    SkippedAlreadyExecutedMessage, SolanaAccountMeta, SolanaTokenAmount, SourceChain,
-    TimestampedPackedU224, TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated,
-    CCIP_RECEIVE_DISCRIMINATOR, DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED,
-    EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    MessageExecutionState, OcrPluginType, RampMessageHeader, SkippedAlreadyExecutedMessage,
+    SolanaAccountMeta, SolanaTokenAmount, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
+    UsdPerTokenUpdated, UsdPerUnitGasUpdated, CCIP_RECEIVE_DISCRIMINATOR, DEST_CHAIN_STATE_SEED,
+    EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
 
 pub fn commit<'info>(
@@ -169,12 +170,13 @@ pub fn commit<'info>(
         price_updates: report.price_updates.clone(),
     });
 
-    config.ocr3[OcrPluginType::Commit as usize].transmit(
+    ocr3_transmit(
+        &config.ocr3[OcrPluginType::Commit as usize],
         &ctx.accounts.sysvar_instructions,
         ctx.accounts.authority.key(),
         OcrPluginType::Commit as u8,
         report_context,
-        &report,
+        &Ocr3ReportForCommit(&report),
         &signatures,
     )?;
 
@@ -190,12 +192,13 @@ pub fn execute<'info>(
     // limit borrowing of ctx
     {
         let config = ctx.accounts.config.load()?;
-        config.ocr3[OcrPluginType::Execution as usize].transmit(
+        ocr3_transmit(
+            &config.ocr3[OcrPluginType::Execution as usize],
             &ctx.accounts.sysvar_instructions,
             ctx.accounts.authority.key(),
             OcrPluginType::Execution as u8,
             report_context,
-            &execution_report,
+            &Ocr3ReportForExecutionReportSingleChain(&execution_report),
             &[],
         )?;
     }
