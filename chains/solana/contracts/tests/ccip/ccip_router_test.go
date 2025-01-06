@@ -4755,6 +4755,80 @@ func TestCCIPRouter(t *testing.T) {
 				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, []string{"writable privilege escalated", "Cross-program invocation with unauthorized signer or writable account"})
 			})
 
+			t.Run("message can be executed with empty Any2SolanaRampMessage.Data", func(t *testing.T) {
+				transmitter := getTransmitter()
+
+				sourceChainSelector := config.EvmChainSelector
+				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message.Data = []byte{} // empty message data
+				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
+				require.NoError(t, err)
+				root := [32]byte(hash)
+
+				sequenceNumber := message.Header.SequenceNumber
+				executedSequenceNumber = sequenceNumber // persist this number as executed, for later tests
+
+				commitReport := ccip_router.CommitInput{
+					MerkleRoot: ccip_router.MerkleRoot{
+						SourceChainSelector: sourceChainSelector,
+						OnRampAddress:       config.OnRampAddress,
+						MinSeqNr:            sequenceNumber,
+						MaxSeqNr:            sequenceNumber,
+						MerkleRoot:          root,
+					},
+				}
+				sigs, err := ccip.SignCommitReport(reportContext, commitReport, signers)
+				require.NoError(t, err)
+				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
+				require.NoError(t, err)
+
+				instruction, err := ccip_router.NewCommitInstruction(
+					reportContext,
+					commitReport,
+					sigs,
+					config.RouterConfigPDA,
+					config.EvmSourceChainStatePDA,
+					rootPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+				).ValidateAndBuild()
+				require.NoError(t, err)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(210_000)) // signature verification compute unit amounts can vary depending on sorting
+				event := ccip.EventCommitReportAccepted{}
+				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
+
+				executionReport := ccip_router.ExecutionReportSingleChain{
+					SourceChainSelector: sourceChainSelector,
+					Message:             message,
+					Root:                root,
+					Proofs:              [][32]uint8{}, // single leaf merkle tree
+				}
+				raw := ccip_router.NewExecuteInstruction(
+					executionReport,
+					reportContext,
+					config.RouterConfigPDA,
+					config.EvmSourceChainStatePDA,
+					rootPDA,
+					config.ExternalExecutionConfigPDA,
+					transmitter.PublicKey(),
+					solana.SystemProgramID,
+					solana.SysVarInstructionsPubkey,
+					config.ExternalTokenPoolsSignerPDA,
+				)
+				raw.AccountMetaSlice = append(
+					raw.AccountMetaSlice,
+					solana.NewAccountMeta(config.CcipReceiverProgram, false, false),
+					solana.NewAccountMeta(config.ReceiverExternalExecutionConfigPDA, true, false),
+					solana.NewAccountMeta(config.ReceiverTargetAccountPDA, true, false),
+					solana.NewAccountMeta(solana.SystemProgramID, false, false),
+				)
+				instruction, err = raw.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+			})
+
 			t.Run("token happy path", func(t *testing.T) {
 				_, initSupply, err := tokens.TokenSupply(ctx, solanaGoClient, token0.Mint.PublicKey(), config.DefaultCommitment)
 				require.NoError(t, err)
