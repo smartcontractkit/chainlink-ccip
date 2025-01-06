@@ -3,13 +3,13 @@ use solana_program::{instruction::Instruction, program::invoke_signed};
 
 use super::merkle::{calculate_merkle_root, MerkleError};
 use super::messages::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
-use super::ocr3::{ocr3_transmit, Ocr3ReportForExecutionReportSingleChain, ReportContext};
+use super::ocr3base::{ocr3_transmit, ReportContext};
+use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
     calculate_token_pool_account_indices, get_balance, interact_with_pool,
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
-use crate::v1::ocr3::Ocr3ReportForCommit;
 use crate::{
     Any2SolanaMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
     CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
