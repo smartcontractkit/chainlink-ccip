@@ -23,8 +23,6 @@ type RemoveBillingTokenConfig struct {
 	// [1] = [WRITE] billingTokenConfig
 	//
 	// [2] = [] tokenProgram
-	// ··········· type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-	// ··········· with a constraint enforcing that it is one of the two allowed programs.
 	//
 	// [3] = [] feeTokenMint
 	//
@@ -69,16 +67,12 @@ func (inst *RemoveBillingTokenConfig) GetBillingTokenConfigAccount() *ag_solanag
 }
 
 // SetTokenProgramAccount sets the "tokenProgram" account.
-// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-// with a constraint enforcing that it is one of the two allowed programs.
 func (inst *RemoveBillingTokenConfig) SetTokenProgramAccount(tokenProgram ag_solanago.PublicKey) *RemoveBillingTokenConfig {
 	inst.AccountMetaSlice[2] = ag_solanago.Meta(tokenProgram)
 	return inst
 }
 
 // GetTokenProgramAccount gets the "tokenProgram" account.
-// type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount
-// with a constraint enforcing that it is one of the two allowed programs.
 func (inst *RemoveBillingTokenConfig) GetTokenProgramAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[2]
 }

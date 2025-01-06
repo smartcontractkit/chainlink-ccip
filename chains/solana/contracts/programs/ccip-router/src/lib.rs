@@ -70,6 +70,7 @@ pub mod ccip_router {
         default_gas_limit: u128,
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
+        fee_aggregator: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
@@ -83,6 +84,8 @@ pub mod ccip_router {
         }
 
         config.owner = ctx.accounts.authority.key();
+
+        config.fee_aggregator = fee_aggregator;
 
         config.ocr3 = [
             Ocr3Config::new(OcrPluginType::Commit as u8),
@@ -127,6 +130,22 @@ pub mod ccip_router {
         let mut config = ctx.accounts.config.load_mut()?;
         config.owner = std::mem::take(&mut config.proposed_owner);
         config.proposed_owner = Pubkey::new_from_array([0; 32]);
+        Ok(())
+    }
+
+    /// Updates the fee aggregator in the router configuration.
+    /// The Admin is the only one able to update the fee aggregator.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
+    pub fn update_fee_aggregator(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        fee_aggregator: Pubkey,
+    ) -> Result<()> {
+        let mut config = ctx.accounts.config.load_mut()?;
+        config.fee_aggregator = fee_aggregator;
         Ok(())
     }
 
@@ -669,6 +688,51 @@ pub mod ccip_router {
             &ctx.accounts.billing_token_config.config,
         )?
         .amount)
+    }
+
+    /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
+    /// Only the CCIP Admin can withdraw billed funds.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the transfer of billed fees.
+    /// * `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.
+    /// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
+    pub fn withdraw_billed_funds(
+        ctx: Context<WithdrawBilledFunds>,
+        transfer_all: bool,
+        desired_amount: u64, // if transfer_all is false, this value must be 0
+    ) -> Result<()> {
+        let transfer = token_interface::TransferChecked {
+            from: ctx.accounts.fee_token_accum.to_account_info(),
+            to: ctx.accounts.recipient.to_account_info(),
+            mint: ctx.accounts.fee_token_mint.to_account_info(),
+            authority: ctx.accounts.fee_billing_signer.to_account_info(),
+        };
+
+        let amount = if transfer_all {
+            require!(desired_amount == 0, CcipRouterError::InvalidInputs);
+            require!(
+                ctx.accounts.fee_token_accum.amount > 0,
+                CcipRouterError::InsufficientFunds
+            );
+            ctx.accounts.fee_token_accum.amount
+        } else {
+            require!(desired_amount > 0, CcipRouterError::InvalidInputs);
+            require!(
+                desired_amount <= ctx.accounts.fee_token_accum.amount,
+                CcipRouterError::InsufficientFunds
+            );
+            desired_amount
+        };
+
+        do_billing_transfer(
+            ctx.accounts.token_program.to_account_info(),
+            transfer,
+            amount,
+            ctx.accounts.fee_token_mint.decimals,
+            ctx.bumps.fee_billing_signer,
+        )
     }
 
     /// ON RAMP FLOW
@@ -1607,6 +1671,8 @@ pub enum CcipRouterError {
     StaleGasPrice,
     #[msg("Insufficient lamports")]
     InsufficientLamports,
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
 }
 
 // TODO: Refactor this to use the same structure as messages: execution_report.validate(..)
