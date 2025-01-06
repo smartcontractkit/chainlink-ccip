@@ -51,6 +51,8 @@ func TestCCIPRouter(t *testing.T) {
 	require.NoError(t, gerr)
 	anotherTokenPoolAdmin, gerr := solana.NewRandomPrivateKey()
 	require.NoError(t, gerr)
+	feeAggregator, gerr := solana.NewRandomPrivateKey()
+	require.NoError(t, gerr)
 
 	var nonceEvmPDA solana.PublicKey
 
@@ -64,6 +66,7 @@ func TestCCIPRouter(t *testing.T) {
 		anotherUserATA   solana.PublicKey
 		tokenlessUserATA solana.PublicKey
 		billingConfigPDA solana.PublicKey
+		feeAggregatorATA solana.PublicKey
 		// add other accounts as needed
 	}
 	wsol := AccountsPerToken{name: "WSOL (pre-2022)"}
@@ -130,7 +133,7 @@ func TestCCIPRouter(t *testing.T) {
 
 	t.Run("setup", func(t *testing.T) {
 		t.Run("funding", func(t *testing.T) {
-			testutils.FundAccounts(ctx, append(transmitters, user, anotherUser, tokenlessUser, admin, anotherAdmin, tokenPoolAdmin, anotherTokenPoolAdmin), solanaGoClient, t)
+			testutils.FundAccounts(ctx, append(transmitters, user, anotherUser, tokenlessUser, admin, anotherAdmin, tokenPoolAdmin, anotherTokenPoolAdmin, feeAggregator), solanaGoClient, t)
 		})
 
 		t.Run("receiver", func(t *testing.T) {
@@ -231,6 +234,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, auerr)
 			wsolTokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, tokenlessUser.PublicKey())
 			require.NoError(t, tuerr)
+			wsolFeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, feeAggregator.PublicKey())
+			require.NoError(t, fuerr)
 
 			// persist the WSOL config for later use
 			wsol.program = solana.TokenProgramID
@@ -240,6 +245,7 @@ func TestCCIPRouter(t *testing.T) {
 			wsol.anotherUserATA = wsolAnotherUserATA
 			wsol.tokenlessUserATA = wsolTokenlessUserATA
 			wsol.billingATA = wsolReceiver
+			wsol.feeAggregatorATA = wsolFeeAggregatorATA
 
 			///////////////
 			// Token2022 //
@@ -264,6 +270,8 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, auerr)
 			token2022TokenlessUserATA, _, tuerr := tokens.FindAssociatedTokenAddress(config.Token2022Program, mintPubK, tokenlessUser.PublicKey())
 			require.NoError(t, tuerr)
+			token2022FeeAggregatorATA, _, fuerr := tokens.FindAssociatedTokenAddress(config.Token2022Program, mintPubK, feeAggregator.PublicKey())
+			require.NoError(t, fuerr)
 
 			// persist the Token2022 billing config for later use
 			token2022.program = config.Token2022Program
@@ -273,6 +281,7 @@ func TestCCIPRouter(t *testing.T) {
 			token2022.anotherUserATA = token2022AnotherUserATA
 			token2022.tokenlessUserATA = token2022TokenlessUserATA
 			token2022.billingATA = token2022Receiver
+			token2022.feeAggregatorATA = token2022FeeAggregatorATA
 		})
 
 		t.Run("Commit price updates address lookup table", func(t *testing.T) {
@@ -332,6 +341,7 @@ func TestCCIPRouter(t *testing.T) {
 				defaultGasLimit,
 				allowOutOfOrderExecution,
 				config.EnableExecutionAfter,
+				anotherUser.PublicKey(), // fee aggregator address, will be changed in later test
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
 				admin.PublicKey(),
@@ -742,6 +752,39 @@ func TestCCIPRouter(t *testing.T) {
 			})
 		})
 
+		t.Run("When an unauthorized user tries to update the fee aggregator, it fails", func(t *testing.T) {
+			instruction, err := ccip_router.NewUpdateFeeAggregatorInstruction(
+				user.PublicKey(), // updating to some other address
+				config.RouterConfigPDA,
+				user.PublicKey(), // wrong user
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + ccip_router.Unauthorized_CcipRouterError.String()})
+			require.NotNil(t, result)
+		})
+
+		t.Run("When an authorized user tries updates the fee aggregator, it succeeds", func(t *testing.T) {
+			var configAccount ccip_router.Config
+			err := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			require.NoError(t, err, "failed to get account info")
+			require.NotEqual(t, feeAggregator.PublicKey(), configAccount.FeeAggregator) // at this point, the fee aggregator is different
+
+			instruction, err := ccip_router.NewUpdateFeeAggregatorInstruction(
+				feeAggregator.PublicKey(), // updating to some other address
+				config.RouterConfigPDA,
+				admin.PublicKey(),
+				solana.SystemProgramID,
+			).ValidateAndBuild()
+			require.NoError(t, err)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+			require.NotNil(t, result)
+
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.RouterConfigPDA, config.DefaultCommitment, &configAccount)
+			require.NoError(t, err, "failed to get account info")
+			require.Equal(t, feeAggregator.PublicKey(), configAccount.FeeAggregator) // now the fee aggregator is updated
+		})
+
 		t.Run("Can transfer ownership", func(t *testing.T) {
 			// Fail to transfer ownership when not owner
 			instruction, err := ccip_router.NewTransferOwnershipInstruction(
@@ -891,6 +934,16 @@ func TestCCIPRouter(t *testing.T) {
 					shouldFund: false, // do not fund tokenless user
 				},
 			}
+
+			feeAggrAtaIx := make([]solana.Instruction, len(billingTokens))
+			for i, token := range billingTokens {
+				// create ATA for fee aggregator
+				ixAtaFeeAggr, addrFeeAggr, uerr := tokens.CreateAssociatedTokenAccount(token.program, token.mint, feeAggregator.PublicKey(), feeAggregator.PublicKey())
+				require.NoError(t, uerr)
+				require.Equal(t, token.feeAggregatorATA, addrFeeAggr, fmt.Sprintf("ATA for feeAggregator and token %s", token.name))
+				feeAggrAtaIx[i] = ixAtaFeeAggr
+			}
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, feeAggrAtaIx, feeAggregator, config.DefaultCommitment)
 
 			for _, it := range list {
 				for _, token := range billingTokens {
@@ -2911,6 +2964,173 @@ func TestCCIPRouter(t *testing.T) {
 					})
 				}
 			})
+		})
+	})
+
+	///////////////////////////
+	// Withdraw billed funds //
+	////////////////////.......
+	t.Run("Withdraw billed funds", func(t *testing.T) {
+		t.Run("Preconditions", func(t *testing.T) {
+			require.Greater(t, getBalance(wsol.billingATA), uint64(0))
+			require.Greater(t, getBalance(token2022.billingATA), uint64(0))
+		})
+
+		t.Run("When an non-admin user tries to withdraw funds from a billing token account, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.feeAggregatorATA,
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				user.PublicKey(), // wrong user here
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, user, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+		})
+
+		t.Run("When withdrawing funds but sending them to the token account for a wrong token, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				token2022.feeAggregatorATA, // wrong token account
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputs_CcipRouterError.String()})
+		})
+
+		t.Run("When withdrawing funds from a token account that does not belong to billing, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.userATA, // attempt to withdraw from user account instead of billingATA
+				wsol.feeAggregatorATA,
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: ConstraintTokenOwner. Error Number: 2015"})
+		})
+
+		t.Run("When withdrawing funds but sending them to a non-whitelisted token account, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.userATA, // wrong destination, sending to user account instead of fee aggregator's
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InvalidInputs_CcipRouterError.String()})
+		})
+
+		t.Run("When trying to withdraw more funds than what's available, it fails", func(t *testing.T) {
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				false,                         // withdraw all
+				getBalance(wsol.billingATA)+1, // amount (more than what's available)
+				wsol.mint,
+				wsol.billingATA,
+				wsol.feeAggregatorATA,
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
+		})
+
+		t.Run("When withdrawing a specific amount of funds, it succeeds", func(t *testing.T) {
+			funds := getBalance(token2022.billingATA)
+			require.Greater(t, funds, uint64(0))
+
+			initialAggrBalance := getBalance(token2022.feeAggregatorATA)
+
+			amount := uint64(2)
+
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				false,  // withdraw all
+				amount, // amount
+				token2022.mint,
+				token2022.billingATA,
+				token2022.feeAggregatorATA,
+				token2022.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
+
+			require.Equal(t, funds-amount, getBalance(token2022.billingATA))                    // empty
+			require.Equal(t, amount, getBalance(token2022.feeAggregatorATA)-initialAggrBalance) // increased by exact amount
+		})
+
+		t.Run("When withdrawing all funds, it succeeds", func(t *testing.T) {
+			funds := getBalance(wsol.billingATA)
+			require.Greater(t, funds, uint64(0))
+
+			initialAggrBalance := getBalance(wsol.feeAggregatorATA)
+
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.feeAggregatorATA,
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment)
+
+			require.Equal(t, uint64(0), getBalance(wsol.billingATA))                      // empty
+			require.Equal(t, funds, getBalance(wsol.feeAggregatorATA)-initialAggrBalance) // increased by exact amount
+		})
+
+		t.Run("When withdrawing all funds but the accumulator account is already empty (no balance), it fails", func(t *testing.T) {
+			funds := getBalance(wsol.billingATA)
+			require.Equal(t, uint64(0), funds)
+
+			ix, err := ccip_router.NewWithdrawBilledFundsInstruction(
+				true,      // withdraw all
+				uint64(0), // amount
+				wsol.mint,
+				wsol.billingATA,
+				wsol.feeAggregatorATA,
+				wsol.program,
+				config.BillingSignerPDA,
+				config.RouterConfigPDA,
+				anotherAdmin.PublicKey(),
+			).ValidateAndBuild()
+			require.NoError(t, err)
+
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.InsufficientFunds_CcipRouterError.String()})
 		})
 	})
 

@@ -51,9 +51,9 @@ type McmOpNode struct {
 }
 
 func (t *McmOpNode) Buffers() [][]byte {
-	hashBytes := eth.Keccak256([]byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP"))
+	domainSeparatorHashBytes := eth.Keccak256([]byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_OP_SOLANA"))
 	buffers := [][]byte{
-		hashBytes[:],
+		domainSeparatorHashBytes[:],
 		config.TestChainIDPaddedBuffer[:],
 		t.Multisig.Bytes(),
 		numToU64LePaddedEncoding(t.Nonce),
@@ -106,9 +106,9 @@ type RootMetadataNode struct {
 }
 
 func (rm *RootMetadataNode) Buffers() [][]byte {
-	hashBytes := eth.Keccak256([]byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA"))
+	domainSeparatorHashBytes := eth.Keccak256([]byte("MANY_CHAIN_MULTI_SIG_DOMAIN_SEPARATOR_METADATA_SOLANA"))
 	return [][]byte{
-		hashBytes[:],
+		domainSeparatorHashBytes[:],
 		config.TestChainIDPaddedBuffer[:],
 		rm.Multisig.Bytes(),
 		numToU64LePaddedEncoding(rm.PreOpCount),
