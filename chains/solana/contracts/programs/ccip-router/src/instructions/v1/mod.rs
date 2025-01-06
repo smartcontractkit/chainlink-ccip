@@ -1,5 +1,5 @@
-pub mod config;
-pub use config::*;
+pub mod admin;
+pub use admin::*;
 
 pub mod tokens;
 pub use tokens::*;

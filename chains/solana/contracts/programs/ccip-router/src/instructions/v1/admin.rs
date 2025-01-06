@@ -1,10 +1,15 @@
 use anchor_lang::prelude::*;
+use anchor_spl::token_interface;
 
 use crate::{
-    AcceptOwnership, AddChainSelector, CcipRouterError, DestChainAdded, DestChainConfig,
-    DestChainConfigUpdated, DestChainState, SourceChainAdded, SourceChainConfig,
-    SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224, TransferOwnership,
+    do_billing_transfer, AcceptOwnership, AddBillingTokenConfig, AddChainSelector,
+    BillingTokenConfig, CcipRouterError, DestChainAdded, DestChainConfig, DestChainConfigUpdated,
+    DestChainState, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved,
+    Ocr3ConfigInfo, OcrPluginType, RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig,
+    SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated, SourceChainState,
+    TimestampedPackedU224, TokenBilling, TransferOwnership, UpdateBillingTokenConfig,
     UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig,
+    WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
 };
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
@@ -184,6 +189,147 @@ pub fn update_enable_manual_execution_after(
 
     Ok(())
 }
+
+pub fn set_token_billing(
+    ctx: Context<SetTokenBillingConfig>,
+    _chain_selector: u64,
+    _mint: Pubkey,
+    cfg: TokenBilling,
+) -> Result<()> {
+    ctx.accounts.per_chain_per_token_config.billing = cfg;
+    Ok(())
+}
+
+pub fn set_ocr_config(
+    ctx: Context<SetOcrConfig>,
+    plugin_type: u8, // OcrPluginType, u8 used because anchor tests did not work with an enum
+    config_info: Ocr3ConfigInfo,
+    signers: Vec<[u8; 20]>,
+    transmitters: Vec<Pubkey>,
+) -> Result<()> {
+    require!(plugin_type < 2, CcipRouterError::InvalidInputs);
+    let mut config = ctx.accounts.config.load_mut()?;
+
+    let is_commit = plugin_type == OcrPluginType::Commit as u8;
+
+    config.ocr3[plugin_type as usize].set(
+        plugin_type,
+        Ocr3ConfigInfo {
+            config_digest: config_info.config_digest,
+            f: config_info.f,
+            n: signers.len() as u8,
+            is_signature_verification_enabled: if is_commit { 1 } else { 0 },
+        },
+        signers,
+        transmitters,
+    )?;
+
+    if is_commit {
+        // When the OCR config changes, we reset the sequence number since it is scoped per config digest.
+        // Note that s_minSeqNr/roots do not need to be reset as the roots persist
+        // across reconfigurations and are de-duplicated separately.
+        ctx.accounts.state.latest_price_sequence_number = 0;
+    }
+
+    Ok(())
+}
+
+pub fn add_billing_token_config(
+    ctx: Context<AddBillingTokenConfig>,
+    config: BillingTokenConfig,
+) -> Result<()> {
+    emit!(FeeTokenAdded {
+        fee_token: config.mint,
+        enabled: config.enabled
+    });
+    ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
+    ctx.accounts.billing_token_config.config = config;
+    Ok(())
+}
+
+pub fn update_billing_token_config(
+    ctx: Context<UpdateBillingTokenConfig>,
+    config: BillingTokenConfig,
+) -> Result<()> {
+    if config.enabled != ctx.accounts.billing_token_config.config.enabled {
+        // enabled/disabled status has changed
+        match config.enabled {
+            true => emit!(FeeTokenEnabled {
+                fee_token: config.mint
+            }),
+            false => emit!(FeeTokenDisabled {
+                fee_token: config.mint
+            }),
+        }
+    }
+    // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
+
+    ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
+    ctx.accounts.billing_token_config.config = config;
+    Ok(())
+}
+
+pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
+    // Close the receiver token account
+    // The context constraints already enforce that it holds 0 balance of the target SPL token
+    let cpi_accounts = token_interface::CloseAccount {
+        account: ctx.accounts.fee_token_receiver.to_account_info(),
+        destination: ctx.accounts.authority.to_account_info(),
+        authority: ctx.accounts.fee_billing_signer.to_account_info(),
+    };
+    let cpi_program = ctx.accounts.token_program.to_account_info();
+    let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[ctx.bumps.fee_billing_signer]];
+    let signer_seeds = &[&seeds[..]];
+    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
+    token_interface::close_account(cpi_ctx)?;
+
+    emit!(FeeTokenRemoved {
+        fee_token: ctx.accounts.fee_token_mint.key()
+    });
+    Ok(())
+}
+
+pub fn withdraw_billed_funds(
+    ctx: Context<WithdrawBilledFunds>,
+    transfer_all: bool,
+    desired_amount: u64, // if transfer_all is false, this value must be 0
+) -> Result<()> {
+    let transfer = token_interface::TransferChecked {
+        from: ctx.accounts.fee_token_accum.to_account_info(),
+        to: ctx.accounts.recipient.to_account_info(),
+        mint: ctx.accounts.fee_token_mint.to_account_info(),
+        authority: ctx.accounts.fee_billing_signer.to_account_info(),
+    };
+
+    let amount = if transfer_all {
+        require!(desired_amount == 0, CcipRouterError::InvalidInputs);
+        require!(
+            ctx.accounts.fee_token_accum.amount > 0,
+            CcipRouterError::InsufficientFunds
+        );
+        ctx.accounts.fee_token_accum.amount
+    } else {
+        require!(desired_amount > 0, CcipRouterError::InvalidInputs);
+        require!(
+            desired_amount <= ctx.accounts.fee_token_accum.amount,
+            CcipRouterError::InsufficientFunds
+        );
+        desired_amount
+    };
+
+    do_billing_transfer(
+        ctx.accounts.token_program.to_account_info(),
+        transfer,
+        amount,
+        ctx.accounts.fee_token_mint.decimals,
+        ctx.bumps.fee_billing_signer,
+    )
+}
+
+/////////////
+// Helpers //
+/////////////
 
 fn validate_source_chain_config(
     _source_chain_selector: u64,

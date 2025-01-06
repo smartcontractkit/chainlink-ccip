@@ -394,12 +394,11 @@ pub mod ccip_router {
     /// * `cfg` - The token billing configuration.
     pub fn set_token_billing(
         ctx: Context<SetTokenBillingConfig>,
-        _chain_selector: u64,
-        _mint: Pubkey,
+        chain_selector: u64,
+        mint: Pubkey,
         cfg: TokenBilling,
     ) -> Result<()> {
-        ctx.accounts.per_chain_per_token_config.billing = cfg;
-        Ok(())
+        instructions::v1::set_token_billing(ctx, chain_selector, mint, cfg)
     }
 
     /// Sets the OCR configuration.
@@ -419,31 +418,7 @@ pub mod ccip_router {
         signers: Vec<[u8; 20]>,
         transmitters: Vec<Pubkey>,
     ) -> Result<()> {
-        require!(plugin_type < 2, CcipRouterError::InvalidInputs);
-        let mut config = ctx.accounts.config.load_mut()?;
-
-        let is_commit = plugin_type == OcrPluginType::Commit as u8;
-
-        config.ocr3[plugin_type as usize].set(
-            plugin_type,
-            Ocr3ConfigInfo {
-                config_digest: config_info.config_digest,
-                f: config_info.f,
-                n: signers.len() as u8,
-                is_signature_verification_enabled: if is_commit { 1 } else { 0 },
-            },
-            signers,
-            transmitters,
-        )?;
-
-        if is_commit {
-            // When the OCR config changes, we reset the sequence number since it is scoped per config digest.
-            // Note that s_minSeqNr/roots do not need to be reset as the roots persist
-            // across reconfigurations and are de-duplicated separately.
-            ctx.accounts.state.latest_price_sequence_number = 0;
-        }
-
-        Ok(())
+        instructions::v1::set_ocr_config(ctx, plugin_type, config_info, signers, transmitters)
     }
 
     /// Adds a billing token configuration.
@@ -457,13 +432,7 @@ pub mod ccip_router {
         ctx: Context<AddBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        emit!(FeeTokenAdded {
-            fee_token: config.mint,
-            enabled: config.enabled
-        });
-        ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
-        ctx.accounts.billing_token_config.config = config;
-        Ok(())
+        instructions::v1::add_billing_token_config(ctx, config)
     }
 
     /// Updates the billing token configuration.
@@ -477,22 +446,7 @@ pub mod ccip_router {
         ctx: Context<UpdateBillingTokenConfig>,
         config: BillingTokenConfig,
     ) -> Result<()> {
-        if config.enabled != ctx.accounts.billing_token_config.config.enabled {
-            // enabled/disabled status has changed
-            match config.enabled {
-                true => emit!(FeeTokenEnabled {
-                    fee_token: config.mint
-                }),
-                false => emit!(FeeTokenDisabled {
-                    fee_token: config.mint
-                }),
-            }
-        }
-        // TODO should we emit an event if the config has changed regardless of the enabled/disabled?
-
-        ctx.accounts.billing_token_config.version = 1; // update this if we change the account struct
-        ctx.accounts.billing_token_config.config = config;
-        Ok(())
+        instructions::v1::update_billing_token_config(ctx, config)
     }
 
     /// Removes the billing token configuration.
@@ -502,24 +456,7 @@ pub mod ccip_router {
     ///
     /// * `ctx` - The context containing the accounts required for removing the billing token configuration.
     pub fn remove_billing_token_config(ctx: Context<RemoveBillingTokenConfig>) -> Result<()> {
-        // Close the receiver token account
-        // The context constraints already enforce that it holds 0 balance of the target SPL token
-        let cpi_accounts = token_interface::CloseAccount {
-            account: ctx.accounts.fee_token_receiver.to_account_info(),
-            destination: ctx.accounts.authority.to_account_info(),
-            authority: ctx.accounts.fee_billing_signer.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let seeds = &[FEE_BILLING_SIGNER_SEEDS, &[ctx.bumps.fee_billing_signer]];
-        let signer_seeds = &[&seeds[..]];
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-
-        token_interface::close_account(cpi_ctx)?;
-
-        emit!(FeeTokenRemoved {
-            fee_token: ctx.accounts.fee_token_mint.key()
-        });
-        Ok(())
+        instructions::v1::remove_billing_token_config(ctx)
     }
 
     /// Calculates the fee for sending a message to the destination chain.
@@ -560,36 +497,7 @@ pub mod ccip_router {
         transfer_all: bool,
         desired_amount: u64, // if transfer_all is false, this value must be 0
     ) -> Result<()> {
-        let transfer = token_interface::TransferChecked {
-            from: ctx.accounts.fee_token_accum.to_account_info(),
-            to: ctx.accounts.recipient.to_account_info(),
-            mint: ctx.accounts.fee_token_mint.to_account_info(),
-            authority: ctx.accounts.fee_billing_signer.to_account_info(),
-        };
-
-        let amount = if transfer_all {
-            require!(desired_amount == 0, CcipRouterError::InvalidInputs);
-            require!(
-                ctx.accounts.fee_token_accum.amount > 0,
-                CcipRouterError::InsufficientFunds
-            );
-            ctx.accounts.fee_token_accum.amount
-        } else {
-            require!(desired_amount > 0, CcipRouterError::InvalidInputs);
-            require!(
-                desired_amount <= ctx.accounts.fee_token_accum.amount,
-                CcipRouterError::InsufficientFunds
-            );
-            desired_amount
-        };
-
-        do_billing_transfer(
-            ctx.accounts.token_program.to_account_info(),
-            transfer,
-            amount,
-            ctx.accounts.fee_token_mint.decimals,
-            ctx.bumps.fee_billing_signer,
-        )
+        instructions::v1::withdraw_billed_funds(ctx, transfer_all, desired_amount)
     }
 
     /// ON RAMP FLOW
