@@ -1,0 +1,176 @@
+package chainfee
+
+import (
+	"github.com/stretchr/testify/require"
+	"math/big"
+	"testing"
+	"time"
+
+	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
+)
+
+func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
+	fourHoursAgo := time.Now().Add(-4 * time.Hour).UTC().Truncate(time.Hour)
+	tests := []struct {
+		name                         string
+		feeComponents                map[ccipocr3.ChainSelector]types.ChainFeeComponents
+		chainFeeUpdates              map[ccipocr3.ChainSelector]Update
+		expectedFeeComponentError    string
+		expectedChainFeeUpdatesError string
+	}{
+		{
+			name: "valid fee components",
+			feeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+				1: {
+					ExecutionFee:        big.NewInt(10),
+					DataAvailabilityFee: big.NewInt(20),
+				},
+			},
+			expectedFeeComponentError: "",
+		},
+		{
+			name: "nil execution fee",
+			feeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+				1: {
+					ExecutionFee:        nil,
+					DataAvailabilityFee: big.NewInt(20),
+				},
+			},
+			expectedFeeComponentError: "nil or non-positive execution fee",
+		},
+		{
+			name: "non-positive execution fee",
+			feeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+				1: {
+					ExecutionFee:        big.NewInt(0),
+					DataAvailabilityFee: big.NewInt(20),
+				},
+			},
+			expectedFeeComponentError: "nil or non-positive execution fee",
+		},
+		{
+			name: "nil data availability fee",
+			feeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+				1: {
+					ExecutionFee:        big.NewInt(10),
+					DataAvailabilityFee: nil,
+				},
+			},
+			expectedFeeComponentError: "nil or negative data availability fee",
+		},
+		{
+			name: "negative data availability fee",
+			feeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+				1: {
+					ExecutionFee:        big.NewInt(10),
+					DataAvailabilityFee: big.NewInt(-1),
+				},
+			},
+			expectedFeeComponentError: "nil or negative data availability fee",
+		},
+		{
+			name: "valid chain fee updates",
+			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+				1: {
+					ChainFee: ComponentsUSDPrices{
+						ExecutionFeePriceUSD: big.NewInt(10),
+						DataAvFeePriceUSD:    big.NewInt(20),
+					},
+					Timestamp: fourHoursAgo,
+				},
+			},
+			expectedChainFeeUpdatesError: "",
+		},
+		{
+			name: "nil execution fee price - chain fee updates",
+			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+				1: {
+					ChainFee: ComponentsUSDPrices{
+						ExecutionFeePriceUSD: nil,
+						DataAvFeePriceUSD:    big.NewInt(20),
+					},
+					Timestamp: fourHoursAgo,
+				},
+			},
+			expectedChainFeeUpdatesError: "nil or non-positive execution fee price",
+		},
+		{
+			name: "non-positive execution fee price - chain fee updates",
+			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+				1: {
+					ChainFee: ComponentsUSDPrices{
+						ExecutionFeePriceUSD: big.NewInt(0),
+						DataAvFeePriceUSD:    big.NewInt(20),
+					},
+					Timestamp: fourHoursAgo,
+				},
+			},
+			expectedChainFeeUpdatesError: "nil or non-positive execution fee price",
+		},
+		{
+			name: "nil data availability fee price - chain fee updates",
+			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+				1: {
+					ChainFee: ComponentsUSDPrices{
+						ExecutionFeePriceUSD: big.NewInt(10),
+						DataAvFeePriceUSD:    nil,
+					},
+					Timestamp: fourHoursAgo,
+				},
+			},
+			expectedChainFeeUpdatesError: "nil or negative data availability fee price",
+		},
+		{
+			name: "negative data availability fee price - chain fee updates",
+			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+				1: {
+					ChainFee: ComponentsUSDPrices{
+						ExecutionFeePriceUSD: big.NewInt(10),
+						DataAvFeePriceUSD:    big.NewInt(-1),
+					},
+					Timestamp: fourHoursAgo,
+				},
+			},
+			expectedChainFeeUpdatesError: "nil or negative data availability fee price",
+		},
+		{
+			name: "zero timestamp - chain fee updates",
+			chainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+				1: {
+					ChainFee: ComponentsUSDPrices{
+						ExecutionFeePriceUSD: big.NewInt(10),
+						DataAvFeePriceUSD:    big.NewInt(20),
+					},
+				},
+			},
+			expectedChainFeeUpdatesError: "zero timestamp",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ao := plugincommon.AttributedObservation[Observation]{
+				Observation: Observation{
+					FeeComponents:   tt.feeComponents,
+					ChainFeeUpdates: tt.chainFeeUpdates,
+				},
+			}
+			err := validateFeeComponents(ao)
+			if tt.expectedFeeComponentError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedFeeComponentError)
+			}
+			err = validateChainFeeUpdates(ao)
+			if tt.expectedChainFeeUpdatesError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedChainFeeUpdatesError)
+			}
+		})
+	}
+}

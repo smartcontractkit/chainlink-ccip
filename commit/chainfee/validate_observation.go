@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/pkg/errors"
-
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 
 	"golang.org/x/exp/maps"
@@ -24,15 +22,15 @@ func (p *processor) ValidateObservation(
 	}
 
 	if err := p.ValidateObservedChains(ao); err != nil {
-		return errors.Wrap(err, "failed to validate observed chains")
+		return fmt.Errorf("failed to validate observed chains: %w", err)
 	}
 
 	if err := validateFeeComponents(ao); err != nil {
-		return errors.Wrap(err, "failed to validate fee components")
+		return fmt.Errorf("failed to validate fee components: %w", err)
 	}
 
 	if err := validateChainFeeUpdates(ao); err != nil {
-		return errors.Wrap(err, "failed to validate chain fee updates")
+		return fmt.Errorf("failed to validate chain fee updates: %w", err)
 	}
 
 	for _, token := range obs.NativeTokenPrices {
@@ -54,6 +52,9 @@ func validateChainFeeUpdates(
 
 		if update.ChainFee.DataAvFeePriceUSD == nil || update.ChainFee.DataAvFeePriceUSD.Cmp(big.NewInt(0)) < 0 {
 			return fmt.Errorf("nil or negative %s", "data availability fee price")
+		}
+		if update.Timestamp.IsZero() {
+			return fmt.Errorf("zero timestamp")
 		}
 	}
 	return nil
@@ -80,7 +81,7 @@ func (p *processor) ValidateObservedChains(
 	obs := ao.Observation
 	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
 	if err != nil {
-		return errors.Wrap(err, "failed to get supported chains")
+		return fmt.Errorf("failed to get supported chains: %w", err)
 	}
 
 	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
