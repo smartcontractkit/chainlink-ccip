@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::ocr3base::Ocr3Config;
+use crate::{
+    ocr3base::Ocr3Config, valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG,
+    MAX_TOKEN_AND_CHAIN_CONFIG_V, TOKEN_POOL_BILLING_SEED,
+};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -170,7 +173,7 @@ impl TryFrom<u128> for MessageExecutionState {
 }
 
 #[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, Debug)]
 pub struct PerChainPerTokenConfig {
     pub version: u8,         // schema version
     pub chain_selector: u64, // remote chain
@@ -179,7 +182,31 @@ pub struct PerChainPerTokenConfig {
     pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+impl PerChainPerTokenConfig {
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+        dest_chain_selector: u64,
+    ) -> Result<Self> {
+        let (expected, _) = Pubkey::find_program_address(
+            &[
+                TOKEN_POOL_BILLING_SEED,
+                dest_chain_selector.to_le_bytes().as_ref(),
+                token.key().as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+        require!(
+            valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(account.into_inner())
+    }
+}
+
+#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenBilling {
     pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
     pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
@@ -210,6 +237,29 @@ pub struct BillingTokenConfig {
     pub usd_per_token: TimestampedPackedU224,
     // billing configs
     pub premium_multiplier_wei_per_eth: u64,
+}
+
+impl BillingTokenConfig {
+    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
+    // specifying a token that has no Billing config.
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+    ) -> Result<Option<Self>> {
+        if account.key() == Pubkey::default() {
+            return Ok(None);
+        }
+
+        let (expected, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
+        require!(
+            valid_version(account.version, 1),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(Some(account.into_inner().config))
+    }
 }
 
 #[account]
