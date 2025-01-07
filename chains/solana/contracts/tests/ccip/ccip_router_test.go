@@ -1456,6 +1456,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						user.PublicKey(),
 					).ValidateAndBuild()
@@ -1469,6 +1470,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						transmitter.PublicKey(),
 					).ValidateAndBuild()
@@ -1481,6 +1483,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						anotherAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1493,6 +1496,7 @@ func TestCCIPRouter(t *testing.T) {
 					base := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					)
@@ -1517,6 +1521,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						solana.PublicKey{},
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1537,6 +1542,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1583,6 +1589,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1594,6 +1601,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1625,6 +1633,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1636,6 +1645,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
 						token0.PoolLookupTable,
+						token0.WritableIndexes,
 						token0.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1724,6 +1734,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
+						token1.WritableIndexes,
 						token1.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1778,6 +1789,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
+						token1.WritableIndexes,
 						token1.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1789,6 +1801,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
+						token1.WritableIndexes,
 						token1.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1820,6 +1833,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
+						token1.WritableIndexes,
 						token1.AdminRegistry,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
@@ -1831,6 +1845,7 @@ func TestCCIPRouter(t *testing.T) {
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
 						token1.PoolLookupTable,
+						token1.WritableIndexes,
 						token1.AdminRegistry,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()

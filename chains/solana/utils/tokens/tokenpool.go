@@ -25,6 +25,7 @@ type TokenPool struct {
 	// pool details
 	PoolProgram, PoolConfig, PoolSigner, PoolTokenAccount solana.PublicKey
 	PoolLookupTable                                       solana.PublicKey
+	WritableIndexes                                       []uint8
 
 	AdditionalAccounts solana.PublicKeySlice
 

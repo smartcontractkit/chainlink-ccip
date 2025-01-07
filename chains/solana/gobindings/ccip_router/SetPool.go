@@ -19,9 +19,11 @@ import (
 // * `ctx` - The context containing the accounts required for setting the pool.
 // * `mint` - The public key of the token mint.
 // * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
+// * `is_writable` - index of account in lookup table that is writable
 type SetPool struct {
 	Mint            *ag_solanago.PublicKey
 	PoolLookupTable *ag_solanago.PublicKey
+	WritableIndexes *[]byte
 
 	// [0] = [WRITE] tokenAdminRegistry
 	//
@@ -46,6 +48,12 @@ func (inst *SetPool) SetMint(mint ag_solanago.PublicKey) *SetPool {
 // SetPoolLookupTable sets the "poolLookupTable" parameter.
 func (inst *SetPool) SetPoolLookupTable(poolLookupTable ag_solanago.PublicKey) *SetPool {
 	inst.PoolLookupTable = &poolLookupTable
+	return inst
+}
+
+// SetWritableIndexes sets the "writableIndexes" parameter.
+func (inst *SetPool) SetWritableIndexes(writableIndexes []byte) *SetPool {
+	inst.WritableIndexes = &writableIndexes
 	return inst
 }
 
@@ -97,6 +105,9 @@ func (inst *SetPool) Validate() error {
 		if inst.PoolLookupTable == nil {
 			return errors.New("PoolLookupTable parameter is not set")
 		}
+		if inst.WritableIndexes == nil {
+			return errors.New("WritableIndexes parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -120,9 +131,10 @@ func (inst *SetPool) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("           Mint", *inst.Mint))
 						paramsBranch.Child(ag_format.Param("PoolLookupTable", *inst.PoolLookupTable))
+						paramsBranch.Child(ag_format.Param("WritableIndexes", *inst.WritableIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -145,6 +157,11 @@ func (obj SetPool) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `WritableIndexes` param:
+	err = encoder.Encode(obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *SetPool) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -158,6 +175,11 @@ func (obj *SetPool) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Deserialize `WritableIndexes`:
+	err = decoder.Decode(&obj.WritableIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -166,12 +188,14 @@ func NewSetPoolInstruction(
 	// Parameters:
 	mint ag_solanago.PublicKey,
 	poolLookupTable ag_solanago.PublicKey,
+	writableIndexes []byte,
 	// Accounts:
 	tokenAdminRegistry ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetPool {
 	return NewSetPoolInstructionBuilder().
 		SetMint(mint).
 		SetPoolLookupTable(poolLookupTable).
+		SetWritableIndexes(writableIndexes).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
 		SetAuthorityAccount(authority)
 }
