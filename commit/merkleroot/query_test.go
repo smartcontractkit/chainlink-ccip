@@ -34,6 +34,14 @@ func TestProcessor_Query(t *testing.T) {
 		dstChain:  {consts.ContractNameOffRamp: []byte("0x1234567890123456789012345678901234567892")},
 	}
 
+	contractAddrsSrc1 := map[ccipocr3.ChainSelector]map[string][]byte{
+		srcChain1: {consts.ContractNameOnRamp: []byte("0x1234567890123456789012345678901234567890")},
+		dstChain:  {consts.ContractNameOffRamp: []byte("0x1234567890123456789012345678901234567892")},
+	}
+	failedContractAddrs := map[ccipocr3.ChainSelector]string{
+		srcChain2: consts.ContractNameOnRamp,
+	}
+
 	expSigs1 := &rmn.ReportSignatures{
 		Signatures: []*rmnpb.EcdsaSignature{
 			{R: []byte("r1"), S: []byte("s1")},
@@ -54,6 +62,10 @@ func TestProcessor_Query(t *testing.T) {
 			},
 		},
 	}
+	expSigsOnlySrc1 := &rmn.ReportSignatures{
+		Signatures:  expSigs1.Signatures[:1],
+		LaneUpdates: expSigs1.LaneUpdates[:1],
+	}
 
 	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
 
@@ -61,6 +73,7 @@ func TestProcessor_Query(t *testing.T) {
 		name              string
 		prevOutcome       Outcome
 		contractAddresses map[ccipocr3.ChainSelector]map[string][]byte
+		failedContracts   map[ccipocr3.ChainSelector]string
 		cfg               pluginconfig.CommitOffchainConfig
 		destChain         ccipocr3.ChainSelector
 		rmnClient         func(t *testing.T) *rmnmocks.MockController
@@ -222,6 +235,52 @@ func TestProcessor_Query(t *testing.T) {
 			expQuery:  Query{},
 			expErr:    true,
 		},
+		{
+			name: "missing onramp addresses",
+			prevOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
+					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
+				},
+				RMNRemoteCfg: rmnRemoteCfg,
+			},
+			contractAddresses: contractAddrsSrc1,
+			failedContracts:   failedContractAddrs,
+			cfg: pluginconfig.CommitOffchainConfig{
+				RMNEnabled:           true,
+				RMNSignaturesTimeout: 5 * time.Second,
+			},
+			destChain: dstChain,
+			rmnClient: func(t *testing.T) *rmnmocks.MockController {
+				cl := rmnmocks.NewMockController(t)
+				cl.EXPECT().
+					ComputeReportSignatures(
+						mock.Anything,
+						&rmnpb.LaneDest{
+							DestChainSelector: uint64(dstChain),
+							OfframpAddress:    contractAddrsSrc1[dstChain][consts.ContractNameOffRamp],
+						},
+						[]*rmnpb.FixedDestLaneUpdateRequest{
+							{
+								LaneSource: &rmnpb.LaneSource{
+									SourceChainSelector: uint64(srcChain1),
+									OnrampAddress:       contractAddrsSrc1[srcChain1][consts.ContractNameOnRamp],
+								},
+								ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
+							},
+						},
+						rmnRemoteCfg,
+					).
+					Return(expSigsOnlySrc1, nil)
+				return cl
+			},
+			expQuery: Query{
+				RetryRMNSignatures: false,
+				RMNSignatures:      expSigsOnlySrc1,
+			},
+			expErr: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -232,6 +291,9 @@ func TestProcessor_Query(t *testing.T) {
 					for name, addr := range contracts {
 						ccipReader.EXPECT().GetContractAddress(name, chainSel).Return(addr, nil)
 					}
+				}
+				for chainSel, name := range tc.failedContracts {
+					ccipReader.EXPECT().GetContractAddress(name, chainSel).Return(nil, fmt.Errorf("some error"))
 				}
 			}
 
