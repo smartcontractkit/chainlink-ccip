@@ -13,6 +13,33 @@ pub struct TokenAdminRegistry {
     pub administrator: Pubkey,
     pub pending_administrator: Pubkey,
     pub lookup_table: Pubkey,
+    // binary representation of indexes that are writable in token pool lookup table
+    // lookup table can store 256 addresses
+    pub writable_indexes: [u128; 2],
+}
+
+impl TokenAdminRegistry {
+    pub fn set_writable(&mut self, index: u8) {
+        match index < 128 {
+            true => {
+                self.writable_indexes[0] |= 1 << index;
+            }
+            false => {
+                self.writable_indexes[1] |= 1 << (index - 128);
+            }
+        }
+    }
+
+    pub fn is_writable(&self, index: u8) -> bool {
+        match index < 128 {
+            true => self.writable_indexes[0] & 1 << index != 0,
+            false => self.writable_indexes[1] & 1 << (index - 128) != 0,
+        }
+    }
+
+    pub fn reset_writable(&mut self) {
+        self.writable_indexes = [0, 0];
+    }
 }
 
 #[derive(Accounts)]
@@ -111,4 +138,61 @@ pub struct SetTokenBillingConfig<'info> {
     #[account(mut, address = config.load()?.owner @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
     pub system_program: Program<'info, System>,
+}
+
+#[cfg(test)]
+mod tests {
+    use bytemuck::Zeroable;
+    use solana_program::pubkey::Pubkey;
+
+    use crate::TokenAdminRegistry;
+    #[test]
+    fn set_writable() {
+        let mut state = TokenAdminRegistry {
+            version: 0,
+            administrator: Pubkey::zeroed(),
+            pending_administrator: Pubkey::zeroed(),
+            lookup_table: Pubkey::zeroed(),
+            writable_indexes: [0, 0],
+        };
+
+        state.set_writable(0);
+        state.set_writable(128);
+        assert_eq!(state.writable_indexes[0], 1);
+        assert_eq!(state.writable_indexes[1], 1);
+
+        state.reset_writable();
+        assert_eq!(state.writable_indexes[0], 0);
+        assert_eq!(state.writable_indexes[1], 0);
+
+        state.set_writable(2);
+        state.set_writable(2 + 128);
+        assert_eq!(state.writable_indexes[0], 4);
+        assert_eq!(state.writable_indexes[1], 4);
+    }
+
+    #[test]
+    fn check_writable() {
+        let state = TokenAdminRegistry {
+            version: 0,
+            administrator: Pubkey::zeroed(),
+            pending_administrator: Pubkey::zeroed(),
+            lookup_table: Pubkey::zeroed(),
+            writable_indexes: [128 + 2 + 4, 256 + 16 + 64],
+        };
+
+        assert_eq!(state.is_writable(0), false);
+        assert_eq!(state.is_writable(128), false);
+        assert_eq!(state.is_writable(255), false);
+
+        assert_eq!(state.writable_indexes[0].count_ones(), 3);
+        assert_eq!(state.writable_indexes[1].count_ones(), 3);
+
+        assert_eq!(state.is_writable(7), true);
+        assert_eq!(state.is_writable(1), true);
+        assert_eq!(state.is_writable(2), true);
+        assert_eq!(state.is_writable(128 + 8), true);
+        assert_eq!(state.is_writable(128 + 4), true);
+        assert_eq!(state.is_writable(128 + 6), true);
+    }
 }

@@ -56,10 +56,17 @@ pub fn set_pool(
     ctx: Context<ModifyTokenAdminRegistry>,
     mint: Pubkey,
     pool_lookup_table: Pubkey,
+    writable_indexes: Vec<u8>,
 ) -> Result<()> {
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
     let previous_pool = token_admin_registry.lookup_table;
     token_admin_registry.lookup_table = pool_lookup_table;
+
+    // set writable indexes
+    token_admin_registry.reset_writable();
+    for ind in writable_indexes {
+        token_admin_registry.set_writable(ind)
+    }
 
     // TODO: Validate here that the lookup table has everything
 
