@@ -50,6 +50,14 @@ pipelines:
       # Deploy CCIP enabled fully configured DON
       run_dependency_pipelines ccip-don
       run_pipelines ingress-check
+  geth:
+    run: |-
+      run_dependency_pipelines geth
+  debug-gap:
+    run: |-
+      run_dependency_pipelines geth
+      task ccip-v2-scripts:build
+      run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
   ccip-v2-scripts-home-chain:
     run: |-
       run_dependency_pipelines ccip-v2-scripts --pipeline deploy-home-chain-contracts
@@ -82,6 +90,21 @@ profiles:
             path: ${DEPENDENCIES_DIR}/ccip-v2-scripts
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
+  - name: debug-gap
+    patches:
+      - op: add
+        path: dependencies
+        value:
+          ccip-v2-scripts:
+            path: ${DEPENDENCIES_DIR}/ccip-v2-scripts
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          geth:
+            path: ${DEPENDENCIES_DIR}/geth
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+            profiles:
+              - ccip
   - name: job-distributor
     patches:
       - op: add
@@ -124,6 +147,14 @@ profiles:
 commands:
   ccip-v2:
     command: devspace run-pipeline ccip-v2 -p ccip-v2
+    description: Run the ccip v2 pipeline.
+    appendArgs: true
+  deploy-geth:
+    command: devspace run-pipeline geth -p ccip-v2
+    description: Run the ccip v2 pipeline.
+    appendArgs: true
+  debug-gap:
+    command: devspace run-pipeline debug-gap -p debug-gap
     description: Run the ccip v2 pipeline.
     appendArgs: true
   deploy-job-distributor:

@@ -58,14 +58,26 @@ deployments:
             customCidrs: ${DEVSPACE_INGRESS_CIDRS}
 hooks:
   # sometimes it takes a little bit of time for cert-manage to provision dynamic certs, we need to wait for that
-  - name: Wait for TLS certificates to be ready
-    command: ${SCRIPTS_DIR}/wait_for_grpc_url.sh
+  - name: Wait for GRPC endpoint to be ready
+    command: |
+      if [ "$CRIB_CI_ENV" == "true" ]; then
+        # we can call GRPC endpoint as it would require invoking via GAP
+        echo "running In CI env, skip waiting for grpc endpoint to be ready"
+      else
+        grpc_endpoint="${DEVSPACE_NAMESPACE}-job-distributor-grpc.${DEVSPACE_INGRESS_BASE_DOMAIN}:443"
+        ${SCRIPTS_DIR}/wait_for_grpc_url.sh "$grpc_endpoint" "grpc.health.v1.Health/Check" "600"
+      fi
     events: ["after:deploy:job-distributor"]
-    args:
-      - ${DEVSPACE_NAMESPACE}-job-distributor-grpc.${DEVSPACE_INGRESS_BASE_DOMAIN}:443
-      - grpc.health.v1.Health/Check
-      # 10 minutes timeout, in AWS it can take very long for DNS to propagate
-      - "600"
+  - wait:
+      running: true
+      # This can be needed for init containers
+      # that terminate instead of become running.
+      terminatedWithCode: 0
+    container:
+      labelSelector:
+        "app.kubernetes.io/name": "job-distributor"
+    name: "wait-for-pods"
+    events: ["after:deploy:job-distributor"]
 profiles:
   - name: git-charts
     merge:

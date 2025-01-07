@@ -15,17 +15,6 @@ fi
 # Init variables
 ref="${1}"
 
-echo "updating chainlink refs in sdk module"
-
-pushd ./sdk
-go get "github.com/smartcontractkit/chainlink/deployment@${ref}"
-go mod tidy
-
-# todo: update chainlink/v2 references to use the same ref as deployment package
-# sed -E -i.bak "s|(github\.com/smartcontractkit/chainlink/v2 v2\.[0-9]+\.[0-9]+-)[a-zA-Z0-9_-]+|\1$ref|g" "go.mod"
-go mod tidy
-popd
-
 echo "updating chainlink refs in ccip-v2-scripts"
 
 pushd ./dependencies/ccip-v2-scripts

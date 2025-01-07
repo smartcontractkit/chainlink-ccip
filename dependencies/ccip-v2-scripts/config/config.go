@@ -6,31 +6,70 @@ import (
 	"strconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	"github.com/smartcontractkit/chainlink/deployment/environment/devenv"
 	"github.com/smartcontractkit/chainlink/deployment/environment/nodeclient"
 	"google.golang.org/grpc/credentials"
 )
 
-func NewEnvConfig(env DevspaceEnv) devenv.EnvironmentConfig {
-	alphaConfigurer := NewChainConfigurer(env.Namespace, env.IngressBaseDomain, uint64(1337))
-	betaConfigurer := NewChainConfigurer(env.Namespace, env.IngressBaseDomain, uint64(2337))
+func GetEnvConfig(env DevspaceEnv, ghaJWTTokenForGAP string) (*devenv.EnvironmentConfig, error) {
+	alphaConfigurer := NewChainConfigurer(env, uint64(1337), "alpha")
+	betaConfigurer := NewChainConfigurer(env, uint64(2337), "beta")
+
+	alphaChainConfig, err := alphaConfigurer.GetDevenvChainConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error getting alpha chain config: %v", err)
+	}
+	betaChainConfig, err := betaConfigurer.GetDevenvChainConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error getting beta chain config: %v", err)
+	}
+
 	chainsConfig := []devenv.ChainConfig{
-		alphaConfigurer.configureChain(),
-		betaConfigurer.configureChain(),
+		*alphaChainConfig,
+		*betaChainConfig,
 	}
 	nodeInfos := NewCLNodeConfigurer(env).GetNodeInfos()
+
+	var grpcUrl string
+	if env.CIEnv {
+		hostnameSuffix := "job-distributor"
+		grpcUrl = gapV2HostName(env, hostnameSuffix)
+	} else {
+		grpcUrl = fmt.Sprintf("%s-job-distributor-grpc.%s:443", env.Namespace, env.IngressBaseDomain)
+	}
+
 	jdConfig := devenv.JDConfig{
-		GRPC:  fmt.Sprintf("%s-job-distributor-grpc.%s:443", env.Namespace, env.IngressBaseDomain),
+		GRPC:  grpcUrl,
 		WSRPC: "job-distributor-noderpc-lb:80",
 		Creds: credentials.NewTLS(&tls.Config{
 			MinVersion: tls.VersionTLS12,
 		}),
 		NodeInfo: nodeInfos,
+		GAP:      ghaJWTTokenForGAP,
 	}
 
-	return devenv.EnvironmentConfig{
+	return &devenv.EnvironmentConfig{
 		Chains:   chainsConfig,
 		JDConfig: jdConfig,
+	}, nil
+}
+
+// Returns gap v2 hostname for the given env
+// hostnameSuffix should be the same as exposed serviceName
+func gapV2HostName(env DevspaceEnv, hostnameSuffix string) string {
+	//${crib-namespace}-${hostnameSuffix}.${dnsZone}.${baseDomain}
+	// example gap-crib-ci-123123-job-distributor.public main.stage.cldev.sh
+	return fmt.Sprintf("gap-%s-%s.public.%s:443", env.Namespace, hostnameSuffix, env.IngressBaseDomain)
+}
+
+func GetTransmittedChainConfigs(env DevspaceEnv) []crib.ChainConfig {
+	alphaConfigurer := NewChainConfigurer(env, uint64(1337), "alpha")
+	betaConfigurer := NewChainConfigurer(env, uint64(2337), "beta")
+
+	return []crib.ChainConfig{
+		alphaConfigurer.GetTransmittedChainConfigs(),
+		betaConfigurer.GetTransmittedChainConfigs(),
 	}
 }
 
@@ -87,13 +126,12 @@ func (c ChainlinkNodeConfigurer) getNodeInfo(nodeName string, isBootstrap bool) 
 }
 
 type ChainConfigurer struct {
-	cribNamespace string
-	ingressDomain string
-	chainID       uint64
-	deployerKey   string
+	chainID     uint64
+	deployerKey string
+	env         DevspaceEnv
 }
 
-func NewChainConfigurer(cribNamespace string, ingressDomain string, chainID uint64) ChainConfigurer {
+func NewChainConfigurer(env DevspaceEnv, chainID uint64, name string) ChainConfigurer {
 	// These are generally known private keys used for testing
 	testKeys := map[string]string{
 		"1337": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
@@ -103,25 +141,55 @@ func NewChainConfigurer(cribNamespace string, ingressDomain string, chainID uint
 	chainIDStr := strconv.FormatUint(chainID, 10)
 
 	return ChainConfigurer{
-		cribNamespace: cribNamespace,
-		ingressDomain: ingressDomain,
-		chainID:       chainID,
-		deployerKey:   testKeys[chainIDStr],
+		env:         env,
+		chainID:     chainID,
+		deployerKey: testKeys[chainIDStr],
 	}
 }
 
-func (c ChainConfigurer) configureChain() devenv.ChainConfig {
-	chainConfig := devenv.ChainConfig{
+func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
+	wsRPC := c.externalWSRPC()
+	if wsRPC == nil {
+		return nil, fmt.Errorf("wsRPC external url not available")
+	}
+	httpRPC := c.externalHTTPRPC()
+	if httpRPC == nil {
+		return nil, fmt.Errorf("httpRPC external url not available")
+	}
+
+	chainConfig := &devenv.ChainConfig{
 		ChainID:   c.chainID,
 		ChainName: "alpha",
 		ChainType: "EVM",
-		WSRPCs:    []string{c.chainWSRPC()},
-		HTTPRPCs:  []string{c.chainHTTPRPC()},
+		WSRPCs:    []string{*wsRPC},
+		HTTPRPCs:  []string{*httpRPC},
 	}
 
 	err := chainConfig.SetDeployerKey(&c.deployerKey)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("unable to set deployer key, err: %s", err)
+	}
+
+	return chainConfig, nil
+}
+
+func (c ChainConfigurer) GetTransmittedChainConfigs() crib.ChainConfig {
+	chainConfig := crib.ChainConfig{
+		ChainID:   c.chainID,
+		ChainName: "alpha",
+		ChainType: "EVM",
+		WSRPCs: []crib.RPC{
+			{
+				Internal: c.internalWSRPC(),
+				External: c.externalWSRPC(),
+			},
+		},
+		HTTPRPCs: []crib.RPC{
+			{
+				External: c.externalHTTPRPC(),
+				Internal: c.internalHTTPRPC(),
+			},
+		},
 	}
 
 	return chainConfig
@@ -138,10 +206,32 @@ func ChainSelector(chainID uint64) uint64 {
 	return homeChainSelector
 }
 
-func (c ChainConfigurer) chainWSRPC() string {
-	return fmt.Sprintf("wss://%s-geth-%d-ws.%s:443", c.cribNamespace, c.chainID, c.ingressDomain)
+func (c ChainConfigurer) externalWSRPC() *string {
+	if c.env.CIEnv {
+		hostName := gapV2HostName(c.env, fmt.Sprintf("geth-%d-ws", c.chainID))
+		u := fmt.Sprintf("wss://%s", hostName)
+		return &u
+	}
+	u := fmt.Sprintf("wss://%s-geth-%d-ws.%s", c.env.Namespace, c.chainID, c.env.IngressBaseDomain)
+	return &u
 }
 
-func (c ChainConfigurer) chainHTTPRPC() string {
-	return fmt.Sprintf("https://%s-geth-%d-ws.%s:443", c.cribNamespace, c.chainID, c.ingressDomain)
+func (c ChainConfigurer) externalHTTPRPC() *string {
+	if c.env.CIEnv {
+		hostName := gapV2HostName(c.env, fmt.Sprintf("geth-%d", c.chainID))
+		u := fmt.Sprintf("https://%s", hostName)
+		return &u
+	}
+	u := fmt.Sprintf("https://%s-geth-%d-ws.%s:443", c.env.Namespace, c.chainID, c.env.IngressBaseDomain)
+	return &u
+}
+
+func (c ChainConfigurer) internalWSRPC() *string {
+	u := fmt.Sprintf("ws://%s-geth-%d-ws:8546", c.env.Namespace, c.chainID)
+	return &u
+}
+
+func (c ChainConfigurer) internalHTTPRPC() *string {
+	u := fmt.Sprintf("http://%s-geth-%d:8544", c.env.Namespace, c.chainID)
+	return &u
 }

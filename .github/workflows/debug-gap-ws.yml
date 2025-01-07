@@ -1,0 +1,31 @@
+name: Debug GAPv2 Websockets
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+  pull-requests: read
+jobs:
+  debub-gap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+
+      - name: Configure Git Credentials
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - name: Setup go
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
+        with:
+          go-version-file: ./dependencies/ccip-v2-scripts/go.mod
+          cache: true
+          cache-dependency-path: ./dependencies/ccip-v2-scripts/go.sum
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2.0.0
+      - name: Debug
+        run: |
+          task ccip-v2-scripts:build
+          ccip-v2-scripts debug

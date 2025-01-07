@@ -2,10 +2,12 @@ package scripts
 
 import (
 	"context"
+	"os"
 
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
 	v2logger "github.com/smartcontractkit/chainlink/v2/core/logger"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/config"
+	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/gap"
 	"github.com/smartcontractkit/crib/dependencies/ccip-v2-scripts/model"
 	"go.uber.org/zap"
 )
@@ -30,6 +32,8 @@ func NewHomeChainDeployer(logger *zap.SugaredLogger, env config.DevspaceEnv) *Ho
 }
 
 func (h HomeChainDeployer) Deploy() {
+	ctx := context.Background()
+
 	if h.shouldSkip() {
 		h.logger.Info("AddressBook already exists, assuming that home chain is already deployed. skipping")
 		return
@@ -40,29 +44,53 @@ func (h HomeChainDeployer) Deploy() {
 	)
 
 	ccipLogger, _ := v2logger.NewLogger()
-	envConfig := config.NewEnvConfig(h.env)
+
+	maybeGHAJWTToken := ""
+	var err error
+
+	if h.env.CIEnv {
+		gap.TestWSConnectionViaGAP(h.env)
+		maybeGHAJWTToken, err = gap.FetchJWTTokenForGAP(ctx)
+		if err != nil {
+			h.logger.Fatal("failed to fetch GA JWT", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	h.logger.Info("debug token", "token", maybeGHAJWTToken)
+
+	envConfig, err := config.GetEnvConfig(h.env, maybeGHAJWTToken)
+	if err != nil {
+		h.logger.Fatal(err)
+		os.Exit(1)
+	}
+	transmittedChainConfigs := config.GetTransmittedChainConfigs(h.env)
 
 	homeChainID := uint64(1337)
 	feedChainID := uint64(2337)
 	homeChainSelector := config.ChainSelector(homeChainID)
 	feedChainSelector := config.ChainSelector(feedChainID)
 
-	ctx := context.Background()
-	capRegConfig, addressBook, err := crib.DeployHomeChainContracts(ctx, ccipLogger, envConfig, homeChainSelector, feedChainSelector)
+	h.logger.Info("Deploying Home Chain Contracts",
+		zap.String("jd-grpc-endpoint", envConfig.JDConfig.GRPC),
+	)
+	capRegConfig, addressBook, err := crib.DeployHomeChainContracts(ctx, ccipLogger, *envConfig, homeChainSelector, feedChainSelector)
 	if err != nil {
-		panic(err)
+		h.logger.Fatal("unable to deploy home chain contracts", "err", err)
+		os.Exit(1)
 	}
 
 	h.envState.SaveNodesTomlOverride(capRegConfig, homeChainID)
 
 	addresses, err := addressBook.Addresses()
 	if err != nil {
-		panic(err)
+		h.logger.Fatal("unable to get addresses", "err", err)
+		os.Exit(1)
 	}
 
 	// Save State to files
 	h.envState.SaveAddressBook(addresses)
-	h.envState.SaveChainConfigs(envConfig.Chains)
+	h.envState.SaveChainConfigs(transmittedChainConfigs)
 }
 
 func (h HomeChainDeployer) shouldSkip() bool {

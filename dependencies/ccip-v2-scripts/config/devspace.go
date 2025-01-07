@@ -11,6 +11,7 @@ type DevspaceEnv struct {
 	DonNodeCount      int
 	IngressBaseDomain string
 	TmpDir            string
+	CIEnv             bool
 }
 
 func NewDevspaceEnvFromEnv() DevspaceEnv {
@@ -21,5 +22,6 @@ func NewDevspaceEnvFromEnv() DevspaceEnv {
 		DonNodeCount:      viper.GetInt("DON_NODE_COUNT"),
 		IngressBaseDomain: viper.GetString("DEVSPACE_INGRESS_BASE_DOMAIN"),
 		TmpDir:            viper.GetString("TMP_DIR"),
+		CIEnv:             viper.GetBool("CRIB_CI_ENV"),
 	}
 }

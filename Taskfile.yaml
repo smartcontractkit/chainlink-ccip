@@ -282,50 +282,6 @@ tasks:
     dir: dependencies/ccip-v2-scripts
     desc: sync dependencies
     cmd: go mod tidy
-  # sdk-build
-  sdk:build:
-    desc: Build sdk go module
-    dir: sdk
-    env:
-      GOPATH:
-        sh: go env GOPATH
-      GOBIN:
-        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
-    cmd: go build ./...
-  sdk:test:
-    desc: Test sdk go module
-    dir: sdk
-    env:
-      GOPATH:
-        sh: go env GOPATH
-      GOBIN:
-        sh: echo ${GOBIN:-$(go env GOPATH)/bin}
-    cmd: go test ./...
-  sdk:lint:
-    desc: Go Lint sdk module
-    deps: [install:golangci-lint]
-    dir: sdk
-    cmd: "{{ .BINDIR }}/golangci-lint run --path-prefix=./sdk"
-  sdk:lint-fix-gci:
-    desc: Fix gci errors
-    dir: sdk
-    cmds:
-      - gci write -s standard -s default -s "prefix(github.com/smartcontractkit/crib/sdk)" .
-  sdk:lint-fix-gofumpt:
-    desc: Fix gofumpt errors
-    dir: sdk
-    cmds:
-      - find . -name '*.go' -exec gofumpt -w {} +
-  sdk:fix-all:
-    desc: Fix all possible lint errors
-    deps:
-      - sdk:lint-fix-gci
-      - sdk:lint-fix-gofumpt
-  sdk:update-dependencies:
-    dir: sdk
-    desc: sync dependencies
-    cmd: go mod tidy
   update-go-dependencies:
     deps:
-      - sdk:update-dependencies
       - ccip-v2-scripts:update-dependencies

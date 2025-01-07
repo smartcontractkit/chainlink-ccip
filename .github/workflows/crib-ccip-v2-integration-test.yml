@@ -1,0 +1,50 @@
+name: CRIB CCIP-v2 Integration Tests
+# This is a WIP workflow for e2e testing ccip-v2 flow
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/crib-ccip-v2-integration-test.yml"
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.2.1
+
+      - uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Deploy and validate CRIB Environment for CCIP v2
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@e818ad7a43c514b59a6c8d96ee8427dc82dd9c9f # crib-deploy-environment@8.2.0
+        id: deploy-crib
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          aws-role-arn: ${{ secrets.AWS_OIDC_CRIB_ROLE_ARN_STAGE }}
+          aws-ecr-private-registry: ${{ secrets.AWS_ACCOUNT_ID_PROD }}
+          ingress-base-domain: ${{ secrets.INGRESS_BASE_DOMAIN_STAGE }}
+          k8s-cluster-name: ${{ secrets.AWS_K8S_CLUSTER_NAME_STAGE }}
+          command: "debug-gap"
+          # crib-alert-slack-webhook: ${{ secrets.CRIB_ALERT_SLACK_WEBHOOK }}
+          product-image: ${{ secrets.AWS_SDLC_ECR_HOSTNAME }}/ccip
+          product-image-tag: develop
+          product-dir: 'ccip-v2'
+          chainlink-team: ccip
+          chainlink-product: ccip
+          k8s-api-endpoint: ${{ secrets.K8S_API_ENDPOINT_STAGE }}
+          crib-repo-ref: 'crib-352/rpc-type'
+      - name: Destroy CRIB Environment
+        id: destroy
+        if: always() && steps.deploy-crib.outputs.devspace-namespace != ''
+        uses: smartcontractkit/.github/actions/crib-purge-environment@c0b38e6c40d72d01b8d2f24f92623a2538b3dedb # crib-purge-environment@0.1.0
+        with:
+          namespace: ${{ steps.deploy-crib.outputs.devspace-namespace }}
