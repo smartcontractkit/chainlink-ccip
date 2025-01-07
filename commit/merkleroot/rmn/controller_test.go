@@ -415,15 +415,11 @@ func TestClient_ComputeReportSignatures(t *testing.T) {
 		const numNodes = 8
 		rmnNodes := make([]rmntypes.HomeNodeInfo, numNodes)
 		for i := 0; i < numNodes; i++ {
-			// deterministically create a public key by seeding with a 32char string.
-			publicKey, _, err := ed25519.GenerateKey(
-				strings.NewReader(strconv.Itoa(i) + strings.Repeat("x", 31)))
-			require.NoError(t, err)
 			rmnNodes[i] = rmntypes.HomeNodeInfo{
 				ID:                    rmntypes.NodeID(i + 1),
 				PeerID:                [32]byte{1, 2, 3},
 				SupportedSourceChains: mapset.NewSet(chainS1, chainS2),
-				OffchainPublicKey:     &publicKey,
+				OffchainPublicKey:     getDeterministicPubKey(t),
 			}
 		}
 
@@ -648,7 +644,7 @@ func Test_controller_validateSignedObservationResponse(t *testing.T) {
 				{
 					ID:                    20,
 					SupportedSourceChains: mapset.NewSet[cciptypes.ChainSelector](cciptypes.ChainSelector(2)),
-					OffchainPublicKey:     &ed25519.PublicKey{},
+					OffchainPublicKey:     getDeterministicPubKey(t),
 				},
 			},
 		},
@@ -731,6 +727,24 @@ func Test_controller_validateSignedObservationResponse(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func Test_newRequestID(t *testing.T) {
+	ids := map[uint64]struct{}{}
+	for i := 0; i < 1000; i++ {
+		id := newRequestID(logger.Test(t))
+		_, ok := ids[id]
+		assert.False(t, ok)
+		ids[id] = struct{}{}
+	}
+}
+
+func getDeterministicPubKey(t *testing.T) *ed25519.PublicKey {
+	// deterministically create a public key by seeding with a 32char string.
+	publicKey, _, err := ed25519.GenerateKey(
+		strings.NewReader(strconv.Itoa(1) + strings.Repeat("x", 31)))
+	require.NoError(t, err)
+	return &publicKey
 }
 
 func (ts *testSetup) waitForObservationRequestsToBeSent(

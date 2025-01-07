@@ -16,6 +16,7 @@ import (
 
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
+	rand2 "golang.org/x/exp/rand"
 	"google.golang.org/protobuf/proto"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
@@ -364,7 +365,7 @@ func (c *controller) sendObservationRequests(
 		}
 
 		req := &rmnpb.Request{
-			RequestId: newRequestID(),
+			RequestId: newRequestID(c.lggr),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: &rmnpb.ObservationRequest{
 					LaneDest:                    destChain,
@@ -810,7 +811,7 @@ func (c *controller) sendReportSignatureRequest(
 		}
 
 		req := &rmnpb.Request{
-			RequestId: newRequestID(),
+			RequestId: newRequestID(c.lggr),
 			Request: &rmnpb.Request_ReportSignatureRequest{
 				ReportSignatureRequest: reportSigReq,
 			},
@@ -908,7 +909,7 @@ func (c *controller) listenForRmnReportSignatures(
 					continue
 				}
 				req := &rmnpb.Request{
-					RequestId: newRequestID(),
+					RequestId: newRequestID(c.lggr),
 					Request: &rmnpb.Request_ReportSignatureRequest{
 						ReportSignatureRequest: reportSigReq,
 					},
@@ -1072,11 +1073,17 @@ func randomShuffle[T any](s []T) []T {
 	return ret
 }
 
-func newRequestID() uint64 {
+// newRequestID generates a new unique request ID.
+func newRequestID(lggr logger.Logger) uint64 {
 	b := make([]byte, 8)
 	_, err := crand.Read(b)
 	if err != nil {
-		panic(err)
+		// fallback to time-based id in the very rare scenario that the random number generator fails
+		lggr.Warnw("failed to generate random request id, falling back to golang.org/x/exp/rand",
+			"err", err,
+		)
+		rand2.Seed(uint64(time.Now().UnixNano()))
+		return rand2.Uint64()
 	}
 	randomUint64 := binary.LittleEndian.Uint64(b)
 	return randomUint64

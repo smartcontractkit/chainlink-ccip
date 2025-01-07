@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::constant::*;
+use crate::{constant::*, state::config::*};
 
 #[event]
 /// @dev Emitted when a new root is set.
@@ -22,8 +22,7 @@ pub struct ConfigSet {
     pub group_parents: [u8; NUM_GROUPS],
     pub group_quorums: [u8; NUM_GROUPS],
     pub is_root_cleared: bool,
-    // todo: emitting all signers causes a memory overflow, need to find a way to emit them
-    // pub signers: Vec<McmSigner>,
+    pub signers: Vec<McmSigner>,
 }
 
 #[event]

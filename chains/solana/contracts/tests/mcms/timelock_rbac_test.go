@@ -11,12 +11,14 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils"
-	mcmsUtils "github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/utils/mcms"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/testutils"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/access_controller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
+	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"
 )
 
 func TestTimelockRBAC(t *testing.T) {
@@ -35,8 +37,8 @@ func TestTimelockRBAC(t *testing.T) {
 	user, err := solana.NewRandomPrivateKey()
 	require.NoError(t, err)
 
-	roles, roleMap := mcmsUtils.TestRoleAccounts(t, config.NumAccountsPerRole)
-	solanaGoClient := utils.DeployAllPrograms(t, utils.PathToAnchorConfig, admin)
+	roles, roleMap := timelockutil.TestRoleAccounts(config.NumAccountsPerRole)
+	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	t.Run("setup:funding", func(t *testing.T) {
 		all := []solana.PrivateKey{}
@@ -45,18 +47,18 @@ func TestTimelockRBAC(t *testing.T) {
 		for _, role := range roles {
 			all = append(all, role.Accounts...)
 		}
-		utils.FundAccounts(ctx, all, solanaGoClient, t)
+		testutils.FundAccounts(ctx, all, solanaGoClient, t)
 	})
 
 	t.Run("setup:init access controllers", func(t *testing.T) {
 		for _, data := range roleMap {
-			initAccIxs, ierr := InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
+			initAccIxs, ierr := timelockutil.InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
 			require.NoError(t, ierr)
 
-			utils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, utils.AddSigners(data.AccessController))
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
 
 			var ac access_controller.AccessController
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, data.AccessController.PublicKey(), config.DefaultCommitment, &ac)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -92,7 +94,7 @@ func TestTimelockRBAC(t *testing.T) {
 		).ValidateAndBuild()
 		require.NoError(t, ierr)
 
-		result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+		result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, anotherAdmin, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 		require.NotNil(t, result)
 	})
 
@@ -125,10 +127,10 @@ func TestTimelockRBAC(t *testing.T) {
 		).ValidateAndBuild()
 		require.NoError(t, ierr)
 
-		utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
+		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
-		err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
 		if err != nil {
 			require.NoError(t, err, "failed to get account info")
 		}
@@ -149,7 +151,7 @@ func TestTimelockRBAC(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
-			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -160,7 +162,7 @@ func TestTimelockRBAC(t *testing.T) {
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
-			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.InvalidInput_TimelockError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment, []string{"Error Code: " + timelock.InvalidInput_TimelockError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -171,7 +173,7 @@ func TestTimelockRBAC(t *testing.T) {
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
-			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
 		})
 
@@ -181,7 +183,7 @@ func TestTimelockRBAC(t *testing.T) {
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
-			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -191,12 +193,12 @@ func TestTimelockRBAC(t *testing.T) {
 				anotherAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
-			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			// Validate proposed set to 0-address after accepting ownership
 			var configAccount timelock.Config
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -212,7 +214,7 @@ func TestTimelockRBAC(t *testing.T) {
 				anotherAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
-			result := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tix}, anotherAdmin, config.DefaultCommitment)
+			result := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{tix}, anotherAdmin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			aix, aerr := timelock.NewAcceptOwnershipInstruction(
@@ -220,11 +222,11 @@ func TestTimelockRBAC(t *testing.T) {
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, aerr)
-			result = utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{aix}, admin, config.DefaultCommitment)
+			result = testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{aix}, admin, config.DefaultCommitment)
 			require.NotNil(t, result)
 
 			var configAccount timelock.Config
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -240,11 +242,11 @@ func TestTimelockRBAC(t *testing.T) {
 			for _, account := range data.Accounts {
 				addresses = append(addresses, account.PublicKey())
 			}
-			batchAddAccessIxs, baerr := TimelockBatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+			batchAddAccessIxs, baerr := timelockutil.BatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 			require.NoError(t, baerr)
 
 			for _, ix := range batchAddAccessIxs {
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 			}
 
 			for _, account := range data.Accounts {
@@ -256,9 +258,9 @@ func TestTimelockRBAC(t *testing.T) {
 	})
 
 	t.Run("rbac: schedule and cancel a timelock operation", func(t *testing.T) {
-		salt, serr := mcmsUtils.SimpleSalt()
+		salt, serr := mcms.SimpleSalt()
 		require.NoError(t, serr)
-		nonExecutableOp := TimelockOperation{
+		nonExecutableOp := timelockutil.Operation{
 			Predecessor: config.TimelockEmptyOpID,
 			Salt:        salt,
 			Delay:       uint64(1),
@@ -271,10 +273,10 @@ func TestTimelockRBAC(t *testing.T) {
 			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			ixs, prierr := TimelockPreloadOperationIxs(ctx, nonExecutableOp, nonProposer.PublicKey(), solanaGoClient)
+			ixs, prierr := timelockutil.PreloadOperationIxs(nonExecutableOp, nonProposer.PublicKey())
 			require.NoError(t, prierr)
 			for _, ix := range ixs {
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
 			}
 
 			ix, scerr := timelock.NewScheduleBatchInstruction(
@@ -286,7 +288,7 @@ func TestTimelockRBAC(t *testing.T) {
 				nonProposer.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, scerr)
-			utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 		})
 
 		t.Run("rbac: Should able to schedule tx with proposer role", func(t *testing.T) {
@@ -300,7 +302,7 @@ func TestTimelockRBAC(t *testing.T) {
 					proposer.PublicKey(), // remove access of proposer
 				).ValidateAndBuild()
 				require.NoError(t, raerr)
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
 
 				found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, ac.PublicKey(), proposer.PublicKey(), config.DefaultCommitment)
 				require.NoError(t, ferr)
@@ -315,7 +317,7 @@ func TestTimelockRBAC(t *testing.T) {
 					proposer.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, scerr)
-				utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+				testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			})
 
 			raIx, raerr := access_controller.NewAddAccessInstruction(
@@ -324,15 +326,15 @@ func TestTimelockRBAC(t *testing.T) {
 				proposer.PublicKey(), // add access of proposer again
 			).ValidateAndBuild()
 			require.NoError(t, raerr)
-			utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{raIx}, admin, config.DefaultCommitment)
 
 			found, ferr := accesscontroller.HasAccess(ctx, solanaGoClient, ac.PublicKey(), proposer.PublicKey(), config.DefaultCommitment)
 			require.NoError(t, ferr)
 			require.True(t, found, "Account %s should be in the AccessList", proposer.PublicKey())
 
-			salt, serr := mcmsUtils.SimpleSalt()
+			salt, serr := mcms.SimpleSalt()
 			require.NoError(t, serr)
-			nonExecutableOp2 := TimelockOperation{
+			nonExecutableOp2 := timelockutil.Operation{
 				Predecessor: config.TimelockEmptyOpID,
 				Salt:        salt,
 				Delay:       uint64(1),
@@ -340,10 +342,10 @@ func TestTimelockRBAC(t *testing.T) {
 			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
 			nonExecutableOp2.AddInstruction(ix, []solana.PublicKey{})
 
-			ixs, prerr := TimelockPreloadOperationIxs(ctx, nonExecutableOp2, proposer.PublicKey(), solanaGoClient)
+			ixs, prerr := timelockutil.PreloadOperationIxs(nonExecutableOp2, proposer.PublicKey())
 			require.NoError(t, prerr)
 			for _, ix := range ixs {
-				utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 			}
 
 			sbix, sberr := timelock.NewScheduleBatchInstruction(
@@ -356,28 +358,28 @@ func TestTimelockRBAC(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, sberr)
 
-			tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{sbix}, proposer, config.DefaultCommitment)
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{sbix}, proposer, config.DefaultCommitment)
 			require.NotNil(t, tx)
 
-			parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-				[]utils.EventMapping{
-					utils.EventMappingFor[CallScheduled]("CallScheduled"),
+			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+				[]common.EventMapping{
+					common.EventMappingFor[timelockutil.CallScheduled]("CallScheduled"),
 				},
 			)
 
 			for i, ixx := range nonExecutableOp2.ToInstructionData() {
-				event := parsedLogs[0].EventData[i].Data.(*CallScheduled)
+				event := parsedLogs[0].EventData[i].Data.(*timelockutil.CallScheduled)
 				require.Equal(t, nonExecutableOp2.OperationID(), event.ID)
 				require.Equal(t, uint64(i), event.Index)
 				require.Equal(t, ixx.ProgramId, event.Target)
 				require.Equal(t, nonExecutableOp2.Predecessor, event.Predecessor)
 				require.Equal(t, nonExecutableOp2.Salt, event.Salt)
 				require.Equal(t, nonExecutableOp2.Delay, event.Delay)
-				require.Equal(t, ixx.Data, utils.NormalizeData(event.Data))
+				require.Equal(t, ixx.Data, common.NormalizeData(event.Data))
 			}
 
 			var opAccount timelock.Operation
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment, &opAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment, &opAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -408,7 +410,7 @@ func TestTimelockRBAC(t *testing.T) {
 
 					require.NoError(t, cerr)
 
-					result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + "InvalidAccessController."})
+					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + "InvalidAccessController."})
 					require.NotNil(t, result)
 				})
 
@@ -425,7 +427,7 @@ func TestTimelockRBAC(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, cerr)
 
-					result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+					result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 					require.NotNil(t, result)
 				})
 
@@ -442,21 +444,21 @@ func TestTimelockRBAC(t *testing.T) {
 					).ValidateAndBuild()
 					require.NoError(t, cerr)
 
-					tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+					tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
 					require.NotNil(t, tx)
 
-					parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-						[]utils.EventMapping{
-							utils.EventMappingFor[Cancelled]("Cancelled"),
+					parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+						[]common.EventMapping{
+							common.EventMappingFor[timelockutil.Cancelled]("Cancelled"),
 						},
 					)
 
 					for i := range nonExecutableOp2.ToInstructionData() {
-						event := parsedLogs[0].EventData[i].Data.(*Cancelled)
+						event := parsedLogs[0].EventData[i].Data.(*timelockutil.Cancelled)
 						require.Equal(t, nonExecutableOp2.OperationID(), event.ID)
 					}
 
-					utils.AssertClosedAccount(ctx, t, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment)
+					testutils.AssertClosedAccount(ctx, t, solanaGoClient, nonExecutableOp2.OperationPDA(), config.DefaultCommitment)
 				})
 			})
 		})
@@ -475,7 +477,7 @@ func TestTimelockRBAC(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
 
-			result := utils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + UnauthorizedTimelockError.String()})
+			result := testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment, []string{"Error Code: " + timelockutil.UnauthorizedError.String()})
 			require.NotNil(t, result)
 		})
 
@@ -483,7 +485,7 @@ func TestTimelockRBAC(t *testing.T) {
 			signer := admin
 
 			var oldConfigAccount timelock.Config
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &oldConfigAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &oldConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -495,21 +497,21 @@ func TestTimelockRBAC(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			tx := utils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
+			tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
 			require.NotNil(t, tx)
 
-			parsedLogs := utils.ParseLogMessages(tx.Meta.LogMessages,
-				[]utils.EventMapping{
-					utils.EventMappingFor[MinDelayChange]("MinDelayChange"),
+			parsedLogs := common.ParseLogMessages(tx.Meta.LogMessages,
+				[]common.EventMapping{
+					common.EventMappingFor[timelockutil.MinDelayChange]("MinDelayChange"),
 				},
 			)
 
-			event := parsedLogs[0].EventData[0].Data.(*MinDelayChange)
+			event := parsedLogs[0].EventData[0].Data.(*timelockutil.MinDelayChange)
 			require.Equal(t, oldConfigAccount.MinDelay, event.OldDuration)
 			require.Equal(t, newMinDelay, event.NewDuration)
 
 			var newConfigAccount timelock.Config
-			err = utils.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &newConfigAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &newConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
