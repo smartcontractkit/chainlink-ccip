@@ -143,7 +143,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		expTransmittedReports []ccipocr3.CommitPluginReport
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
-		offRampNextSeqNumDefaultOverrideValues []ccipocr3.SeqNum
+		offRampNextSeqNumDefaultOverrideValues map[ccipocr3.ChainSelector]ccipocr3.SeqNum
 
 		enableDiscovery bool
 	}{
@@ -204,7 +204,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			name:                                   "report generated in previous outcome, transmitted with success",
 			prevOutcome:                            outcomeReportGenerated,
 			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
-			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
+			offRampNextSeqNumDefaultOverrideValues: map[ccipocr3.ChainSelector]ccipocr3.SeqNum{sourceChain1: 11, sourceChain2: 20},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmitted,
@@ -690,7 +690,7 @@ func prepareCcipReaderMock(
 
 	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()
-		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Return([]ccipocr3.SeqNum{}, nil).
+		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.SeqNum{}, nil).
 			Maybe()
 	}
 
@@ -787,12 +787,12 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	}
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 
-	offRampNextSeqNums := make([]ccipocr3.SeqNum, 0)
+	offRampNextSeqNums := make(map[ccipocr3.ChainSelector]ccipocr3.SeqNum)
 	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
 	for _, sourceChain := range sourceChains {
 		offRampNextSeqNum, ok := params.offRampNextSeqNum[sourceChain]
 		assert.True(params.t, ok)
-		offRampNextSeqNums = append(offRampNextSeqNums, offRampNextSeqNum)
+		offRampNextSeqNums[sourceChain] = offRampNextSeqNum
 
 		newMsgs := make([]ccipocr3.Message, 0)
 		numNewMsgs := (params.onRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
@@ -815,9 +815,9 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		}
 	}
 
-	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
+	seqNumsOfChainsWithNewMsgs := make(map[ccipocr3.ChainSelector]ccipocr3.SeqNum, 0)
 	for _, chainSel := range chainsWithNewMsgs {
-		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, params.offRampNextSeqNum[chainSel])
+		seqNumsOfChainsWithNewMsgs[chainSel] = params.offRampNextSeqNum[chainSel]
 	}
 	if len(chainsWithNewMsgs) > 0 {
 		ccipReader.EXPECT().NextSeqNum(params.ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()

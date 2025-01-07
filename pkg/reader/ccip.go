@@ -399,13 +399,13 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
-) ([]cciptypes.SeqNum, error) {
+) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	cfgs, err := r.getOffRampSourceChainsConfig(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
 
-	res := make([]cciptypes.SeqNum, 0, len(chains))
+	res := map[cciptypes.ChainSelector]cciptypes.SeqNum{}
 	for _, chain := range chains {
 		cfg, exists := cfgs[chain]
 		if !exists {
@@ -414,7 +414,7 @@ func (r *ccipChainReader) NextSeqNum(
 		if cfg.MinSeqNr == 0 {
 			return nil, fmt.Errorf("minSeqNr not found for chain %d", chain)
 		}
-		res = append(res, cciptypes.SeqNum(cfg.MinSeqNr))
+		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
 	}
 
 	return res, err

@@ -345,7 +345,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 	testCases := []struct {
 		name                 string
 		onRampNextSeqNum     []plugintypes.SeqNumChain
-		offRampExpNextSeqNum []cciptypes.SeqNum
+		offRampExpNextSeqNum map[cciptypes.ChainSelector]cciptypes.SeqNum
 		readerErr            error
 		expErr               bool
 	}{
@@ -355,7 +355,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200},
 			expErr:               false,
 		},
 		{
@@ -364,7 +364,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 201}, // <- 200 is already on chain
 			expErr:               true,
 		},
 		{
@@ -373,7 +373,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200},
 			expErr:               true,
 		},
 		{
@@ -382,7 +382,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200, 300},
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200, 30: 300},
 			expErr:               true,
 		},
 		{
@@ -391,7 +391,7 @@ func Test_validateMerkleRootsState(t *testing.T) {
 				plugintypes.NewSeqNumChain(10, 100),
 				plugintypes.NewSeqNumChain(20, 200),
 			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
+			offRampExpNextSeqNum: map[cciptypes.ChainSelector]cciptypes.SeqNum{10: 100, 20: 200},
 			readerErr:            fmt.Errorf("reader error"),
 			expErr:               true,
 		},
