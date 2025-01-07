@@ -20,10 +20,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -801,7 +800,7 @@ func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecuteP
 func Test_execReportBuilder_verifyReport(t *testing.T) {
 	type fields struct {
 		encoder            cciptypes.ExecutePluginCodec
-		estimateProvider   gas.EstimateProvider
+		estimateProvider   cciptypes.EstimateProvider
 		maxReportSizeBytes uint64
 		maxGas             uint64
 		accumulated        validationMetadata
@@ -848,7 +847,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			fields: fields{
 				maxReportSizeBytes: 10000,
 				maxGas:             1000000,
-				estimateProvider: func() gas.EstimateProvider {
+				estimateProvider: func() cciptypes.EstimateProvider {
 					// values taken from evm.EstimateProvider
 					mockep := gasmock.NewMockEstimateProvider(t)
 					mockep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(119920)).Times(4)
