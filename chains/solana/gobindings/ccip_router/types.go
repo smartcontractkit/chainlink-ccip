@@ -1962,6 +1962,9 @@ const (
 	InvalidTokenPrice_CcipRouterError
 	StaleGasPrice_CcipRouterError
 	InsufficientLamports_CcipRouterError
+	InsufficientFunds_CcipRouterError
+	UnsupportedToken_CcipRouterError
+	InvalidInputsMissingTokenConfig_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -2032,6 +2035,12 @@ func (value CcipRouterError) String() string {
 		return "StaleGasPrice"
 	case InsufficientLamports_CcipRouterError:
 		return "InsufficientLamports"
+	case InsufficientFunds_CcipRouterError:
+		return "InsufficientFunds"
+	case UnsupportedToken_CcipRouterError:
+		return "UnsupportedToken"
+	case InvalidInputsMissingTokenConfig_CcipRouterError:
+		return "InvalidInputsMissingTokenConfig"
 	default:
 		return ""
 	}

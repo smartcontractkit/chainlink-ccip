@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	"github.com/gagliardetto/solana-go"
+	computebudget "github.com/gagliardetto/solana-go/programs/compute-budget"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/ccip"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/fees"
 )
 
 // this files includes wrapped methods to be used in testing without additional error checks
@@ -57,6 +59,22 @@ func SimulateTransaction(ctx context.Context, t *testing.T, rpcClient *rpc.Clien
 	require.NoError(t, err)
 
 	return simRes
+}
+
+func GetRequiredCU(ctx context.Context, t *testing.T, client *rpc.Client, ixs []solana.Instruction, signer solana.PrivateKey, commitment rpc.CommitmentType) fees.ComputeUnitLimit {
+	// simulate the transaction with max cu to get the required CU
+	cuIx, err := computebudget.NewSetComputeUnitLimitInstruction(uint32(computebudget.MAX_COMPUTE_UNIT_LIMIT)).ValidateAndBuild()
+	require.NoError(t, err)
+	simulateIxs := append([]solana.Instruction{cuIx}, ixs...)
+	feeResult, err := common.SimulateTransactionWithOpts(ctx, client, simulateIxs, signer, rpc.SimulateTransactionOpts{
+		ReplaceRecentBlockhash: true,
+		Commitment:             commitment,
+	})
+	require.NoError(t, err)
+	require.Nil(t, feeResult.Value.Err)
+	// maximum cu is 1_400_000, so we can safely cast to uint32
+	//nolint:gosec
+	return fees.ComputeUnitLimit(*feeResult.Value.UnitsConsumed)
 }
 
 func AssertClosedAccount(ctx context.Context, t *testing.T, solanaGoClient *rpc.Client, accountKey solana.PublicKey, commitment rpc.CommitmentType) {

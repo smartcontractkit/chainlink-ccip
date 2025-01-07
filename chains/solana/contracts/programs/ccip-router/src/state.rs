@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::ocr3base::Ocr3Config;
+use crate::{
+    ocr3base::Ocr3Config, valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG,
+    MAX_TOKEN_AND_CHAIN_CONFIG_V, TOKEN_POOL_BILLING_SEED,
+};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -24,6 +27,7 @@ pub struct Config {
     // TODO: token pool global config
 
     // TODO: billing global configs'
+    pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
 #[account]
@@ -51,7 +55,8 @@ pub struct SourceChainState {
 pub struct SourceChain {
     // Config for Any2Solana
     pub version: u8,
-    pub state: SourceChainState, // values that are updated automatically
+    pub chain_selector: u64,       // Chain selector used for the seed
+    pub state: SourceChainState,   // values that are updated automatically
     pub config: SourceChainConfig, // values configured by an admin
 }
 
@@ -90,6 +95,7 @@ pub struct DestChainConfig {
 pub struct DestChain {
     // Config for Solana2Any
     pub version: u8,
+    pub chain_selector: u64,     // Chain selector used for the seed
     pub state: DestChainState,   // values that are updated automatically
     pub config: DestChainConfig, // values configured by an admin
 }
@@ -109,6 +115,8 @@ pub struct ExternalExecutionConfig {}
 #[derive(InitSpace)]
 pub struct CommitReport {
     pub version: u8,
+    pub chain_selector: u64,
+    pub merkle_root: [u8; 32],
     pub timestamp: i64, // Expressed as Unix time (i.e. seconds since the Unix epoch).
     pub min_msg_nr: u64,
     pub max_msg_nr: u64, // TODO: Change this to [u128; 2] when supporting commit reports with 256 messages
@@ -165,7 +173,7 @@ impl TryFrom<u128> for MessageExecutionState {
 }
 
 #[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, Debug)]
 pub struct PerChainPerTokenConfig {
     pub version: u8,         // schema version
     pub chain_selector: u64, // remote chain
@@ -174,7 +182,31 @@ pub struct PerChainPerTokenConfig {
     pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+impl PerChainPerTokenConfig {
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+        dest_chain_selector: u64,
+    ) -> Result<Self> {
+        let (expected, _) = Pubkey::find_program_address(
+            &[
+                TOKEN_POOL_BILLING_SEED,
+                dest_chain_selector.to_le_bytes().as_ref(),
+                token.key().as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+        require!(
+            valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(account.into_inner())
+    }
+}
+
+#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenBilling {
     pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
     pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
@@ -205,6 +237,29 @@ pub struct BillingTokenConfig {
     pub usd_per_token: TimestampedPackedU224,
     // billing configs
     pub premium_multiplier_wei_per_eth: u64,
+}
+
+impl BillingTokenConfig {
+    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
+    // specifying a token that has no Billing config.
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+    ) -> Result<Option<Self>> {
+        if account.key() == Pubkey::default() {
+            return Ok(None);
+        }
+
+        let (expected, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
+        require!(
+            valid_version(account.version, 1),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(Some(account.into_inner().config))
+    }
 }
 
 #[account]
@@ -252,6 +307,8 @@ mod tests {
     fn test_set_state() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 0,
+            merkle_root: [0; 32],
             timestamp: 0,
             min_msg_nr: 0,
             max_msg_nr: 64,
@@ -279,6 +336,8 @@ mod tests {
     fn test_set_state_out_of_bounds() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
@@ -292,6 +351,8 @@ mod tests {
     fn test_get_state() {
         let mut commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
@@ -326,6 +387,8 @@ mod tests {
     fn test_get_state_out_of_bounds() {
         let commit_report = CommitReport {
             version: 1,
+            chain_selector: 1,
+            merkle_root: [0; 32],
             timestamp: 1,
             min_msg_nr: 1500,
             max_msg_nr: 1530,
