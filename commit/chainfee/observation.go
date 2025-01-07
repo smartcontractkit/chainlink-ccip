@@ -31,8 +31,9 @@ func (p *processor) Observation(
 		return Observation{}, err
 	}
 
+	supportedChains.Remove(p.destChain)
 	if supportedChains.Cardinality() == 0 {
-		p.lggr.Info("no supported chains, nothing to observe")
+		p.lggr.Info("no supported chains other than dest chain to observe")
 		return Observation{}, nil
 	}
 

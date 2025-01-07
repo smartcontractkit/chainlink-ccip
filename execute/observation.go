@@ -212,7 +212,7 @@ func (p *Plugin) getMessagesObservation(
 	// Phase 2: Get messages and determine which messages are too costly to execute.
 	//          These messages will not be executed in the current round, but may be executed in future rounds
 	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
-	if len(previousOutcome.PendingCommitReports) == 0 {
+	if len(previousOutcome.CommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
@@ -220,7 +220,7 @@ func (p *Plugin) getMessagesObservation(
 	}
 
 	// group reports by chain selector.
-	commitReportCache := regroup(previousOutcome.PendingCommitReports)
+	commitReportCache := regroup(previousOutcome.CommitReports)
 
 	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
 	if err != nil {
@@ -235,6 +235,9 @@ func (p *Plugin) getMessagesObservation(
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
+	}
+	if validateTokenDataObservations(messageObs, tkData) != nil {
+		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
 
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
@@ -252,9 +255,11 @@ func (p *Plugin) getMessagesObservation(
 	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
+	//observation.MessageAndTokenDataEncodedSizes = exectypes.GetEncodedMsgAndTokenDataSizes(messageObs, tkData)
 
 	// Make sure encoded observation fits within the maximum observation size.
-	observation, err = truncateObservation(observation, maxObservationLength)
+	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
+	observation, err = p.observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}
@@ -278,7 +283,7 @@ func (p *Plugin) getFilterObservation(
 
 	// Collect unique senders.
 	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
-	for _, commitReport := range previousOutcome.PendingCommitReports {
+	for _, commitReport := range previousOutcome.CommitReports {
 		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
 			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
 		}

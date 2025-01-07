@@ -44,6 +44,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -837,6 +838,7 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -882,6 +884,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -1312,4 +1315,78 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			assert.Equal(t, tc.expCurseInfo, *curseInfo)
 		})
 	}
+}
+
+func TestCCIPChainReader_Nonces(t *testing.T) {
+	addr1 := "0x1234567890123456789012345678901234567890"
+	addr2 := "0x2234567890123456789012345678901234567890"
+	nonceManagerAddr := "0x3234567890123456789012345678901234567890"
+
+	destReader := reader_mocks.NewMockExtended(t)
+
+	// Mock Bind call
+	destReader.EXPECT().Bind(
+		mock.Anything,
+		[]types.BoundContract{{
+			Name:    consts.ContractNameNonceManager,
+			Address: nonceManagerAddr,
+		}},
+	).Return(nil)
+
+	// Setup expected responses
+	nonce1, nonce2 := uint64(5), uint64(10)
+
+	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
+	result1.SetResult(&nonce1, nil)
+
+	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
+	result2.SetResult(&nonce2, nil)
+
+	responses := types.BatchGetLatestValuesResult{
+		types.BoundContract{
+			Name:    consts.ContractNameNonceManager,
+			Address: nonceManagerAddr,
+		}: []types.BatchReadResult{*result1, *result2},
+	}
+	destReader.EXPECT().ExtendedBatchGetLatestValues(
+		mock.Anything,
+		mock.MatchedBy(func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+			batch := req[consts.ContractNameNonceManager]
+			return len(batch) == 2 &&
+				batch[0].ReadName == consts.MethodNameGetInboundNonce &&
+				batch[1].ReadName == consts.MethodNameGetInboundNonce
+		}),
+	).Return(responses, nil)
+
+	ccipReader := &ccipChainReader{
+		lggr: logger.Test(t),
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			chainB: destReader,
+		},
+		destChain: chainB,
+	}
+
+	// Bind the contract first
+	err := ccipReader.contractReaders[chainB].Bind(
+		context.Background(),
+		[]types.BoundContract{{
+			Name:    consts.ContractNameNonceManager,
+			Address: nonceManagerAddr,
+		}},
+	)
+	require.NoError(t, err)
+
+	// Call Nonces
+	nonces, err := ccipReader.Nonces(
+		context.Background(),
+		chainA,
+		chainB,
+		[]string{addr1, addr2},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]uint64{
+		addr1: 5,
+		addr2: 10,
+	}, nonces)
 }

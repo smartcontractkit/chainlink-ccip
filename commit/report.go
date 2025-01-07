@@ -10,6 +10,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -19,11 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-)
-
-const (
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
-	transmissionDelayMultiplier = 3 * time.Second
 )
 
 // ReportInfo is the info data that will be sent with the along with the report
@@ -62,6 +58,8 @@ func (p *Plugin) Reports(
 		rep     cciptypes.CommitPluginReport
 		repInfo ReportInfo
 	)
+
+	// MerkleRoots and RMNSignatures will be empty arrays if there is nothing to report
 	rep = cciptypes.CommitPluginReport{
 		MerkleRoots: outcome.MerkleRootOutcome.RootsToReport,
 		PriceUpdates: cciptypes.PriceUpdates{
@@ -69,6 +67,11 @@ func (p *Plugin) Reports(
 			GasPriceUpdates:   outcome.ChainFeeOutcome.GasPrices,
 		},
 		RMNSignatures: outcome.MerkleRootOutcome.RMNReportSignatures,
+	}
+
+	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportEmpty {
+		rep.MerkleRoots = []cciptypes.MerkleRootChain{}
+		rep.RMNSignatures = []cciptypes.RMNECDSASignature{}
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
@@ -93,7 +96,7 @@ func (p *Plugin) Reports(
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
 		maps.Keys(p.oracleIDToP2PID),
-		transmissionDelayMultiplier,
+		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
@@ -123,8 +126,10 @@ func (p *Plugin) validateReport(
 	seqNr uint64,
 	r ocr3types.ReportWithInfo[[]byte],
 ) (bool, cciptypes.CommitPluginReport, error) {
+	lggr := logger.With(p.lggr, "seqNr", seqNr)
+
 	if r.Report == nil {
-		p.lggr.Warn("nil report", "seqNr", seqNr)
+		lggr.Warn("nil report")
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -134,7 +139,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if decodedReport.IsEmpty() {
-		p.lggr.Warnw("empty report after decoding", "seqNr", seqNr, "decodedReport", decodedReport)
+		lggr.Warnw("empty report after decoding", "decodedReport", decodedReport)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -146,7 +151,7 @@ func (p *Plugin) validateReport(
 	if p.offchainCfg.RMNEnabled &&
 		len(decodedReport.MerkleRoots) > 0 &&
 		consensus.LtFPlusOne(int(reportInfo.RemoteF), len(decodedReport.RMNSignatures)) {
-		p.lggr.Infow("report with insufficient RMN signatures %d < %d+1",
+		lggr.Infof("report with insufficient RMN signatures %d < %d+1",
 			len(decodedReport.RMNSignatures), reportInfo.RemoteF)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
@@ -158,7 +163,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
+		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
 
@@ -168,7 +173,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
+		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
 		)
@@ -186,7 +191,7 @@ func (p *Plugin) validateReport(
 
 	err = merkleroot.ValidateMerkleRootsState(ctx, decodedReport.MerkleRoots, p.ccipReader)
 	if err != nil {
-		p.lggr.Warnw("report reached transmission protocol but not transmitted, invalid merkle roots state",
+		lggr.Infow("report reached transmission protocol but not transmitted, invalid merkle roots state",
 			"err", err, "merkleRoots", decodedReport.MerkleRoots)
 		return false, cciptypes.CommitPluginReport{}, nil
 	}
@@ -203,7 +208,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not accepting", "seqNr", seqNr)
+		p.lggr.Infow("report is not accepted", "seqNr", seqNr)
 		return false, nil
 	}
 
@@ -213,6 +218,13 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, err
 	}
 
+	p.lggr.Infow("ShouldAcceptedAttestedReport passed checks",
+		"seqNr", seqNr,
+		"timestamp", time.Now().UTC(),
+		"rootsLen", len(decodedReport.MerkleRoots),
+		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
+		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
+	)
 	return true, nil
 }
 
@@ -228,7 +240,7 @@ func (p *Plugin) decodeReport(ctx context.Context, report []byte) (cciptypes.Com
 }
 
 func (p *Plugin) isStaleReport(seqNr, latestSeqNr uint64, decodedReport cciptypes.CommitPluginReport) bool {
-	if seqNr < latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
+	if seqNr <= latestSeqNr && len(decodedReport.MerkleRoots) == 0 {
 		p.lggr.Infow("skipping stale report", "seqNr", seqNr, "latestSeqNr", latestSeqNr)
 		return true
 	}
@@ -257,14 +269,16 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
+		p.lggr.Infow("report not valid, not transmitting", "seqNr", seqNr)
 		return false, nil
 	}
 
-	p.lggr.Infow("transmitting report",
-		"roots", len(decodedReport.MerkleRoots),
-		"tokenPriceUpdates", len(decodedReport.PriceUpdates.TokenPriceUpdates),
-		"gasPriceUpdates", len(decodedReport.PriceUpdates.GasPriceUpdates),
+	p.lggr.Infow("ShouldTransmitAcceptedReport passed checks",
+		"seqNr", seqNr,
+		"timestamp", time.Now().UTC(),
+		"rootsLen", len(decodedReport.MerkleRoots),
+		"tokenPriceUpdatesLen", len(decodedReport.PriceUpdates.TokenPriceUpdates),
+		"gasPriceUpdatesLen", len(decodedReport.PriceUpdates.GasPriceUpdates),
 	)
 	return true, nil
 }

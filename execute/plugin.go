@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"golang.org/x/exp/maps"
 
@@ -63,6 +65,7 @@ type Plugin struct {
 	estimateProvider      gas.EstimateProvider
 	lggr                  logger.Logger
 
+	observationOptimizer optimizers.ObservationOptimizer
 	// state
 	contractsInitialized bool
 }
@@ -114,7 +117,8 @@ func NewPlugin(
 			reportingCfg.OracleID,
 			destChain,
 		),
-		observer: metricsReporter,
+		observer:             metricsReporter,
+		observationOptimizer: optimizers.NewObservationOptimizer(maxObservationLength),
 	}
 }
 
@@ -235,22 +239,28 @@ func selectReport(
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
 
-	var stillPendingReports []exectypes.CommitData
-	for i, report := range commitReports {
-		// Reports at the end may not have messages yet.
-		if len(report.Messages) == 0 {
-			stillPendingReports = append(stillPendingReports, report)
+	var selectedReports []exectypes.CommitData
+	pendingReports := 0
+	for i, commitReport := range commitReports {
+		// handle incomplete observations.
+		if len(commitReport.Messages) == 0 {
+			pendingReports++
 			continue
 		}
 
 		var err error
-		commitReports[i], err = builder.Add(ctx, report)
+		// The builder may attach metadata to the commit report.
+		commitReports[i], err = builder.Add(ctx, commitReport)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
 		}
+
+		selectedReports = append(selectedReports, commitReports[i])
+
 		// If the report has not been fully executed, keep it for the next round.
+		// Detect a report was not fully executed
 		if len(commitReports[i].Messages) > len(commitReports[i].ExecutedMessages) {
-			stillPendingReports = append(stillPendingReports, commitReports[i])
+			pendingReports++
 		}
 	}
 
@@ -259,8 +269,23 @@ func selectReport(
 	lggr.Infow(
 		"reports have been selected",
 		"numReports", len(execReports),
-		"numPendingReports", len(stillPendingReports))
-	return execReports, stillPendingReports, err
+		"numPendingReports", pendingReports)
+	return execReports, selectedReports, err
+}
+
+func extractReportInfo(report exectypes.Outcome) cciptypes.ExecuteReportInfo {
+	var ri cciptypes.ExecuteReportInfo
+
+	for _, commitReport := range report.CommitReports {
+		ri = append(ri, cciptypes.MerkleRootChain{
+			ChainSel:      commitReport.SourceChain,
+			OnRampAddress: commitReport.OnRampAddress,
+			SeqNumsRange:  commitReport.SequenceNumberRange,
+			MerkleRoot:    commitReport.MerkleRoot,
+		})
+	}
+
+	return ri
 }
 
 func (p *Plugin) Reports(
@@ -276,9 +301,15 @@ func (p *Plugin) Reports(
 		return nil, fmt.Errorf("unable to decode outcome: %w", err)
 	}
 
-	encoded, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
+	encodedReport, err := p.reportCodec.Encode(ctx, decodedOutcome.Report)
 	if err != nil {
 		return nil, fmt.Errorf("unable to encode report: %w", err)
+	}
+
+	reportInfo := extractReportInfo(decodedOutcome)
+	encodedInfo, err := reportInfo.Encode()
+	if err != nil {
+		return nil, err
 	}
 
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
@@ -292,17 +323,17 @@ func (p *Plugin) Reports(
 	p.lggr.Debugw("transmission schedule override",
 		"transmissionSchedule", transmissionSchedule, "oracleIDToP2PID", p.oracleIDToP2pID)
 
-	report := []ocr3types.ReportPlus[[]byte]{
+	r := []ocr3types.ReportPlus[[]byte]{
 		{
 			ReportWithInfo: ocr3types.ReportWithInfo[[]byte]{
-				Report: encoded,
-				Info:   nil,
+				Report: encodedReport,
+				Info:   encodedInfo,
 			},
 			TransmissionScheduleOverride: transmissionSchedule,
 		},
 	}
 
-	return report, nil
+	return r, nil
 }
 
 // validateReport validates various aspects of the report.
@@ -314,9 +345,11 @@ func (p *Plugin) validateReport(
 	seqNr uint64,
 	r ocr3types.ReportWithInfo[[]byte],
 ) (valid bool, decodedReport cciptypes.ExecutePluginReport, err error) {
+	lggr := logger.With(p.lggr, "seqNr", seqNr)
+
 	// Just a safety check, should never happen.
 	if r.Report == nil {
-		p.lggr.Warn("skipping nil report", "seqNr", seqNr)
+		lggr.Warn("skipping nil report")
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
@@ -326,7 +359,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if len(decodedReport.ChainReports) == 0 {
-		p.lggr.Info("skipping empty report", "seqNr", seqNr)
+		lggr.Infow("skipping empty report")
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
@@ -337,7 +370,7 @@ func (p *Plugin) validateReport(
 	}
 
 	if !supports {
-		p.lggr.Warnw("dest chain not supported, can't run report acceptance procedures", "seqNr", seqNr)
+		lggr.Warnw("dest chain not supported, can't run report acceptance procedures")
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
 
@@ -347,10 +380,9 @@ func (p *Plugin) validateReport(
 	}
 
 	if !bytes.Equal(offRampConfigDigest[:], p.reportingCfg.ConfigDigest[:]) {
-		p.lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
+		lggr.Warnw("my config digest doesn't match offramp's config digest, not accepting/transmitting report",
 			"myConfigDigest", p.reportingCfg.ConfigDigest,
 			"offRampConfigDigest", hex.EncodeToString(offRampConfigDigest[:]),
-			"seqNr", seqNr,
 		)
 		return false, cciptypes.ExecutePluginReport{}, nil
 	}
@@ -367,7 +399,7 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 	}
 
 	if !valid {
-		p.lggr.Warn("report not valid, not accepting", "seqNr", seqNr)
+		p.lggr.Infow("report is not accepted", "seqNr", seqNr)
 		return false, nil
 	}
 
@@ -390,7 +422,10 @@ func (p *Plugin) ShouldAcceptAttestedReport(
 		return false, nil
 	}
 
-	p.lggr.Info("ShouldAcceptAttestedReport returns true, report accepted")
+	p.lggr.Infow("ShouldAcceptAttestedReport returns true, report accepted",
+		"seqNr", seqNr,
+		"reports", decodedReport.ChainReports,
+	)
 	return true, nil
 }
 
@@ -403,11 +438,14 @@ func (p *Plugin) ShouldTransmitAcceptedReport(
 	}
 
 	if !valid {
-		p.lggr.Warnw("report not valid, not transmitting", "seqNr", seqNr)
+		p.lggr.Infow("report not accepted for transmit", "seqNr", seqNr)
 		return false, nil
 	}
 
-	p.lggr.Infow("transmitting report", "reports", decodedReport.ChainReports)
+	p.lggr.Infow("ShouldTransmitAttestedReport returns true, report accepted",
+		"seqNr", seqNr,
+		"reports", decodedReport.ChainReports,
+	)
 	return true, nil
 }
 

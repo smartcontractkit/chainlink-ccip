@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
+
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -158,7 +160,7 @@ func (p *Plugin) getMessagesOutcome(
 		}
 		if len(report.Messages) == 0 {
 			// If there are no messages, remove the commit report.
-			commitReports = append(commitReports[:i], commitReports[i+1:]...)
+			commitReports = internal.RemoveIthElement(commitReports, i)
 		}
 		commitReports = append(commitReports, report)
 	}
@@ -173,7 +175,7 @@ func (p *Plugin) getFilterOutcome(
 	observation exectypes.Observation,
 	previousOutcome exectypes.Outcome,
 ) (exectypes.Outcome, error) {
-	commitReports := previousOutcome.PendingCommitReports
+	commitReports := previousOutcome.CommitReports
 
 	builder := report.NewBuilder(
 		p.lggr,
@@ -185,13 +187,14 @@ func (p *Plugin) getFilterOutcome(
 		uint64(maxReportLength),
 		p.offchainCfg.BatchGasLimit,
 	)
-	outcomeReports, commitReports, err := selectReport(
+
+	outcomeReports, selectedReports, err := selectReport(
 		ctx,
 		p.lggr,
 		commitReports,
 		builder)
 	if err != nil {
-		return exectypes.Outcome{}, fmt.Errorf("unable to extract proofs: %w", err)
+		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}
 
 	execReport := cciptypes.ExecutePluginReport{
@@ -200,5 +203,5 @@ func (p *Plugin) getFilterOutcome(
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, commitReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, selectedReports, execReport), nil
 }

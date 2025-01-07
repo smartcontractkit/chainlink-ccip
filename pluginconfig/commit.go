@@ -25,6 +25,7 @@ const (
 	defaultRMNEnabled                         = false
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
+	defaultTransmissionDelayMultiplier        = 30 * time.Second
 )
 
 type FeeInfo struct {
@@ -116,6 +117,9 @@ type CommitOffchainConfig struct {
 
 	// SignObservationPrefix is the prefix used by the RMN node to sign observations.
 	SignObservationPrefix string `json:"signObservationPrefix"`
+
+	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
+	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
 }
 
 func (c *CommitOffchainConfig) applyDefaults() {
@@ -141,6 +145,10 @@ func (c *CommitOffchainConfig) applyDefaults() {
 
 	if c.SignObservationPrefix == "" {
 		c.SignObservationPrefix = defaultSignObservationPrefix
+	}
+
+	if c.TransmissionDelayMultiplier == 0 {
+		c.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
 	}
 }
 

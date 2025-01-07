@@ -429,50 +429,77 @@ func (r *ccipChainReader) Nonces(
 		return nil, err
 	}
 
-	res := make(map[string]uint64)
-	mu := new(sync.Mutex)
-	eg := new(errgroup.Group)
+	// Prepare the batch request
+	contractBatch := make([]types.BatchRead, len(addresses))
+	addressToIndex := make(map[string]int, len(addresses))
+	responses := make([]uint64, len(addresses))
 
-	for _, address := range addresses {
-		eg.Go(func() error {
-			sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
-			if err != nil {
-				return fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
-			}
+	for i, address := range addresses {
+		sender, err := typeconv.AddressStringToBytes(address, uint64(sourceChainSelector))
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
+		}
 
-			// TODO: evm only, need to make chain agnostic.
-			// pad the sender slice to 32 bytes from the left
-			sender = slicelib.LeftPadBytes(sender, 32)
+		// TODO: evm only, need to make chain agnostic.
+		// pad the sender slice to 32 bytes from the left
+		sender = slicelib.LeftPadBytes(sender, 32)
 
-			r.lggr.Infow("getting nonce for address",
-				"address", address, "sender", hex.EncodeToString(sender))
+		r.lggr.Infow("getting nonce for address",
+			"address", address, "sender", hex.EncodeToString(sender))
 
-			var resp uint64
-			err = r.contractReaders[destChainSelector].ExtendedGetLatestValue(
-				ctx,
-				consts.ContractNameNonceManager,
-				consts.MethodNameGetInboundNonce,
-				primitives.Unconfirmed,
-				map[string]any{
-					"sourceChainSelector": sourceChainSelector,
-					"sender":              sender,
-				},
-				&resp,
-			)
-			if err != nil {
-				return fmt.Errorf("failed to get nonce for address %s: %w", address, err)
-			}
-			mu.Lock()
-			defer mu.Unlock()
-			res[address] = resp
-			return nil
-		})
+		contractBatch[i] = types.BatchRead{
+			ReadName: consts.MethodNameGetInboundNonce,
+			Params: map[string]any{
+				"sourceChainSelector": sourceChainSelector,
+				"sender":              sender,
+			},
+			ReturnVal: &responses[i],
+		}
+		addressToIndex[address] = i
 	}
 
-	if err := eg.Wait(); err != nil {
-		return nil, err
+	request := contractreader.ExtendedBatchGetLatestValuesRequest{
+		consts.ContractNameNonceManager: contractBatch,
 	}
+
+	batchResult, err := r.contractReaders[destChainSelector].ExtendedBatchGetLatestValues(
+		ctx,
+		request,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("batch get nonces failed: %w", err)
+	}
+
+	// Process results
+	res := make(map[string]uint64, len(addresses))
+	for _, results := range batchResult {
+		for i, readResult := range results {
+			address := getAddressByIndex(addressToIndex, i)
+
+			returnVal, err := readResult.GetResult()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get nonce for address %s: %w", address, err)
+			}
+
+			val, ok := returnVal.(*uint64)
+			if !ok || val == nil {
+				return nil, fmt.Errorf("invalid nonce value returned for address %s", address)
+			}
+
+			res[address] = *val
+		}
+	}
+
 	return res, nil
+}
+
+func getAddressByIndex(addressToIndex map[string]int, index int) string {
+	for address, idx := range addressToIndex {
+		if idx == index {
+			return address
+		}
+	}
+	return ""
 }
 
 func (r *ccipChainReader) GetChainsFeeComponents(
@@ -1001,13 +1028,16 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	)
 
 	if err != nil {
-		return cciptypes.BigInt{}, fmt.Errorf("failed to get LINK token price, addr: %v, err: %w", tokenAddr, err)
+		return cciptypes.BigInt{}, fmt.Errorf("failed to get token price, addr: %v, err: %w", tokenAddr, err)
 	}
 
 	price := timestampedPrice.Value
 
+	if price == nil {
+		return cciptypes.BigInt{}, fmt.Errorf("token price is nil,  addr: %v", tokenAddr)
+	}
 	if price.Cmp(big.NewInt(0)) == 0 {
-		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
+		return cciptypes.BigInt{}, fmt.Errorf("token price is 0, addr: %v", tokenAddr)
 	}
 
 	return cciptypes.NewBigInt(price), nil

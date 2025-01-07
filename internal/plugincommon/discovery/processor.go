@@ -155,14 +155,14 @@ func aggregateObservations(
 		for chain, addr := range ao.Observation.Addresses[consts.ContractNameOnRamp] {
 			// we don't want invalid observations to "poison" the consensus.
 			if isZero(addr) {
-				lggr.Warnf("skipping empty onramp address in observation from Oracle %d", ao.OracleID)
+				lggr.Debugf("skipping empty onramp address in observation from Oracle %d", ao.OracleID)
 				continue
 			}
 			obs.onrampAddrs[chain] = append(obs.onrampAddrs[chain], addr)
 		}
 
 		if isZero(ao.Observation.Addresses[consts.ContractNameNonceManager][dest]) {
-			lggr.Warnf("skipping empty nonce manager address in observation from Oracle %d", ao.OracleID)
+			lggr.Debugf("skipping empty nonce manager address in observation from Oracle %d", ao.OracleID)
 		} else {
 			obs.nonceManagerAddrs[dest] = append(
 				obs.nonceManagerAddrs[dest],
@@ -171,7 +171,7 @@ func aggregateObservations(
 		}
 
 		if isZero(ao.Observation.Addresses[consts.ContractNameRMNRemote][dest]) {
-			lggr.Warnf("skipping empty RMNRemote address in observation from Oracle %d", ao.OracleID)
+			lggr.Debugf("skipping empty RMNRemote address in observation from Oracle %d", ao.OracleID)
 		} else {
 			obs.rmnRemoteAddrs[dest] = append(
 				obs.rmnRemoteAddrs[dest],
@@ -181,7 +181,7 @@ func aggregateObservations(
 
 		for chain, addr := range ao.Observation.Addresses[consts.ContractNameRouter] {
 			if isZero(addr) {
-				lggr.Warnf("skipping empty Router address in observation from Oracle %d", ao.OracleID)
+				lggr.Debugf("skipping empty Router address in observation from Oracle %d", ao.OracleID)
 				continue
 			}
 			obs.routerAddrs[chain] = append(
@@ -193,7 +193,7 @@ func aggregateObservations(
 		for chain, addr := range ao.Observation.Addresses[consts.ContractNameFeeQuoter] {
 			// we don't want invalid observations to "poison" the consensus.
 			if isZero(addr) {
-				lggr.Warnf("skipping empty fee quoter address in observation from Oracle %d", ao.OracleID)
+				lggr.Debugf("skipping empty fee quoter address in observation from Oracle %d", ao.OracleID)
 				continue
 			}
 			obs.feeQuoterAddrs[chain] = append(obs.feeQuoterAddrs[chain], addr)
@@ -218,6 +218,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	ctx context.Context, _ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
+	contracts := make(reader.ContractAddresses)
 
 	agg := aggregateObservations(cdp.lggr, cdp.dest, aos)
 
@@ -225,24 +226,28 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
 	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", agg.fChain, donThresh)
 	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
-	destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
 
-	contracts := make(reader.ContractAddresses)
-	onrampConsensus := consensus.GetConsensusMap(
-		cdp.lggr,
-		"onramp",
-		agg.onrampAddrs,
-		destThresh,
-	)
-	cdp.lggr.Infow("Determined consensus onramps",
-		"onrampConsensus", onrampConsensus,
-		"onrampAddrs", agg.onrampAddrs,
-		"fChainThresh", fChainThresh,
-	)
-	if len(onrampConsensus) == 0 {
-		cdp.lggr.Warnw("No consensus on onramps, onrampConsensus map is empty")
+	if _, exists := fChain[cdp.dest]; !exists {
+		cdp.lggr.Warnw("missing fChain for dest (fChain[%d]), skipping onramp address lookup", cdp.dest)
+	} else {
+		destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
+
+		onrampConsensus := consensus.GetConsensusMap(
+			cdp.lggr,
+			"onramp",
+			agg.onrampAddrs,
+			destThresh,
+		)
+		cdp.lggr.Infow("Determined consensus onramps",
+			"onrampConsensus", onrampConsensus,
+			"onrampAddrs", agg.onrampAddrs,
+			"fChainThresh", fChainThresh,
+		)
+		if len(onrampConsensus) == 0 {
+			cdp.lggr.Debugw("No consensus on onramps, onrampConsensus map is empty")
+		}
+		contracts[consts.ContractNameOnRamp] = onrampConsensus
 	}
-	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
 	nonceManagerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,
@@ -256,7 +261,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"fChainThresh", fChainThresh,
 	)
 	if len(nonceManagerConsensus) == 0 {
-		cdp.lggr.Warnw("No consensus on nonce manager, nonceManagerConsensus map is empty")
+		cdp.lggr.Debugw("No consensus on nonce manager, nonceManagerConsensus map is empty")
 	}
 	contracts[consts.ContractNameNonceManager] = nonceManagerConsensus
 
@@ -273,7 +278,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"fChainThresh", fChainThresh,
 	)
 	if len(rmnRemoteConsensus) == 0 {
-		cdp.lggr.Warnw("No consensus on RMNRemote, rmnRemoteConsensus map is empty")
+		cdp.lggr.Debugw("No consensus on RMNRemote, rmnRemoteConsensus map is empty")
 	}
 	contracts[consts.ContractNameRMNRemote] = rmnRemoteConsensus
 
@@ -289,7 +294,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"fChainThresh", fChainThresh,
 	)
 	if len(feeQuoterConsensus) == 0 {
-		cdp.lggr.Warnw("No consensus on fee quoters, feeQuoterConsensus map is empty")
+		cdp.lggr.Debugw("No consensus on fee quoters, feeQuoterConsensus map is empty")
 	}
 	contracts[consts.ContractNameFeeQuoter] = feeQuoterConsensus
 
@@ -306,7 +311,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 		"fChainThresh", fChainThresh,
 	)
 	if len(routerConsensus) == 0 {
-		cdp.lggr.Warnw("No consensus on router, routerConsensus map is empty")
+		cdp.lggr.Debugw("No consensus on router, routerConsensus map is empty")
 	}
 	contracts[consts.ContractNameRouter] = routerConsensus
 

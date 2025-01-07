@@ -8,7 +8,7 @@ require (
 	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/smartcontractkit/chain-selectors v1.0.34
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241127162636-07aa781ee1f4
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241212163958-6a43e61b9d49
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
