@@ -8,6 +8,10 @@ export ANCHOR_IMAGE ?= backpackapp/build:$(ANCHOR_VERSION)
 anchor_version:
 	@echo "${ANCHOR_VERSION}"
 
+.PHONY: clippy
+clippy:
+	cargo clippy --manifest-path ./contracts/programs/ccip-router/Cargo.toml
+
 .PHONY: gomods
 gomods: ## Install gomods
 	go install github.com/jmank88/gomods@v0.1.3
@@ -44,6 +48,9 @@ format:
 go-tests:
 	go test -v ./... -json -covermode=atomic -coverpkg=./... -coverprofile=integration_coverage.txt 2>&1 | tee /tmp/gotest.log | gotestloghelper -ci=true -singlepackage=true -hidepassingtests=false -hidepassinglogs=false
 
-.PHONY: generate-idl
-generate-idl:
+.PHONY: build-contracts
+build-contracts:
 	cd ./contracts && anchor build
+
+.PHONY: solana-checks
+solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
