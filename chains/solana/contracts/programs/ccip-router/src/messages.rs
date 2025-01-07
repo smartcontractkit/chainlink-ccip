@@ -358,8 +358,11 @@ impl Solana2AnyMessage {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use crate::utils::Exponential;
+
     use super::*;
     use anchor_lang::solana_program::pubkey::Pubkey;
+    use anchor_spl::token::spl_token::native_mint;
     use bytemuck::Zeroable;
 
     /// Builds a message and hash it, it's compared with a known hash
@@ -509,27 +512,32 @@ pub(crate) mod tests {
 
     pub fn sample_billing_config() -> BillingTokenConfig {
         let mut value = [0; 28];
-        value[27] = 3;
+        value.clone_from_slice(&3u32.e(18).to_be_bytes()[4..]);
         BillingTokenConfig {
             enabled: true,
-            mint: Pubkey::new_unique(),
+            mint: native_mint::ID,
             usd_per_token: crate::TimestampedPackedU224 {
                 value,
                 timestamp: 100,
             },
-            premium_multiplier_wei_per_eth: 0,
+            premium_multiplier_wei_per_eth: 1,
         }
     }
 
     pub fn sample_dest_chain() -> DestChain {
+        let mut value = [0; 28];
+        // L1 gas price
+        value[0..14].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
+        // L2 gas price
+        value[14..].clone_from_slice(&U256::new(22u128).to_be_bytes()[18..]);
         DestChain {
             version: 1,
             chain_selector: 1,
             state: crate::DestChainState {
                 sequence_number: 0,
                 usd_per_unit_gas: crate::TimestampedPackedU224 {
-                    value: [0; 28],
-                    timestamp: 0,
+                    value,
+                    timestamp: 100,
                 },
             },
             config: crate::DestChainConfig {
@@ -537,16 +545,16 @@ pub(crate) mod tests {
                 max_number_of_tokens_per_msg: 5,
                 max_data_bytes: 200,
                 max_per_msg_gas_limit: 0,
-                dest_gas_overhead: 0,
+                dest_gas_overhead: 1,
                 dest_gas_per_payload_byte: 0,
                 dest_data_availability_overhead_gas: 0,
-                dest_gas_per_data_availability_byte: 0,
-                dest_data_availability_multiplier_bps: 0,
-                default_token_fee_usdcents: 0,
+                dest_gas_per_data_availability_byte: 1,
+                dest_data_availability_multiplier_bps: 1,
+                default_token_fee_usdcents: 100,
                 default_token_dest_gas_overhead: 0,
                 default_tx_gas_limit: 0,
-                gas_multiplier_wei_per_eth: 0,
-                network_fee_usdcents: 0,
+                gas_multiplier_wei_per_eth: 1,
+                network_fee_usdcents: 100,
                 gas_price_staleness_threshold: 10,
                 enforce_out_of_order: false,
                 chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),

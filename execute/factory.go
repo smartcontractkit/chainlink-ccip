@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
@@ -98,7 +97,7 @@ type PluginFactory struct {
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
 	homeChainReader  reader.HomeChain
-	estimateProvider gas.EstimateProvider
+	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
@@ -112,7 +111,7 @@ func NewPluginFactory(
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	tokenDataEncoder cciptypes.TokenDataEncoder,
-	estimateProvider gas.EstimateProvider,
+	estimateProvider cciptypes.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 ) *PluginFactory {

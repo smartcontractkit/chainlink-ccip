@@ -22,6 +22,8 @@ use crate::ocr3base::*;
 mod instructions;
 use crate::instructions::*;
 
+mod utils;
+
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
@@ -372,8 +374,8 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-    /// * `_chain_selector` - The chain selector.
-    /// * `_mint` - The public key of the token mint.
+    /// * `chain_selector` - The chain selector.
+    /// * `mint` - The public key of the token mint.
     /// * `cfg` - The token billing configuration.
     pub fn set_token_billing(
         ctx: Context<SetTokenBillingConfig>,
@@ -450,11 +452,22 @@ pub mod ccip_router {
     /// * `dest_chain_selector` - The chain selector for the destination chain.
     /// * `message` - The message to be sent.
     ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token sent with the message, sequentially.
+    ///   For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
+    ///   tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
+    /// * Then, the per chain / per token config of every token sent with the message, sequentially
+    ///   in the same order.
+    ///
     /// # Returns
     ///
     /// The fee amount in u64.
-    pub fn get_fee(
-        ctx: Context<GetFee>,
+    pub fn get_fee<'info>(
+        ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<u64> {
@@ -649,4 +662,8 @@ pub enum CcipRouterError {
     InsufficientLamports,
     #[msg("Insufficient funds")]
     InsufficientFunds,
+    #[msg("Unsupported token")]
+    UnsupportedToken,
+    #[msg("Inputs are missing token configuration")]
+    InvalidInputsMissingTokenConfig,
 }

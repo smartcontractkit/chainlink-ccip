@@ -194,11 +194,14 @@ pub fn update_enable_manual_execution_after(
 
 pub fn set_token_billing(
     ctx: Context<SetTokenBillingConfig>,
-    _chain_selector: u64,
-    _mint: Pubkey,
+    chain_selector: u64,
+    mint: Pubkey,
     cfg: TokenBilling,
 ) -> Result<()> {
+    ctx.accounts.per_chain_per_token_config.version = 1; // update this if we change the account struct
     ctx.accounts.per_chain_per_token_config.billing = cfg;
+    ctx.accounts.per_chain_per_token_config.chain_selector = chain_selector;
+    ctx.accounts.per_chain_per_token_config.mint = mint;
     Ok(())
 }
 

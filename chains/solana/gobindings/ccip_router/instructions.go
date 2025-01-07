@@ -232,8 +232,8 @@ var (
 	// # Arguments
 	//
 	// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-	// * `_chain_selector` - The chain selector.
-	// * `_mint` - The public key of the token mint.
+	// * `chain_selector` - The chain selector.
+	// * `mint` - The public key of the token mint.
 	// * `cfg` - The token billing configuration.
 	Instruction_SetTokenBilling = ag_binary.TypeID([8]byte{225, 230, 37, 71, 131, 209, 54, 230})
 
@@ -282,6 +282,17 @@ var (
 	// * `_ctx` - The context containing the accounts required for the fee calculation.
 	// * `dest_chain_selector` - The chain selector for the destination chain.
 	// * `message` - The message to be sent.
+	//
+	// # Additional accounts
+	//
+	// In addition to the fixed amount of accounts defined in the `GetFee` context,
+	// the following accounts must be provided:
+	//
+	// * First, the billing token config accounts for each token sent with the message, sequentially.
+	// For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
+	// tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
+	// * Then, the per chain / per token config of every token sent with the message, sequentially
+	// in the same order.
 	//
 	// # Returns
 	//
