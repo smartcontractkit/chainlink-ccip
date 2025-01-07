@@ -390,7 +390,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	for c, s := range offRampNextSeqNums {
 		result = append(result, plugintypes.SeqNumChain{ChainSel: c, SeqNum: s})
 	}
-	
+
 	return result
 }
 
