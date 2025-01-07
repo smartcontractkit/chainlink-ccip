@@ -59,16 +59,16 @@ func TestCCIPRouter(t *testing.T) {
 
 	// billing
 	type AccountsPerToken struct {
-		name                      string
-		program                   solana.PublicKey
-		mint                      solana.PublicKey
-		billingATA                solana.PublicKey
-		userATA                   solana.PublicKey
-		anotherUserATA            solana.PublicKey
-		tokenlessUserATA          solana.PublicKey
-		billingConfigPDA          solana.PublicKey
-		feeAggregatorATA          solana.PublicKey
-		perChainPerTokenConfigPDA solana.PublicKey
+		name             string
+		program          solana.PublicKey
+		mint             solana.PublicKey
+		billingATA       solana.PublicKey
+		userATA          solana.PublicKey
+		anotherUserATA   solana.PublicKey
+		tokenlessUserATA solana.PublicKey
+		billingConfigPDA solana.PublicKey
+		feeAggregatorATA solana.PublicKey
+		evmConfigPDA     solana.PublicKey
 		// add other accounts as needed
 	}
 	wsol := AccountsPerToken{name: "WSOL (pre-2022)"}
@@ -238,7 +238,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, aerr)
 			wsolReceiver, _, rerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, config.BillingSignerPDA)
 			require.NoError(t, rerr)
-			wsolPerChainPerTokenConfigPDA, _, perr := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), solana.SolMint.Bytes()}, ccip_router.ProgramID)
+			wsolEvmConfigPDA, _, perr := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), solana.SolMint.Bytes()}, ccip_router.ProgramID)
 			require.NoError(t, perr)
 			wsolUserATA, _, uerr := tokens.FindAssociatedTokenAddress(solana.TokenProgramID, solana.SolMint, user.PublicKey())
 			require.NoError(t, uerr)
@@ -258,7 +258,7 @@ func TestCCIPRouter(t *testing.T) {
 			wsol.tokenlessUserATA = wsolTokenlessUserATA
 			wsol.billingATA = wsolReceiver
 			wsol.feeAggregatorATA = wsolFeeAggregatorATA
-			wsol.perChainPerTokenConfigPDA = wsolPerChainPerTokenConfigPDA
+			wsol.evmConfigPDA = wsolEvmConfigPDA
 
 			///////////////
 			// Token2022 //
@@ -275,7 +275,7 @@ func TestCCIPRouter(t *testing.T) {
 
 			token2022PDA, _, aerr := solana.FindProgramAddress([][]byte{config.BillingTokenConfigPrefix, mintPubK.Bytes()}, ccip_router.ProgramID)
 			require.NoError(t, aerr)
-			token2022PerChainPerTokenConfigPDA, _, puerr := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), mintPubK.Bytes()}, ccip_router.ProgramID)
+			token2022EvmConfigPDA, _, puerr := solana.FindProgramAddress([][]byte{[]byte("ccip_tokenpool_billing"), binary.LittleEndian.AppendUint64([]byte{}, config.EvmChainSelector), mintPubK.Bytes()}, ccip_router.ProgramID)
 			require.NoError(t, puerr)
 			token2022Receiver, _, rerr := tokens.FindAssociatedTokenAddress(config.Token2022Program, mintPubK, config.BillingSignerPDA)
 			require.NoError(t, rerr)
@@ -297,7 +297,7 @@ func TestCCIPRouter(t *testing.T) {
 			token2022.tokenlessUserATA = token2022TokenlessUserATA
 			token2022.billingATA = token2022Receiver
 			token2022.feeAggregatorATA = token2022FeeAggregatorATA
-			token2022.perChainPerTokenConfigPDA = token2022PerChainPerTokenConfigPDA
+			token2022.evmConfigPDA = token2022EvmConfigPDA
 		})
 
 		t.Run("Commit price updates address lookup table", func(t *testing.T) {
