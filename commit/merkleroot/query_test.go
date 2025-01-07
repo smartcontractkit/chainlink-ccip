@@ -34,6 +34,12 @@ func TestProcessor_Query(t *testing.T) {
 		dstChain:  {consts.ContractNameOffRamp: []byte("0x1234567890123456789012345678901234567892")},
 	}
 
+	contractAddrNoErrs := map[ccipocr3.ChainSelector]map[string]error{
+		srcChain1: {consts.ContractNameOnRamp: nil},
+		srcChain2: {consts.ContractNameOnRamp: nil},
+		dstChain:  {consts.ContractNameOffRamp: nil},
+	}
+
 	expSigs1 := &rmn.ReportSignatures{
 		Signatures: []*rmnpb.EcdsaSignature{
 			{R: []byte("r1"), S: []byte("s1")},
@@ -58,14 +64,15 @@ func TestProcessor_Query(t *testing.T) {
 	rmnRemoteCfg := testhelpers.CreateRMNRemoteCfg()
 
 	testCases := []struct {
-		name              string
-		prevOutcome       Outcome
-		contractAddresses map[ccipocr3.ChainSelector]map[string][]byte
-		cfg               pluginconfig.CommitOffchainConfig
-		destChain         ccipocr3.ChainSelector
-		rmnClient         func(t *testing.T) *rmnmocks.MockController
-		expQuery          Query
-		expErr            bool
+		name               string
+		prevOutcome        Outcome
+		contractAddresses  map[ccipocr3.ChainSelector]map[string][]byte
+		contractAddrErrors map[ccipocr3.ChainSelector]map[string]error
+		cfg                pluginconfig.CommitOffchainConfig
+		destChain          ccipocr3.ChainSelector
+		rmnClient          func(t *testing.T) *rmnmocks.MockController
+		expQuery           Query
+		expErr             bool
 	}{
 		{
 			name: "happy path",
@@ -77,7 +84,8 @@ func TestProcessor_Query(t *testing.T) {
 				},
 				RMNRemoteCfg: rmnRemoteCfg,
 			},
-			contractAddresses: contractAddrs,
+			contractAddresses:  contractAddrs,
+			contractAddrErrors: contractAddrNoErrs,
 			cfg: pluginconfig.CommitOffchainConfig{
 				RMNEnabled:           true,
 				RMNSignaturesTimeout: 5 * time.Second,
@@ -120,7 +128,7 @@ func TestProcessor_Query(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name: "rmn timeout",
+			name: "onRamp address resolution on one chain should not affect other chains",
 			prevOutcome: Outcome{
 				OutcomeType: ReportIntervalsSelected,
 				RangesSelectedForReport: []plugintypes.ChainRange{
@@ -130,6 +138,81 @@ func TestProcessor_Query(t *testing.T) {
 				RMNRemoteCfg: rmnRemoteCfg,
 			},
 			contractAddresses: contractAddrs,
+			contractAddrErrors: map[ccipocr3.ChainSelector]map[string]error{
+				srcChain1: {consts.ContractNameOnRamp: nil},
+				srcChain2: {consts.ContractNameOnRamp: fmt.Errorf("some error")},
+				dstChain:  {consts.ContractNameOffRamp: nil},
+			},
+			cfg: pluginconfig.CommitOffchainConfig{
+				RMNEnabled:           true,
+				RMNSignaturesTimeout: 5 * time.Second,
+			},
+			destChain: dstChain,
+			rmnClient: func(t *testing.T) *rmnmocks.MockController {
+				cl := rmnmocks.NewMockController(t)
+				cl.EXPECT().
+					ComputeReportSignatures(
+						mock.Anything,
+						&rmnpb.LaneDest{
+							DestChainSelector: uint64(dstChain),
+							OfframpAddress:    contractAddrs[dstChain][consts.ContractNameOffRamp],
+						},
+						[]*rmnpb.FixedDestLaneUpdateRequest{
+							{
+								LaneSource: &rmnpb.LaneSource{
+									SourceChainSelector: uint64(srcChain1),
+									OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
+								},
+								ClosedInterval: &rmnpb.ClosedInterval{MinMsgNr: 10, MaxMsgNr: 20},
+							},
+						},
+						rmnRemoteCfg,
+					).
+					Return(&rmn.ReportSignatures{
+						Signatures: []*rmnpb.EcdsaSignature{
+							{R: []byte("r1"), S: []byte("s1")},
+						},
+						LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+							{
+								LaneSource: &rmnpb.LaneSource{
+									SourceChainSelector: uint64(srcChain1),
+									OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
+								},
+							},
+						},
+					}, nil)
+				return cl
+			},
+			expQuery: Query{
+				RetryRMNSignatures: false,
+				RMNSignatures: &rmn.ReportSignatures{
+					Signatures: []*rmnpb.EcdsaSignature{
+						{R: []byte("r1"), S: []byte("s1")},
+					},
+					LaneUpdates: []*rmnpb.FixedDestLaneUpdate{
+						{
+							LaneSource: &rmnpb.LaneSource{
+								SourceChainSelector: uint64(srcChain1),
+								OnrampAddress:       contractAddrs[srcChain1][consts.ContractNameOnRamp],
+							},
+						},
+					},
+				},
+			},
+			expErr: false,
+		},
+		{
+			name: "rmn timeout",
+			prevOutcome: Outcome{
+				OutcomeType: ReportIntervalsSelected,
+				RangesSelectedForReport: []plugintypes.ChainRange{
+					{ChainSel: srcChain1, SeqNumRange: ccipocr3.NewSeqNumRange(10, 20)},
+					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
+				},
+				RMNRemoteCfg: rmnRemoteCfg,
+			},
+			contractAddresses:  contractAddrs,
+			contractAddrErrors: contractAddrNoErrs,
 			cfg: pluginconfig.CommitOffchainConfig{
 				RMNEnabled:           true,
 				RMNSignaturesTimeout: time.Second,
@@ -158,7 +241,8 @@ func TestProcessor_Query(t *testing.T) {
 				},
 				RMNRemoteCfg: rmnRemoteCfg,
 			},
-			contractAddresses: contractAddrs,
+			contractAddresses:  contractAddrs,
+			contractAddrErrors: contractAddrNoErrs,
 			cfg: pluginconfig.CommitOffchainConfig{
 				RMNEnabled:           true,
 				RMNSignaturesTimeout: time.Second,
@@ -212,7 +296,8 @@ func TestProcessor_Query(t *testing.T) {
 					{ChainSel: srcChain2, SeqNumRange: ccipocr3.NewSeqNumRange(50, 51)},
 				},
 			},
-			contractAddresses: contractAddrs,
+			contractAddresses:  contractAddrs,
+			contractAddrErrors: contractAddrNoErrs,
 			cfg: pluginconfig.CommitOffchainConfig{
 				RMNEnabled:           true,
 				RMNSignaturesTimeout: time.Second,
@@ -230,7 +315,8 @@ func TestProcessor_Query(t *testing.T) {
 			if !tc.prevOutcome.RMNRemoteCfg.IsEmpty() {
 				for chainSel, contracts := range tc.contractAddresses {
 					for name, addr := range contracts {
-						ccipReader.EXPECT().GetContractAddress(name, chainSel).Return(addr, nil)
+						ccipReader.EXPECT().GetContractAddress(name, chainSel).
+							Return(addr, tc.contractAddrErrors[chainSel][name])
 					}
 				}
 			}
