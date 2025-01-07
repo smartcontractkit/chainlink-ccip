@@ -380,17 +380,9 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	o.lggr.Debugw("Output of ccipreader is ", "offrampnextseqnums", offRampNextSeqNums)
-	if len(offRampNextSeqNums) != len(sourceChains) {
-		o.lggr.Warnw("unexpected number of sequence numbers returned",
-			"expected", len(sourceChains),
-			"actual", len(offRampNextSeqNums),
-		)
-	}
-
 	for _, c := range sourceChains {
 		if _, ok := offRampNextSeqNums[c]; !ok {
-			o.lggr.Errorf("error finding source chain %d in sequence numbers", c)
+			o.lggr.Errorf("error finding source chain %d in sequence numbers, skipping", c)
 		}
 	}
 
@@ -398,8 +390,7 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 	for c, s := range offRampNextSeqNums {
 		result = append(result, plugintypes.SeqNumChain{ChainSel: c, SeqNum: s})
 	}
-
-	o.lggr.Debugw("observed final result is", "result", result)
+	
 	return result
 }
 
