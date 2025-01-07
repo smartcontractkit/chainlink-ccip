@@ -391,6 +391,9 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		result = append(result, plugintypes.SeqNumChain{ChainSel: c, SeqNum: s})
 	}
 
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ChainSel < result[j].ChainSel
+	})
 	return result
 }
 
