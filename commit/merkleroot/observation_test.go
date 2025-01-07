@@ -241,7 +241,8 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				// return a smaller slice, should return subset
-				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345}, nil)
+				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).
+					Return(map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345}, nil)
 				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
 					Return(&reader.CurseInfo{}, nil)
 				return chainSupport, ccipReader

@@ -201,10 +201,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			},
 		},
 		{
-			name:                                   "report generated in previous outcome, transmitted with success",
-			prevOutcome:                            outcomeReportGenerated,
-			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
-			offRampNextSeqNumDefaultOverrideValues: map[ccipocr3.ChainSelector]ccipocr3.SeqNum{sourceChain1: 11, sourceChain2: 20},
+			name:                                 "report generated in previous outcome, transmitted with success",
+			prevOutcome:                          outcomeReportGenerated,
+			offRampNextSeqNumDefaultOverrideKeys: []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
+			offRampNextSeqNumDefaultOverrideValues: map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
+				sourceChain1: 11,
+				sourceChain2: 20,
+			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmitted,
