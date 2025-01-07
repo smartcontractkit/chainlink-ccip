@@ -156,7 +156,7 @@ func validateRMNRemoteConfig(
 		return fmt.Errorf("empty RmnReportVersion")
 	}
 
-	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.F+1 {
+	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.FSign+1 {
 		return fmt.Errorf("not enough signers to cover F+1 threshold")
 	}
 
