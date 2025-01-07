@@ -33,6 +33,8 @@ use crate::ocr3base::*;
 mod fee_quoter;
 use crate::fee_quoter::*;
 
+mod utils;
+
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
@@ -70,6 +72,7 @@ pub mod ccip_router {
         default_gas_limit: u128,
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
+        fee_aggregator: Pubkey,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
@@ -83,6 +86,8 @@ pub mod ccip_router {
         }
 
         config.owner = ctx.accounts.authority.key();
+
+        config.fee_aggregator = fee_aggregator;
 
         config.ocr3 = [
             Ocr3Config::new(OcrPluginType::Commit as u8),
@@ -130,6 +135,22 @@ pub mod ccip_router {
         Ok(())
     }
 
+    /// Updates the fee aggregator in the router configuration.
+    /// The Admin is the only one able to update the fee aggregator.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for updating the configuration.
+    /// * `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token).
+    pub fn update_fee_aggregator(
+        ctx: Context<UpdateConfigCCIPRouter>,
+        fee_aggregator: Pubkey,
+    ) -> Result<()> {
+        let mut config = ctx.accounts.config.load_mut()?;
+        config.fee_aggregator = fee_aggregator;
+        Ok(())
+    }
+
     /// Adds a new chain selector to the router.
     ///
     /// The Admin needs to add any new chain supported (this means both OnRamp and OffRamp).
@@ -152,6 +173,7 @@ pub mod ccip_router {
         let source_chain_state = &mut ctx.accounts.source_chain_state;
         validate_source_chain_config(new_chain_selector, &source_chain_config)?;
         source_chain_state.version = 1;
+        source_chain_state.chain_selector = new_chain_selector;
         source_chain_state.config = source_chain_config.clone();
         source_chain_state.state = SourceChainState { min_seq_nr: 1 };
 
@@ -159,6 +181,7 @@ pub mod ccip_router {
         let dest_chain_state = &mut ctx.accounts.dest_chain_state;
         validate_dest_chain_config(new_chain_selector, &dest_chain_config)?;
         dest_chain_state.version = 1;
+        dest_chain_state.chain_selector = new_chain_selector;
         dest_chain_state.config = dest_chain_config.clone();
         dest_chain_state.state = DestChainState {
             sequence_number: 0,
@@ -511,16 +534,19 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for setting the token billing configuration.
-    /// * `_chain_selector` - The chain selector.
-    /// * `_mint` - The public key of the token mint.
+    /// * `chain_selector` - The chain selector.
+    /// * `mint` - The public key of the token mint.
     /// * `cfg` - The token billing configuration.
     pub fn set_token_billing(
         ctx: Context<SetTokenBillingConfig>,
-        _chain_selector: u64,
-        _mint: Pubkey,
+        chain_selector: u64,
+        mint: Pubkey,
         cfg: TokenBilling,
     ) -> Result<()> {
+        ctx.accounts.per_chain_per_token_config.version = 1; // update this if we change the account struct
         ctx.accounts.per_chain_per_token_config.billing = cfg;
+        ctx.accounts.per_chain_per_token_config.chain_selector = chain_selector;
+        ctx.accounts.per_chain_per_token_config.mint = mint;
         Ok(())
     }
 
@@ -652,21 +678,105 @@ pub mod ccip_router {
     /// * `dest_chain_selector` - The chain selector for the destination chain.
     /// * `message` - The message to be sent.
     ///
+    /// # Additional accounts
+    ///
+    /// In addition to the fixed amount of accounts defined in the `GetFee` context,
+    /// the following accounts must be provided:
+    ///
+    /// * First, the billing token config accounts for each token sent with the message, sequentially.
+    ///   For each token with no billing config account (i.e. tokens that cannot be possibly used as fee
+    ///   tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.
+    /// * Then, the per chain / per token config of every token sent with the message, sequentially
+    ///   in the same order.
+    ///
     /// # Returns
     ///
     /// The fee amount in u64.
-    pub fn get_fee(
-        ctx: Context<GetFee>,
+    pub fn get_fee<'info>(
+        ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
     ) -> Result<u64> {
+        let remaining_accounts = &ctx.remaining_accounts;
+        let message = &message;
+        require_eq!(
+            remaining_accounts.len(),
+            2 * message.token_amounts.len(),
+            CcipRouterError::InvalidInputsTokenAccounts
+        );
+
+        let (token_billing_config_accounts, per_chain_per_token_config_accounts) =
+            remaining_accounts.split_at(message.token_amounts.len());
+
+        let token_billing_config_accounts = token_billing_config_accounts
+            .iter()
+            .zip(message.token_amounts.iter())
+            .map(|(a, SolanaTokenAmount { token, .. })| {
+                BillingTokenConfig::validated_try_from(a, *token)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
+            .iter()
+            .zip(message.token_amounts.iter())
+            .map(|(a, SolanaTokenAmount { token, .. })| {
+                PerChainPerTokenConfig::validated_try_from(a, *token, dest_chain_selector)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         Ok(fee_for_msg(
             dest_chain_selector,
-            &message,
+            message,
             &ctx.accounts.dest_chain_state,
             &ctx.accounts.billing_token_config.config,
+            &token_billing_config_accounts,
+            &per_chain_per_token_config_accounts,
         )?
         .amount)
+    }
+
+    /// Transfers the accumulated billed fees in a particular token to an arbitrary token account.
+    /// Only the CCIP Admin can withdraw billed funds.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context containing the accounts required for the transfer of billed fees.
+    /// * `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.
+    /// * `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0.
+    pub fn withdraw_billed_funds(
+        ctx: Context<WithdrawBilledFunds>,
+        transfer_all: bool,
+        desired_amount: u64, // if transfer_all is false, this value must be 0
+    ) -> Result<()> {
+        let transfer = token_interface::TransferChecked {
+            from: ctx.accounts.fee_token_accum.to_account_info(),
+            to: ctx.accounts.recipient.to_account_info(),
+            mint: ctx.accounts.fee_token_mint.to_account_info(),
+            authority: ctx.accounts.fee_billing_signer.to_account_info(),
+        };
+
+        let amount = if transfer_all {
+            require!(desired_amount == 0, CcipRouterError::InvalidInputs);
+            require!(
+                ctx.accounts.fee_token_accum.amount > 0,
+                CcipRouterError::InsufficientFunds
+            );
+            ctx.accounts.fee_token_accum.amount
+        } else {
+            require!(desired_amount > 0, CcipRouterError::InvalidInputs);
+            require!(
+                desired_amount <= ctx.accounts.fee_token_accum.amount,
+                CcipRouterError::InsufficientFunds
+            );
+            desired_amount
+        };
+
+        do_billing_transfer(
+            ctx.accounts.token_program.to_account_info(),
+            transfer,
+            amount,
+            ctx.accounts.fee_token_mint.decimals,
+            ctx.bumps.fee_billing_signer,
+        )
     }
 
     /// ON RAMP FLOW
@@ -692,8 +802,58 @@ pub mod ccip_router {
         let config = ctx.accounts.config.load()?;
 
         let dest_chain = &mut ctx.accounts.dest_chain_state;
-        let fee_token_config = &ctx.accounts.fee_token_config.config;
-        let fee = fee_for_msg(dest_chain_selector, &message, dest_chain, fee_token_config)?;
+
+        let mut accounts_per_sent_token: Vec<TokenAccounts> = vec![];
+
+        for (i, token_amount) in message.token_amounts.iter().enumerate() {
+            require!(
+                token_amount.amount != 0,
+                CcipRouterError::InvalidInputsTokenAmount
+            );
+
+            // Calculate the indexes for the additional accounts of the current token index `i`
+            let (start, end) = calculate_token_pool_account_indices(
+                i,
+                &message.token_indexes,
+                ctx.remaining_accounts.len(),
+            )?;
+
+            let current_token_accounts = validate_and_parse_token_accounts(
+                ctx.accounts.authority.key(),
+                dest_chain_selector,
+                ctx.program_id.key(),
+                &ctx.remaining_accounts[start..end],
+            )?;
+
+            accounts_per_sent_token.push(current_token_accounts);
+        }
+
+        let token_billing_config_accounts = accounts_per_sent_token
+            .iter()
+            .map(|accs| {
+                BillingTokenConfig::validated_try_from(accs.fee_token_config, accs.mint.key())
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let per_chain_per_token_config_accounts = accounts_per_sent_token
+            .iter()
+            .map(|accs| {
+                PerChainPerTokenConfig::validated_try_from(
+                    accs.token_billing_config,
+                    accs.mint.key(),
+                    dest_chain_selector,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let fee = fee_for_msg(
+            dest_chain_selector,
+            &message,
+            dest_chain,
+            &ctx.accounts.fee_token_config.config,
+            &token_billing_config_accounts,
+            &per_chain_per_token_config_accounts,
+        )?;
 
         let is_paying_with_native_sol = message.fee_token == Pubkey::zeroed();
         if is_paying_with_native_sol {
@@ -762,30 +922,12 @@ pub mod ccip_router {
         };
 
         let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-        for (i, token_amount) in message.token_amounts.iter().enumerate() {
-            require!(
-                token_amount.amount != 0,
-                CcipRouterError::InvalidInputsTokenAmount
-            );
-
-            // Calculate the indexes for the additional accounts of the current token index `i`
-            let (start, end) = calculate_token_pool_account_indices(
-                i,
-                &message.token_indexes,
-                ctx.remaining_accounts.len(),
-            )?;
-
-            let current_token_accounts = validate_and_parse_token_accounts(
-                ctx.accounts.authority.key(),
-                dest_chain_selector,
-                ctx.program_id.key(),
-                &ctx.remaining_accounts[start..end],
-            )?;
-
+        for (i, (current_token_accounts, token_amount)) in accounts_per_sent_token
+            .iter()
+            .zip(message.token_amounts.iter())
+            .enumerate()
+        {
             let router_token_pool_signer = &ctx.accounts.token_pools_signer;
-
-            let _token_billing_config = &current_token_accounts._token_billing_config;
-            // TODO: Implement charging depending on the token transfer
 
             // CPI: transfer token amount from user to token pool
             transfer_token(
@@ -1015,6 +1157,8 @@ pub mod ccip_router {
 
         let clock: Clock = Clock::get()?;
         commit_report.version = 1;
+        commit_report.chain_selector = report.merkle_root.source_chain_selector;
+        commit_report.merkle_root = report.merkle_root.merkle_root;
         commit_report.timestamp = clock.unix_timestamp;
         commit_report.execution_states = 0;
         commit_report.min_msg_nr = root.min_seq_nr;
@@ -1603,6 +1747,12 @@ pub enum CcipRouterError {
     StaleGasPrice,
     #[msg("Insufficient lamports")]
     InsufficientLamports,
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
+    #[msg("Unsupported token")]
+    UnsupportedToken,
+    #[msg("Inputs are missing token configuration")]
+    InvalidInputsMissingTokenConfig,
 }
 
 // TODO: Refactor this to use the same structure as messages: execution_report.validate(..)

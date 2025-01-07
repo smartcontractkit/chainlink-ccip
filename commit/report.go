@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"golang.org/x/exp/maps"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/committypes"
@@ -75,7 +75,7 @@ func (p *Plugin) Reports(
 	}
 
 	if outcome.MerkleRootOutcome.OutcomeType == merkleroot.ReportGenerated {
-		repInfo = ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.F}
+		repInfo = ReportInfo{RemoteF: outcome.MerkleRootOutcome.RMNRemoteCfg.FSign}
 	}
 
 	if rep.IsEmpty() {

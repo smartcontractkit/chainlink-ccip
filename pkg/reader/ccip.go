@@ -435,7 +435,7 @@ func (r *ccipChainReader) Nonces(
 	responses := make([]uint64, len(addresses))
 
 	for i, address := range addresses {
-		sender, err := typeconv.AddressStringToBytes(address, uint64(destChainSelector))
+		sender, err := typeconv.AddressStringToBytes(address, uint64(sourceChainSelector))
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert address %s to bytes: %w", address, err)
 		}
@@ -698,7 +698,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
 		Signers:          signers,
-		F:                vc.Config.F,
+		FSign:            vc.Config.F,
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
@@ -1028,13 +1028,16 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 	)
 
 	if err != nil {
-		return cciptypes.BigInt{}, fmt.Errorf("failed to get LINK token price, addr: %v, err: %w", tokenAddr, err)
+		return cciptypes.BigInt{}, fmt.Errorf("failed to get token price, addr: %v, err: %w", tokenAddr, err)
 	}
 
 	price := timestampedPrice.Value
 
+	if price == nil {
+		return cciptypes.BigInt{}, fmt.Errorf("token price is nil,  addr: %v", tokenAddr)
+	}
 	if price.Cmp(big.NewInt(0)) == 0 {
-		return cciptypes.BigInt{}, fmt.Errorf("LINK token price is 0, addr: %v", tokenAddr)
+		return cciptypes.BigInt{}, fmt.Errorf("token price is 0, addr: %v", tokenAddr)
 	}
 
 	return cciptypes.NewBigInt(price), nil

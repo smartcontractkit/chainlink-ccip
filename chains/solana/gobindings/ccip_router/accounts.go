@@ -20,6 +20,7 @@ type Config struct {
 	EnableManualExecutionAfter      int64
 	Padding2                        [8]uint8
 	Ocr3                            [2]Ocr3Config
+	FeeAggregator                   ag_solanago.PublicKey
 }
 
 var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
@@ -82,6 +83,11 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	}
 	// Serialize `Ocr3` param:
 	err = encoder.Encode(obj.Ocr3)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeAggregator` param:
+	err = encoder.Encode(obj.FeeAggregator)
 	if err != nil {
 		return err
 	}
@@ -157,6 +163,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
+	// Deserialize `FeeAggregator`:
+	err = decoder.Decode(&obj.FeeAggregator)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -203,9 +214,10 @@ func (obj *GlobalState) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 }
 
 type SourceChain struct {
-	Version uint8
-	State   SourceChainState
-	Config  SourceChainConfig
+	Version       uint8
+	ChainSelector uint64
+	State         SourceChainState
+	Config        SourceChainConfig
 }
 
 var SourceChainDiscriminator = [8]byte{242, 235, 220, 98, 252, 121, 191, 216}
@@ -218,6 +230,11 @@ func (obj SourceChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
 	if err != nil {
 		return err
 	}
@@ -253,6 +270,11 @@ func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 	if err != nil {
 		return err
 	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
 	// Deserialize `State`:
 	err = decoder.Decode(&obj.State)
 	if err != nil {
@@ -267,9 +289,10 @@ func (obj *SourceChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 }
 
 type DestChain struct {
-	Version uint8
-	State   DestChainState
-	Config  DestChainConfig
+	Version       uint8
+	ChainSelector uint64
+	State         DestChainState
+	Config        DestChainConfig
 }
 
 var DestChainDiscriminator = [8]byte{77, 18, 241, 132, 212, 54, 218, 16}
@@ -282,6 +305,11 @@ func (obj DestChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
 	if err != nil {
 		return err
 	}
@@ -314,6 +342,11 @@ func (obj *DestChain) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
 	if err != nil {
 		return err
 	}
@@ -415,6 +448,8 @@ func (obj *ExternalExecutionConfig) UnmarshalWithDecoder(decoder *ag_binary.Deco
 
 type CommitReport struct {
 	Version         uint8
+	ChainSelector   uint64
+	MerkleRoot      [32]uint8
 	Timestamp       int64
 	MinMsgNr        uint64
 	MaxMsgNr        uint64
@@ -431,6 +466,16 @@ func (obj CommitReport) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	}
 	// Serialize `Version` param:
 	err = encoder.Encode(obj.Version)
+	if err != nil {
+		return err
+	}
+	// Serialize `ChainSelector` param:
+	err = encoder.Encode(obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `MerkleRoot` param:
+	err = encoder.Encode(obj.MerkleRoot)
 	if err != nil {
 		return err
 	}
@@ -473,6 +518,16 @@ func (obj *CommitReport) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 	}
 	// Deserialize `Version`:
 	err = decoder.Decode(&obj.Version)
+	if err != nil {
+		return err
+	}
+	// Deserialize `ChainSelector`:
+	err = decoder.Decode(&obj.ChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `MerkleRoot`:
+	err = decoder.Decode(&obj.MerkleRoot)
 	if err != nil {
 		return err
 	}

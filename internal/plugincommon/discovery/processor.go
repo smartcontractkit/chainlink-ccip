@@ -218,6 +218,7 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	ctx context.Context, _ dt.Outcome, _ dt.Query, aos []plugincommon.AttributedObservation[dt.Observation],
 ) (dt.Outcome, error) {
 	cdp.lggr.Infow("Processing contract discovery outcome", "observations", aos)
+	contracts := make(reader.ContractAddresses)
 
 	agg := aggregateObservations(cdp.lggr, cdp.dest, aos)
 
@@ -225,24 +226,28 @@ func (cdp *ContractDiscoveryProcessor) Outcome(
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(cdp.fRoleDON))
 	fChain := consensus.GetConsensusMap(cdp.lggr, "fChain", agg.fChain, donThresh)
 	fChainThresh := consensus.MakeMultiThreshold(fChain, consensus.TwoFPlus1)
-	destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
 
-	contracts := make(reader.ContractAddresses)
-	onrampConsensus := consensus.GetConsensusMap(
-		cdp.lggr,
-		"onramp",
-		agg.onrampAddrs,
-		destThresh,
-	)
-	cdp.lggr.Infow("Determined consensus onramps",
-		"onrampConsensus", onrampConsensus,
-		"onrampAddrs", agg.onrampAddrs,
-		"fChainThresh", fChainThresh,
-	)
-	if len(onrampConsensus) == 0 {
-		cdp.lggr.Debugw("No consensus on onramps, onrampConsensus map is empty")
+	if _, exists := fChain[cdp.dest]; !exists {
+		cdp.lggr.Warnw("missing fChain for dest (fChain[%d]), skipping onramp address lookup", cdp.dest)
+	} else {
+		destThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fChain[cdp.dest]))
+
+		onrampConsensus := consensus.GetConsensusMap(
+			cdp.lggr,
+			"onramp",
+			agg.onrampAddrs,
+			destThresh,
+		)
+		cdp.lggr.Infow("Determined consensus onramps",
+			"onrampConsensus", onrampConsensus,
+			"onrampAddrs", agg.onrampAddrs,
+			"fChainThresh", fChainThresh,
+		)
+		if len(onrampConsensus) == 0 {
+			cdp.lggr.Debugw("No consensus on onramps, onrampConsensus map is empty")
+		}
+		contracts[consts.ContractNameOnRamp] = onrampConsensus
 	}
-	contracts[consts.ContractNameOnRamp] = onrampConsensus
 
 	nonceManagerConsensus := consensus.GetConsensusMap(
 		cdp.lggr,

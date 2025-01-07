@@ -91,6 +91,10 @@
         {
           "name": "enableExecutionAfter",
           "type": "i64"
+        },
+        {
+          "name": "feeAggregator",
+          "type": "publicKey"
         }
       ]
     },
@@ -150,6 +154,41 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "updateFeeAggregator",
+      "docs": [
+        "Updates the fee aggregator in the router configuration.",
+        "The Admin is the only one able to update the fee aggregator.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for updating the configuration.",
+        "* `fee_aggregator` - The new fee aggregator address (ATAs will be derived for it for each token)."
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "feeAggregator",
+          "type": "publicKey"
+        }
+      ]
     },
     {
       "name": "addChainSelector",
@@ -708,8 +747,8 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
-        "* `_chain_selector` - The chain selector.",
-        "* `_mint` - The public key of the token mint.",
+        "* `chain_selector` - The chain selector.",
+        "* `mint` - The public key of the token mint.",
         "* `cfg` - The token billing configuration."
       ],
       "accounts": [
@@ -837,11 +876,7 @@
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount",
-            "with a constraint enforcing that it is one of the two allowed programs."
-          ]
+          "isSigner": false
         },
         {
           "name": "feeTokenMint",
@@ -944,11 +979,7 @@
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount",
-            "with a constraint enforcing that it is one of the two allowed programs."
-          ]
+          "isSigner": false
         },
         {
           "name": "feeTokenMint",
@@ -989,6 +1020,17 @@
         "* `dest_chain_selector` - The chain selector for the destination chain.",
         "* `message` - The message to be sent.",
         "",
+        "# Additional accounts",
+        "",
+        "In addition to the fixed amount of accounts defined in the `GetFee` context,",
+        "the following accounts must be provided:",
+        "",
+        "* First, the billing token config accounts for each token sent with the message, sequentially.",
+        "For each token with no billing config account (i.e. tokens that cannot be possibly used as fee",
+        "tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.",
+        "* Then, the per chain / per token config of every token sent with the message, sequentially",
+        "in the same order.",
+        "",
         "# Returns",
         "",
         "The fee amount in u64."
@@ -1018,6 +1060,66 @@
         }
       ],
       "returns": "u64"
+    },
+    {
+      "name": "withdrawBilledFunds",
+      "docs": [
+        "Transfers the accumulated billed fees in a particular token to an arbitrary token account.",
+        "Only the CCIP Admin can withdraw billed funds.",
+        "",
+        "# Arguments",
+        "",
+        "* `ctx` - The context containing the accounts required for the transfer of billed fees.",
+        "* `transfer_all` - A flag indicating whether to transfer all the accumulated fees in that token or not.",
+        "* `desired_amount` - The amount to transfer. If `transfer_all` is true, this value must be 0."
+      ],
+      "accounts": [
+        {
+          "name": "feeTokenMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeTokenAccum",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "recipient",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "feeBillingSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": true,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "transferAll",
+          "type": "bool"
+        },
+        {
+          "name": "desiredAmount",
+          "type": "u64"
+        }
+      ]
     },
     {
       "name": "ccipSend",
@@ -1066,11 +1168,7 @@
         {
           "name": "feeTokenProgram",
           "isMut": false,
-          "isSigner": false,
-          "docs": [
-            "type of a specific program (which would enforce its ID). Thus, it's an UncheckedAccount",
-            "with a constraint enforcing that it is one of the two allowed programs."
-          ]
+          "isSigner": false
         },
         {
           "name": "feeTokenMint",
@@ -1441,6 +1539,10 @@
                 2
               ]
             }
+          },
+          {
+            "name": "feeAggregator",
+            "type": "publicKey"
           }
         ]
       }
@@ -1467,6 +1569,10 @@
             "type": "u8"
           },
           {
+            "name": "chainSelector",
+            "type": "u64"
+          },
+          {
             "name": "state",
             "type": {
               "defined": "SourceChainState"
@@ -1489,6 +1595,10 @@
           {
             "name": "version",
             "type": "u8"
+          },
+          {
+            "name": "chainSelector",
+            "type": "u64"
           },
           {
             "name": "state",
@@ -1536,6 +1646,19 @@
           {
             "name": "version",
             "type": "u8"
+          },
+          {
+            "name": "chainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "merkleRoot",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
             "name": "timestamp",
@@ -2729,6 +2852,15 @@
           },
           {
             "name": "InsufficientLamports"
+          },
+          {
+            "name": "InsufficientFunds"
+          },
+          {
+            "name": "UnsupportedToken"
+          },
+          {
+            "name": "InvalidInputsMissingTokenConfig"
           }
         ]
       }
