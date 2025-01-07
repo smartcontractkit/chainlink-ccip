@@ -8,7 +8,6 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/internal/reader:
         interfaces:
             HomeChain:
-            RMNRemote:
             CCIP:
     github.com/smartcontractkit/chainlink-ccip/internal/plugincommon:
         interfaces:
