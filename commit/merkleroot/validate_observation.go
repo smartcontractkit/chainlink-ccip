@@ -209,16 +209,12 @@ func ValidateMerkleRootsState(
 		return fmt.Errorf("get next sequence numbers: %w", err)
 	}
 
-	if len(offRampExpNextSeqNums) != len(chainSlice) {
-		return fmt.Errorf("critical reader error: seq nums length mismatch")
-	}
-
-	for i, offRampExpNextSeqNum := range offRampExpNextSeqNums {
-		chain := chainSlice[i]
-
-		newNextOnRampSeqNum, ok := newNextOnRampSeqNums[chain]
+	for chain, newNextOnRampSeqNum := range newNextOnRampSeqNums {
+		offRampExpNextSeqNum, ok := offRampExpNextSeqNums[chain]
 		if !ok {
-			return fmt.Errorf("critical unexpected error: newOnRampSeqNum not found")
+			// Due to some chain being disabled while the sequence numbers were already observed, reported should
+			// not be considered valid in that case.
+			return fmt.Errorf("offRamp expected next sequence number for chain %d was not found", chain)
 		}
 
 		if newNextOnRampSeqNum != offRampExpNextSeqNum {

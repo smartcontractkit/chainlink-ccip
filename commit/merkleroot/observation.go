@@ -380,17 +380,12 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	if len(offRampNextSeqNums) != len(sourceChains) {
-		o.lggr.Errorf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
-			len(offRampNextSeqNums), len(sourceChains))
-		return nil
+	result := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
+	for chainSelector, seqNum := range offRampNextSeqNums {
+		result = append(result, plugintypes.NewSeqNumChain(chainSelector, seqNum))
 	}
 
-	result := make([]plugintypes.SeqNumChain, len(sourceChains))
-	for i := range sourceChains {
-		result[i] = plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]}
-	}
-
+	sort.Slice(result, func(i, j int) bool { return result[i].ChainSel < result[j].ChainSel })
 	return result
 }
 

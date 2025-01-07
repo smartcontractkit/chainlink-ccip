@@ -110,7 +110,7 @@ func (r InMemoryCCIPReader) MsgsBetweenSeqNums(
 
 func (r InMemoryCCIPReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
-) (seqNum []cciptypes.SeqNum, err error) {
+) (seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error) {
 	panic("implement me")
 }
 
