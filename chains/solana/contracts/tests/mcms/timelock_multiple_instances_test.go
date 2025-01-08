@@ -5,6 +5,7 @@ import (
 
 	bin "github.com/gagliardetto/binary"
 	"github.com/gagliardetto/solana-go"
+	"github.com/gagliardetto/solana-go/programs/system"
 	"github.com/gagliardetto/solana-go/rpc"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/require"
@@ -210,7 +211,7 @@ func TestTimelockMultipleInstances(t *testing.T) {
 			}
 		}
 	})
-	// todo: config / signer seeds constraints
+
 	t.Run("instance isolation tests", func(t *testing.T) {
 		t.Run("config isolation", func(t *testing.T) {
 			t.Run("cannot access other instance config using own roles", func(t *testing.T) {
@@ -343,10 +344,153 @@ func TestTimelockMultipleInstances(t *testing.T) {
 		})
 
 		t.Run("operation isolation", func(t *testing.T) {
-			t.Run("cannot schedule operation using other instance's signer PDA", func(t *testing.T) {})
-			t.Run("cannot execute operation scheduled on another instance", func(t *testing.T) {})
-			t.Run("cannot cancel operation from another instance", func(t *testing.T) {})
-			t.Run("cannot reuse operation ID between instances", func(t *testing.T) {})
+			t.Run("cannot execute operation scheduled on another instance", func(t *testing.T) {
+				// Schedule operation on instance1
+				proposer1 := timelockInstances[0].RoleMap[timelock.Proposer_Role].RandomPick()
+				executor2 := timelockInstances[1].RoleMap[timelock.Executor_Role].RandomPick()
+
+				salt, err := mcms.SimpleSalt()
+				require.NoError(t, err)
+
+				// Create and schedule operation on instance1
+				op := timelockutil.Operation{
+					TimelockID:  timelockInstances[0].ID,
+					Predecessor: config.TimelockEmptyOpID,
+					Salt:        salt,
+					Delay:       uint64(1),
+				}
+
+				// Add simple transfer instruction
+				ix := system.NewTransferInstruction(
+					1*solana.LAMPORTS_PER_SOL,
+					proposer1.PublicKey(),
+					timelockInstances[0].SignerPDA,
+				).Build()
+				op.AddInstruction(ix, []solana.PublicKey{})
+
+				// Schedule on instance1
+				preloadIxs, prierr := timelockutil.GetPreloadOperationIxs(
+					timelockInstances[0].ID,
+					op,
+					proposer1.PublicKey(),
+				)
+				require.NoError(t, prierr)
+				for _, ix := range preloadIxs {
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer1, config.DefaultCommitment)
+				}
+
+				scheduleIx, ierr := timelock.NewScheduleBatchInstruction(
+					timelockInstances[0].ID,
+					op.OperationID(),
+					op.Delay,
+					op.OperationPDA(),
+					timelockInstances[0].ConfigPDA,
+					timelockInstances[0].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
+					proposer1.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, ierr)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, proposer1, config.DefaultCommitment)
+
+				// Wait for operation to be ready
+				err = timelockutil.WaitForOperationToBeReady(ctx, solanaGoClient, op.OperationPDA(), config.DefaultCommitment)
+				require.NoError(t, err)
+
+				// try to execute instance1's operation using instance2's executor
+				executeIx := timelock.NewExecuteBatchInstruction(
+					timelockInstances[1].ID, // Use instance2's ID
+					op.OperationID(),
+					op.OperationPDA(),              // instance1's operation PDA
+					config.TimelockEmptyOpID,       // empty predecessor
+					timelockInstances[1].ConfigPDA, // instance2's config
+					timelockInstances[1].SignerPDA, // instance2's signer
+					timelockInstances[1].RoleMap[timelock.Executor_Role].AccessController.PublicKey(),
+					executor2.PublicKey(),
+				)
+				executeIx.AccountMetaSlice = append(executeIx.AccountMetaSlice, op.RemainingAccounts()...)
+
+				vIx, err := executeIx.ValidateAndBuild()
+				require.NoError(t, err)
+
+				testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{vIx},
+					executor2,
+					config.DefaultCommitment,
+					[]string{"Error Code: ConstraintSeeds."},
+				)
+			})
+			t.Run("cannot cancel operation from another instance", func(t *testing.T) {
+				// Schedule operation on instance1
+				proposer1 := timelockInstances[0].RoleMap[timelock.Proposer_Role].RandomPick()
+				salt, err := mcms.SimpleSalt()
+				require.NoError(t, err)
+
+				// Create test operation for instance1
+				op := timelockutil.Operation{
+					TimelockID:  timelockInstances[0].ID,
+					Predecessor: config.TimelockEmptyOpID,
+					Salt:        salt,
+					Delay:       uint64(1),
+				}
+
+				// Add simple transfer instruction
+				ix := system.NewTransferInstruction(
+					1*solana.LAMPORTS_PER_SOL,
+					proposer1.PublicKey(),
+					timelockInstances[0].SignerPDA,
+				).Build()
+				op.AddInstruction(ix, []solana.PublicKey{})
+
+				// Schedule on instance1
+				preloadIxs, prierr := timelockutil.GetPreloadOperationIxs(
+					timelockInstances[0].ID,
+					op,
+					proposer1.PublicKey(),
+				)
+				require.NoError(t, prierr)
+				for _, ix := range preloadIxs {
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer1, config.DefaultCommitment)
+				}
+
+				scheduleIx, ierr := timelock.NewScheduleBatchInstruction(
+					timelockInstances[0].ID,
+					op.OperationID(),
+					op.Delay,
+					op.OperationPDA(),
+					timelockInstances[0].ConfigPDA,
+					timelockInstances[0].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(),
+					proposer1.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, ierr)
+
+				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{scheduleIx}, proposer1, config.DefaultCommitment)
+
+				// Try to cancel instance1's operation using instance2's canceller
+				canceller2 := timelockInstances[1].RoleMap[timelock.Canceller_Role].RandomPick()
+
+				cancelIx, cerr := timelock.NewCancelInstruction(
+					timelockInstances[1].ID, // Using instance2's ID
+					op.OperationID(),
+					op.OperationPDA(),
+					timelockInstances[1].ConfigPDA,
+					timelockInstances[1].RoleMap[timelock.Canceller_Role].AccessController.PublicKey(),
+					canceller2.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, cerr)
+
+				testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{cancelIx},
+					canceller2,
+					config.DefaultCommitment,
+					[]string{"Error Code: ConstraintSeeds"},
+				)
+			})
 		})
 
 		t.Run("role isolation", func(t *testing.T) {

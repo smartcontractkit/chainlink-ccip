@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 )
 
-func TestMcmMultipleMultisigs(t *testing.T) {
+func TestMcmMultipleInstances(t *testing.T) {
 	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
