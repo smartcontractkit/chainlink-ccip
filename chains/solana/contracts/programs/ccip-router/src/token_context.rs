@@ -19,21 +19,23 @@ pub struct TokenAdminRegistry {
 }
 
 impl TokenAdminRegistry {
+    // set writable inserts bits from left to right
+    // index 0 is left-most bit
     pub fn set_writable(&mut self, index: u8) {
         match index < 128 {
             true => {
-                self.writable_indexes[0] |= 1 << index;
+                self.writable_indexes[0] |= 1 << (127 - index);
             }
             false => {
-                self.writable_indexes[1] |= 1 << (index - 128);
+                self.writable_indexes[1] |= 1 << (255 - index);
             }
         }
     }
 
     pub fn is_writable(&self, index: u8) -> bool {
         match index < 128 {
-            true => self.writable_indexes[0] & 1 << index != 0,
-            false => self.writable_indexes[1] & 1 << (index - 128) != 0,
+            true => self.writable_indexes[0] & 1 << (127 - index) != 0,
+            false => self.writable_indexes[1] & 1 << (255 - index) != 0,
         }
     }
 
@@ -158,17 +160,27 @@ mod tests {
 
         state.set_writable(0);
         state.set_writable(128);
-        assert_eq!(state.writable_indexes[0], 1);
-        assert_eq!(state.writable_indexes[1], 1);
+        assert_eq!(state.writable_indexes[0], 2u128.pow(127));
+        assert_eq!(state.writable_indexes[1], 2u128.pow(127));
 
         state.reset_writable();
         assert_eq!(state.writable_indexes[0], 0);
         assert_eq!(state.writable_indexes[1], 0);
 
+        state.set_writable(0);
         state.set_writable(2);
+        state.set_writable(127);
+        state.set_writable(128);
         state.set_writable(2 + 128);
-        assert_eq!(state.writable_indexes[0], 4);
-        assert_eq!(state.writable_indexes[1], 4);
+        state.set_writable(255);
+        assert_eq!(
+            state.writable_indexes[0],
+            2u128.pow(127) + 2u128.pow(127 - 2) + 2u128.pow(0)
+        );
+        assert_eq!(
+            state.writable_indexes[1],
+            2u128.pow(127) + 2u128.pow(127 - 2) + 2u128.pow(0)
+        );
     }
 
     #[test]
@@ -178,7 +190,10 @@ mod tests {
             administrator: Pubkey::zeroed(),
             pending_administrator: Pubkey::zeroed(),
             lookup_table: Pubkey::zeroed(),
-            writable_indexes: [128 + 2 + 4, 256 + 16 + 64],
+            writable_indexes: [
+                2u128.pow(127 - 7) + 2u128.pow(127 - 2) + 2u128.pow(127 - 4),
+                2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
+            ],
         };
 
         assert_eq!(state.is_writable(0), false);
@@ -189,10 +204,10 @@ mod tests {
         assert_eq!(state.writable_indexes[1].count_ones(), 3);
 
         assert_eq!(state.is_writable(7), true);
-        assert_eq!(state.is_writable(1), true);
         assert_eq!(state.is_writable(2), true);
+        assert_eq!(state.is_writable(4), true);
         assert_eq!(state.is_writable(128 + 8), true);
-        assert_eq!(state.is_writable(128 + 4), true);
-        assert_eq!(state.is_writable(128 + 6), true);
+        assert_eq!(state.is_writable(128 + 56), true);
+        assert_eq!(state.is_writable(128 + 100), true);
     }
 }

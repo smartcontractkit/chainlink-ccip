@@ -3,12 +3,14 @@ package tokens
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"strings"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
+	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/ccip_router"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/token_pool"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
@@ -41,15 +43,15 @@ type TokenPool struct {
 
 func (tp TokenPool) ToTokenPoolEntries() []solana.PublicKey {
 	list := solana.PublicKeySlice{
-		tp.PoolLookupTable,
-		tp.AdminRegistry,
-		tp.PoolProgram,
-		tp.PoolConfig,
-		tp.PoolTokenAccount,
-		tp.PoolSigner,
-		tp.Program,
-		tp.Mint.PublicKey(),
-		tp.FeeTokenConfig,
+		tp.PoolLookupTable,  // 0
+		tp.AdminRegistry,    // 1
+		tp.PoolProgram,      // 2
+		tp.PoolConfig,       // 3 - writable
+		tp.PoolTokenAccount, // 4 - writable
+		tp.PoolSigner,       // 5
+		tp.Program,          // 6
+		tp.Mint.PublicKey(), // 7 - writable
+		tp.FeeTokenConfig,   // 8
 	}
 	return append(list, tp.AdditionalAccounts...)
 }
@@ -85,6 +87,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 		FeeTokenConfig:  tokenConfigPda,
 		AdminRegistry:   tokenAdminRegistryPDA,
 		PoolLookupTable: solana.PublicKey{},
+		WritableIndexes: []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
 		User:            map[solana.PublicKey]solana.PublicKey{},
 		Chain:           map[uint64]solana.PublicKey{},
 		Billing:         map[uint64]solana.PublicKey{},
@@ -170,29 +173,39 @@ func ParseTokenLookupTable(ctx context.Context, client *rpc.Client, token TokenP
 	tokenBillingConfig := token.Billing[config.EvmChainSelector]
 	poolChainConfig := token.Chain[config.EvmChainSelector]
 
+	tokenAdminRegistry := ccip_router.TokenAdminRegistry{}
+	err := common.GetAccountDataBorshInto(ctx, client, token.AdminRegistry, config.DefaultCommitment, &tokenAdminRegistry)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	lookupTableEntries, err := common.GetAddressLookupTable(ctx, client, token.PoolLookupTable)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	writableBytes := append(tokenAdminRegistry.WritableIndexes[0].Bytes(), tokenAdminRegistry.WritableIndexes[1].Bytes()...)
+	writableBits := ""
+	for _, b := range writableBytes {
+		writableBits += fmt.Sprintf("%08b", b)
+	}
+
+	lookupTableMeta := []*solana.AccountMeta{}
+	for i := range lookupTableEntries {
+		meta := solana.Meta(lookupTableEntries[i])
+
+		if string(writableBits[i]) == "1" {
+			meta = meta.WRITE()
+		}
+		lookupTableMeta = append(lookupTableMeta, meta)
 	}
 
 	list := []*solana.AccountMeta{
 		solana.Meta(userTokenAccount).WRITE(),
 		solana.Meta(tokenBillingConfig),
 		solana.Meta(poolChainConfig).WRITE(),
-		solana.Meta(lookupTableEntries[0]),         // lookup table
-		solana.Meta(lookupTableEntries[1]),         // token admin registry
-		solana.Meta(lookupTableEntries[2]),         // PoolProgram
-		solana.Meta(lookupTableEntries[3]).WRITE(), // PoolConfig
-		solana.Meta(lookupTableEntries[4]).WRITE(), // PoolTokenAccount
-		solana.Meta(lookupTableEntries[5]),         // PoolSigner
-		solana.Meta(lookupTableEntries[6]),         // TokenProgram
-		solana.Meta(lookupTableEntries[7]).WRITE(), // Mint
-		solana.Meta(lookupTableEntries[8]),         // FeeTokenConfig
 	}
-
-	for _, v := range token.AdditionalAccounts {
-		list = append(list, solana.Meta(v))
-	}
+	list = append(list, lookupTableMeta...)
 
 	addressTables := make(map[solana.PublicKey]solana.PublicKeySlice)
 	addressTables[token.PoolLookupTable] = lookupTableEntries
