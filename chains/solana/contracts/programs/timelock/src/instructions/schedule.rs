@@ -35,12 +35,12 @@ pub fn schedule_batch<'info>(
     op.timestamp = scheduled_time;
 
     for (i, ix) in op.instructions.iter().enumerate() {
-        // check if the instruction data is blocked
-        // todo: add note
+        // check for 8-byte Anchor discriminator (since our internally developed programs use Anchor)
+        // non-Anchor instructions may have different/empty data formats and are allowed
         if ix.data.len() >= ANCHOR_DISCRIMINATOR {
-            let selector: [u8; ANCHOR_DISCRIMINATOR] =
             // extract the first 8 bytes from ix.data as the selector
-            ix.data[..ANCHOR_DISCRIMINATOR].try_into().unwrap();
+            let selector: [u8; ANCHOR_DISCRIMINATOR] =
+                ix.data[..ANCHOR_DISCRIMINATOR].try_into().unwrap();
 
             if config.blocked_selectors.is_blocked(&selector) {
                 return err!(TimelockError::BlockedSelector);
