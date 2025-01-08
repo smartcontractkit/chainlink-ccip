@@ -1,5 +1,7 @@
 TEST_COUNT ?= 10
 COVERAGE_FILE ?= coverage.out
+export PROJECT_SERUM_VERSION ?=v0.29.0
+export PROJECT_SERUM_IMAGE ?= backpackapp/build:$(PROJECT_SERUM_VERSION)
 
 # Detect the system architecture
 ARCH := $(shell uname -m)
@@ -70,3 +72,6 @@ ensure_golangcilint_1_62_2:
 
 ensure_protoc_28_0:
 	@$(PROTOC_BIN) --version | grep -q 'libprotoc 28.0' || (echo "Please use protoc 28.0, (make install-protoc)" && exit 1)
+
+anchor_shell:
+	docker run --rm -it -v $(shell pwd):/workdir --entrypoint bash ${PROJECT_SERUM_IMAGE}
