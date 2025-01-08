@@ -115,37 +115,10 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				ixs := make([]solana.Instruction, 0)
+				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				require.NoError(t, pierr)
 
-				parsedTotalSigners, err := mcms.SafeToUint8(len(signerAddresses))
-				require.NoError(t, err)
-
-				initSignersIx, err := mcm.NewInitSignersInstruction(
-					testMsigName1,
-					parsedTotalSigners,
-					multisigConfigPDA1,
-					configSignersPDA1,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-
-				require.NoError(t, err)
-				ixs = append(ixs, initSignersIx)
-
-				appendSignersIxs, err := mcms.AppendSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
-				require.NoError(t, err)
-				ixs = append(ixs, appendSignersIxs...)
-
-				finalizeSignersIx, err := mcm.NewFinalizeSignersInstruction(
-					testMsigName1,
-					multisigConfigPDA1,
-					configSignersPDA1,
-					admin.PublicKey(),
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				ixs = append(ixs, finalizeSignersIx)
-
-				for _, ix := range ixs {
+				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
@@ -170,6 +143,8 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 					mcmConfig.ClearRoot,
 					multisigConfigPDA1,
 					configSignersPDA1,
+					rootMetadataPDA1,
+					expiringRootAndOpCountPDA1,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -263,37 +238,10 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				ixs := make([]solana.Instruction, 0)
+				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				require.NoError(t, pierr)
 
-				parsedTotalSigners, err := mcms.SafeToUint8(len(signerAddresses))
-				require.NoError(t, err)
-
-				initSignersIx, err := mcm.NewInitSignersInstruction(
-					testMsigName2,
-					parsedTotalSigners,
-					multisigConfigPDA2,
-					configSignersPDA2,
-					admin.PublicKey(),
-					solana.SystemProgramID,
-				).ValidateAndBuild()
-
-				require.NoError(t, err)
-				ixs = append(ixs, initSignersIx)
-
-				appendSignersIxs, err := mcms.AppendSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
-				require.NoError(t, err)
-				ixs = append(ixs, appendSignersIxs...)
-
-				finalizeSignersIx, err := mcm.NewFinalizeSignersInstruction(
-					testMsigName2,
-					multisigConfigPDA2,
-					configSignersPDA2,
-					admin.PublicKey(),
-				).ValidateAndBuild()
-				require.NoError(t, err)
-				ixs = append(ixs, finalizeSignersIx)
-
-				for _, ix := range ixs {
+				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
@@ -318,6 +266,8 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 					mcmConfig.ClearRoot,
 					multisigConfigPDA2,
 					configSignersPDA2,
+					rootMetadataPDA2,
+					expiringRootAndOpCountPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()
@@ -337,6 +287,8 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 					mcmConfig.ClearRoot,
 					multisigConfigPDA2,
 					configSignersPDA2,
+					rootMetadataPDA2,
+					expiringRootAndOpCountPDA2,
 					admin.PublicKey(),
 					solana.SystemProgramID,
 				).ValidateAndBuild()

@@ -22,16 +22,20 @@ type SetConfig struct {
 	//
 	// [1] = [WRITE] configSigners
 	//
-	// [2] = [WRITE, SIGNER] authority
+	// [2] = [WRITE] rootMetadata
 	//
-	// [3] = [] systemProgram
+	// [3] = [WRITE] expiringRootAndOpCount
+	//
+	// [4] = [WRITE, SIGNER] authority
+	//
+	// [5] = [] systemProgram
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetConfigInstructionBuilder creates a new `SetConfig` instruction builder.
 func NewSetConfigInstructionBuilder() *SetConfig {
 	nd := &SetConfig{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
 }
@@ -88,26 +92,48 @@ func (inst *SetConfig) GetConfigSignersAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[1]
 }
 
+// SetRootMetadataAccount sets the "rootMetadata" account.
+func (inst *SetConfig) SetRootMetadataAccount(rootMetadata ag_solanago.PublicKey) *SetConfig {
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(rootMetadata).WRITE()
+	return inst
+}
+
+// GetRootMetadataAccount gets the "rootMetadata" account.
+func (inst *SetConfig) GetRootMetadataAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[2]
+}
+
+// SetExpiringRootAndOpCountAccount sets the "expiringRootAndOpCount" account.
+func (inst *SetConfig) SetExpiringRootAndOpCountAccount(expiringRootAndOpCount ag_solanago.PublicKey) *SetConfig {
+	inst.AccountMetaSlice[3] = ag_solanago.Meta(expiringRootAndOpCount).WRITE()
+	return inst
+}
+
+// GetExpiringRootAndOpCountAccount gets the "expiringRootAndOpCount" account.
+func (inst *SetConfig) GetExpiringRootAndOpCountAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[3]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetConfig) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetConfig {
-	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[4] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetConfig) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[2]
+	return inst.AccountMetaSlice[4]
 }
 
 // SetSystemProgramAccount sets the "systemProgram" account.
 func (inst *SetConfig) SetSystemProgramAccount(systemProgram ag_solanago.PublicKey) *SetConfig {
-	inst.AccountMetaSlice[3] = ag_solanago.Meta(systemProgram)
+	inst.AccountMetaSlice[5] = ag_solanago.Meta(systemProgram)
 	return inst
 }
 
 // GetSystemProgramAccount gets the "systemProgram" account.
 func (inst *SetConfig) GetSystemProgramAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[3]
+	return inst.AccountMetaSlice[5]
 }
 
 func (inst SetConfig) Build() *Instruction {
@@ -156,9 +182,15 @@ func (inst *SetConfig) Validate() error {
 			return errors.New("accounts.ConfigSigners is not set")
 		}
 		if inst.AccountMetaSlice[2] == nil {
-			return errors.New("accounts.Authority is not set")
+			return errors.New("accounts.RootMetadata is not set")
 		}
 		if inst.AccountMetaSlice[3] == nil {
+			return errors.New("accounts.ExpiringRootAndOpCount is not set")
+		}
+		if inst.AccountMetaSlice[4] == nil {
+			return errors.New("accounts.Authority is not set")
+		}
+		if inst.AccountMetaSlice[5] == nil {
 			return errors.New("accounts.SystemProgram is not set")
 		}
 	}
@@ -183,11 +215,13 @@ func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=4]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
-						accountsBranch.Child(ag_format.Meta("multisigConfig", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta(" configSigners", inst.AccountMetaSlice[1]))
-						accountsBranch.Child(ag_format.Meta("     authority", inst.AccountMetaSlice[2]))
-						accountsBranch.Child(ag_format.Meta(" systemProgram", inst.AccountMetaSlice[3]))
+					instructionBranch.Child("Accounts[len=6]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+						accountsBranch.Child(ag_format.Meta("        multisigConfig", inst.AccountMetaSlice[0]))
+						accountsBranch.Child(ag_format.Meta("         configSigners", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("          rootMetadata", inst.AccountMetaSlice[2]))
+						accountsBranch.Child(ag_format.Meta("expiringRootAndOpCount", inst.AccountMetaSlice[3]))
+						accountsBranch.Child(ag_format.Meta("             authority", inst.AccountMetaSlice[4]))
+						accountsBranch.Child(ag_format.Meta("         systemProgram", inst.AccountMetaSlice[5]))
 					})
 				})
 		})
@@ -261,6 +295,8 @@ func NewSetConfigInstruction(
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	configSigners ag_solanago.PublicKey,
+	rootMetadata ag_solanago.PublicKey,
+	expiringRootAndOpCount ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetConfig {
 	return NewSetConfigInstructionBuilder().
@@ -271,6 +307,8 @@ func NewSetConfigInstruction(
 		SetClearRoot(clearRoot).
 		SetMultisigConfigAccount(multisigConfig).
 		SetConfigSignersAccount(configSigners).
+		SetRootMetadataAccount(rootMetadata).
+		SetExpiringRootAndOpCountAccount(expiringRootAndOpCount).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram)
 }

@@ -21,16 +21,12 @@ pub fn set_root(
     );
 
     // verify ECDSA signatures on (root, validUntil) and ensure that the root group is successful
-    let verified = verify_ecdsa_signatures(
+    verify_ecdsa_signatures(
         &ctx.accounts.root_signatures.signatures,
         &ctx.accounts.multisig_config,
         &root,
         valid_until,
-    );
-    #[allow(clippy::unnecessary_unwrap)]
-    if verified.is_err() {
-        return Err(verified.unwrap_err());
-    }
+    )?;
 
     require!(
         Clock::get()?.unix_timestamp <= valid_until.into(),
@@ -56,6 +52,8 @@ pub fn set_root(
     );
 
     let current_op_count = ctx.accounts.expiring_root_and_op_count.op_count;
+    // don't allow a new root to be set if there are still outstanding ops that have not been
+    // executed, unless override_previous_root is set
     require!(
         current_op_count == ctx.accounts.root_metadata.post_op_count
             || metadata.override_previous_root,
@@ -78,7 +76,6 @@ pub fn set_root(
     );
 
     // After validations, persist all changes
-    ctx.accounts.seen_signed_hashes.seen = true; // now it has been seen
     ctx.accounts
         .expiring_root_and_op_count
         .set_inner(ExpiringRootAndOpCount {
@@ -87,16 +84,15 @@ pub fn set_root(
             op_count: metadata.pre_op_count,
         });
 
-    {
-        let account_data = RootMetadata {
-            chain_id: metadata.chain_id,
-            multisig: metadata.multisig,
-            pre_op_count: metadata.pre_op_count,
-            post_op_count: metadata.post_op_count,
-            override_previous_root: metadata.override_previous_root,
-        };
-        ctx.accounts.root_metadata.set_inner(account_data);
-    }
+    ctx.accounts.root_metadata.set_inner(RootMetadata {
+        chain_id: metadata.chain_id,
+        multisig: metadata.multisig,
+        pre_op_count: metadata.pre_op_count,
+        post_op_count: metadata.post_op_count,
+        override_previous_root: metadata.override_previous_root,
+    });
+
+    ctx.accounts.seen_signed_hashes.seen = true; // now it has been seen
 
     let md = &ctx.accounts.root_metadata;
 
@@ -122,21 +118,16 @@ fn verify_ecdsa_signatures(
     let signed_hash = compute_eth_message_hash(root, valid_until);
     let mut previous_addr: [u8; EVM_ADDRESS_BYTES] = [0; EVM_ADDRESS_BYTES];
     let mut group_vote_counts: [u8; NUM_GROUPS] = [0; NUM_GROUPS];
+
     for sig in signatures {
-        let signer_addr = ecdsa_recover_evm_addr(&signed_hash.to_bytes(), sig);
-
-        #[allow(clippy::unnecessary_unwrap)]
-        // Clippy's alternatives cause problems with conditionally returning (early exit of the fn)
-        if signer_addr.is_err() {
-            return Err(signer_addr.unwrap_err());
-        }
-        let signer_addr = signer_addr.unwrap();
-
-        require!(
-            signer_addr.gt(&previous_addr),
-            McmError::SignersAddressesMustBeStrictlyIncreasing
-        );
-
+        let signer_addr = {
+            let recovered = ecdsa_recover_evm_addr(&signed_hash.to_bytes(), sig)?;
+            require!(
+                recovered.gt(&previous_addr),
+                McmError::SignersAddressesMustBeStrictlyIncreasing
+            );
+            recovered
+        };
         previous_addr = signer_addr;
 
         let signer_idx = multisig_config
@@ -144,6 +135,7 @@ fn verify_ecdsa_signatures(
             .binary_search_by_key(&signer_addr, |s| s.evm_address);
 
         require!(signer_idx.is_ok(), McmError::InvalidSigner);
+
         let signer = &multisig_config.signers[signer_idx.unwrap()];
 
         let mut group = usize::from(signer.group);

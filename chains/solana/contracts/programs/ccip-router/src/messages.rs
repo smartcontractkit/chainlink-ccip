@@ -1,11 +1,10 @@
-use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, ReportContext,
-    TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
-};
+use crate::{BillingTokenConfig, CcipRouterError, DestChain, ReportContext};
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::{ocr3base::Ocr3Report, ToTxData, TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR};
+// TODO this file has to be broken up
+
+use crate::ocr3base::Ocr3Report;
 
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
 
@@ -263,59 +262,6 @@ impl Any2SolanaTokenTransfer {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct LockOrBurnInV1 {
-    pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
-    pub remote_chain_selector: u64, // The chain ID of the destination chain
-    pub original_sender: Pubkey, // The original sender of the tx on the source chain
-    pub amount: u64, // solana-specific amount uses u64 - the amount of tokens to lock or burn, denominated in the source token's decimals
-    pub local_token: Pubkey, //  The address on this chain of the mint account to lock or burn
-}
-
-impl ToTxData for LockOrBurnInV1 {
-    fn to_tx_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.extend_from_slice(&TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR);
-        data.extend_from_slice(&self.try_to_vec().unwrap());
-        data
-    }
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct ReleaseOrMintInV1 {
-    pub original_sender: Vec<u8>, //          The original sender of the tx on the source chain
-    pub remote_chain_selector: u64, // ─╮ The chain ID of the source chain
-    pub receiver: Pubkey, // ───────────╯ The Token Associated Account that will receive the tokens on the destination chain.
-    pub amount: [u8; 32], // LE u256 amount - The amount of tokens to release or mint, denominated in the source token's decimals, pool expected to handle conversation to solana token specifics
-    pub local_token: Pubkey, //            The address of the Token Mint Account on Solana
-    /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
-    /// expected pool address for the given remoteChainSelector.
-    pub source_pool_address: Vec<u8>, //       The address bytes of the source pool
-    pub source_pool_data: Vec<u8>, //          The data received from the source pool to process the release or mint
-    /// @dev WARNING: offchainTokenData is untrusted data.
-    pub offchain_token_data: Vec<u8>, //       The offchain data to process the release or mint
-}
-
-impl ToTxData for ReleaseOrMintInV1 {
-    fn to_tx_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.extend_from_slice(&TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR);
-        data.extend_from_slice(&self.try_to_vec().unwrap());
-        data
-    }
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct LockOrBurnOutV1 {
-    pub dest_token_address: Vec<u8>,
-    pub dest_pool_data: Vec<u8>,
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct ReleaseOrMintOutV1 {
-    pub destination_amount: u64, // TODO: u256 on EVM?
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct Solana2AnyMessage {
     pub receiver: Vec<u8>,
     pub data: Vec<u8>,
@@ -412,8 +358,11 @@ impl Solana2AnyMessage {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use crate::utils::Exponential;
+
     use super::*;
     use anchor_lang::solana_program::pubkey::Pubkey;
+    use anchor_spl::token::spl_token::native_mint;
     use bytemuck::Zeroable;
 
     /// Builds a message and hash it, it's compared with a known hash
@@ -563,26 +512,32 @@ pub(crate) mod tests {
 
     pub fn sample_billing_config() -> BillingTokenConfig {
         let mut value = [0; 28];
-        value[27] = 3;
+        value.clone_from_slice(&3u32.e(18).to_be_bytes()[4..]);
         BillingTokenConfig {
             enabled: true,
-            mint: Pubkey::new_unique(),
+            mint: native_mint::ID,
             usd_per_token: crate::TimestampedPackedU224 {
                 value,
                 timestamp: 100,
             },
-            premium_multiplier_wei_per_eth: 0,
+            premium_multiplier_wei_per_eth: 1,
         }
     }
 
     pub fn sample_dest_chain() -> DestChain {
+        let mut value = [0; 28];
+        // L1 gas price
+        value[0..14].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
+        // L2 gas price
+        value[14..].clone_from_slice(&U256::new(22u128).to_be_bytes()[18..]);
         DestChain {
             version: 1,
+            chain_selector: 1,
             state: crate::DestChainState {
                 sequence_number: 0,
                 usd_per_unit_gas: crate::TimestampedPackedU224 {
-                    value: [0; 28],
-                    timestamp: 0,
+                    value,
+                    timestamp: 100,
                 },
             },
             config: crate::DestChainConfig {
@@ -590,16 +545,16 @@ pub(crate) mod tests {
                 max_number_of_tokens_per_msg: 5,
                 max_data_bytes: 200,
                 max_per_msg_gas_limit: 0,
-                dest_gas_overhead: 0,
+                dest_gas_overhead: 1,
                 dest_gas_per_payload_byte: 0,
                 dest_data_availability_overhead_gas: 0,
-                dest_gas_per_data_availability_byte: 0,
-                dest_data_availability_multiplier_bps: 0,
-                default_token_fee_usdcents: 0,
+                dest_gas_per_data_availability_byte: 1,
+                dest_data_availability_multiplier_bps: 1,
+                default_token_fee_usdcents: 100,
                 default_token_dest_gas_overhead: 0,
                 default_tx_gas_limit: 0,
-                gas_multiplier_wei_per_eth: 0,
-                network_fee_usdcents: 0,
+                gas_multiplier_wei_per_eth: 1,
+                network_fee_usdcents: 100,
                 gas_price_staleness_threshold: 10,
                 enforce_out_of_order: false,
                 chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),

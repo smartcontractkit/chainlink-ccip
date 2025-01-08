@@ -21,9 +21,6 @@ packages:
         interfaces:
             Controller:
             Stream:
-    github.com/smartcontractkit/chainlink-ccip/execute/internal/gas:
-        interfaces:
-            EstimateProvider:
     github.com/smartcontractkit/chainlink-ccip/pkg/reader:
         interfaces:
             CCIPReader:
@@ -36,6 +33,7 @@ packages:
     github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3:
         interfaces:
             ExecutePluginCodec:
+            EstimateProvider:
     github.com/smartcontractkit/chainlink-common/pkg/types:
             interfaces:
                 ContractWriter:
