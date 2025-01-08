@@ -409,12 +409,12 @@ func (r *ccipChainReader) NextSeqNum(
 	for _, chain := range chains {
 		cfg, exists := cfgs[chain]
 		if !exists {
-			r.lggr.Warnw("source chain config not found for chain %d, chain is skipped.", chain)
+			r.lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
 			continue
 		}
 
 		if cfg.MinSeqNr == 0 {
-			r.lggr.Errorw("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
+			r.lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
 			continue
 		}
 
