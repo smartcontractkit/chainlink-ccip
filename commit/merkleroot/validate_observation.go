@@ -212,8 +212,8 @@ func ValidateMerkleRootsState(
 	for chain, newNextOnRampSeqNum := range newNextOnRampSeqNums {
 		offRampExpNextSeqNum, ok := offRampExpNextSeqNums[chain]
 		if !ok {
-			// Due to some chain being disabled while the sequence numbers were already observed, reported should
-			// not be considered valid in that case.
+			// Due to some chain being disabled while the sequence numbers were already observed.
+			// Report should not be considered valid in that case.
 			return fmt.Errorf("offRamp expected next sequence number for chain %d was not found", chain)
 		}
 
