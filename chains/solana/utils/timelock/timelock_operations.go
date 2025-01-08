@@ -7,7 +7,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/contracts/tests/config"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
 
@@ -19,6 +18,7 @@ type Instruction struct {
 
 // represents a batch of instructions that having atomicy to be scheduled and executed via timelock
 type Operation struct {
+	TimelockID   [32]byte      // timelock instance identifier
 	Predecessor  [32]byte      // hashed id of the previous operation
 	Salt         [32]byte      // random salt for the operation
 	Delay        uint64        // delay in seconds
@@ -96,7 +96,7 @@ func (op *Operation) OperationID() [32]byte {
 
 func (op *Operation) OperationPDA() solana.PublicKey {
 	id := op.OperationID()
-	return GetOperationPDA(config.TestTimelockIDPaddedBuffer, id)
+	return GetOperationPDA(op.TimelockID, id)
 }
 
 // type conversion from solana instruction to timelock instruction data

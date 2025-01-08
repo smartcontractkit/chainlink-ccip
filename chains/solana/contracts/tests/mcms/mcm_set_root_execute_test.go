@@ -57,7 +57,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 	t.Run("mcm:general test cases", func(t *testing.T) {
 		// mcm name
-		testMsigName := config.TestMsigNamePaddedBuffer
+		testMsigName := config.TestMsigName
 
 		// test mcm pdas
 		multisigConfigPDA := mcms.GetConfigPDA(testMsigName)
@@ -95,7 +95,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						IsWritable: true,
 					},
 					{
-						PublicKey:  mcms.GetSignerPDA(config.TestMsigNamePaddedBuffer),
+						PublicKey:  mcms.GetSignerPDA(config.TestMsigName),
 						IsSigner:   false,
 						IsWritable: true,
 					},
@@ -149,7 +149,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						IsWritable: true,
 					},
 					{
-						PublicKey:  mcms.GetSignerPDA(config.TestMsigNamePaddedBuffer),
+						PublicKey:  mcms.GetSignerPDA(config.TestMsigName),
 						IsSigner:   false,
 						IsWritable: true,
 					},

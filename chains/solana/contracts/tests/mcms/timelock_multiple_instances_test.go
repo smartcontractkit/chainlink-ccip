@@ -210,4 +210,150 @@ func TestTimelockMultipleInstances(t *testing.T) {
 			}
 		}
 	})
+	// todo: config / signer seeds constraints
+	t.Run("instance isolation tests", func(t *testing.T) {
+		t.Run("config isolation", func(t *testing.T) {
+			t.Run("cannot access other instance config using own roles", func(t *testing.T) {
+				// try to use instance1's proposer to schedule on instance2
+				proposer := timelockInstances[0].RoleMap[timelock.Proposer_Role].RandomPick()
+				salt, err := mcms.SimpleSalt()
+				require.NoError(t, err)
+
+				// create test operation for instance2 but using instance1's proposer
+				op := timelockutil.Operation{
+					TimelockID:  timelockInstances[1].ID,
+					Predecessor: config.TimelockEmptyOpID,
+					Salt:        salt,
+					Delay:       uint64(1),
+				}
+
+				// preload operation instructions
+				preloadIxs, prierr := timelockutil.GetPreloadOperationIxs(
+					timelockInstances[1].ID,
+					op,
+					proposer.PublicKey(),
+				)
+				require.NoError(t, prierr)
+
+				for _, ix := range preloadIxs {
+					testutils.SendAndConfirm(
+						ctx,
+						t,
+						solanaGoClient,
+						[]solana.Instruction{ix},
+						proposer,
+						config.DefaultCommitment,
+					)
+				}
+
+				// Try to schedule operation on instance2 using instance1's proposer
+				ix, ierr := timelock.NewScheduleBatchInstruction(
+					timelockInstances[1].ID, // instance2's ID
+					op.OperationID(),
+					op.Delay,
+					op.OperationPDA(),
+					timelockInstances[1].ConfigPDA, // instance2's config
+					timelockInstances[0].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(), // instance1's proposer AC
+					proposer.PublicKey(),
+				).ValidateAndBuild()
+				require.NoError(t, ierr)
+
+				result := testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{ix},
+					proposer, // signing with instance1's proposer
+					config.DefaultCommitment,
+					[]string{"Error Code: " + timelock.InvalidAccessController_TimelockError.String()},
+				)
+				require.NotNil(t, result)
+			})
+
+			t.Run("cannot update delay using other instance's admin", func(t *testing.T) {
+				// try to update instance2's delay using instance1's admin
+				newMinDelay := uint64(14000)
+
+				ix, ierr := timelock.NewUpdateDelayInstruction(
+					timelockInstances[1].ID, // instance2's ID
+					newMinDelay,
+					timelockInstances[1].ConfigPDA,
+					timelockInstances[0].Admin.PublicKey(), // instance1's admin trying to update
+				).ValidateAndBuild()
+				require.NoError(t, ierr)
+
+				result := testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{ix},
+					timelockInstances[0].Admin, // signing with instance1's admin
+					config.DefaultCommitment,
+					[]string{"Error Code: " + timelockutil.UnauthorizedError.String()},
+				)
+				require.NotNil(t, result)
+			})
+
+			t.Run("cannot modify access controllers of another instance", func(t *testing.T) {
+				// try to use instance1's admin to modify instance2's access controller
+				randomKey, err := solana.NewRandomPrivateKey()
+				require.NoError(t, err)
+
+				// try to add access to instance2's proposer role using instance1's admin
+				ix, ierr := access_controller.NewAddAccessInstruction(
+					timelockInstances[1].RoleMap[timelock.Proposer_Role].AccessController.PublicKey(), // instance2's proposer AC
+					timelockInstances[0].Admin.PublicKey(),                                            // instance1's admin trying to modify
+					randomKey.PublicKey(),                                                             // random key to add
+				).ValidateAndBuild()
+				require.NoError(t, ierr)
+
+				result := testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{ix},
+					timelockInstances[0].Admin, // signing with instance1's admin
+					config.DefaultCommitment,
+					[]string{"Error Code: ConstraintHasOne"},
+				)
+				require.NotNil(t, result)
+			})
+
+			t.Run("cannot transfer ownership of another instance", func(t *testing.T) {
+				// try to transfer instance2's ownership using instance1's admin
+				ix, ierr := timelock.NewTransferOwnershipInstruction(
+					timelockInstances[1].ID,                // instance2's ID
+					timelockInstances[0].Admin.PublicKey(), // trying to transfer to instance1's admin
+					timelockInstances[1].ConfigPDA,
+					timelockInstances[0].Admin.PublicKey(), // instance1's admin trying to transfer
+				).ValidateAndBuild()
+				require.NoError(t, ierr)
+
+				result := testutils.SendAndFailWith(
+					ctx,
+					t,
+					solanaGoClient,
+					[]solana.Instruction{ix},
+					timelockInstances[0].Admin, // signing with instance1's admin
+					config.DefaultCommitment,
+					[]string{"Error Code: " + timelockutil.UnauthorizedError.String()},
+				)
+				require.NotNil(t, result)
+			})
+		})
+
+		t.Run("operation isolation", func(t *testing.T) {
+			t.Run("cannot schedule operation using other instance's signer PDA", func(t *testing.T) {})
+			t.Run("cannot execute operation scheduled on another instance", func(t *testing.T) {})
+			t.Run("cannot cancel operation from another instance", func(t *testing.T) {})
+			t.Run("cannot reuse operation ID between instances", func(t *testing.T) {})
+		})
+
+		t.Run("role isolation", func(t *testing.T) {
+			t.Run("proposer cannot schedule on other instance", func(t *testing.T) {})
+			t.Run("executor cannot execute on other instance", func(t *testing.T) {})
+			t.Run("canceller cannot cancel on other instance", func(t *testing.T) {})
+			t.Run("bypasser cannot bypass on other instance", func(t *testing.T) {})
+		})
+	})
 }

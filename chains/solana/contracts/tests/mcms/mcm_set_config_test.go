@@ -39,7 +39,7 @@ func TestMcmSetConfig(t *testing.T) {
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	// mcm name
-	testMsigName := config.TestMsigNamePaddedBuffer
+	testMsigName := config.TestMsigName
 
 	// test mcm pdas
 	multisigConfigPDA := mcms.GetConfigPDA(testMsigName)
