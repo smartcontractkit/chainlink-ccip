@@ -940,23 +940,23 @@ func (_c *MockCCIPReader_MsgsBetweenSeqNums_Call) RunAndReturn(run func(context.
 }
 
 // NextSeqNum provides a mock function with given fields: ctx, chains
-func (_m *MockCCIPReader) NextSeqNum(ctx context.Context, chains []ccipocr3.ChainSelector) ([]ccipocr3.SeqNum, error) {
+func (_m *MockCCIPReader) NextSeqNum(ctx context.Context, chains []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.SeqNum, error) {
 	ret := _m.Called(ctx, chains)
 
 	if len(ret) == 0 {
 		panic("no return value specified for NextSeqNum")
 	}
 
-	var r0 []ccipocr3.SeqNum
+	var r0 map[ccipocr3.ChainSelector]ccipocr3.SeqNum
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) ([]ccipocr3.SeqNum, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.SeqNum, error)); ok {
 		return rf(ctx, chains)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) []ccipocr3.SeqNum); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, []ccipocr3.ChainSelector) map[ccipocr3.ChainSelector]ccipocr3.SeqNum); ok {
 		r0 = rf(ctx, chains)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]ccipocr3.SeqNum)
+			r0 = ret.Get(0).(map[ccipocr3.ChainSelector]ccipocr3.SeqNum)
 		}
 	}
 
@@ -988,12 +988,12 @@ func (_c *MockCCIPReader_NextSeqNum_Call) Run(run func(ctx context.Context, chai
 	return _c
 }
 
-func (_c *MockCCIPReader_NextSeqNum_Call) Return(seqNum []ccipocr3.SeqNum, err error) *MockCCIPReader_NextSeqNum_Call {
+func (_c *MockCCIPReader_NextSeqNum_Call) Return(seqNum map[ccipocr3.ChainSelector]ccipocr3.SeqNum, err error) *MockCCIPReader_NextSeqNum_Call {
 	_c.Call.Return(seqNum, err)
 	return _c
 }
 
-func (_c *MockCCIPReader_NextSeqNum_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) ([]ccipocr3.SeqNum, error)) *MockCCIPReader_NextSeqNum_Call {
+func (_c *MockCCIPReader_NextSeqNum_Call) RunAndReturn(run func(context.Context, []ccipocr3.ChainSelector) (map[ccipocr3.ChainSelector]ccipocr3.SeqNum, error)) *MockCCIPReader_NextSeqNum_Call {
 	_c.Call.Return(run)
 	return _c
 }

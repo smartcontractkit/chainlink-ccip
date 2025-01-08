@@ -380,17 +380,12 @@ func (o observerImpl) ObserveOffRampNextSeqNums(ctx context.Context) []plugintyp
 		return nil
 	}
 
-	if len(offRampNextSeqNums) != len(sourceChains) {
-		o.lggr.Errorf("call to NextSeqNum returned unexpected number of seq nums, got %d, expected %d",
-			len(offRampNextSeqNums), len(sourceChains))
-		return nil
+	result := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
+	for chainSelector, seqNum := range offRampNextSeqNums {
+		result = append(result, plugintypes.NewSeqNumChain(chainSelector, seqNum))
 	}
 
-	result := make([]plugintypes.SeqNumChain, len(sourceChains))
-	for i := range sourceChains {
-		result[i] = plugintypes.SeqNumChain{ChainSel: sourceChains[i], SeqNum: offRampNextSeqNums[i]}
-	}
-
+	sort.Slice(result, func(i, j int) bool { return result[i].ChainSel < result[j].ChainSel })
 	return result
 }
 
@@ -413,23 +408,30 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 	sourceChains := mapset.NewSet(allSourceChains...).Intersect(supportedChains).ToSlice()
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 
-	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, len(sourceChains))
+	mu := &sync.Mutex{}
+	latestOnRampSeqNums := make([]plugintypes.SeqNumChain, 0, len(sourceChains))
 	eg := &errgroup.Group{}
 
-	for i, sourceChain := range sourceChains {
+	for _, sourceChain := range sourceChains {
 		eg.Go(func() error {
 			nextOnRampSeqNum, err := o.ccipReader.GetExpectedNextSequenceNumber(ctx, sourceChain, destChain)
 			if err != nil {
-				return fmt.Errorf("failed to get expected next sequence number for source chain %d: %w", sourceChain, err)
-			}
-			if nextOnRampSeqNum == 0 {
-				return fmt.Errorf("expected next sequence number for source chain %d is 0", sourceChain)
+				o.lggr.Errorf("failed to get expected next seq num for source chain %d: %s", sourceChain, err)
+				return nil
 			}
 
-			latestOnRampSeqNums[i] = plugintypes.SeqNumChain{
-				ChainSel: sourceChain,
-				SeqNum:   nextOnRampSeqNum - 1, // Latest is the next one minus one.
+			if nextOnRampSeqNum == 0 {
+				o.lggr.Errorf("unexpected next seq num for source chain %d, it is 0", sourceChain)
+				return nil
 			}
+
+			mu.Lock()
+			latestOnRampSeqNums = append(
+				latestOnRampSeqNums,
+				plugintypes.NewSeqNumChain(sourceChain, nextOnRampSeqNum-1), // Latest is the next one minus one.
+			)
+			mu.Unlock()
+
 			return nil
 		})
 	}
@@ -439,6 +441,9 @@ func (o observerImpl) ObserveLatestOnRampSeqNums(
 		return nil
 	}
 
+	sort.Slice(latestOnRampSeqNums, func(i, j int) bool {
+		return latestOnRampSeqNums[i].ChainSel < latestOnRampSeqNums[j].ChainSel
+	})
 	return latestOnRampSeqNums
 }
 
