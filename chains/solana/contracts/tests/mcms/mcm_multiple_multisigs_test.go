@@ -33,18 +33,18 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 	// mcm multisig 1
 	testMsigName1, err := mcms.PadString32("test_mcm_instance_1")
 	require.NoError(t, err)
-	multisigConfigPDA1 := mcms.McmConfigAddress(testMsigName1)
-	rootMetadataPDA1 := mcms.RootMetadataAddress(testMsigName1)
-	expiringRootAndOpCountPDA1 := mcms.ExpiringRootAndOpCountAddress(testMsigName1)
-	configSignersPDA1 := mcms.McmConfigSignersAddress(testMsigName1)
+	multisigConfigPDA1 := mcms.GetConfigPDA(testMsigName1)
+	rootMetadataPDA1 := mcms.GetRootMetadataPDA(testMsigName1)
+	expiringRootAndOpCountPDA1 := mcms.GetExpiringRootAndOpCountPDA(testMsigName1)
+	configSignersPDA1 := mcms.GetConfigSignersPDA(testMsigName1)
 
 	// mcm multisig 2
 	testMsigName2, err := mcms.PadString32("test_mcm_instance_2")
 	require.NoError(t, err)
-	multisigConfigPDA2 := mcms.McmConfigAddress(testMsigName2)
-	rootMetadataPDA2 := mcms.RootMetadataAddress(testMsigName2)
-	expiringRootAndOpCountPDA2 := mcms.ExpiringRootAndOpCountAddress(testMsigName2)
-	configSignersPDA2 := mcms.McmConfigSignersAddress(testMsigName2)
+	multisigConfigPDA2 := mcms.GetConfigPDA(testMsigName2)
+	rootMetadataPDA2 := mcms.GetRootMetadataPDA(testMsigName2)
+	expiringRootAndOpCountPDA2 := mcms.GetExpiringRootAndOpCountPDA(testMsigName2)
+	configSignersPDA2 := mcms.GetConfigSignersPDA(testMsigName2)
 
 	t.Run("setup:funding", func(t *testing.T) {
 		testutils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
@@ -115,7 +115,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
@@ -238,7 +238,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {

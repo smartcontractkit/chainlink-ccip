@@ -67,7 +67,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				admin, config.DefaultCommitment)
 		}
 		// fund timelock signer
-		fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
+		fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer)).Build()
 		testutils.SendAndConfirm(ctx, t, solanaGoClient,
 			[]solana.Instruction{fundPDAIx},
 			admin, config.DefaultCommitment)
@@ -142,7 +142,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						require.NoError(t, initSignersIxErr)
 						ixs = append(ixs, initSignersIx)
 
-						appendSignersIxs, appendSignersIxsErr := mcms.AppendSignersIxs(signerAddresses, msig.PaddedName, msig.ConfigPDA, msig.ConfigSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+						appendSignersIxs, appendSignersIxsErr := mcms.GetAppendSignersIxs(signerAddresses, msig.PaddedName, msig.ConfigPDA, msig.ConfigSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 						require.NoError(t, appendSignersIxsErr)
 						ixs = append(ixs, appendSignersIxs...)
 
@@ -234,7 +234,7 @@ func TestMcmWithTimelock(t *testing.T) {
 	t.Run("setup: timelock", func(t *testing.T) {
 		for role, roleMsigs := range msigs {
 			t.Run(fmt.Sprintf("init access controller for role %s", role.String()), func(t *testing.T) {
-				initAccIxs, initAccErr := timelockutil.InitAccessControllersIxs(ctx, roleMsigs.AccessController.PublicKey(), admin, solanaGoClient)
+				initAccIxs, initAccErr := timelockutil.GetInitAccessControllersIxs(ctx, roleMsigs.AccessController.PublicKey(), admin, solanaGoClient)
 				require.NoError(t, initAccErr)
 
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(roleMsigs.AccessController))
@@ -262,8 +262,9 @@ func TestMcmWithTimelock(t *testing.T) {
 			require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 			initTimelockIx, initTimelockErr := timelock.NewInitializeInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				config.MinDelay,
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 				solana.SystemProgramID,
 				config.TimelockProgram,
@@ -279,7 +280,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -300,7 +301,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					for _, msig := range roleMsigs.Multisigs {
 						addresses = append(addresses, msig.SignerPDA)
 					}
-					batchAddAccessIxs, batchAddAccessErr := timelockutil.BatchAddAccessIxs(ctx, roleMsigs.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+					batchAddAccessIxs, batchAddAccessErr := timelockutil.GetBatchAddAccessIxs(ctx, config.TestTimelockIDPaddedBuffer, roleMsigs.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 					require.NoError(t, batchAddAccessErr)
 
 					for _, ix := range batchAddAccessIxs {
@@ -325,7 +326,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					t.Run(fmt.Sprintf(role.String(), mcms.UnpadString32(msig.PaddedName)), func(t *testing.T) {
 						ix, transferOwnershipErr := mcm.NewTransferOwnershipInstruction(
 							msig.PaddedName,
-							config.TimelockSignerPDA, // new proposed owner
+							timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), // new proposed owner
 							msig.ConfigPDA,
 							admin.PublicKey(),
 						).ValidateAndBuild()
@@ -339,12 +340,12 @@ func TestMcmWithTimelock(t *testing.T) {
 							require.NoError(t, err, "failed to get account info")
 						}
 						require.Equal(t, admin.PublicKey(), configAccount.Owner)
-						require.Equal(t, config.TimelockSignerPDA, configAccount.ProposedOwner)
+						require.Equal(t, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), configAccount.ProposedOwner)
 
 						acceptOwnershipIx, acceptOwnershipixErr := mcm.NewAcceptOwnershipInstruction(
 							msig.PaddedName,
 							msig.ConfigPDA,
-							config.TimelockSignerPDA,
+							timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						).ValidateAndBuild()
 						require.NoError(t, acceptOwnershipixErr)
 
@@ -361,17 +362,18 @@ func TestMcmWithTimelock(t *testing.T) {
 						id := acceptOwnershipOp.OperationID()
 						operationPDA := acceptOwnershipOp.OperationPDA()
 
-						ixs, ierr := timelockutil.PreloadOperationIxs(acceptOwnershipOp, admin.PublicKey())
+						ixs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, acceptOwnershipOp, admin.PublicKey())
 						require.NoError(t, ierr)
 						for _, ix := range ixs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 						}
 
 						scheduleBatchIx, scErr := timelock.NewScheduleBatchInstruction(
+							config.TestTimelockIDPaddedBuffer,
 							acceptOwnershipOp.OperationID(),
 							acceptOwnershipOp.Delay,
 							operationPDA,
-							config.TimelockConfigPDA,
+							timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 							roleMsigs.AccessController.PublicKey(),
 							admin.PublicKey(),
 						).ValidateAndBuild()
@@ -410,10 +412,11 @@ func TestMcmWithTimelock(t *testing.T) {
 						)
 
 						bypassExeIx := timelock.NewBypasserExecuteBatchInstruction(
+							config.TestTimelockIDPaddedBuffer,
 							acceptOwnershipOp.OperationID(),
 							acceptOwnershipOp.OperationPDA(),
-							config.TimelockConfigPDA,
-							config.TimelockSignerPDA,
+							timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+							timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 							roleMsigs.AccessController.PublicKey(),
 							admin.PublicKey(), // bypass execute with admin previledges
 						)
@@ -441,7 +444,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						if err != nil {
 							require.NoError(t, err, "failed to get account info")
 						}
-						require.Equal(t, config.TimelockSignerPDA, configAccount.Owner)
+						require.Equal(t, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), configAccount.Owner)
 						require.Equal(t, solana.PublicKey{}, configAccount.ProposedOwner)
 					})
 				}
@@ -506,7 +509,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					require.Equal(t, 0, rInitBal)
 
 					// mint authority to timelock
-					authIx, aErr := tokens.SetTokenMintAuthority(v.tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
+					authIx, aErr := tokens.SetTokenMintAuthority(v.tokenProgram, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), mint, admin.PublicKey())
 					require.NoError(t, aErr)
 
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{authIx}, admin, config.DefaultCommitment)
@@ -523,14 +526,14 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					for i := 0; i < numMintIxs; i++ {
 						// timelock signer can mint token (transferred authority)
-						ix, mIxErr := tokens.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, config.TimelockSignerPDA)
+						ix, mIxErr := tokens.MintTo(1*solana.LAMPORTS_PER_SOL, v.tokenProgram, mint, rAta, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer))
 						require.NoError(t, mIxErr)
 
 						// add instruction to timelock operation
 						opToSchedule.AddInstruction(ix, []solana.PublicKey{v.tokenProgram})
 					}
 
-					ixs, ierr := timelockutil.PreloadOperationIxs(opToSchedule, admin.PublicKey())
+					ixs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, opToSchedule, admin.PublicKey())
 					require.NoError(t, ierr)
 					for _, ix := range ixs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -538,10 +541,11 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					// Schedule the operation
 					scheduleIx, scErr := timelock.NewScheduleBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						opToSchedule.OperationID(),
 						opToSchedule.Delay,
 						opToSchedule.OperationPDA(),
-						config.TimelockConfigPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 						msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 						proposerMsig.SignerPDA, // msig signer since we're going to run this ix with mcm::execute
 					).ValidateAndBuild()
@@ -569,7 +573,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 					t.Run("mcm:preload signatures", func(t *testing.T) {
-						preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+						preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 						require.NoError(t, plerr)
 
 						for _, ix := range preloadIxs {
@@ -598,7 +602,7 @@ func TestMcmWithTimelock(t *testing.T) {
 							rootValidationData.MetadataProof,
 							signaturesPDA,
 							proposerMsig.RootMetadataPDA,
-							mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+							mcms.GetSeenSignedHashesPDA(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 							proposerMsig.ExpiringRootAndOpCountPDA,
 							proposerMsig.ConfigPDA,
 							admin.PublicKey(),
@@ -646,7 +650,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					t.Run("mcm:execute -> timelock::schedule_batch", func(t *testing.T) {
 						t.Run("check if timelock config is correct", func(t *testing.T) {
-							info, infoErr := solanaGoClient.GetAccountInfoWithOpts(ctx, config.TimelockConfigPDA, &rpc.GetAccountInfoOpts{
+							info, infoErr := solanaGoClient.GetAccountInfoWithOpts(ctx, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), &rpc.GetAccountInfoOpts{
 								Commitment: config.DefaultCommitment,
 							})
 							require.NoError(t, infoErr)
@@ -736,11 +740,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					t.Run("timelock worker -> timelock::execute_batch", func(t *testing.T) {
 						ix := timelock.NewExecuteBatchInstruction(
+							config.TestTimelockIDPaddedBuffer,
 							opToSchedule.OperationID(),
 							opToSchedule.OperationPDA(),
 							config.TimelockEmptyOpID,
-							config.TimelockConfigPDA,
-							config.TimelockSignerPDA,
+							timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+							timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 							msigs[timelock.Executor_Role].AccessController.PublicKey(),
 							admin.PublicKey(), // timelock worker authority
 						)
@@ -818,7 +823,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		)
 		require.NoError(t, cterr)
 
-		authIx, aterr := tokens.SetTokenMintAuthority(tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
+		authIx, aterr := tokens.SetTokenMintAuthority(tokenProgram, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), mint, admin.PublicKey())
 		require.NoError(t, aterr)
 
 		setupIxs := append(createTokenIxs, authIx)
@@ -831,10 +836,10 @@ func TestMcmWithTimelock(t *testing.T) {
 		treasury, kerr := solana.NewRandomPrivateKey()
 		require.NoError(t, kerr)
 
-		ix1, treasuryATA, taerr := tokens.CreateAssociatedTokenAccount(tokenProgram, mint, treasury.PublicKey(), config.TimelockSignerPDA)
+		ix1, treasuryATA, taerr := tokens.CreateAssociatedTokenAccount(tokenProgram, mint, treasury.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer))
 		require.NoError(t, taerr)
 
-		ix2, tmerr := tokens.MintTo(1000*solana.LAMPORTS_PER_SOL, tokenProgram, mint, treasuryATA, config.TimelockSignerPDA)
+		ix2, tmerr := tokens.MintTo(1000*solana.LAMPORTS_PER_SOL, tokenProgram, mint, treasuryATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer))
 		require.NoError(t, tmerr)
 
 		salt1, serr := mcms.SimpleSalt()
@@ -859,19 +864,19 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		ix3, team1ATA, t1cerr := tokens.CreateAssociatedTokenAccount(
 			tokenProgram, mint, team1.PublicKey(),
-			config.TimelockSignerPDA,
+			timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 		)
 		require.NoError(t, t1cerr)
 
 		ix4, team2ATA, t2cerr := tokens.CreateAssociatedTokenAccount(
 			tokenProgram, mint, team2.PublicKey(),
-			config.TimelockSignerPDA,
+			timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 		)
 		require.NoError(t, t2cerr)
 
 		ix5, team3ATA, t3cerr := tokens.CreateAssociatedTokenAccount(
 			tokenProgram, mint, team3.PublicKey(),
-			config.TimelockSignerPDA,
+			timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 		)
 		require.NoError(t, t3cerr)
 
@@ -889,11 +894,11 @@ func TestMcmWithTimelock(t *testing.T) {
 		//////////////////////////////////////////////////////////////
 		// Timelock Operation 3 - Schedule team token distribution //
 		//////////////////////////////////////////////////////////////
-		ix6, i6err := tokens.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+		ix6, i6err := tokens.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), []solana.PublicKey{})
 		require.NoError(t, i6err)
-		ix7, i7err := tokens.TokenTransferChecked(200*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+		ix7, i7err := tokens.TokenTransferChecked(200*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), []solana.PublicKey{})
 		require.NoError(t, i7err)
-		ix8, i8err := tokens.TokenTransferChecked(300*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+		ix8, i8err := tokens.TokenTransferChecked(300*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), []solana.PublicKey{})
 		require.NoError(t, i8err)
 
 		// add all team distribution instructions
@@ -920,17 +925,18 @@ func TestMcmWithTimelock(t *testing.T) {
 
 		for i, op := range timelockOps {
 			t.Run(fmt.Sprintf("prepare mcm op node %d with timelock::schedule_batch ix", i), func(t *testing.T) {
-				ixs, ierr := timelockutil.PreloadOperationIxs(op, admin.PublicKey())
+				ixs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, op, admin.PublicKey())
 				require.NoError(t, ierr)
 				for _, ix := range ixs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
 				}
 
 				scheduleOpIx, scErr := timelock.NewScheduleBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					op.OperationID(),
 					op.Delay,
 					op.OperationPDA(),
-					config.TimelockConfigPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 					proposerMsig.SignerPDA,
 				).ValidateAndBuild()
@@ -969,7 +975,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			////////////////////////////////////////////////
 			// mcm::set_root - with preloading signatures //
 			////////////////////////////////////////////////
-			preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+			preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil), admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 			require.NoError(t, plerr)
 
 			for _, ix := range preloadIxs {
@@ -998,7 +1004,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				rootValidationData.MetadataProof,
 				proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil),
 				proposerMsig.RootMetadataPDA,
-				mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+				mcms.GetSeenSignedHashesPDA(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 				proposerMsig.ExpiringRootAndOpCountPDA,
 				proposerMsig.ConfigPDA,
 				admin.PublicKey(),
@@ -1110,9 +1116,10 @@ func TestMcmWithTimelock(t *testing.T) {
 				canceller := msigs[timelock.Canceller_Role].GetAnyMultisig()
 
 				cancelIx, cerr := timelock.NewCancelInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					op3.OperationID(),
 					op3.OperationPDA(),
-					config.TimelockConfigPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Canceller_Role].AccessController.PublicKey(),
 					canceller.SignerPDA,
 				).ValidateAndBuild()
@@ -1142,7 +1149,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				signaturesPDA := canceller.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
-				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, canceller.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, canceller.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 
 				for _, ix := range preloadIxs {
@@ -1157,7 +1164,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					rootValidationData.MetadataProof,
 					signaturesPDA,
 					canceller.RootMetadataPDA,
-					mcms.SeenSignedHashesAddress(canceller.PaddedName, rootValidationData.Root, validUntil),
+					mcms.GetSeenSignedHashesPDA(canceller.PaddedName, rootValidationData.Root, validUntil),
 					canceller.ExpiringRootAndOpCountPDA,
 					canceller.ConfigPDA,
 					admin.PublicKey(),
@@ -1230,11 +1237,11 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			t.Run("create new operation with corrected amounts", func(t *testing.T) {
 				// Create corrected transfer instructions with new amounts
-				ix1, i1err := tokens.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+				ix1, i1err := tokens.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team1ATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), []solana.PublicKey{})
 				require.NoError(t, i1err)
-				ix2, i2err := tokens.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+				ix2, i2err := tokens.TokenTransferChecked(150*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team2ATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), []solana.PublicKey{})
 				require.NoError(t, i2err)
-				ix3, i3err := tokens.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, config.TimelockSignerPDA, []solana.PublicKey{})
+				ix3, i3err := tokens.TokenTransferChecked(100*solana.LAMPORTS_PER_SOL, 9, tokenProgram, treasuryATA, mint, team3ATA, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), []solana.PublicKey{})
 				require.NoError(t, i3err)
 
 				// Create new operation
@@ -1250,7 +1257,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				newOp3.AddInstruction(ix2, []solana.PublicKey{tokenProgram})
 				newOp3.AddInstruction(ix3, []solana.PublicKey{tokenProgram})
 
-				ixs, perr := timelockutil.PreloadOperationIxs(newOp3, admin.PublicKey())
+				ixs, perr := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, newOp3, admin.PublicKey())
 				require.NoError(t, perr)
 				for _, ix := range ixs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -1258,10 +1265,11 @@ func TestMcmWithTimelock(t *testing.T) {
 
 				// Create mcm operation node for scheduling
 				scheduleIx, scerr := timelock.NewScheduleBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					newOp3.OperationID(),
 					newOp3.Delay,
 					newOp3.OperationPDA(),
-					config.TimelockConfigPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 					proposerMsig.SignerPDA,
 				).ValidateAndBuild()
@@ -1293,7 +1301,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 				// preload signatures
-				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, proposerMsig.PaddedName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 				for _, ix := range preloadIxs {
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -1308,7 +1316,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					rootValidationData.MetadataProof,
 					signaturesPDA,
 					proposerMsig.RootMetadataPDA,
-					mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+					mcms.GetSeenSignedHashesPDA(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 					proposerMsig.ExpiringRootAndOpCountPDA,
 					proposerMsig.ConfigPDA,
 					admin.PublicKey(),
@@ -1397,11 +1405,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			t.Run("op2: cannot be executed before op1", func(t *testing.T) {
 				ix := timelock.NewExecuteBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					op2.OperationID(),
 					op2.OperationPDA(),
 					op1.OperationPDA(), // provide op1 PDA as predecessor
-					config.TimelockConfigPDA,
-					config.TimelockSignerPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+					timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Executor_Role].AccessController.PublicKey(),
 					admin.PublicKey(),
 				)
@@ -1420,11 +1429,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			t.Run("op1: initial mint to treasury", func(t *testing.T) {
 				ix := timelock.NewExecuteBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					op1.OperationID(),
 					op1.OperationPDA(),
 					config.TimelockEmptyOpID,
-					config.TimelockConfigPDA,
-					config.TimelockSignerPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+					timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Executor_Role].AccessController.PublicKey(),
 					admin.PublicKey(),
 				)
@@ -1485,7 +1495,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					tokenProgram,
 					treasuryATA,
 					mint,
-					config.TimelockSignerPDA,
+					timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 					treasury.PublicKey(),
 					nil,
 				)
@@ -1495,11 +1505,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			t.Run("op2: should provide the correct predecessor pda address", func(t *testing.T) {
 				ix := timelock.NewExecuteBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					op2.OperationID(),
 					op2.OperationPDA(),
 					op1.OperationID(), // provide op1 ID as predecessor
-					config.TimelockConfigPDA,
-					config.TimelockSignerPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+					timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Executor_Role].AccessController.PublicKey(),
 					admin.PublicKey(),
 				)
@@ -1518,11 +1529,12 @@ func TestMcmWithTimelock(t *testing.T) {
 
 			t.Run("op2: team ata creation", func(t *testing.T) {
 				ix := timelock.NewExecuteBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					op2.OperationID(),
 					op2.OperationPDA(),
 					op1.OperationPDA(), // provide op1 PDA as predecessor
-					config.TimelockConfigPDA,
-					config.TimelockSignerPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+					timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 					msigs[timelock.Executor_Role].AccessController.PublicKey(),
 					admin.PublicKey(),
 				)
@@ -1566,11 +1578,12 @@ func TestMcmWithTimelock(t *testing.T) {
 			require.NoError(t, werr)
 
 			executeTimelockIx := timelock.NewExecuteBatchInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				newOp3.OperationID(),
 				newOp3.OperationPDA(),
 				op2.OperationPDA(),
-				config.TimelockConfigPDA,
-				config.TimelockSignerPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				msigs[timelock.Executor_Role].AccessController.PublicKey(),
 				admin.PublicKey(),
 			)
@@ -1746,7 +1759,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signaturesPDA := executorMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 					// preload signatures
-					preloadIxs, err := mcms.McmPreloadSignaturesIxs(
+					preloadIxs, err := mcms.GetMcmPreloadSignaturesIxs(
 						signatures,
 						executorMsig.PaddedName,
 						rootValidationData.Root,
@@ -1770,7 +1783,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						rootValidationData.MetadataProof,
 						signaturesPDA,
 						executorMsig.RootMetadataPDA,
-						mcms.SeenSignedHashesAddress(executorMsig.PaddedName, rootValidationData.Root, validUntil),
+						mcms.GetSeenSignedHashesPDA(executorMsig.PaddedName, rootValidationData.Root, validUntil),
 						executorMsig.ExpiringRootAndOpCountPDA,
 						executorMsig.ConfigPDA,
 						admin.PublicKey(),
@@ -1896,7 +1909,7 @@ func TestMcmWithTimelock(t *testing.T) {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, setupIxs, admin, config.DefaultCommitment, common.AddSigners(mintKeypair))
 
 			// setup mint authority to Timelock signer
-			authIx, err := tokens.SetTokenMintAuthority(tokenProgram, config.TimelockSignerPDA, mint, admin.PublicKey())
+			authIx, err := tokens.SetTokenMintAuthority(tokenProgram, timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer), mint, admin.PublicKey())
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{authIx}, admin, config.DefaultCommitment)
 
@@ -1935,7 +1948,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				tokenProgram,
 				treasuryATA,
 				mint,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				treasury.PublicKey(),
 				nil,
 			)
@@ -1991,7 +2004,7 @@ func TestMcmWithTimelock(t *testing.T) {
 							treasuryATA,
 							mint,
 							ata,
-							config.TimelockSignerPDA,
+							timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 							[]solana.PublicKey{},
 						)
 						require.NoError(t, err)
@@ -2031,7 +2044,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					}
 
 					// create and initialize operation accounts
-					ixs, err := timelockutil.PreloadOperationIxs(op, admin.PublicKey())
+					ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, op, admin.PublicKey())
 					require.NoError(t, err)
 					for _, ix := range ixs {
 						cu := testutils.GetRequiredCU(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -2046,10 +2059,11 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					// schedule the operation
 					scheduleIx, err := timelock.NewScheduleBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op.OperationID(),
 						op.Delay,
 						op.OperationPDA(),
-						config.TimelockConfigPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 						msigs[timelock.Proposer_Role].AccessController.PublicKey(),
 						proposerMsig.SignerPDA,
 					).ValidateAndBuild()
@@ -2089,7 +2103,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					signaturesPDA := proposerMsig.RootSignaturesPDA(rootValidationData.Root, validUntil)
 
 					// preload signatures
-					preloadIxs, err := mcms.McmPreloadSignaturesIxs(
+					preloadIxs, err := mcms.GetMcmPreloadSignaturesIxs(
 						signatures,
 						proposerMsig.PaddedName,
 						rootValidationData.Root,
@@ -2113,7 +2127,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						rootValidationData.MetadataProof,
 						signaturesPDA,
 						proposerMsig.RootMetadataPDA,
-						mcms.SeenSignedHashesAddress(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
+						mcms.GetSeenSignedHashesPDA(proposerMsig.PaddedName, rootValidationData.Root, validUntil),
 						proposerMsig.ExpiringRootAndOpCountPDA,
 						proposerMsig.ConfigPDA,
 						admin.PublicKey(),
@@ -2155,11 +2169,12 @@ func TestMcmWithTimelock(t *testing.T) {
 					require.NoError(t, err)
 
 					tlExeIx := timelock.NewExecuteBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op.OperationID(),
 						op.OperationPDA(),
 						config.TimelockEmptyOpID,
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+						timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						msigs[timelock.Executor_Role].AccessController.PublicKey(),
 						admin.PublicKey(),
 					)

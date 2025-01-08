@@ -70,7 +70,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 	t.Run("setup:init access controllers", func(t *testing.T) {
 		for _, data := range roleMap {
-			initAccIxs, initAccIxsErr := timelockutil.InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
+			initAccIxs, initAccIxsErr := timelockutil.GetInitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
 			require.NoError(t, initAccIxsErr)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
@@ -97,8 +97,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 		initTimelockIx, initErr := timelock.NewInitializeInstruction(
+			config.TestTimelockIDPaddedBuffer,
 			config.MinDelay,
-			config.TimelockConfigPDA,
+			timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 			admin.PublicKey(),
 			solana.SystemProgramID,
 			config.TimelockProgram,
@@ -114,7 +115,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
-		cfgErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+		cfgErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment, &configAccount)
 		if cfgErr != nil {
 			require.NoError(t, cfgErr, "failed to get account info")
 		}
@@ -133,7 +134,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			for _, account := range data.Accounts {
 				addresses = append(addresses, account.PublicKey())
 			}
-			batchAddAccessIxs, batchAddAccessIxsErr := timelockutil.BatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+			batchAddAccessIxs, batchAddAccessIxsErr := timelockutil.GetBatchAddAccessIxs(ctx, config.TestTimelockIDPaddedBuffer, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 			require.NoError(t, batchAddAccessIxsErr)
 
 			for _, ix := range batchAddAccessIxs {
@@ -153,8 +154,9 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			newMinDelay := uint64(1)
 
 			ix, updateDelayIxErr := timelock.NewUpdateDelayInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				newMinDelay,
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, updateDelayIxErr)
@@ -163,7 +165,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			require.NotNil(t, result)
 
 			var configAccount timelock.Config
-			getConfigAccountErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			getConfigAccountErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment, &configAccount)
 			require.NoError(t, getConfigAccountErr, "failed to get account info")
 
 			require.Equal(t, newMinDelay, configAccount.MinDelay, "MinDelay is not updated")
@@ -172,7 +174,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		t.Run("setup: wsol transfer operation", func(t *testing.T) {
 			requiredAmount := allowance.recipient
 
-			fundPDAIx := system.NewTransferInstruction(allowance.timelockAuthority, admin.PublicKey(), config.TimelockSignerPDA).Build()
+			fundPDAIx := system.NewTransferInstruction(allowance.timelockAuthority, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer)).Build()
 
 			createAdminATAIx, _, caErr := tokens.CreateAssociatedTokenAccount(tokenProgram, wsol, admin.PublicKey(), admin.PublicKey())
 			require.NoError(t, caErr)
@@ -196,7 +198,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				tokenProgram,
 				adminATA,
 				wsol,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 				nil,
 			)
@@ -209,7 +211,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 			timelockAuthorityBalance, tlBalanceErr := solanaGoClient.GetBalance(
 				ctx,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				config.DefaultCommitment,
 			)
 			require.NoError(t, tlBalanceErr)
@@ -236,7 +238,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				tokenProgram,
 				wsol,
 				recipient.PublicKey(),
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 			)
 			require.NoError(t, ciErr)
 			op1.AddInstruction(cIx, []solana.PublicKey{solana.TokenProgramID, solana.SPLAssociatedTokenAccountProgramID})
@@ -256,7 +258,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				adminATA,
 				wsol,
 				recipientATA,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				nil,
 			)
 			require.NoError(t, tiErr)
@@ -277,7 +279,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				adminATA,
 				wsol,
 				recipientATA,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				nil,
 			)
 			require.NoError(t, atErr)
@@ -292,7 +294,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("success: schedule all operations", func(t *testing.T) {
 					for _, op := range []timelockutil.Operation{op1, op2, op3} {
-						invalidIxs, ierr := timelockutil.PreloadOperationIxs(op, proposer.PublicKey())
+						invalidIxs, ierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, op, proposer.PublicKey())
 						require.NoError(t, ierr)
 						for _, ix := range invalidIxs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
@@ -301,9 +303,10 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						t.Run("clear operation", func(t *testing.T) {
 							// clear instructions so that we can reinitialize the operation
 							clearIx, ciErr := timelock.NewClearOperationInstruction(
+								config.TestTimelockIDPaddedBuffer,
 								op.OperationID(),
 								op.OperationPDA(),
-								config.TimelockConfigPDA,
+								timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 								proposer.PublicKey(),
 							).ValidateAndBuild()
 							require.NoError(t, ciErr)
@@ -314,17 +317,18 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 						})
 
 						// re-preload instructions
-						ixs, err := timelockutil.PreloadOperationIxs(op, proposer.PublicKey())
+						ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, op, proposer.PublicKey())
 						require.NoError(t, err)
 						for _, ix := range ixs {
 							testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 						}
 
 						ix, ixVErr := timelock.NewScheduleBatchInstruction(
+							config.TestTimelockIDPaddedBuffer,
 							op.OperationID(),
 							op.Delay,
 							op.OperationPDA(),
-							config.TimelockConfigPDA,
+							timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 							proposerAccessController,
 							proposer.PublicKey(),
 						).ValidateAndBuild()
@@ -359,10 +363,11 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("fail: OperationAlreadyExists", func(t *testing.T) {
 					ix := timelock.NewScheduleBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op1.OperationID(),
 						op1.Delay,
 						op1.OperationPDA(),
-						config.TimelockConfigPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 						proposerAccessController,
 						proposer.PublicKey(),
 					).Build()
@@ -378,11 +383,12 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("fail: should provide the right dependency pda", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op2.OperationID(),
 						op2.OperationPDA(),
 						op2.OperationPDA(), // wrong dependency
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+						timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -396,11 +402,12 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("fail: not able to execute op2 before dependency(op1) execution", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op2.OperationID(),
 						op2.OperationPDA(),
 						op1.OperationPDA(), // not executed yet
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+						timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -415,11 +422,12 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("success: op1 executed", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op1.OperationID(),
 						op1.OperationPDA(),
 						config.TimelockEmptyOpID,
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+						timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -461,11 +469,12 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("success: op2 executed", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op2.OperationID(),
 						op2.OperationPDA(),
 						op1.OperationPDA(),
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+						timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -519,11 +528,12 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 				t.Run("failure on execution try: op3 is not ready", func(t *testing.T) {
 					ix := timelock.NewExecuteBatchInstruction(
+						config.TestTimelockIDPaddedBuffer,
 						op3.OperationID(),
 						op3.OperationPDA(),
 						config.TimelockEmptyOpID,
-						config.TimelockConfigPDA,
-						config.TimelockSignerPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+						timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 						executorAccessController,
 						executor.PublicKey(),
 					)
@@ -562,22 +572,24 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 		t.Run("blocks initialize function", func(t *testing.T) {
 			bIx, bIxErr := timelock.NewBlockFunctionSelectorInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, bIxErr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bIx}, admin, config.DefaultCommitment)
 
-			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment)
 			require.NoError(t, bserr)
 			require.Contains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize.Bytes())
 		})
 
 		t.Run("not able to block function that is already blocked", func(t *testing.T) {
 			bbIx, bbIxErr := timelock.NewBlockFunctionSelectorInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, bbIxErr)
@@ -587,17 +599,18 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		id := op.OperationID()
 		operationPDA := op.OperationPDA()
 
-		ixs, err := timelockutil.PreloadOperationIxs(op, proposer.PublicKey())
+		ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, op, proposer.PublicKey())
 		require.NoError(t, err)
 		for _, ix := range ixs {
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 		}
 
 		scIx, scIxVErr := timelock.NewScheduleBatchInstruction(
+			config.TestTimelockIDPaddedBuffer,
 			id,
 			op.Delay,
 			operationPDA,
-			config.TimelockConfigPDA,
+			timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 			proposerAccessController,
 			proposer.PublicKey(),
 		).ValidateAndBuild()
@@ -607,22 +620,24 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 		t.Run("unblocks initialize function", func(t *testing.T) {
 			bIx, bIxErr := timelock.NewUnblockFunctionSelectorInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, bIxErr)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{bIx}, admin, config.DefaultCommitment)
 
-			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment)
 			require.NoError(t, bserr)
 			require.NotContains(t, blockedSelectors, external_program_cpi_stub.Instruction_Initialize.Bytes())
 		})
 
 		t.Run("not able to unblock function that is not blocked", func(t *testing.T) {
 			bbIx, bbIxErr := timelock.NewUnblockFunctionSelectorInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				[8]uint8(external_program_cpi_stub.Instruction_Initialize.Bytes()),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, bbIxErr)
@@ -647,15 +662,16 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 
 		t.Run("can't register more than MAX_SELECTOR", func(t *testing.T) {
 			// check if it's empty
-			oldBlockedSelectors, gberr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			oldBlockedSelectors, gberr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment)
 			require.NoError(t, gberr)
 			require.Empty(t, oldBlockedSelectors)
 
 			ixs := []solana.Instruction{}
 			for i := 0; i < config.MaxFunctionSelectorLen; i++ {
 				ix, nberr := timelock.NewBlockFunctionSelectorInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					[8]uint8{byte(i)},
-					config.TimelockConfigPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 					admin.PublicKey(),
 				).ValidateAndBuild()
 				require.NoError(t, nberr)
@@ -675,14 +691,15 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			}
 
 			// check if it's full
-			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment)
+			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment)
 			require.NoError(t, bserr)
 			require.Equal(t, config.MaxFunctionSelectorLen, len(blockedSelectors))
 
 			// try one more
 			ix, nberr := timelock.NewBlockFunctionSelectorInstruction(
+				config.TestTimelockIDPaddedBuffer,
 				[8]uint8{255},
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, nberr)

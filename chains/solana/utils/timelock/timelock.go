@@ -19,8 +19,27 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 )
 
+func GetSignerPDA(timelockID [32]byte) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress([][]byte{[]byte("timelock_signer"), timelockID[:]}, config.TimelockProgram)
+	return pda
+}
+
+func GetConfigPDA(timelockID [32]byte) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress([][]byte{[]byte("timelock_config"), timelockID[:]}, config.TimelockProgram)
+	return pda
+}
+
+func GetOperationPDA(timelockID [32]byte, opID [32]byte) solana.PublicKey {
+	pda, _, _ := solana.FindProgramAddress([][]byte{
+		[]byte("timelock_operation"),
+		timelockID[:],
+		opID[:],
+	}, config.TimelockProgram)
+	return pda
+}
+
 // instruction builder for initializing access controllers
-func InitAccessControllersIxs(ctx context.Context, roleAcAccount solana.PublicKey, authority solana.PrivateKey, client *rpc.Client) ([]solana.Instruction, error) {
+func GetInitAccessControllersIxs(ctx context.Context, roleAcAccount solana.PublicKey, authority solana.PrivateKey, client *rpc.Client) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 
 	rentExemption, err := client.GetMinimumBalanceForRentExemption(
@@ -57,7 +76,7 @@ func InitAccessControllersIxs(ctx context.Context, roleAcAccount solana.PublicKe
 }
 
 // instructions builder for adding access to a role
-func BatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicKey, role timelock.Role, addresses []solana.PublicKey, authority solana.PrivateKey, chunkSize int, client *rpc.Client) ([]solana.Instruction, error) {
+func GetBatchAddAccessIxs(ctx context.Context, timelockID [32]byte, roleAcAccount solana.PublicKey, role timelock.Role, addresses []solana.PublicKey, authority solana.PrivateKey, chunkSize int, client *rpc.Client) ([]solana.Instruction, error) {
 	var ac access_controller.AccessController
 	err := common.GetAccountDataBorshInto(ctx, client, roleAcAccount, config.DefaultCommitment, &ac)
 	if err != nil {
@@ -71,8 +90,9 @@ func BatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicKey, role
 		}
 		chunk := addresses[i:end]
 		ix := timelock.NewBatchAddAccessInstruction(
+			timelockID,
 			role,
-			config.TimelockConfigPDA,
+			GetConfigPDA(timelockID),
 			config.AccessControllerProgram,
 			roleAcAccount,
 			authority.PublicKey(),
@@ -90,15 +110,16 @@ func BatchAddAccessIxs(ctx context.Context, roleAcAccount solana.PublicKey, role
 }
 
 // instructions builder for preloading instructions to timelock operation
-func PreloadOperationIxs(op Operation, authority solana.PublicKey) ([]solana.Instruction, error) {
+func GetPreloadOperationIxs(timelockID [32]byte, op Operation, authority solana.PublicKey) ([]solana.Instruction, error) {
 	ixs := []solana.Instruction{}
 	initOpIx, ioErr := timelock.NewInitializeOperationInstruction(
+		timelockID,
 		op.OperationID(),
 		op.Predecessor,
 		op.Salt,
 		op.IxsCountU32(),
 		op.OperationPDA(),
-		config.TimelockConfigPDA,
+		GetConfigPDA(timelockID),
 		authority,
 		solana.SystemProgramID,
 	).ValidateAndBuild()
@@ -109,10 +130,11 @@ func PreloadOperationIxs(op Operation, authority solana.PublicKey) ([]solana.Ins
 
 	for _, instruction := range op.ToInstructionData() {
 		appendIxsIx, apErr := timelock.NewAppendInstructionsInstruction(
+			timelockID,
 			op.OperationID(),
 			[]timelock.InstructionData{instruction}, // this should be a slice of instruction within 1232 bytes
 			op.OperationPDA(),
-			config.TimelockConfigPDA,
+			GetConfigPDA(timelockID),
 			authority,
 			solana.SystemProgramID, // for reallocation
 		).ValidateAndBuild()
@@ -123,9 +145,10 @@ func PreloadOperationIxs(op Operation, authority solana.PublicKey) ([]solana.Ins
 	}
 
 	finOpIx, foErr := timelock.NewFinalizeOperationInstruction(
+		timelockID,
 		op.OperationID(),
 		op.OperationPDA(),
-		config.TimelockConfigPDA,
+		GetConfigPDA(timelockID),
 		authority,
 	).ValidateAndBuild()
 	if foErr != nil {
@@ -158,7 +181,7 @@ func CreateRoleMultisigs(role timelock.Role, numMsigs int) RoleMultisigs {
 	msigs := make([]mcms.Multisig, numMsigs)
 	for i := 0; i < numMsigs; i++ {
 		name, _ := mcms.PadString32(fmt.Sprintf("%s_%d", role.String(), i))
-		msig := mcms.NewMcmMultisig(name)
+		msig := mcms.GetNewMcmMultisig(name)
 		// Create and set the config for each msig
 		//       ┌──────┐
 		//       │2-of-2│ root

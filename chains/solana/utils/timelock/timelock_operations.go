@@ -99,7 +99,7 @@ func (op *Operation) OperationID() [32]byte {
 
 func (op *Operation) OperationPDA() solana.PublicKey {
 	id := op.OperationID()
-	return config.TimelockOperationPDA(id)
+	return GetOperationPDA(config.TestTimelockIDPaddedBuffer, id)
 }
 
 // type conversion from solana instruction to timelock instruction data

@@ -69,7 +69,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 
 	t.Run("setup:init access controllers", func(t *testing.T) {
 		for _, data := range roleMap {
-			initAccIxs, initAccIxsErr := timelockutil.InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
+			initAccIxs, initAccIxsErr := timelockutil.GetInitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
 			require.NoError(t, initAccIxsErr)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
@@ -97,8 +97,9 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 		initTimelockIx, initErr := timelock.NewInitializeInstruction(
+			config.TestTimelockIDPaddedBuffer,
 			config.MinDelay,
-			config.TimelockConfigPDA,
+			timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
 			admin.PublicKey(),
 			solana.SystemProgramID,
 			config.TimelockProgram,
@@ -114,7 +115,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
-		cfgErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+		cfgErr := common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer), config.DefaultCommitment, &configAccount)
 		if cfgErr != nil {
 			require.NoError(t, cfgErr, "failed to get account info")
 		}
@@ -133,7 +134,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			for _, account := range data.Accounts {
 				addresses = append(addresses, account.PublicKey())
 			}
-			batchAddAccessIxs, batchAddAccessIxsErr := timelockutil.BatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+			batchAddAccessIxs, batchAddAccessIxsErr := timelockutil.GetBatchAddAccessIxs(ctx, config.TestTimelockIDPaddedBuffer, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 			require.NoError(t, batchAddAccessIxsErr)
 
 			for _, ix := range batchAddAccessIxs {
@@ -152,7 +153,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		t.Run("setup: wsol transfer operation", func(t *testing.T) {
 			requiredAmount := allowance.recipient
 
-			fundPDAIx := system.NewTransferInstruction(allowance.timelockAuthority, admin.PublicKey(), config.TimelockSignerPDA).Build()
+			fundPDAIx := system.NewTransferInstruction(allowance.timelockAuthority, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer)).Build()
 
 			createAdminATAIx, _, caErr := tokens.CreateAssociatedTokenAccount(tokenProgram, wsol, admin.PublicKey(), admin.PublicKey())
 			require.NoError(t, caErr)
@@ -177,7 +178,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				tokenProgram,
 				adminATA,
 				wsol,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				admin.PublicKey(),
 				nil,
 			)
@@ -191,7 +192,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			// check results
 			timelockAuthorityBalance, tlBalanceErr := solanaGoClient.GetBalance(
 				ctx,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				config.DefaultCommitment,
 			)
 			require.NoError(t, tlBalanceErr)
@@ -219,7 +220,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				tokenProgram,
 				wsol,
 				recipient.PublicKey(),
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 			)
 			require.NoError(t, ciErr)
 			op.AddInstruction(
@@ -234,7 +235,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				adminATA,
 				wsol,
 				recipientATA,
-				config.TimelockSignerPDA,
+				timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 				nil,
 			)
 			require.NoError(t, tiErr)
@@ -244,7 +245,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 			operationPDA := op.OperationPDA()
 			signer := roleMap[timelock.Proposer_Role].RandomPick()
 
-			ixs, err := timelockutil.PreloadOperationIxs(op, signer.PublicKey())
+			ixs, err := timelockutil.GetPreloadOperationIxs(config.TestTimelockIDPaddedBuffer, op, signer.PublicKey())
 			require.NoError(t, err)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, signer, config.DefaultCommitment)
@@ -267,10 +268,11 @@ func TestTimelockBypasserExecute(t *testing.T) {
 				ac := roleMap[timelock.Bypasser_Role].AccessController
 
 				ix := timelock.NewBypasserExecuteBatchInstruction(
+					config.TestTimelockIDPaddedBuffer,
 					id,
 					operationPDA,
-					config.TimelockConfigPDA,
-					config.TimelockSignerPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockIDPaddedBuffer),
+					timelockutil.GetSignerPDA(config.TestTimelockIDPaddedBuffer),
 					ac.PublicKey(),
 					signer.PublicKey(),
 				)

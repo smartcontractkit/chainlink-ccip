@@ -57,7 +57,7 @@ pub fn batch_add_access<'info>(
 }
 
 #[derive(Accounts)]
-#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], op_id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED])]
 pub struct Initialize<'info> {
     #[account(
         init,

@@ -200,7 +200,7 @@ pub struct AppendInstructions<'info> {
     )]
     pub operation: Account<'info, Operation>,
 
-    #[account(seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
     #[account(

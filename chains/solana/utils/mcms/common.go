@@ -9,65 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/sha3"
-
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/eth"
 )
-
-type McmConfigArgs struct {
-	MultisigName    [32]uint8
-	SignerAddresses [][20]uint8
-	SignerGroups    []byte
-	GroupQuorums    [32]uint8
-	GroupParents    [32]uint8
-	ClearRoot       bool
-}
-
-func NewValidMcmConfig(msigName [32]byte, signerPrivateKeys []string, signerGroups []byte, quorums []uint8, parents []uint8, clearRoot bool) (*McmConfigArgs, error) {
-	if len(signerGroups) == 0 {
-		return nil, fmt.Errorf("signerGroups cannot be empty")
-	}
-
-	signers, err := eth.GetEvmSigners(signerPrivateKeys)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get test EVM signers: %w", err)
-	}
-
-	if len(signers) != len(signerGroups) {
-		return nil, fmt.Errorf("number of signers (%d) does not match length of signerGroups (%d)", len(signers), len(signerGroups))
-	}
-
-	signerAddresses := make([][20]uint8, len(signers))
-	for i, signer := range signers {
-		signerAddresses[i] = signer.Address
-	}
-
-	var groupQuorums [32]uint8
-	var groupParents [32]uint8
-
-	copy(groupQuorums[:], quorums)
-	copy(groupParents[:], parents)
-
-	// Create new config vars to ensure atomic test configs
-	newSignerAddresses := make([][20]uint8, len(signerAddresses))
-	copy(newSignerAddresses, signerAddresses)
-
-	newSignerGroups := make([]byte, len(signerGroups))
-	copy(newSignerGroups, signerGroups)
-
-	newGroupQuorums := groupQuorums
-	newGroupParents := groupParents
-	newClearRoot := clearRoot
-
-	config := &McmConfigArgs{
-		MultisigName: msigName,
-	}
-	config.SignerAddresses = newSignerAddresses
-	config.SignerGroups = newSignerGroups
-	config.GroupQuorums = newGroupQuorums
-	config.GroupParents = newGroupParents
-	config.ClearRoot = newClearRoot
-	return config, nil
-}
 
 func Keccak256(data []byte) []byte {
 	hash := sha3.NewLegacyKeccak256()
