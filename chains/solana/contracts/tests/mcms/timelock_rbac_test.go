@@ -99,7 +99,7 @@ func TestTimelockRBAC(t *testing.T) {
 		require.NotNil(t, result)
 	})
 
-	t.Run("setup:init timelock program", func(t *testing.T) {
+	t.Run("setup:initialize timelock instance", func(t *testing.T) {
 		// get program data account
 		data, accErr := solanaGoClient.GetAccountInfoWithOpts(ctx, config.TimelockProgram, &rpc.GetAccountInfoOpts{
 			Commitment: config.DefaultCommitment,
