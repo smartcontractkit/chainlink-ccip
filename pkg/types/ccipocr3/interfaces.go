@@ -38,3 +38,9 @@ type RMNCrypto interface {
 type TokenDataEncoder interface {
 	EncodeUSDC(ctx context.Context, message Bytes, attestation Bytes) (Bytes, error)
 }
+
+// EstimateProvider is used to estimate the gas cost of a message or a merkle tree.
+type EstimateProvider interface {
+	CalculateMerkleTreeGas(numRequests int) uint64
+	CalculateMessageMaxGas(msg Message) uint64
+}
