@@ -3,8 +3,12 @@ package chainfee
 import (
 	"fmt"
 	"math/big"
+	"time"
+
+	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 
 	"golang.org/x/exp/maps"
 )
@@ -20,8 +24,11 @@ func (p *processor) ValidateObservation(
 	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
-
-	if err := p.ValidateObservedChains(ao); err != nil {
+	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
+	if err != nil {
+		return fmt.Errorf("failed to get supported chains: %w", err)
+	}
+	if err := validateObservedChains(ao, observerSupportedChains); err != nil {
 		return fmt.Errorf("failed to validate observed chains: %w", err)
 	}
 
@@ -39,6 +46,9 @@ func (p *processor) ValidateObservation(
 		}
 	}
 
+	if obs.TimestampNow.IsZero() || obs.TimestampNow.After(time.Now().UTC()) {
+		return fmt.Errorf("invalid timestamp now value %s", obs.TimestampNow.String())
+	}
 	return nil
 }
 
@@ -75,13 +85,16 @@ func validateFeeComponents(
 	return nil
 }
 
-func (p *processor) ValidateObservedChains(
+func validateObservedChains(
 	ao plugincommon.AttributedObservation[Observation],
+	observerSupportedChains mapset.Set[ccipocr3.ChainSelector],
 ) error {
 	obs := ao.Observation
-	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
-	if err != nil {
-		return fmt.Errorf("failed to get supported chains: %w", err)
+	if !areMapKeysEqual(obs.FeeComponents, obs.NativeTokenPrices) {
+		return fmt.Errorf("fee components and native token prices have different observed chains")
+	}
+	if !areMapKeysEqual(obs.NativeTokenPrices, obs.ChainFeeUpdates) {
+		return fmt.Errorf("native token and chain fee updates prices have different observed chains")
 	}
 
 	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)
@@ -93,4 +106,18 @@ func (p *processor) ValidateObservedChains(
 	}
 
 	return nil
+}
+
+func areMapKeysEqual[T, T1 comparable](map1 map[ccipocr3.ChainSelector]T, map2 map[ccipocr3.ChainSelector]T1) bool {
+	if len(map1) != len(map2) {
+		return false // Maps have different number of keys
+	}
+
+	for key := range map1 {
+		if _, exists := map2[key]; !exists {
+			return false // Key in map1 doesn't exist in map2
+		}
+	}
+
+	return true // All keys in map1 exist in map2
 }

@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	mapset "github.com/deckarep/golang-set/v2"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 )
 
 func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
@@ -172,6 +173,145 @@ func Test_validateFeeComponentsAndChainFeeUpdates(t *testing.T) {
 			} else {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedChainFeeUpdatesError)
+			}
+		})
+	}
+}
+
+func Test_validateObservedChains(t *testing.T) {
+	fourHoursAgo := time.Now().Add(-4 * time.Hour).UTC().Truncate(time.Hour)
+	tests := []struct {
+		name                    string
+		ao                      plugincommon.AttributedObservation[Observation]
+		observerSupportedChains mapset.Set[ccipocr3.ChainSelector]
+		expectedError           string
+	}{
+		{
+			name: "valid observed chains",
+			ao: plugincommon.AttributedObservation[Observation]{
+				Observation: Observation{
+					FeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+						1: {
+							ExecutionFee:        big.NewInt(10),
+							DataAvailabilityFee: big.NewInt(20),
+						},
+					},
+					NativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						1: {
+							Int: big.NewInt(100),
+						},
+					},
+					ChainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+						1: {
+							ChainFee: ComponentsUSDPrices{
+								ExecutionFeePriceUSD: big.NewInt(10),
+								DataAvFeePriceUSD:    big.NewInt(20),
+							},
+							Timestamp: fourHoursAgo,
+						},
+					},
+				},
+			},
+			observerSupportedChains: mapset.NewSet[ccipocr3.ChainSelector](1),
+			expectedError:           "",
+		},
+		{
+			name: "unsupported chain",
+			ao: plugincommon.AttributedObservation[Observation]{
+				Observation: Observation{
+					FeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+						1: {
+							ExecutionFee:        big.NewInt(10),
+							DataAvailabilityFee: big.NewInt(20),
+						},
+					},
+					NativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						1: {
+							Int: big.NewInt(100),
+						},
+					},
+					ChainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+						1: {
+							ChainFee: ComponentsUSDPrices{
+								ExecutionFeePriceUSD: big.NewInt(10),
+								DataAvFeePriceUSD:    big.NewInt(20),
+							},
+							Timestamp: fourHoursAgo,
+						},
+					},
+				},
+			},
+			observerSupportedChains: mapset.NewSet[ccipocr3.ChainSelector](2),
+			expectedError:           "chain 1 is not supported by observer",
+		},
+		{
+			name: "different observed chains in fee components and native token prices",
+			ao: plugincommon.AttributedObservation[Observation]{
+				Observation: Observation{
+					FeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+						1: {
+							ExecutionFee:        big.NewInt(10),
+							DataAvailabilityFee: big.NewInt(20),
+						},
+					},
+					NativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						2: {
+							Int: big.NewInt(100),
+						},
+					},
+					ChainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+						1: {
+							ChainFee: ComponentsUSDPrices{
+								ExecutionFeePriceUSD: big.NewInt(10),
+								DataAvFeePriceUSD:    big.NewInt(20),
+							},
+							Timestamp: fourHoursAgo,
+						},
+					},
+				},
+			},
+			observerSupportedChains: mapset.NewSet[ccipocr3.ChainSelector](1, 2),
+			expectedError:           "fee components and native token prices have different observed chains",
+		},
+		{
+			name: "different observed chains in native token prices and chain fee updates",
+			ao: plugincommon.AttributedObservation[Observation]{
+				Observation: Observation{
+					FeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
+						1: {
+							ExecutionFee:        big.NewInt(10),
+							DataAvailabilityFee: big.NewInt(20),
+						},
+					},
+					NativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						1: {
+							Int: big.NewInt(100),
+						},
+					},
+					ChainFeeUpdates: map[ccipocr3.ChainSelector]Update{
+						2: {
+							ChainFee: ComponentsUSDPrices{
+								ExecutionFeePriceUSD: big.NewInt(10),
+								DataAvFeePriceUSD:    big.NewInt(20),
+							},
+							Timestamp: fourHoursAgo,
+						},
+					},
+				},
+			},
+			observerSupportedChains: mapset.NewSet[ccipocr3.ChainSelector](1, 2, 3),
+			expectedError:           "native token and chain fee updates prices have different observed chains",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateObservedChains(tt.ao, tt.observerSupportedChains)
+			if tt.expectedError == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectedError)
 			}
 		})
 	}
