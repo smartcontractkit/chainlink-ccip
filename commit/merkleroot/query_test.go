@@ -90,7 +90,7 @@ func TestProcessor_Query(t *testing.T) {
 				},
 				RMNRemoteCfg: rmnRemoteCfg,
 			},
-			contractAddresses:  contractAddrs,
+			contractAddresses: contractAddrs,
 			cfg: pluginconfig.CommitOffchainConfig{
 				RMNEnabled:           true,
 				RMNSignaturesTimeout: 5 * time.Second,
