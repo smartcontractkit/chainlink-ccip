@@ -42,6 +42,7 @@ pipelines:
     run: |-
       if [ "$PROVIDER" == "kind" ]; then
         run_dependency_pipelines kind-core
+        run_dependency_pipelines kind-monitoring
       fi
 
       run_dependency_pipelines geth
@@ -79,6 +80,10 @@ profiles:
         value:
           kind-core:
             path: ${DEPENDENCIES_DIR}/kind-core
+            overwriteVars: true
+            namespace: ${DEVSPACE_NAMESPACE}
+          kind-monitoring:
+            path: ${DEPENDENCIES_DIR}/kind-monitoring
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
   - name: ccip-v2-scripts
