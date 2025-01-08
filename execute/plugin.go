@@ -22,7 +22,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
@@ -62,7 +61,7 @@ type Plugin struct {
 	oracleIDToP2pID       map[commontypes.OracleID]libocrtypes.PeerID
 	tokenDataObserver     tokendata.TokenDataObserver
 	costlyMessageObserver costlymessages.Observer
-	estimateProvider      gas.EstimateProvider
+	estimateProvider      cciptypes.EstimateProvider
 	lggr                  logger.Logger
 
 	observationOptimizer optimizers.ObservationOptimizer
@@ -81,7 +80,7 @@ func NewPlugin(
 	msgHasher cciptypes.MessageHasher,
 	homeChain reader.HomeChain,
 	tokenDataObserver tokendata.TokenDataObserver,
-	estimateProvider gas.EstimateProvider,
+	estimateProvider cciptypes.EstimateProvider,
 	lggr logger.Logger,
 	costlyMessageObserver costlymessages.Observer,
 	metricsReporter metrics.Reporter,

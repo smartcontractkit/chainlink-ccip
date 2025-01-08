@@ -41,7 +41,7 @@ func (p *Processor) Query(ctx context.Context, prevOutcome Outcome) (Query, erro
 	for _, sourceChainRange := range prevOutcome.RangesSelectedForReport {
 		onRampAddress, err := p.ccipReader.GetContractAddress(consts.ContractNameOnRamp, sourceChainRange.ChainSel)
 		if err != nil {
-			p.lggr.Errorf("skipping chain %d updates, onRamp address error: %s", sourceChainRange.ChainSel, err)
+			p.lggr.Warnf("get onRamp address for chain %v: %w", sourceChainRange.ChainSel, err)
 			continue
 		}
 

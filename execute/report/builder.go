@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -23,7 +22,7 @@ func NewBuilder(
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
-	estimateProvider gas.EstimateProvider,
+	estimateProvider cciptypes.EstimateProvider,
 	nonces map[cciptypes.ChainSelector]map[string]uint64,
 	destChainSelector cciptypes.ChainSelector,
 	maxReportSizeBytes uint64,
@@ -63,7 +62,7 @@ type execReportBuilder struct {
 	// Providers
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
-	estimateProvider gas.EstimateProvider
+	estimateProvider cciptypes.EstimateProvider
 	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
 
 	// Config
