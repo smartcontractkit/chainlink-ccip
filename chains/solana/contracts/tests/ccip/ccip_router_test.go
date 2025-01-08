@@ -182,13 +182,7 @@ func TestCCIPRouter(t *testing.T) {
 		})
 
 		t.Run("token-pool", func(t *testing.T) {
-			token0.PoolProgram = config.CcipTokenPoolProgram
 			token0.AdditionalAccounts = append(token0.AdditionalAccounts, solana.MemoProgramID) // add test additional accounts in pool interactions
-			var err error
-			token0.PoolConfig, err = tokens.TokenPoolConfigAddress(token0.Mint.PublicKey())
-			require.NoError(t, err)
-			token0.PoolSigner, err = tokens.TokenPoolSignerAddress(token0.Mint.PublicKey())
-			require.NoError(t, err)
 
 			ixInit, err := token_pool.NewInitializeInstruction(
 				token_pool.BurnAndMint_PoolType,
@@ -201,15 +195,19 @@ func TestCCIPRouter(t *testing.T) {
 			).ValidateAndBuild()
 			require.NoError(t, err)
 
-			ixAta, addr, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), token0.PoolSigner, tokenPoolAdmin.PublicKey())
+			ixAta0, addr0, err := tokens.CreateAssociatedTokenAccount(token0.Program, token0.Mint.PublicKey(), token0.PoolSigner, tokenPoolAdmin.PublicKey())
 			require.NoError(t, err)
-			token0.PoolTokenAccount = addr
+			token0.PoolTokenAccount = addr0
 			token0.User[token0.PoolSigner] = token0.PoolTokenAccount
+			ixAta1, addr1, err := tokens.CreateAssociatedTokenAccount(token1.Program, token1.Mint.PublicKey(), token1.PoolSigner, tokenPoolAdmin.PublicKey())
+			require.NoError(t, err)
+			token1.PoolTokenAccount = addr1
+			token1.User[token1.PoolSigner] = token1.PoolTokenAccount
 
 			ixAuth, err := tokens.SetTokenMintAuthority(token0.Program, token0.PoolSigner, token0.Mint.PublicKey(), tokenPoolAdmin.PublicKey())
 			require.NoError(t, err)
 
-			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit, ixAta, ixAuth}, tokenPoolAdmin, config.DefaultCommitment)
+			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ixInit, ixAta0, ixAta1, ixAuth}, tokenPoolAdmin, config.DefaultCommitment)
 
 			// Lookup Table for Tokens
 			require.NoError(t, token0.SetupLookupTable(ctx, solanaGoClient, tokenPoolAdmin))
@@ -1455,9 +1453,9 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When any user wants to set up the pool, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						user.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1469,9 +1467,9 @@ func TestCCIPRouter(t *testing.T) {
 					transmitter := getTransmitter()
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						transmitter.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1482,9 +1480,22 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When admin wants to set up the pool, it fails", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
+						anotherAdmin.PublicKey(),
+					).ValidateAndBuild()
+					require.NoError(t, err)
+
+					testutils.SendAndFailWith(ctx, t, solanaGoClient, []solana.Instruction{instruction}, anotherAdmin, config.DefaultCommitment, []string{ccip_router.Unauthorized_CcipRouterError.String()})
+				})
+
+				t.Run("When setting pool to incorrect addresses in lookup table, it fails", func(t *testing.T) {
+					instruction, err := ccip_router.NewSetPoolInstruction(
+						token0.Mint.PublicKey(),
+						token0.WritableIndexes,
+						token0.AdminRegistry,
+						token1.PoolLookupTable, // accounts do not match the expected mint related accounts
 						anotherAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1495,9 +1506,9 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When Token Pool Admin wants to set up the pool, it succeeds", func(t *testing.T) {
 					base := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
 					)
 
@@ -1520,9 +1531,9 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When Token Pool Admin wants to set up the pool again to zero, it is none", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						solana.PublicKey{},
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						solana.PublicKey{},
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1541,9 +1552,9 @@ func TestCCIPRouter(t *testing.T) {
 					// Rollback to previous state
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1588,9 +1599,9 @@ func TestCCIPRouter(t *testing.T) {
 					// check if the admin is still the same
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1600,9 +1611,9 @@ func TestCCIPRouter(t *testing.T) {
 					// new one cant make changes yet
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1632,9 +1643,9 @@ func TestCCIPRouter(t *testing.T) {
 					// check old admin can not make changes anymore
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1644,9 +1655,9 @@ func TestCCIPRouter(t *testing.T) {
 					// new one can make changes now
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token0.Mint.PublicKey(),
-						token0.PoolLookupTable,
 						token0.WritableIndexes,
 						token0.AdminRegistry,
+						token0.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1733,9 +1744,9 @@ func TestCCIPRouter(t *testing.T) {
 				t.Run("When Mint Authority wants to set up the pool, it succeeds", func(t *testing.T) {
 					instruction, err := ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
-						token1.PoolLookupTable,
 						token1.WritableIndexes,
 						token1.AdminRegistry,
+						token1.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1788,9 +1799,9 @@ func TestCCIPRouter(t *testing.T) {
 					// check if the admin is still the same
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
-						token1.PoolLookupTable,
 						token1.WritableIndexes,
 						token1.AdminRegistry,
+						token1.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1800,9 +1811,9 @@ func TestCCIPRouter(t *testing.T) {
 					// new one cant make changes yet
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
-						token1.PoolLookupTable,
 						token1.WritableIndexes,
 						token1.AdminRegistry,
+						token1.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1832,9 +1843,9 @@ func TestCCIPRouter(t *testing.T) {
 					// check old admin can not make changes anymore
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
-						token1.PoolLookupTable,
 						token1.WritableIndexes,
 						token1.AdminRegistry,
+						token1.PoolLookupTable,
 						anotherTokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)
@@ -1844,9 +1855,9 @@ func TestCCIPRouter(t *testing.T) {
 					// new one can make changes now
 					instruction, err = ccip_router.NewSetPoolInstruction(
 						token1.Mint.PublicKey(),
-						token1.PoolLookupTable,
 						token1.WritableIndexes,
 						token1.AdminRegistry,
+						token1.PoolLookupTable,
 						tokenPoolAdmin.PublicKey(),
 					).ValidateAndBuild()
 					require.NoError(t, err)

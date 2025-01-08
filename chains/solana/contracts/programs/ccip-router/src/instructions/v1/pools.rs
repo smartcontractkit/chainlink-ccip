@@ -190,7 +190,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         // reconstruct + validate expected values in token pool lookup table
         // base set of constant accounts (9)
         // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
-        let required_entries = vec![
+        let required_entries = [
             lookup_table,
             token_admin_registry,
             pool_program,

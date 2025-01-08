@@ -104,6 +104,22 @@ pub struct ModifyTokenAdminRegistry<'info> {
 
 #[derive(Accounts)]
 #[instruction(mint: Pubkey)]
+pub struct SetPoolTokenAdminRegistry<'info> {
+    #[account(
+        mut,
+        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        bump,
+        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    /// CHECK: anchor does not support automatic lookup table deserialization
+    pub pool_lookuptable: UncheckedAccount<'info>,
+    #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
 pub struct AcceptAdminRoleTokenAdminRegistry<'info> {
     #[account(
         mut,

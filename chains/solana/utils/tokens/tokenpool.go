@@ -86,6 +86,7 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 		Mint:            mint,
 		FeeTokenConfig:  tokenConfigPda,
 		AdminRegistry:   tokenAdminRegistryPDA,
+		PoolProgram:     config.CcipTokenPoolProgram,
 		PoolLookupTable: solana.PublicKey{},
 		WritableIndexes: []uint8{3, 4, 7}, // see ToTokenPoolEntries for writable indexes
 		User:            map[solana.PublicKey]solana.PublicKey{},
@@ -94,6 +95,14 @@ func NewTokenPool(program solana.PublicKey) (TokenPool, error) {
 	}
 	p.Chain[config.EvmChainSelector] = chainPDA
 	p.Billing[config.EvmChainSelector] = billingPDA
+	p.PoolConfig, err = TokenPoolConfigAddress(p.Mint.PublicKey())
+	if err != nil {
+		return TokenPool{}, err
+	}
+	p.PoolSigner, err = TokenPoolSignerAddress(p.Mint.PublicKey())
+	if err != nil {
+		return TokenPool{}, err
+	}
 	return p, nil
 }
 

@@ -329,12 +329,11 @@ pub mod ccip_router {
     /// * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
     /// * `is_writable` - index of account in lookup table that is writable
     pub fn set_pool(
-        ctx: Context<ModifyTokenAdminRegistry>,
+        ctx: Context<SetPoolTokenAdminRegistry>,
         mint: Pubkey,
-        pool_lookup_table: Pubkey,
         writable_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::token_admin_registry::set_pool(ctx, mint, pool_lookup_table, writable_indexes)
+        v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.

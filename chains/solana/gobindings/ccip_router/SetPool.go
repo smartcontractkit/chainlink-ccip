@@ -22,19 +22,20 @@ import (
 // * `is_writable` - index of account in lookup table that is writable
 type SetPool struct {
 	Mint            *ag_solanago.PublicKey
-	PoolLookupTable *ag_solanago.PublicKey
 	WritableIndexes *[]byte
 
 	// [0] = [WRITE] tokenAdminRegistry
 	//
-	// [1] = [WRITE, SIGNER] authority
+	// [1] = [] poolLookuptable
+	//
+	// [2] = [WRITE, SIGNER] authority
 	ag_solanago.AccountMetaSlice `bin:"-" borsh_skip:"true"`
 }
 
 // NewSetPoolInstructionBuilder creates a new `SetPool` instruction builder.
 func NewSetPoolInstructionBuilder() *SetPool {
 	nd := &SetPool{
-		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
+		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
 }
@@ -42,12 +43,6 @@ func NewSetPoolInstructionBuilder() *SetPool {
 // SetMint sets the "mint" parameter.
 func (inst *SetPool) SetMint(mint ag_solanago.PublicKey) *SetPool {
 	inst.Mint = &mint
-	return inst
-}
-
-// SetPoolLookupTable sets the "poolLookupTable" parameter.
-func (inst *SetPool) SetPoolLookupTable(poolLookupTable ag_solanago.PublicKey) *SetPool {
-	inst.PoolLookupTable = &poolLookupTable
 	return inst
 }
 
@@ -68,15 +63,26 @@ func (inst *SetPool) GetTokenAdminRegistryAccount() *ag_solanago.AccountMeta {
 	return inst.AccountMetaSlice[0]
 }
 
+// SetPoolLookuptableAccount sets the "poolLookuptable" account.
+func (inst *SetPool) SetPoolLookuptableAccount(poolLookuptable ag_solanago.PublicKey) *SetPool {
+	inst.AccountMetaSlice[1] = ag_solanago.Meta(poolLookuptable)
+	return inst
+}
+
+// GetPoolLookuptableAccount gets the "poolLookuptable" account.
+func (inst *SetPool) GetPoolLookuptableAccount() *ag_solanago.AccountMeta {
+	return inst.AccountMetaSlice[1]
+}
+
 // SetAuthorityAccount sets the "authority" account.
 func (inst *SetPool) SetAuthorityAccount(authority ag_solanago.PublicKey) *SetPool {
-	inst.AccountMetaSlice[1] = ag_solanago.Meta(authority).WRITE().SIGNER()
+	inst.AccountMetaSlice[2] = ag_solanago.Meta(authority).WRITE().SIGNER()
 	return inst
 }
 
 // GetAuthorityAccount gets the "authority" account.
 func (inst *SetPool) GetAuthorityAccount() *ag_solanago.AccountMeta {
-	return inst.AccountMetaSlice[1]
+	return inst.AccountMetaSlice[2]
 }
 
 func (inst SetPool) Build() *Instruction {
@@ -102,9 +108,6 @@ func (inst *SetPool) Validate() error {
 		if inst.Mint == nil {
 			return errors.New("Mint parameter is not set")
 		}
-		if inst.PoolLookupTable == nil {
-			return errors.New("PoolLookupTable parameter is not set")
-		}
 		if inst.WritableIndexes == nil {
 			return errors.New("WritableIndexes parameter is not set")
 		}
@@ -116,6 +119,9 @@ func (inst *SetPool) Validate() error {
 			return errors.New("accounts.TokenAdminRegistry is not set")
 		}
 		if inst.AccountMetaSlice[1] == nil {
+			return errors.New("accounts.PoolLookuptable is not set")
+		}
+		if inst.AccountMetaSlice[2] == nil {
 			return errors.New("accounts.Authority is not set")
 		}
 	}
@@ -131,16 +137,16 @@ func (inst *SetPool) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("           Mint", *inst.Mint))
-						paramsBranch.Child(ag_format.Param("PoolLookupTable", *inst.PoolLookupTable))
 						paramsBranch.Child(ag_format.Param("WritableIndexes", *inst.WritableIndexes))
 					})
 
 					// Accounts of the instruction:
-					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Accounts[len=3]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
 						accountsBranch.Child(ag_format.Meta("tokenAdminRegistry", inst.AccountMetaSlice[0]))
-						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("   poolLookuptable", inst.AccountMetaSlice[1]))
+						accountsBranch.Child(ag_format.Meta("         authority", inst.AccountMetaSlice[2]))
 					})
 				})
 		})
@@ -149,11 +155,6 @@ func (inst *SetPool) EncodeToTree(parent ag_treeout.Branches) {
 func (obj SetPool) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `Mint` param:
 	err = encoder.Encode(obj.Mint)
-	if err != nil {
-		return err
-	}
-	// Serialize `PoolLookupTable` param:
-	err = encoder.Encode(obj.PoolLookupTable)
 	if err != nil {
 		return err
 	}
@@ -170,11 +171,6 @@ func (obj *SetPool) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Deserialize `PoolLookupTable`:
-	err = decoder.Decode(&obj.PoolLookupTable)
-	if err != nil {
-		return err
-	}
 	// Deserialize `WritableIndexes`:
 	err = decoder.Decode(&obj.WritableIndexes)
 	if err != nil {
@@ -187,15 +183,15 @@ func (obj *SetPool) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 func NewSetPoolInstruction(
 	// Parameters:
 	mint ag_solanago.PublicKey,
-	poolLookupTable ag_solanago.PublicKey,
 	writableIndexes []byte,
 	// Accounts:
 	tokenAdminRegistry ag_solanago.PublicKey,
+	poolLookuptable ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *SetPool {
 	return NewSetPoolInstructionBuilder().
 		SetMint(mint).
-		SetPoolLookupTable(poolLookupTable).
 		SetWritableIndexes(writableIndexes).
 		SetTokenAdminRegistryAccount(tokenAdminRegistry).
+		SetPoolLookuptableAccount(poolLookuptable).
 		SetAuthorityAccount(authority)
 }
