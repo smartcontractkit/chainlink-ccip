@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/ragep2p/types"
@@ -176,7 +177,7 @@ func TestObservation(t *testing.T) {
 func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 	const nodeID commontypes.OracleID = 1
 	knownSourceChains := []cciptypes.ChainSelector{4, 7, 19}
-	nextSeqNums := []cciptypes.SeqNum{345, 608, 7713}
+	nextSeqNums := map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345, 7: 608, 19: 7713}
 
 	testCases := []struct {
 		name      string
@@ -233,7 +234,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 			expResult: nil,
 		},
 		{
-			name: "nil is returned when nextSeqNums returns incorrect number of seq nums",
+			name: "nextSeqNums returns incorrect number of seq nums, other chains should be processed correctly",
 			getDeps: func(t *testing.T) (*common_mock.MockChainSupport, *reader_mock.MockCCIPReader) {
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
@@ -241,12 +242,19 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				chainSupport.EXPECT().KnownSourceChainsSlice().Return(knownSourceChains, nil)
 				ccipReader := reader_mock.NewMockCCIPReader(t)
 				// return a smaller slice, should trigger validation condition
-				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNums[1:], nil)
+
+				nextSeqNumsCp := maps.Clone(nextSeqNums)
+				delete(nextSeqNumsCp, cciptypes.ChainSelector(4))
+
+				ccipReader.EXPECT().NextSeqNum(mock.Anything, knownSourceChains).Return(nextSeqNumsCp, nil)
 				ccipReader.EXPECT().GetRmnCurseInfo(mock.Anything, mock.Anything, mock.Anything).
 					Return(&reader.CurseInfo{}, nil)
 				return chainSupport, ccipReader
 			},
-			expResult: nil,
+			expResult: []plugintypes.SeqNumChain{
+				plugintypes.NewSeqNumChain(7, 608),
+				plugintypes.NewSeqNumChain(19, 7713),
+			},
 		},
 		{
 			name: "dest chain is cursed sequence numbers not observed",
@@ -286,7 +294,7 @@ func Test_ObserveOffRampNextSeqNums(t *testing.T) {
 				knownSourceChains := []cciptypes.ChainSelector{4, 7, 19}
 				cursedSourceChains := map[cciptypes.ChainSelector]bool{7: true, 4: false}
 				knownSourceChainsExcludingCursed := []cciptypes.ChainSelector{4, 19}
-				nextSeqNumsExcludingCursed := []cciptypes.SeqNum{345, 7713}
+				nextSeqNumsExcludingCursed := map[cciptypes.ChainSelector]cciptypes.SeqNum{4: 345, 19: 7713}
 
 				chainSupport := common_mock.NewMockChainSupport(t)
 				chainSupport.EXPECT().SupportsDestChain(nodeID).Return(true, nil)
