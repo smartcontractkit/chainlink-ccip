@@ -2,17 +2,21 @@ use anchor_lang::prelude::*;
 
 use access_controller::AccessController;
 
-use crate::constants::{ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED};
-use crate::error::AuthError;
+use crate::constants::{ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED};
+use crate::error::{AuthError, TimelockError};
 use crate::program::Timelock;
 use crate::state::{Config, Role};
-use crate::TimelockError;
 
 /// initialize Timelock config with owner(admin),
 /// role access controller keys and global configuration value.
-pub fn initialize(ctx: Context<Initialize>, min_delay: u64) -> Result<()> {
+pub fn initialize(
+    ctx: Context<Initialize>,
+    timelock_id: [u8; TIMELOCK_ID_PADDED],
+    min_delay: u64,
+) -> Result<()> {
     // assign owner(owner is admin)
     let config = &mut ctx.accounts.config;
+    config.timelock_id = timelock_id;
     config.owner = ctx.accounts.authority.key();
     config.min_delay = min_delay;
 
@@ -29,6 +33,7 @@ pub fn initialize(ctx: Context<Initialize>, min_delay: u64) -> Result<()> {
 /// tested with up to 24 addresses per each transaction.
 pub fn batch_add_access<'info>(
     ctx: Context<'_, '_, '_, 'info, BatchAddAccess<'info>>,
+    _timelock_id: [u8; TIMELOCK_ID_PADDED],
     _role: Role,
 ) -> Result<()> {
     require!(
@@ -52,11 +57,12 @@ pub fn batch_add_access<'info>(
 }
 
 #[derive(Accounts)]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], op_id: [u8; 32])]
 pub struct Initialize<'info> {
     #[account(
         init,
         space = ANCHOR_DISCRIMINATOR + Config::INIT_SPACE,
-        seeds = [TIMELOCK_CONFIG_SEED],
+        seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()],
         bump,
         payer = authority,
     )]
@@ -86,10 +92,10 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(role: Role)]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], role: Role)]
 pub struct BatchAddAccess<'info> {
     #[account(
-        seeds = [TIMELOCK_CONFIG_SEED],
+        seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()],
         bump,
     )]
     pub config: Account<'info, Config>,

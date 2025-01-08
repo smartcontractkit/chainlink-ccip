@@ -1,3 +1,6 @@
+// fixed size timelock id for distinguishing different timelock states
+pub const TIMELOCK_ID_PADDED: usize = 32;
+
 /// PDA seeds
 pub const TIMELOCK_CONFIG_SEED: &[u8] = b"timelock_config";
 pub const TIMELOCK_OPERATION_SEED: &[u8] = b"timelock_operation";

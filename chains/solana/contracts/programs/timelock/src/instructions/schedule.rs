@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 
 use access_controller::AccessController;
 
-use crate::constants::{ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_OPERATION_SEED};
+use crate::constants::{
+    ANCHOR_DISCRIMINATOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
+};
 use crate::error::{AuthError, TimelockError};
 use crate::event::*;
 use crate::state::{Config, InstructionData, Operation};
@@ -11,6 +13,7 @@ use crate::state::{Config, InstructionData, Operation};
 /// Operation account should be preloaded with instructions and finalized before scheduling
 pub fn schedule_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, ScheduleBatch<'info>>,
+    _timelock_id: [u8; TIMELOCK_ID_PADDED],
     _id: [u8; 32],
     delay: u64,
 ) -> Result<()> {
@@ -32,6 +35,8 @@ pub fn schedule_batch<'info>(
     op.timestamp = scheduled_time;
 
     for (i, ix) in op.instructions.iter().enumerate() {
+        // check if the instruction data is blocked
+        // todo: add note
         if ix.data.len() >= ANCHOR_DISCRIMINATOR {
             let selector: [u8; ANCHOR_DISCRIMINATOR] =
             // extract the first 8 bytes from ix.data as the selector
@@ -40,8 +45,6 @@ pub fn schedule_batch<'info>(
             if config.blocked_selectors.is_blocked(&selector) {
                 return err!(TimelockError::BlockedSelector);
             }
-        } else {
-            // todo: in discussion (allow empty data)
         }
 
         emit!(CallScheduled {
@@ -66,6 +69,7 @@ pub fn schedule_batch<'info>(
 /// in a single execute_batch transaction ensuring atomicy.
 pub fn initialize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, InitializeOperation<'info>>,
+    _timelock_id: [u8; TIMELOCK_ID_PADDED],
     id: [u8; 32],
     predecessor: [u8; 32],
     salt: [u8; 32],
@@ -90,6 +94,7 @@ pub fn initialize_operation<'info>(
 /// append instructions to the operation
 pub fn append_instructions<'info>(
     ctx: Context<'_, '_, '_, 'info, AppendInstructions<'info>>,
+    _timelock_id: [u8; TIMELOCK_ID_PADDED],
     _id: [u8; 32],
     instructions_batch: Vec<InstructionData>,
 ) -> Result<()> {
@@ -103,6 +108,7 @@ pub fn append_instructions<'info>(
 /// verify the operation status and id before mark it as finalized
 pub fn finalize_operation<'info>(
     ctx: Context<'_, '_, '_, 'info, FinalizeOperation<'info>>,
+    _timelock_id: [u8; TIMELOCK_ID_PADDED],
     _id: [u8; 32],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
@@ -111,27 +117,29 @@ pub fn finalize_operation<'info>(
     Ok(())
 }
 
-pub fn clear_operation(_ctx: Context<ClearOperation>, _id: [u8; 32]) -> Result<()> {
+pub fn clear_operation(
+    _ctx: Context<ClearOperation>,
+    _timelock_id: [u8; TIMELOCK_ID_PADDED],
+    _id: [u8; 32],
+) -> Result<()> {
     // NOTE: ctx.accounts.operation is closed to be able to re-initialized,
     // also allow finalized operation to be cleared
     Ok(())
 }
 
 #[derive(Accounts)]
-#[instruction(
-    id: [u8; 32],
-)]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
 pub struct ScheduleBatch<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
         constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled
     )]
     pub operation: Box<Account<'info, Operation>>,
 
-    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
     // NOTE: access controller check and access happens in only_role_or_admin_role macro
@@ -143,6 +151,7 @@ pub struct ScheduleBatch<'info> {
 
 #[derive(Accounts)]
 #[instruction(
+    timelock_id: [u8; TIMELOCK_ID_PADDED],
     id: [u8; 32],
     predecessor: [u8; 32],
     salt: [u8; 32],
@@ -151,7 +160,7 @@ pub struct ScheduleBatch<'info> {
 pub struct InitializeOperation<'info> {
     #[account(
         init,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + Operation::INIT_SPACE,
@@ -159,7 +168,7 @@ pub struct InitializeOperation<'info> {
     )]
     pub operation: Account<'info, Operation>,
 
-    #[account(seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
     #[account(mut)]
@@ -169,11 +178,11 @@ pub struct InitializeOperation<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(id: [u8; 32], instructions_batch: Vec<InstructionData>)]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32], instructions_batch: Vec<InstructionData>)]
 pub struct AppendInstructions<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR +
            Operation::INIT_SPACE +
@@ -207,11 +216,11 @@ pub struct AppendInstructions<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
 pub struct FinalizeOperation<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = !operation.is_finalized @ TimelockError::OperationAlreadyFinalized,
         constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled,
@@ -220,7 +229,7 @@ pub struct FinalizeOperation<'info> {
     )]
     pub operation: Account<'info, Operation>,
 
-    #[account(seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
     #[account(
@@ -234,18 +243,18 @@ pub struct FinalizeOperation<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; 32])]
 pub struct ClearOperation<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         close = authority,
         constraint = !operation.is_scheduled() @ TimelockError::OperationAlreadyScheduled, // restrict clearing of scheduled operation
     )]
     pub operation: Account<'info, Operation>,
 
-    #[account(seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account(seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref()], bump)]
     pub config: Account<'info, Config>,
 
     #[account(
