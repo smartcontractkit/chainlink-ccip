@@ -2671,7 +2671,7 @@ func TestCCIPRouter(t *testing.T) {
 			inputs := []struct {
 				name        string
 				index       uint
-				replaceWith solana.PublicKey // default to zero address
+				replaceWith *solana.AccountMeta // default to zero address
 				errorStr    ccip_router.CcipRouterError
 			}{
 				{
@@ -2697,8 +2697,20 @@ func TestCCIPRouter(t *testing.T) {
 				{
 					name:        "is pool config but for wrong token",
 					index:       6,
-					replaceWith: token1.PoolConfig,
+					replaceWith: solana.Meta(token1.PoolConfig),
 					errorStr:    ccip_router.InvalidInputsPoolAccounts_CcipRouterError,
+				},
+				{
+					name:        "is pool config but missing write permissions",
+					index:       6,
+					replaceWith: solana.Meta(token0.PoolConfig),
+					errorStr:    ccip_router.InvalidInputsLookupTableAccountWritable_CcipRouterError,
+				},
+				{
+					name:        "is pool lookup table but has write permissions",
+					index:       3,
+					replaceWith: solana.Meta(token0.PoolLookupTable).WRITE(),
+					errorStr:    ccip_router.InvalidInputsLookupTableAccountWritable_CcipRouterError,
 				},
 				{
 					name:     "incorrect pool signer",
@@ -2718,7 +2730,7 @@ func TestCCIPRouter(t *testing.T) {
 				{
 					name:        "incorrect token pool lookup table",
 					index:       3,
-					replaceWith: token1.PoolLookupTable,
+					replaceWith: solana.Meta(token1.PoolLookupTable),
 					errorStr:    ccip_router.InvalidInputsLookupTableAccounts_CcipRouterError,
 				},
 				{
@@ -2762,10 +2774,13 @@ func TestCCIPRouter(t *testing.T) {
 					tokenMetas, addressTables, err := tokens.ParseTokenLookupTable(ctx, solanaGoClient, token0, userTokenAccount)
 					require.NoError(t, err)
 					// replace account meta with invalid account to trigger error or append
+					if in.replaceWith == nil {
+						in.replaceWith = solana.Meta(solana.PublicKey{}) // default 0 address
+					}
 					if in.index >= uint(len(tokenMetas)) {
-						tokenMetas = append(tokenMetas, solana.Meta(in.replaceWith))
+						tokenMetas = append(tokenMetas, in.replaceWith)
 					} else {
-						tokenMetas[in.index] = solana.Meta(in.replaceWith)
+						tokenMetas[in.index] = in.replaceWith
 					}
 
 					tx.AccountMetaSlice = append(tx.AccountMetaSlice, tokenMetas...)
