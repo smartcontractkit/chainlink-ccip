@@ -355,9 +355,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				signatures, sigsErr := mcms.BulkSignOnMsgHash(signers, rootValidationData.EthMsgHash)
 				require.NoError(t, sigsErr)
 
-				parsedTotalSigs, pErr := mcms.SafeToUint8(len(signatures))
-				require.NoError(t, pErr)
-
+				//nolint:gosec
+				parsedTotalSigs := uint8(len(signatures))
 				initSigsIx, isErr := mcm.NewInitSignaturesInstruction(
 					testMsigName,
 					rootValidationData.Root,
@@ -1056,10 +1055,8 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				if tt.modifySigs != nil {
 					tt.modifySigs(&signatures, &rootValidationData)
 				}
-
-				parsedTotalSigs, err := mcms.SafeToUint8(len(signatures))
-				require.NoError(t, err)
-
+				//nolint:gosec
+				parsedTotalSigs := uint8(len(signatures))
 				initSigsIx, err := mcm.NewInitSignaturesInstruction(
 					testMsigName,
 					rootValidationData.Root,

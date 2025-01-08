@@ -127,10 +127,8 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					t.Run("preload signers on PDA", func(t *testing.T) {
 						ixs := make([]solana.Instruction, 0)
-
-						parsedTotalSigners, parseErr := mcms.SafeToUint8(len(signerAddresses))
-						require.NoError(t, parseErr)
-
+						//nolint:gosec
+						parsedTotalSigners := uint8(len(signerAddresses))
 						initSignersIx, initSignersIxErr := mcm.NewInitSignersInstruction(
 							msig.PaddedName,
 							parsedTotalSigners,

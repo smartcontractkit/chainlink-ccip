@@ -337,10 +337,8 @@ func TestMcmSetConfig(t *testing.T) {
 		t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
 			// ConfigSignersPDA should be closed before reinitializing
 			testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA, config.DefaultCommitment)
-
-			parsedTotalSigners, err := mcms.SafeToUint8(len(signerAddresses))
-			require.NoError(t, err)
-
+			//nolint:gosec
+			parsedTotalSigners := uint8(len(signerAddresses))
 			initSignersIx, err := mcm.NewInitSignersInstruction(
 				testMsigName,
 				parsedTotalSigners,
@@ -572,9 +570,8 @@ func TestMcmSetConfig(t *testing.T) {
 					if tt.skipPreloadSigners {
 						return
 					}
-					parsedTotalSigners, parsingErr := mcms.SafeToUint8(len(cfg.SignerAddresses))
-					require.NoError(t, parsingErr)
-
+					//nolint:gosec
+					parsedTotalSigners := uint8(len(cfg.SignerAddresses))
 					initSignersIx, initSignersErr := mcm.NewInitSignersInstruction(
 						failTestMsigName,
 						parsedTotalSigners,
@@ -781,7 +778,8 @@ func TestMcmSetConfig(t *testing.T) {
 
 				if !tt.skipInitSigners {
 					actualLength := len(cfg.SignerAddresses)
-					totalSigners, _ := mcms.SafeToUint8(actualLength + tt.totalSignersOffset) // offset for the test
+					//nolint:gosec
+					totalSigners := uint8(actualLength + tt.totalSignersOffset) // offset for the test
 
 					initSignersIx, _ := mcm.NewInitSignersInstruction(
 						failTestMsigName,
