@@ -188,29 +188,48 @@ pub fn validate_and_parse_token_accounts<'info>(
                 .map_err(|_| CcipRouterError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (8)
+        // base set of constant accounts (9)
         // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
-        let mut expected_entries = vec![
-            lookup_table.key(),
-            token_admin_registry.key(),
-            pool_program.key(),
-            pool_config.key(),
-            pool_token_account.key(),
-            pool_signer.key(),
-            token_program.key(),
-            mint.key(),
-            fee_token_config.key(),
+        let required_entries = vec![
+            lookup_table,
+            token_admin_registry,
+            pool_program,
+            pool_config,
+            pool_token_account,
+            pool_signer,
+            token_program,
+            mint,
+            fee_token_config,
         ];
-        let mut remaining_keys: Vec<Pubkey> = remaining_accounts.iter().map(|x| x.key()).collect();
-        expected_entries.append(&mut remaining_keys);
-        require!(
-            lookup_table_account.addresses.len() == expected_entries.len(),
-            CcipRouterError::InvalidInputsLookupTableAccounts
-        );
-        require!(
-            lookup_table_account.addresses.as_ref() == expected_entries,
-            CcipRouterError::InvalidInputsLookupTableAccounts
-        );
+        {
+            // validate pool addresses
+            let mut expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
+            let mut remaining_keys: Vec<Pubkey> =
+                remaining_accounts.iter().map(|x| x.key()).collect();
+            expected_keys.append(&mut remaining_keys);
+            require!(
+                lookup_table_account.addresses.len() == expected_keys.len(),
+                CcipRouterError::InvalidInputsLookupTableAccounts
+            );
+            require!(
+                lookup_table_account.addresses.as_ref() == expected_keys,
+                CcipRouterError::InvalidInputsLookupTableAccounts
+            );
+        }
+        {
+            // validate pool address writable
+            let mut expected_is_writable: Vec<bool> =
+                required_entries.iter().map(|x| x.is_writable).collect();
+            let mut remaining_is_writable: Vec<bool> =
+                remaining_accounts.iter().map(|x| x.is_writable).collect();
+            expected_is_writable.append(&mut remaining_is_writable);
+            for (i, is_writable) in expected_is_writable.iter().enumerate() {
+                require!(
+                    token_admin_registry_account.is_writable(i as u8) == *is_writable,
+                    CcipRouterError::InvalidInputsLookupTableAccountWritable
+                );
+            }
+        }
     }
 
     Ok(TokenAccounts {

@@ -2823,6 +2823,9 @@
             "name": "InvalidInputsLookupTableAccounts"
           },
           {
+            "name": "InvalidInputsLookupTableAccountWritable"
+          },
+          {
             "name": "InvalidInputsTokenAmount"
           },
           {

@@ -630,6 +630,8 @@ pub enum CcipRouterError {
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]
     InvalidInputsLookupTableAccounts,
+    #[msg("Invalid LookupTable account writable access")]
+    InvalidInputsLookupTableAccountWritable,
     #[msg("Cannot send zero tokens")]
     InvalidInputsTokenAmount,
     #[msg("Release or mint balance mismatch")]
