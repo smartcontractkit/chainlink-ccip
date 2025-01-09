@@ -306,6 +306,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: orderedTokenPrices,
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -323,6 +324,19 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "prices already inflight, no prices to report",
+			prevOutcome: committypes.Outcome{
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+			},
+			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {},
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				TokenPriceOutcome: tokenprice.Outcome{},
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+			},
+			expTransmittedReports: []ccipocr3.CommitPluginReport{},
 		},
 		{
 			name:        "fresh tokens don't need new updates",
@@ -383,6 +397,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 						tokenPriceMap[ethAddr],
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -477,6 +492,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -502,6 +518,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -521,6 +538,21 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 		},
 		{
+			name: "fee components should not be updated when there's a subset of chains but we wait for prices",
+			prevOutcome: committypes.Outcome{
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+			},
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+			},
+			expTransmittedReportLen: 0,
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Unset()
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(0, nil).Maybe()
+			},
+		},
+		{
 			name: "fee components should not be updated within deviation",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
@@ -529,6 +561,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -562,6 +595,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -595,6 +629,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -916,7 +951,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
-		PriceFeedChainSelector: sourceChain1,
+		PriceFeedChainSelector:    sourceChain1,
+		InflightPriceCheckRetries: 10,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

@@ -256,17 +256,7 @@ func (p *Plugin) Observation(
 			"err", err, "prevOutcome", prevOutcome.MerkleRootOutcome, "decodedQ", decodedQ.MerkleRootQuery)
 	}
 
-	tokenPriceObs, err := p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
-	if err != nil {
-		p.lggr.Errorw("get token price processor observation", "err", err,
-			"prevOutcome", prevOutcome.TokenPriceOutcome, "decodedQ", decodedQ.TokenPriceQuery)
-	}
-
-	chainFeeObs, err := p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
-	if err != nil {
-		p.lggr.Errorw("get gas prices processor observation",
-			"err", err, "prevOutcome", prevOutcome.ChainFeeOutcome, "decodedQ", decodedQ.ChainFeeQuery)
-	}
+	tokenPriceObs, chainFeeObs := p.getPriceRelatedObservations(ctx, outCtx, prevOutcome, decodedQ)
 
 	obs := committypes.Observation{
 		MerkleRootObs: merkleRootObs,
@@ -285,6 +275,62 @@ func (p *Plugin) Observation(
 
 	p.lggr.Debugw("Commit plugin making observation", "encodedObservation", encoded, "observation", obs)
 	return encoded, nil
+}
+
+func (p *Plugin) getPriceRelatedObservations(
+	ctx context.Context, outCtx ocr3types.OutcomeContext, prevOutcome committypes.Outcome, decodedQ committypes.Query,
+) (tokenprice.Observation, chainfee.Observation) {
+	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
+
+	// If we are waiting for price updates to make it onchain, but we have no more checks remaining, stop waiting.
+	if waitingForPriceUpdatesToMakeItOnchain && prevOutcome.MainOutcome.RemainingPriceChecks == 0 {
+		p.lggr.Warnw("no more price checks remaining, prices of previous outcome did not make it through",
+			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+			"currentOcrSequenceNumber", outCtx.SeqNr)
+		waitingForPriceUpdatesToMakeItOnchain = false
+	}
+
+	// If we still wait for price updates to make it onchain, check if the latest price report made it through.
+	if waitingForPriceUpdatesToMakeItOnchain {
+		latestPriceOcrSeqNum, err := p.ccipReader.GetLatestPriceSeqNr(ctx)
+		if err != nil {
+			p.lggr.Errorw("get latest price sequence number", "err", err)
+			return tokenprice.Observation{}, chainfee.Observation{}
+		}
+
+		if cciptypes.SeqNum(latestPriceOcrSeqNum) >= prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber {
+			p.lggr.Infow("previous price report made it through", "ocrSeqNum", latestPriceOcrSeqNum)
+			waitingForPriceUpdatesToMakeItOnchain = false
+		}
+	}
+
+	// If we are still waiting for price updates to make it onchain, don't make any price observations.
+	if waitingForPriceUpdatesToMakeItOnchain {
+		p.lggr.Infow("waiting for price updates to make it onchain, no prices observed in this round",
+			"inflightPriceOcrSequenceNumber", prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+			"remainingPriceChecks", prevOutcome.MainOutcome.RemainingPriceChecks,
+			"currentOcrSequenceNumber", outCtx.SeqNr,
+		)
+		return tokenprice.Observation{}, chainfee.Observation{}
+	}
+
+	var tokenPriceObs tokenprice.Observation
+	var chainFeeObs chainfee.Observation
+	var err error
+
+	tokenPriceObs, err = p.tokenPriceProcessor.Observation(ctx, prevOutcome.TokenPriceOutcome, decodedQ.TokenPriceQuery)
+	if err != nil {
+		p.lggr.Errorw("get token price processor observation", "err", err,
+			"prevOutcome", prevOutcome.TokenPriceOutcome, "decodedQ", decodedQ.TokenPriceQuery)
+	}
+
+	chainFeeObs, err = p.chainFeeProcessor.Observation(ctx, prevOutcome.ChainFeeOutcome, decodedQ.ChainFeeQuery)
+	if err != nil {
+		p.lggr.Errorw("get gas prices processor observation",
+			"err", err, "prevOutcome", prevOutcome.ChainFeeOutcome, "decodedQ", decodedQ.ChainFeeQuery)
+	}
+
+	return tokenPriceObs, chainFeeObs
 }
 
 func (p *Plugin) ObserveFChain() map[cciptypes.ChainSelector]int {
@@ -384,9 +430,38 @@ func (p *Plugin) Outcome(
 		MerkleRootOutcome: merkleRootOutcome,
 		TokenPriceOutcome: tokenPriceOutcome,
 		ChainFeeOutcome:   chainFeeOutcome,
+		MainOutcome:       p.getMainOutcome(outCtx, prevOutcome, tokenPriceOutcome, chainFeeOutcome),
 	}
 	p.metricsReporter.TrackOutcome(out)
 	return out.Encode()
+}
+
+func (p *Plugin) getMainOutcome(
+	outCtx ocr3types.OutcomeContext,
+	prevOutcome committypes.Outcome,
+	tokenPriceOutcome tokenprice.Outcome,
+	chainFeeOutcome chainfee.Outcome,
+) committypes.MainOutcome {
+	pricesObservedInThisRound := len(tokenPriceOutcome.TokenPrices) > 0 || len(chainFeeOutcome.GasPrices) > 0
+	if pricesObservedInThisRound {
+		return committypes.MainOutcome{
+			InflightPriceOcrSequenceNumber: cciptypes.SeqNum(outCtx.SeqNr),
+			RemainingPriceChecks:           p.offchainCfg.InflightPriceCheckRetries,
+		}
+	}
+
+	waitingForPriceUpdatesToMakeItOnchain := prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber > 0
+	if waitingForPriceUpdatesToMakeItOnchain {
+		return committypes.MainOutcome{
+			RemainingPriceChecks:           prevOutcome.MainOutcome.RemainingPriceChecks - 1,
+			InflightPriceOcrSequenceNumber: prevOutcome.MainOutcome.InflightPriceOcrSequenceNumber,
+		}
+	}
+
+	return committypes.MainOutcome{
+		InflightPriceOcrSequenceNumber: 0,
+		RemainingPriceChecks:           0,
+	}
 }
 
 func (p *Plugin) Close() error {
