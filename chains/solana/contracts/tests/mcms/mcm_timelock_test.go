@@ -347,7 +347,7 @@ func TestMcmWithTimelock(t *testing.T) {
 						).ValidateAndBuild()
 						require.NoError(t, acceptOwnershipixErr)
 
-						salt, sErr := mcms.SimpleSalt()
+						salt, sErr := timelockutil.SimpleSalt()
 						require.NoError(t, sErr)
 						acceptOwnershipOp := timelockutil.Operation{
 							TimelockID:  config.TestTimelockID,
@@ -515,7 +515,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					numMintIxs := 18
 
-					salt, sErr := mcms.SimpleSalt()
+					salt, sErr := timelockutil.SimpleSalt()
 					require.NoError(t, sErr)
 					opToSchedule := timelockutil.Operation{
 						TimelockID:  config.TestTimelockID,
@@ -842,7 +842,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		ix2, tmerr := tokens.MintTo(1000*solana.LAMPORTS_PER_SOL, tokenProgram, mint, treasuryATA, timelockutil.GetSignerPDA(config.TestTimelockID))
 		require.NoError(t, tmerr)
 
-		salt1, serr := mcms.SimpleSalt()
+		salt1, serr := timelockutil.SimpleSalt()
 		require.NoError(t, serr)
 		op1 := timelockutil.Operation{
 			TimelockID:  config.TestTimelockID,
@@ -881,7 +881,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		)
 		require.NoError(t, t3cerr)
 
-		salt2, s2err := mcms.SimpleSalt()
+		salt2, s2err := timelockutil.SimpleSalt()
 		require.NoError(t, s2err)
 		op2 := timelockutil.Operation{
 			TimelockID:  config.TestTimelockID,
@@ -904,7 +904,7 @@ func TestMcmWithTimelock(t *testing.T) {
 		require.NoError(t, i8err)
 
 		// add all team distribution instructions
-		salt3, s3err := mcms.SimpleSalt()
+		salt3, s3err := timelockutil.SimpleSalt()
 		require.NoError(t, s3err)
 		op3 := timelockutil.Operation{
 			TimelockID:  config.TestTimelockID,
@@ -1248,7 +1248,7 @@ func TestMcmWithTimelock(t *testing.T) {
 				require.NoError(t, i3err)
 
 				// Create new operation
-				salt, serr := mcms.SimpleSalt()
+				salt, serr := timelockutil.SimpleSalt()
 				require.NoError(t, serr)
 				newOp3 = timelockutil.Operation{
 					TimelockID:  config.TestTimelockID,
@@ -2033,7 +2033,7 @@ func TestMcmWithTimelock(t *testing.T) {
 					}
 
 					// create timelock operation for the batch
-					salt, err := mcms.SimpleSalt()
+					salt, err := timelockutil.SimpleSalt()
 					require.NoError(t, err)
 
 					op := timelockutil.Operation{

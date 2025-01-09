@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"
 )
 
@@ -267,7 +266,7 @@ func TestTimelockRBAC(t *testing.T) {
 	})
 
 	t.Run("rbac: schedule and cancel a timelock operation", func(t *testing.T) {
-		salt, serr := mcms.SimpleSalt()
+		salt, serr := timelockutil.SimpleSalt()
 		require.NoError(t, serr)
 		nonExecutableOp := timelockutil.Operation{
 			TimelockID:  config.TestTimelockID,
@@ -344,7 +343,7 @@ func TestTimelockRBAC(t *testing.T) {
 			require.NoError(t, ferr)
 			require.True(t, found, "Account %s should be in the AccessList", proposer.PublicKey())
 
-			salt, serr := mcms.SimpleSalt()
+			salt, serr := timelockutil.SimpleSalt()
 			require.NoError(t, serr)
 			nonExecutableOp2 := timelockutil.Operation{
 				TimelockID:  config.TestTimelockID,

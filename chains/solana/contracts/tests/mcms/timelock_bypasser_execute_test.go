@@ -18,7 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
@@ -208,7 +207,7 @@ func TestTimelockBypasserExecute(t *testing.T) {
 		})
 
 		t.Run("success: schedule and execute batch instructions", func(t *testing.T) {
-			salt, err := mcms.SimpleSalt()
+			salt, err := timelockutil.SimpleSalt()
 			require.NoError(t, err)
 			op := timelockutil.Operation{
 				TimelockID:  config.TestTimelockID,

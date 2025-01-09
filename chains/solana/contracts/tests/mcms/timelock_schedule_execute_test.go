@@ -20,7 +20,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/tokens"
 )
@@ -227,7 +226,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		})
 
 		t.Run("success: schedule and execute operations", func(t *testing.T) {
-			salt1, err := mcms.SimpleSalt()
+			salt1, err := timelockutil.SimpleSalt()
 			require.NoError(t, err)
 			op1 := timelockutil.Operation{
 				TimelockID:  config.TestTimelockID,
@@ -244,7 +243,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			require.NoError(t, ciErr)
 			op1.AddInstruction(cIx, []solana.PublicKey{solana.TokenProgramID, solana.SPLAssociatedTokenAccountProgramID})
 
-			salt2, err := mcms.SimpleSalt()
+			salt2, err := timelockutil.SimpleSalt()
 			require.NoError(t, err)
 			op2 := timelockutil.Operation{
 				TimelockID:  config.TestTimelockID,
@@ -266,7 +265,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 			require.NoError(t, tiErr)
 			op2.AddInstruction(tIx, []solana.PublicKey{tokenProgram})
 
-			salt3, err := mcms.SimpleSalt()
+			salt3, err := timelockutil.SimpleSalt()
 			require.NoError(t, err)
 			op3 := timelockutil.Operation{
 				TimelockID:  config.TestTimelockID,
@@ -555,7 +554,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 		proposer := roleMap[timelock.Proposer_Role].RandomPick()
 		proposerAccessController := roleMap[timelock.Proposer_Role].AccessController.PublicKey()
 
-		salt, err := mcms.SimpleSalt()
+		salt, err := timelockutil.SimpleSalt()
 		require.NoError(t, err)
 
 		op := timelockutil.Operation{

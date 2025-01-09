@@ -3,6 +3,7 @@ package timelock
 import (
 	"context"
 	crypto_rand "crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
@@ -286,4 +287,22 @@ func GetBlockedFunctionSelectors(
 	}
 
 	return selectors, nil
+}
+
+// simple salt generator that uses the current Unix timestamp(in mills)
+func SimpleSalt() ([32]byte, error) {
+	var salt [32]byte
+	now := time.Now().UnixMilli()
+	if now < 0 {
+		return salt, fmt.Errorf("negative timestamp: %d", now)
+	}
+	// unix timestamp in millseconds
+	binary.BigEndian.PutUint64(salt[:8], uint64(now))
+	// Next 8 bytes: Crypto random
+	randBytes := make([]byte, 8)
+	if _, err := crypto_rand.Read(randBytes); err != nil {
+		return salt, fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+	copy(salt[8:16], randBytes)
+	return salt, nil
 }
