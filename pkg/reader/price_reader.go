@@ -23,7 +23,8 @@ type PriceReader interface {
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetFeedPricesUSD(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error)
+	GetFeedPricesUSD(ctx context.Context,
+		tokens []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error)
 
 	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the specified chain
 	GetFeeQuoterTokenUpdates(

@@ -3,9 +3,10 @@ package reader
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"math/big"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/stretchr/testify/require"
 
