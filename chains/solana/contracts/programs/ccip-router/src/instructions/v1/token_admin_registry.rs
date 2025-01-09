@@ -76,7 +76,7 @@ pub fn set_pool(
         token_admin_registry.set_writable(ind)
     }
 
-    // validate lookup table contains minium required accounts if not zero address
+    // validate lookup table contains minimum required accounts if not zero address
     if new_pool != Pubkey::zeroed() {
         // deserialize lookup table account
         let lookup_table_data = &mut &ctx.accounts.pool_lookuptable.data.borrow()[..];
