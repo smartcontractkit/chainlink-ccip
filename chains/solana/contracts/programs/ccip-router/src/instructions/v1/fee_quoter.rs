@@ -213,8 +213,7 @@ fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
     }
 }
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
