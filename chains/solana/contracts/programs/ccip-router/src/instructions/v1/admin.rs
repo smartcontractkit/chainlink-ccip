@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::fee_quoter::do_billing_transfer;
+use super::ocr3base::ocr3_set;
 
 pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubkey) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
@@ -225,7 +226,8 @@ pub fn set_ocr_config(
 
     let is_commit = plugin_type == OcrPluginType::Commit as u8;
 
-    config.ocr3[plugin_type as usize].set(
+    ocr3_set(
+        &mut config.ocr3[plugin_type as usize],
         plugin_type,
         Ocr3ConfigInfo {
             config_digest: config_info.config_digest,

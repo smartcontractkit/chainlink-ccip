@@ -430,6 +430,28 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
+type ReportContext struct {
+	ByteWords [3][32]uint8
+}
+
+func (obj ReportContext) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ByteWords` param:
+	err = encoder.Encode(obj.ByteWords)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *ReportContext) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ByteWords`:
+	err = decoder.Decode(&obj.ByteWords)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type RampMessageHeader struct {
 	MessageId           [32]uint8
 	SourceChainSelector uint64
@@ -1220,22 +1242,55 @@ func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	return nil
 }
 
-type ReportContext struct {
-	ByteWords [3][32]uint8
+type Ocr3ConfigInfo struct {
+	ConfigDigest                   [32]uint8
+	F                              uint8
+	N                              uint8
+	IsSignatureVerificationEnabled uint8
 }
 
-func (obj ReportContext) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ByteWords` param:
-	err = encoder.Encode(obj.ByteWords)
+func (obj Ocr3ConfigInfo) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `ConfigDigest` param:
+	err = encoder.Encode(obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
+	// Serialize `F` param:
+	err = encoder.Encode(obj.F)
+	if err != nil {
+		return err
+	}
+	// Serialize `N` param:
+	err = encoder.Encode(obj.N)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsSignatureVerificationEnabled` param:
+	err = encoder.Encode(obj.IsSignatureVerificationEnabled)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (obj *ReportContext) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ByteWords`:
-	err = decoder.Decode(&obj.ByteWords)
+func (obj *Ocr3ConfigInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `ConfigDigest`:
+	err = decoder.Decode(&obj.ConfigDigest)
+	if err != nil {
+		return err
+	}
+	// Deserialize `F`:
+	err = decoder.Decode(&obj.F)
+	if err != nil {
+		return err
+	}
+	// Deserialize `N`:
+	err = decoder.Decode(&obj.N)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsSignatureVerificationEnabled`:
+	err = decoder.Decode(&obj.IsSignatureVerificationEnabled)
 	if err != nil {
 		return err
 	}
@@ -1291,61 +1346,6 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	}
 	// Deserialize `Transmitters`:
 	err = decoder.Decode(&obj.Transmitters)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type Ocr3ConfigInfo struct {
-	ConfigDigest                   [32]uint8
-	F                              uint8
-	N                              uint8
-	IsSignatureVerificationEnabled uint8
-}
-
-func (obj Ocr3ConfigInfo) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `ConfigDigest` param:
-	err = encoder.Encode(obj.ConfigDigest)
-	if err != nil {
-		return err
-	}
-	// Serialize `F` param:
-	err = encoder.Encode(obj.F)
-	if err != nil {
-		return err
-	}
-	// Serialize `N` param:
-	err = encoder.Encode(obj.N)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsSignatureVerificationEnabled` param:
-	err = encoder.Encode(obj.IsSignatureVerificationEnabled)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Ocr3ConfigInfo) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `ConfigDigest`:
-	err = decoder.Decode(&obj.ConfigDigest)
-	if err != nil {
-		return err
-	}
-	// Deserialize `F`:
-	err = decoder.Decode(&obj.F)
-	if err != nil {
-		return err
-	}
-	// Deserialize `N`:
-	err = decoder.Decode(&obj.N)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsSignatureVerificationEnabled`:
-	err = decoder.Decode(&obj.IsSignatureVerificationEnabled)
 	if err != nil {
 		return err
 	}
