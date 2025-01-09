@@ -35,7 +35,7 @@ are put into a [Commit Report][commit-report-src]. The report is sent to the
 on-chain code for final processing where a commit report log is written to the
 blockchain.
 
-An independant Risk Management Network (RMN) serves as an additional security
+An independent Risk Management Network (RMN) serves as an additional security
 layer to validate merkle roots. RMN can be thought of as a
 validation network with veto power. In the previous version of CCIP RMN was
 an independent component which provided a blessing or curse after the commit
