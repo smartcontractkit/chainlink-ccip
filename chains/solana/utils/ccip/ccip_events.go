@@ -65,3 +65,15 @@ type UsdPerUnitGasUpdated struct {
 	Value         [28]byte
 	Timestamp     int64
 }
+
+type OwnershipTransferRequested struct {
+	Discriminator [8]byte
+	From          solana.PublicKey
+	To            solana.PublicKey
+}
+
+type OwnershipTransferred struct {
+	Discriminator [8]byte
+	From          solana.PublicKey
+	To            solana.PublicKey
+}
