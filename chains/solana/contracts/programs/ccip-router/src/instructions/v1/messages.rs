@@ -2,14 +2,11 @@ use anchor_lang::prelude::*;
 use ethnum::U256;
 
 use crate::{
-    Any2SolanaRampMessage, BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage,
-    Solana2AnyRampMessage, CHAIN_FAMILY_SELECTOR_EVM, TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR,
-    TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
+    BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM,
+    TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR, TOKENPOOL_RELEASE_OR_MINT_DISCRIMINATOR,
 };
 
 use super::pools::ToTxData;
-
-const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
 ///////////////////
 // Pool Messages //
@@ -68,98 +65,11 @@ pub struct ReleaseOrMintOutV1 {
     pub destination_amount: u64, // TODO: u256 on EVM?
 }
 
-/////////////////////////////
-// Ramp messages functions //
-/////////////////////////////
+///////////////////
+// Ramp Messages //
+///////////////////
 
-pub fn hash_any2solana(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
-    use anchor_lang::solana_program::hash;
-
-    // Calculate vectors size to ensure that the hash is unique
-    let sender_size = [msg.sender.len() as u8];
-    let on_ramp_address_size = [on_ramp_address.len() as u8];
-    let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
-
-    // RampMessageHeader struct
-    let header_source_chain_selector = msg.header.source_chain_selector.to_be_bytes();
-    let header_dest_chain_selector = msg.header.dest_chain_selector.to_be_bytes();
-    let header_sequence_number = msg.header.sequence_number.to_be_bytes();
-    let header_nonce = msg.header.nonce.to_be_bytes();
-
-    // Extra Args struct
-    let extra_args_compute_units = msg.extra_args.compute_units.to_be_bytes();
-    let extra_args_accounts_len = [msg.extra_args.accounts.len() as u8];
-    let extra_args_accounts = msg.extra_args.accounts.try_to_vec().unwrap();
-
-    // TODO: Hash token amounts
-
-    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
-    // As similar as https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L402
-    let result = hash::hashv(&[
-        "Any2SolanaMessageHashV1".as_bytes(),
-        &header_source_chain_selector,
-        &header_dest_chain_selector,
-        &on_ramp_address_size,
-        on_ramp_address,
-        &msg.header.message_id,
-        &msg.receiver.to_bytes(),
-        &header_sequence_number,
-        &extra_args_compute_units,
-        &extra_args_accounts_len,
-        &extra_args_accounts,
-        &header_nonce,
-        &sender_size,
-        &msg.sender,
-        &data_size.to_be_bytes(),
-        &msg.data,
-    ]);
-
-    result.to_bytes()
-}
-
-pub fn hash_solana2any(msg: &Solana2AnyRampMessage) -> [u8; 32] {
-    // TODO: Modify this hash to be similar to the one in EVM
-    // https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/libraries/Internal.sol#L129
-    // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // - metadata_hash =  sha256("Solana2AnyMessageHashV1", solana_chain_selector, dest_chain_selector, ccip_router_program_id))
-    // - first_part = sha256(sender, sequence_number, nonce, fee_token, fee_token_amount)
-    // - receiver
-    // - message.data
-    // - token_amounts
-    // - extra_args
-
-    use anchor_lang::solana_program::hash;
-
-    // Push Data Size to ensure that the hash is unique
-    let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
-
-    // RampMessageHeader struct
-    let header_source_chain_selector = msg.header.source_chain_selector.to_be_bytes();
-    let header_dest_chain_selector = msg.header.dest_chain_selector.to_be_bytes();
-    let header_sequence_number = msg.header.sequence_number.to_be_bytes();
-    let header_nonce = msg.header.nonce.to_be_bytes();
-
-    // Extra Args struct
-    let extra_args_gas_limit = msg.extra_args.gas_limit.to_be_bytes();
-    let extra_args_allow_out_of_order_execution =
-        [msg.extra_args.allow_out_of_order_execution as u8];
-
-    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
-    let result = hash::hashv(&[
-        &msg.sender.to_bytes(),
-        &msg.receiver,
-        &data_size.to_be_bytes(),
-        &msg.data,
-        &header_source_chain_selector,
-        &header_dest_chain_selector,
-        &header_sequence_number,
-        &header_nonce,
-        &extra_args_gas_limit,
-        &extra_args_allow_out_of_order_execution,
-    ]);
-
-    result.to_bytes()
-}
+const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
 pub fn validate_solana2any(
     msg: &Solana2AnyMessage,
@@ -188,7 +98,7 @@ pub fn validate_solana2any(
     validate_dest_family_address(msg, dest_chain.config.chain_family_selector)
 }
 
-pub fn validate_dest_family_address(
+fn validate_dest_family_address(
     msg: &Solana2AnyMessage,
     chain_family_selector: [u8; 4],
 ) -> Result<()> {
@@ -227,54 +137,9 @@ pub fn validate_dest_family_address(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::{
-        utils::Exponential, RampMessageHeader, SolanaAccountMeta, SolanaExtraArgs,
-        SolanaTokenAmount,
-    };
+    use crate::{utils::Exponential, SolanaTokenAmount};
     use anchor_lang::solana_program::pubkey::Pubkey;
     use anchor_spl::token::spl_token::native_mint;
-    use bytemuck::Zeroable;
-
-    /// Builds a message and hash it, it's compared with a known hash
-    #[test]
-    fn test_hash() {
-        let message = Any2SolanaRampMessage {
-            sender: [
-                1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 0,
-            ]
-            .to_vec(),
-            receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
-            data: vec![4, 5, 6],
-            header: RampMessageHeader {
-                message_id: [
-                    8, 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    0, 0, 0, 0, 0, 0,
-                ],
-                source_chain_selector: 67,
-                dest_chain_selector: 78,
-                sequence_number: 89,
-                nonce: 90,
-            },
-            token_amounts: [].to_vec(), // TODO: hash token amounts
-            extra_args: SolanaExtraArgs {
-                compute_units: 1000,
-                accounts: vec![SolanaAccountMeta {
-                    pubkey: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-                        .unwrap(),
-                    is_writable: true,
-                }],
-            },
-        };
-
-        let on_ramp_address = &[1, 2, 3].to_vec();
-        let hash_result = hash_any2solana(&message, on_ramp_address);
-
-        assert_eq!(
-            "03da97f96c82237d8a8ab0f68d4f7ba02afe188b4a876f348278fbf2226312ed",
-            hex::encode(hash_result)
-        );
-    }
 
     #[test]
     fn message_not_validated_for_disabled_destination_chain() {
@@ -365,7 +230,7 @@ pub(crate) mod tests {
             receiver,
             data: vec![],
             token_amounts: vec![],
-            fee_token: Pubkey::zeroed(),
+            fee_token: Pubkey::default(),
             extra_args: crate::ExtraArgsInput {
                 gas_limit: None,
                 allow_out_of_order_execution: None,

@@ -319,7 +319,7 @@ mod tests {
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
-    use super::super::messages::tests::*;
+    use super::super::onramp::tests::*;
     use super::*;
     use crate::{TimestampedPackedU224, TokenBilling};
 

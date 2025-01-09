@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
-use super::messages::{hash_solana2any, LockOrBurnInV1, LockOrBurnOutV1};
+use super::messages::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
     validate_and_parse_token_accounts, TokenAccounts,
@@ -246,7 +246,7 @@ pub fn ccip_send<'info>(
         }
     }
 
-    let message_id = &hash_solana2any(&new_message);
+    let message_id = &hash(&new_message);
     new_message.header.message_id.clone_from(message_id);
 
     emit!(CCIPMessageSent {
@@ -295,4 +295,48 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
         final_nonce = nonce_counter_account.counter;
     }
     Ok(final_nonce)
+}
+
+fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
+    // TODO: Modify this hash to be similar to the one in EVM
+    // https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/libraries/Internal.sol#L129
+    // Fixed-size message fields are included in nested hash to reduce stack pressure.
+    // - metadata_hash =  sha256("Solana2AnyMessageHashV1", solana_chain_selector, dest_chain_selector, ccip_router_program_id))
+    // - first_part = sha256(sender, sequence_number, nonce, fee_token, fee_token_amount)
+    // - receiver
+    // - message.data
+    // - token_amounts
+    // - extra_args
+
+    use anchor_lang::solana_program::hash;
+
+    // Push Data Size to ensure that the hash is unique
+    let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
+
+    // RampMessageHeader struct
+    let header_source_chain_selector = msg.header.source_chain_selector.to_be_bytes();
+    let header_dest_chain_selector = msg.header.dest_chain_selector.to_be_bytes();
+    let header_sequence_number = msg.header.sequence_number.to_be_bytes();
+    let header_nonce = msg.header.nonce.to_be_bytes();
+
+    // Extra Args struct
+    let extra_args_gas_limit = msg.extra_args.gas_limit.to_be_bytes();
+    let extra_args_allow_out_of_order_execution =
+        [msg.extra_args.allow_out_of_order_execution as u8];
+
+    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
+    let result = hash::hashv(&[
+        &msg.sender.to_bytes(),
+        &msg.receiver,
+        &data_size.to_be_bytes(),
+        &msg.data,
+        &header_source_chain_selector,
+        &header_dest_chain_selector,
+        &header_sequence_number,
+        &header_nonce,
+        &extra_args_gas_limit,
+        &extra_args_allow_out_of_order_execution,
+    ]);
+
+    result.to_bytes()
 }
