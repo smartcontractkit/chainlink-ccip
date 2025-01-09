@@ -71,6 +71,9 @@ pub fn set_pool(
     token_admin_registry.lookup_table = new_pool;
 
     // set writable indexes
+    // used to build offchain tokenpool accounts in a transaction
+    // indexes can be checked to indicate is_writable for the specific account
+    // this is also used to validate to ensure the correct write permissions are used according the admin
     token_admin_registry.reset_writable();
     for ind in writable_indexes {
         token_admin_registry.set_writable(ind)
@@ -100,14 +103,7 @@ pub fn set_pool(
         let (pool_signer, _) =
             Pubkey::find_program_address(&[CCIP_TOKENPOOL_SIGNER, mint.as_ref()], &pool_program);
         let (fee_billing_config, _) = Pubkey::find_program_address(
-            &[
-                FEE_BILLING_TOKEN_CONFIG,
-                if mint.key() == Pubkey::default() {
-                    native_mint::ID.as_ref() // pre-2022 WSOL
-                } else {
-                    mint.as_ref()
-                },
-            ],
+            &[FEE_BILLING_TOKEN_CONFIG, mint.as_ref()],
             ctx.program_id,
         );
 

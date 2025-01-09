@@ -108,17 +108,8 @@ pub fn validate_and_parse_token_accounts<'info>(
             CcipRouterError::InvalidInputsPoolAccounts
         );
 
-        let (expected_fee_token_config, _) = Pubkey::find_program_address(
-            &[
-                FEE_BILLING_TOKEN_CONFIG,
-                if mint.key() == Pubkey::default() {
-                    native_mint::ID.as_ref() // pre-2022 WSOL
-                } else {
-                    mint.key.as_ref()
-                },
-            ],
-            &router,
-        );
+        let (expected_fee_token_config, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()], &router);
         require!(
             fee_token_config.key() == expected_fee_token_config,
             CcipRouterError::InvalidInputsConfigAccounts
@@ -208,16 +199,14 @@ pub fn validate_and_parse_token_accounts<'info>(
                 remaining_accounts.iter().map(|x| x.key()).collect();
             expected_keys.append(&mut remaining_keys);
             require!(
-                lookup_table_account.addresses.len() == expected_keys.len(),
-                CcipRouterError::InvalidInputsLookupTableAccounts
-            );
-            require!(
                 lookup_table_account.addresses.as_ref() == expected_keys,
                 CcipRouterError::InvalidInputsLookupTableAccounts
             );
         }
         {
             // validate pool address writable
+            // token admin registry contains an array (binary) of indexes that are writable
+            // check that the writability of the passed accounts match the writable configuration (using indexes)
             let mut expected_is_writable: Vec<bool> =
                 required_entries.iter().map(|x| x.is_writable).collect();
             let mut remaining_is_writable: Vec<bool> =
