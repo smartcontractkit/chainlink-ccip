@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
-use super::messages::{LockOrBurnInV1, LockOrBurnOutV1};
+use super::messages::{hash_solana2any, LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
     validate_and_parse_token_accounts, TokenAccounts,
@@ -246,7 +246,7 @@ pub fn ccip_send<'info>(
         }
     }
 
-    let message_id = &new_message.hash();
+    let message_id = &hash_solana2any(&new_message);
     new_message.header.message_id.clone_from(message_id);
 
     emit!(CCIPMessageSent {

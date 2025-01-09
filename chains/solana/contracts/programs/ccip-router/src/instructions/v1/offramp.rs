@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
 use super::merkle::{calculate_merkle_root, MerkleError};
-use super::messages::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
+use super::messages::{hash_any2solana, ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
@@ -613,7 +613,7 @@ pub fn verify_merkle_root(
     execution_report: &ExecutionReportSingleChain,
     on_ramp_address: &[u8],
 ) -> Result<[u8; 32]> {
-    let hashed_leaf = execution_report.message.hash(on_ramp_address);
+    let hashed_leaf = hash_any2solana(&execution_report.message, on_ramp_address);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
