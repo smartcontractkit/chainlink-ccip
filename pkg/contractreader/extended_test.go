@@ -3,8 +3,9 @@ package contractreader_test
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"testing"
+
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
