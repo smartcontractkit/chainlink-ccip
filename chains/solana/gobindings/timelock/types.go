@@ -146,7 +146,6 @@ const (
 	BlockedSelector_TimelockError
 	AlreadyBlocked_TimelockError
 	SelectorNotFound_TimelockError
-	InvalidInstructionData_TimelockError
 	MaxCapacityReached_TimelockError
 )
 
@@ -182,8 +181,6 @@ func (value TimelockError) String() string {
 		return "AlreadyBlocked"
 	case SelectorNotFound_TimelockError:
 		return "SelectorNotFound"
-	case InvalidInstructionData_TimelockError:
-		return "InvalidInstructionData"
 	case MaxCapacityReached_TimelockError:
 		return "MaxCapacityReached"
 	default:

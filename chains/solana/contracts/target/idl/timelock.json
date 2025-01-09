@@ -904,9 +904,6 @@
             "name": "SelectorNotFound"
           },
           {
-            "name": "InvalidInstructionData"
-          },
-          {
             "name": "MaxCapacityReached"
           }
         ]
