@@ -313,6 +313,12 @@ impl TimestampedPackedU224 {
         U256::from_be_bytes(u256_buffer)
     }
 
+    pub fn from_single(timestamp: i64, single: U256) -> Self {
+        let mut value = [0u8; 28];
+        value.clone_from_slice(&single.to_be_bytes()[4..32]);
+        Self { value, timestamp }
+    }
+
     pub fn unpack(&self) -> UnpackedDoubleU224 {
         let mut u128_buffer = [0u8; 16];
         u128_buffer[2..16].clone_from_slice(&self.value[14..]);
@@ -340,8 +346,6 @@ impl UnpackedDoubleU224 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{utils::Usd18Decimals, PackedPrice};
-
     use super::*;
     use std::convert::TryFrom;
 
@@ -459,21 +463,5 @@ mod tests {
             MessageExecutionState::Failure
         );
         assert!(MessageExecutionState::try_from(4).is_err());
-    }
-
-    #[test]
-    fn packing_unpacking_price() {
-        let price = PackedPrice {
-            execution_gas_price: Usd18Decimals::from_usd_cents(100),
-            data_availability_gas_price: Usd18Decimals::from_usd_cents(200),
-        };
-
-        let roundtrip = PackedPrice::from(
-            TryInto::<UnpackedDoubleU224>::try_into(price.clone())
-                .unwrap()
-                .pack(0)
-                .unpack(),
-        );
-        assert_eq!(price, roundtrip);
     }
 }
