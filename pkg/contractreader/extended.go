@@ -109,9 +109,7 @@ func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended
 	}
 	// so far this is the only contract that allows multiple bindings
 	// if more contracts are added, this should be moved to a config
-	multiBindAllowed := map[string]bool{
-		consts.ContractNamePriceAggregator: true,
-	}
+	multiBindAllowed := map[string]bool{consts.ContractNamePriceAggregator: true}
 	return &extendedContractReader{
 		reader:                 baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
@@ -277,6 +275,13 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 				Binding: binding,
 			})
 		} else {
+			if len(e.contractBindingsByName[binding.Name]) > 0 {
+				// Unbind the previous binding
+				err := e.reader.Unbind(ctx, []types.BoundContract{e.contractBindingsByName[binding.Name][0].Binding})
+				if err != nil {
+					return fmt.Errorf("failed to unbind previous binding: %w", err)
+				}
+			}
 			// Override the previous binding
 			e.contractBindingsByName[binding.Name] = []ExtendedBoundContract{{
 				BoundAt: time.Now(),

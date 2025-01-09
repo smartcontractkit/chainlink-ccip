@@ -30,6 +30,8 @@ func TestExtendedContractReader(t *testing.T) {
 
 	cr.On("Bind", context.Background(),
 		[]types.BoundContract{{Name: contractName, Address: "0x123"}}).Return(nil)
+	cr.On("Unbind", context.Background(),
+		[]types.BoundContract{{Name: contractName, Address: "0x123"}}).Return(nil)
 	cr.On("Bind", context.Background(),
 		[]types.BoundContract{{Name: contractName, Address: "0x124"}}).Return(nil)
 	cr.On("Bind", context.Background(),
