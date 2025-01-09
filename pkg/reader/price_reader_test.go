@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"math/big"
 	"testing"
 
@@ -59,7 +60,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		inputTokens   []cciptypes.UnknownEncodedAddress
 		tokenInfo     map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo
 		mockPrices    map[cciptypes.UnknownEncodedAddress]*big.Int
-		want          []*big.Int
+		want          map[cciptypes.UnknownEncodedAddress]*big.Int
 		errorAccounts []cciptypes.UnknownEncodedAddress
 		wantErr       bool
 	}{
@@ -70,7 +71,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
-			want:        []*big.Int{ArbPrice},
+			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 		},
 		{
 			name: "On-chain multiple prices",
@@ -80,10 +81,10 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr, EthAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice, EthAddr: EthPrice},
-			want:        []*big.Int{ArbPrice, EthPrice},
+			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice, EthAddr: EthPrice},
 		},
 		{
-			name: "Missing price should error",
+			name: "Missing price doesn't fail, return available prices",
 			tokenInfo: map[cciptypes.UnknownEncodedAddress]pluginconfig.TokenInfo{
 				ArbAddr: ArbInfo,
 				EthAddr: EthInfo,
@@ -91,8 +92,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			inputTokens:   []cciptypes.UnknownEncodedAddress{ArbAddr, EthAddr},
 			mockPrices:    map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 			errorAccounts: []cciptypes.UnknownEncodedAddress{EthAddr},
-			want:          nil,
-			wantErr:       true,
+			want:          map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 		},
 		{
 			name: "Empty input tokens list",
@@ -101,7 +101,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{},
-			want:        []*big.Int{},
+			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{},
 		},
 		{
 			name: "Repeated token in input",
@@ -110,7 +110,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr, ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
-			want:        []*big.Int{ArbPrice, ArbPrice},
+			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 		},
 		{
 			name: "Zero price should succeed",
@@ -119,7 +119,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			},
 			inputTokens: []cciptypes.UnknownEncodedAddress{ArbAddr},
 			mockPrices:  map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: big.NewInt(0)},
-			want:        []*big.Int{big.NewInt(0)},
+			want:        map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: big.NewInt(0)},
 		},
 		{
 			name: "Multiple error accounts",
@@ -131,8 +131,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 			inputTokens:   []cciptypes.UnknownEncodedAddress{ArbAddr, EthAddr, BtcAddr},
 			mockPrices:    map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 			errorAccounts: []cciptypes.UnknownEncodedAddress{EthAddr, BtcAddr},
-			want:          nil,
-			wantErr:       true,
+			want:          map[cciptypes.UnknownEncodedAddress]*big.Int{ArbAddr: ArbPrice},
 		},
 	}
 
@@ -140,6 +139,7 @@ func TestOnchainTokenPricesReader_GetTokenPricesUSD(t *testing.T) {
 		contractReader := createMockReader(t, tc.mockPrices, tc.errorAccounts, tc.tokenInfo)
 		feedChain := cciptypes.ChainSelector(1)
 		tokenPricesReader := priceReader{
+			lggr: logger.Test(t),
 			chainReaders: map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 				feedChain: contractReader,
 			},
