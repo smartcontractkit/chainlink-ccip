@@ -16,9 +16,6 @@ use crate::event::*;
 mod messages;
 use crate::messages::*;
 
-mod ocr3base;
-use crate::ocr3base::*;
-
 mod instructions;
 use crate::instructions::*;
 
