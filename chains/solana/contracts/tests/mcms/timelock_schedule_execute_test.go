@@ -2,6 +2,7 @@ package contracts
 
 import (
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -551,6 +552,7 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 	})
 
 	t.Run("function blockers", func(t *testing.T) {
+		t.Parallel()
 		proposer := roleMap[timelock.Proposer_Role].RandomPick()
 		proposerAccessController := roleMap[timelock.Proposer_Role].AccessController.PublicKey()
 
@@ -682,16 +684,25 @@ func TestTimelockScheduleAndExecute(t *testing.T) {
 				ixs = append(ixs, ix)
 			}
 
-			// max selectors at 32, two transactions happen here
-			chunkSize := 16
+			// max selectors at 128
+			chunkSize := 18
+			var wg sync.WaitGroup
+
 			for i := 0; i < len(ixs); i += chunkSize {
+				wg.Add(1)
 				end := i + chunkSize
 				if end > len(ixs) {
 					end = len(ixs)
 				}
 				chunk := ixs[i:end]
-				testutils.SendAndConfirm(ctx, t, solanaGoClient, chunk, admin, config.DefaultCommitment)
+
+				go func(chunk []solana.Instruction) {
+					defer wg.Done()
+					testutils.SendAndConfirm(ctx, t, solanaGoClient, chunk, admin, config.DefaultCommitment)
+				}(chunk)
 			}
+
+			wg.Wait()
 
 			// check if it's full
 			blockedSelectors, bserr := timelockutil.GetBlockedFunctionSelectors(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment)

@@ -8,7 +8,7 @@ import (
 )
 
 type BlockedSelectors struct {
-	Xs  [32][8]uint8
+	Xs  [128][8]uint8
 	Len uint64
 }
 
