@@ -26,7 +26,7 @@ const (
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
-	defaultInflightPriceCheckRetries          = 3
+	defaultInflightPriceCheckRetries          = 5
 )
 
 type FeeInfo struct {
