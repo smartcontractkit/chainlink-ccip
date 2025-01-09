@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -121,11 +122,12 @@ func buildSingleChainReportHelper(
 type messageStatus string
 
 const (
-	Unknown                       messageStatus = "unknown"
+	None                          messageStatus = ""
+	Error                         messageStatus = "error"
 	ReadyToExecute                messageStatus = "ready_to_execute"
 	AlreadyExecuted               messageStatus = "already_executed"
 	TokenDataNotReady             messageStatus = "token_data_not_ready" //nolint:gosec // this is not a password
-	MessagePseudoDeleted          messageStatus = "message_pseudo_deleted"
+	PseudoDeleted                 messageStatus = "message_pseudo_deleted"
 	TokenDataFetchError           messageStatus = "token_data_fetch_error"
 	InsufficientRemainingBatchGas messageStatus = "insufficient_remaining_batch_gas"
 	MissingNoncesForChain         messageStatus = "missing_nonces_for_chain"
@@ -145,80 +147,182 @@ const (
 	*/
 )
 
+// Check for the messages.
+type Check func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error)
+
+/*
+// Template
+func Template() Check {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		// check
+
+		// else
+		return None, nil
+	}
+}
+*/
+
+// CheckIfPseudoDeleted checks if the message has been removed, typically done to reduce observation size.
+// This check should happen early because other checks are likely to fail if the message has been deleted.
+func CheckIfPseudoDeleted() Check {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		if msg.IsEmpty() {
+			lggr.Errorw("message pseudo deleted", "index", idx)
+			return PseudoDeleted, nil
+		}
+		return None, nil
+	}
+}
+
+// CheckAlreadyExecuted checks the report executed list to see if the message has been executed.
+func CheckAlreadyExecuted() Check {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		if slices.Contains(report.ExecutedMessages, msg.Header.SequenceNumber) {
+			lggr.Infow(
+				"message already executed",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", AlreadyExecuted)
+			return AlreadyExecuted, nil
+		}
+
+		return None, nil
+	}
+}
+
+func CheckTokenData() Check {
+	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		if idx >= len(report.MessageTokenData) {
+			lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(report.MessageTokenData))
+			return Error, fmt.Errorf("token data index out of range")
+		}
+
+		messageTokenData := report.MessageTokenData[idx]
+		if !messageTokenData.IsReady() {
+			lggr.Infow(
+				"unable to read token data - token data not ready",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"error", messageTokenData.Error(),
+				"messageState", TokenDataNotReady)
+			return TokenDataNotReady, nil
+		}
+
+		lggr.Infow(
+			"read token data",
+			"messageID", msg.Header.MessageID,
+			"sourceChain", report.SourceChain,
+			"seqNum", msg.Header.SequenceNumber,
+			"data", messageTokenData.ToByteSlice())
+
+		return None, nil
+	}
+}
+
+// CheckTooCostly compares the costly list for a given message.
+func CheckTooCostly() Check {
+	return func(lggr logger.Logger, msg cciptypes.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		// 4. Check if the message is too costly to execute.
+		if slices.Contains(report.CostlyMessages, msg.Header.MessageID) {
+			lggr.Infow(
+				"message too costly to execute",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", TooCostly)
+			return TooCostly, nil
+		}
+
+		return None, nil
+	}
+}
+
+// CheckNonces compares message nonces against the input to determine message validity. A cache is maintained within
+// the check in order to increment nonces for subsequent messages from the same sender.
+func CheckNonces(sendersNonce map[cciptypes.ChainSelector]map[string]uint64) Check {
+	// temporary map to store state between nonce checks for this round.
+	expectedNonce := make(map[cciptypes.ChainSelector]map[string]uint64)
+	return func(lggr logger.Logger, msg cciptypes.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
+		if msg.Header.Nonce != 0 {
+			// Sequenced messages have non-zero nonces.
+
+			if _, ok := sendersNonce[report.SourceChain]; !ok {
+				lggr.Errorw("Skipping message - nonces not available for chain",
+					"messageID", msg.Header.MessageID,
+					"sourceChain", report.SourceChain,
+					"seqNum", msg.Header.SequenceNumber,
+					"messageState", MissingNoncesForChain)
+				return MissingNoncesForChain, nil
+			}
+
+			chainNonces := sendersNonce[report.SourceChain]
+			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
+			if _, ok := chainNonces[sender]; !ok {
+				lggr.Errorw("Skipping message - missing nonce",
+					"messageID", msg.Header.MessageID,
+					"sourceChain", report.SourceChain,
+					"seqNum", msg.Header.SequenceNumber,
+					"messageState", MissingNonce)
+				return MissingNonce, nil
+			}
+
+			if _, ok := expectedNonce[report.SourceChain]; !ok {
+				// initialize expected nonce if needed.
+				expectedNonce[report.SourceChain] = make(map[string]uint64)
+			}
+			if _, ok := expectedNonce[report.SourceChain][sender]; !ok {
+				expectedNonce[report.SourceChain][sender] = chainNonces[sender] + 1
+			}
+
+			// Check expected nonce is valid for sequenced messages.
+			if msg.Header.Nonce != expectedNonce[report.SourceChain][sender] {
+				lggr.Warnw("Skipping message - invalid nonce",
+					"messageID", msg.Header.MessageID,
+					"sourceChain", report.SourceChain,
+					"seqNum", msg.Header.SequenceNumber,
+					"have", msg.Header.Nonce,
+					"want", expectedNonce[report.SourceChain][sender],
+					"messageState", InvalidNonce)
+				return InvalidNonce, nil
+			}
+			expectedNonce[report.SourceChain][sender] = expectedNonce[report.SourceChain][sender] + 1
+		}
+
+		return None, nil
+	}
+}
+
 func (b *execReportBuilder) checkMessage(
 	_ context.Context, idx int, execReport exectypes.CommitData,
 ) (exectypes.CommitData, messageStatus, error) {
 	result := execReport
 
+	// OutOfRangeCheck
 	if idx >= len(execReport.Messages) {
 		b.lggr.Errorw("message index out of range", "index", idx, "numMessages", len(execReport.Messages))
-		return execReport, Unknown, fmt.Errorf("message index out of range")
+		return execReport, Error, fmt.Errorf("message index out of range")
 	}
 
 	msg := execReport.Messages[idx]
 
-	// Check if the message has been pseudo-deleted
-	if msg.IsEmpty() {
-		b.lggr.Errorw("message pseudo deleted", "index", idx)
-		return execReport, MessagePseudoDeleted, nil
+	for _, check := range b.checks {
+		status, err := check(b.lggr, msg, idx, execReport)
+		if err != nil {
+			return execReport, Error, err
+		}
+		if status != None {
+			return execReport, status, nil
+		}
 	}
 
-	// 1. Check if the message has already been executed.
-	if slices.Contains(execReport.ExecutedMessages, msg.Header.SequenceNumber) {
-		b.lggr.Infow(
-			"message already executed",
-			"messageID", msg.Header.MessageID,
-			"sourceChain", execReport.SourceChain,
-			"seqNum", msg.Header.SequenceNumber,
-			"messageState", AlreadyExecuted)
-		return execReport, AlreadyExecuted, nil
-	}
-
-	// 2. Check if all tokens are properly initialized with token data
-	if idx >= len(execReport.MessageTokenData) {
-		b.lggr.Errorw("token data index out of range", "index", idx, "messageTokensData", len(execReport.MessageTokenData))
-		return execReport, Unknown, fmt.Errorf("token data index out of range")
-	}
-
-	messageTokenData := execReport.MessageTokenData[idx]
-	if !messageTokenData.IsReady() {
-		b.lggr.Infow(
-			"unable to read token data - token data not ready",
-			"messageID", msg.Header.MessageID,
-			"sourceChain", execReport.SourceChain,
-			"seqNum", msg.Header.SequenceNumber,
-			"error", messageTokenData.Error(),
-			"messageState", TokenDataNotReady)
-		return execReport, TokenDataNotReady, nil
-	}
-	result.MessageTokenData[idx] = messageTokenData
-	b.lggr.Infow(
-		"read token data",
-		"messageID", msg.Header.MessageID,
-		"sourceChain", execReport.SourceChain,
-		"seqNum", msg.Header.SequenceNumber,
-		"data", messageTokenData.ToByteSlice())
-
-	// 3. Check if the message has a valid nonce.
-	status := b.checkMessageNonce(msg, execReport)
-	if status != "" {
-		return execReport, status, nil
-	}
-
-	// 4. Check if the message is too costly to execute.
-	if slices.Contains(execReport.CostlyMessages, msg.Header.MessageID) {
-		b.lggr.Infow(
-			"message too costly to execute",
-			"messageID", msg.Header.MessageID,
-			"sourceChain", execReport.SourceChain,
-			"seqNum", msg.Header.SequenceNumber,
-			"messageState", TooCostly)
-		return execReport, TooCostly, nil
-	}
+	// TODO: Check txm for too many failures?
 
 	return result, ReadyToExecute, nil
 }
 
+/*
 func (b *execReportBuilder) checkMessageNonce(
 	msg cciptypes.Message,
 	execReport exectypes.CommitData,
@@ -274,6 +378,7 @@ func (b *execReportBuilder) checkMessageNonce(
 
 	return ""
 }
+*/
 
 func (b *execReportBuilder) verifyReport(
 	ctx context.Context,
@@ -325,8 +430,8 @@ func (b *execReportBuilder) verifyReport(
 // buildSingleChainReport generates the largest report which fits into maxSizeBytes.
 // See buildSingleChainReport for more details about how a report is built.
 // returns
-// 1. the exec report that's added to builder
-// 2. the updated commit report after marking new messages from the exec report as executed
+// 1. exec report for the builder
+// 2. updated commit report after marking new messages from the exec report as executed
 //
 //nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(

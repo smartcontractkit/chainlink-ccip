@@ -18,29 +18,78 @@ type ExecReportBuilder interface {
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
+type Option func(erb *execReportBuilder)
+
+func WithMaxGas(maxGas uint64) func(*execReportBuilder) {
+	return func(erb *execReportBuilder) {
+		erb.maxGas = maxGas
+	}
+}
+
+func WithMaxReportSizeBytes(maxReportSizeBytes uint64) Option {
+	return func(erb *execReportBuilder) {
+		erb.maxReportSizeBytes = maxReportSizeBytes
+	}
+}
+
+func MaxMessages(maxMessages uint64) Option {
+	return func(erb *execReportBuilder) {
+		erb.maxMessages = maxMessages
+		panic("not implemented")
+	}
+}
+
+// WithExtraMessageCheck adds additional message checks to the default ones.
+func WithExtraMessageCheck(check Check) Option {
+	return func(erb *execReportBuilder) {
+		erb.checks = append(erb.checks, check)
+	}
+}
+
+func newBuilderInternal(
+	logger logger.Logger,
+	hasher cciptypes.MessageHasher,
+	encoder cciptypes.ExecutePluginCodec,
+	estimateProvider cciptypes.EstimateProvider,
+	destChainSelector cciptypes.ChainSelector,
+	options ...Option,
+) *execReportBuilder {
+	defaultChecks := []Check{
+		CheckIfPseudoDeleted(),
+		CheckAlreadyExecuted(),
+		CheckTokenData(),
+		CheckTooCostly(),
+	}
+
+	builder := &execReportBuilder{
+		lggr: logger,
+
+		checks:           defaultChecks,
+		encoder:          encoder,
+		hasher:           hasher,
+		estimateProvider: estimateProvider,
+
+		destChainSelector: destChainSelector,
+	}
+
+	for _, option := range options {
+		if option != nil {
+			option(builder)
+		}
+	}
+
+	return builder
+}
+
 func NewBuilder(
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
 	estimateProvider cciptypes.EstimateProvider,
-	nonces map[cciptypes.ChainSelector]map[string]uint64,
 	destChainSelector cciptypes.ChainSelector,
-	maxReportSizeBytes uint64,
-	maxGas uint64,
+	options ...Option,
 ) ExecReportBuilder {
-	return &execReportBuilder{
-		lggr: logger,
-
-		encoder:          encoder,
-		hasher:           hasher,
-		estimateProvider: estimateProvider,
-		sendersNonce:     nonces,
-		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
-
-		destChainSelector:  destChainSelector,
-		maxReportSizeBytes: maxReportSizeBytes,
-		maxGas:             maxGas,
-	}
+	return newBuilderInternal(logger, hasher, encoder, estimateProvider, destChainSelector, options...)
 }
 
 // validationMetadata contains all metadata needed to accumulate results across multiple reports and messages.
@@ -63,17 +112,16 @@ type execReportBuilder struct {
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
 	estimateProvider cciptypes.EstimateProvider
-	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
 
 	// Config
+	checks             []Check
 	destChainSelector  cciptypes.ChainSelector
 	maxReportSizeBytes uint64
 	maxGas             uint64
+	maxMessages        uint64
 
 	// State
 	accumulated validationMetadata
-	// expectedNonce is used to track nonces for multiple messages from the same sender.
-	expectedNonce map[cciptypes.ChainSelector]map[string]uint64
 
 	// Result
 	execReports []cciptypes.ExecutePluginReportSingleChain
