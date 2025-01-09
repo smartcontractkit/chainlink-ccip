@@ -211,6 +211,7 @@ fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
 }
 
 #[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
@@ -224,6 +225,25 @@ impl From<UnpackedDoubleU224> for PackedPrice {
             execution_gas_price: Usd18Decimals(value.low.into()),
             data_availability_gas_price: Usd18Decimals(value.high.into()),
         }
+    }
+}
+
+impl TryFrom<PackedPrice> for UnpackedDoubleU224 {
+    type Error = Error;
+
+    fn try_from(value: PackedPrice) -> Result<Self> {
+        Ok(Self {
+            high: value
+                .data_availability_gas_price
+                .0
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+            low: value
+                .execution_gas_price
+                .0
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+        })
     }
 }
 
@@ -680,5 +700,14 @@ mod tests {
             .unwrap_err(),
             CcipRouterError::StaleGasPrice.into()
         );
+    }
+
+    #[test]
+    fn fee_with_mainnet_configuration_snapshot() {
+        let mut chain = sample_dest_chain();
+        let mut billing = sample_billing_config();
+        let mut message = sample_message();
+
+        // chain.state.usd_per_unit_gas = PackedPrice { execution_gas_price: Usd18Decimals(921441088750), Usd18Decimals(1736422019) }.try_into().unwrap();
     }
 }
