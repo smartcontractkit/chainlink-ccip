@@ -5,11 +5,11 @@ use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
     DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
     FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
-    RemoveBillingTokenConfig, SetOcrConfig, SetTokenBillingConfig, SourceChainAdded,
-    SourceChainConfig, SourceChainConfigUpdated, SourceChainState, TimestampedPackedU224,
-    TokenBilling, TransferOwnership, UpdateBillingTokenConfig, UpdateConfigCCIPRouter,
-    UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig, WithdrawBilledFunds,
-    FEE_BILLING_SIGNER_SEEDS,
+    OwnershipTransferRequested, OwnershipTransferred, RemoveBillingTokenConfig, SetOcrConfig,
+    SetTokenBillingConfig, SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated,
+    SourceChainState, TimestampedPackedU224, TokenBilling, TransferOwnership,
+    UpdateBillingTokenConfig, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
+    UpdateSourceChainSelectorConfig, WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::fee_quoter::do_billing_transfer;
@@ -20,12 +20,20 @@ pub fn transfer_ownership(ctx: Context<TransferOwnership>, proposed_owner: Pubke
         proposed_owner != config.owner,
         CcipRouterError::InvalidInputs
     );
+    emit!(OwnershipTransferRequested {
+        from: config.owner,
+        to: proposed_owner,
+    });
     config.proposed_owner = proposed_owner;
     Ok(())
 }
 
 pub fn accept_ownership(ctx: Context<AcceptOwnership>) -> Result<()> {
     let mut config = ctx.accounts.config.load_mut()?;
+    emit!(OwnershipTransferred {
+        from: config.owner,
+        to: config.proposed_owner,
+    });
     config.owner = std::mem::take(&mut config.proposed_owner);
     config.proposed_owner = Pubkey::new_from_array([0; 32]);
     Ok(())
