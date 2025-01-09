@@ -112,7 +112,7 @@ func TestMcmWithTimelock(t *testing.T) {
 
 					require.Equal(t, config.TestChainID, configAccount.ChainId)
 					require.Equal(t, admin.PublicKey(), configAccount.Owner)
-					require.Equal(t, msig.PaddedName, configAccount.MultisigID)
+					require.Equal(t, msig.PaddedName, configAccount.MultisigId)
 				})
 			}
 		}
