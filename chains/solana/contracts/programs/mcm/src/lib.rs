@@ -23,21 +23,21 @@ mod instructions;
 use instructions::*;
 
 /// This is mcm program supporting multiple instances of multisig configuration
-/// A single deployed program manages multiple multisig states(configurations) identified by multisig_name
+/// A single deployed program manages multiple multisig states(configurations) identified by multisig_id
 #[program]
 pub mod mcm {
     use super::*;
 
-    /// initialize a new multisig configuration, store the chain_id and multisig_name
-    /// multisig_name is a unique identifier for the multisig configuration(32 bytes, left-padded)
+    /// initialize a new multisig configuration, store the chain_id and multisig_id
+    /// multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)
     pub fn initialize(
         ctx: Context<Initialize>,
         chain_id: u64,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
     ) -> Result<()> {
         let config = &mut ctx.accounts.multisig_config;
         config.chain_id = chain_id;
-        config.multisig_name = multisig_name;
+        config.multisig_id = multisig_id;
         config.owner = ctx.accounts.authority.key();
         Ok(())
     }
@@ -45,7 +45,7 @@ pub mod mcm {
     // shared func signature with other programs
     pub fn transfer_ownership(
         ctx: Context<TransferOwnership>,
-        _multisig_name: [u8; MULTISIG_NAME_PADDED],
+        _multisig_id: [u8; MULTISIG_ID_PADDED],
         proposed_owner: Pubkey,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
@@ -57,7 +57,7 @@ pub mod mcm {
     // shared func signature with other programs
     pub fn accept_ownership(
         ctx: Context<AcceptOwnership>,
-        _multisig_name: [u8; MULTISIG_NAME_PADDED],
+        _multisig_id: [u8; MULTISIG_ID_PADDED],
     ) -> Result<()> {
         ctx.accounts.config.owner = std::mem::take(&mut ctx.accounts.config.proposed_owner);
         ctx.accounts.config.proposed_owner = Pubkey::new_from_array([0; 32]);
@@ -66,7 +66,7 @@ pub mod mcm {
 
     pub fn set_config(
         ctx: Context<SetConfig>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         signer_groups: Vec<u8>,
         group_quorums: [u8; NUM_GROUPS],
         group_parents: [u8; NUM_GROUPS],
@@ -74,7 +74,7 @@ pub mod mcm {
     ) -> Result<()> {
         instructions::set_config(
             ctx,
-            multisig_name,
+            multisig_id,
             signer_groups,
             group_quorums,
             group_parents,
@@ -84,7 +84,7 @@ pub mod mcm {
 
     pub fn set_root(
         ctx: Context<SetRoot>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         root: [u8; 32],
         valid_until: u32,
         metadata: RootMetadataInput,
@@ -92,7 +92,7 @@ pub mod mcm {
     ) -> Result<()> {
         instructions::set_root(
             ctx,
-            multisig_name,
+            multisig_id,
             root,
             valid_until,
             metadata,
@@ -102,91 +102,91 @@ pub mod mcm {
 
     pub fn execute<'info>(
         ctx: Context<'_, '_, '_, 'info, Execute<'info>>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         chain_id: u64,
         nonce: u64,
         data: Vec<u8>, // bytes array
         proof: Vec<[u8; 32]>,
     ) -> Result<()> {
-        instructions::execute(ctx, multisig_name, chain_id, nonce, data, proof)
+        instructions::execute(ctx, multisig_id, chain_id, nonce, data, proof)
     }
 
     // batch configuration methods prerequisites for set_config
     pub fn init_signers(
         ctx: Context<InitSigners>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         total_signers: u8,
     ) -> Result<()> {
-        instructions::init_signers(ctx, multisig_name, total_signers)
+        instructions::init_signers(ctx, multisig_id, total_signers)
     }
 
     pub fn append_signers(
         ctx: Context<AppendSigners>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         signers_batch: Vec<[u8; 20]>,
     ) -> Result<()> {
-        instructions::append_signers(ctx, multisig_name, signers_batch)
+        instructions::append_signers(ctx, multisig_id, signers_batch)
     }
 
     pub fn clear_signers(
         ctx: Context<ClearSigners>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
     ) -> Result<()> {
-        instructions::clear_signers(ctx, multisig_name)
+        instructions::clear_signers(ctx, multisig_id)
     }
 
     pub fn finalize_signers(
         ctx: Context<FinalizeSigners>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
     ) -> Result<()> {
-        instructions::finalize_signers(ctx, multisig_name)
+        instructions::finalize_signers(ctx, multisig_id)
     }
 
     // batch configuration methods prerequisites for set_root
     pub fn init_signatures(
         ctx: Context<InitSignatures>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         root: [u8; 32],
         valid_until: u32,
         total_signatures: u8,
     ) -> Result<()> {
-        instructions::init_signatures(ctx, multisig_name, root, valid_until, total_signatures)
+        instructions::init_signatures(ctx, multisig_id, root, valid_until, total_signatures)
     }
 
     pub fn append_signatures(
         ctx: Context<AppendSignatures>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         root: [u8; 32],
         valid_until: u32,
         signatures_batch: Vec<Signature>,
     ) -> Result<()> {
-        instructions::append_signatures(ctx, multisig_name, root, valid_until, signatures_batch)
+        instructions::append_signatures(ctx, multisig_id, root, valid_until, signatures_batch)
     }
     pub fn clear_signatures(
         ctx: Context<ClearSignatures>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         root: [u8; 32],
         valid_until: u32,
     ) -> Result<()> {
-        instructions::clear_signatures(ctx, multisig_name, root, valid_until)
+        instructions::clear_signatures(ctx, multisig_id, root, valid_until)
     }
 
     pub fn finalize_signatures(
         ctx: Context<FinalizeSignatures>,
-        multisig_name: [u8; MULTISIG_NAME_PADDED],
+        multisig_id: [u8; MULTISIG_ID_PADDED],
         root: [u8; 32],
         valid_until: u32,
     ) -> Result<()> {
-        instructions::finalize_signatures(ctx, multisig_name, root, valid_until)
+        instructions::finalize_signatures(ctx, multisig_id, root, valid_until)
     }
 }
 
 #[derive(Accounts)]
-#[instruction(chain_id: u64, multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(chain_id: u64, multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct Initialize<'info> {
     #[account(
         init,
-        seeds = [CONFIG_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SEED, multisig_id.as_ref()],
         bump,
         space = ANCHOR_DISCRIMINATOR + config::MultisigConfig::INIT_SPACE,
         payer = authority,
@@ -206,7 +206,7 @@ pub struct Initialize<'info> {
 
     #[account(
         init,
-        seeds = [ROOT_METADATA_SEED, multisig_name.as_ref()],
+        seeds = [ROOT_METADATA_SEED, multisig_id.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + RootMetadata::INIT_SPACE
@@ -215,7 +215,7 @@ pub struct Initialize<'info> {
 
     #[account(
         init,
-        seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_name.as_ref()],
+        seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_id.as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + ExpiringRootAndOpCount::INIT_SPACE,
@@ -224,9 +224,9 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct TransferOwnership<'info> {
-    #[account(mut, seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub config: Account<'info, config::MultisigConfig>,
 
     #[account(address = config.owner @ AuthError::Unauthorized)]
@@ -234,9 +234,9 @@ pub struct TransferOwnership<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct AcceptOwnership<'info> {
-    #[account(mut, seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub config: Account<'info, config::MultisigConfig>,
 
     #[account(address = config.proposed_owner @ AuthError::Unauthorized)]
