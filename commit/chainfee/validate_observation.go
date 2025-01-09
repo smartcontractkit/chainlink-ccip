@@ -110,14 +110,14 @@ func validateObservedChains(
 
 func areMapKeysEqual[T, T1 comparable](map1 map[ccipocr3.ChainSelector]T, map2 map[ccipocr3.ChainSelector]T1) bool {
 	if len(map1) != len(map2) {
-		return false // Maps have different number of keys
+		return false
 	}
 
 	for key := range map1 {
 		if _, exists := map2[key]; !exists {
-			return false // Key in map1 doesn't exist in map2
+			return false
 		}
 	}
 
-	return true // All keys in map1 exist in map2
+	return true
 }
