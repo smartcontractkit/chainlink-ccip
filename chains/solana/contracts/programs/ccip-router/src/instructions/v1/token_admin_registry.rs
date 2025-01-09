@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use bytemuck::Zeroable;
 use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
 use crate::{
@@ -10,6 +9,8 @@ use crate::{
     SetPoolTokenAdminRegistry, CCIP_TOKENPOOL_CONFIG, CCIP_TOKENPOOL_SIGNER,
     FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
 };
+
+const MINIMUM_TOKEN_POOL_ACCOUNTS: usize = 9;
 
 pub fn register_token_admin_registry_via_get_ccip_admin(
     ctx: Context<RegisterTokenAdminRegistryViaGetCCIPAdmin>,
@@ -78,14 +79,15 @@ pub fn set_pool(
     }
 
     // validate lookup table contains minimum required accounts if not zero address
-    if new_pool != Pubkey::zeroed() {
+    if new_pool != Pubkey::default() {
         // deserialize lookup table account
         let lookup_table_data = &mut &ctx.accounts.pool_lookuptable.data.borrow()[..];
         let lookup_table_account: AddressLookupTable =
             AddressLookupTable::deserialize(lookup_table_data)
                 .map_err(|_| CcipRouterError::InvalidInputsLookupTableAccounts)?;
-        require!(
-            lookup_table_account.addresses.len() >= 9,
+        require_gte!(
+            lookup_table_account.addresses.len(),
+            MINIMUM_TOKEN_POOL_ACCOUNTS,
             CcipRouterError::InvalidInputsLookupTableAccounts
         );
 
@@ -128,8 +130,9 @@ pub fn set_pool(
                 sol_log(&acc.to_string());
                 sol_log(&lookup_table_account.addresses[i].to_string());
             }
-            require!(
-                lookup_table_account.addresses[i] == *acc,
+            require_eq!(
+                lookup_table_account.addresses[i],
+                *acc,
                 CcipRouterError::InvalidInputsLookupTableAccounts
             );
         }
