@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::get_associated_token_address_with_program_id;
-use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint};
 use anchor_spl::token_interface::TokenAccount;
 use solana_program::{
@@ -108,17 +107,8 @@ pub fn validate_and_parse_token_accounts<'info>(
             CcipRouterError::InvalidInputsPoolAccounts
         );
 
-        let (expected_fee_token_config, _) = Pubkey::find_program_address(
-            &[
-                FEE_BILLING_TOKEN_CONFIG,
-                if mint.key() == Pubkey::default() {
-                    native_mint::ID.as_ref() // pre-2022 WSOL
-                } else {
-                    mint.key.as_ref()
-                },
-            ],
-            &router,
-        );
+        let (expected_fee_token_config, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()], &router);
         require!(
             fee_token_config.key() == expected_fee_token_config,
             CcipRouterError::InvalidInputsConfigAccounts
@@ -188,29 +178,46 @@ pub fn validate_and_parse_token_accounts<'info>(
                 .map_err(|_| CcipRouterError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (8)
+        // base set of constant accounts (9)
         // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
-        let mut expected_entries = vec![
-            lookup_table.key(),
-            token_admin_registry.key(),
-            pool_program.key(),
-            pool_config.key(),
-            pool_token_account.key(),
-            pool_signer.key(),
-            token_program.key(),
-            mint.key(),
-            fee_token_config.key(),
+        let required_entries = [
+            lookup_table,
+            token_admin_registry,
+            pool_program,
+            pool_config,
+            pool_token_account,
+            pool_signer,
+            token_program,
+            mint,
+            fee_token_config,
         ];
-        let mut remaining_keys: Vec<Pubkey> = remaining_accounts.iter().map(|x| x.key()).collect();
-        expected_entries.append(&mut remaining_keys);
-        require!(
-            lookup_table_account.addresses.len() == expected_entries.len(),
-            CcipRouterError::InvalidInputsLookupTableAccounts
-        );
-        require!(
-            lookup_table_account.addresses.as_ref() == expected_entries,
-            CcipRouterError::InvalidInputsLookupTableAccounts
-        );
+        {
+            // validate pool addresses
+            let mut expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
+            let mut remaining_keys: Vec<Pubkey> =
+                remaining_accounts.iter().map(|x| x.key()).collect();
+            expected_keys.append(&mut remaining_keys);
+            require!(
+                lookup_table_account.addresses.as_ref() == expected_keys,
+                CcipRouterError::InvalidInputsLookupTableAccounts
+            );
+        }
+        {
+            // validate pool address writable
+            // token admin registry contains an array (binary) of indexes that are writable
+            // check that the writability of the passed accounts match the writable configuration (using indexes)
+            let mut expected_is_writable: Vec<bool> =
+                required_entries.iter().map(|x| x.is_writable).collect();
+            let mut remaining_is_writable: Vec<bool> =
+                remaining_accounts.iter().map(|x| x.is_writable).collect();
+            expected_is_writable.append(&mut remaining_is_writable);
+            for (i, is_writable) in expected_is_writable.iter().enumerate() {
+                require!(
+                    token_admin_registry_account.is_writable(i as u8) == *is_writable,
+                    CcipRouterError::InvalidInputsLookupTableAccountWritable
+                );
+            }
+        }
     }
 
     Ok(TokenAccounts {

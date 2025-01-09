@@ -202,6 +202,7 @@ var (
 	// * `ctx` - The context containing the accounts required for setting the pool.
 	// * `mint` - The public key of the token mint.
 	// * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
+	// * `is_writable` - index of account in lookup table that is writable
 	Instruction_SetPool = ag_binary.TypeID([8]byte{119, 30, 14, 180, 115, 225, 167, 238})
 
 	// Transfers the admin role of the token admin registry to a new admin.

@@ -1946,6 +1946,7 @@ const (
 	InvalidInputsConfigAccounts_CcipRouterError
 	InvalidInputsTokenAdminRegistryAccounts_CcipRouterError
 	InvalidInputsLookupTableAccounts_CcipRouterError
+	InvalidInputsLookupTableAccountWritable_CcipRouterError
 	InvalidInputsTokenAmount_CcipRouterError
 	OfframpReleaseMintBalanceMismatch_CcipRouterError
 	OfframpInvalidDataLength_CcipRouterError
@@ -2003,6 +2004,8 @@ func (value CcipRouterError) String() string {
 		return "InvalidInputsTokenAdminRegistryAccounts"
 	case InvalidInputsLookupTableAccounts_CcipRouterError:
 		return "InvalidInputsLookupTableAccounts"
+	case InvalidInputsLookupTableAccountWritable_CcipRouterError:
+		return "InvalidInputsLookupTableAccountWritable"
 	case InvalidInputsTokenAmount_CcipRouterError:
 		return "InvalidInputsTokenAmount"
 	case OfframpReleaseMintBalanceMismatch_CcipRouterError:
