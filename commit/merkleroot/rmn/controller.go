@@ -169,7 +169,7 @@ func (c *controller) ComputeReportSignatures(
 		return nil, fmt.Errorf("process update requests: %w", err)
 	}
 
-	homeFMap, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
+	homeFMap, err := c.rmnHomeReader.GetFObserve(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
 		return nil, fmt.Errorf("get home F: %w", err)
 	}
@@ -625,7 +625,7 @@ func (c *controller) getRmnReportSignatures(
 	// At this point it is also possible that the signed observations contain
 	// different roots for the same source chain and interval.
 
-	homeChainF, err := c.rmnHomeReader.GetF(rmnRemoteCfg.ConfigDigest)
+	homeChainF, err := c.rmnHomeReader.GetFObserve(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
 		return nil, fmt.Errorf("get home reader F: %w", err)
 	}
@@ -685,7 +685,7 @@ func (c *controller) getRmnReportSignatures(
 		},
 		AttributedSignedObservations: transformAndSortObservations(rmnSignedObservations),
 	}
-	remoteF := int(rmnRemoteCfg.F)
+	remoteF := int(rmnRemoteCfg.FSign)
 	signers := rmnRemoteCfg.Signers
 	requestIDs, signersRequested, err := c.sendReportSignatureRequest(
 		reportSigReq,

@@ -399,22 +399,26 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
-) ([]cciptypes.SeqNum, error) {
+) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	cfgs, err := r.getOffRampSourceChainsConfig(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
 
-	res := make([]cciptypes.SeqNum, 0, len(chains))
+	res := make(map[cciptypes.ChainSelector]cciptypes.SeqNum, len(chains))
 	for _, chain := range chains {
 		cfg, exists := cfgs[chain]
 		if !exists {
-			return nil, fmt.Errorf("source chain config not found for chain %d", chain)
+			r.lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
+			continue
 		}
+
 		if cfg.MinSeqNr == 0 {
-			return nil, fmt.Errorf("minSeqNr not found for chain %d", chain)
+			r.lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
+			continue
 		}
-		res = append(res, cciptypes.SeqNum(cfg.MinSeqNr))
+
+		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
 	}
 
 	return res, err
@@ -698,7 +702,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 		ContractAddress:  rmnRemoteAddress,
 		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
 		Signers:          signers,
-		F:                vc.Config.F,
+		FSign:            vc.Config.F,
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
@@ -1067,7 +1071,7 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 }
 
 // getOffRampSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source
-// chain.
+// chain. If some chain is disabled it is not included in the response.
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
@@ -1141,7 +1145,6 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
 	var resp selectorsAndConfigs
-	//var resp map[string]any
 	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -1197,13 +1200,6 @@ type offRampDynamicChainConfig struct {
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
 	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
 	MessageInterceptor                      []byte `json:"messageInterceptor"`
-}
-
-//nolint:unused // it will be used soon // TODO: Remove nolint
-type offRampDestChainConfig struct {
-	SequenceNumber   uint64 `json:"sequenceNumber"`
-	AllowListEnabled bool   `json:"allowListEnabled"`
-	Router           []byte `json:"router"`
 }
 
 // getData returns data for a single reader.

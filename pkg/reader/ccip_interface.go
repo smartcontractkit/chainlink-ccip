@@ -108,7 +108,8 @@ type CCIPReader interface {
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
-	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
+	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (
+		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
