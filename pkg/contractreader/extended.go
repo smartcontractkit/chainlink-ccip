@@ -107,14 +107,13 @@ func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended
 	if ecr, ok := baseContractReader.(Extended); ok {
 		return ecr
 	}
-	// so far this is the only contract that allows multiple bindings
-	// if more contracts are added, this should be moved to a config
-	multiBindAllowed := map[string]bool{consts.ContractNamePriceAggregator: true}
 	return &extendedContractReader{
 		reader:                 baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
-		multiBindAllowed:       multiBindAllowed,
-		mu:                     &sync.RWMutex{},
+		// so far this is the only contract that allows multiple bindings
+		// if more contracts are added, this should be moved to a config
+		multiBindAllowed: map[string]bool{consts.ContractNamePriceAggregator: true},
+		mu:               &sync.RWMutex{},
 	}
 }
 
