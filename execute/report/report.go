@@ -191,6 +191,7 @@ func CheckAlreadyExecuted() Check {
 	}
 }
 
+// CheckTokenData rejects messages which are missing their token data (attestations, i.e. CCTP).
 func CheckTokenData() Check {
 	return func(lggr logger.Logger, msg ccipocr3.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
 		if idx >= len(report.MessageTokenData) {
@@ -294,6 +295,7 @@ func CheckNonces(sendersNonce map[cciptypes.ChainSelector]map[string]uint64) Che
 	}
 }
 
+// checkMessage for execution readiness.
 func (b *execReportBuilder) checkMessage(
 	_ context.Context, idx int, execReport exectypes.CommitData,
 ) (exectypes.CommitData, messageStatus, error) {
@@ -322,64 +324,7 @@ func (b *execReportBuilder) checkMessage(
 	return result, ReadyToExecute, nil
 }
 
-/*
-func (b *execReportBuilder) checkMessageNonce(
-	msg cciptypes.Message,
-	execReport exectypes.CommitData,
-) messageStatus {
-	if msg.Header.Nonce != 0 {
-		// Sequenced messages have non-zero nonces.
-
-		if _, ok := b.sendersNonce[execReport.SourceChain]; !ok {
-			b.lggr.Errorw("Skipping message - nonces not available for chain",
-				"messageID", msg.Header.MessageID,
-				"sourceChain", execReport.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"messageState", MissingNoncesForChain)
-			return MissingNoncesForChain
-		}
-
-		chainNonces := b.sendersNonce[execReport.SourceChain]
-		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
-		if _, ok := chainNonces[sender]; !ok {
-			b.lggr.Errorw("Skipping message - missing nonce",
-				"messageID", msg.Header.MessageID,
-				"sourceChain", execReport.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"messageState", MissingNonce)
-			return MissingNonce
-		}
-
-		if b.expectedNonce == nil {
-			// initialize expected nonce if needed.
-			b.expectedNonce = make(map[cciptypes.ChainSelector]map[string]uint64)
-		}
-		if _, ok := b.expectedNonce[execReport.SourceChain]; !ok {
-			// initialize expected nonce if needed.
-			b.expectedNonce[execReport.SourceChain] = make(map[string]uint64)
-		}
-		if _, ok := b.expectedNonce[execReport.SourceChain][sender]; !ok {
-			b.expectedNonce[execReport.SourceChain][sender] = chainNonces[sender] + 1
-		}
-
-		// Check expected nonce is valid for sequenced messages.
-		if msg.Header.Nonce != b.expectedNonce[execReport.SourceChain][sender] {
-			b.lggr.Warnw("Skipping message - invalid nonce",
-				"messageID", msg.Header.MessageID,
-				"sourceChain", execReport.SourceChain,
-				"seqNum", msg.Header.SequenceNumber,
-				"have", msg.Header.Nonce,
-				"want", b.expectedNonce[execReport.SourceChain][sender],
-				"messageState", InvalidNonce)
-			return InvalidNonce
-		}
-		b.expectedNonce[execReport.SourceChain][sender] = b.expectedNonce[execReport.SourceChain][sender] + 1
-	}
-
-	return ""
-}
-*/
-
+// verifyReport is a final step to ensure the encoded message meets our exec criteria.
 func (b *execReportBuilder) verifyReport(
 	ctx context.Context,
 	execReport cciptypes.ExecutePluginReportSingleChain,

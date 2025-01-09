@@ -18,21 +18,25 @@ type ExecReportBuilder interface {
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
+// Option that can be passed to the builder.
 type Option func(erb *execReportBuilder)
 
+// WithMaxGas limits how much gas can be used during execution.
 func WithMaxGas(maxGas uint64) func(*execReportBuilder) {
 	return func(erb *execReportBuilder) {
 		erb.maxGas = maxGas
 	}
 }
 
+// WithMaxReportSizeBytes configures the maximum report size.
 func WithMaxReportSizeBytes(maxReportSizeBytes uint64) Option {
 	return func(erb *execReportBuilder) {
 		erb.maxReportSizeBytes = maxReportSizeBytes
 	}
 }
 
-func MaxMessages(maxMessages uint64) Option {
+// WithMaxMessages configures the number of messages allowed to be in a report.
+func WithMaxMessages(maxMessages uint64) Option {
 	return func(erb *execReportBuilder) {
 		erb.maxMessages = maxMessages
 		panic("not implemented")
@@ -62,13 +66,11 @@ func newBuilderInternal(
 	}
 
 	builder := &execReportBuilder{
-		lggr: logger,
-
-		checks:           defaultChecks,
-		encoder:          encoder,
-		hasher:           hasher,
-		estimateProvider: estimateProvider,
-
+		lggr:              logger,
+		checks:            defaultChecks,
+		encoder:           encoder,
+		hasher:            hasher,
+		estimateProvider:  estimateProvider,
 		destChainSelector: destChainSelector,
 	}
 
@@ -81,6 +83,7 @@ func newBuilderInternal(
 	return builder
 }
 
+// NewBuilder constructs the report builder.
 func NewBuilder(
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
@@ -127,6 +130,9 @@ type execReportBuilder struct {
 	execReports []cciptypes.ExecutePluginReportSingleChain
 }
 
+// Add an exec report for as many messages as possible in the given commit report.
+// The commit report with updated metadata is returned, it reflects which messages
+// were selected for the exec report.
 func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,

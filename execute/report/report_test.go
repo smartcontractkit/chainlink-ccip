@@ -970,9 +970,6 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 }
 
 func Test_execReportBuilder_checkMessage(t *testing.T) {
-	type fields struct {
-		accumulated validationMetadata
-	}
 	type args struct {
 		idx        int
 		nonces     map[cciptypes.ChainSelector]map[string]uint64
@@ -980,7 +977,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 	}
 	tests := []struct {
 		name             string
-		fields           fields
 		args             args
 		expectedData     exectypes.CommitData
 		expectedStatus   messageStatus
