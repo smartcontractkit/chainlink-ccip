@@ -186,12 +186,8 @@ fn token_network_fees(
         _ => Usd18Decimals::ZERO,
     };
 
-    let min_fee = dbg!(Usd18Decimals::from_usd_cents(
-        config_for_dest_chain.billing.min_fee_usdcents
-    ));
-    let max_fee = dbg!(Usd18Decimals::from_usd_cents(
-        config_for_dest_chain.billing.max_fee_usdcents
-    ));
+    let min_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.min_fee_usdcents);
+    let max_fee = Usd18Decimals::from_usd_cents(config_for_dest_chain.billing.max_fee_usdcents);
     let (premium, token_transfer_gas, token_transfer_bytes_overhead) = (
         bps_fee.clamp(min_fee, max_fee),
         U256::new(config_for_dest_chain.billing.dest_gas_overhead.into()),
