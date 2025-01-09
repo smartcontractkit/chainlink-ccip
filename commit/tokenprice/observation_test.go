@@ -54,7 +54,9 @@ func Test_Observation(t *testing.T) {
 
 				tokenPriceReader := readerpkg_mock.NewMockPriceReader(t)
 				tokenPriceReader.EXPECT().GetFeedPricesUSD(mock.Anything, []cciptypes.UnknownEncodedAddress{tokenA, tokenB}).
-					Return([]*big.Int{bi100, bi200}, nil)
+					Return(map[cciptypes.UnknownEncodedAddress]*big.Int{
+						tokenA: bi100,
+						tokenB: bi200}, nil)
 
 				tokenPriceReader.EXPECT().GetFeeQuoterTokenUpdates(mock.Anything, mock.Anything, mock.Anything).Return(
 					map[cciptypes.UnknownEncodedAddress]plugintypes.TimestampedBig{
