@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::ocr3base::Ocr3Config;
+use crate::{
+    valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG, MAX_TOKEN_AND_CHAIN_CONFIG_V,
+    TOKEN_POOL_BILLING_SEED,
+};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -25,6 +28,37 @@ pub struct Config {
 
     // TODO: billing global configs'
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+pub struct Ocr3ConfigInfo {
+    pub config_digest: [u8; 32], // 32-byte hash of configuration
+    pub f: u8,                   // f+1 = number of signatures per report
+    pub n: u8,                   // number of signers
+    pub is_signature_verification_enabled: u8, // bool -> bytemuck::Pod compliant required for zero_copy
+}
+
+// TODO: do we need to verify signers and transmitters are different? (between the two groups)
+// signers: pubkey is 20-byte address, secp256k1 curve ECDSA
+// transmitters: 32-byte pubkey, ed25519
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+pub struct Ocr3Config {
+    pub plugin_type: u8, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
+    pub config_info: Ocr3ConfigInfo,
+    pub signers: [[u8; 20]; 16], // v0.29.0 - anchor IDL does not build with MAX_SIGNERS
+    pub transmitters: [[u8; 32]; 16], // v0.29.0 - anchor IDL does not build with MAX_TRANSMITTERS
+}
+
+impl Ocr3Config {
+    pub fn new(plugin_type: u8) -> Self {
+        Self {
+            plugin_type,
+            ..Default::default()
+        }
+    }
 }
 
 #[account]
@@ -170,7 +204,7 @@ impl TryFrom<u128> for MessageExecutionState {
 }
 
 #[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, Debug)]
 pub struct PerChainPerTokenConfig {
     pub version: u8,         // schema version
     pub chain_selector: u64, // remote chain
@@ -179,7 +213,31 @@ pub struct PerChainPerTokenConfig {
     pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+impl PerChainPerTokenConfig {
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+        dest_chain_selector: u64,
+    ) -> Result<Self> {
+        let (expected, _) = Pubkey::find_program_address(
+            &[
+                TOKEN_POOL_BILLING_SEED,
+                dest_chain_selector.to_le_bytes().as_ref(),
+                token.key().as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+        require!(
+            valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(account.into_inner())
+    }
+}
+
+#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenBilling {
     pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
     pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
@@ -210,6 +268,29 @@ pub struct BillingTokenConfig {
     pub usd_per_token: TimestampedPackedU224,
     // billing configs
     pub premium_multiplier_wei_per_eth: u64,
+}
+
+impl BillingTokenConfig {
+    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
+    // specifying a token that has no Billing config.
+    pub fn validated_try_from<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+    ) -> Result<Option<Self>> {
+        if account.key() == Pubkey::default() {
+            return Ok(None);
+        }
+
+        let (expected, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
+        require!(
+            valid_version(account.version, 1),
+            CcipRouterError::InvalidInputs
+        );
+        Ok(Some(account.into_inner().config))
+    }
 }
 
 #[account]
