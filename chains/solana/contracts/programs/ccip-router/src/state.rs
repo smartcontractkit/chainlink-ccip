@@ -154,33 +154,6 @@ pub struct CommitReport {
     pub execution_states: u128,
 }
 
-impl CommitReport {
-    pub fn set_state(&mut self, sequence_number: u64, execution_state: MessageExecutionState) {
-        let packed = &mut self.execution_states;
-        let dif = sequence_number.checked_sub(self.min_msg_nr);
-        assert!(dif.is_some(), "Sequence number out of bounds");
-        let i = dif.unwrap();
-        assert!(i < 64, "Sequence number out of bounds");
-
-        // Clear the 2 bits at position 'i'
-        *packed &= !(0b11 << (i * 2));
-        // Set the new value in the cleared bits
-        *packed |= (execution_state as u128) << (i * 2);
-    }
-
-    pub fn get_state(&self, sequence_number: u64) -> MessageExecutionState {
-        let packed = self.execution_states;
-        let dif = sequence_number.checked_sub(self.min_msg_nr);
-        assert!(dif.is_some(), "Sequence number out of bounds");
-        let i = dif.unwrap();
-        assert!(i < 64, "Sequence number out of bounds");
-
-        let mask = 0b11 << (i * 2);
-        let state = (packed & mask) >> (i * 2);
-        MessageExecutionState::try_from(state).unwrap()
-    }
-}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
 pub enum MessageExecutionState {
     Untouched = 0,
@@ -333,101 +306,6 @@ pub struct UnpackedDoubleU224 {
 mod tests {
     use super::*;
     use std::convert::TryFrom;
-
-    #[test]
-    fn test_set_state() {
-        let mut commit_report = CommitReport {
-            version: 1,
-            chain_selector: 0,
-            merkle_root: [0; 32],
-            timestamp: 0,
-            min_msg_nr: 0,
-            max_msg_nr: 64,
-            execution_states: 0,
-        };
-
-        commit_report.set_state(0, MessageExecutionState::Success);
-        assert_eq!(commit_report.get_state(0), MessageExecutionState::Success);
-
-        commit_report.set_state(1, MessageExecutionState::Failure);
-        assert_eq!(commit_report.get_state(1), MessageExecutionState::Failure);
-
-        commit_report.set_state(2, MessageExecutionState::Untouched);
-        assert_eq!(commit_report.get_state(2), MessageExecutionState::Untouched);
-
-        commit_report.set_state(3, MessageExecutionState::InProgress);
-        assert_eq!(
-            commit_report.get_state(3),
-            MessageExecutionState::InProgress
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "Sequence number out of bounds")]
-    fn test_set_state_out_of_bounds() {
-        let mut commit_report = CommitReport {
-            version: 1,
-            chain_selector: 1,
-            merkle_root: [0; 32],
-            timestamp: 1,
-            min_msg_nr: 1500,
-            max_msg_nr: 1530,
-            execution_states: 0,
-        };
-
-        commit_report.set_state(65, MessageExecutionState::Success);
-    }
-
-    #[test]
-    fn test_get_state() {
-        let mut commit_report = CommitReport {
-            version: 1,
-            chain_selector: 1,
-            merkle_root: [0; 32],
-            timestamp: 1,
-            min_msg_nr: 1500,
-            max_msg_nr: 1530,
-            execution_states: 0,
-        };
-
-        commit_report.set_state(1501, MessageExecutionState::Success);
-        commit_report.set_state(1505, MessageExecutionState::Failure);
-        commit_report.set_state(1520, MessageExecutionState::Untouched);
-        commit_report.set_state(1523, MessageExecutionState::InProgress);
-
-        assert_eq!(
-            commit_report.get_state(1501),
-            MessageExecutionState::Success
-        );
-        assert_eq!(
-            commit_report.get_state(1505),
-            MessageExecutionState::Failure
-        );
-        assert_eq!(
-            commit_report.get_state(1520),
-            MessageExecutionState::Untouched
-        );
-        assert_eq!(
-            commit_report.get_state(1523),
-            MessageExecutionState::InProgress
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "Sequence number out of bounds")]
-    fn test_get_state_out_of_bounds() {
-        let commit_report = CommitReport {
-            version: 1,
-            chain_selector: 1,
-            merkle_root: [0; 32],
-            timestamp: 1,
-            min_msg_nr: 1500,
-            max_msg_nr: 1530,
-            execution_states: 0,
-        };
-
-        commit_report.get_state(65);
-    }
 
     #[test]
     fn test_execution_state_try_from() {

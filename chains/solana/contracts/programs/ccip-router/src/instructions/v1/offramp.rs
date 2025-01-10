@@ -361,7 +361,7 @@ fn internal_execute<'info>(
         solana_chain_selector,
     )?;
 
-    let original_state = commit_report.get_state(message_header.sequence_number);
+    let original_state = commit_report_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
         emit!(SkippedAlreadyExecutedMessage {
@@ -509,7 +509,11 @@ fn internal_execute<'info>(
     }
 
     let new_state = MessageExecutionState::Success;
-    commit_report.set_state(message_header.sequence_number, new_state.to_owned());
+    commit_report_state::set(
+        commit_report,
+        message_header.sequence_number,
+        new_state.to_owned(),
+    );
 
     emit!(ExecutionStateChanged {
         source_chain_selector: message_header.source_chain_selector,
@@ -707,6 +711,124 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
     ]);
 
     result.to_bytes()
+}
+
+mod commit_report_state {
+    use crate::{CommitReport, MessageExecutionState};
+
+    pub fn set(
+        report: &mut CommitReport,
+        sequence_number: u64,
+        execution_state: MessageExecutionState,
+    ) {
+        let packed = &mut report.execution_states;
+        let dif = sequence_number.checked_sub(report.min_msg_nr);
+        assert!(dif.is_some(), "Sequence number out of bounds");
+        let i = dif.unwrap();
+        assert!(i < 64, "Sequence number out of bounds");
+
+        // Clear the 2 bits at position 'i'
+        *packed &= !(0b11 << (i * 2));
+        // Set the new value in the cleared bits
+        *packed |= (execution_state as u128) << (i * 2);
+    }
+
+    pub fn get(report: &CommitReport, sequence_number: u64) -> MessageExecutionState {
+        let packed = report.execution_states;
+        let dif = sequence_number.checked_sub(report.min_msg_nr);
+        assert!(dif.is_some(), "Sequence number out of bounds");
+        let i = dif.unwrap();
+        assert!(i < 64, "Sequence number out of bounds");
+
+        let mask = 0b11 << (i * 2);
+        let state = (packed & mask) >> (i * 2);
+        MessageExecutionState::try_from(state).unwrap()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_set_state() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 0,
+                merkle_root: [0; 32],
+                timestamp: 0,
+                min_msg_nr: 0,
+                max_msg_nr: 64,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 0, MessageExecutionState::Success);
+            assert_eq!(get(&commit_report, 0), MessageExecutionState::Success);
+
+            set(&mut commit_report, 1, MessageExecutionState::Failure);
+            assert_eq!(get(&commit_report, 1), MessageExecutionState::Failure);
+
+            set(&mut commit_report, 2, MessageExecutionState::Untouched);
+            assert_eq!(get(&commit_report, 2), MessageExecutionState::Untouched);
+
+            set(&mut commit_report, 3, MessageExecutionState::InProgress);
+            assert_eq!(get(&commit_report, 3), MessageExecutionState::InProgress);
+        }
+
+        #[test]
+        #[should_panic(expected = "Sequence number out of bounds")]
+        fn test_set_state_out_of_bounds() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 65, MessageExecutionState::Success);
+        }
+
+        #[test]
+        fn test_get_state() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 1501, MessageExecutionState::Success);
+            set(&mut commit_report, 1505, MessageExecutionState::Failure);
+            set(&mut commit_report, 1520, MessageExecutionState::Untouched);
+            set(&mut commit_report, 1523, MessageExecutionState::InProgress);
+
+            assert_eq!(get(&commit_report, 1501), MessageExecutionState::Success);
+            assert_eq!(get(&commit_report, 1505), MessageExecutionState::Failure);
+            assert_eq!(get(&commit_report, 1520), MessageExecutionState::Untouched);
+            assert_eq!(get(&commit_report, 1523), MessageExecutionState::InProgress);
+        }
+
+        #[test]
+        #[should_panic(expected = "Sequence number out of bounds")]
+        fn test_get_state_out_of_bounds() {
+            let commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            get(&commit_report, 65);
+        }
+    }
 }
 
 #[cfg(test)]
