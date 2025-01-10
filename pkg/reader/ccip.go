@@ -1060,7 +1060,7 @@ type sourceChainConfig struct {
 	Router    []byte // local router
 	IsEnabled bool
 	MinSeqNr  uint64
-	OnRamp    []byte
+	OnRamp    UnknownAddress
 }
 
 func (scc sourceChainConfig) check() (bool /* enabled */, error) {
