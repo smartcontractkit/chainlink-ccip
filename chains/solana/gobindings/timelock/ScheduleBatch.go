@@ -12,8 +12,9 @@ import (
 
 // ScheduleBatch is the `scheduleBatch` instruction.
 type ScheduleBatch struct {
-	Id    *[32]uint8
-	Delay *uint64
+	TimelockId *[32]uint8
+	Id         *[32]uint8
+	Delay      *uint64
 
 	// [0] = [WRITE] operation
 	//
@@ -31,6 +32,12 @@ func NewScheduleBatchInstructionBuilder() *ScheduleBatch {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *ScheduleBatch) SetTimelockId(timelockId [32]uint8) *ScheduleBatch {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -109,6 +116,9 @@ func (inst ScheduleBatch) ValidateAndBuild() (*Instruction, error) {
 func (inst *ScheduleBatch) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -144,9 +154,10 @@ func (inst *ScheduleBatch) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("   Id", *inst.Id))
-						paramsBranch.Child(ag_format.Param("Delay", *inst.Delay))
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
+						paramsBranch.Child(ag_format.Param("     Delay", *inst.Delay))
 					})
 
 					// Accounts of the instruction:
@@ -161,6 +172,11 @@ func (inst *ScheduleBatch) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj ScheduleBatch) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -174,6 +190,11 @@ func (obj ScheduleBatch) MarshalWithEncoder(encoder *ag_binary.Encoder) (err err
 	return nil
 }
 func (obj *ScheduleBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -190,6 +211,7 @@ func (obj *ScheduleBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 // NewScheduleBatchInstruction declares a new ScheduleBatch instruction with the provided parameters and accounts.
 func NewScheduleBatchInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	delay uint64,
 	// Accounts:
@@ -198,6 +220,7 @@ func NewScheduleBatchInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ScheduleBatch {
 	return NewScheduleBatchInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetDelay(delay).
 		SetOperationAccount(operation).

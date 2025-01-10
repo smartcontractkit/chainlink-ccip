@@ -648,12 +648,18 @@
         "",
         "* `ctx` - The context containing the accounts required for setting the pool.",
         "* `mint` - The public key of the token mint.",
-        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool."
+        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.",
+        "* `is_writable` - index of account in lookup table that is writable"
       ],
       "accounts": [
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolLookuptable",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -668,8 +674,8 @@
           "type": "publicKey"
         },
         {
-          "name": "poolLookupTable",
-          "type": "publicKey"
+          "name": "writableIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1746,6 +1752,15 @@
           {
             "name": "lookupTable",
             "type": "publicKey"
+          },
+          {
+            "name": "writableIndexes",
+            "type": {
+              "array": [
+                "u128",
+                2
+              ]
+            }
           }
         ]
       }
@@ -1975,6 +1990,28 @@
           {
             "name": "destinationAmount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReportContext",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "byteWords",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                3
+              ]
+            }
           }
         ]
       }
@@ -2377,23 +2414,30 @@
       }
     },
     {
-      "name": "ReportContext",
+      "name": "Ocr3ConfigInfo",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "byteWords",
+            "name": "configDigest",
             "type": {
               "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                3
+                "u8",
+                32
               ]
             }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "n",
+            "type": "u8"
+          },
+          {
+            "name": "isSignatureVerificationEnabled",
+            "type": "u8"
           }
         ]
       }
@@ -2440,35 +2484,6 @@
                 16
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Ocr3ConfigInfo",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "configDigest",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "f",
-            "type": "u8"
-          },
-          {
-            "name": "n",
-            "type": "u8"
-          },
-          {
-            "name": "isSignatureVerificationEnabled",
-            "type": "u8"
           }
         ]
       }
@@ -2807,6 +2822,9 @@
           },
           {
             "name": "InvalidInputsLookupTableAccounts"
+          },
+          {
+            "name": "InvalidInputsLookupTableAccountWritable"
           },
           {
             "name": "InvalidInputsTokenAmount"
@@ -3248,6 +3266,36 @@
         },
         {
           "name": "administrator",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
           "type": "publicKey",
           "index": false
         }

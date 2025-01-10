@@ -12,6 +12,7 @@ import (
 
 // TransferOwnership is the `transferOwnership` instruction.
 type TransferOwnership struct {
+	TimelockId    *[32]uint8
 	ProposedOwner *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
@@ -26,6 +27,12 @@ func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *TransferOwnership) SetTimelockId(timelockId [32]uint8) *TransferOwnership {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetProposedOwner sets the "proposedOwner" parameter.
@@ -76,6 +83,9 @@ func (inst TransferOwnership) ValidateAndBuild() (*Instruction, error) {
 func (inst *TransferOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.ProposedOwner == nil {
 			return errors.New("ProposedOwner parameter is not set")
 		}
@@ -102,7 +112,8 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("   TimelockId", *inst.TimelockId))
 						paramsBranch.Child(ag_format.Param("ProposedOwner", *inst.ProposedOwner))
 					})
 
@@ -116,6 +127,11 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `ProposedOwner` param:
 	err = encoder.Encode(obj.ProposedOwner)
 	if err != nil {
@@ -124,6 +140,11 @@ func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `ProposedOwner`:
 	err = decoder.Decode(&obj.ProposedOwner)
 	if err != nil {
@@ -135,11 +156,13 @@ func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewTransferOwnershipInstruction declares a new TransferOwnership instruction with the provided parameters and accounts.
 func NewTransferOwnershipInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	proposedOwner ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferOwnership {
 	return NewTransferOwnershipInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetProposedOwner(proposedOwner).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
