@@ -38,7 +38,7 @@ lint-go-fix:
 
 .PHONY: anchor-go-gen
 anchor-go-gen:
-	cd ./contracts && rm -rf ./target && anchor build && cd .. && ./scripts/anchor-go-gen.sh
+	make build-contracts && ./scripts/anchor-go-gen.sh
 
 .PHONY: format
 format:
@@ -50,7 +50,7 @@ go-tests:
 
 .PHONY: build-contracts
 build-contracts:
-	cd ./contracts && anchor build
+	cd ./contracts && rm -rf ./target && anchor build && cd -
 
 .PHONY: solana-checks
 solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
