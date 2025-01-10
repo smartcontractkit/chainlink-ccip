@@ -445,6 +445,7 @@ func Test_Builder_Build(t *testing.T) {
 		nonces        map[cciptypes.ChainSelector]map[string]uint64
 		maxReportSize uint64
 		maxGasLimit   uint64
+		maxMessages   uint64
 	}
 	tests := []struct {
 		name                  string
@@ -724,6 +725,46 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecThings:    []int{8},
 			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102, 103, 104, 106, 107, 109},
 		},
+		{
+			name: "report num message limiting",
+			args: args{
+				maxReportSize: 10000000,
+				maxGasLimit:   10000000,
+				maxMessages:   3,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{3},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 101, 102},
+		},
+		{
+			name: "report and size limiting (skip over two large messages)",
+			args: args{
+				maxReportSize: 10000,
+				maxGasLimit:   10000000,
+				maxMessages:   3,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					setMessageData(1, 90000,
+						setMessageData(3, 90000,
+							makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+								sender,
+								cciptypes.Bytes32{},
+								nil))),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 1,
+			expectedExecThings:    []int{3},
+			lastReportExecuted:    []cciptypes.SeqNum{100, 102, 104},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -744,6 +785,7 @@ func Test_Builder_Build(t *testing.T) {
 				1,
 				WithMaxReportSizeBytes(tt.args.maxReportSize),
 				WithMaxGas(tt.args.maxGasLimit),
+				WithMaxMessages(tt.args.maxMessages),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
 			)
 

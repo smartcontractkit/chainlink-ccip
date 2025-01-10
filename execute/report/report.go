@@ -471,6 +471,11 @@ func (b *execReportBuilder) buildSingleChainReport(
 		} else if validReport {
 			finalReport = finalReport2
 			meta = meta2
+
+			// Stop searching if we reach the maximum number of messages.
+			if b.maxMessages > 0 && uint64(len(msgs)) >= b.maxMessages {
+				break
+			}
 		} else {
 			// this message didn't work, continue to the next one
 			delete(msgs, i)
