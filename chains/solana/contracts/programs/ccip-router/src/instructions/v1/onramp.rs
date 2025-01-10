@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
-use super::messages::{LockOrBurnInV1, LockOrBurnOutV1};
+use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
     validate_and_parse_token_accounts, TokenAccounts,

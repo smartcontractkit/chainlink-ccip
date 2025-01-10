@@ -11,7 +11,7 @@ use crate::{
     SolanaTokenAmount, UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
-use super::messages::validate_solana2any;
+use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
@@ -319,7 +319,7 @@ mod tests {
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
-    use super::super::onramp::tests::*;
+    use super::super::messages::ramps::tests::*;
     use super::*;
     use crate::{TimestampedPackedU224, TokenBilling};
 

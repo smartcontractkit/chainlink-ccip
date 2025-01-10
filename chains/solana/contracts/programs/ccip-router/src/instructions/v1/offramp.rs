@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
 use super::merkle::{calculate_merkle_root, MerkleError};
-use super::messages::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
+use super::messages::pools::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
 use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
