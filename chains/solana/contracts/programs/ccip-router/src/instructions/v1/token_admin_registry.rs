@@ -1,9 +1,14 @@
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use bytemuck::Zeroable;
+use solana_program::{address_lookup_table::state::AddressLookupTable, log::sol_log};
 
 use crate::{
     AcceptAdminRoleTokenAdminRegistry, AdministratorRegistered, AdministratorTransferRequested,
     AdministratorTransferred, CcipRouterError, ModifyTokenAdminRegistry, PoolSet,
     RegisterTokenAdminRegistryViaGetCCIPAdmin, RegisterTokenAdminRegistryViaOwner,
+    SetPoolTokenAdminRegistry, CCIP_TOKENPOOL_CONFIG, CCIP_TOKENPOOL_SIGNER,
+    FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
 };
 
 pub fn register_token_admin_registry_via_get_ccip_admin(
@@ -53,20 +58,87 @@ pub fn register_token_admin_registry_via_owner(
 }
 
 pub fn set_pool(
-    ctx: Context<ModifyTokenAdminRegistry>,
+    ctx: Context<SetPoolTokenAdminRegistry>,
     mint: Pubkey,
-    pool_lookup_table: Pubkey,
+    writable_indexes: Vec<u8>,
 ) -> Result<()> {
+    // set new lookup table
     let token_admin_registry = &mut ctx.accounts.token_admin_registry;
     let previous_pool = token_admin_registry.lookup_table;
-    token_admin_registry.lookup_table = pool_lookup_table;
+    let new_pool = ctx.accounts.pool_lookuptable.key();
+    token_admin_registry.lookup_table = new_pool;
 
-    // TODO: Validate here that the lookup table has everything
+    // set writable indexes
+    // used to build offchain tokenpool accounts in a transaction
+    // indexes can be checked to indicate is_writable for the specific account
+    // this is also used to validate to ensure the correct write permissions are used according the admin
+    token_admin_registry.reset_writable();
+    for ind in writable_indexes {
+        token_admin_registry.set_writable(ind)
+    }
+
+    // validate lookup table contains minimum required accounts if not zero address
+    if new_pool != Pubkey::zeroed() {
+        // deserialize lookup table account
+        let lookup_table_data = &mut &ctx.accounts.pool_lookuptable.data.borrow()[..];
+        let lookup_table_account: AddressLookupTable =
+            AddressLookupTable::deserialize(lookup_table_data)
+                .map_err(|_| CcipRouterError::InvalidInputsLookupTableAccounts)?;
+        require!(
+            lookup_table_account.addresses.len() >= 9,
+            CcipRouterError::InvalidInputsLookupTableAccounts
+        );
+
+        // calculate or retrieve expected addresses
+        let (token_admin_registry, _) = Pubkey::find_program_address(
+            &[TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+            ctx.program_id,
+        );
+        let pool_program = lookup_table_account.addresses[2]; // cannot be calculated, can be custom per pool
+        let token_program = lookup_table_account.addresses[6]; // cannot be calculated, can be custom per token
+        let (pool_config, _) =
+            Pubkey::find_program_address(&[CCIP_TOKENPOOL_CONFIG, mint.as_ref()], &pool_program);
+        let (pool_signer, _) =
+            Pubkey::find_program_address(&[CCIP_TOKENPOOL_SIGNER, mint.as_ref()], &pool_program);
+        let (fee_billing_config, _) = Pubkey::find_program_address(
+            &[FEE_BILLING_TOKEN_CONFIG, mint.as_ref()],
+            ctx.program_id,
+        );
+
+        let min_accounts = [
+            ctx.accounts.pool_lookuptable.key(),
+            token_admin_registry,
+            pool_program,
+            pool_config,
+            get_associated_token_address_with_program_id(
+                &pool_signer.key(),
+                &mint.key(),
+                &token_program.key(),
+            ),
+            pool_signer,
+            token_program,
+            mint,
+            fee_billing_config,
+        ];
+
+        for (i, acc) in min_accounts.iter().enumerate() {
+            // for easier debugging UX
+            if lookup_table_account.addresses[i] != *acc {
+                sol_log(&i.to_string());
+                sol_log(&acc.to_string());
+                sol_log(&lookup_table_account.addresses[i].to_string());
+            }
+            require!(
+                lookup_table_account.addresses[i] == *acc,
+                CcipRouterError::InvalidInputsLookupTableAccounts
+            );
+        }
+    }
 
     emit!(PoolSet {
         token: mint,
         previous_pool_lookup_table: previous_pool,
-        new_pool_lookup_table: pool_lookup_table,
+        new_pool_lookup_table: new_pool,
     });
 
     Ok(())
