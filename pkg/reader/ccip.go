@@ -705,7 +705,7 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 
 	return rmntypes.RemoteConfig{
 		ContractAddress:  rmnRemoteAddress,
-		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
+		ConfigDigest:     vc.Config.RMNHomeContractConfigDigest,
 		Signers:          signers,
 		FSign:            vc.Config.F,
 		ConfigVersion:    vc.Version,
