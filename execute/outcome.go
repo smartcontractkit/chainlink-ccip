@@ -182,10 +182,10 @@ func (p *Plugin) getFilterOutcome(
 		p.msgHasher,
 		p.reportCodec,
 		p.estimateProvider,
-		observation.Nonces,
 		p.destChain,
-		uint64(maxReportLength),
-		p.offchainCfg.BatchGasLimit,
+		report.WithMaxReportSizeBytes(maxReportLength),
+		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
+		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
 	)
 
 	outcomeReports, selectedReports, err := selectReport(
