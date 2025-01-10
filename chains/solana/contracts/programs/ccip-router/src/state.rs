@@ -149,28 +149,6 @@ pub struct CommitReport {
     pub execution_states: u128,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
-pub enum MessageExecutionState {
-    Untouched = 0,
-    InProgress = 1, // Not used in Solana, but used in EVM
-    Success = 2,
-    Failure = 3,
-}
-
-impl TryFrom<u128> for MessageExecutionState {
-    type Error = &'static str;
-
-    fn try_from(value: u128) -> std::result::Result<MessageExecutionState, &'static str> {
-        match value {
-            0 => Ok(MessageExecutionState::Untouched),
-            1 => Ok(MessageExecutionState::InProgress),
-            2 => Ok(MessageExecutionState::Success),
-            3 => Ok(MessageExecutionState::Failure),
-            _ => Err("Invalid ExecutionState"),
-        }
-    }
-}
-
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct PerChainPerTokenConfig {
@@ -248,6 +226,28 @@ impl TimestampedPackedU224 {
 pub struct UnpackedDoubleU224 {
     pub high: u128,
     pub low: u128,
+}
+
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
+pub enum MessageExecutionState {
+    Untouched = 0,
+    InProgress = 1, // Not used in Solana, but used in EVM
+    Success = 2,
+    Failure = 3,
+}
+
+impl TryFrom<u128> for MessageExecutionState {
+    type Error = &'static str;
+
+    fn try_from(value: u128) -> std::result::Result<MessageExecutionState, &'static str> {
+        match value {
+            0 => Ok(MessageExecutionState::Untouched),
+            1 => Ok(MessageExecutionState::InProgress),
+            2 => Ok(MessageExecutionState::Success),
+            3 => Ok(MessageExecutionState::Failure),
+            _ => Err("Invalid ExecutionState"),
+        }
+    }
 }
 
 #[cfg(test)]
