@@ -9,7 +9,7 @@ use crate::state::root::*;
 
 pub fn set_root(
     ctx: Context<SetRoot>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     root: [u8; 32],
     valid_until: u32,
     metadata: RootMetadataInput,
@@ -172,7 +172,7 @@ fn verify_ecdsa_signatures(
 
 pub fn init_signatures(
     ctx: Context<InitSignatures>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     _root: [u8; 32],
     _valid_until: u32,
     total_signatures: u8,
@@ -186,7 +186,7 @@ pub fn init_signatures(
 
 pub fn append_signatures(
     ctx: Context<AppendSignatures>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     _root: [u8; 32],
     _valid_until: u32,
     signatures_batch: Vec<Signature>,
@@ -207,7 +207,7 @@ pub fn append_signatures(
 
 pub fn clear_signatures(
     _ctx: Context<ClearSignatures>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     _root: [u8; 32],
     _valid_until: u32,
 ) -> Result<()> {
@@ -218,7 +218,7 @@ pub fn clear_signatures(
 
 pub fn finalize_signatures(
     ctx: Context<FinalizeSignatures>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     _root: [u8; 32],
     _valid_until: u32,
 ) -> Result<()> {
@@ -235,33 +235,33 @@ pub fn finalize_signatures(
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED], root: [u8; 32], valid_until: u32)]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED], root: [u8; 32], valid_until: u32)]
 pub struct SetRoot<'info> {
     #[account(
         mut,
-        seeds = [ROOT_SIGNATURES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
+        seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump,
         constraint = root_signatures.is_finalized @ McmError::SignaturesNotFinalized,
         close = authority
     )]
     pub root_signatures: Account<'info, RootSignatures>, // preloaded signatures account
 
-    #[account(mut, seeds = [ROOT_METADATA_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [ROOT_METADATA_SEED, multisig_id.as_ref()], bump)]
     pub root_metadata: Account<'info, RootMetadata>,
 
     #[account(
         init,
-        seeds = [SEEN_SIGNED_HASHES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
+        seeds = [SEEN_SIGNED_HASHES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump,
         payer = authority,
         space = ANCHOR_DISCRIMINATOR + SeenSignedHash::INIT_SPACE,
     )]
     pub seen_signed_hashes: Account<'info, SeenSignedHash>,
 
-    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_id.as_ref()], bump)]
     pub expiring_root_and_op_count: Account<'info, ExpiringRootAndOpCount>,
 
-    #[account(seeds = [CONFIG_SEED, multisig_name.as_ref()],bump)]
+    #[account(seeds = [CONFIG_SEED, multisig_id.as_ref()],bump)]
     pub multisig_config: Account<'info, MultisigConfig>,
 
     #[account(mut)]
@@ -272,7 +272,7 @@ pub struct SetRoot<'info> {
 
 #[derive(Accounts)]
 #[instruction(
-    multisig_name: [u8; MULTISIG_NAME_PADDED],
+    multisig_id: [u8; MULTISIG_ID_PADDED],
     root: [u8; 32],
     valid_until: u32,
     total_signatures: u8,
@@ -282,7 +282,7 @@ pub struct InitSignatures<'info> {
         init,
         payer = authority,
         space = RootSignatures::space(total_signatures as usize),
-        seeds = [ROOT_SIGNATURES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
+        seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump
     )]
     pub signatures: Account<'info, RootSignatures>,
@@ -294,11 +294,11 @@ pub struct InitSignatures<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED], root: [u8; 32], valid_until: u32)]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED], root: [u8; 32], valid_until: u32)]
 pub struct AppendSignatures<'info> {
     #[account(
         mut,
-        seeds = [ROOT_SIGNATURES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
+        seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump,
         constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized
     )]
@@ -309,11 +309,11 @@ pub struct AppendSignatures<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED], root: [u8; 32], valid_until: u32)]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED], root: [u8; 32], valid_until: u32)]
 pub struct ClearSignatures<'info> {
     #[account(
         mut,
-        seeds = [ROOT_SIGNATURES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
+        seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump,
         close = authority // close so that it can be re-initialized
     )]
@@ -324,11 +324,11 @@ pub struct ClearSignatures<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED], root: [u8; 32], valid_until: u32)]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED], root: [u8; 32], valid_until: u32)]
 pub struct FinalizeSignatures<'info> {
     #[account(
         mut,
-        seeds = [ROOT_SIGNATURES_SEED, multisig_name.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
+        seeds = [ROOT_SIGNATURES_SEED, multisig_id.as_ref(), root.as_ref(), valid_until.to_le_bytes().as_ref()],
         bump,
         constraint = !signatures.is_finalized @ McmError::SignaturesAlreadyFinalized
     )]
