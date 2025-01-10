@@ -302,6 +302,23 @@ func CheckNonces(sendersNonce map[cciptypes.ChainSelector]map[string]uint64) Che
 	}
 }
 
+// checkMessages to get a set of which are ready to execute.
+func (b *execReportBuilder) checkMessages(ctx context.Context, report exectypes.CommitData) (map[int]struct{}, error) {
+	readyMessages := make(map[int]struct{})
+	for i := 0; i < len(report.Messages); i++ {
+		updatedReport, status, err := b.checkMessage(ctx, i, report)
+		if err != nil {
+			return nil,
+				fmt.Errorf("unable to check message: %w", err)
+		}
+		report = updatedReport
+		if status == ReadyToExecute {
+			readyMessages[i] = struct{}{}
+		}
+	}
+	return readyMessages, nil
+}
+
 // checkMessage for execution readiness.
 func (b *execReportBuilder) checkMessage(
 	_ context.Context, idx int, execReport exectypes.CommitData,
@@ -384,8 +401,6 @@ func (b *execReportBuilder) verifyReport(
 // returns
 // 1. exec report for the builder
 // 2. updated commit report after marking new messages from the exec report as executed
-//
-//nolint:gocyclo // todo
 func (b *execReportBuilder) buildSingleChainReport(
 	ctx context.Context,
 	report exectypes.CommitData,
@@ -401,43 +416,38 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 
 	// Check which messages are ready to execute, and update report with any additional metadata needed for execution.
-	readyMessages := make(map[int]struct{})
-	for i := 0; i < len(report.Messages); i++ {
-		updatedReport, status, err := b.checkMessage(ctx, i, report)
-		if err != nil {
-			return cciptypes.ExecutePluginReportSingleChain{},
-				exectypes.CommitData{},
-				fmt.Errorf("unable to check message: %w", err)
-		}
-		report = updatedReport
-		if status == ReadyToExecute {
-			readyMessages[i] = struct{}{}
-		}
+	readyMessages, err := b.checkMessages(ctx, report)
+	if err != nil {
+		return cciptypes.ExecutePluginReportSingleChain{},
+			exectypes.CommitData{},
+			fmt.Errorf("unable to check message: %w", err)
 	}
-
 	if len(readyMessages) == 0 {
 		return cciptypes.ExecutePluginReportSingleChain{}, report, ErrEmptyReport
 	}
 
-	// Attempt to include all messages in the report.
-	finalReport, err :=
-		buildSingleChainReportHelper(b.lggr, report, readyMessages)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			exectypes.CommitData{},
-			fmt.Errorf("unable to build a single chain report (max): %w", err)
+	// Unless there is a message limit, attempt to build a report for executing all ready messages.
+	if b.maxMessages != 0 {
+		finalReport, err :=
+			buildSingleChainReportHelper(b.lggr, report, readyMessages)
+		if err != nil {
+			return cciptypes.ExecutePluginReportSingleChain{},
+				exectypes.CommitData{},
+				fmt.Errorf("unable to build a single chain report (max): %w", err)
+		}
+
+		validReport, meta, err := b.verifyReport(ctx, finalReport)
+		if err != nil {
+			return cciptypes.ExecutePluginReportSingleChain{},
+				exectypes.CommitData{},
+				fmt.Errorf("unable to verify report: %w", err)
+		} else if validReport {
+			return finalize(finalReport, report, meta)
+		}
 	}
 
-	validReport, meta, err := b.verifyReport(ctx, finalReport)
-	if err != nil {
-		return cciptypes.ExecutePluginReportSingleChain{},
-			exectypes.CommitData{},
-			fmt.Errorf("unable to verify report: %w", err)
-	} else if validReport {
-		return finalize(finalReport, report, meta)
-	}
-
-	finalReport = cciptypes.ExecutePluginReportSingleChain{}
+	var finalReport cciptypes.ExecutePluginReportSingleChain
+	var meta validationMetadata
 	msgs := make(map[int]struct{})
 	for i := range report.Messages {
 		if _, ok := readyMessages[i]; !ok {

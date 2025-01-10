@@ -39,7 +39,6 @@ func WithMaxReportSizeBytes(maxReportSizeBytes uint64) Option {
 func WithMaxMessages(maxMessages uint64) Option {
 	return func(erb *execReportBuilder) {
 		erb.maxMessages = maxMessages
-		panic("not implemented")
 	}
 }
 
