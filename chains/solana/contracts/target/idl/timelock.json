@@ -58,6 +58,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "minDelay",
           "type": "u64"
         }
@@ -88,6 +97,15 @@
         }
       ],
       "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "role",
           "type": {
@@ -121,6 +139,15 @@
         }
       ],
       "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "id",
           "type": {
@@ -161,6 +188,15 @@
         }
       ],
       "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "id",
           "type": {
@@ -220,6 +256,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "id",
           "type": {
             "array": [
@@ -259,6 +304,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "id",
           "type": {
             "array": [
@@ -289,6 +343,15 @@
         }
       ],
       "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "id",
           "type": {
@@ -325,6 +388,15 @@
         }
       ],
       "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "id",
           "type": {
@@ -372,6 +444,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "id",
           "type": {
             "array": [
@@ -413,6 +494,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "id",
           "type": {
             "array": [
@@ -439,6 +529,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "delay",
           "type": "u64"
         }
@@ -459,6 +558,15 @@
         }
       ],
       "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
         {
           "name": "selector",
           "type": {
@@ -486,6 +594,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "selector",
           "type": {
             "array": [
@@ -512,6 +629,15 @@
       ],
       "args": [
         {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "proposedOwner",
           "type": "publicKey"
         }
@@ -531,7 +657,17 @@
           "isSigner": true
         }
       ],
-      "args": []
+      "args": [
+        {
+          "name": "timelockId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -540,6 +676,15 @@
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "timelockId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
           {
             "name": "owner",
             "type": "publicKey"
@@ -653,7 +798,7 @@
                     8
                   ]
                 },
-                32
+                128
               ]
             }
           },
@@ -757,9 +902,6 @@
           },
           {
             "name": "SelectorNotFound"
-          },
-          {
-            "name": "InvalidInstructionData"
           },
           {
             "name": "MaxCapacityReached"
