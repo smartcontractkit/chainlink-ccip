@@ -12,11 +12,11 @@ import (
 
 // Execute is the `execute` instruction.
 type Execute struct {
-	MultisigName *[32]uint8
-	ChainId      *uint64
-	Nonce        *uint64
-	Data         *[]byte
-	Proof        *[][32]uint8
+	MultisigId *[32]uint8
+	ChainId    *uint64
+	Nonce      *uint64
+	Data       *[]byte
+	Proof      *[][32]uint8
 
 	// [0] = [WRITE] multisigConfig
 	//
@@ -40,9 +40,9 @@ func NewExecuteInstructionBuilder() *Execute {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *Execute) SetMultisigName(multisigName [32]uint8) *Execute {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *Execute) SetMultisigId(multisigId [32]uint8) *Execute {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -156,8 +156,8 @@ func (inst Execute) ValidateAndBuild() (*Instruction, error) {
 func (inst *Execute) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 		if inst.ChainId == nil {
 			return errors.New("ChainId parameter is not set")
@@ -207,11 +207,11 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigName", *inst.MultisigName))
-						paramsBranch.Child(ag_format.Param("     ChainId", *inst.ChainId))
-						paramsBranch.Child(ag_format.Param("       Nonce", *inst.Nonce))
-						paramsBranch.Child(ag_format.Param("        Data", *inst.Data))
-						paramsBranch.Child(ag_format.Param("       Proof", *inst.Proof))
+						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
+						paramsBranch.Child(ag_format.Param("   ChainId", *inst.ChainId))
+						paramsBranch.Child(ag_format.Param("     Nonce", *inst.Nonce))
+						paramsBranch.Child(ag_format.Param("      Data", *inst.Data))
+						paramsBranch.Child(ag_format.Param("     Proof", *inst.Proof))
 					})
 
 					// Accounts of the instruction:
@@ -228,8 +228,8 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -256,8 +256,8 @@ func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewExecuteInstruction declares a new Execute instruction with the provided parameters and accounts.
 func NewExecuteInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	chainId uint64,
 	nonce uint64,
 	data []byte,
@@ -300,7 +300,7 @@ func NewExecuteInstruction(
 	multisigSigner ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *Execute {
 	return NewExecuteInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetChainId(chainId).
 		SetNonce(nonce).
 		SetData(data).

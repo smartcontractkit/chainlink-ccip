@@ -57,14 +57,14 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 	t.Run("mcm:general test cases", func(t *testing.T) {
 		// mcm name
-		testMsigName := config.TestMsigNamePaddedBuffer
+		testMsigID := config.TestMsigID
 
 		// test mcm pdas
-		multisigConfigPDA := mcms.McmConfigAddress(testMsigName)
-		rootMetadataPDA := mcms.RootMetadataAddress(testMsigName)
-		expiringRootAndOpCountPDA := mcms.ExpiringRootAndOpCountAddress(testMsigName)
-		configSignersPDA := mcms.McmConfigSignersAddress(testMsigName)
-		msigSignerPDA := mcms.McmSignerAddress(testMsigName)
+		multisigConfigPDA := mcms.GetConfigPDA(testMsigID)
+		rootMetadataPDA := mcms.GetRootMetadataPDA(testMsigID)
+		expiringRootAndOpCountPDA := mcms.GetExpiringRootAndOpCountPDA(testMsigID)
+		configSignersPDA := mcms.GetConfigSignersPDA(testMsigID)
+		msigSignerPDA := mcms.GetSignerPDA(testMsigID)
 
 		// fund the signer pda
 		fundPDAIx := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), msigSignerPDA).Build()
@@ -95,7 +95,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						IsWritable: true,
 					},
 					{
-						PublicKey:  mcms.McmSignerAddress(config.TestMsigNamePaddedBuffer),
+						PublicKey:  mcms.GetSignerPDA(config.TestMsigID),
 						IsSigner:   false,
 						IsWritable: true,
 					},
@@ -149,7 +149,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 						IsWritable: true,
 					},
 					{
-						PublicKey:  mcms.McmSignerAddress(config.TestMsigNamePaddedBuffer),
+						PublicKey:  mcms.GetSignerPDA(config.TestMsigID),
 						IsSigner:   false,
 						IsWritable: true,
 					},
@@ -185,7 +185,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			ix, initErr := mcm.NewInitializeInstruction(
 				config.TestChainID,
-				testMsigName,
+				testMsigID,
 				multisigConfigPDA,
 				user.PublicKey(),
 				solana.SystemProgramID,
@@ -215,7 +215,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			ix, initErr := mcm.NewInitializeInstruction(
 				config.TestChainID,
-				testMsigName,
+				testMsigID,
 				multisigConfigPDA,
 				admin.PublicKey(),
 				solana.SystemProgramID,
@@ -252,7 +252,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			groupParents := []uint8{0, 0, 0, 2, 0}
 
 			mcmConfig, configErr := mcms.NewValidMcmConfig(
-				testMsigName,
+				testMsigID,
 				signerPrivateKeys,
 				signerGroups,
 				groupQuorums,
@@ -264,7 +264,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:preload signers", func(t *testing.T) {
-				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigID, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
@@ -285,7 +285,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			// set config
 			ix, configErr := mcm.NewSetConfigInstruction(
-				mcmConfig.MultisigName,
+				mcmConfig.MultisigID,
 				mcmConfig.SignerGroups,
 				mcmConfig.GroupQuorums,
 				mcmConfig.GroupParents,
@@ -346,7 +346,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				},
 			)
 			require.NoError(t, rvErr)
-			signaturesPDA := mcms.RootSignaturesAddress(testMsigName, rootValidationData.Root, validUntil)
+			signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil)
 
 			t.Run("preload signatures", func(t *testing.T) {
 				signers, getSignerErr := eth.GetEvmSigners(signerPrivateKeys)
@@ -355,11 +355,10 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				signatures, sigsErr := mcms.BulkSignOnMsgHash(signers, rootValidationData.EthMsgHash)
 				require.NoError(t, sigsErr)
 
-				parsedTotalSigs, pErr := mcms.SafeToUint8(len(signatures))
-				require.NoError(t, pErr)
-
+				//nolint:gosec
+				parsedTotalSigs := uint8(len(signatures))
 				initSigsIx, isErr := mcm.NewInitSignaturesInstruction(
-					testMsigName,
+					testMsigID,
 					rootValidationData.Root,
 					validUntil,
 					parsedTotalSigs,
@@ -371,7 +370,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, isErr)
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSigsIx}, admin, config.DefaultCommitment)
 
-				appendSigsIxs, asErr := mcms.AppendSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// partially register signatures
@@ -381,7 +380,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 				// clear uploaded signatures(this closes the account)
 				clearIx, cErr := mcm.NewClearSignaturesInstruction(
-					testMsigName,
+					testMsigID,
 					rootValidationData.Root,
 					validUntil,
 					signaturesPDA,
@@ -393,7 +392,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				testutils.AssertClosedAccount(ctx, t, solanaGoClient, signaturesPDA, config.DefaultCommitment)
 
 				// preload again
-				preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, plerr)
 
 				for _, ix := range preloadIxs {
@@ -414,14 +413,14 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			})
 
 			newIx, setRootIxErr := mcm.NewSetRootInstruction(
-				testMsigName,
+				testMsigID,
 				rootValidationData.Root,
 				validUntil,
 				rootValidationData.Metadata,
 				rootValidationData.MetadataProof,
 				signaturesPDA,
 				rootMetadataPDA,
-				mcms.SeenSignedHashesAddress(testMsigName, rootValidationData.Root, validUntil),
+				mcms.GetSeenSignedHashesPDA(testMsigID, rootValidationData.Root, validUntil),
 				expiringRootAndOpCountPDA,
 				multisigConfigPDA,
 				admin.PublicKey(),
@@ -479,7 +478,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			// new config with clear_root
 			newMcmConfig, configErr := mcms.NewValidMcmConfig(
-				testMsigName,
+				testMsigID,
 				config.SignerPrivateKeys,
 				config.SignerGroups,
 				config.GroupQuorums,
@@ -491,7 +490,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 			signerAddresses := newMcmConfig.SignerAddresses
 
 			t.Run("preload signers", func(t *testing.T) {
-				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigID, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
@@ -510,7 +509,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 			t.Run("set_config with clear_root", func(t *testing.T) {
 				ix, configErr := mcm.NewSetConfigInstruction(
-					newMcmConfig.MultisigName,
+					newMcmConfig.MultisigID,
 					newMcmConfig.SignerGroups,
 					newMcmConfig.GroupQuorums,
 					newMcmConfig.GroupParents,
@@ -606,7 +605,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					},
 				)
 				require.NoError(t, rvErr)
-				signaturesPDA := mcms.RootSignaturesAddress(testMsigName, rootValidationData.Root, validUntil)
+				signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil)
 
 				t.Run("preload signatures", func(t *testing.T) {
 					signers, getSignerErr := eth.GetEvmSigners(config.SignerPrivateKeys)
@@ -615,7 +614,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					signatures, sigsErr := mcms.BulkSignOnMsgHash(signers, rootValidationData.EthMsgHash)
 					require.NoError(t, sigsErr)
 
-					preloadIxs, plerr := mcms.McmPreloadSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+					preloadIxs, plerr := mcms.GetMcmPreloadSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 					require.NoError(t, plerr)
 
 					for _, ix := range preloadIxs {
@@ -636,14 +635,14 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				})
 
 				newIx, setRootIxErr := mcm.NewSetRootInstruction(
-					testMsigName,
+					testMsigID,
 					rootValidationData.Root,
 					validUntil,
 					rootValidationData.Metadata,
 					rootValidationData.MetadataProof,
 					signaturesPDA,
 					rootMetadataPDA,
-					mcms.SeenSignedHashesAddress(testMsigName, rootValidationData.Root, validUntil),
+					mcms.GetSeenSignedHashesPDA(testMsigID, rootValidationData.Root, validUntil),
 					expiringRootAndOpCountPDA,
 					multisigConfigPDA,
 					admin.PublicKey(),
@@ -697,7 +696,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, proofsErr, "Failed to getting op proof")
 
 				ix := mcm.NewExecuteInstruction(
-					testMsigName,
+					testMsigID,
 					config.TestChainID,
 					op.Nonce,
 					op.Data,
@@ -707,7 +706,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					rootMetadataPDA,
 					expiringRootAndOpCountPDA,
 					config.ExternalCpiStubProgram,
-					mcms.McmSignerAddress(testMsigName),
+					mcms.GetSignerPDA(testMsigID),
 					admin.PublicKey(),
 				)
 				// append remaining accounts
@@ -901,15 +900,15 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				t.Parallel()
 
 				// use different msig accounts per test
-				testMsigName, err := mcms.PadString32(fmt.Sprintf("fail_sig_validation_test_%d", i))
+				testMsigID, err := mcms.PadString32(fmt.Sprintf("fail_sig_validation_test_%d", i))
 				require.NoError(t, err)
 
 				// test scoped mcm pdas
-				multisigConfigPDA := mcms.McmConfigAddress(testMsigName)
-				multisigSignerPDA := mcms.McmSignerAddress(testMsigName)
-				rootMetadataPDA := mcms.RootMetadataAddress(testMsigName)
-				expiringRootAndOpCountPDA := mcms.ExpiringRootAndOpCountAddress(testMsigName)
-				configSignersPDA := mcms.McmConfigSignersAddress(testMsigName)
+				multisigConfigPDA := mcms.GetConfigPDA(testMsigID)
+				multisigSignerPDA := mcms.GetSignerPDA(testMsigID)
+				rootMetadataPDA := mcms.GetRootMetadataPDA(testMsigID)
+				expiringRootAndOpCountPDA := mcms.GetExpiringRootAndOpCountPDA(testMsigID)
+				configSignersPDA := mcms.GetConfigSignersPDA(testMsigID)
 
 				// fund the signer pda
 				fundPDAIx, err := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), multisigSignerPDA).ValidateAndBuild()
@@ -935,7 +934,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 					ix, initErr := mcm.NewInitializeInstruction(
 						config.TestChainID,
-						testMsigName,
+						testMsigID,
 						multisigConfigPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
@@ -957,7 +956,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				})
 
 				mcmConfig, configErr := mcms.NewValidMcmConfig(
-					testMsigName,
+					testMsigID,
 					config.SignerPrivateKeys,
 					config.SignerGroups,
 					config.GroupQuorums,
@@ -967,7 +966,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, configErr)
 
 				t.Run("setup: load signers and set_config", func(t *testing.T) {
-					preloadIxs, pierr := mcms.McmPreloadSignersIxs(mcmConfig.SignerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+					preloadIxs, pierr := mcms.GetPreloadSignersIxs(mcmConfig.SignerAddresses, testMsigID, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 					require.NoError(t, pierr)
 
 					for _, ix := range preloadIxs {
@@ -987,7 +986,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 
 					// set config
 					ix, configErr := mcm.NewSetConfigInstruction(
-						mcmConfig.MultisigName,
+						mcmConfig.MultisigID,
 						mcmConfig.SignerGroups,
 						mcmConfig.GroupQuorums,
 						mcmConfig.GroupParents,
@@ -1046,7 +1045,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 					},
 				)
 				require.NoError(t, rvErr)
-				signaturesPDA := mcms.RootSignaturesAddress(testMsigName, rootValidationData.Root, validUntil)
+				signaturesPDA := mcms.GetRootSignaturesPDA(testMsigID, rootValidationData.Root, validUntil)
 
 				signers, getSignerErr := eth.GetEvmSigners(config.SignerPrivateKeys)
 				require.NoError(t, getSignerErr)
@@ -1056,12 +1055,10 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				if tt.modifySigs != nil {
 					tt.modifySigs(&signatures, &rootValidationData)
 				}
-
-				parsedTotalSigs, err := mcms.SafeToUint8(len(signatures))
-				require.NoError(t, err)
-
+				//nolint:gosec
+				parsedTotalSigs := uint8(len(signatures))
 				initSigsIx, err := mcm.NewInitSignaturesInstruction(
-					testMsigName,
+					testMsigID,
 					rootValidationData.Root,
 					validUntil,
 					parsedTotalSigs,
@@ -1072,14 +1069,14 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, err)
 				txs = append(txs, TxWithStage{Instructions: []solana.Instruction{initSigsIx}, Stage: InitSignatures})
 
-				appendSigsIxs, asErr := mcms.AppendSignaturesIxs(signatures, testMsigName, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
+				appendSigsIxs, asErr := mcms.GetAppendSignaturesIxs(signatures, testMsigID, rootValidationData.Root, validUntil, signaturesPDA, admin.PublicKey(), config.MaxAppendSignatureBatchSize)
 				require.NoError(t, asErr)
 
 				// one tx is enough since we only have 5 signers
 				txs = append(txs, TxWithStage{Instructions: appendSigsIxs, Stage: AppendSignatures})
 
 				finalizeSigsIx, err := mcm.NewFinalizeSignaturesInstruction(
-					testMsigName,
+					testMsigID,
 					rootValidationData.Root,
 					validUntil,
 					signaturesPDA,
@@ -1090,14 +1087,14 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				txs = append(txs, TxWithStage{Instructions: []solana.Instruction{finalizeSigsIx}, Stage: FinalizeSignatures})
 
 				setRootIx, err := mcm.NewSetRootInstruction(
-					testMsigName,
+					testMsigID,
 					rootValidationData.Root,
 					validUntil,
 					rootValidationData.Metadata,
 					rootValidationData.MetadataProof,
 					signaturesPDA,
 					rootMetadataPDA,
-					mcms.SeenSignedHashesAddress(testMsigName, rootValidationData.Root, validUntil),
+					mcms.GetSeenSignedHashesPDA(testMsigID, rootValidationData.Root, validUntil),
 					expiringRootAndOpCountPDA,
 					multisigConfigPDA,
 					admin.PublicKey(),
@@ -1117,7 +1114,7 @@ func TestMcmSetRootAndExecute(t *testing.T) {
 				require.NoError(t, proofsErr, "Failed to getting op proof")
 
 				executeIx := mcm.NewExecuteInstruction(
-					testMsigName,
+					testMsigID,
 					config.TestChainID,
 					opNode.Nonce,
 					opNode.Data,

@@ -12,7 +12,8 @@ import (
 
 // ClearOperation is the `clearOperation` instruction.
 type ClearOperation struct {
-	Id *[32]uint8
+	TimelockId *[32]uint8
+	Id         *[32]uint8
 
 	// [0] = [WRITE] operation
 	//
@@ -28,6 +29,12 @@ func NewClearOperationInstructionBuilder() *ClearOperation {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *ClearOperation) SetTimelockId(timelockId [32]uint8) *ClearOperation {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -89,6 +96,9 @@ func (inst ClearOperation) ValidateAndBuild() (*Instruction, error) {
 func (inst *ClearOperation) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -118,8 +128,9 @@ func (inst *ClearOperation) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Id", *inst.Id))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
@@ -133,6 +144,11 @@ func (inst *ClearOperation) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj ClearOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -141,6 +157,11 @@ func (obj ClearOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 func (obj *ClearOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -152,12 +173,14 @@ func (obj *ClearOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 // NewClearOperationInstruction declares a new ClearOperation instruction with the provided parameters and accounts.
 func NewClearOperationInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ClearOperation {
 	return NewClearOperationInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).
