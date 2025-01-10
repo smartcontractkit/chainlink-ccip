@@ -1,10 +1,7 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::{
-    valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG, MAX_TOKEN_AND_CHAIN_CONFIG_V,
-    TOKEN_POOL_BILLING_SEED,
-};
+use crate::{valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG};
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -184,30 +181,6 @@ pub struct PerChainPerTokenConfig {
     pub mint: Pubkey,        // token on solana
 
     pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
-}
-
-impl PerChainPerTokenConfig {
-    pub fn validated_try_from<'info>(
-        account: &'info AccountInfo<'info>,
-        token: Pubkey,
-        dest_chain_selector: u64,
-    ) -> Result<Self> {
-        let (expected, _) = Pubkey::find_program_address(
-            &[
-                TOKEN_POOL_BILLING_SEED,
-                dest_chain_selector.to_le_bytes().as_ref(),
-                token.key().as_ref(),
-            ],
-            &crate::ID,
-        );
-        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
-        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
-        require!(
-            valid_version(account.version, MAX_TOKEN_AND_CHAIN_CONFIG_V),
-            CcipRouterError::InvalidInputs
-        );
-        Ok(account.into_inner())
-    }
 }
 
 #[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]

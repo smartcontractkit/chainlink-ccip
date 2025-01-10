@@ -15,11 +15,9 @@ pub const ANCHOR_DISCRIMINATOR: usize = 8;
 
 // track state versions
 pub const MAX_CONFIG_V: u8 = 1;
-pub const MAX_CHAINSTATE_V: u8 = 1;
-pub const MAX_NONCE_V: u8 = 1;
-pub const MAX_COMMITREPORT_V: u8 = 1;
-pub const MAX_TOKEN_REGISTRY_V: u8 = 1;
-pub const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
+const MAX_CHAINSTATE_V: u8 = 1;
+const MAX_NONCE_V: u8 = 1;
+const MAX_COMMITREPORT_V: u8 = 1;
 
 // valid_version validates that the passed in version is not 0 (uninitialized)
 // and it is within the expected maximum supported version bounds

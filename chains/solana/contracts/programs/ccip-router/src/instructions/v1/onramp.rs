@@ -14,6 +14,7 @@ use crate::{
     AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
     ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, Solana2AnyMessage,
     Solana2AnyRampMessage, Solana2AnyTokenTransfer, SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
+    TOKEN_POOL_BILLING_SEED,
 };
 
 pub fn get_fee<'info>(
@@ -43,7 +44,7 @@ pub fn get_fee<'info>(
         .iter()
         .zip(message.token_amounts.iter())
         .map(|(a, SolanaTokenAmount { token, .. })| {
-            PerChainPerTokenConfig::validated_try_from(a, *token, dest_chain_selector)
+            validated_try_to_per_chain_per_token_config(a, *token, dest_chain_selector)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -101,7 +102,7 @@ pub fn ccip_send<'info>(
     let per_chain_per_token_config_accounts = accounts_per_sent_token
         .iter()
         .map(|accs| {
-            PerChainPerTokenConfig::validated_try_from(
+            validated_try_to_per_chain_per_token_config(
                 accs.token_billing_config,
                 accs.mint.key(),
                 dest_chain_selector,
@@ -339,4 +340,27 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     ]);
 
     result.to_bytes()
+}
+
+fn validated_try_to_per_chain_per_token_config<'info>(
+    account: &'info AccountInfo<'info>,
+    token: Pubkey,
+    dest_chain_selector: u64,
+) -> Result<PerChainPerTokenConfig> {
+    let (expected, _) = Pubkey::find_program_address(
+        &[
+            TOKEN_POOL_BILLING_SEED,
+            dest_chain_selector.to_le_bytes().as_ref(),
+            token.key().as_ref(),
+        ],
+        &crate::ID,
+    );
+    require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+    let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+    require_eq!(
+        account.version,
+        1, // the v1 version of the onramp will always be tied to version 1 of the state
+        CcipRouterError::InvalidInputs
+    );
+    Ok(account.into_inner())
 }
