@@ -96,7 +96,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	type MerkleRoot struct {
 		SourceChainSelector uint64
-		OnRampAddress       []byte
+		OnRampAddress       UnknownAddress
 		MinSeqNr            uint64
 		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
