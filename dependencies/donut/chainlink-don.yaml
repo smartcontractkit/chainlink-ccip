@@ -46,6 +46,11 @@ vars:
   DON_NODE_COUNT:
     source: env
     default: 1
+  # chains
+  # Option to generate variable number of networks to be configured in Node config
+  ADDITIONAL_CHAINS_COUNT:
+    source: env
+    default: 0
   # switch
   ENABLE_DON_BASE:
     source: env
@@ -178,6 +183,14 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/network.ava-spruce-calm.yaml
+  # to support load testing scenarios, the profile generate variable number of chain configs
+  - name: network-additional-geth-chains
+    merge: |-
+      $(
+        ADDITIONAL_CHAINS_COUNT=${ADDITIONAL_CHAINS_COUNT} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/network.geth-n-chains.yaml
+      )
   # versions
   - name: version-latest
     patches:
@@ -189,6 +202,17 @@ profiles:
       - op: add
         path: deployments.chainlink-don.helm.valuesFiles
         value: ${LOCAL_VALUES_DIR}/chainlink-cluster/version.k3d-local.yaml
+  - name: version-from-env
+    merge:
+      deployments:
+        chainlink-don:
+          helm:
+            values:
+              common:
+                image:
+                  repository: ${DEVSPACE_IMAGE}
+                  tag: ${DEVSPACE_IMAGE_TAG}
+                  pullPolicy: IfNotPresent
   # overrides
   - name: overrides
     patches:

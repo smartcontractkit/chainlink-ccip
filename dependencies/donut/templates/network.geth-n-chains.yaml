@@ -1,0 +1,24 @@
+---
+in: |
+  deployments:
+    chainlink-don:
+      helm:
+        values:
+          common:
+            chainlink:
+              v2Config:
+                {{- if gt (conv.ToInt .Env.ADDITIONAL_CHAINS_COUNT) 0 }}
+                {{- range $i := seq 1 .Env.ADDITIONAL_CHAINS_COUNT }}
+                01-network-geth-chain-9000000{{ $i }}.toml: |
+                  [[EVM]]
+                  ChainID = "9000000{{ $i }}"
+                  MinContractPayment = '0'
+                  AutoCreateKey = true
+                  FinalityDepth = 50
+
+                  [[EVM.Nodes]]
+                  Name = 'node-9000000{{ $i }}'
+                  HTTPURL = "http://geth-9000000{{ $i }}:8544"
+                  WSURL = "ws://geth-9000000{{ $i }}:8546"
+                {{- end }}
+                {{- end }}

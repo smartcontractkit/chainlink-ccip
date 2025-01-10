@@ -26,12 +26,27 @@ vars:
   CHAINLINK_HELM_REGISTRY_URI:
     source: env
     default: "oci://804282218731.dkr.ecr.us-west-2.amazonaws.com/infra-charts"
+  DON_TYPE:
+    source: env
+    default: ccip
+  DON_VERSION:
+    source: env
+    default: ccip-dev
+  CCIP_TOOLING_VERSION:
+    source: env
+    default: v2
   DON_NODE_COUNT:
     source: env
     default: 4
   DON_BOOT_NODE_COUNT:
     source: env
     default: 1
+  ADDITIONAL_CHAINS_COUNT:
+    source: env
+    default: 0
+  ENABLE_MONITORING:
+    source: env
+    default: false
 imports:
   - path: ${IMPORTS_DIR}/lib-common
   - path: ${IMPORTS_DIR}/lib-aws
@@ -42,7 +57,9 @@ pipelines:
     run: |-
       if [ "$PROVIDER" == "kind" ]; then
         run_dependency_pipelines kind-core
-        run_dependency_pipelines kind-monitoring
+        if [ "ENABLE_MONITORING" == "true" ]; then
+          run_dependency_pipelines kind-monitoring
+        fi
       fi
 
       run_dependency_pipelines geth
@@ -53,6 +70,10 @@ pipelines:
       run_pipelines ingress-check
   geth:
     run: |-
+      if [ "$PROVIDER" == "kind" ]; then
+        run_dependency_pipelines kind-core
+      fi
+
       run_dependency_pipelines geth
   debug-gap:
     run: |-
@@ -122,18 +143,6 @@ profiles:
   - name: ccip-v2
     patches:
       - op: add
-        path: vars
-        value:
-          DON_TYPE:
-            source: env
-            default: ccip
-          DON_VERSION:
-            source: env
-            default: ccip-dev
-          CCIP_TOOLING_VERSION:
-            source: env
-            default: v2
-      - op: add
         path: dependencies
         value:
           geth:
@@ -142,13 +151,16 @@ profiles:
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
               - ccip
+              - additional-chains
           ccip-don:
             path: ${DEPENDENCIES_DIR}/donut/chainlink-don.yaml
             overwriteVars: true
             namespace: ${DEVSPACE_NAMESPACE}
             profiles:
+              - version-from-env
               - network-geth-chain-1337
               - network-geth-chain-2337
+              - network-additional-geth-chains
 commands:
   ccip-v2:
     command: devspace run-pipeline ccip-v2 -p ccip-v2

@@ -1,0 +1,76 @@
+# we want to define 3 fast chain and 4 slow chains, define a chain profile
+---
+in: |
+  deployments:
+    geth:
+      helm:
+        values:
+          chains:
+            - networkId: 1337
+            - networkId: 2337
+            {{- if gt (conv.ToInt .Env.ADDITIONAL_CHAINS_COUNT) 0 }}
+            {{- range $i := seq 1 .Env.ADDITIONAL_CHAINS_COUNT }}
+            - networkId: "9000000{{ $i }}"
+            {{- end }}
+            {{- end }}
+          ingress:
+            enabled: true
+            hosts:
+              - host: ${DEVSPACE_NAMESPACE}-geth-1337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-1337
+                          port:
+                            number: 8544
+              - host: ${DEVSPACE_NAMESPACE}-geth-1337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-1337
+                          port:
+                            number: 8546
+              - host: ${DEVSPACE_NAMESPACE}-geth-2337-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-2337
+                          port:
+                            number: 8544
+              - host: ${DEVSPACE_NAMESPACE}-geth-2337-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-2337
+                          port:
+                            number: 8546
+              {{- if gt (conv.ToInt .Env.ADDITIONAL_CHAINS_COUNT) 0 }}
+              {{- range $i := seq 1 .Env.ADDITIONAL_CHAINS_COUNT }}
+              - host: ${DEVSPACE_NAMESPACE}-geth-9000000{{ $i }}-http.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-9000000{{ $i }}
+                          port:
+                            number: 8544
+              - host: ${DEVSPACE_NAMESPACE}-geth-9000000{{ $i }}-ws.${DEVSPACE_INGRESS_BASE_DOMAIN}
+                http:
+                  paths:
+                    - path: /
+                      backend:
+                        service:
+                          name: geth-9000000{{ $i }}
+                          port:
+                            number: 8546
+              {{- end }}
+              {{- end }}

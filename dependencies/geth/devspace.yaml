@@ -2,6 +2,15 @@
 version: v2beta1
 name: geth
 
+vars:
+  LOCAL_TEMPLATES_DIR:
+    source: env
+    default: ./templates
+  # Optional property useful for generating n number of additional chains
+  ADDITIONAL_CHAINS_COUNT:
+    source: env
+    default: 2
+
 pipelines:
   kind:
     run: |-
@@ -157,6 +166,15 @@ profiles:
                     PriceMax = '200 gwei'
                     LimitDefault = 6000000
                     FeeCapDefault = '200 gwei'
+
+  - name: additional-chains
+    merge: |-
+      $(
+        DEVSPACE_NAMESPACE=${DEVSPACE_NAMESPACE} \
+        ADDITIONAL_CHAINS_COUNT=${ADDITIONAL_CHAINS_COUNT} \
+        gomplate \
+          --config ${LOCAL_TEMPLATES_DIR}/additional-chains.yaml
+      )
   - name: aws
     activation:
       - vars:
