@@ -237,7 +237,7 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 		MessageHash         cciptypes.Bytes32
 		State               uint8
 		ReturnData          cciptypes.Bytes
-		GasUsed             uint64
+		GasUsed             big.Int
 	}
 
 	dataTyp := ExecutionStateChangedEvent{}
@@ -1366,9 +1366,9 @@ type signer struct {
 // config is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L49-L53
 type config struct {
-	RMNHomeContractConfigDigest []byte   `json:"rmnHomeContractConfigDigest"`
-	Signers                     []signer `json:"signers"`
-	F                           uint64   `json:"f"` // previously: MinSigners
+	RMNHomeContractConfigDigest cciptypes.Bytes32 `json:"rmnHomeContractConfigDigest"`
+	Signers                     []signer          `json:"signers"`
+	F                           uint64            `json:"f"` // previously: MinSigners
 }
 
 // versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.
