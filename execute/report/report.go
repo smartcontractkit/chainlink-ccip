@@ -240,56 +240,63 @@ func CheckTooCostly() Check {
 	}
 }
 
-// CheckNonces compares message nonces against the input to determine message validity. A cache is maintained within
-// the check in order to increment nonces for subsequent messages from the same sender.
+// CheckNonces ensures that messages are executed in the correct order by
+// comparing the expected nonce to the message nonce. The check needs to be
+// initialized using a list of sender nonces from the destination chain. In
+// order to check multiple messages from the same sender, a copy of the initial
+// list is maintained with incremented nonces after each message.
 func CheckNonces(sendersNonce map[cciptypes.ChainSelector]map[string]uint64) Check {
 	// temporary map to store state between nonce checks for this round.
 	expectedNonce := make(map[cciptypes.ChainSelector]map[string]uint64)
+
 	return func(lggr logger.Logger, msg cciptypes.Message, idx int, report exectypes.CommitData) (messageStatus, error) {
-		if msg.Header.Nonce != 0 {
-			// Sequenced messages have non-zero nonces.
-
-			if _, ok := sendersNonce[report.SourceChain]; !ok {
-				lggr.Errorw("Skipping message - nonces not available for chain",
-					"messageID", msg.Header.MessageID,
-					"sourceChain", report.SourceChain,
-					"seqNum", msg.Header.SequenceNumber,
-					"messageState", MissingNoncesForChain)
-				return MissingNoncesForChain, nil
-			}
-
-			chainNonces := sendersNonce[report.SourceChain]
-			sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
-			if _, ok := chainNonces[sender]; !ok {
-				lggr.Errorw("Skipping message - missing nonce",
-					"messageID", msg.Header.MessageID,
-					"sourceChain", report.SourceChain,
-					"seqNum", msg.Header.SequenceNumber,
-					"messageState", MissingNonce)
-				return MissingNonce, nil
-			}
-
-			if _, ok := expectedNonce[report.SourceChain]; !ok {
-				// initialize expected nonce if needed.
-				expectedNonce[report.SourceChain] = make(map[string]uint64)
-			}
-			if _, ok := expectedNonce[report.SourceChain][sender]; !ok {
-				expectedNonce[report.SourceChain][sender] = chainNonces[sender] + 1
-			}
-
-			// Check expected nonce is valid for sequenced messages.
-			if msg.Header.Nonce != expectedNonce[report.SourceChain][sender] {
-				lggr.Warnw("Skipping message - invalid nonce",
-					"messageID", msg.Header.MessageID,
-					"sourceChain", report.SourceChain,
-					"seqNum", msg.Header.SequenceNumber,
-					"have", msg.Header.Nonce,
-					"want", expectedNonce[report.SourceChain][sender],
-					"messageState", InvalidNonce)
-				return InvalidNonce, nil
-			}
-			expectedNonce[report.SourceChain][sender] = expectedNonce[report.SourceChain][sender] + 1
+		// Setting the Nonce to zero (or omitting it) indicates that the message
+		// can be executed out of order. We allow this in the plugin by skipping
+		// the nonce check.
+		if msg.Header.Nonce == 0 {
+			return None, nil
 		}
+
+		if _, ok := sendersNonce[report.SourceChain]; !ok {
+			lggr.Errorw("Skipping message - nonces not available for chain",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", MissingNoncesForChain)
+			return MissingNoncesForChain, nil
+		}
+
+		chainNonces := sendersNonce[report.SourceChain]
+		sender := typeconv.AddressBytesToString(msg.Sender[:], uint64(msg.Header.SourceChainSelector))
+		if _, ok := chainNonces[sender]; !ok {
+			lggr.Errorw("Skipping message - missing nonce",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"messageState", MissingNonce)
+			return MissingNonce, nil
+		}
+
+		if _, ok := expectedNonce[report.SourceChain]; !ok {
+			// initialize expected nonce if needed.
+			expectedNonce[report.SourceChain] = make(map[string]uint64)
+		}
+		if _, ok := expectedNonce[report.SourceChain][sender]; !ok {
+			expectedNonce[report.SourceChain][sender] = chainNonces[sender] + 1
+		}
+
+		// Check expected nonce is valid for sequenced messages.
+		if msg.Header.Nonce != expectedNonce[report.SourceChain][sender] {
+			lggr.Warnw("Skipping message - invalid nonce",
+				"messageID", msg.Header.MessageID,
+				"sourceChain", report.SourceChain,
+				"seqNum", msg.Header.SequenceNumber,
+				"have", msg.Header.Nonce,
+				"want", expectedNonce[report.SourceChain][sender],
+				"messageState", InvalidNonce)
+			return InvalidNonce, nil
+		}
+		expectedNonce[report.SourceChain][sender] = expectedNonce[report.SourceChain][sender] + 1
 
 		return None, nil
 	}
