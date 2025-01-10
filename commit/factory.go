@@ -57,7 +57,7 @@ const (
 
 	// maxOutcomeLength is set to the maximum size of an outcome
 	// check factory_test for the calculation
-	maxOutcomeLength = 1_167_765
+	maxOutcomeLength = 1_167_836
 
 	// maxReportLength is set to an estimate of a maximum report size
 	// check factory_test for the calculation

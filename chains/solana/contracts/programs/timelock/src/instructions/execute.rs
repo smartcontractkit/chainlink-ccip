@@ -1,4 +1,5 @@
 use anchor_lang::solana_program::instruction::Instruction;
+use anchor_lang::solana_program::keccak::HASH_BYTES;
 use anchor_lang::{prelude::*, solana_program};
 use solana_program::program::invoke_signed;
 
@@ -6,7 +7,8 @@ use access_controller::AccessController;
 use bytemuck::Zeroable;
 
 use crate::constants::{
-    EMPTY_PREDECESSOR, TIMELOCK_CONFIG_SEED, TIMELOCK_OPERATION_SEED, TIMELOCK_SIGNER_SEED,
+    EMPTY_PREDECESSOR, TIMELOCK_CONFIG_SEED, TIMELOCK_ID_PADDED, TIMELOCK_OPERATION_SEED,
+    TIMELOCK_SIGNER_SEED,
 };
 use crate::error::TimelockError;
 use crate::event::*;
@@ -16,6 +18,7 @@ use crate::state::{Config, InstructionData, Operation};
 /// operation can be executed only if it's ready and all predecessors are done
 pub fn execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, ExecuteBatch<'info>>,
+    timelock_id: [u8; TIMELOCK_ID_PADDED],
     _id: [u8; 32],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
@@ -27,7 +30,11 @@ pub fn execute_batch<'info>(
     if op.predecessor != EMPTY_PREDECESSOR {
         // force predecessor to be provided
         let (expected_address, _) = Pubkey::find_program_address(
-            &[TIMELOCK_OPERATION_SEED, op.predecessor.as_ref()],
+            &[
+                TIMELOCK_OPERATION_SEED,
+                timelock_id.as_ref(),
+                op.predecessor.as_ref(),
+            ],
             ctx.program_id,
         );
 
@@ -48,7 +55,11 @@ pub fn execute_batch<'info>(
         );
     }
 
-    let seeds = &[TIMELOCK_SIGNER_SEED, &[ctx.bumps.timelock_signer]];
+    let seeds = &[
+        TIMELOCK_SIGNER_SEED,
+        timelock_id.as_ref(),
+        &[ctx.bumps.timelock_signer],
+    ];
     let signer = &[&seeds[..]];
 
     for (i, instruction_data) in op.instructions.iter().enumerate() {
@@ -79,11 +90,16 @@ pub fn execute_batch<'info>(
 /// bypasser_execute also need the operation to be uploaded formerly
 pub fn bypasser_execute_batch<'info>(
     ctx: Context<'_, '_, '_, 'info, BypasserExecuteBatch<'info>>,
+    timelock_id: [u8; TIMELOCK_ID_PADDED],
     _id: [u8; 32],
 ) -> Result<()> {
     let op = &mut ctx.accounts.operation;
 
-    let seeds = &[TIMELOCK_SIGNER_SEED, &[ctx.bumps.timelock_signer]];
+    let seeds = &[
+        TIMELOCK_SIGNER_SEED,
+        timelock_id.as_ref(),
+        &[ctx.bumps.timelock_signer],
+    ];
     let signer = &[&seeds[..]];
 
     for (i, instruction_data) in op.instructions.iter().enumerate() {
@@ -127,11 +143,11 @@ fn execute(
 }
 
 #[derive(Accounts)]
-#[instruction(id: [u8; 32])]
+#[instruction(timelock_id: [u8; TIMELOCK_ID_PADDED], id: [u8; HASH_BYTES])]
 pub struct ExecuteBatch<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_scheduled() @ TimelockError::InvalidId,
     )]
@@ -140,12 +156,12 @@ pub struct ExecuteBatch<'info> {
     /// CHECK: Will be validated in handler if predecessor exists
     pub predecessor_operation: UncheckedAccount<'info>,
 
-    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account( seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref(),], bump)]
     pub config: Account<'info, Config>,
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
-        seeds = [TIMELOCK_SIGNER_SEED],
+        seeds = [TIMELOCK_SIGNER_SEED, timelock_id.as_ref()],
         bump
     )]
     pub timelock_signer: UncheckedAccount<'info>,
@@ -158,22 +174,22 @@ pub struct ExecuteBatch<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(id: [u8; 32])]
+#[instruction(timelock_id: [u8; 32], id: [u8; 32])]
 pub struct BypasserExecuteBatch<'info> {
     #[account(
         mut,
-        seeds = [TIMELOCK_OPERATION_SEED, id.as_ref()],
+        seeds = [TIMELOCK_OPERATION_SEED, timelock_id.as_ref(), id.as_ref()],
         bump,
         constraint = operation.is_finalized @ TimelockError::OperationNotFinalized,
     )]
     pub operation: Account<'info, Operation>,
 
-    #[account( seeds = [TIMELOCK_CONFIG_SEED], bump)]
+    #[account( seeds = [TIMELOCK_CONFIG_SEED, timelock_id.as_ref(),], bump)]
     pub config: Account<'info, Config>,
 
     /// CHECK: program signer PDA that can hold balance
     #[account(
-        seeds = [TIMELOCK_SIGNER_SEED],
+        seeds = [TIMELOCK_SIGNER_SEED, timelock_id.as_ref()],
         bump
     )]
     pub timelock_signer: UncheckedAccount<'info>,

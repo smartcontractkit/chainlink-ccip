@@ -13,6 +13,9 @@ pub struct TokenAdminRegistry {
     pub administrator: Pubkey,
     pub pending_administrator: Pubkey,
     pub lookup_table: Pubkey,
+    // binary representation of indexes that are writable in token pool lookup table
+    // lookup table can store 256 addresses
+    pub writable_indexes: [u128; 2],
 }
 
 #[derive(Accounts)]
@@ -69,6 +72,22 @@ pub struct ModifyTokenAdminRegistry<'info> {
         constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
     )]
     pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
+    pub authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(mint: Pubkey)]
+pub struct SetPoolTokenAdminRegistry<'info> {
+    #[account(
+        mut,
+        seeds = [TOKEN_ADMIN_REGISTRY_SEED, mint.as_ref()],
+        bump,
+        constraint = valid_version(token_admin_registry.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
+    )]
+    pub token_admin_registry: Account<'info, TokenAdminRegistry>,
+    /// CHECK: anchor does not support automatic lookup table deserialization
+    pub pool_lookuptable: UncheckedAccount<'info>,
     #[account(mut, address = token_admin_registry.administrator @ CcipRouterError::Unauthorized)]
     pub authority: Signer<'info>,
 }

@@ -12,7 +12,7 @@ import (
 
 // AcceptOwnership is the `acceptOwnership` instruction.
 type AcceptOwnership struct {
-	MultisigName *[32]uint8
+	MultisigId *[32]uint8
 
 	// [0] = [WRITE] config
 	//
@@ -28,9 +28,9 @@ func NewAcceptOwnershipInstructionBuilder() *AcceptOwnership {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *AcceptOwnership) SetMultisigName(multisigName [32]uint8) *AcceptOwnership {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *AcceptOwnership) SetMultisigId(multisigId [32]uint8) *AcceptOwnership {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -76,8 +76,8 @@ func (inst AcceptOwnership) ValidateAndBuild() (*Instruction, error) {
 func (inst *AcceptOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 	}
 
@@ -103,7 +103,7 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
 					})
 
 					// Accounts of the instruction:
@@ -116,16 +116,16 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj AcceptOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *AcceptOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -135,12 +135,12 @@ func (obj *AcceptOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewAcceptOwnershipInstruction declares a new AcceptOwnership instruction with the provided parameters and accounts.
 func NewAcceptOwnershipInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AcceptOwnership {
 	return NewAcceptOwnershipInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }
