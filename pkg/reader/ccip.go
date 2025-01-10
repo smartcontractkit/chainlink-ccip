@@ -96,10 +96,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	type MerkleRoot struct {
 		SourceChainSelector uint64
+		OnRampAddress       []byte
 		MinSeqNr            uint64
 		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
-		OnRampAddress       []byte
 	}
 
 	type TokenPriceUpdate struct {
@@ -118,8 +118,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	type CommitReportAcceptedEvent struct {
-		PriceUpdates PriceUpdates
 		MerkleRoots  []MerkleRoot
+		PriceUpdates PriceUpdates
 	}
 	// ---------------------------------------------------
 
@@ -233,7 +233,11 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 	type ExecutionStateChangedEvent struct {
 		SourceChainSelector cciptypes.ChainSelector
 		SequenceNumber      cciptypes.SeqNum
+		MessageID           cciptypes.Bytes32
+		MessageHash         cciptypes.Bytes32
 		State               uint8
+		ReturnData          cciptypes.Bytes
+		GasUsed             uint64
 	}
 
 	dataTyp := ExecutionStateChangedEvent{}
@@ -300,6 +304,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 
 	type SendRequestedEvent struct {
 		DestChainSelector cciptypes.ChainSelector
+		SequenceNumber    cciptypes.SeqNum
 		Message           cciptypes.Message
 	}
 
@@ -1054,8 +1059,8 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 type sourceChainConfig struct {
 	Router    []byte // local router
 	IsEnabled bool
-	OnRamp    []byte
 	MinSeqNr  uint64
+	OnRamp    []byte
 }
 
 func (scc sourceChainConfig) check() (bool /* enabled */, error) {
