@@ -1,8 +1,6 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::{valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG};
-
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
@@ -214,29 +212,6 @@ pub struct BillingTokenConfig {
     pub usd_per_token: TimestampedPackedU224,
     // billing configs
     pub premium_multiplier_wei_per_eth: u64,
-}
-
-impl BillingTokenConfig {
-    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
-    // specifying a token that has no Billing config.
-    pub fn validated_try_from<'info>(
-        account: &'info AccountInfo<'info>,
-        token: Pubkey,
-    ) -> Result<Option<Self>> {
-        if account.key() == Pubkey::default() {
-            return Ok(None);
-        }
-
-        let (expected, _) =
-            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
-        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
-        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
-        require!(
-            valid_version(account.version, 1),
-            CcipRouterError::InvalidInputs
-        );
-        Ok(Some(account.into_inner().config))
-    }
 }
 
 #[account]
