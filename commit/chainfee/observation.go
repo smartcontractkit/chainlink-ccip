@@ -111,7 +111,10 @@ func (p *processor) Observation(
 }
 
 // filterMapBySet filters a map based on the keys present in the set.
-func filterMapByUniqueChains[T comparable](m map[cciptypes.ChainSelector]T, s mapset.Set[cciptypes.ChainSelector]) map[cciptypes.ChainSelector]T {
+func filterMapByUniqueChains[T comparable](
+	m map[cciptypes.ChainSelector]T,
+	s mapset.Set[cciptypes.ChainSelector],
+) map[cciptypes.ChainSelector]T {
 	filtered := make(map[cciptypes.ChainSelector]T)
 	for k, v := range m {
 		if s.Contains(k) {
