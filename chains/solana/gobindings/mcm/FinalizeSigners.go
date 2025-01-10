@@ -12,7 +12,7 @@ import (
 
 // FinalizeSigners is the `finalizeSigners` instruction.
 type FinalizeSigners struct {
-	MultisigName *[32]uint8
+	MultisigId *[32]uint8
 
 	// [0] = [] multisigConfig
 	//
@@ -30,9 +30,9 @@ func NewFinalizeSignersInstructionBuilder() *FinalizeSigners {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *FinalizeSigners) SetMultisigName(multisigName [32]uint8) *FinalizeSigners {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *FinalizeSigners) SetMultisigId(multisigId [32]uint8) *FinalizeSigners {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -89,8 +89,8 @@ func (inst FinalizeSigners) ValidateAndBuild() (*Instruction, error) {
 func (inst *FinalizeSigners) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 	}
 
@@ -119,7 +119,7 @@ func (inst *FinalizeSigners) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
 					})
 
 					// Accounts of the instruction:
@@ -133,16 +133,16 @@ func (inst *FinalizeSigners) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj FinalizeSigners) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 func (obj *FinalizeSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -152,13 +152,13 @@ func (obj *FinalizeSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (er
 // NewFinalizeSignersInstruction declares a new FinalizeSigners instruction with the provided parameters and accounts.
 func NewFinalizeSignersInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	configSigners ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeSigners {
 	return NewFinalizeSignersInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetMultisigConfigAccount(multisigConfig).
 		SetConfigSignersAccount(configSigners).
 		SetAuthorityAccount(authority)

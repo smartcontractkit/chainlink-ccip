@@ -291,8 +291,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return([]*big.Int{arbPrice, ethPrice}, nil).
-					Maybe()
+					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
+						arbAddr: arbPrice,
+						ethAddr: ethPrice,
+					}, nil).Maybe()
 
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
@@ -345,7 +347,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return([]*big.Int{arbPrice, ethPrice}, nil).
+					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
+						arbAddr: arbPrice,
+						ethAddr: ethPrice,
+					}, nil).
 					Maybe()
 
 				// Arb is fresh, will not be updated
@@ -371,8 +376,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return([]*big.Int{arbPrice, ethPrice}, nil).
-					Maybe()
+					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
+						arbAddr: arbPrice,
+						ethAddr: ethPrice,
+					}, nil).Maybe()
 
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
@@ -748,8 +755,7 @@ func preparePriceReaderMock(ctx context.Context, priceReader *readerpkg_mock.Moc
 
 	priceReader.EXPECT().
 		GetFeedPricesUSD(ctx, mock.Anything).
-		Return([]*big.Int{}, nil).
-		Maybe()
+		Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{}, nil).Maybe()
 }
 
 type nodeSetup struct {

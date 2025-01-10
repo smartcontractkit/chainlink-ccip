@@ -12,7 +12,8 @@ import (
 
 // UpdateDelay is the `updateDelay` instruction.
 type UpdateDelay struct {
-	Delay *uint64
+	TimelockId *[32]uint8
+	Delay      *uint64
 
 	// [0] = [WRITE] config
 	//
@@ -26,6 +27,12 @@ func NewUpdateDelayInstructionBuilder() *UpdateDelay {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *UpdateDelay) SetTimelockId(timelockId [32]uint8) *UpdateDelay {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetDelay sets the "delay" parameter.
@@ -76,6 +83,9 @@ func (inst UpdateDelay) ValidateAndBuild() (*Instruction, error) {
 func (inst *UpdateDelay) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Delay == nil {
 			return errors.New("Delay parameter is not set")
 		}
@@ -102,8 +112,9 @@ func (inst *UpdateDelay) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Delay", *inst.Delay))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("     Delay", *inst.Delay))
 					})
 
 					// Accounts of the instruction:
@@ -116,6 +127,11 @@ func (inst *UpdateDelay) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj UpdateDelay) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Delay` param:
 	err = encoder.Encode(obj.Delay)
 	if err != nil {
@@ -124,6 +140,11 @@ func (obj UpdateDelay) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error
 	return nil
 }
 func (obj *UpdateDelay) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Delay`:
 	err = decoder.Decode(&obj.Delay)
 	if err != nil {
@@ -135,11 +156,13 @@ func (obj *UpdateDelay) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err er
 // NewUpdateDelayInstruction declares a new UpdateDelay instruction with the provided parameters and accounts.
 func NewUpdateDelayInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	delay uint64,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UpdateDelay {
 	return NewUpdateDelayInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetDelay(delay).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)

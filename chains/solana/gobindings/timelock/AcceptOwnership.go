@@ -12,6 +12,7 @@ import (
 
 // AcceptOwnership is the `acceptOwnership` instruction.
 type AcceptOwnership struct {
+	TimelockId *[32]uint8
 
 	// [0] = [WRITE] config
 	//
@@ -25,6 +26,12 @@ func NewAcceptOwnershipInstructionBuilder() *AcceptOwnership {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *AcceptOwnership) SetTimelockId(timelockId [32]uint8) *AcceptOwnership {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetConfigAccount sets the "config" account.
@@ -67,6 +74,13 @@ func (inst AcceptOwnership) ValidateAndBuild() (*Instruction, error) {
 }
 
 func (inst *AcceptOwnership) Validate() error {
+	// Check whether all (required) parameters are set:
+	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
+	}
+
 	// Check whether all (required) accounts are set:
 	{
 		if inst.AccountMetaSlice[0] == nil {
@@ -88,7 +102,9 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=0]").ParentFunc(func(paramsBranch ag_treeout.Branches) {})
+					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+					})
 
 					// Accounts of the instruction:
 					instructionBranch.Child("Accounts[len=2]").ParentFunc(func(accountsBranch ag_treeout.Branches) {
@@ -100,18 +116,31 @@ func (inst *AcceptOwnership) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj AcceptOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *AcceptOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // NewAcceptOwnershipInstruction declares a new AcceptOwnership instruction with the provided parameters and accounts.
 func NewAcceptOwnershipInstruction(
+	// Parameters:
+	timelockId [32]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AcceptOwnership {
 	return NewAcceptOwnershipInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
 }

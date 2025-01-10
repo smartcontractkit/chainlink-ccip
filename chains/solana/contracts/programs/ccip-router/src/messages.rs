@@ -1,10 +1,6 @@
-use crate::{BillingTokenConfig, CcipRouterError, DestChain, ReportContext};
+use crate::{BillingTokenConfig, CcipRouterError, DestChain};
 use anchor_lang::prelude::*;
 use ethnum::U256;
-
-// TODO this file has to be broken up
-
-use crate::ocr3base::Ocr3Report;
 
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
 
@@ -42,25 +38,6 @@ pub struct ExecutionReportSingleChain {
 
     // NOT HASHED
     pub token_indexes: Vec<u8>, // outside of message because this is not available during commit stage
-}
-
-impl Ocr3Report for ExecutionReportSingleChain {
-    fn hash(&self, _: &ReportContext) -> [u8; 32] {
-        [0; 32] // not needed, this report is not hashed for signing
-    }
-    fn len(&self) -> usize {
-        let offchain_token_data_len = self
-            .offchain_token_data
-            .iter()
-            .fold(0, |acc, e| acc + 4 + e.len());
-
-        8 // source chain selector
-        + self.message.len() // ccip message
-        + 4 + offchain_token_data_len// offchain_token_data
-        + 32 // root
-        + 4 + self.proofs.len() * 32 // count + proofs
-        + 4 + self.token_indexes.len() // token_indexes
-    }
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]

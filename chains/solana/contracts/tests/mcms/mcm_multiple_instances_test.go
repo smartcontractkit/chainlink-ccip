@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 )
 
-func TestMcmMultipleMultisigs(t *testing.T) {
+func TestMcmMultipleInstances(t *testing.T) {
 	t.Parallel()
 	mcm.SetProgramID(config.McmProgram)
 
@@ -31,20 +31,20 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	// mcm multisig 1
-	testMsigName1, err := mcms.PadString32("test_mcm_instance_1")
+	testMsigID1, err := mcms.PadString32("test_mcm_instance_1")
 	require.NoError(t, err)
-	multisigConfigPDA1 := mcms.McmConfigAddress(testMsigName1)
-	rootMetadataPDA1 := mcms.RootMetadataAddress(testMsigName1)
-	expiringRootAndOpCountPDA1 := mcms.ExpiringRootAndOpCountAddress(testMsigName1)
-	configSignersPDA1 := mcms.McmConfigSignersAddress(testMsigName1)
+	multisigConfigPDA1 := mcms.GetConfigPDA(testMsigID1)
+	rootMetadataPDA1 := mcms.GetRootMetadataPDA(testMsigID1)
+	expiringRootAndOpCountPDA1 := mcms.GetExpiringRootAndOpCountPDA(testMsigID1)
+	configSignersPDA1 := mcms.GetConfigSignersPDA(testMsigID1)
 
 	// mcm multisig 2
-	testMsigName2, err := mcms.PadString32("test_mcm_instance_2")
+	testMsigID2, err := mcms.PadString32("test_mcm_instance_2")
 	require.NoError(t, err)
-	multisigConfigPDA2 := mcms.McmConfigAddress(testMsigName2)
-	rootMetadataPDA2 := mcms.RootMetadataAddress(testMsigName2)
-	expiringRootAndOpCountPDA2 := mcms.ExpiringRootAndOpCountAddress(testMsigName2)
-	configSignersPDA2 := mcms.McmConfigSignersAddress(testMsigName2)
+	multisigConfigPDA2 := mcms.GetConfigPDA(testMsigID2)
+	rootMetadataPDA2 := mcms.GetRootMetadataPDA(testMsigID2)
+	expiringRootAndOpCountPDA2 := mcms.GetExpiringRootAndOpCountPDA(testMsigID2)
+	configSignersPDA2 := mcms.GetConfigSignersPDA(testMsigID2)
 
 	t.Run("setup:funding", func(t *testing.T) {
 		testutils.FundAccounts(ctx, []solana.PrivateKey{admin}, solanaGoClient, t)
@@ -67,7 +67,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			ix, err := mcm.NewInitializeInstruction(
 				config.TestChainID,
-				testMsigName1,
+				testMsigID1,
 				multisigConfigPDA1,
 				admin.PublicKey(),
 				solana.SystemProgramID,
@@ -103,7 +103,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
 			mcmConfig, err := mcms.NewValidMcmConfig(
-				testMsigName1,
+				testMsigID1,
 				signerPrivateKeys,
 				signerGroups,
 				groupQuorums,
@@ -115,7 +115,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigID1, multisigConfigPDA1, configSignersPDA1, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
@@ -136,7 +136,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			t.Run("success:set_config", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					testMsigName1,
+					testMsigID1,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
@@ -191,7 +191,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			ix, err := mcm.NewInitializeInstruction(
 				config.TestChainID,
-				testMsigName2,
+				testMsigID2,
 				multisigConfigPDA2,
 				admin.PublicKey(),
 				solana.SystemProgramID,
@@ -226,7 +226,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
 			mcmConfig, err := mcms.NewValidMcmConfig(
-				testMsigName2,
+				testMsigID2,
 				signerPrivateKeys,
 				signerGroups,
 				groupQuorums,
@@ -238,7 +238,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 			signerAddresses := mcmConfig.SignerAddresses
 
 			t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-				preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+				preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigID2, multisigConfigPDA2, configSignersPDA2, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 				require.NoError(t, pierr)
 
 				for _, ix := range preloadIxs {
@@ -259,7 +259,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			t.Run("fail:set_config with invalid seeds", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					testMsigName1,
+					testMsigID1,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
@@ -280,7 +280,7 @@ func TestMcmMultipleMultisigs(t *testing.T) {
 
 			t.Run("success:set_config", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					testMsigName2,
+					testMsigID2,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,

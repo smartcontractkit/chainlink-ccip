@@ -12,7 +12,8 @@ import (
 
 // UnblockFunctionSelector is the `unblockFunctionSelector` instruction.
 type UnblockFunctionSelector struct {
-	Selector *[8]uint8
+	TimelockId *[32]uint8
+	Selector   *[8]uint8
 
 	// [0] = [WRITE] config
 	//
@@ -26,6 +27,12 @@ func NewUnblockFunctionSelectorInstructionBuilder() *UnblockFunctionSelector {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 2),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *UnblockFunctionSelector) SetTimelockId(timelockId [32]uint8) *UnblockFunctionSelector {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetSelector sets the "selector" parameter.
@@ -76,6 +83,9 @@ func (inst UnblockFunctionSelector) ValidateAndBuild() (*Instruction, error) {
 func (inst *UnblockFunctionSelector) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Selector == nil {
 			return errors.New("Selector parameter is not set")
 		}
@@ -102,8 +112,9 @@ func (inst *UnblockFunctionSelector) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Selector", *inst.Selector))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("  Selector", *inst.Selector))
 					})
 
 					// Accounts of the instruction:
@@ -116,6 +127,11 @@ func (inst *UnblockFunctionSelector) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj UnblockFunctionSelector) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Selector` param:
 	err = encoder.Encode(obj.Selector)
 	if err != nil {
@@ -124,6 +140,11 @@ func (obj UnblockFunctionSelector) MarshalWithEncoder(encoder *ag_binary.Encoder
 	return nil
 }
 func (obj *UnblockFunctionSelector) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Selector`:
 	err = decoder.Decode(&obj.Selector)
 	if err != nil {
@@ -135,11 +156,13 @@ func (obj *UnblockFunctionSelector) UnmarshalWithDecoder(decoder *ag_binary.Deco
 // NewUnblockFunctionSelectorInstruction declares a new UnblockFunctionSelector instruction with the provided parameters and accounts.
 func NewUnblockFunctionSelectorInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	selector [8]uint8,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *UnblockFunctionSelector {
 	return NewUnblockFunctionSelectorInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetSelector(selector).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)
