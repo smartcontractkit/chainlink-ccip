@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mr-tron/base58"
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
@@ -57,7 +58,13 @@ func (a TokenInfo) Validate() error {
 
 	switch a.ChainFamily {
 	case chain_selectors.FamilySolana:
-		// solana validation
+		decoded, err := base58.Decode(string(a.AggregatorAddress))
+		if err != nil {
+			return fmt.Errorf("aggregatorAddress must be a valid Solana address (i.e. base58 encoded): %w", err)
+		}
+		if len(decoded) != 32 {
+			return fmt.Errorf("aggregatorAddress must be a valid Solana address, got %d bytes expected 32", len(decoded))
+		}
 	case chain_selectors.FamilyEVM:
 		// EVM is the default case
 		fallthrough
