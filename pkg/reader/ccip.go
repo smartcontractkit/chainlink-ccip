@@ -96,7 +96,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	type MerkleRoot struct {
 		SourceChainSelector uint64
-		OnRampAddress       UnknownAddress
+		OnRampAddress       cciptypes.UnknownAddress
 		MinSeqNr            uint64
 		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
@@ -1060,7 +1060,7 @@ type sourceChainConfig struct {
 	Router    []byte // local router
 	IsEnabled bool
 	MinSeqNr  uint64
-	OnRamp    UnknownAddress
+	OnRamp    cciptypes.UnknownAddress
 }
 
 func (scc sourceChainConfig) check() (bool /* enabled */, error) {
