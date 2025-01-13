@@ -160,6 +160,12 @@ func (u *TokenDataObserver) extractTokenData(
 	messages exectypes.MessageObservations,
 	attestations map[cciptypes.ChainSelector]map[reader.MessageTokenID]AttestationStatus,
 ) (exectypes.TokenDataObservations, error) {
+	if attestations == nil {
+		// TODO: is this an error?
+		u.lggr.Warnw("extractTokenData given a nil attestations map.")
+		return exectypes.TokenDataObservations{}, nil
+	}
+
 	tokenObservations := make(exectypes.TokenDataObservations)
 
 	for chainSelector, chainMessages := range messages {
@@ -194,6 +200,11 @@ func (u *TokenDataObserver) attestationToTokenData(
 	tokenIndex int,
 	attestations map[reader.MessageTokenID]AttestationStatus,
 ) exectypes.TokenData {
+	if attestations == nil {
+		// TODO: is this an error?
+		u.lggr.Warnw("attestationToTokenData given a nil attestations map.")
+		return exectypes.NewErrorTokenData(fmt.Errorf("missing token status"))
+	}
 	status, ok := attestations[reader.NewMessageTokenID(seqNr, tokenIndex)]
 	if !ok {
 		return exectypes.NewErrorTokenData(ErrDataMissing)
