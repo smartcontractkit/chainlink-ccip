@@ -66,8 +66,12 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain,
     )?;
 
-    // TODO extract from extra args if available
-    let gas_limit = U256::new(dest_chain.config.default_tx_gas_limit.into());
+    let gas_limit = U256::new(
+        message
+            .extra_args
+            .gas_limit
+            .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
+    );
 
     let execution_gas = gas_limit
         + U256::new(dest_chain.config.dest_gas_overhead as u128)
