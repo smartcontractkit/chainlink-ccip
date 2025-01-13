@@ -91,7 +91,6 @@ func (p *processor) Observation(
 
 	uniqueChains := mapset.NewSet[cciptypes.ChainSelector](maps.Keys(feeComponents)...)
 	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(nativeTokenPrices)...))
-	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(chainFeeUpdates)...))
 
 	if len(uniqueChains.ToSlice()) == 0 {
 		p.lggr.Info("observations don't have any unique chains")
@@ -102,7 +101,7 @@ func (p *processor) Observation(
 		FChain:            fChain,
 		FeeComponents:     filterMapByUniqueChains(feeComponents, uniqueChains),
 		NativeTokenPrices: filterMapByUniqueChains(nativeTokenPrices, uniqueChains),
-		ChainFeeUpdates:   filterMapByUniqueChains(chainFeeUpdates, uniqueChains),
+		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      now,
 	}
 

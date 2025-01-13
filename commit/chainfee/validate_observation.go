@@ -21,6 +21,10 @@ func (p *processor) ValidateObservation(
 	obs := ao.Observation
 	zero := big.NewInt(0)
 
+	if obs.IsEmpty() {
+		return nil
+	}
+
 	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("failed to validate FChain: %w", err)
 	}
@@ -92,9 +96,6 @@ func validateObservedChains(
 	obs := ao.Observation
 	if !areMapKeysEqual(obs.FeeComponents, obs.NativeTokenPrices) {
 		return fmt.Errorf("fee components and native token prices have different observed chains")
-	}
-	if !areMapKeysEqual(obs.NativeTokenPrices, obs.ChainFeeUpdates) {
-		return fmt.Errorf("native token and chain fee updates prices have different observed chains")
 	}
 
 	observedChains := append(maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices)...)

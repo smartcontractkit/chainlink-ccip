@@ -226,7 +226,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			expUniqueChains: 2,
 		},
 		{
-			name:            "only one unique chains",
+			name:            "only one unique chain between fee components and native token prices",
 			supportedChains: []ccipocr3.ChainSelector{1, 2, 3},
 			dstChain:        3,
 			chainFeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
@@ -266,7 +266,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 			expUniqueChains: 1,
 		},
 		{
-			name:            "zero unique chains",
+			name:            "zero unique chains between fee components and native token prices",
 			supportedChains: []ccipocr3.ChainSelector{1, 2, 3},
 			dstChain:        3,
 			chainFeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
@@ -280,7 +280,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 				},
 			},
 			nativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-				1: ccipocr3.NewBigIntFromInt64(1000),
+				3: ccipocr3.NewBigIntFromInt64(1000),
 			},
 			existingChainFeePriceUpdates: map[ccipocr3.ChainSelector]plugintypes.TimestampedBig{
 				3: {
@@ -348,9 +348,7 @@ func Test_unique_chain_filter_in_Observation(t *testing.T) {
 
 			require.True(t, tc.expUniqueChains == len(maps.Keys(obs.FeeComponents)))
 			require.True(t, tc.expUniqueChains == len(maps.Keys(obs.NativeTokenPrices)))
-			require.True(t, tc.expUniqueChains == len(maps.Keys(obs.ChainFeeUpdates)))
 			require.ElementsMatch(t, maps.Keys(obs.FeeComponents), maps.Keys(obs.NativeTokenPrices))
-			require.ElementsMatch(t, maps.Keys(obs.NativeTokenPrices), maps.Keys(obs.ChainFeeUpdates))
 		})
 	}
 }

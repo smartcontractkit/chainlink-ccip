@@ -274,35 +274,6 @@ func Test_validateObservedChains(t *testing.T) {
 			observerSupportedChains: mapset.NewSet[ccipocr3.ChainSelector](1, 2),
 			expectedError:           "fee components and native token prices have different observed chains",
 		},
-		{
-			name: "different observed chains in native token prices and chain fee updates",
-			ao: plugincommon.AttributedObservation[Observation]{
-				Observation: Observation{
-					FeeComponents: map[ccipocr3.ChainSelector]types.ChainFeeComponents{
-						1: {
-							ExecutionFee:        big.NewInt(10),
-							DataAvailabilityFee: big.NewInt(20),
-						},
-					},
-					NativeTokenPrices: map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-						1: {
-							Int: big.NewInt(100),
-						},
-					},
-					ChainFeeUpdates: map[ccipocr3.ChainSelector]Update{
-						2: {
-							ChainFee: ComponentsUSDPrices{
-								ExecutionFeePriceUSD: big.NewInt(10),
-								DataAvFeePriceUSD:    big.NewInt(20),
-							},
-							Timestamp: fourHoursAgo,
-						},
-					},
-				},
-			},
-			observerSupportedChains: mapset.NewSet[ccipocr3.ChainSelector](1, 2, 3),
-			expectedError:           "native token and chain fee updates prices have different observed chains",
-		},
 	}
 
 	for _, tt := range tests {
