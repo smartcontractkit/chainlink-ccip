@@ -1190,6 +1190,11 @@
           "isSigner": false
         },
         {
+          "name": "linkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "feeTokenUserAssociatedAccount",
           "isMut": false,
           "isSigner": false,
@@ -1548,6 +1553,14 @@
                 2
               ]
             }
+          },
+          {
+            "name": "maxFeeJuelsPerMsg",
+            "type": "u128"
+          },
+          {
+            "name": "linkTokenMint",
+            "type": "publicKey"
           },
           {
             "name": "feeAggregator",
@@ -2882,6 +2895,12 @@
           },
           {
             "name": "InvalidInputsMissingTokenConfig"
+          },
+          {
+            "name": "MessageFeeTooHigh"
+          },
+          {
+            "name": "SourceTokenDataTooLarge"
           }
         ]
       }
