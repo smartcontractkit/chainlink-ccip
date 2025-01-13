@@ -681,7 +681,8 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
-    let on_ramp_address_size = [on_ramp_address.len() as u8];
+    let trimmed_on_ramp_address = trim_leading_zeros(on_ramp_address);
+    let on_ramp_address_size = [trimmed_on_ramp_address.len() as u8];
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -704,7 +705,7 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size,
-        on_ramp_address,
+        trimmed_on_ramp_address,
         &msg.header.message_id,
         &msg.receiver.to_bytes(),
         &header_sequence_number,
@@ -721,6 +722,14 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
     result.to_bytes()
 }
 
+fn trim_leading_zeros(input: &[u8]) -> &[u8] {
+    let start = input
+        .iter()
+        .position(|&byte| byte != 0)
+        .unwrap_or(input.len());
+    &input[start..]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -729,6 +738,8 @@ mod tests {
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
+        let on_ramp_address = &[1, 2, 3].to_vec();
+
         let message = Any2SolanaRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -756,14 +767,32 @@ mod tests {
                     is_writable: true,
                 }],
             },
+            on_ramp_address: on_ramp_address.clone(),
         };
-
-        let on_ramp_address = &[1, 2, 3].to_vec();
         let hash_result = hash(&message, on_ramp_address);
 
         assert_eq!(
             "03da97f96c82237d8a8ab0f68d4f7ba02afe188b4a876f348278fbf2226312ed",
             hex::encode(hash_result)
         );
+    }
+
+    #[test]
+    fn test_trim_leading_zeros() {
+        let input = vec![0, 0, 0, 1, 2, 3];
+        let expected_output = &[1, 2, 3];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![1, 2, 3];
+        let expected_output = &[1, 2, 3];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![0, 0, 0];
+        let expected_output: &[u8] = &[];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![];
+        let expected_output: &[u8] = &[];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
     }
 }
