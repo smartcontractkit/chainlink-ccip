@@ -63,7 +63,7 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage,
+        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage, TimestampedPackedU224,
         CHAIN_FAMILY_SELECTOR_EVM,
     };
 
@@ -134,11 +134,10 @@ pub mod ramps {
 
     #[cfg(test)]
     pub mod tests {
+        use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::utils::Usd18Decimals;
         use super::*;
-        use crate::{
-            v1::fee_quoter::PackedPrice, ExtraArgsInput, SolanaTokenAmount, UnpackedDoubleU224,
-        };
+        use crate::{ExtraArgsInput, SolanaTokenAmount};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
 

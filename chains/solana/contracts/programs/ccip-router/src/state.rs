@@ -217,30 +217,6 @@ impl TimestampedPackedU224 {
         value.clone_from_slice(&single.to_be_bytes()[4..32]);
         Self { value, timestamp }
     }
-
-    pub fn unpack(&self) -> UnpackedDoubleU224 {
-        let mut u128_buffer = [0u8; 16];
-        u128_buffer[2..16].clone_from_slice(&self.value[14..]);
-        let high = u128::from_be_bytes(u128_buffer);
-        u128_buffer[2..16].clone_from_slice(&self.value[..14]);
-        let low = u128::from_be_bytes(u128_buffer);
-        UnpackedDoubleU224 { high, low }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct UnpackedDoubleU224 {
-    pub high: u128,
-    pub low: u128,
-}
-
-impl UnpackedDoubleU224 {
-    pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
-        let mut value = [0u8; 28];
-        value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-        value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
-        TimestampedPackedU224 { value, timestamp }
-    }
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]

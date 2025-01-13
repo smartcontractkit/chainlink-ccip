@@ -7,7 +7,7 @@ use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
     BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
-    SolanaTokenAmount, UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
+    SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::messages::ramps::validate_solana2any;
@@ -225,11 +225,43 @@ pub struct PackedPrice {
     pub data_availability_gas_price: Usd18Decimals,
 }
 
-impl From<UnpackedDoubleU224> for PackedPrice {
-    fn from(value: UnpackedDoubleU224) -> Self {
-        Self {
-            execution_gas_price: Usd18Decimals(value.low.into()),
-            data_availability_gas_price: Usd18Decimals(value.high.into()),
+impl From<&TimestampedPackedU224> for PackedPrice {
+    fn from(value: &TimestampedPackedU224) -> Self {
+        UnpackedDoubleU224::from(value).into()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnpackedDoubleU224 {
+    pub high: u128,
+    pub low: u128,
+}
+
+impl UnpackedDoubleU224 {
+    pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
+        let mut value = [0u8; 28];
+        value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
+        value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+        TimestampedPackedU224 { value, timestamp }
+    }
+}
+
+impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
+    fn from(packed: &TimestampedPackedU224) -> Self {
+        let mut u128_buffer = [0u8; 16];
+        u128_buffer[2..16].clone_from_slice(&packed.value[14..]);
+        let high = u128::from_be_bytes(u128_buffer);
+        u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
+        let low = u128::from_be_bytes(u128_buffer);
+        Self { high, low }
+    }
+}
+
+impl Into<PackedPrice> for UnpackedDoubleU224 {
+    fn into(self) -> PackedPrice {
+        PackedPrice {
+            execution_gas_price: Usd18Decimals(self.low.into()),
+            data_availability_gas_price: Usd18Decimals(self.high.into()),
         }
     }
 }
@@ -255,7 +287,7 @@ impl TryFrom<PackedPrice> for UnpackedDoubleU224 {
 
 fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     let timestamp = dest_chain.state.usd_per_unit_gas.timestamp;
-    let price = dest_chain.state.usd_per_unit_gas.unpack().into();
+    let price = PackedPrice::from(&dest_chain.state.usd_per_unit_gas);
     let threshold = dest_chain.config.gas_price_staleness_threshold as i64;
     let elapsed_time = Clock::get()?.unix_timestamp - timestamp;
 
@@ -741,10 +773,9 @@ mod tests {
         };
 
         let roundtrip = PackedPrice::from(
-            TryInto::<UnpackedDoubleU224>::try_into(price.clone())
+            &TryInto::<UnpackedDoubleU224>::try_into(price.clone())
                 .unwrap()
-                .pack(0)
-                .unpack(),
+                .pack(0),
         );
         assert_eq!(price, roundtrip);
     }
