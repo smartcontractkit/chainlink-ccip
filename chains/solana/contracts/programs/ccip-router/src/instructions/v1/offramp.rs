@@ -348,11 +348,10 @@ fn internal_execute<'info>(
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
-    let on_ramp_address = &execution_report.message.on_ramp_address;
     require!(
         source_chain_state
             .config
-            .is_on_ramp_configured(on_ramp_address),
+            .is_on_ramp_configured(&execution_report.message.on_ramp_address),
         CcipRouterError::InvalidInputs
     );
 
@@ -383,7 +382,7 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
-    let hashed_leaf = verify_merkle_root(&execution_report, on_ramp_address)?;
+    let hashed_leaf = verify_merkle_root(&execution_report)?;
 
     // send tokens any -> SOL
     require!(
@@ -622,11 +621,8 @@ fn build_receiver_discriminator_and_data(ramp_message: Any2SolanaMessage) -> Res
     Ok(data)
 }
 
-pub fn verify_merkle_root(
-    execution_report: &ExecutionReportSingleChain,
-    on_ramp_address: &[u8],
-) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message, on_ramp_address);
+pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {
+    let hashed_leaf = hash(&execution_report.message);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
@@ -676,12 +672,12 @@ pub fn validate_execution_report<'info>(
     Ok(())
 }
 
-fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
+fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
     use anchor_lang::solana_program::hash;
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
-    let trimmed_on_ramp_address = trim_leading_zeros(on_ramp_address);
+    let trimmed_on_ramp_address = trim_leading_zeros(&msg.on_ramp_address);
     let on_ramp_address_size = [trimmed_on_ramp_address.len() as u8];
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
@@ -769,7 +765,7 @@ mod tests {
             },
             on_ramp_address: on_ramp_address.clone(),
         };
-        let hash_result = hash(&message, on_ramp_address);
+        let hash_result = hash(&message);
 
         assert_eq!(
             "03da97f96c82237d8a8ab0f68d4f7ba02afe188b4a876f348278fbf2226312ed",

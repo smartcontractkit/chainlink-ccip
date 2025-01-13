@@ -85,6 +85,7 @@ impl Any2SolanaRampMessage {
         + 32 // receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
+        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
 }
 
