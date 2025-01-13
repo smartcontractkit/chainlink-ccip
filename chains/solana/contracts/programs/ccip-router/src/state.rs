@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use ethnum::U256;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -203,14 +202,6 @@ pub struct BillingTokenConfigWrapper {
 pub struct TimestampedPackedU224 {
     pub value: [u8; 28],
     pub timestamp: i64, // maintaining the type that Solana returns for the time (solana_program::clock::UnixTimestamp = i64)
-}
-
-impl TimestampedPackedU224 {
-    pub fn from_single(timestamp: i64, single: U256) -> Self {
-        let mut value = [0u8; 28];
-        value.clone_from_slice(&single.to_be_bytes()[4..32]);
-        Self { value, timestamp }
-    }
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
