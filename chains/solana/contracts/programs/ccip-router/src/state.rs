@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 use ethnum::U256;
 
+use crate::CcipRouterError;
+
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]
@@ -308,6 +310,8 @@ impl TryFrom<u128> for MessageExecutionState {
 
 #[cfg(test)]
 mod tests {
+    use crate::CcipRouterError;
+
     use super::*;
     use std::convert::TryFrom;
 
