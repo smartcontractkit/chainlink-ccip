@@ -361,7 +361,7 @@ fn internal_execute<'info>(
         solana_chain_selector,
     )?;
 
-    let original_state = commit_report_state::get(commit_report, message_header.sequence_number);
+    let original_state = execution_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
         emit!(SkippedAlreadyExecutedMessage {
@@ -509,7 +509,7 @@ fn internal_execute<'info>(
     }
 
     let new_state = MessageExecutionState::Success;
-    commit_report_state::set(
+    execution_state::set(
         commit_report,
         message_header.sequence_number,
         new_state.to_owned(),
@@ -713,7 +713,7 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
     result.to_bytes()
 }
 
-mod commit_report_state {
+mod execution_state {
     use crate::{CommitReport, MessageExecutionState};
 
     pub fn set(
