@@ -1268,8 +1268,8 @@ func Test_getMessageTimestampMap(t *testing.T) {
 					},
 				},
 			},
-			want:    nil,
-			wantErr: assert.Error,
+			want:    map[cciptypes.Bytes32]time.Time{},
+			wantErr: assert.NoError,
 		},
 		{
 			name: "happy path",
@@ -1309,10 +1309,7 @@ func Test_getMessageTimestampMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getMessageTimestampMap(tt.commitReportCache, tt.obs)
-			if !tt.wantErr(t, err, "getMessageTimestampMap(...)") {
-				return
-			}
+			got := getMessageTimestampMap(tt.commitReportCache, tt.obs)
 			assert.Equal(t, tt.want, got)
 		})
 	}
