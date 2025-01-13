@@ -245,15 +245,6 @@ pub struct UnpackedDoubleU224 {
     pub low: u128,
 }
 
-impl UnpackedDoubleU224 {
-    pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
-        let mut value = [0u8; 28];
-        value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-        value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
-        TimestampedPackedU224 { value, timestamp }
-    }
-}
-
 impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
     fn from(packed: &TimestampedPackedU224) -> Self {
         let mut u128_buffer = [0u8; 16];
@@ -310,17 +301,17 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
 
 fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
     let timestamp = token_config.usd_per_token.timestamp;
-    let price = token_config.usd_per_token.as_single();
+    let price: Usd18Decimals = (&token_config.usd_per_token).into();
 
     // NOTE: There's no validation done with respect to token price staleness since data feeds are not
     // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
     // was set at least once.
     require!(
-        price != 0 && timestamp != 0,
+        price.0 != 0 && timestamp != 0,
         CcipRouterError::InvalidTokenPrice
     );
 
-    Ok(Usd18Decimals(price))
+    Ok(price)
 }
 
 pub fn wrap_native_sol<'info>(
@@ -781,11 +772,10 @@ mod tests {
             data_availability_gas_price: Usd18Decimals::from_usd_cents(200),
         };
 
-        let roundtrip = PackedPrice::from(
-            &TryInto::<UnpackedDoubleU224>::try_into(price.clone())
-                .unwrap()
-                .pack(0),
-        );
+        let unpacked: UnpackedDoubleU224 = price.clone().try_into().unwrap();
+        let ts_packed: TimestampedPackedU224 = unpacked.pack(0);
+        let roundtrip: PackedPrice = (&ts_packed).into();
+
         assert_eq!(price, roundtrip);
     }
 }

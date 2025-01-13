@@ -137,9 +137,18 @@ pub mod ramps {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{ExtraArgsInput, SolanaTokenAmount};
+        use crate::{ExtraArgsInput, SolanaTokenAmount, TimestampedPackedU224};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
+
+        impl UnpackedDoubleU224 {
+            pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
+                let mut value = [0u8; 28];
+                value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
+                value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                TimestampedPackedU224 { value, timestamp }
+            }
+        }
 
         #[test]
         fn message_not_validated_for_disabled_destination_chain() {

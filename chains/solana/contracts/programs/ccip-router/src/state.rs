@@ -206,12 +206,6 @@ pub struct TimestampedPackedU224 {
 }
 
 impl TimestampedPackedU224 {
-    pub fn as_single(&self) -> U256 {
-        let mut u256_buffer = [0u8; 32];
-        u256_buffer[4..32].clone_from_slice(&self.value);
-        U256::from_be_bytes(u256_buffer)
-    }
-
     pub fn from_single(timestamp: i64, single: U256) -> Self {
         let mut value = [0u8; 28];
         value.clone_from_slice(&single.to_be_bytes()[4..32]);

@@ -2,7 +2,7 @@ use std::ops::{Add, AddAssign, Mul};
 
 use ethnum::U256;
 
-use crate::SolanaTokenAmount;
+use crate::{SolanaTokenAmount, TimestampedPackedU224};
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;
@@ -50,5 +50,13 @@ impl Mul<U256> for Usd18Decimals {
     fn mul(mut self, rhs: U256) -> Self::Output {
         self.0 *= rhs;
         self
+    }
+}
+
+impl From<&TimestampedPackedU224> for Usd18Decimals {
+    fn from(tpu: &TimestampedPackedU224) -> Self {
+        let mut u256_buffer = [0u8; 32];
+        u256_buffer[4..32].clone_from_slice(&tpu.value);
+        Usd18Decimals(U256::from_be_bytes(u256_buffer))
     }
 }
