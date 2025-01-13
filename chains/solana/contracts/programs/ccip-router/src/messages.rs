@@ -66,10 +66,13 @@ pub struct Any2SolanaRampMessage {
     pub header: RampMessageHeader,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    // receiver is used as the target for the two main functionalities
-    // token transfers: recipient of token transfers (associated token addresses are validated against this address)
-    // arbitrary messaging: expected account in the declared arbitrary messaging accounts (2nd in the list of the accounts)
-    pub receiver: Pubkey,
+    // In EVM receiver means the address that all the listed tokens will transfer to and the address of the message execution.
+    // In Solana the receiver is split into two:
+    // Logic Receiver is the Program ID of the user's program that will execute the message
+    pub logic_receiver: Pubkey,
+    // Token Receiver is the address which the ATA will be calculated from.
+    // If token receiver and message execution, then the token receiver must be a PDA from the logic receiver
+    pub token_receiver: Pubkey,
     pub token_amounts: Vec<Any2SolanaTokenTransfer>,
     pub extra_args: SolanaExtraArgs,
 }
