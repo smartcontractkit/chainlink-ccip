@@ -265,6 +265,7 @@ impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
     }
 }
 
+#[allow(clippy::from_over_into)] // we don't want to implement methods for state structs, only for internal ones
 impl Into<PackedPrice> for UnpackedDoubleU224 {
     fn into(self) -> PackedPrice {
         PackedPrice {
