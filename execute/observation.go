@@ -3,6 +3,7 @@ package execute
 import (
 	"context"
 	"fmt"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -171,9 +172,10 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 
 func readAllMessages(
 	ctx context.Context,
+	lggr logger.Logger,
 	ccipReader reader.CCIPReader,
 	commitObs exectypes.CommitObservations,
-) (exectypes.MessageObservations, error) {
+) exectypes.MessageObservations {
 	messageObs := make(exectypes.MessageObservations)
 
 	for srcChain, reports := range commitObs {
@@ -183,7 +185,8 @@ func readAllMessages(
 
 		ranges, err := computeRanges(reports)
 		if err != nil {
-			return exectypes.MessageObservations{}, err
+			lggr.Errorw("unable to compute ranges", "err", err)
+			continue
 		}
 
 		// Read messages for each range.
@@ -191,7 +194,12 @@ func readAllMessages(
 			// TODO: check if srcChain is supported.
 			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqRange)
 			if err != nil {
-				return exectypes.MessageObservations{}, err
+				lggr.Errorw("unable to read messages",
+					"srcChain", srcChain,
+					"seqRange", seqRange,
+					"err", err,
+				)
+				continue
 			}
 			for _, msg := range msgs {
 				if _, ok := messageObs[srcChain]; !ok {
@@ -201,7 +209,7 @@ func readAllMessages(
 			}
 		}
 	}
-	return messageObs, nil
+	return messageObs
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -222,14 +230,12 @@ func (p *Plugin) getMessagesObservation(
 	// group reports by chain selector.
 	commitReportCache := regroup(previousOutcome.CommitReports)
 
-	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
-	if err != nil {
-		return exectypes.Observation{}, err
-	}
+	messageObs := readAllMessages(ctx, p.lggr, p.ccipReader, commitReportCache)
 
-	messageTimestamps, err := getMessageTimestampMap(commitReportCache, messageObs)
-	if err != nil {
-		return exectypes.Observation{}, err
+	messageTimestamps := getMessageTimestampMap(commitReportCache, messageObs)
+
+	if len(messageObs) != len(messageTimestamps) {
+		p.lggr.Errorw("wans't able to get all message timestamps")
 	}
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
@@ -242,7 +248,7 @@ func (p *Plugin) getMessagesObservation(
 
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
+		p.lggr.Errorw("unable to observe costly messages", "err", err)
 	}
 
 	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
@@ -255,7 +261,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
-	//observation.MessageAndTokenDataEncodedSizes = exectypes.GetEncodedMsgAndTokenDataSizes(messageObs, tkData)
 
 	// Make sure encoded observation fits within the maximum observation size.
 	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)

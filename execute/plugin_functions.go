@@ -599,13 +599,13 @@ func getConsensusObservation(
 func getMessageTimestampMap(
 	commitReportCache map[cciptypes.ChainSelector][]exectypes.CommitData,
 	messages exectypes.MessageObservations,
-) (map[cciptypes.Bytes32]time.Time, error) {
+) map[cciptypes.Bytes32]time.Time {
 	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
 
 	for chainSel, SeqNumToMsg := range messages {
 		commitData, ok := commitReportCache[chainSel]
 		if !ok {
-			return nil, fmt.Errorf("missing commit data for chain %s", chainSel)
+			continue
 		}
 
 		for seqNum, msg := range SeqNumToMsg {
@@ -617,5 +617,5 @@ func getMessageTimestampMap(
 		}
 	}
 
-	return messageTimestamps, nil
+	return messageTimestamps
 }
