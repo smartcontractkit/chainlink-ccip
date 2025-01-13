@@ -19,8 +19,6 @@ use crate::messages::*;
 mod instructions;
 use crate::instructions::*;
 
-mod utils;
-
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive
 const TOKENPOOL_LOCK_OR_BURN_DISCRIMINATOR: [u8; 8] =
