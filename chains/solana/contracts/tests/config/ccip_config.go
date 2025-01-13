@@ -41,6 +41,7 @@ var (
 	EvmDestChainStatePDA, _, _      = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
+	OnRampAddressPadded  = [64]byte{1, 2, 3}
 	EnableExecutionAfter = int64(1800) // 30min
 
 	MaxOracles                      = 16
