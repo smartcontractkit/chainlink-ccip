@@ -6,9 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 )
 
 func TestLogWrapper(t *testing.T) {
@@ -49,15 +50,16 @@ func TestNamed(t *testing.T) {
 	// Name the base logger.
 	namedLggr := logger.Named(lggr, "ElToroLoco")
 	namedLggr.Info("Monster Jam")
-	require.Equal(t, 1, hook.Len())
-	require.Equal(t, "ElToroLoco", hook.All()[0].LoggerName)
+	logs := hook.TakeAll()
+	require.Len(t, logs, 2)
+	require.Equal(t, "ElToroLoco", logs[1].LoggerName)
 
 	// Name the named logger.
 	namedLggr2 := logger.Named(namedLggr, "ObiWan")
 	namedLggr2.Info("Star Wars")
-
-	require.Equal(t, 2, hook.Len())
-	require.Equal(t, "ElToroLoco.ObiWan", hook.All()[1].LoggerName)
+	logs = hook.TakeAll()
+	require.Len(t, logs, 2)
+	require.Equal(t, "ElToroLoco.ObiWan", logs[1].LoggerName)
 }
 
 func TestLogCopy(t *testing.T) {
