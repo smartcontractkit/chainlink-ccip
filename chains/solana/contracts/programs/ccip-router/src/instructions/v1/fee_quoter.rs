@@ -12,7 +12,7 @@ use crate::{
 
 use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
-use super::utils::{Exponential, Usd18Decimals};
+use super::price_math::{Exponential, Usd18Decimals};
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.
@@ -93,7 +93,15 @@ pub fn fee_for_msg(
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
     let fee_token_value =
         (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
-    SolanaTokenAmount::amount(fee_token, fee_token_value, fee_token_price)
+
+    let fee_token_amount = (fee_token_value.0 / fee_token_price.0)
+        .try_into()
+        .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
+
+    Ok(SolanaTokenAmount {
+        token: fee_token,
+        amount: fee_token_amount,
+    })
 }
 
 fn data_availability_cost(
@@ -182,8 +190,8 @@ fn token_network_fees(
             // Calculate token transfer value, then apply fee ratio
             // ratio represents multiples of 0.1bps, or 1e-5
             Usd18Decimals(
-                (token_amount.value(&token_price).0
-                    * U256::new(config_for_dest_chain.billing.deci_bps.into()))
+                Usd18Decimals::from_token_amount(token_amount, &token_price).0
+                    * U256::new(config_for_dest_chain.billing.deci_bps.into())
                     / 1u32.e(5),
             )
         }
