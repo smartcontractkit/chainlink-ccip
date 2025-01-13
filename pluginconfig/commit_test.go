@@ -332,6 +332,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 			},
 		},
 		{
@@ -348,6 +349,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 			},
 		},
 		{
@@ -359,6 +361,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
 				TransmissionDelayMultiplier:        20,
+				InflightPriceCheckRetries:          5,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -369,6 +372,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        20,
+				InflightPriceCheckRetries:          5,
 			},
 		},
 		{
@@ -387,6 +391,7 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
 				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 			},
 		},
 	}
