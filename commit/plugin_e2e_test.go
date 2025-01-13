@@ -143,7 +143,7 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 		expTransmittedReports []ccipocr3.CommitPluginReport
 
 		offRampNextSeqNumDefaultOverrideKeys   []ccipocr3.ChainSelector
-		offRampNextSeqNumDefaultOverrideValues []ccipocr3.SeqNum
+		offRampNextSeqNumDefaultOverrideValues map[ccipocr3.ChainSelector]ccipocr3.SeqNum
 
 		enableDiscovery bool
 	}{
@@ -201,10 +201,13 @@ func TestPlugin_E2E_AllNodesAgree_MerkleRoots(t *testing.T) {
 			},
 		},
 		{
-			name:                                   "report generated in previous outcome, transmitted with success",
-			prevOutcome:                            outcomeReportGenerated,
-			offRampNextSeqNumDefaultOverrideKeys:   []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
-			offRampNextSeqNumDefaultOverrideValues: []ccipocr3.SeqNum{11, 20},
+			name:                                 "report generated in previous outcome, transmitted with success",
+			prevOutcome:                          outcomeReportGenerated,
+			offRampNextSeqNumDefaultOverrideKeys: []ccipocr3.ChainSelector{sourceChain1, sourceChain2},
+			offRampNextSeqNumDefaultOverrideValues: map[ccipocr3.ChainSelector]ccipocr3.SeqNum{
+				sourceChain1: 11,
+				sourceChain2: 20,
+			},
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleroot.Outcome{
 					OutcomeType: merkleroot.ReportTransmitted,
@@ -288,8 +291,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return([]*big.Int{arbPrice, ethPrice}, nil).
-					Maybe()
+					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
+						arbAddr: arbPrice,
+						ethAddr: ethPrice,
+					}, nil).Maybe()
 
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
@@ -303,6 +308,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				TokenPriceOutcome: tokenprice.Outcome{
 					TokenPrices: orderedTokenPrices,
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -322,13 +328,29 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 			},
 		},
 		{
+			name: "prices already inflight, no prices to report",
+			prevOutcome: committypes.Outcome{
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+			},
+			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {},
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				TokenPriceOutcome: tokenprice.Outcome{},
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+			},
+			expTransmittedReports: []ccipocr3.CommitPluginReport{},
+		},
+		{
 			name:        "fresh tokens don't need new updates",
 			prevOutcome: committypes.Outcome{},
 			mockPriceReader: func(m *readerpkg_mock.MockPriceReader) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return([]*big.Int{arbPrice, ethPrice}, nil).
+					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
+						arbAddr: arbPrice,
+						ethAddr: ethPrice,
+					}, nil).
 					Maybe()
 
 				// Arb is fresh, will not be updated
@@ -354,8 +376,10 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 				m.EXPECT().
 					// tokens need to be ordered, plugin checks all tokens from commit offchain config
 					GetFeedPricesUSD(params.ctx, []ccipocr3.UnknownEncodedAddress{arbAddr, ethAddr}).
-					Return([]*big.Int{arbPrice, ethPrice}, nil).
-					Maybe()
+					Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{
+						arbAddr: arbPrice,
+						ethAddr: ethPrice,
+					}, nil).Maybe()
 
 				m.EXPECT().
 					GetFeeQuoterTokenUpdates(params.ctx, mock.Anything, mock.Anything).
@@ -380,6 +404,7 @@ func TestPlugin_E2E_AllNodesAgree_TokenPrices(t *testing.T) {
 						tokenPriceMap[ethAddr],
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReports: []ccipocr3.CommitPluginReport{
 				{
@@ -474,6 +499,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -499,6 +525,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -518,6 +545,21 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			},
 		},
 		{
+			name: "fee components should not be updated when there's a subset of chains but we wait for prices",
+			prevOutcome: committypes.Outcome{
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 4},
+			},
+			expOutcome: committypes.Outcome{
+				MerkleRootOutcome: merkleOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 3},
+			},
+			expTransmittedReportLen: 0,
+			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Unset()
+				m.EXPECT().GetLatestPriceSeqNr(mock.Anything).Return(0, nil).Maybe()
+			},
+		},
+		{
 			name: "fee components should not be updated within deviation",
 			prevOutcome: committypes.Outcome{
 				MerkleRootOutcome: merkleOutcome,
@@ -526,6 +568,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 			expOutcome: committypes.Outcome{
 				MerkleRootOutcome: noReportMerkleOutcome(params.rmnReportCfg),
 				ChainFeeOutcome:   expectedChain1FeeOutcome,
+				MainOutcome:       committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -559,6 +602,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -592,6 +636,7 @@ func TestPlugin_E2E_AllNodesAgree_ChainFee(t *testing.T) {
 						},
 					},
 				},
+				MainOutcome: committypes.MainOutcome{InflightPriceOcrSequenceNumber: 1, RemainingPriceChecks: 10},
 			},
 			expTransmittedReportLen: 1,
 			mockCCIPReader: func(m *readerpkg_mock.MockCCIPReader) {
@@ -690,7 +735,7 @@ func prepareCcipReaderMock(
 
 	if mockEmptySeqNrs {
 		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Unset()
-		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Return([]ccipocr3.SeqNum{}, nil).
+		ccipReader.EXPECT().NextSeqNum(ctx, mock.Anything).Return(map[ccipocr3.ChainSelector]ccipocr3.SeqNum{}, nil).
 			Maybe()
 	}
 
@@ -710,8 +755,7 @@ func preparePriceReaderMock(ctx context.Context, priceReader *readerpkg_mock.Moc
 
 	priceReader.EXPECT().
 		GetFeedPricesUSD(ctx, mock.Anything).
-		Return([]*big.Int{}, nil).
-		Maybe()
+		Return(map[ccipocr3.UnknownEncodedAddress]*big.Int{}, nil).Maybe()
 }
 
 type nodeSetup struct {
@@ -787,12 +831,12 @@ func setupNode(params SetupNodeParams) nodeSetup {
 	}
 	sort.Slice(sourceChains, func(i, j int) bool { return sourceChains[i] < sourceChains[j] })
 
-	offRampNextSeqNums := make([]ccipocr3.SeqNum, 0)
+	offRampNextSeqNums := make(map[ccipocr3.ChainSelector]ccipocr3.SeqNum, 0)
 	chainsWithNewMsgs := make([]ccipocr3.ChainSelector, 0)
 	for _, sourceChain := range sourceChains {
 		offRampNextSeqNum, ok := params.offRampNextSeqNum[sourceChain]
 		assert.True(params.t, ok)
-		offRampNextSeqNums = append(offRampNextSeqNums, offRampNextSeqNum)
+		offRampNextSeqNums[sourceChain] = offRampNextSeqNum
 
 		newMsgs := make([]ccipocr3.Message, 0)
 		numNewMsgs := (params.onRampLastSeqNum[sourceChain] - offRampNextSeqNum) + 1
@@ -815,9 +859,9 @@ func setupNode(params SetupNodeParams) nodeSetup {
 		}
 	}
 
-	seqNumsOfChainsWithNewMsgs := make([]ccipocr3.SeqNum, 0)
+	seqNumsOfChainsWithNewMsgs := map[ccipocr3.ChainSelector]ccipocr3.SeqNum{}
 	for _, chainSel := range chainsWithNewMsgs {
-		seqNumsOfChainsWithNewMsgs = append(seqNumsOfChainsWithNewMsgs, params.offRampNextSeqNum[chainSel])
+		seqNumsOfChainsWithNewMsgs[chainSel] = params.offRampNextSeqNum[chainSel]
 	}
 	if len(chainsWithNewMsgs) > 0 {
 		ccipReader.EXPECT().NextSeqNum(params.ctx, chainsWithNewMsgs).Return(seqNumsOfChainsWithNewMsgs, nil).Maybe()
@@ -913,7 +957,8 @@ func defaultNodeParams(t *testing.T) SetupNodeParams {
 			arbAddr: arbInfo,
 			ethAddr: ethInfo,
 		},
-		PriceFeedChainSelector: sourceChain1,
+		PriceFeedChainSelector:    sourceChain1,
+		InflightPriceCheckRetries: 10,
 	}
 
 	reportingCfg := ocr3types.ReportingPluginConfig{F: 1, ConfigDigest: digest}

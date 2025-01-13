@@ -12,7 +12,7 @@ import (
 
 // SetConfig is the `setConfig` instruction.
 type SetConfig struct {
-	MultisigName *[32]uint8
+	MultisigId   *[32]uint8
 	SignerGroups *[]byte
 	GroupQuorums *[32]uint8
 	GroupParents *[32]uint8
@@ -40,9 +40,9 @@ func NewSetConfigInstructionBuilder() *SetConfig {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *SetConfig) SetMultisigName(multisigName [32]uint8) *SetConfig {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *SetConfig) SetMultisigId(multisigId [32]uint8) *SetConfig {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -156,8 +156,8 @@ func (inst SetConfig) ValidateAndBuild() (*Instruction, error) {
 func (inst *SetConfig) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 		if inst.SignerGroups == nil {
 			return errors.New("SignerGroups parameter is not set")
@@ -207,7 +207,7 @@ func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("  MultisigId", *inst.MultisigId))
 						paramsBranch.Child(ag_format.Param("SignerGroups", *inst.SignerGroups))
 						paramsBranch.Child(ag_format.Param("GroupQuorums", *inst.GroupQuorums))
 						paramsBranch.Child(ag_format.Param("GroupParents", *inst.GroupParents))
@@ -228,8 +228,8 @@ func (inst *SetConfig) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj SetConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -256,8 +256,8 @@ func (obj SetConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) 
 	return nil
 }
 func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (obj *SetConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err erro
 // NewSetConfigInstruction declares a new SetConfig instruction with the provided parameters and accounts.
 func NewSetConfigInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	signerGroups []byte,
 	groupQuorums [32]uint8,
 	groupParents [32]uint8,
@@ -300,7 +300,7 @@ func NewSetConfigInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetConfig {
 	return NewSetConfigInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetSignerGroups(signerGroups).
 		SetGroupQuorums(groupQuorums).
 		SetGroupParents(groupParents).

@@ -12,7 +12,8 @@ import (
 
 // ExecuteBatch is the `executeBatch` instruction.
 type ExecuteBatch struct {
-	Id *[32]uint8
+	TimelockId *[32]uint8
+	Id         *[32]uint8
 
 	// [0] = [WRITE] operation
 	//
@@ -34,6 +35,12 @@ func NewExecuteBatchInstructionBuilder() *ExecuteBatch {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 6),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *ExecuteBatch) SetTimelockId(timelockId [32]uint8) *ExecuteBatch {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -128,6 +135,9 @@ func (inst ExecuteBatch) ValidateAndBuild() (*Instruction, error) {
 func (inst *ExecuteBatch) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -166,8 +176,9 @@ func (inst *ExecuteBatch) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Id", *inst.Id))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
@@ -184,6 +195,11 @@ func (inst *ExecuteBatch) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj ExecuteBatch) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -192,6 +208,11 @@ func (obj ExecuteBatch) MarshalWithEncoder(encoder *ag_binary.Encoder) (err erro
 	return nil
 }
 func (obj *ExecuteBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -203,6 +224,7 @@ func (obj *ExecuteBatch) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 // NewExecuteBatchInstruction declares a new ExecuteBatch instruction with the provided parameters and accounts.
 func NewExecuteBatchInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
@@ -212,6 +234,7 @@ func NewExecuteBatchInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *ExecuteBatch {
 	return NewExecuteBatchInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetPredecessorOperationAccount(predecessorOperation).

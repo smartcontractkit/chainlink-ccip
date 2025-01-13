@@ -2,8 +2,8 @@ use anchor_lang::prelude::*;
 use ethnum::U256;
 
 use crate::{
-    ocr3base::Ocr3Config, valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG,
-    MAX_TOKEN_AND_CHAIN_CONFIG_V, TOKEN_POOL_BILLING_SEED,
+    valid_version, CcipRouterError, FEE_BILLING_TOKEN_CONFIG, MAX_TOKEN_AND_CHAIN_CONFIG_V,
+    TOKEN_POOL_BILLING_SEED,
 };
 
 // zero_copy is used to prevent hitting stack/heap memory limits
@@ -28,6 +28,37 @@ pub struct Config {
 
     // TODO: billing global configs'
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+pub struct Ocr3ConfigInfo {
+    pub config_digest: [u8; 32], // 32-byte hash of configuration
+    pub f: u8,                   // f+1 = number of signatures per report
+    pub n: u8,                   // number of signers
+    pub is_signature_verification_enabled: u8, // bool -> bytemuck::Pod compliant required for zero_copy
+}
+
+// TODO: do we need to verify signers and transmitters are different? (between the two groups)
+// signers: pubkey is 20-byte address, secp256k1 curve ECDSA
+// transmitters: 32-byte pubkey, ed25519
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+pub struct Ocr3Config {
+    pub plugin_type: u8, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
+    pub config_info: Ocr3ConfigInfo,
+    pub signers: [[u8; 20]; 16], // v0.29.0 - anchor IDL does not build with MAX_SIGNERS
+    pub transmitters: [[u8; 32]; 16], // v0.29.0 - anchor IDL does not build with MAX_TRANSMITTERS
+}
+
+impl Ocr3Config {
+    pub fn new(plugin_type: u8) -> Self {
+        Self {
+            plugin_type,
+            ..Default::default()
+        }
+    }
 }
 
 #[account]

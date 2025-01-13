@@ -74,7 +74,7 @@ func (obj *ConfigSigners) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err 
 
 type MultisigConfig struct {
 	ChainId       uint64
-	MultisigName  [32]uint8
+	MultisigId    [32]uint8
 	Owner         ag_solanago.PublicKey
 	ProposedOwner ag_solanago.PublicKey
 	GroupQuorums  [32]uint8
@@ -95,8 +95,8 @@ func (obj MultisigConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	if err != nil {
 		return err
 	}
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -147,8 +147,8 @@ func (obj *MultisigConfig) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 	if err != nil {
 		return err
 	}
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}

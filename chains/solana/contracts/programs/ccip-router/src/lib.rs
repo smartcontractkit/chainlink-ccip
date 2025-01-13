@@ -16,9 +16,6 @@ use crate::event::*;
 mod messages;
 use crate::messages::*;
 
-mod ocr3base;
-use crate::ocr3base::*;
-
 mod instructions;
 use crate::instructions::*;
 
@@ -327,12 +324,13 @@ pub mod ccip_router {
     /// * `ctx` - The context containing the accounts required for setting the pool.
     /// * `mint` - The public key of the token mint.
     /// * `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.
+    /// * `is_writable` - index of account in lookup table that is writable
     pub fn set_pool(
-        ctx: Context<ModifyTokenAdminRegistry>,
+        ctx: Context<SetPoolTokenAdminRegistry>,
         mint: Pubkey,
-        pool_lookup_table: Pubkey,
+        writable_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::token_admin_registry::set_pool(ctx, mint, pool_lookup_table)
+        v1::token_admin_registry::set_pool(ctx, mint, writable_indexes)
     }
 
     /// Transfers the admin role of the token admin registry to a new admin.
@@ -630,6 +628,8 @@ pub enum CcipRouterError {
     InvalidInputsTokenAdminRegistryAccounts,
     #[msg("Invalid LookupTable account")]
     InvalidInputsLookupTableAccounts,
+    #[msg("Invalid LookupTable account writable access")]
+    InvalidInputsLookupTableAccountWritable,
     #[msg("Cannot send zero tokens")]
     InvalidInputsTokenAmount,
     #[msg("Release or mint balance mismatch")]

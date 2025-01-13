@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,6 +22,42 @@ import (
 
 func TestExtendedContractReader(t *testing.T) {
 	const contractName = "testContract"
+	cr := chainreadermocks.NewMockContractReaderFacade(t)
+	extCr := contractreader.NewExtendedContractReader(cr)
+
+	bindings := extCr.GetBindings(contractName)
+	assert.Len(t, bindings, 0)
+
+	cr.On("Bind", context.Background(),
+		[]types.BoundContract{{Name: contractName, Address: "0x123"}}).Return(nil)
+	cr.On("Unbind", context.Background(),
+		[]types.BoundContract{{Name: contractName, Address: "0x123"}}).Return(nil)
+	cr.On("Bind", context.Background(),
+		[]types.BoundContract{{Name: contractName, Address: "0x124"}}).Return(nil)
+	cr.On("Bind", context.Background(),
+		[]types.BoundContract{{Name: contractName, Address: "0x125"}}).Return(fmt.Errorf("some err"))
+
+	err := extCr.Bind(context.Background(), []types.BoundContract{{Name: contractName, Address: "0x123"}})
+	assert.NoError(t, err)
+
+	// ignored since 0x123 already exists
+	err = extCr.Bind(context.Background(), []types.BoundContract{{Name: contractName, Address: "0x123"}})
+	assert.NoError(t, err)
+
+	err = extCr.Bind(context.Background(), []types.BoundContract{{Name: contractName, Address: "0x124"}})
+	assert.NoError(t, err)
+
+	// Bind fails
+	err = extCr.Bind(context.Background(), []types.BoundContract{{Name: contractName, Address: "0x125"}})
+	assert.Error(t, err)
+
+	bindings = extCr.GetBindings(contractName)
+	assert.Len(t, bindings, 1)
+	assert.Equal(t, "0x124", bindings[0].Binding.Address)
+}
+
+func TestExtendedContractReader_AllowMultiBindingForAggregator(t *testing.T) {
+	const contractName = consts.ContractNamePriceAggregator
 	cr := chainreadermocks.NewMockContractReaderFacade(t)
 	extCr := contractreader.NewExtendedContractReader(cr)
 

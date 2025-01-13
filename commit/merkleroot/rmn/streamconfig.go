@@ -20,10 +20,10 @@ const (
 	estimatedMaxNumberOfSourceChains = 500
 
 	// initialObservationRequest + observationRequestWithOtherSourcesAfterTimeout + reportSignatureRequest
-	maxNumOfMsgsPerRound = 3
+	// maxNumOfMsgsPerRound = 3
 
-	rateScale     = 1.2
-	capacityScale = 5
+	// rateScale     = 1.2
+	// capacityScale = 5
 
 	// bufferSize should be set to 1 as advised by the RMN team.
 	outgoingBufferSize = 1
@@ -66,19 +66,23 @@ func maxMessageLength() int {
 	)
 }
 
-func messagesLimit(estimatedRoundInterval time.Duration) ragep2p.TokenBucketParams {
+// todo: fine-tune
+func messagesLimit(_ time.Duration) ragep2p.TokenBucketParams {
 	return ragep2p.TokenBucketParams{
-		Rate:     rateScale * (float64(maxNumOfMsgsPerRound) / estimatedRoundInterval.Seconds()),
-		Capacity: maxNumOfMsgsPerRound * uint32(capacityScale/estimatedRoundInterval.Seconds()),
+		Rate:     50,
+		Capacity: 100,
 	}
 }
 
-func bytesLimit(estimatedRoundInterval time.Duration) ragep2p.TokenBucketParams {
-	maxSumLenOutboundPerRound := maxObservationResponseBytes + maxReportSigResponseBytes
+// todo: fine-tune
+func bytesLimit(_ time.Duration) ragep2p.TokenBucketParams {
+	// maxSumLenOutboundPerRound := maxObservationResponseBytes + maxReportSigResponseBytes
+
+	const tenMB = uint32(10 * 1024 * 1024)
 
 	return ragep2p.TokenBucketParams{
-		Rate:     (float64(maxSumLenOutboundPerRound) / estimatedRoundInterval.Seconds()) * rateScale,
-		Capacity: uint32(maxSumLenOutboundPerRound) * capacityScale,
+		Rate:     float64(tenMB),
+		Capacity: tenMB,
 	}
 }
 
