@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+use crate::{v1::price_math::get_validated_token_price, BillingTokenConfig, CcipRouterError};
+
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]
@@ -160,6 +162,25 @@ pub struct Solana2AnyMessage {
 pub struct SolanaTokenAmount {
     pub token: Pubkey,
     pub amount: u64, // u64 - amount local to solana
+}
+
+impl SolanaTokenAmount {
+    pub fn convert(
+        &self,
+        source_config: &BillingTokenConfig,
+        target_config: &BillingTokenConfig,
+    ) -> Result<SolanaTokenAmount> {
+        assert!(source_config.mint == self.token);
+        let source_price = get_validated_token_price(source_config)?;
+        let target_price = get_validated_token_price(target_config)?;
+
+        Ok(SolanaTokenAmount {
+            token: target_config.mint,
+            amount: ((source_price * self.amount).0 / target_price.0)
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+        })
+    }
 }
 
 #[derive(Clone, Copy, AnchorSerialize, AnchorDeserialize)]

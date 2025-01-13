@@ -5,6 +5,7 @@ use anchor_spl::{token::spl_token::native_mint, token_interface};
 use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
+use crate::v1::price_math::get_validated_token_price;
 use crate::{
     BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
     SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
@@ -294,21 +295,6 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     require!(
         threshold == 0 || threshold > elapsed_time,
         CcipRouterError::StaleGasPrice
-    );
-
-    Ok(price)
-}
-
-fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
-    let timestamp = token_config.usd_per_token.timestamp;
-    let price: Usd18Decimals = (&token_config.usd_per_token).into();
-
-    // NOTE: There's no validation done with respect to token price staleness since data feeds are not
-    // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
-    // was set at least once.
-    require!(
-        price.0 != 0 && timestamp != 0,
-        CcipRouterError::InvalidTokenPrice
     );
 
     Ok(price)

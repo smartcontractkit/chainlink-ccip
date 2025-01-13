@@ -60,6 +60,8 @@ pub mod ccip_router {
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
         fee_aggregator: Pubkey,
+        link_token_mint: Pubkey,
+        max_fee_juels_per_msg: u128,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
@@ -67,6 +69,8 @@ pub mod ccip_router {
         config.solana_chain_selector = solana_chain_selector;
         config.default_gas_limit = default_gas_limit;
         config.enable_manual_execution_after = enable_execution_after;
+        config.link_token_mint = link_token_mint;
+        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
 
         if default_allow_out_of_order_execution {
             config.default_allow_out_of_order_execution = 1;
@@ -664,4 +668,8 @@ pub enum CcipRouterError {
     UnsupportedToken,
     #[msg("Inputs are missing token configuration")]
     InvalidInputsMissingTokenConfig,
+    #[msg("Message fee is too high")]
+    MessageFeeTooHigh,
+    #[msg("Source token data is too large")]
+    SourceTokenDataTooLarge,
 }

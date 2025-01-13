@@ -6,15 +6,15 @@ use anchor_spl::token_interface;
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
-    calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
-    validate_and_parse_token_accounts, TokenAccounts,
+    self, calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
+    validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
 use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
 use crate::{
-    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, GetFee,
-    Nonce, RampMessageHeader, Solana2AnyMessage, Solana2AnyRampMessage, Solana2AnyTokenTransfer,
-    SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
+    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, DestChainConfig,
+    ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, Solana2AnyMessage,
+    Solana2AnyRampMessage, Solana2AnyTokenTransfer, SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
 };
 
 pub fn get_fee<'info>(
@@ -118,6 +118,17 @@ pub fn ccip_send<'info>(
         &token_billing_config_accounts,
         &per_chain_per_token_config_accounts,
     )?;
+
+    let link_fee = fee.convert(
+        &ctx.accounts.fee_token_config.config,
+        &ctx.accounts.link_token_config.config,
+    )?;
+
+    require_gte!(
+        config.max_fee_juels_per_msg,
+        link_fee.amount as u128,
+        CcipRouterError::MessageFeeTooHigh,
+    );
 
     let is_paying_with_native_sol = message.fee_token == Pubkey::default();
     if is_paying_with_native_sol {
@@ -234,17 +245,14 @@ pub fn ccip_send<'info>(
                 seeds,
             )?;
 
-            let data = LockOrBurnOutV1::try_from_slice(&return_data)?;
-            new_message.token_amounts[i] = Solana2AnyTokenTransfer {
-                source_pool_address: current_token_accounts.pool_config.key(),
-                dest_token_address: data.dest_token_address,
-                extra_data: data.dest_pool_data,
-                amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
-                dest_exec_data: vec![0; 0],                  // TODO: Implement this
-                                                             // Destination chain specific execution data encoded in bytes
-                                                             // for an EVM destination, it consists of the amount of gas available for the releaseOrMint
-                                                             // and transfer calls made by the offRamp
-            };
+            let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
+            new_message.token_amounts[i] = token_transfer(
+                lock_or_burn_out_data,
+                current_token_accounts,
+                token_amount,
+                &dest_chain.config,
+                &per_chain_per_token_config_accounts[i],
+            )?;
         }
     }
 
@@ -258,6 +266,44 @@ pub fn ccip_send<'info>(
     });
 
     Ok(())
+}
+
+fn token_transfer(
+    lock_or_burn_out_data: LockOrBurnOutV1,
+    current_token_accounts: &pools::TokenAccounts<'_>,
+    token_amount: &SolanaTokenAmount,
+    dest_chain_config: &DestChainConfig,
+    token_config: &PerChainPerTokenConfig,
+) -> Result<Solana2AnyTokenTransfer> {
+    let dest_gas_amount = if token_config.billing.is_enabled {
+        token_config.billing.dest_gas_overhead
+    } else {
+        dest_chain_config.default_token_dest_gas_overhead
+    };
+
+    let extra_data = lock_or_burn_out_data.dest_pool_data;
+    let extra_data_length = extra_data.len() as u32;
+
+    require!(
+        extra_data_length <= CCIP_LOCK_OR_BURN_V1_RET_BYTES
+            || extra_data_length <= token_config.billing.dest_bytes_overhead,
+        CcipRouterError::SourceTokenDataTooLarge
+    );
+
+    // TODO: Revisit when/if non-EVM destinations from Solana become supported.
+    // for an EVM destination, exec data it consists of the amount of gas available for the releaseOrMint
+    // and transfer calls made by the offRamp
+    let dest_exec_data = ethnum::U256::new(dest_gas_amount.into())
+        .to_be_bytes()
+        .to_vec();
+
+    Ok(Solana2AnyTokenTransfer {
+        source_pool_address: current_token_accounts.pool_config.key(),
+        dest_token_address: lock_or_burn_out_data.dest_token_address,
+        extra_data,
+        amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
+        dest_exec_data,
+    })
 }
 
 /////////////
