@@ -1064,6 +1064,10 @@ type sourceChainConfig struct {
 }
 
 func (scc sourceChainConfig) check() (bool /* enabled */, error) {
+	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
+	if !scc.IsEnabled {
+		return false, nil
+	}
 	// This may happen due to some sort of regression in the codec that unmarshals
 	// chain data -> go struct.
 	if len(scc.OnRamp) == 0 {

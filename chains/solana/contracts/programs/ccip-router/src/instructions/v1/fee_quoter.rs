@@ -11,6 +11,7 @@ use crate::{
     SolanaTokenAmount, UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
+use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
@@ -50,7 +51,7 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         CcipRouterError::InvalidInputsMissingTokenConfig
     );
-    message.validate(dest_chain, fee_token_config)?;
+    validate_solana2any(message, dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -318,11 +319,9 @@ mod tests {
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
+    use super::super::messages::ramps::tests::*;
     use super::*;
-    use crate::{
-        tests::{sample_billing_config, sample_dest_chain, sample_message},
-        TimestampedPackedU224, TokenBilling,
-    };
+    use crate::{TimestampedPackedU224, TokenBilling};
 
     struct TestStubs;
 
