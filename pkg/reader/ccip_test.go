@@ -61,7 +61,9 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := returnVal.(*sourceChainConfig)
 
-		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf("0x%d000000000000000000000000000000000000000", sourceChain))
+		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
+			"0x%d000000000000000000000000000000000000000", sourceChain),
+		)
 		require.NoError(t, err)
 		v.OnRamp = cciptypes.UnknownAddress(fromString)
 		v.IsEnabled = true
