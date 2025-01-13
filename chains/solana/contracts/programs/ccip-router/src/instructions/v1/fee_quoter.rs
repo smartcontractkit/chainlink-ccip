@@ -96,6 +96,19 @@ pub fn fee_for_msg(
     SolanaTokenAmount::amount(fee_token, fee_token_value, fee_token_price)
 }
 
+impl SolanaTokenAmount {
+    pub fn convert(
+        &self,
+        source_config: &BillingTokenConfig,
+        target_config: &BillingTokenConfig,
+    ) -> Result<SolanaTokenAmount> {
+        assert!(source_config.mint == self.token);
+        let source_price = get_validated_token_price(source_config)?;
+        let target_price = get_validated_token_price(target_config)?;
+        SolanaTokenAmount::amount(target_config.mint, source_price * self.amount, target_price)
+    }
+}
+
 fn data_availability_cost(
     data_availability_gas_price: Usd18Decimals,
     message: &Solana2AnyMessage,

@@ -666,4 +666,8 @@ pub enum CcipRouterError {
     UnsupportedToken,
     #[msg("Inputs are missing token configuration")]
     InvalidInputsMissingTokenConfig,
+    #[msg("Message fee is too high")]
+    MessageFeeTooHigh,
+    #[msg("Source token data is too large")]
+    SourceTokenDataTooLarge,
 }

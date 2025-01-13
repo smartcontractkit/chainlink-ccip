@@ -1966,6 +1966,8 @@ const (
 	InsufficientFunds_CcipRouterError
 	UnsupportedToken_CcipRouterError
 	InvalidInputsMissingTokenConfig_CcipRouterError
+	MessageFeeTooHigh_CcipRouterError
+	SourceTokenDataTooLarge_CcipRouterError
 )
 
 func (value CcipRouterError) String() string {
@@ -2044,6 +2046,10 @@ func (value CcipRouterError) String() string {
 		return "UnsupportedToken"
 	case InvalidInputsMissingTokenConfig_CcipRouterError:
 		return "InvalidInputsMissingTokenConfig"
+	case MessageFeeTooHigh_CcipRouterError:
+		return "MessageFeeTooHigh"
+	case SourceTokenDataTooLarge_CcipRouterError:
+		return "SourceTokenDataTooLarge"
 	default:
 		return ""
 	}

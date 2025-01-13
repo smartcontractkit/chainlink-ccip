@@ -41,11 +41,11 @@ impl AddAssign for Usd18Decimals {
     }
 }
 
-impl Mul<U256> for Usd18Decimals {
+impl<T: Into<U256>> Mul<T> for Usd18Decimals {
     type Output = Self;
 
-    fn mul(mut self, rhs: U256) -> Self::Output {
-        self.0 *= rhs;
+    fn mul(mut self, rhs: T) -> Self::Output {
+        self.0 *= rhs.into();
         self
     }
 }
