@@ -12,7 +12,7 @@ import (
 
 // TransferOwnership is the `transferOwnership` instruction.
 type TransferOwnership struct {
-	MultisigName  *[32]uint8
+	MultisigId    *[32]uint8
 	ProposedOwner *ag_solanago.PublicKey
 
 	// [0] = [WRITE] config
@@ -29,9 +29,9 @@ func NewTransferOwnershipInstructionBuilder() *TransferOwnership {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *TransferOwnership) SetMultisigName(multisigName [32]uint8) *TransferOwnership {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *TransferOwnership) SetMultisigId(multisigId [32]uint8) *TransferOwnership {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -83,8 +83,8 @@ func (inst TransferOwnership) ValidateAndBuild() (*Instruction, error) {
 func (inst *TransferOwnership) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 		if inst.ProposedOwner == nil {
 			return errors.New("ProposedOwner parameter is not set")
@@ -113,7 +113,7 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param(" MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
 						paramsBranch.Child(ag_format.Param("ProposedOwner", *inst.ProposedOwner))
 					})
 
@@ -127,8 +127,8 @@ func (inst *TransferOwnership) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -140,8 +140,8 @@ func (obj TransferOwnership) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -156,13 +156,13 @@ func (obj *TransferOwnership) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewTransferOwnershipInstruction declares a new TransferOwnership instruction with the provided parameters and accounts.
 func NewTransferOwnershipInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	proposedOwner ag_solanago.PublicKey,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *TransferOwnership {
 	return NewTransferOwnershipInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetProposedOwner(proposedOwner).
 		SetConfigAccount(config).
 		SetAuthorityAccount(authority)

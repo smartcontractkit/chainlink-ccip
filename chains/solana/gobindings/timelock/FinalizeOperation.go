@@ -12,7 +12,8 @@ import (
 
 // FinalizeOperation is the `finalizeOperation` instruction.
 type FinalizeOperation struct {
-	Id *[32]uint8
+	TimelockId *[32]uint8
+	Id         *[32]uint8
 
 	// [0] = [WRITE] operation
 	//
@@ -28,6 +29,12 @@ func NewFinalizeOperationInstructionBuilder() *FinalizeOperation {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 3),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *FinalizeOperation) SetTimelockId(timelockId [32]uint8) *FinalizeOperation {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -89,6 +96,9 @@ func (inst FinalizeOperation) ValidateAndBuild() (*Instruction, error) {
 func (inst *FinalizeOperation) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -118,8 +128,9 @@ func (inst *FinalizeOperation) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Id", *inst.Id))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("        Id", *inst.Id))
 					})
 
 					// Accounts of the instruction:
@@ -133,6 +144,11 @@ func (inst *FinalizeOperation) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj FinalizeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -141,6 +157,11 @@ func (obj FinalizeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	return nil
 }
 func (obj *FinalizeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -152,12 +173,14 @@ func (obj *FinalizeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 // NewFinalizeOperationInstruction declares a new FinalizeOperation instruction with the provided parameters and accounts.
 func NewFinalizeOperationInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	// Accounts:
 	operation ag_solanago.PublicKey,
 	config ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *FinalizeOperation {
 	return NewFinalizeOperationInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetOperationAccount(operation).
 		SetConfigAccount(config).

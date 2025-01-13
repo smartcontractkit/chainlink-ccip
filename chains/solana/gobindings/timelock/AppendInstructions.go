@@ -12,6 +12,7 @@ import (
 
 // AppendInstructions is the `appendInstructions` instruction.
 type AppendInstructions struct {
+	TimelockId        *[32]uint8
 	Id                *[32]uint8
 	InstructionsBatch *[]InstructionData
 
@@ -31,6 +32,12 @@ func NewAppendInstructionsInstructionBuilder() *AppendInstructions {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *AppendInstructions) SetTimelockId(timelockId [32]uint8) *AppendInstructions {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -109,6 +116,9 @@ func (inst AppendInstructions) ValidateAndBuild() (*Instruction, error) {
 func (inst *AppendInstructions) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -144,7 +154,8 @@ func (inst *AppendInstructions) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("       TimelockId", *inst.TimelockId))
 						paramsBranch.Child(ag_format.Param("               Id", *inst.Id))
 						paramsBranch.Child(ag_format.Param("InstructionsBatch", *inst.InstructionsBatch))
 					})
@@ -161,6 +172,11 @@ func (inst *AppendInstructions) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj AppendInstructions) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -174,6 +190,11 @@ func (obj AppendInstructions) MarshalWithEncoder(encoder *ag_binary.Encoder) (er
 	return nil
 }
 func (obj *AppendInstructions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -190,6 +211,7 @@ func (obj *AppendInstructions) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 // NewAppendInstructionsInstruction declares a new AppendInstructions instruction with the provided parameters and accounts.
 func NewAppendInstructionsInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	instructionsBatch []InstructionData,
 	// Accounts:
@@ -198,6 +220,7 @@ func NewAppendInstructionsInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *AppendInstructions {
 	return NewAppendInstructionsInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetInstructionsBatch(instructionsBatch).
 		SetOperationAccount(operation).

@@ -10,11 +10,11 @@ import (
 	ag_treeout "github.com/gagliardetto/treeout"
 )
 
-// initialize a new multisig configuration, store the chain_id and multisig_name
-// multisig_name is a unique identifier for the multisig configuration(32 bytes, left-padded)
+// initialize a new multisig configuration, store the chain_id and multisig_id
+// multisig_id is a unique identifier for the multisig configuration(32 bytes, left-padded)
 type Initialize struct {
-	ChainId      *uint64
-	MultisigName *[32]uint8
+	ChainId    *uint64
+	MultisigId *[32]uint8
 
 	// [0] = [WRITE] multisigConfig
 	//
@@ -46,9 +46,9 @@ func (inst *Initialize) SetChainId(chainId uint64) *Initialize {
 	return inst
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *Initialize) SetMultisigName(multisigName [32]uint8) *Initialize {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *Initialize) SetMultisigId(multisigId [32]uint8) *Initialize {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -152,8 +152,8 @@ func (inst *Initialize) Validate() error {
 		if inst.ChainId == nil {
 			return errors.New("ChainId parameter is not set")
 		}
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 	}
 
@@ -194,8 +194,8 @@ func (inst *Initialize) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("     ChainId", *inst.ChainId))
-						paramsBranch.Child(ag_format.Param("MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("   ChainId", *inst.ChainId))
+						paramsBranch.Child(ag_format.Param("MultisigId", *inst.MultisigId))
 					})
 
 					// Accounts of the instruction:
@@ -218,8 +218,8 @@ func (obj Initialize) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error)
 	if err != nil {
 		return err
 	}
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -231,8 +231,8 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 	if err != nil {
 		return err
 	}
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (obj *Initialize) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 func NewInitializeInstruction(
 	// Parameters:
 	chainId uint64,
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	// Accounts:
 	multisigConfig ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey,
@@ -254,7 +254,7 @@ func NewInitializeInstruction(
 	expiringRootAndOpCount ag_solanago.PublicKey) *Initialize {
 	return NewInitializeInstructionBuilder().
 		SetChainId(chainId).
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetMultisigConfigAccount(multisigConfig).
 		SetAuthorityAccount(authority).
 		SetSystemProgramAccount(systemProgram).

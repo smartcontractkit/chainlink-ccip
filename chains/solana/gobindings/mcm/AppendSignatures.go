@@ -12,7 +12,7 @@ import (
 
 // AppendSignatures is the `appendSignatures` instruction.
 type AppendSignatures struct {
-	MultisigName    *[32]uint8
+	MultisigId      *[32]uint8
 	Root            *[32]uint8
 	ValidUntil      *uint32
 	SignaturesBatch *[]Signature
@@ -31,9 +31,9 @@ func NewAppendSignaturesInstructionBuilder() *AppendSignatures {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *AppendSignatures) SetMultisigName(multisigName [32]uint8) *AppendSignatures {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *AppendSignatures) SetMultisigId(multisigId [32]uint8) *AppendSignatures {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -97,8 +97,8 @@ func (inst AppendSignatures) ValidateAndBuild() (*Instruction, error) {
 func (inst *AppendSignatures) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 		if inst.Root == nil {
 			return errors.New("Root parameter is not set")
@@ -133,7 +133,7 @@ func (inst *AppendSignatures) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("   MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("     MultisigId", *inst.MultisigId))
 						paramsBranch.Child(ag_format.Param("           Root", *inst.Root))
 						paramsBranch.Child(ag_format.Param("     ValidUntil", *inst.ValidUntil))
 						paramsBranch.Child(ag_format.Param("SignaturesBatch", *inst.SignaturesBatch))
@@ -149,8 +149,8 @@ func (inst *AppendSignatures) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj AppendSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -172,8 +172,8 @@ func (obj AppendSignatures) MarshalWithEncoder(encoder *ag_binary.Encoder) (err 
 	return nil
 }
 func (obj *AppendSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (obj *AppendSignatures) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (e
 // NewAppendSignaturesInstruction declares a new AppendSignatures instruction with the provided parameters and accounts.
 func NewAppendSignaturesInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	root [32]uint8,
 	validUntil uint32,
 	signaturesBatch []Signature,
@@ -206,7 +206,7 @@ func NewAppendSignaturesInstruction(
 	signatures ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *AppendSignatures {
 	return NewAppendSignaturesInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetRoot(root).
 		SetValidUntil(validUntil).
 		SetSignaturesBatch(signaturesBatch).
