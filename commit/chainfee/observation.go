@@ -7,8 +7,12 @@ import (
 	"sort"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-common/pkg/types"
+	mapset "github.com/deckarep/golang-set/v2"
+	"golang.org/x/exp/maps"
+
 	"golang.org/x/sync/errgroup"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
@@ -85,16 +89,38 @@ func (p *processor) Observation(
 		"timestampNow", now,
 	)
 
+	uniqueChains := mapset.NewSet[cciptypes.ChainSelector](maps.Keys(feeComponents)...)
+	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(nativeTokenPrices)...))
+
+	if len(uniqueChains.ToSlice()) == 0 {
+		p.lggr.Info("observations don't have any unique chains")
+		return Observation{}, nil
+	}
+
 	obs := Observation{
 		FChain:            fChain,
-		FeeComponents:     feeComponents,
-		NativeTokenPrices: nativeTokenPrices,
+		FeeComponents:     filterMapByUniqueChains(feeComponents, uniqueChains),
+		NativeTokenPrices: filterMapByUniqueChains(nativeTokenPrices, uniqueChains),
 		ChainFeeUpdates:   chainFeeUpdates,
 		TimestampNow:      now,
 	}
 
 	p.metricsReporter.TrackChainFeeObservation(obs)
 	return obs, nil
+}
+
+// filterMapBySet filters a map based on the keys present in the set.
+func filterMapByUniqueChains[T comparable](
+	m map[cciptypes.ChainSelector]T,
+	s mapset.Set[cciptypes.ChainSelector],
+) map[cciptypes.ChainSelector]T {
+	filtered := make(map[cciptypes.ChainSelector]T)
+	for k, v := range m {
+		if s.Contains(k) {
+			filtered[k] = v
+		}
+	}
+	return filtered
 }
 
 func (p *processor) observeFChain() map[cciptypes.ChainSelector]int {

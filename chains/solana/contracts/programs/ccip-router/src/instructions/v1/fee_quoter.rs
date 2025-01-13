@@ -66,8 +66,15 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain,
     )?;
 
-    // TODO consider extra args
-    let execution_gas = U256::new(dest_chain.config.dest_gas_overhead as u128)
+    let gas_limit = U256::new(
+        message
+            .extra_args
+            .gas_limit
+            .unwrap_or_else(|| dest_chain.config.default_tx_gas_limit.into()),
+    );
+
+    let execution_gas = gas_limit
+        + U256::new(dest_chain.config.dest_gas_overhead as u128)
         + U256::new(message.data.len() as u128)
             * U256::new(dest_chain.config.dest_gas_per_payload_byte as u128)
         + network_fee.transfer_gas;
@@ -210,7 +217,7 @@ fn global_network_fees(dest_chain: &DestChain) -> NetworkFee {
     }
 }
 
-#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackedPrice {
     // L1 gas price (encoded in the lower 112 bits)
     pub execution_gas_price: Usd18Decimals,
@@ -224,6 +231,25 @@ impl From<UnpackedDoubleU224> for PackedPrice {
             execution_gas_price: Usd18Decimals(value.low.into()),
             data_availability_gas_price: Usd18Decimals(value.high.into()),
         }
+    }
+}
+
+impl TryFrom<PackedPrice> for UnpackedDoubleU224 {
+    type Error = Error;
+
+    fn try_from(value: PackedPrice) -> Result<Self> {
+        Ok(Self {
+            high: value
+                .data_availability_gas_price
+                .0
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+            low: value
+                .execution_gas_price
+                .0
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+        })
     }
 }
 
@@ -319,9 +345,10 @@ mod tests {
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
+    use crate::TokenBilling;
+
     use super::super::messages::ramps::tests::*;
     use super::*;
-    use crate::{TimestampedPackedU224, TokenBilling};
 
     struct TestStubs;
 
@@ -334,6 +361,12 @@ mod tests {
     }
 
     #[test]
+    // NOTE: This test is unique in that the return value of `fee_for_msg` has been
+    // directly validated against a `getFee` query in the Ethereum mainnet -> Avalanche Fuji
+    // lane, using the same configuration. This ensures that at least on a simple execution
+    // path, the Solana fee quoter behaves identically to the EVM implementation. Further
+    // tests after this one simply observe the impact of modifying certain parameters on the
+    // output.
     fn retrieving_fee_from_valid_message() {
         set_syscall_stubs(Box::new(TestStubs));
         assert_eq!(
@@ -348,7 +381,7 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 995200000000000000
+                amount: 48282184443231661
             }
         );
     }
@@ -371,7 +404,7 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
-                amount: 4661866666666666666
+                amount: 298071755652939846
             }
         );
     }
@@ -403,7 +436,7 @@ mod tests {
         let mut chain = sample_dest_chain();
 
         // Will have no effect because we're not using the network fee
-        chain.config.network_fee_usdcents *= 0;
+        chain.config.network_fee_usdcents = 0;
 
         let (token_config, mut per_chain_per_token) = sample_additional_token();
 
@@ -432,7 +465,7 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 1229866666666666666
+                amount: 52885511932309044,
             }
         );
     }
@@ -468,7 +501,7 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
-                amount: 3539733333333333333
+                amount: 398110981980079407
             }
         );
     }
@@ -482,7 +515,10 @@ mod tests {
         let (another_token_config, mut another_per_chain_per_token_config) =
             sample_additional_token();
 
-        another_per_chain_per_token_config.billing.deci_bps = 100;
+        // Set some arbitrary values so the bps fee lands between min and max
+        another_per_chain_per_token_config.billing.min_fee_usdcents = 1;
+        another_per_chain_per_token_config.billing.max_fee_usdcents = 1000;
+        another_per_chain_per_token_config.billing.deci_bps = 10000;
 
         let mut message = sample_message();
         message.token_amounts = vec![SolanaTokenAmount {
@@ -496,13 +532,33 @@ mod tests {
                 &message,
                 &chain,
                 &sample_billing_config(),
+                &[Some(another_token_config.clone())],
+                &[another_per_chain_per_token_config.clone()]
+            )
+            .unwrap(),
+            SolanaTokenAmount {
+                token: native_mint::ID,
+                amount: 36130696584140229
+            }
+        );
+
+        // changing deci_bps affects the outcome.
+        another_per_chain_per_token_config.billing.deci_bps = 20000;
+
+        assert_eq!(
+            fee_for_msg(
+                0,
+                &message,
+                &chain,
+                &sample_billing_config(),
                 &[Some(another_token_config)],
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 923066666666666666
+                // Slight increase in price
+                amount: 37480696584140229
             }
         );
     }
@@ -515,7 +571,9 @@ mod tests {
         let (_, mut another_per_chain_per_token_config) = sample_additional_token();
 
         // Will have no effect, as we cannot know the price of the token
-        another_per_chain_per_token_config.billing.deci_bps = 100;
+        another_per_chain_per_token_config.billing.min_fee_usdcents = 1;
+        another_per_chain_per_token_config.billing.max_fee_usdcents = 1000;
+        another_per_chain_per_token_config.billing.deci_bps = 10000;
 
         let mut message = sample_message();
         message.token_amounts = vec![SolanaTokenAmount {
@@ -535,12 +593,12 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 906400000000000000
+                amount: 35234859440885153
             }
         );
 
         // Will have no effect, as we cannot know the price of the token
-        another_per_chain_per_token_config.billing.deci_bps = 2500;
+        another_per_chain_per_token_config.billing.deci_bps = 20000;
 
         assert_eq!(
             fee_for_msg(
@@ -554,7 +612,7 @@ mod tests {
             .unwrap(),
             SolanaTokenAmount {
                 token: native_mint::ID,
-                amount: 906400000000000000
+                amount: 35234859440885153
             }
         );
     }
@@ -576,11 +634,14 @@ mod tests {
         let tokens: Vec<_> = tokens.into_iter().map(|t| Some(t)).collect();
         let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
+
+        let mut chain = sample_dest_chain();
+        chain.config.max_number_of_tokens_per_msg = 5;
         assert_eq!(
             fee_for_msg(
                 0,
                 &message,
-                &sample_dest_chain(),
+                &chain,
                 &sample_billing_config(),
                 &tokens,
                 &per_chains
@@ -589,35 +650,25 @@ mod tests {
             SolanaTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
-                amount: 1640000000000000000
+                amount: 153233232867589323
             }
         );
     }
 
     fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
         let mint = Pubkey::new_unique();
-        let mut usd_per_token = [0u8; 28];
-        usd_per_token.clone_from_slice(&1_000_000u32.e(16).to_be_bytes()[4..]);
         (
-            BillingTokenConfig {
-                enabled: true,
-                mint,
-                usd_per_token: TimestampedPackedU224 {
-                    value: usd_per_token,
-                    timestamp: 100,
-                },
-                premium_multiplier_wei_per_eth: 1,
-            },
+            sample_billing_config(),
             PerChainPerTokenConfig {
                 version: 1,
                 chain_selector: 0,
                 mint,
                 billing: TokenBilling {
-                    min_fee_usdcents: 10,
-                    max_fee_usdcents: 20,
+                    min_fee_usdcents: 50,
+                    max_fee_usdcents: 4294967295,
                     deci_bps: 0,
-                    dest_gas_overhead: 0,
-                    dest_bytes_overhead: 0,
+                    dest_gas_overhead: 180000,
+                    dest_bytes_overhead: 640,
                     is_enabled: true,
                 },
             },
@@ -680,5 +731,21 @@ mod tests {
             .unwrap_err(),
             CcipRouterError::StaleGasPrice.into()
         );
+    }
+
+    #[test]
+    fn packing_unpacking_price() {
+        let price = PackedPrice {
+            execution_gas_price: Usd18Decimals::from_usd_cents(100),
+            data_availability_gas_price: Usd18Decimals::from_usd_cents(200),
+        };
+
+        let roundtrip = PackedPrice::from(
+            TryInto::<UnpackedDoubleU224>::try_into(price.clone())
+                .unwrap()
+                .pack(0)
+                .unpack(),
+        );
+        assert_eq!(price, roundtrip);
     }
 }
