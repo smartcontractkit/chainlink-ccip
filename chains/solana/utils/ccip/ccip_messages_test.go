@@ -17,9 +17,9 @@ func TestMessageHashing(t *testing.T) {
 
 	sender := make([]byte, 32)
 	copy(sender, []byte{1, 2, 3})
-	token_amount := [32]uint8{}
-	for i := range token_amount {
-		token_amount[i] = 1
+	tokenAmount := [32]uint8{}
+	for i := range tokenAmount {
+		tokenAmount[i] = 1
 	}
 
 	t.Run("EvmToSolana", func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMessageHashing(t *testing.T) {
 					DestTokenAddress:  solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestGasAmount:     100,
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            token_amount,
+					Amount:            tokenAmount,
 				},
 			},
 		}, config.OnRampAddress)
@@ -84,7 +84,7 @@ func TestMessageHashing(t *testing.T) {
 					SourcePoolAddress: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc"),
 					DestTokenAddress:  []byte{0, 1, 2, 3},
 					ExtraData:         []byte{4, 5, 6},
-					Amount:            token_amount,
+					Amount:            tokenAmount,
 					DestExecData:      []byte{4, 5, 6},
 				},
 			},

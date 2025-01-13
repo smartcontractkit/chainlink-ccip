@@ -158,9 +158,9 @@ func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress
 	if _, err := hash.Write([]byte{uint8(len(msg.ExtraArgs.Accounts))}); err != nil { //nolint:gosec
 		return nil, err
 	}
-	accountsBytes, err := bin.MarshalBorsh(msg.ExtraArgs.Accounts)
-	if err != nil {
-		return nil, err
+	accountsBytes, borshErr := bin.MarshalBorsh(msg.ExtraArgs.Accounts)
+	if borshErr != nil {
+		return nil, borshErr
 	}
 	if _, err := hash.Write(accountsBytes); err != nil {
 		return nil, err
