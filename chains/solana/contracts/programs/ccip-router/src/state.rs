@@ -178,7 +178,6 @@ pub struct RateLimitTokenBucket {
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
 }
 
-// WIP
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct BillingTokenConfig {
     // NOTE: when modifying this struct, make sure to update the version in the wrapper
@@ -205,6 +204,7 @@ pub struct TimestampedPackedU224 {
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
+// used in the commit report execution_states field
 pub enum MessageExecutionState {
     Untouched = 0,
     InProgress = 1, // Not used in Solana, but used in EVM
