@@ -6,6 +6,10 @@ use crate::CcipRouterError;
 
 use anchor_spl::token_interface::Mint;
 
+// track state versions
+const MAX_TOKEN_REGISTRY_V: u8 = 1;
+const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
+
 #[account]
 #[derive(InitSpace)]
 pub struct TokenAdminRegistry {
@@ -24,7 +28,7 @@ pub struct RegisterTokenAdminRegistryViaGetCCIPAdmin<'info> {
     #[account(
         seeds = [CONFIG_SEED],
         bump,
-        constraint = valid_version(config.load()?.version, MAX_TOKEN_REGISTRY_V) @ CcipRouterError::InvalidInputs,
+        constraint = valid_version(config.load()?.version, MAX_CONFIG_V) @ CcipRouterError::InvalidInputs,
     )]
     pub config: AccountLoader<'info, Config>,
     #[account(
