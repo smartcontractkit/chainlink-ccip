@@ -125,15 +125,15 @@ func TestCCIPRouter(t *testing.T) {
 		IsEnabled: true,
 
 		// minimal valid config
-		DefaultTxGasLimit:       1,
-		MaxPerMsgGasLimit:       100,
-		MaxDataBytes:            32,
+		DefaultTxGasLimit:       200000,
+		MaxPerMsgGasLimit:       3000000,
+		MaxDataBytes:            30000,
 		MaxNumberOfTokensPerMsg: 5,
 		// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
 		ChainFamilySelector: [4]uint8{40, 18, 213, 44},
 
-		DefaultTokenFeeUsdcents: 1,
-		NetworkFeeUsdcents:      1,
+		DefaultTokenFeeUsdcents: 50,
+		NetworkFeeUsdcents:      50,
 	}
 	// Small enough to fit in u160, big enough to not fall in the precompile space.
 	validReceiverAddress := [32]byte{}
@@ -882,7 +882,7 @@ func TestCCIPRouter(t *testing.T) {
 			// Any nonzero timestamp is valid (for now)
 			validTimestamp := int64(100)
 			value := [28]uint8{}
-			bigNum, ok := new(big.Int).SetString("1000000000000000000000000000000", 10)
+			bigNum, ok := new(big.Int).SetString("19816680000000000000", 10)
 			require.True(t, ok)
 			bigNum.FillBytes(value[:])
 
@@ -896,7 +896,7 @@ func TestCCIPRouter(t *testing.T) {
 							Value:     value,
 							Timestamp: validTimestamp,
 						},
-						PremiumMultiplierWeiPerEth: 1,
+						PremiumMultiplierWeiPerEth: 9000000,
 					}},
 				{
 					Accounts: token2022,
@@ -907,7 +907,7 @@ func TestCCIPRouter(t *testing.T) {
 							Value:     value,
 							Timestamp: validTimestamp,
 						},
-						PremiumMultiplierWeiPerEth: 1,
+						PremiumMultiplierWeiPerEth: 11000000,
 					}},
 			}
 
@@ -1930,7 +1930,6 @@ func TestCCIPRouter(t *testing.T) {
 			feeResult := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, user, config.DefaultCommitment)
 			require.NotNil(t, feeResult)
 			fee, _ := common.ExtractTypedReturnValue(ctx, feeResult.Meta.LogMessages, config.CcipRouterProgram.String(), binary.LittleEndian.Uint64)
-			t.Log(fee)
 			require.Greater(t, fee, uint64(0))
 		})
 

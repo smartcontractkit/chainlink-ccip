@@ -60,7 +60,12 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	) {
 		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := returnVal.(*sourceChainConfig)
-		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
+
+		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
+			"0x%d000000000000000000000000000000000000000", sourceChain),
+		)
+		require.NoError(t, err)
+		v.OnRamp = cciptypes.UnknownAddress(fromString)
 		v.IsEnabled = true
 	}).Return(nil)
 
@@ -87,8 +92,8 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	cfgs, err := ccipReader.getOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 2)
-	assert.Equal(t, []byte("onramp-1"), cfgs[chainA].OnRamp)
-	assert.Equal(t, []byte("onramp-2"), cfgs[chainB].OnRamp)
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgs[chainA].OnRamp.String())
+	assert.Equal(t, "0x2000000000000000000000000000000000000000", cfgs[chainB].OnRamp.String())
 }
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
