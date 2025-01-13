@@ -6,13 +6,13 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    utils::{Exponential, Usd18Decimals},
     BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
     SolanaTokenAmount, UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+use super::utils::{Exponential, Usd18Decimals};
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.

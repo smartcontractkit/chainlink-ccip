@@ -134,10 +134,10 @@ pub mod ramps {
 
     #[cfg(test)]
     pub mod tests {
+        use super::super::super::utils::Usd18Decimals;
         use super::*;
         use crate::{
-            utils::Usd18Decimals, v1::fee_quoter::PackedPrice, ExtraArgsInput, SolanaTokenAmount,
-            UnpackedDoubleU224,
+            v1::fee_quoter::PackedPrice, ExtraArgsInput, SolanaTokenAmount, UnpackedDoubleU224,
         };
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
