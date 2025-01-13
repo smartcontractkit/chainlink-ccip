@@ -30,6 +30,20 @@ pub fn commit<'info>(
     // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
 
+    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
+    let source_chain_state = &mut ctx.accounts.source_chain_state;
+
+    require!(
+        source_chain_state.config.is_enabled,
+        CcipRouterError::UnsupportedSourceChainSelector
+    );
+    require!(
+        source_chain_state
+            .config
+            .is_on_ramp_configured(&report.merkle_root.on_ramp_address),
+        CcipRouterError::InvalidInputs
+    );
+
     // Check if the report contains price updates
     let empty_token_price_updates = report.price_updates.token_price_updates.is_empty();
     let empty_gas_price_updates = report.price_updates.gas_price_updates.is_empty();
@@ -108,14 +122,6 @@ pub fn commit<'info>(
             );
         }
     }
-
-    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
-
-    require!(
-        source_chain_state.config.is_enabled,
-        CcipRouterError::UnsupportedSourceChainSelector
-    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -338,7 +344,13 @@ fn internal_execute<'info>(
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
-    let on_ramp_address = &source_chain_state.config.on_ramp;
+    let on_ramp_address = &execution_report.message.on_ramp_address;
+    require!(
+        source_chain_state
+            .config
+            .is_on_ramp_configured(on_ramp_address),
+        CcipRouterError::InvalidInputs
+    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root

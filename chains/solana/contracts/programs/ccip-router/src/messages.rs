@@ -99,6 +99,7 @@ pub struct Any2SolanaRampMessage {
     pub receiver: Pubkey,
     pub token_amounts: Vec<Any2SolanaTokenTransfer>,
     pub extra_args: SolanaExtraArgs,
+    pub on_ramp_address: Vec<u8>,
 }
 
 impl Any2SolanaRampMessage {
@@ -107,7 +108,8 @@ impl Any2SolanaRampMessage {
 
         // Calculate vectors size to ensure that the hash is unique
         let sender_size = [self.sender.len() as u8];
-        let on_ramp_address_size = [on_ramp_address.len() as u8];
+        let trimmed_on_ramp_address = trim_leading_zeros(on_ramp_address);
+        let on_ramp_address_size = [trimmed_on_ramp_address.len() as u8];
         let data_size = self.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
         // RampMessageHeader struct
@@ -130,7 +132,7 @@ impl Any2SolanaRampMessage {
             &header_source_chain_selector,
             &header_dest_chain_selector,
             &on_ramp_address_size,
-            on_ramp_address,
+            trimmed_on_ramp_address,
             &self.header.message_id,
             &self.receiver.to_bytes(),
             &header_sequence_number,
@@ -156,7 +158,16 @@ impl Any2SolanaRampMessage {
         + 32 // receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
+        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
+}
+
+fn trim_leading_zeros(input: &[u8]) -> &[u8] {
+    let start = input
+        .iter()
+        .position(|&byte| byte != 0)
+        .unwrap_or(input.len());
+    &input[start..]
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -368,6 +379,7 @@ pub(crate) mod tests {
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
+        let on_ramp_address = &[1, 2, 3].to_vec();
         let message = Any2SolanaRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -395,9 +407,9 @@ pub(crate) mod tests {
                     is_writable: true,
                 }],
             },
+            on_ramp_address: on_ramp_address.to_vec(),
         };
 
-        let on_ramp_address = &[1, 2, 3].to_vec();
         let hash_result = message.hash(on_ramp_address);
 
         assert_eq!(
@@ -488,6 +500,25 @@ pub(crate) mod tests {
                 .unwrap_err(),
             CcipRouterError::UnsupportedNumberOfTokens.into()
         );
+    }
+
+    #[test]
+    fn test_trim_leading_zeros() {
+        let input = vec![0, 0, 0, 1, 2, 3];
+        let expected_output = &[1, 2, 3];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![1, 2, 3];
+        let expected_output = &[1, 2, 3];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![0, 0, 0];
+        let expected_output: &[u8] = &[];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![];
+        let expected_output: &[u8] = &[];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
     }
 
     pub fn sample_message() -> Solana2AnyMessage {

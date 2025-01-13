@@ -372,6 +372,7 @@ var (
 	// * report_context_byte_words[0]: ConfigDigest
 	// * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
 	// * report_context_byte_words[2]: ExtraHash
+	// * `on_ramp_address` - The address of the on-ramp program to send the message from
 	Instruction_Execute = ag_binary.TypeID([8]byte{130, 221, 242, 154, 13, 193, 189, 29})
 
 	// Manually executes a report to the router.
@@ -384,6 +385,7 @@ var (
 	//
 	// * `ctx` - The context containing the accounts required for the execution.
 	// * `execution_report` - The execution report containing the message and proofs.
+	// * `on_ramp_address` - The address of the on-ramp program to send the message from
 	Instruction_ManuallyExecute = ag_binary.TypeID([8]byte{238, 219, 224, 11, 226, 248, 47, 192})
 )
 

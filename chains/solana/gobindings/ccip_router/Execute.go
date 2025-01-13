@@ -32,6 +32,7 @@ import (
 // * report_context_byte_words[0]: ConfigDigest
 // * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
 // * report_context_byte_words[2]: ExtraHash
+// * `on_ramp_address` - The address of the on-ramp program to send the message from
 type Execute struct {
 	ExecutionReport        *ExecutionReportSingleChain
 	ReportContextByteWords *[3][32]uint8

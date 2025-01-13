@@ -338,10 +338,9 @@ pub fn withdraw_billed_funds(
 
 fn validate_source_chain_config(
     _source_chain_selector: u64,
-    _config: &SourceChainConfig,
+    config: &SourceChainConfig,
 ) -> Result<()> {
-    // As of now, the config has very few properties and there is nothing to validate yet.
-    // This is a placeholder to add validations as that config object grows.
+    require!(config.is_valid_on_ramp(), CcipRouterError::InvalidInputs);
     Ok(())
 }
 
