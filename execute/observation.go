@@ -171,6 +171,39 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
+// filterCommitReports filters out commit reports that have no messages or have missing messages.
+// as all messages for each report are required to be present in the observation, otherwise merkle proofs will fail.
+func filterCommitReports(msgObs exectypes.MessageObservations, commitObs exectypes.CommitObservations) exectypes.CommitObservations {
+	filteredCommitReports := make(exectypes.CommitObservations)
+	for srcChain, reports := range commitObs {
+		filteredReports := make([]exectypes.CommitData, 0)
+		// filter out reports that have no messages
+		if _, ok := msgObs[srcChain]; !ok {
+			continue
+		}
+
+		// filter out reports that have missing messages
+		for _, report := range reports {
+			valid := true
+			for seq := report.SequenceNumberRange.Start(); seq <= report.SequenceNumberRange.End(); seq++ {
+				if _, ok := msgObs[srcChain][seq]; !ok {
+					valid = false
+					break
+				}
+			}
+			if valid {
+				filteredReports = append(filteredReports, report)
+			}
+		}
+
+		if len(filteredReports) > 0 {
+			filteredCommitReports[srcChain] = filteredReports
+		}
+
+	}
+	return filteredCommitReports
+}
+
 func readAllMessages(
 	ctx context.Context,
 	lggr logger.Logger,
@@ -200,13 +233,7 @@ func readAllMessages(
 					"seqRange", seqRange,
 					"err", err,
 				)
-				// Fill range with empty messages.
-				for _, seqNum := range seqRange {
-					if _, ok := messageObs[srcChain]; !ok {
-						messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-					}
-					messageObs[srcChain][seqNum] = cciptypes.Message{}
-				}
+				continue
 			}
 			for _, msg := range msgs {
 				if _, ok := messageObs[srcChain]; !ok {
@@ -239,7 +266,9 @@ func (p *Plugin) getMessagesObservation(
 
 	messageObs := readAllMessages(ctx, p.lggr, p.ccipReader, commitReportCache)
 
-	messageTimestamps := getMessageTimestampMap(commitReportCache, messageObs)
+	filteredCommitReports := filterCommitReports(messageObs, commitReportCache)
+
+	messageTimestamps := getMessageTimestampMap(filteredCommitReports, messageObs)
 
 	if len(messageObs) != len(messageTimestamps) {
 		p.lggr.Errorw("wans't able to get all message timestamps")
@@ -266,7 +295,7 @@ func (p *Plugin) getMessagesObservation(
 		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
 	}
 
-	observation.CommitReports = commitReportCache
+	observation.CommitReports = filteredCommitReports
 	observation.Messages = messageObs
 	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
