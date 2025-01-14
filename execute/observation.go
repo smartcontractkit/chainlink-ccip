@@ -173,7 +173,9 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 
 // intersectCommitReportsAndMessages filters out commit reports that have no messages or have missing messages.
 // as all messages for each report are required to be present in the observation, otherwise merkle proofs will fail.
-func intersectCommitReportsAndMessages(msgObs exectypes.MessageObservations, commitObs exectypes.CommitObservations) (exectypes.MessageObservations, exectypes.CommitObservations) {
+func intersectCommitReportsAndMessages(msgObs exectypes.MessageObservations,
+	commitObs exectypes.CommitObservations,
+) (exectypes.MessageObservations, exectypes.CommitObservations) {
 	filteredCommitReports := make(exectypes.CommitObservations)
 	filteredMsgs := msgObs
 	for srcChain, reports := range commitObs {

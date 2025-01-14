@@ -2,6 +2,11 @@ package execute
 
 import (
 	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
 	"github.com/smartcontractkit/chainlink-ccip/execute/optimizers"
@@ -9,9 +14,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func Test_filterCommitReports(t *testing.T) {
@@ -255,14 +257,16 @@ func Test_getMessagesObservation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up mock expectations
-			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1), cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
+			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
+				cciptypes.NewSeqNumRange(1, 3)).Return([]cciptypes.Message{
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
 			}, nil).Maybe()
 
 			// missing message 5 and 6
-			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1), cciptypes.NewSeqNumRange(6, 10)).Return([]cciptypes.Message{
+			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
+				cciptypes.NewSeqNumRange(6, 10)).Return([]cciptypes.Message{
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 6}},
 			}, nil).Maybe()
 
