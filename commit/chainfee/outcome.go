@@ -216,9 +216,17 @@ func (p *processor) getGasPricesToUpdate(
 	for chain, currentChainFee := range currentChainUSDFees {
 		packedFee := cciptypes.NewBigInt(FeeComponentsToPackedFee(currentChainFee))
 		lastUpdate, exists := latestUpdates[chain]
-		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
 		// If the chain is not in the fee quoter updates or is stale, then we should update it
-		if !exists || obsTimestamp.After(nextUpdateTime) {
+		if !exists {
+			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
+				ChainSel: chain,
+				GasPrice: packedFee,
+			})
+			continue
+		}
+
+		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
+		if obsTimestamp.After(nextUpdateTime) {
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
