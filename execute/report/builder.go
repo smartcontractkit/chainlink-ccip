@@ -164,26 +164,24 @@ func (b *execReportBuilder) Add(
 func (b *execReportBuilder) Build() (
 	[]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error,
 ) {
-	/*
-		if len(b.execReports) != len(b.commitReports) {
-			return nil, nil, fmt.Errorf(
-				"expected the same number of exec and commit reports, got %d and %d",
-				len(b.execReports),
-				len(b.commitReports),
-			)
-		}
+	if len(b.execReports) != len(b.commitReports) {
+		return nil, nil, fmt.Errorf(
+			"expected the same number of exec and commit reports, got %d and %d",
+			len(b.execReports),
+			len(b.commitReports),
+		)
+	}
 
-		// Check if limiting is required.
-		if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
-			b.lggr.Infof(
-				"limiting number of reports to maxReports from %d to %d",
-				len(b.execReports),
-				b.maxSingleChainReports,
-			)
-			b.execReports = b.execReports[:b.maxSingleChainReports]
-			b.commitReports = b.commitReports[:b.maxSingleChainReports]
-		}
-	*/
+	// Check if limiting is required.
+	if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
+		b.lggr.Infof(
+			"limiting number of reports to maxReports from %d to %d",
+			len(b.execReports),
+			b.maxSingleChainReports,
+		)
+		b.execReports = b.execReports[:b.maxSingleChainReports]
+		b.commitReports = b.commitReports[:b.maxSingleChainReports]
+	}
 
 	b.lggr.Infow(
 		"selected commit reports for execution report",

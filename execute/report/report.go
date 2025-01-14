@@ -427,7 +427,7 @@ func (b *execReportBuilder) buildSingleChainReport(
 	}
 
 	// Unless there is a message limit, attempt to build a report for executing all ready messages.
-	if b.maxMessages != 0 {
+	if b.maxMessages == 0 {
 		finalReport, err :=
 			buildSingleChainReportHelper(b.lggr, report, readyMessages)
 		if err != nil {

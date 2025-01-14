@@ -766,6 +766,28 @@ func Test_Builder_Build(t *testing.T) {
 			expectedExecThings:    []int{3},
 			lastReportExecuted:    []cciptypes.SeqNum{100, 102, 104},
 		},
+		{
+			name: "two reports limited to one",
+			args: args{
+				maxReportSize: 15000,
+				maxGasLimit:   10000000,
+				maxReports:    1,
+				nonces:        defaultNonces,
+				reports: []exectypes.CommitData{
+					makeTestCommitReport(hasher, 10, 1, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil),
+					makeTestCommitReport(hasher, 20, 2, 100, 999, 10101010101,
+						sender,
+						cciptypes.Bytes32{}, // generate a correct root.
+						nil),
+				},
+			},
+			expectedExecReports:   1,
+			expectedCommitReports: 0,
+			expectedExecThings:    []int{10},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -787,6 +809,7 @@ func Test_Builder_Build(t *testing.T) {
 				WithMaxReportSizeBytes(tt.args.maxReportSize),
 				WithMaxGas(tt.args.maxGasLimit),
 				WithMaxMessages(tt.args.maxMessages),
+				WithMaxSingleChainReports(tt.args.maxReports),
 				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
 			)
 

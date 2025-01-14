@@ -261,7 +261,7 @@ func selectReport(
 		}
 	}
 
-	execReports, selectedReports, err := builder.Build(maxSingleChainReportSize)
+	execReports, selectedReports, err := builder.Build()
 
 	lggr.Infow(
 		"reports have been selected",
