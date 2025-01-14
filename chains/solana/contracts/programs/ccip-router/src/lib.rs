@@ -562,7 +562,6 @@ pub mod ccip_router {
     ///     * report_context_byte_words[0]: ConfigDigest
     ///     * report_context_byte_words[1]: 24 byte padding, 8 byte sequence number
     ///     * report_context_byte_words[2]: ExtraHash
-    /// * `on_ramp_address` - The address of the on-ramp program to send the message from
     pub fn execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
@@ -581,7 +580,6 @@ pub mod ccip_router {
     ///
     /// * `ctx` - The context containing the accounts required for the execution.
     /// * `execution_report` - The execution report containing the message and proofs.
-    /// * `on_ramp_address` - The address of the on-ramp program to send the message from
     pub fn manually_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,

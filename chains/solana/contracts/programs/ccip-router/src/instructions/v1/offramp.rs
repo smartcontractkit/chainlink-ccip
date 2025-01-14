@@ -10,6 +10,7 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::config::is_on_ramp_configured;
 use crate::{
     Any2SolanaMessage, Any2SolanaRampMessage, BillingTokenConfigWrapper, CcipRouterError,
     CommitInput, CommitReport, CommitReportAccepted, CommitReportContext, DestChain,
@@ -40,9 +41,7 @@ pub fn commit<'info>(
         CcipRouterError::UnsupportedSourceChainSelector
     );
     require!(
-        source_chain_state
-            .config
-            .is_on_ramp_configured(&report.merkle_root.on_ramp_address),
+        is_on_ramp_configured(&source_chain_state.config, &report.merkle_root.on_ramp_address),
         CcipRouterError::InvalidInputs
     );
 
@@ -349,9 +348,7 @@ fn internal_execute<'info>(
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
     require!(
-        source_chain_state
-            .config
-            .is_on_ramp_configured(&execution_report.message.on_ramp_address),
+        is_on_ramp_configured(&source_chain_state.config, &execution_report.message.on_ramp_address),
         CcipRouterError::InvalidInputs
     );
 
