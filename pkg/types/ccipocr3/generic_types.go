@@ -20,14 +20,14 @@ func NewTokenPrice(tokenID UnknownEncodedAddress, price *big.Int) TokenPrice {
 }
 
 type GasPriceChain struct {
-	GasPrice BigInt        `json:"gasPrice"`
 	ChainSel ChainSelector `json:"chainSel"`
+	GasPrice BigInt        `json:"gasPrice"`
 }
 
 func NewGasPriceChain(gasPrice *big.Int, chainSel ChainSelector) GasPriceChain {
 	return GasPriceChain{
-		GasPrice: NewBigInt(gasPrice),
 		ChainSel: chainSel,
+		GasPrice: NewBigInt(gasPrice),
 	}
 }
 

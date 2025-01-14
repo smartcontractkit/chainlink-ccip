@@ -29,6 +29,7 @@ const (
 	defaultRemoteGasPriceBatchWriteFrequency  = 1 * time.Minute
 	defaultSignObservationPrefix              = "chainlink ccip 1.6 rmn observation"
 	defaultTransmissionDelayMultiplier        = 30 * time.Second
+	defaultInflightPriceCheckRetries          = 5
 )
 
 type FeeInfo struct {
@@ -140,6 +141,9 @@ type CommitOffchainConfig struct {
 
 	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
 	TransmissionDelayMultiplier time.Duration `json:"transmissionDelayMultiplier"`
+
+	// InflightPriceCheckRetries is the number of rounds we wait for a price report to get recorded on the blockchain.
+	InflightPriceCheckRetries int `json:"inflightPriceCheckRetries"`
 }
 
 func (c *CommitOffchainConfig) applyDefaults() {
@@ -169,6 +173,10 @@ func (c *CommitOffchainConfig) applyDefaults() {
 
 	if c.TransmissionDelayMultiplier == 0 {
 		c.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
+	}
+
+	if c.InflightPriceCheckRetries == 0 {
+		c.InflightPriceCheckRetries = defaultInflightPriceCheckRetries
 	}
 }
 
