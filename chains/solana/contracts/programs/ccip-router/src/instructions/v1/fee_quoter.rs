@@ -6,13 +6,13 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    utils::{Exponential, Usd18Decimals},
     BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
-    SolanaTokenAmount, UnpackedDoubleU224, FEE_BILLING_SIGNER_SEEDS,
+    SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
 use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+use super::price_math::{Exponential, Usd18Decimals};
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
 /// Each variable array takes 1 more slot to store its length.
@@ -93,7 +93,15 @@ pub fn fee_for_msg(
     let premium_multiplier = U256::new(fee_token_config.premium_multiplier_wei_per_eth.into());
     let fee_token_value =
         (network_fee.premium * premium_multiplier) + execution_cost + data_availability_cost;
-    SolanaTokenAmount::amount(fee_token, fee_token_value, fee_token_price)
+
+    let fee_token_amount = (fee_token_value.0 / fee_token_price.0)
+        .try_into()
+        .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
+
+    Ok(SolanaTokenAmount {
+        token: fee_token,
+        amount: fee_token_amount,
+    })
 }
 
 fn data_availability_cost(
@@ -182,8 +190,8 @@ fn token_network_fees(
             // Calculate token transfer value, then apply fee ratio
             // ratio represents multiples of 0.1bps, or 1e-5
             Usd18Decimals(
-                (token_amount.value(&token_price).0
-                    * U256::new(config_for_dest_chain.billing.deci_bps.into()))
+                Usd18Decimals::from_token_amount(token_amount, &token_price).0
+                    * U256::new(config_for_dest_chain.billing.deci_bps.into())
                     / 1u32.e(5),
             )
         }
@@ -225,11 +233,35 @@ pub struct PackedPrice {
     pub data_availability_gas_price: Usd18Decimals,
 }
 
-impl From<UnpackedDoubleU224> for PackedPrice {
-    fn from(value: UnpackedDoubleU224) -> Self {
-        Self {
-            execution_gas_price: Usd18Decimals(value.low.into()),
-            data_availability_gas_price: Usd18Decimals(value.high.into()),
+impl From<&TimestampedPackedU224> for PackedPrice {
+    fn from(value: &TimestampedPackedU224) -> Self {
+        UnpackedDoubleU224::from(value).into()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UnpackedDoubleU224 {
+    pub high: u128,
+    pub low: u128,
+}
+
+impl From<&TimestampedPackedU224> for UnpackedDoubleU224 {
+    fn from(packed: &TimestampedPackedU224) -> Self {
+        let mut u128_buffer = [0u8; 16];
+        u128_buffer[2..16].clone_from_slice(&packed.value[14..]);
+        let high = u128::from_be_bytes(u128_buffer);
+        u128_buffer[2..16].clone_from_slice(&packed.value[..14]);
+        let low = u128::from_be_bytes(u128_buffer);
+        Self { high, low }
+    }
+}
+
+#[allow(clippy::from_over_into)] // we don't want to implement methods for state structs, only for internal ones
+impl Into<PackedPrice> for UnpackedDoubleU224 {
+    fn into(self) -> PackedPrice {
+        PackedPrice {
+            execution_gas_price: Usd18Decimals(self.low.into()),
+            data_availability_gas_price: Usd18Decimals(self.high.into()),
         }
     }
 }
@@ -255,7 +287,7 @@ impl TryFrom<PackedPrice> for UnpackedDoubleU224 {
 
 fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     let timestamp = dest_chain.state.usd_per_unit_gas.timestamp;
-    let price = dest_chain.state.usd_per_unit_gas.unpack().into();
+    let price = PackedPrice::from(&dest_chain.state.usd_per_unit_gas);
     let threshold = dest_chain.config.gas_price_staleness_threshold as i64;
     let elapsed_time = Clock::get()?.unix_timestamp - timestamp;
 
@@ -269,17 +301,17 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
 
 fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
     let timestamp = token_config.usd_per_token.timestamp;
-    let price = token_config.usd_per_token.as_single();
+    let price: Usd18Decimals = (&token_config.usd_per_token).into();
 
     // NOTE: There's no validation done with respect to token price staleness since data feeds are not
     // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
     // was set at least once.
     require!(
-        price != 0 && timestamp != 0,
+        price.0 != 0 && timestamp != 0,
         CcipRouterError::InvalidTokenPrice
     );
 
-    Ok(Usd18Decimals(price))
+    Ok(price)
 }
 
 pub fn wrap_native_sol<'info>(
@@ -740,12 +772,10 @@ mod tests {
             data_availability_gas_price: Usd18Decimals::from_usd_cents(200),
         };
 
-        let roundtrip = PackedPrice::from(
-            TryInto::<UnpackedDoubleU224>::try_into(price.clone())
-                .unwrap()
-                .pack(0)
-                .unpack(),
-        );
+        let unpacked: UnpackedDoubleU224 = price.clone().try_into().unwrap();
+        let ts_packed: TimestampedPackedU224 = unpacked.pack(0);
+        let roundtrip: PackedPrice = (&ts_packed).into();
+
         assert_eq!(price, roundtrip);
     }
 }

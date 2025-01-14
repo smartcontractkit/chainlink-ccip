@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use ethnum::U256;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -179,7 +178,6 @@ pub struct RateLimitTokenBucket {
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
 }
 
-// WIP
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct BillingTokenConfig {
     // NOTE: when modifying this struct, make sure to update the version in the wrapper
@@ -205,45 +203,8 @@ pub struct TimestampedPackedU224 {
     pub timestamp: i64, // maintaining the type that Solana returns for the time (solana_program::clock::UnixTimestamp = i64)
 }
 
-impl TimestampedPackedU224 {
-    pub fn as_single(&self) -> U256 {
-        let mut u256_buffer = [0u8; 32];
-        u256_buffer[4..32].clone_from_slice(&self.value);
-        U256::from_be_bytes(u256_buffer)
-    }
-
-    pub fn from_single(timestamp: i64, single: U256) -> Self {
-        let mut value = [0u8; 28];
-        value.clone_from_slice(&single.to_be_bytes()[4..32]);
-        Self { value, timestamp }
-    }
-
-    pub fn unpack(&self) -> UnpackedDoubleU224 {
-        let mut u128_buffer = [0u8; 16];
-        u128_buffer[2..16].clone_from_slice(&self.value[14..]);
-        let high = u128::from_be_bytes(u128_buffer);
-        u128_buffer[2..16].clone_from_slice(&self.value[..14]);
-        let low = u128::from_be_bytes(u128_buffer);
-        UnpackedDoubleU224 { high, low }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct UnpackedDoubleU224 {
-    pub high: u128,
-    pub low: u128,
-}
-
-impl UnpackedDoubleU224 {
-    pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
-        let mut value = [0u8; 28];
-        value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
-        value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
-        TimestampedPackedU224 { value, timestamp }
-    }
-}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
+// used in the commit report execution_states field
 pub enum MessageExecutionState {
     Untouched = 0,
     InProgress = 1, // Not used in Solana, but used in EVM
