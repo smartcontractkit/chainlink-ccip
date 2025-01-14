@@ -337,6 +337,7 @@ func selectReport(
 	lggr logger.Logger,
 	commitReports []exectypes.CommitData,
 	builder report.ExecReportBuilder,
+	maxSingleChainReportSize uint64,
 ) ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error) {
 	// TODO: It may be desirable for this entire function to be an interface so that
 	//       different selection algorithms can be used.
@@ -365,7 +366,7 @@ func selectReport(
 		}
 	}
 
-	execReports, selectedReports, err := builder.Build()
+	execReports, selectedReports, err := builder.Build(maxSingleChainReportSize)
 
 	lggr.Infow(
 		"reports have been selected",
