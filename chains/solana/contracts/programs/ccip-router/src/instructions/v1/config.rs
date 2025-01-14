@@ -2,7 +2,6 @@ use anchor_lang::{error::Error, require};
 
 use crate::{CcipRouterError, SourceChainConfig};
 
-
 pub fn is_valid_on_ramp(config: &SourceChainConfig) -> bool {
     let len = config.on_ramp.len();
 
@@ -21,7 +20,7 @@ pub fn get_on_ramps(config: &SourceChainConfig) -> Result<Vec<[u8; 64]>, Error> 
             config.on_ramp[0..64]
                 .try_into()
                 .map_err(|_| CcipRouterError::InvalidInputs)?,
-                config.on_ramp[64..128]
+            config.on_ramp[64..128]
                 .try_into()
                 .map_err(|_| CcipRouterError::InvalidInputs)?,
         ],
@@ -42,6 +41,7 @@ pub fn is_on_ramp_configured(config: &SourceChainConfig, on_ramp: &[u8]) -> bool
     valid_on_ramps.unwrap().contains(&on_ramp_bytes)
 }
 
+#[allow(dead_code)]
 fn trim_leading_zeros(input: &[u8]) -> &[u8] {
     let start = input
         .iter()
@@ -49,7 +49,6 @@ fn trim_leading_zeros(input: &[u8]) -> &[u8] {
         .unwrap_or(input.len());
     &input[start..]
 }
-
 
 #[cfg(test)]
 mod tests {

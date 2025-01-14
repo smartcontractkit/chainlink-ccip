@@ -42,7 +42,10 @@ pub fn commit<'info>(
         CcipRouterError::UnsupportedSourceChainSelector
     );
     require!(
-        is_on_ramp_configured(&source_chain_state.config, &report.merkle_root.on_ramp_address),
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &report.merkle_root.on_ramp_address
+        ),
         CcipRouterError::InvalidInputs
     );
 
@@ -349,7 +352,10 @@ fn internal_execute<'info>(
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
     require!(
-        is_on_ramp_configured(&source_chain_state.config, &execution_report.message.on_ramp_address),
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &execution_report.message.on_ramp_address
+        ),
         CcipRouterError::InvalidInputs
     );
 
