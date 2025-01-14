@@ -1,7 +1,4 @@
 use anchor_lang::prelude::*;
-use ethnum::U256;
-
-use crate::ocr3base::Ocr3Config;
 
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
@@ -25,6 +22,37 @@ pub struct Config {
 
     // TODO: billing global configs'
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
+}
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+pub struct Ocr3ConfigInfo {
+    pub config_digest: [u8; 32], // 32-byte hash of configuration
+    pub f: u8,                   // f+1 = number of signatures per report
+    pub n: u8,                   // number of signers
+    pub is_signature_verification_enabled: u8, // bool -> bytemuck::Pod compliant required for zero_copy
+}
+
+// TODO: do we need to verify signers and transmitters are different? (between the two groups)
+// signers: pubkey is 20-byte address, secp256k1 curve ECDSA
+// transmitters: 32-byte pubkey, ed25519
+
+#[zero_copy]
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
+pub struct Ocr3Config {
+    pub plugin_type: u8, // plugin identifier for validation (example: ccip:commit = 0, ccip:execute = 1)
+    pub config_info: Ocr3ConfigInfo,
+    pub signers: [[u8; 20]; 16], // v0.29.0 - anchor IDL does not build with MAX_SIGNERS
+    pub transmitters: [[u8; 32]; 16], // v0.29.0 - anchor IDL does not build with MAX_TRANSMITTERS
+}
+
+impl Ocr3Config {
+    pub fn new(plugin_type: u8) -> Self {
+        Self {
+            plugin_type,
+            ..Default::default()
+        }
+    }
 }
 
 #[account]
@@ -120,57 +148,8 @@ pub struct CommitReport {
     pub execution_states: u128,
 }
 
-impl CommitReport {
-    pub fn set_state(&mut self, sequence_number: u64, execution_state: MessageExecutionState) {
-        let packed = &mut self.execution_states;
-        let dif = sequence_number.checked_sub(self.min_msg_nr);
-        assert!(dif.is_some(), "Sequence number out of bounds");
-        let i = dif.unwrap();
-        assert!(i < 64, "Sequence number out of bounds");
-
-        // Clear the 2 bits at position 'i'
-        *packed &= !(0b11 << (i * 2));
-        // Set the new value in the cleared bits
-        *packed |= (execution_state as u128) << (i * 2);
-    }
-
-    pub fn get_state(&self, sequence_number: u64) -> MessageExecutionState {
-        let packed = self.execution_states;
-        let dif = sequence_number.checked_sub(self.min_msg_nr);
-        assert!(dif.is_some(), "Sequence number out of bounds");
-        let i = dif.unwrap();
-        assert!(i < 64, "Sequence number out of bounds");
-
-        let mask = 0b11 << (i * 2);
-        let state = (packed & mask) >> (i * 2);
-        MessageExecutionState::try_from(state).unwrap()
-    }
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
-pub enum MessageExecutionState {
-    Untouched = 0,
-    InProgress = 1, // Not used in Solana, but used in EVM
-    Success = 2,
-    Failure = 3,
-}
-
-impl TryFrom<u128> for MessageExecutionState {
-    type Error = &'static str;
-
-    fn try_from(value: u128) -> std::result::Result<MessageExecutionState, &'static str> {
-        match value {
-            0 => Ok(MessageExecutionState::Untouched),
-            1 => Ok(MessageExecutionState::InProgress),
-            2 => Ok(MessageExecutionState::Success),
-            3 => Ok(MessageExecutionState::Failure),
-            _ => Err("Invalid ExecutionState"),
-        }
-    }
-}
-
 #[account]
-#[derive(InitSpace)]
+#[derive(InitSpace, Debug)]
 pub struct PerChainPerTokenConfig {
     pub version: u8,         // schema version
     pub chain_selector: u64, // remote chain
@@ -179,7 +158,7 @@ pub struct PerChainPerTokenConfig {
     pub billing: TokenBilling, // EVM: configurable in router only by ccip admins
 }
 
-#[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize)]
+#[derive(InitSpace, Debug, Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct TokenBilling {
     pub min_fee_usdcents: u32, // Minimum fee to charge per token transfer, multiples of 0.01 USD
     pub max_fee_usdcents: u32, // Maximum fee to charge per token transfer, multiples of 0.01 USD
@@ -199,7 +178,6 @@ pub struct RateLimitTokenBucket {
     pub rate: u128,        // Number of tokens per second that the bucket is refilled.
 }
 
-// WIP
 #[derive(InitSpace, Clone, AnchorSerialize, AnchorDeserialize, Debug)]
 pub struct BillingTokenConfig {
     // NOTE: when modifying this struct, make sure to update the version in the wrapper
@@ -225,128 +203,33 @@ pub struct TimestampedPackedU224 {
     pub timestamp: i64, // maintaining the type that Solana returns for the time (solana_program::clock::UnixTimestamp = i64)
 }
 
-impl TimestampedPackedU224 {
-    pub fn as_single(&self) -> U256 {
-        let mut u256_buffer = [0u8; 32];
-        u256_buffer[4..32].clone_from_slice(&self.value);
-        U256::from_be_bytes(u256_buffer)
-    }
-
-    pub fn unpack(&self) -> UnpackedDoubleU224 {
-        let mut u128_buffer = [0u8; 16];
-        u128_buffer[2..16].clone_from_slice(&self.value[14..]);
-        let high = u128::from_be_bytes(u128_buffer);
-        u128_buffer[2..16].clone_from_slice(&self.value[..14]);
-        let low = u128::from_be_bytes(u128_buffer);
-        UnpackedDoubleU224 { high, low }
-    }
+#[derive(Clone, AnchorSerialize, AnchorDeserialize, Debug, PartialEq)]
+// used in the commit report execution_states field
+pub enum MessageExecutionState {
+    Untouched = 0,
+    InProgress = 1, // Not used in Solana, but used in EVM
+    Success = 2,
+    Failure = 3,
 }
 
-#[derive(Debug, Clone)]
-pub struct UnpackedDoubleU224 {
-    pub high: u128,
-    pub low: u128,
+impl TryFrom<u128> for MessageExecutionState {
+    type Error = &'static str;
+
+    fn try_from(value: u128) -> std::result::Result<MessageExecutionState, &'static str> {
+        match value {
+            0 => Ok(MessageExecutionState::Untouched),
+            1 => Ok(MessageExecutionState::InProgress),
+            2 => Ok(MessageExecutionState::Success),
+            3 => Ok(MessageExecutionState::Failure),
+            _ => Err("Invalid ExecutionState"),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::convert::TryFrom;
-
-    #[test]
-    fn test_set_state() {
-        let mut commit_report = CommitReport {
-            version: 1,
-            chain_selector: 0,
-            merkle_root: [0; 32],
-            timestamp: 0,
-            min_msg_nr: 0,
-            max_msg_nr: 64,
-            execution_states: 0,
-        };
-
-        commit_report.set_state(0, MessageExecutionState::Success);
-        assert_eq!(commit_report.get_state(0), MessageExecutionState::Success);
-
-        commit_report.set_state(1, MessageExecutionState::Failure);
-        assert_eq!(commit_report.get_state(1), MessageExecutionState::Failure);
-
-        commit_report.set_state(2, MessageExecutionState::Untouched);
-        assert_eq!(commit_report.get_state(2), MessageExecutionState::Untouched);
-
-        commit_report.set_state(3, MessageExecutionState::InProgress);
-        assert_eq!(
-            commit_report.get_state(3),
-            MessageExecutionState::InProgress
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "Sequence number out of bounds")]
-    fn test_set_state_out_of_bounds() {
-        let mut commit_report = CommitReport {
-            version: 1,
-            chain_selector: 1,
-            merkle_root: [0; 32],
-            timestamp: 1,
-            min_msg_nr: 1500,
-            max_msg_nr: 1530,
-            execution_states: 0,
-        };
-
-        commit_report.set_state(65, MessageExecutionState::Success);
-    }
-
-    #[test]
-    fn test_get_state() {
-        let mut commit_report = CommitReport {
-            version: 1,
-            chain_selector: 1,
-            merkle_root: [0; 32],
-            timestamp: 1,
-            min_msg_nr: 1500,
-            max_msg_nr: 1530,
-            execution_states: 0,
-        };
-
-        commit_report.set_state(1501, MessageExecutionState::Success);
-        commit_report.set_state(1505, MessageExecutionState::Failure);
-        commit_report.set_state(1520, MessageExecutionState::Untouched);
-        commit_report.set_state(1523, MessageExecutionState::InProgress);
-
-        assert_eq!(
-            commit_report.get_state(1501),
-            MessageExecutionState::Success
-        );
-        assert_eq!(
-            commit_report.get_state(1505),
-            MessageExecutionState::Failure
-        );
-        assert_eq!(
-            commit_report.get_state(1520),
-            MessageExecutionState::Untouched
-        );
-        assert_eq!(
-            commit_report.get_state(1523),
-            MessageExecutionState::InProgress
-        );
-    }
-
-    #[test]
-    #[should_panic(expected = "Sequence number out of bounds")]
-    fn test_get_state_out_of_bounds() {
-        let commit_report = CommitReport {
-            version: 1,
-            chain_selector: 1,
-            merkle_root: [0; 32],
-            timestamp: 1,
-            min_msg_nr: 1500,
-            max_msg_nr: 1530,
-            execution_states: 0,
-        };
-
-        commit_report.get_state(65);
-    }
 
     #[test]
     fn test_execution_state_try_from() {

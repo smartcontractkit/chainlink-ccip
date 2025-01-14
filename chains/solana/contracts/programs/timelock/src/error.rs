@@ -61,9 +61,6 @@ pub enum TimelockError {
     #[msg("RBACTimelock: selector not found")]
     SelectorNotFound,
 
-    #[msg("RBACTimelock: invalid instruction data")]
-    InvalidInstructionData, // todo: update this with solid fn blocker policy
-
     #[msg("RBACTimelock: maximum capacity reached for function blocker")]
     MaxCapacityReached,
 }

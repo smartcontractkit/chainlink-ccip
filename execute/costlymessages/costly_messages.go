@@ -9,7 +9,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -43,7 +42,7 @@ func NewObserverWithDefaults(
 	enabled bool,
 	ccipReader readerpkg.CCIPReader,
 	relativeBoostPerWaitHour float64,
-	estimateProvider gas.EstimateProvider,
+	estimateProvider cciptypes.EstimateProvider,
 ) Observer {
 	return NewObserver(
 		lggr,
@@ -344,7 +343,7 @@ func waitBoostedFee(
 type CCIPMessageExecCostUSD18Calculator struct {
 	lggr             logger.Logger
 	ccipReader       readerpkg.CCIPReader
-	estimateProvider gas.EstimateProvider
+	estimateProvider cciptypes.EstimateProvider
 }
 
 // MessageExecCostUSD18 returns a map from message ID to the message's estimated execution cost in USD18s.

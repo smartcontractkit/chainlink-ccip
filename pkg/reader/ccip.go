@@ -96,10 +96,10 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 
 	type MerkleRoot struct {
 		SourceChainSelector uint64
+		OnRampAddress       cciptypes.UnknownAddress
 		MinSeqNr            uint64
 		MaxSeqNr            uint64
 		MerkleRoot          cciptypes.Bytes32
-		OnRampAddress       []byte
 	}
 
 	type TokenPriceUpdate struct {
@@ -118,8 +118,8 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 	}
 
 	type CommitReportAcceptedEvent struct {
-		PriceUpdates PriceUpdates
 		MerkleRoots  []MerkleRoot
+		PriceUpdates PriceUpdates
 	}
 	// ---------------------------------------------------
 
@@ -233,7 +233,11 @@ func (r *ccipChainReader) ExecutedMessageRanges(
 	type ExecutionStateChangedEvent struct {
 		SourceChainSelector cciptypes.ChainSelector
 		SequenceNumber      cciptypes.SeqNum
+		MessageID           cciptypes.Bytes32
+		MessageHash         cciptypes.Bytes32
 		State               uint8
+		ReturnData          cciptypes.Bytes
+		GasUsed             big.Int
 	}
 
 	dataTyp := ExecutionStateChangedEvent{}
@@ -300,6 +304,7 @@ func (r *ccipChainReader) MsgsBetweenSeqNums(
 
 	type SendRequestedEvent struct {
 		DestChainSelector cciptypes.ChainSelector
+		SequenceNumber    cciptypes.SeqNum
 		Message           cciptypes.Message
 	}
 
@@ -399,22 +404,26 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 
 func (r *ccipChainReader) NextSeqNum(
 	ctx context.Context, chains []cciptypes.ChainSelector,
-) ([]cciptypes.SeqNum, error) {
+) (map[cciptypes.ChainSelector]cciptypes.SeqNum, error) {
 	cfgs, err := r.getOffRampSourceChainsConfig(ctx, chains)
 	if err != nil {
 		return nil, fmt.Errorf("get source chains config: %w", err)
 	}
 
-	res := make([]cciptypes.SeqNum, 0, len(chains))
+	res := make(map[cciptypes.ChainSelector]cciptypes.SeqNum, len(chains))
 	for _, chain := range chains {
 		cfg, exists := cfgs[chain]
 		if !exists {
-			return nil, fmt.Errorf("source chain config not found for chain %d", chain)
+			r.lggr.Warnf("source chain config not found for chain %d, chain is skipped.", chain)
+			continue
 		}
+
 		if cfg.MinSeqNr == 0 {
-			return nil, fmt.Errorf("minSeqNr not found for chain %d", chain)
+			r.lggr.Errorf("minSeqNr not found for chain %d or is set to 0, chain is skipped.", chain)
+			continue
 		}
-		res = append(res, cciptypes.SeqNum(cfg.MinSeqNr))
+
+		res[chain] = cciptypes.SeqNum(cfg.MinSeqNr)
 	}
 
 	return res, err
@@ -696,9 +705,9 @@ func (r *ccipChainReader) GetRMNRemoteConfig(
 
 	return rmntypes.RemoteConfig{
 		ContractAddress:  rmnRemoteAddress,
-		ConfigDigest:     cciptypes.Bytes32(vc.Config.RMNHomeContractConfigDigest),
+		ConfigDigest:     vc.Config.RMNHomeContractConfigDigest,
 		Signers:          signers,
-		F:                vc.Config.F,
+		FSign:            vc.Config.F,
 		ConfigVersion:    vc.Version,
 		RmnReportVersion: header.DigestHeader,
 	}, nil
@@ -1050,11 +1059,15 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 type sourceChainConfig struct {
 	Router    []byte // local router
 	IsEnabled bool
-	OnRamp    []byte
 	MinSeqNr  uint64
+	OnRamp    cciptypes.UnknownAddress
 }
 
 func (scc sourceChainConfig) check() (bool /* enabled */, error) {
+	// The chain may be set in CCIPHome's ChainConfig map but not hooked up yet in the offramp.
+	if !scc.IsEnabled {
+		return false, nil
+	}
 	// This may happen due to some sort of regression in the codec that unmarshals
 	// chain data -> go struct.
 	if len(scc.OnRamp) == 0 {
@@ -1067,7 +1080,7 @@ func (scc sourceChainConfig) check() (bool /* enabled */, error) {
 }
 
 // getOffRampSourceChainsConfig returns the offRamp contract's source chain configurations for each supported source
-// chain.
+// chain. If some chain is disabled it is not included in the response.
 func (r *ccipChainReader) getOffRampSourceChainsConfig(
 	ctx context.Context, chains []cciptypes.ChainSelector) (map[cciptypes.ChainSelector]sourceChainConfig, error) {
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
@@ -1141,7 +1154,6 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 	configs := make(map[cciptypes.ChainSelector]sourceChainConfig)
 
 	var resp selectorsAndConfigs
-	//var resp map[string]any
 	err := r.contractReaders[chain].ExtendedGetLatestValue(
 		ctx,
 		consts.ContractNameOffRamp,
@@ -1197,13 +1209,6 @@ type offRampDynamicChainConfig struct {
 	PermissionLessExecutionThresholdSeconds uint32 `json:"permissionLessExecutionThresholdSeconds"`
 	IsRMNVerificationDisabled               bool   `json:"isRMNVerificationDisabled"`
 	MessageInterceptor                      []byte `json:"messageInterceptor"`
-}
-
-//nolint:unused // it will be used soon // TODO: Remove nolint
-type offRampDestChainConfig struct {
-	SequenceNumber   uint64 `json:"sequenceNumber"`
-	AllowListEnabled bool   `json:"allowListEnabled"`
-	Router           []byte `json:"router"`
 }
 
 // getData returns data for a single reader.
@@ -1365,9 +1370,9 @@ type signer struct {
 // config is used to parse the response from the RMNRemote contract's getVersionedConfig method.
 // See: https://github.com/smartcontractkit/ccip/blob/ccip-develop/contracts/src/v0.8/ccip/rmn/RMNRemote.sol#L49-L53
 type config struct {
-	RMNHomeContractConfigDigest []byte   `json:"rmnHomeContractConfigDigest"`
-	Signers                     []signer `json:"signers"`
-	F                           uint64   `json:"f"` // previously: MinSigners
+	RMNHomeContractConfigDigest cciptypes.Bytes32 `json:"rmnHomeContractConfigDigest"`
+	Signers                     []signer          `json:"signers"`
+	F                           uint64            `json:"f"` // previously: MinSigners
 }
 
 // versionedConfig is used to parse the response from the RMNRemote contract's getVersionedConfig method.

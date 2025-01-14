@@ -8,7 +8,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -19,29 +18,81 @@ type ExecReportBuilder interface {
 	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
 }
 
+// Option that can be passed to the builder.
+type Option func(erb *execReportBuilder)
+
+// WithMaxGas limits how much gas can be used during execution.
+func WithMaxGas(maxGas uint64) func(*execReportBuilder) {
+	return func(erb *execReportBuilder) {
+		erb.maxGas = maxGas
+	}
+}
+
+// WithMaxReportSizeBytes configures the maximum report size.
+func WithMaxReportSizeBytes(maxReportSizeBytes uint64) Option {
+	return func(erb *execReportBuilder) {
+		erb.maxReportSizeBytes = maxReportSizeBytes
+	}
+}
+
+// WithMaxMessages configures the number of messages allowed to be in a report.
+func WithMaxMessages(maxMessages uint64) Option {
+	return func(erb *execReportBuilder) {
+		erb.maxMessages = maxMessages
+		panic("not implemented")
+	}
+}
+
+// WithExtraMessageCheck adds additional message checks to the default ones.
+func WithExtraMessageCheck(check Check) Option {
+	return func(erb *execReportBuilder) {
+		erb.checks = append(erb.checks, check)
+	}
+}
+
+func newBuilderInternal(
+	logger logger.Logger,
+	hasher cciptypes.MessageHasher,
+	encoder cciptypes.ExecutePluginCodec,
+	estimateProvider cciptypes.EstimateProvider,
+	destChainSelector cciptypes.ChainSelector,
+	options ...Option,
+) *execReportBuilder {
+	defaultChecks := []Check{
+		CheckIfPseudoDeleted(),
+		CheckAlreadyExecuted(),
+		CheckTokenData(),
+		CheckTooCostly(),
+	}
+
+	builder := &execReportBuilder{
+		lggr:              logger,
+		checks:            defaultChecks,
+		encoder:           encoder,
+		hasher:            hasher,
+		estimateProvider:  estimateProvider,
+		destChainSelector: destChainSelector,
+	}
+
+	for _, option := range options {
+		if option != nil {
+			option(builder)
+		}
+	}
+
+	return builder
+}
+
+// NewBuilder constructs the report builder.
 func NewBuilder(
 	logger logger.Logger,
 	hasher cciptypes.MessageHasher,
 	encoder cciptypes.ExecutePluginCodec,
-	estimateProvider gas.EstimateProvider,
-	nonces map[cciptypes.ChainSelector]map[string]uint64,
+	estimateProvider cciptypes.EstimateProvider,
 	destChainSelector cciptypes.ChainSelector,
-	maxReportSizeBytes uint64,
-	maxGas uint64,
+	options ...Option,
 ) ExecReportBuilder {
-	return &execReportBuilder{
-		lggr: logger,
-
-		encoder:          encoder,
-		hasher:           hasher,
-		estimateProvider: estimateProvider,
-		sendersNonce:     nonces,
-		expectedNonce:    make(map[cciptypes.ChainSelector]map[string]uint64),
-
-		destChainSelector:  destChainSelector,
-		maxReportSizeBytes: maxReportSizeBytes,
-		maxGas:             maxGas,
-	}
+	return newBuilderInternal(logger, hasher, encoder, estimateProvider, destChainSelector, options...)
 }
 
 // validationMetadata contains all metadata needed to accumulate results across multiple reports and messages.
@@ -63,23 +114,25 @@ type execReportBuilder struct {
 	// Providers
 	encoder          cciptypes.ExecutePluginCodec
 	hasher           cciptypes.MessageHasher
-	estimateProvider gas.EstimateProvider
-	sendersNonce     map[cciptypes.ChainSelector]map[string]uint64
+	estimateProvider cciptypes.EstimateProvider
 
 	// Config
+	checks             []Check
 	destChainSelector  cciptypes.ChainSelector
 	maxReportSizeBytes uint64
 	maxGas             uint64
+	maxMessages        uint64
 
 	// State
 	accumulated validationMetadata
-	// expectedNonce is used to track nonces for multiple messages from the same sender.
-	expectedNonce map[cciptypes.ChainSelector]map[string]uint64
 
 	// Result
 	execReports []cciptypes.ExecutePluginReportSingleChain
 }
 
+// Add an exec report for as many messages as possible in the given commit report.
+// The commit report with updated metadata is returned, it reflects which messages
+// were selected for the exec report.
 func (b *execReportBuilder) Add(
 	ctx context.Context,
 	commitReport exectypes.CommitData,

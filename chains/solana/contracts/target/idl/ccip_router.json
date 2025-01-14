@@ -6,7 +6,10 @@
     "",
     "This is the Collapsed Router Program for CCIP.",
     "As it's upgradable persisting the same program id, there is no need to have an indirection of a Proxy Program.",
-    "This Router handles both the OnRamp and OffRamp flow of the CCIP Messages."
+    "This Router handles both the OnRamp and OffRamp flow of the CCIP Messages.",
+    "",
+    "NOTE to devs: This file however should contain *no logic*, only the entrypoints to the different versioned modules,",
+    "thus making it easier to ensure later on that logic can be changed during upgrades without affecting the interface."
   ],
   "constants": [
     {
@@ -645,12 +648,18 @@
         "",
         "* `ctx` - The context containing the accounts required for setting the pool.",
         "* `mint` - The public key of the token mint.",
-        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool."
+        "* `pool_lookup_table` - The public key of the pool lookup table, this address will be used for validations when interacting with the pool.",
+        "* `is_writable` - index of account in lookup table that is writable"
       ],
       "accounts": [
         {
           "name": "tokenAdminRegistry",
           "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolLookuptable",
+          "isMut": false,
           "isSigner": false
         },
         {
@@ -665,8 +674,8 @@
           "type": "publicKey"
         },
         {
-          "name": "poolLookupTable",
-          "type": "publicKey"
+          "name": "writableIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -747,8 +756,8 @@
         "# Arguments",
         "",
         "* `ctx` - The context containing the accounts required for setting the token billing configuration.",
-        "* `_chain_selector` - The chain selector.",
-        "* `_mint` - The public key of the token mint.",
+        "* `chain_selector` - The chain selector.",
+        "* `mint` - The public key of the token mint.",
         "* `cfg` - The token billing configuration."
       ],
       "accounts": [
@@ -1019,6 +1028,17 @@
         "* `_ctx` - The context containing the accounts required for the fee calculation.",
         "* `dest_chain_selector` - The chain selector for the destination chain.",
         "* `message` - The message to be sent.",
+        "",
+        "# Additional accounts",
+        "",
+        "In addition to the fixed amount of accounts defined in the `GetFee` context,",
+        "the following accounts must be provided:",
+        "",
+        "* First, the billing token config accounts for each token sent with the message, sequentially.",
+        "For each token with no billing config account (i.e. tokens that cannot be possibly used as fee",
+        "tokens, which also have no BPS fees enabled) the ZERO address must be provided instead.",
+        "* Then, the per chain / per token config of every token sent with the message, sequentially",
+        "in the same order.",
         "",
         "# Returns",
         "",
@@ -1732,6 +1752,15 @@
           {
             "name": "lookupTable",
             "type": "publicKey"
+          },
+          {
+            "name": "writableIndexes",
+            "type": {
+              "array": [
+                "u128",
+                2
+              ]
+            }
           }
         ]
       }
@@ -1851,6 +1880,136 @@
               "array": [
                 "u8",
                 32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "receiver",
+            "type": "bytes"
+          },
+          {
+            "name": "remoteChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "originalSender",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "localToken",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintInV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "originalSender",
+            "type": "bytes"
+          },
+          {
+            "name": "remoteChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "receiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "amount",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "localToken",
+            "type": "publicKey"
+          },
+          {
+            "name": "sourcePoolAddress",
+            "docs": [
+              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
+              "expected pool address for the given remoteChainSelector."
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "sourcePoolData",
+            "type": "bytes"
+          },
+          {
+            "name": "offchainTokenData",
+            "docs": [
+              "@dev WARNING: offchainTokenData is untrusted data."
+            ],
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockOrBurnOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destTokenAddress",
+            "type": "bytes"
+          },
+          {
+            "name": "destPoolData",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReleaseOrMintOutV1",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "destinationAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReportContext",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "byteWords",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                3
               ]
             }
           }
@@ -2067,6 +2226,10 @@
             "type": "publicKey"
           },
           {
+            "name": "feeTokenAmount",
+            "type": "u64"
+          },
+          {
             "name": "tokenAmounts",
             "type": {
               "vec": {
@@ -2139,114 +2302,6 @@
                 32
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockOrBurnInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "receiver",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "originalSender",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReleaseOrMintInV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "originalSender",
-            "type": "bytes"
-          },
-          {
-            "name": "remoteChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "receiver",
-            "type": "publicKey"
-          },
-          {
-            "name": "amount",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "localToken",
-            "type": "publicKey"
-          },
-          {
-            "name": "sourcePoolAddress",
-            "docs": [
-              "@dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the",
-              "expected pool address for the given remoteChainSelector."
-            ],
-            "type": "bytes"
-          },
-          {
-            "name": "sourcePoolData",
-            "type": "bytes"
-          },
-          {
-            "name": "offchainTokenData",
-            "docs": [
-              "@dev WARNING: offchainTokenData is untrusted data."
-            ],
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "LockOrBurnOutV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destTokenAddress",
-            "type": "bytes"
-          },
-          {
-            "name": "destPoolData",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "ReleaseOrMintOutV1",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "destinationAmount",
-            "type": "u64"
           }
         ]
       }
@@ -2363,23 +2418,30 @@
       }
     },
     {
-      "name": "ReportContext",
+      "name": "Ocr3ConfigInfo",
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "byteWords",
+            "name": "configDigest",
             "type": {
               "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                3
+                "u8",
+                32
               ]
             }
+          },
+          {
+            "name": "f",
+            "type": "u8"
+          },
+          {
+            "name": "n",
+            "type": "u8"
+          },
+          {
+            "name": "isSignatureVerificationEnabled",
+            "type": "u8"
           }
         ]
       }
@@ -2426,35 +2488,6 @@
                 16
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Ocr3ConfigInfo",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "configDigest",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "f",
-            "type": "u8"
-          },
-          {
-            "name": "n",
-            "type": "u8"
-          },
-          {
-            "name": "isSignatureVerificationEnabled",
-            "type": "u8"
           }
         ]
       }
@@ -2795,6 +2828,9 @@
             "name": "InvalidInputsLookupTableAccounts"
           },
           {
+            "name": "InvalidInputsLookupTableAccountWritable"
+          },
+          {
             "name": "InvalidInputsTokenAmount"
           },
           {
@@ -2844,6 +2880,12 @@
           },
           {
             "name": "InsufficientFunds"
+          },
+          {
+            "name": "UnsupportedToken"
+          },
+          {
+            "name": "InvalidInputsMissingTokenConfig"
           }
         ]
       }
@@ -3228,6 +3270,36 @@
         },
         {
           "name": "administrator",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferRequested",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
+          "type": "publicKey",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "OwnershipTransferred",
+      "fields": [
+        {
+          "name": "from",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "to",
           "type": "publicKey",
           "index": false
         }

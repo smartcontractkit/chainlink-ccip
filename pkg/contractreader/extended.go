@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	clcommontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
@@ -95,7 +97,9 @@ type ExtendedBoundContract struct {
 type extendedContractReader struct {
 	reader                 ContractReaderFacade
 	contractBindingsByName map[string][]ExtendedBoundContract
-	mu                     *sync.RWMutex
+	// contract names that allow multiple bindings
+	multiBindAllowed map[string]bool
+	mu               *sync.RWMutex
 }
 
 func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended {
@@ -106,7 +110,10 @@ func NewExtendedContractReader(baseContractReader ContractReaderFacade) Extended
 	return &extendedContractReader{
 		reader:                 baseContractReader,
 		contractBindingsByName: make(map[string][]ExtendedBoundContract),
-		mu:                     &sync.RWMutex{},
+		// so far this is the only contract that allows multiple bindings
+		// if more contracts are added, this should be moved to a config
+		multiBindAllowed: map[string]bool{consts.ContractNamePriceAggregator: true},
+		mu:               &sync.RWMutex{},
 	}
 }
 
@@ -261,10 +268,25 @@ func (e *extendedContractReader) Bind(ctx context.Context, allBindings []types.B
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for _, binding := range validBindings {
-		e.contractBindingsByName[binding.Name] = append(e.contractBindingsByName[binding.Name], ExtendedBoundContract{
-			BoundAt: time.Now(),
-			Binding: binding,
-		})
+		if e.multiBindAllowed[binding.Name] {
+			e.contractBindingsByName[binding.Name] = append(e.contractBindingsByName[binding.Name], ExtendedBoundContract{
+				BoundAt: time.Now(),
+				Binding: binding,
+			})
+		} else {
+			if len(e.contractBindingsByName[binding.Name]) > 0 {
+				// Unbind the previous binding
+				err := e.reader.Unbind(ctx, []types.BoundContract{e.contractBindingsByName[binding.Name][0].Binding})
+				if err != nil {
+					return fmt.Errorf("failed to unbind previous binding: %w", err)
+				}
+			}
+			// Override the previous binding
+			e.contractBindingsByName[binding.Name] = []ExtendedBoundContract{{
+				BoundAt: time.Now(),
+				Binding: binding,
+			}}
+		}
 	}
 
 	return nil

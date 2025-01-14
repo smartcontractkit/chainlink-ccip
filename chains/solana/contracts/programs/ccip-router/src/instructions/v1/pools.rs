@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::get_associated_token_address_with_program_id,
-    token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint},
-    token_interface::TokenAccount,
-};
+use anchor_spl::associated_token::get_associated_token_address_with_program_id;
+use anchor_spl::token_2022::spl_token_2022::{self, instruction::transfer_checked, state::Mint};
+use anchor_spl::token_interface::TokenAccount;
 use solana_program::{
     address_lookup_table::state::AddressLookupTable, instruction::Instruction,
     program::invoke_signed,
@@ -12,12 +10,13 @@ use solana_program::{program::get_return_data, program_pack::Pack};
 
 use crate::{
     CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, TOKEN_ADMIN_REGISTRY_SEED, TOKEN_POOL_BILLING_SEED,
-    TOKEN_POOL_CONFIG_SEED,
+    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
+    TOKEN_POOL_BILLING_SEED, TOKEN_POOL_CONFIG_SEED,
 };
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
-const MIN_TOKEN_POOL_ACCOUNTS: usize = 11; // see TokenAccounts struct for all required accounts
+pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
+const MIN_TOKEN_POOL_ACCOUNTS: usize = 12; // see TokenAccounts struct for all required accounts
 
 pub fn calculate_token_pool_account_indices(
     i: usize,
@@ -46,7 +45,7 @@ pub fn calculate_token_pool_account_indices(
 
 pub struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
-    pub _token_billing_config: &'a AccountInfo<'a>,
+    pub token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,
     pub pool_program: &'a AccountInfo<'a>,
     pub pool_config: &'a AccountInfo<'a>,
@@ -54,6 +53,7 @@ pub struct TokenAccounts<'a> {
     pub pool_signer: &'a AccountInfo<'a>,
     pub token_program: &'a AccountInfo<'a>,
     pub mint: &'a AccountInfo<'a>,
+    pub fee_token_config: &'a AccountInfo<'a>,
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
@@ -77,6 +77,7 @@ pub fn validate_and_parse_token_accounts<'info>(
     let (pool_signer, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (token_program, remaining_accounts) = remaining_accounts.split_first().unwrap();
     let (mint, remaining_accounts) = remaining_accounts.split_first().unwrap();
+    let (fee_token_config, remaining_accounts) = remaining_accounts.split_first().unwrap();
 
     // Account validations (using remaining_accounts does not facilitate built-in anchor checks)
     {
@@ -104,6 +105,13 @@ pub fn validate_and_parse_token_accounts<'info>(
                 && pool_config.key() == expected_pool_config
                 && pool_signer.key() == expected_pool_signer,
             CcipRouterError::InvalidInputsPoolAccounts
+        );
+
+        let (expected_fee_token_config, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, mint.key.as_ref()], &router);
+        require!(
+            fee_token_config.key() == expected_fee_token_config,
+            CcipRouterError::InvalidInputsConfigAccounts
         );
 
         // check token accounts
@@ -170,33 +178,52 @@ pub fn validate_and_parse_token_accounts<'info>(
                 .map_err(|_| CcipRouterError::InvalidInputsLookupTableAccounts)?;
 
         // reconstruct + validate expected values in token pool lookup table
-        // base set of constant accounts (8)
+        // base set of constant accounts (9)
         // + additional constant accounts (remaining_accounts) that are not required but may be used for additional token pool functionality (like CPI)
-        let mut expected_entries = vec![
-            lookup_table.key(),
-            token_admin_registry.key(),
-            pool_program.key(),
-            pool_config.key(),
-            pool_token_account.key(),
-            pool_signer.key(),
-            token_program.key(),
-            mint.key(),
+        let required_entries = [
+            lookup_table,
+            token_admin_registry,
+            pool_program,
+            pool_config,
+            pool_token_account,
+            pool_signer,
+            token_program,
+            mint,
+            fee_token_config,
         ];
-        let mut remaining_keys: Vec<Pubkey> = remaining_accounts.iter().map(|x| x.key()).collect();
-        expected_entries.append(&mut remaining_keys);
-        require!(
-            lookup_table_account.addresses.len() == expected_entries.len(),
-            CcipRouterError::InvalidInputsLookupTableAccounts
-        );
-        require!(
-            lookup_table_account.addresses.as_ref() == expected_entries,
-            CcipRouterError::InvalidInputsLookupTableAccounts
-        );
+        {
+            // validate pool addresses
+            let mut expected_keys: Vec<Pubkey> = required_entries.iter().map(|x| x.key()).collect();
+            let mut remaining_keys: Vec<Pubkey> =
+                remaining_accounts.iter().map(|x| x.key()).collect();
+            expected_keys.append(&mut remaining_keys);
+            require!(
+                lookup_table_account.addresses.as_ref() == expected_keys,
+                CcipRouterError::InvalidInputsLookupTableAccounts
+            );
+        }
+        {
+            // validate pool address writable
+            // token admin registry contains an array (binary) of indexes that are writable
+            // check that the writability of the passed accounts match the writable configuration (using indexes)
+            let mut expected_is_writable: Vec<bool> =
+                required_entries.iter().map(|x| x.is_writable).collect();
+            let mut remaining_is_writable: Vec<bool> =
+                remaining_accounts.iter().map(|x| x.is_writable).collect();
+            expected_is_writable.append(&mut remaining_is_writable);
+            for (i, is_writable) in expected_is_writable.iter().enumerate() {
+                require_eq!(
+                    token_admin_registry_account.is_writable(i as u8),
+                    *is_writable,
+                    CcipRouterError::InvalidInputsLookupTableAccountWritable
+                );
+            }
+        }
     }
 
     Ok(TokenAccounts {
         user_token_account,
-        _token_billing_config: token_billing_config,
+        token_billing_config,
         pool_chain_config,
         pool_program,
         pool_config,
@@ -204,6 +231,7 @@ pub fn validate_and_parse_token_accounts<'info>(
         pool_signer,
         token_program,
         mint,
+        fee_token_config,
         remaining_accounts,
     })
 }
@@ -291,4 +319,100 @@ pub fn u64_to_le_u256(v: u64) -> [u8; 32] {
     let mut out: [u8; 32] = [0; 32];
     out[..8].copy_from_slice(v.to_le_bytes().as_slice());
     out
+}
+
+impl TokenAdminRegistry {
+    // set writable inserts bits from left to right
+    // index 0 is left-most bit
+    pub fn set_writable(&mut self, index: u8) {
+        match index < 128 {
+            true => {
+                self.writable_indexes[0] |= 1 << (127 - index);
+            }
+            false => {
+                self.writable_indexes[1] |= 1 << (255 - index);
+            }
+        }
+    }
+
+    pub fn is_writable(&self, index: u8) -> bool {
+        match index < 128 {
+            true => self.writable_indexes[0] & 1 << (127 - index) != 0,
+            false => self.writable_indexes[1] & 1 << (255 - index) != 0,
+        }
+    }
+
+    pub fn reset_writable(&mut self) {
+        self.writable_indexes = [0, 0];
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bytemuck::Zeroable;
+    use solana_program::pubkey::Pubkey;
+
+    use crate::TokenAdminRegistry;
+    #[test]
+    fn set_writable() {
+        let mut state = TokenAdminRegistry {
+            version: 0,
+            administrator: Pubkey::zeroed(),
+            pending_administrator: Pubkey::zeroed(),
+            lookup_table: Pubkey::zeroed(),
+            writable_indexes: [0, 0],
+        };
+
+        state.set_writable(0);
+        state.set_writable(128);
+        assert_eq!(state.writable_indexes[0], 2u128.pow(127));
+        assert_eq!(state.writable_indexes[1], 2u128.pow(127));
+
+        state.reset_writable();
+        assert_eq!(state.writable_indexes[0], 0);
+        assert_eq!(state.writable_indexes[1], 0);
+
+        state.set_writable(0);
+        state.set_writable(2);
+        state.set_writable(127);
+        state.set_writable(128);
+        state.set_writable(2 + 128);
+        state.set_writable(255);
+        assert_eq!(
+            state.writable_indexes[0],
+            2u128.pow(127) + 2u128.pow(127 - 2) + 2u128.pow(0)
+        );
+        assert_eq!(
+            state.writable_indexes[1],
+            2u128.pow(127) + 2u128.pow(127 - 2) + 2u128.pow(0)
+        );
+    }
+
+    #[test]
+    fn check_writable() {
+        let state = TokenAdminRegistry {
+            version: 0,
+            administrator: Pubkey::zeroed(),
+            pending_administrator: Pubkey::zeroed(),
+            lookup_table: Pubkey::zeroed(),
+            writable_indexes: [
+                2u128.pow(127 - 7) + 2u128.pow(127 - 2) + 2u128.pow(127 - 4),
+                2u128.pow(127 - 8) + 2u128.pow(127 - 56) + 2u128.pow(127 - 100),
+            ],
+        };
+
+        assert_eq!(state.is_writable(0), false);
+        assert_eq!(state.is_writable(128), false);
+        assert_eq!(state.is_writable(255), false);
+
+        assert_eq!(state.writable_indexes[0].count_ones(), 3);
+        assert_eq!(state.writable_indexes[1].count_ones(), 3);
+
+        assert_eq!(state.is_writable(7), true);
+        assert_eq!(state.is_writable(2), true);
+        assert_eq!(state.is_writable(4), true);
+        assert_eq!(state.is_writable(128 + 8), true);
+        assert_eq!(state.is_writable(128 + 56), true);
+        assert_eq!(state.is_writable(128 + 100), true);
+    }
 }
