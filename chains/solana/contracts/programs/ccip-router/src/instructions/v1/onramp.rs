@@ -10,6 +10,7 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts,
 };
 
+use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
 use crate::{
     AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, GetFee,
     Nonce, RampMessageHeader, Solana2AnyMessage, Solana2AnyRampMessage, Solana2AnyTokenTransfer,
@@ -139,7 +140,7 @@ pub fn ccip_send<'info>(
         };
 
         transfer_fee(
-            fee,
+            &fee,
             ctx.accounts.fee_token_program.to_account_info(),
             transfer,
             ctx.accounts.fee_token_mint.decimals,
@@ -181,6 +182,7 @@ pub fn ccip_send<'info>(
         },
         extra_args,
         fee_token: message.fee_token,
+        fee_token_amount: fee.amount,
         token_amounts: vec![Solana2AnyTokenTransfer::default(); token_count],
     };
 
@@ -298,16 +300,6 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
 }
 
 fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
-    // TODO: Modify this hash to be similar to the one in EVM
-    // https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/libraries/Internal.sol#L129
-    // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // - metadata_hash =  sha256("Solana2AnyMessageHashV1", solana_chain_selector, dest_chain_selector, ccip_router_program_id))
-    // - first_part = sha256(sender, sequence_number, nonce, fee_token, fee_token_amount)
-    // - receiver
-    // - message.data
-    // - token_amounts
-    // - extra_args
-
     use anchor_lang::solana_program::hash;
 
     // Push Data Size to ensure that the hash is unique
@@ -325,15 +317,28 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
         [msg.extra_args.allow_out_of_order_execution as u8];
 
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
+    // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
     let result = hash::hashv(&[
+        LEAF_DOMAIN_SEPARATOR.as_slice(),
+        // metadata
+        "Solana2AnyMessageHashV1".as_bytes(),
+        &header_source_chain_selector,
+        &header_dest_chain_selector,
+        &crate::ID.to_bytes(), // onramp: ccip_router program
+        // message header
         &msg.sender.to_bytes(),
+        &header_sequence_number,
+        &header_nonce,
+        &msg.fee_token.to_bytes(),
+        &msg.fee_token_amount.to_be_bytes(),
+        // messaging
+        &[msg.receiver.len() as u8],
         &msg.receiver,
         &data_size.to_be_bytes(),
         &msg.data,
-        &header_source_chain_selector,
-        &header_dest_chain_selector,
-        &header_sequence_number,
-        &header_nonce,
+        // tokens
+        &msg.token_amounts.try_to_vec().unwrap(),
+        // extra args
         &extra_args_gas_limit,
         &extra_args_allow_out_of_order_execution,
     ]);
@@ -393,5 +398,55 @@ mod validated_try_to {
             CcipRouterError::InvalidInputs
         );
         Ok(Some(account.into_inner().config))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds a message and hash it, it's compared with a known hash
+    #[test]
+    fn test_hash() {
+        let message = Solana2AnyRampMessage {
+            header: RampMessageHeader {
+                message_id: [0; 32],
+                source_chain_selector: 10,
+                dest_chain_selector: 20,
+                sequence_number: 30,
+                nonce: 40,
+            },
+            sender: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa").unwrap(),
+            data: vec![4, 5, 6],
+            receiver: [
+                1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ]
+            .to_vec(),
+            extra_args: AnyExtraArgs {
+                gas_limit: 1,
+                allow_out_of_order_execution: true,
+            },
+            fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+            fee_token_amount: 50,
+            token_amounts: [Solana2AnyTokenTransfer {
+                source_pool_address: Pubkey::try_from(
+                    "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
+                )
+                .unwrap(),
+                dest_token_address: vec![0, 1, 2, 3],
+                extra_data: vec![4, 5, 6],
+                amount: [1; 32],
+                dest_exec_data: vec![4, 5, 6],
+            }]
+            .to_vec(),
+        };
+
+        let hash_result = hash(&message);
+
+        assert_eq!(
+            "9296d0ab425d1715b7709d1350e9486edc4ea235c47eed096b54bff20d07c692",
+            hex::encode(hash_result)
+        );
     }
 }

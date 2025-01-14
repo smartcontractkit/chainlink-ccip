@@ -2232,6 +2232,10 @@
             "type": "publicKey"
           },
           {
+            "name": "feeTokenAmount",
+            "type": "u64"
+          },
+          {
             "name": "tokenAmounts",
             "type": {
               "vec": {

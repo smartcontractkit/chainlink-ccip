@@ -783,13 +783,14 @@ func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 }
 
 type Solana2AnyRampMessage struct {
-	Header       RampMessageHeader
-	Sender       ag_solanago.PublicKey
-	Data         []byte
-	Receiver     []byte
-	ExtraArgs    AnyExtraArgs
-	FeeToken     ag_solanago.PublicKey
-	TokenAmounts []Solana2AnyTokenTransfer
+	Header         RampMessageHeader
+	Sender         ag_solanago.PublicKey
+	Data           []byte
+	Receiver       []byte
+	ExtraArgs      AnyExtraArgs
+	FeeToken       ag_solanago.PublicKey
+	FeeTokenAmount uint64
+	TokenAmounts   []Solana2AnyTokenTransfer
 }
 
 func (obj Solana2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -820,6 +821,11 @@ func (obj Solana2AnyRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	}
 	// Serialize `FeeToken` param:
 	err = encoder.Encode(obj.FeeToken)
+	if err != nil {
+		return err
+	}
+	// Serialize `FeeTokenAmount` param:
+	err = encoder.Encode(obj.FeeTokenAmount)
 	if err != nil {
 		return err
 	}
@@ -859,6 +865,11 @@ func (obj *Solana2AnyRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	}
 	// Deserialize `FeeToken`:
 	err = decoder.Decode(&obj.FeeToken)
+	if err != nil {
+		return err
+	}
+	// Deserialize `FeeTokenAmount`:
+	err = decoder.Decode(&obj.FeeTokenAmount)
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
+var leafDomainSeparator = [32]byte{}
+
 func HashCommitReport(ctx [3][32]byte, report ccip_router.CommitInput) ([]byte, error) {
 	hash := sha256.New()
 	encodedReport, err := bin.MarshalBorsh(report)
@@ -125,6 +127,7 @@ func MakeEvmToSolanaMessage(ccipReceiver solana.PublicKey, evmChainSelector uint
 func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress []byte) ([]byte, error) {
 	hash := sha256.New()
 
+	hash.Write(leafDomainSeparator[:])
 	hash.Write([]byte("Any2SolanaMessageHashV1"))
 
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.SourceChainSelector); err != nil {
@@ -156,9 +159,9 @@ func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress
 	if _, err := hash.Write([]byte{uint8(len(msg.ExtraArgs.Accounts))}); err != nil { //nolint:gosec
 		return nil, err
 	}
-	accountsBytes, err := bin.MarshalBorsh(msg.ExtraArgs.Accounts)
-	if err != nil {
-		return nil, err
+	accountsBytes, borshErr := bin.MarshalBorsh(msg.ExtraArgs.Accounts)
+	if borshErr != nil {
+		return nil, borshErr
 	}
 	if _, err := hash.Write(accountsBytes); err != nil {
 		return nil, err
@@ -179,6 +182,13 @@ func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress
 		return nil, err
 	}
 	if _, err := hash.Write(msg.Data); err != nil {
+		return nil, err
+	}
+	tokenAmountsBytes, err := bin.MarshalBorsh(msg.TokenAmounts)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(tokenAmountsBytes); err != nil {
 		return nil, err
 	}
 
@@ -211,4 +221,68 @@ func MerkleFrom(data [][]byte) []byte {
 	}
 
 	return hash
+}
+
+func HashSolanaToAnyMessage(msg ccip_router.Solana2AnyRampMessage) ([]byte, error) {
+	hash := sha256.New()
+
+	hash.Write(leafDomainSeparator[:])
+	hash.Write([]byte("Solana2AnyMessageHashV1"))
+
+	if err := binary.Write(hash, binary.BigEndian, msg.Header.SourceChainSelector); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(hash, binary.BigEndian, msg.Header.DestChainSelector); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(config.CcipRouterProgram[:]); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(msg.Sender[:]); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(hash, binary.BigEndian, msg.Header.SequenceNumber); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(hash, binary.BigEndian, msg.Header.Nonce); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(msg.FeeToken[:]); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(hash, binary.BigEndian, msg.FeeTokenAmount); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write([]byte{uint8(len(msg.Receiver))}); err != nil { //nolint:gosec
+		return nil, err
+	}
+	if _, err := hash.Write(msg.Receiver); err != nil {
+		return nil, err
+	}
+	dataLen := uint16(len(msg.Data)) //nolint:gosec // max U16 larger than solana transaction size
+	if err := binary.Write(hash, binary.BigEndian, dataLen); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(msg.Data); err != nil {
+		return nil, err
+	}
+	tokenAmountsBytes, err := bin.MarshalBorsh(msg.TokenAmounts)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(tokenAmountsBytes); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(msg.ExtraArgs.GasLimit.Bytes()); err != nil {
+		return nil, err
+	}
+	allowOutOfOrderExecution := uint8(0)
+	if msg.ExtraArgs.AllowOutOfOrderExecution {
+		allowOutOfOrderExecution = 1
+	}
+	if _, err := hash.Write([]byte{allowOutOfOrderExecution}); err != nil {
+		return nil, err
+	}
+
+	return hash.Sum(nil), nil
 }
