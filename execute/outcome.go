@@ -196,8 +196,7 @@ func (p *Plugin) getFilterOutcome(
 		ctx,
 		lggr,
 		commitReports,
-		builder,
-		p.offchainCfg.MaxSingleChainReports)
+		builder)
 	if err != nil {
 		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}
