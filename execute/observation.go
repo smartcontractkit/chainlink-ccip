@@ -171,10 +171,11 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 	return groupedCommits
 }
 
-// filterCommitReports filters out commit reports that have no messages or have missing messages.
+// intersectCommitReportsAndMessages filters out commit reports that have no messages or have missing messages.
 // as all messages for each report are required to be present in the observation, otherwise merkle proofs will fail.
-func filterCommitReports(msgObs exectypes.MessageObservations, commitObs exectypes.CommitObservations) exectypes.CommitObservations {
+func intersectCommitReportsAndMessages(msgObs exectypes.MessageObservations, commitObs exectypes.CommitObservations) (exectypes.MessageObservations, exectypes.CommitObservations) {
 	filteredCommitReports := make(exectypes.CommitObservations)
+	filteredMsgs := msgObs
 	for srcChain, reports := range commitObs {
 		filteredReports := make([]exectypes.CommitData, 0)
 		// filter out reports that have no messages
@@ -193,6 +194,11 @@ func filterCommitReports(msgObs exectypes.MessageObservations, commitObs exectyp
 			}
 			if valid {
 				filteredReports = append(filteredReports, report)
+			} else {
+				// remove messages that are not valid anymore
+				for seq := report.SequenceNumberRange.Start(); seq <= report.SequenceNumberRange.End(); seq++ {
+					delete(filteredMsgs[srcChain], seq)
+				}
 			}
 		}
 
@@ -201,7 +207,7 @@ func filterCommitReports(msgObs exectypes.MessageObservations, commitObs exectyp
 		}
 
 	}
-	return filteredCommitReports
+	return filteredMsgs, filteredCommitReports
 }
 
 func readAllMessages(
@@ -266,7 +272,7 @@ func (p *Plugin) getMessagesObservation(
 
 	messageObs := readAllMessages(ctx, p.lggr, p.ccipReader, commitReportCache)
 
-	filteredCommitReports := filterCommitReports(messageObs, commitReportCache)
+	messageObs, filteredCommitReports := intersectCommitReportsAndMessages(messageObs, commitReportCache)
 
 	messageTimestamps := getMessageTimestampMap(filteredCommitReports, messageObs)
 
