@@ -15,7 +15,7 @@ var _ ExecReportBuilder = &execReportBuilder{}
 
 type ExecReportBuilder interface {
 	Add(ctx context.Context, report exectypes.CommitData) (exectypes.CommitData, error)
-	Build() ([]cciptypes.ExecutePluginReportSingleChain, error)
+	Build() ([]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error)
 }
 
 // Option that can be passed to the builder.
@@ -39,6 +39,13 @@ func WithMaxReportSizeBytes(maxReportSizeBytes uint64) Option {
 func WithMaxMessages(maxMessages uint64) Option {
 	return func(erb *execReportBuilder) {
 		erb.maxMessages = maxMessages
+	}
+}
+
+// WithMaxSingleChainReports configures the number of reports when building the final result.
+func WithMaxSingleChainReports(max uint64) Option {
+	return func(erb *execReportBuilder) {
+		erb.maxSingleChainReports = max
 	}
 }
 
@@ -116,17 +123,19 @@ type execReportBuilder struct {
 	estimateProvider cciptypes.EstimateProvider
 
 	// Config
-	checks             []Check
-	destChainSelector  cciptypes.ChainSelector
-	maxReportSizeBytes uint64
-	maxGas             uint64
-	maxMessages        uint64
+	checks                []Check
+	destChainSelector     cciptypes.ChainSelector
+	maxReportSizeBytes    uint64
+	maxGas                uint64
+	maxMessages           uint64
+	maxSingleChainReports uint64
 
 	// State
 	accumulated validationMetadata
 
 	// Result
-	execReports []cciptypes.ExecutePluginReportSingleChain
+	execReports   []cciptypes.ExecutePluginReportSingleChain
+	commitReports []exectypes.CommitData
 }
 
 // Add an exec report for as many messages as possible in the given commit report.
@@ -147,15 +156,39 @@ func (b *execReportBuilder) Add(
 	}
 
 	b.execReports = append(b.execReports, execReport)
+	b.commitReports = append(b.commitReports, updatedReport)
 
 	return updatedReport, nil
 }
 
-func (b *execReportBuilder) Build() ([]cciptypes.ExecutePluginReportSingleChain, error) {
+func (b *execReportBuilder) Build() (
+	[]cciptypes.ExecutePluginReportSingleChain, []exectypes.CommitData, error,
+) {
+	/*
+		if len(b.execReports) != len(b.commitReports) {
+			return nil, nil, fmt.Errorf(
+				"expected the same number of exec and commit reports, got %d and %d",
+				len(b.execReports),
+				len(b.commitReports),
+			)
+		}
+
+		// Check if limiting is required.
+		if b.maxSingleChainReports != 0 && uint64(len(b.execReports)) > b.maxSingleChainReports {
+			b.lggr.Infof(
+				"limiting number of reports to maxReports from %d to %d",
+				len(b.execReports),
+				b.maxSingleChainReports,
+			)
+			b.execReports = b.execReports[:b.maxSingleChainReports]
+			b.commitReports = b.commitReports[:b.maxSingleChainReports]
+		}
+	*/
+
 	b.lggr.Infow(
 		"selected commit reports for execution report",
 		"numReports", len(b.execReports),
 		"sizeBytes", b.accumulated.encodedSizeBytes,
 		"maxSize", b.maxReportSizeBytes)
-	return b.execReports, nil
+	return b.execReports, b.commitReports, nil
 }

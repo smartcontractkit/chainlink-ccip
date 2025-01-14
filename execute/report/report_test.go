@@ -446,6 +446,7 @@ func Test_Builder_Build(t *testing.T) {
 		maxReportSize uint64
 		maxGasLimit   uint64
 		maxMessages   uint64
+		maxReports    uint64
 	}
 	tests := []struct {
 		name                  string
@@ -804,14 +805,14 @@ func Test_Builder_Build(t *testing.T) {
 			if foundError {
 				return
 			}
-			execReports, err := builder.Build()
+			execReports, commitReports, err := builder.Build()
 			if tt.wantErr != "" {
 				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
 			require.NoError(t, err)
 			require.Len(t, execReports, tt.expectedExecReports)
-			//require.Len(t, commitReports, tt.expectedCommitReports)
+			require.Equal(t, len(execReports), len(commitReports))
 			for i, execReport := range execReports {
 				require.Lenf(t, execReport.Messages, tt.expectedExecThings[i],
 					"Unexpected number of messages, iter %d", i)

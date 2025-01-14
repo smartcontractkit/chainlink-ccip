@@ -186,22 +186,29 @@ func (p *Plugin) getFilterOutcome(
 		report.WithMaxReportSizeBytes(maxReportLength),
 		report.WithMaxGas(p.offchainCfg.BatchGasLimit),
 		report.WithExtraMessageCheck(report.CheckNonces(observation.Nonces)),
+		report.WithMaxMessages(p.offchainCfg.MaxReportMessages),
 	)
 
-	outcomeReports, selectedReports, err := selectReport(
+	outcomeReports, selectedCommitReports, err := selectReport(
 		ctx,
 		p.lggr,
 		commitReports,
-		builder)
+		builder,
+		p.offchainCfg.MaxSingleChainReports)
 	if err != nil {
 		return exectypes.Outcome{}, fmt.Errorf("unable to select report: %w", err)
 	}
 
-	execReport := cciptypes.ExecutePluginReport{
-		ChainReports: outcomeReports,
-	}
+	// Limit report if necessary.
+	/*
+		outcomeReports, selectedCommitReports =
+			limitToMaxSingleChainReports(p.lggr, outcomeReports, selectedCommitReports, p.offchainCfg.MaxSingleChainReports)
+		execReport := cciptypes.ExecutePluginReport{
+			ChainReports: outcomeReports,
+		}
+	*/
 
 	// Must use 'NewOutcome' rather than direct struct initialization to ensure the outcome is sorted.
 	// TODO: sort in the encoder.
-	return exectypes.NewOutcome(exectypes.Filter, selectedReports, execReport), nil
+	return exectypes.NewOutcome(exectypes.Filter, selectedCommitReports, execReport), nil
 }
