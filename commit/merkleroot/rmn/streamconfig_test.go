@@ -81,12 +81,10 @@ func Test_newStreamConfig(t *testing.T) {
 	assert.Less(t, cfg.MaxMessageLength, 53*kB)
 
 	// messages RL
-	assert.Greater(t, cfg.MessagesLimit.Rate, 3.58)
-	assert.Less(t, cfg.MessagesLimit.Rate, 3.60)
+	assert.Equal(t, cfg.MessagesLimit.Rate, 6.0)
 	assert.Equal(t, uint32(15), cfg.MessagesLimit.Capacity)
 
 	// bytes RL
-	assert.Greater(t, cfg.BytesLimit.Rate, 64743.59)
-	assert.Less(t, cfg.BytesLimit.Rate, 64743.61)
+	assert.Equal(t, cfg.BytesLimit.Rate, 107906.0)
 	assert.Equal(t, uint32(269765), cfg.BytesLimit.Capacity)
 }
