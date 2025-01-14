@@ -13,7 +13,7 @@ import (
 )
 
 func waitForWebSocket(url string, timeout time.Duration) error {
-	logger.Info("Waiting for websocket service to be available", "url", url)
+	logger.Infow("Waiting for websocket service to be available", "url", url)
 	start := time.Now()
 	for {
 		if time.Since(start) > timeout {
@@ -44,13 +44,13 @@ func tryConnecting(url string) error {
 	}
 
 	if err != nil {
-		logger.Info("WebSocket server not available",
+		logger.Infow("WebSocket server not available",
 			"error", err.Error(),
 		)
 		if resp != nil {
 			body, _ := io.ReadAll(resp.Body)
 
-			logger.Info("Error details: ",
+			logger.Infow("Error details: ",
 				"url", url,
 				"statusCode", resp.StatusCode,
 				"body", body,

@@ -34,8 +34,8 @@ to quickly create a Cobra application.`,
 
 //nolint:gochecknoinits
 func init() {
-	deployCcipCmd.Flags().StringVar(&deployCCIPInputDirPath, "deploy-ccip-out", "/tmp", "Specify the output dir path")
-	deployCcipCmd.Flags().StringVar(&deployCCIPOutputDirPath, "deploy-ccip-in", "/tmp", "Specify the input dir path")
+	deployCcipCmd.Flags().StringVar(&deployCCIPOutputDirPath, "deploy-ccip-out", "/tmp", "Specify the output dir path")
+	deployCcipCmd.Flags().StringVar(&deployCCIPInputDirPath, "deploy-ccip-in", "/tmp", "Specify the input dir path")
 
 	rootCmd.AddCommand(deployCcipCmd)
 }

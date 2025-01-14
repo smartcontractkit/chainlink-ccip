@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/tls"
 	"fmt"
-	"strconv"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink/deployment/environment/crib"
@@ -13,22 +12,18 @@ import (
 )
 
 func GetEnvConfig(env DevspaceEnv, ghaJWTTokenForGAP string) (*devenv.EnvironmentConfig, error) {
-	alphaConfigurer := NewChainConfigurer(env, uint64(1337), "alpha")
-	betaConfigurer := NewChainConfigurer(env, uint64(2337), "beta")
+	chainConfigurers := getChainConfigurers(env)
 
-	alphaChainConfig, err := alphaConfigurer.GetDevenvChainConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error getting alpha chain config: %v", err)
-	}
-	betaChainConfig, err := betaConfigurer.GetDevenvChainConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error getting beta chain config: %v", err)
+	chainConfigs := make([]devenv.ChainConfig, 0)
+	for _, chainConfigurer := range chainConfigurers {
+		config, err := chainConfigurer.GetDevenvChainConfig()
+		if err != nil {
+			return nil, fmt.Errorf("error getting chain config: %v", err)
+		}
+
+		chainConfigs = append(chainConfigs, *config)
 	}
 
-	chainsConfig := []devenv.ChainConfig{
-		*alphaChainConfig,
-		*betaChainConfig,
-	}
 	nodeInfos := NewCLNodeConfigurer(env).GetNodeInfos()
 
 	var grpcUrl string
@@ -50,9 +45,26 @@ func GetEnvConfig(env DevspaceEnv, ghaJWTTokenForGAP string) (*devenv.Environmen
 	}
 
 	return &devenv.EnvironmentConfig{
-		Chains:   chainsConfig,
+		Chains:   chainConfigs,
 		JDConfig: jdConfig,
 	}, nil
+}
+
+func getChainConfigurers(env DevspaceEnv) []ChainConfigurer {
+	chainConfigurers := []ChainConfigurer{
+		NewChainConfigurer(env, uint64(1337), "alpha"),
+		NewChainConfigurer(env, uint64(2337), "beta"),
+	}
+
+	//nolint:gosec
+	for i := 1; i <= env.AdditionalChainsCount; i++ {
+		const baseChainID uint64 = 90000000
+		chainID := baseChainID + uint64(i)
+		c := NewChainConfigurer(env, chainID, fmt.Sprintf("nchain-%d", chainID))
+
+		chainConfigurers = append(chainConfigurers, c)
+	}
+	return chainConfigurers
 }
 
 // Returns gap v2 hostname for the given env
@@ -64,13 +76,16 @@ func gapV2HostName(env DevspaceEnv, hostnameSuffix string) string {
 }
 
 func GetTransmittedChainConfigs(env DevspaceEnv) []crib.ChainConfig {
-	alphaConfigurer := NewChainConfigurer(env, uint64(1337), "alpha")
-	betaConfigurer := NewChainConfigurer(env, uint64(2337), "beta")
+	chainConfigurers := getChainConfigurers(env)
 
-	return []crib.ChainConfig{
-		alphaConfigurer.GetTransmittedChainConfigs(),
-		betaConfigurer.GetTransmittedChainConfigs(),
+	chainConfigs := make([]crib.ChainConfig, 0)
+	for _, chainConfigurer := range chainConfigurers {
+		config := chainConfigurer.GetTransmittedChainConfigs()
+
+		chainConfigs = append(chainConfigs, config)
 	}
+
+	return chainConfigs
 }
 
 type ChainlinkNodeConfigurer struct {
@@ -112,12 +127,12 @@ func (c ChainlinkNodeConfigurer) getNodeInfo(nodeName string, isBootstrap bool) 
 			URL:        fmt.Sprintf("%s://%s-%s.%s:%d", protocol, c.env.Namespace, nodeName, c.env.IngressBaseDomain, port),
 			Email:      "admin@chain.link",
 			Password:   "hWDmgcub2gUhyrG6cxriqt7T",
-			InternalIP: fmt.Sprintf("%s-%s", c.env.Namespace, nodeName),
+			InternalIP: nodeName,
 			Headers: map[string]string{
 				"Content-Type": "application/json",
 			},
 		},
-		P2PPort:     "6690",
+		P2PPort:     "5001",
 		IsBootstrap: isBootstrap,
 		Name:        nodeName,
 		AdminAddr:   "",
@@ -129,40 +144,51 @@ type ChainConfigurer struct {
 	chainID     uint64
 	deployerKey string
 	env         DevspaceEnv
+	chainName   string
 }
 
 func NewChainConfigurer(env DevspaceEnv, chainID uint64, name string) ChainConfigurer {
 	// These are generally known private keys used for testing
-	testKeys := map[string]string{
-		"1337": "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-		"2337": "59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
-	}
-
-	chainIDStr := strconv.FormatUint(chainID, 10)
+	testKey := "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
 	return ChainConfigurer{
 		env:         env,
 		chainID:     chainID,
-		deployerKey: testKeys[chainIDStr],
+		chainName:   name,
+		deployerKey: testKey,
 	}
 }
 
 func (c ChainConfigurer) GetDevenvChainConfig() (*devenv.ChainConfig, error) {
-	wsRPC := c.externalWSRPC()
-	if wsRPC == nil {
+	wsExternalRPC := c.externalWSRPC()
+	if wsExternalRPC == nil {
 		return nil, fmt.Errorf("wsRPC external url not available")
 	}
-	httpRPC := c.externalHTTPRPC()
-	if httpRPC == nil {
+	wsInternalRPC := c.internalWSRPC()
+	if wsInternalRPC == nil {
+		return nil, fmt.Errorf("wsRPC internal url not available")
+	}
+	httpExternalRPC := c.externalHTTPRPC()
+	if httpExternalRPC == nil {
 		return nil, fmt.Errorf("httpRPC external url not available")
+	}
+	httpInternalRPC := c.internalWSRPC()
+	if httpInternalRPC == nil {
+		return nil, fmt.Errorf("httpRPC internal url not available")
 	}
 
 	chainConfig := &devenv.ChainConfig{
 		ChainID:   c.chainID,
-		ChainName: "alpha",
+		ChainName: c.chainName,
 		ChainType: "EVM",
-		WSRPCs:    []string{*wsRPC},
-		HTTPRPCs:  []string{*httpRPC},
+		WSRPCs: []devenv.CribRPCs{{
+			External: *wsExternalRPC,
+			Internal: *wsInternalRPC,
+		}},
+		HTTPRPCs: []devenv.CribRPCs{{
+			External: *httpExternalRPC,
+			Internal: *httpInternalRPC,
+		}},
 	}
 
 	err := chainConfig.SetDeployerKey(&c.deployerKey)

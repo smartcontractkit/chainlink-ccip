@@ -39,7 +39,7 @@ func (h HomeChainDeployer) Deploy() {
 		return
 	}
 	// Use the output value
-	h.logger.Info("Deploying home chain",
+	h.logger.Infow("Deploying home chain",
 		zap.String("tmp_dir", h.env.TmpDir),
 	)
 
@@ -57,21 +57,20 @@ func (h HomeChainDeployer) Deploy() {
 		}
 	}
 
-	h.logger.Info("debug token", "token", maybeGHAJWTToken)
+	h.logger.Infow("debug token", "token", maybeGHAJWTToken)
 
 	envConfig, err := config.GetEnvConfig(h.env, maybeGHAJWTToken)
 	if err != nil {
 		h.logger.Fatal(err)
 		os.Exit(1)
 	}
-	transmittedChainConfigs := config.GetTransmittedChainConfigs(h.env)
 
 	homeChainID := uint64(1337)
 	feedChainID := uint64(2337)
 	homeChainSelector := config.ChainSelector(homeChainID)
 	feedChainSelector := config.ChainSelector(feedChainID)
 
-	h.logger.Info("Deploying Home Chain Contracts",
+	h.logger.Infow("Deploying Home Chain Contracts",
 		zap.String("jd-grpc-endpoint", envConfig.JDConfig.GRPC),
 	)
 	capRegConfig, addressBook, err := crib.DeployHomeChainContracts(ctx, ccipLogger, *envConfig, homeChainSelector, feedChainSelector)
@@ -90,6 +89,8 @@ func (h HomeChainDeployer) Deploy() {
 
 	// Save State to files
 	h.envState.SaveAddressBook(addresses)
+
+	transmittedChainConfigs := config.GetTransmittedChainConfigs(h.env)
 	h.envState.SaveChainConfigs(transmittedChainConfigs)
 }
 
