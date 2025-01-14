@@ -62,7 +62,7 @@ func TestMessageHashing(t *testing.T) {
 	t.Run("SolanaToEvm", func(t *testing.T) {
 		t.Parallel()
 
-		h, err := HashSolanaToEvmMessage(ccip_router.Solana2AnyRampMessage{
+		h, err := HashSolanaToAnyMessage(ccip_router.Solana2AnyRampMessage{
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{},
 				SourceChainSelector: 10,

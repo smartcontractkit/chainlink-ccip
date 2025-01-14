@@ -222,7 +222,7 @@ func MerkleFrom(data [][]byte) []byte {
 	return hash
 }
 
-func HashSolanaToEvmMessage(msg ccip_router.Solana2AnyRampMessage) ([]byte, error) {
+func HashSolanaToAnyMessage(msg ccip_router.Solana2AnyRampMessage) ([]byte, error) {
 	hash := sha256.New()
 
 	hash.Write(leafDomainSeparator[:])

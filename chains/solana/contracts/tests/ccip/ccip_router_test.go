@@ -2087,7 +2087,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.SequenceNumber)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.Nonce)
-			hash, err := ccip.HashSolanaToEvmMessage(ccipMessageSentEvent.Message)
+			hash, err := ccip.HashSolanaToAnyMessage(ccipMessageSentEvent.Message)
 			require.NoError(t, err)
 			require.Equal(t, hash, ccipMessageSentEvent.Message.Header.MessageId[:])
 		})
