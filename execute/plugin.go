@@ -251,7 +251,9 @@ func selectReport(
 		// The builder may attach metadata to the commit report.
 		commitReports[i], err = builder.Add(ctx, commitReport)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
+			pendingReports++
+			lggr.Errorw("unable to add report to builder", "err", err)
+			continue
 		}
 
 		selectedReports = append(selectedReports, commitReports[i])

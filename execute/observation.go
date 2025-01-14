@@ -3,8 +3,9 @@ package execute
 import (
 	"context"
 	"fmt"
-	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"time"
+
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
 	"golang.org/x/exp/maps"
 
@@ -199,7 +200,13 @@ func readAllMessages(
 					"seqRange", seqRange,
 					"err", err,
 				)
-				continue
+				// Fill range with empty messages.
+				for _, seqNum := range seqRange {
+					if _, ok := messageObs[srcChain]; !ok {
+						messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
+					}
+					messageObs[srcChain][seqNum] = cciptypes.Message{}
+				}
 			}
 			for _, msg := range msgs {
 				if _, ok := messageObs[srcChain]; !ok {
@@ -240,8 +247,9 @@ func (p *Plugin) getMessagesObservation(
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
+		p.lggr.Errorw("unable to complete token data processing", "err", err1)
 	}
+
 	if validateTokenDataObservations(messageObs, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
@@ -306,7 +314,8 @@ func (p *Plugin) getFilterObservation(
 		addrs := maps.Keys(addrSet)
 		nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.destChain, addrs)
 		if err != nil {
-			return exectypes.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
+			p.lggr.Errorw("unable to get nonces", "err", err)
+			continue
 		}
 		nonceObservations[srcChain] = nonces
 	}

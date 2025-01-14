@@ -146,7 +146,8 @@ func (c *compositeTokenDataObserver) Observe(
 		}
 		tokenDataObservations, err = merge(tokenDataObservations, tokenData)
 		if err != nil {
-			return nil, err
+			c.lggr.Error("Error while merging token data",
+				"error", err)
 		}
 	}
 	return tokenDataObservations, nil
@@ -203,6 +204,8 @@ func (c *compositeTokenDataObserver) initTokenDataObservations(
 	return tokenObservation
 }
 
+// merge merges token data from two observations, it's used to combine token data from multiple observers.
+// In case of token data mismatch, it returns an error and the base observation.
 func merge(
 	base exectypes.TokenDataObservations,
 	from exectypes.TokenDataObservations,
@@ -210,7 +213,7 @@ func merge(
 	for chainSelector, chainObservations := range from {
 		for seq, messageTokenData := range chainObservations {
 			if len(messageTokenData.TokenData) != len(base[chainSelector][seq].TokenData) {
-				return nil, errors.New("token data length mismatch")
+				return base, errors.New("token data length mismatch")
 			}
 
 			// Merge only TokenData created by the observer
