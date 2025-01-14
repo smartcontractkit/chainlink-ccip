@@ -43,9 +43,9 @@ func WithMaxMessages(maxMessages uint64) Option {
 }
 
 // WithMaxSingleChainReports configures the number of reports when building the final result.
-func WithMaxSingleChainReports(max uint64) Option {
+func WithMaxSingleChainReports(maxSingleChainReports uint64) Option {
 	return func(erb *execReportBuilder) {
-		erb.maxSingleChainReports = max
+		erb.maxSingleChainReports = maxSingleChainReports
 	}
 }
 
