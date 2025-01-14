@@ -2,6 +2,7 @@ package timelock
 
 import (
 	"bytes"
+	"encoding/binary"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -124,23 +125,30 @@ func convertToInstructionData(ix solana.Instruction) (timelock.InstructionData, 
 
 func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte, salt [32]byte) [32]byte {
 	var encodedData bytes.Buffer
+	// length prefix for instructions
+	binary.Write(&encodedData, binary.LittleEndian, uint32(len(instructions)))
+
+	boolToByte := func(b bool) byte {
+		if b {
+			return 1
+		}
+		return 0
+	}
 
 	for _, ix := range instructions {
 		encodedData.Write(ix.ProgramId[:])
 
+		// length prefix for accounts array
+		binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Accounts)))
+
 		for _, acc := range ix.Accounts {
 			encodedData.Write(acc.Pubkey[:])
-			if acc.IsSigner {
-				encodedData.WriteByte(1)
-			} else {
-				encodedData.WriteByte(0)
-			}
-			if acc.IsWritable {
-				encodedData.WriteByte(1)
-			} else {
-				encodedData.WriteByte(0)
-			}
+			encodedData.WriteByte(boolToByte(acc.IsSigner))
+			encodedData.WriteByte(boolToByte(acc.IsWritable))
 		}
+
+		// length prefix for instruction data
+		binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Data)))
 		encodedData.Write(ix.Data)
 	}
 
@@ -151,6 +159,5 @@ func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte
 
 	var hash [32]byte
 	copy(hash[:], result)
-
 	return hash
 }

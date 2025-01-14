@@ -43,15 +43,24 @@ impl Operation {
         let total_size = self
             .instructions
             .iter()
-            .map(|ix_data: &InstructionData| ix_data.space())
+            .map(|ix_data: &InstructionData| {
+                // length prefixes for instruction array + accounts array + data
+                4 + 4 + 4 + ix_data.space()
+            })
             .sum::<usize>()
             + HASH_BYTES * 2; // add predecessor and salt
 
         let mut encoded_data = Vec::with_capacity(total_size);
 
+        // add length prefix for instruction array
+        encoded_data.extend_from_slice(&(self.instructions.len() as u32).to_le_bytes());
+
         // encode each instruction
         for ix in &self.instructions {
             encoded_data.extend_from_slice(&ix.program_id.to_bytes());
+
+            // add length prefix for accounts array
+            encoded_data.extend_from_slice(&(ix.accounts.len() as u32).to_le_bytes());
 
             for acc in &ix.accounts {
                 encoded_data.extend_from_slice(&acc.pubkey.to_bytes());
@@ -59,6 +68,8 @@ impl Operation {
                 encoded_data.push(acc.is_writable as u8);
             }
 
+            // add length prefix for instruction data
+            encoded_data.extend_from_slice(&(ix.data.len() as u32).to_le_bytes());
             encoded_data.extend_from_slice(&ix.data);
         }
 
@@ -269,5 +280,128 @@ mod tests {
         let result2 = op2.hash_instructions(salt);
 
         assert_eq!(result1, result2);
+    }
+
+    #[test]
+    fn test_different_instructions_different_hash() {
+        let program_id = Pubkey::new_unique();
+        let account1 = Pubkey::new_unique();
+        let account2 = Pubkey::new_unique();
+        let predecessor = [1u8; HASH_BYTES];
+        let salt = [2u8; HASH_BYTES];
+
+        let op1 = create_test_operation(
+            vec![InstructionData {
+                program_id,
+                accounts: vec![InstructionAccount {
+                    pubkey: account1,
+                    is_signer: true,
+                    is_writable: false,
+                }],
+                data: vec![1, 2],
+            }],
+            predecessor,
+        );
+
+        let op2 = create_test_operation(
+            vec![InstructionData {
+                program_id,
+                accounts: vec![InstructionAccount {
+                    pubkey: account2,
+                    is_signer: true,
+                    is_writable: false,
+                }],
+                data: vec![1, 2],
+            }],
+            predecessor,
+        );
+
+        let hash1 = op1.hash_instructions(salt);
+        let hash2 = op2.hash_instructions(salt);
+
+        // even though data is the same, account differs → hash must differ
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_collision_prevention() {
+        let program_id = Pubkey::default(); // use default to minimize random differences
+        let salt = [0u8; HASH_BYTES];
+        let predecessor = [0u8; HASH_BYTES];
+
+        // [ [1,2], [3] ] vs [ [1], [2,3] ]
+        let case1_ix1 = InstructionData {
+            program_id,
+            accounts: vec![],
+            data: vec![1, 2],
+        };
+        let case1_ix2 = InstructionData {
+            program_id,
+            accounts: vec![],
+            data: vec![3],
+        };
+        let op1 = create_test_operation(vec![case1_ix1, case1_ix2], predecessor);
+
+        let case1_ix3 = InstructionData {
+            program_id,
+            accounts: vec![],
+            data: vec![1],
+        };
+        let case1_ix4 = InstructionData {
+            program_id,
+            accounts: vec![],
+            data: vec![2, 3],
+        };
+        let op2 = create_test_operation(vec![case1_ix3, case1_ix4], predecessor);
+
+        let hash1 = op1.hash_instructions(salt);
+        let hash2 = op2.hash_instructions(salt);
+
+        assert_ne!(hash1, hash2);
+
+        // single instruction with 2 accounts vs. 2 instructions with 1 account each
+        let account = Pubkey::default();
+        let case2_ix1 = InstructionData {
+            program_id,
+            accounts: vec![
+                InstructionAccount {
+                    pubkey: account,
+                    is_signer: true,
+                    is_writable: true,
+                },
+                InstructionAccount {
+                    pubkey: account,
+                    is_signer: false,
+                    is_writable: false,
+                },
+            ],
+            data: vec![],
+        };
+        let op3 = create_test_operation(vec![case2_ix1], predecessor);
+
+        let ix2_a = InstructionData {
+            program_id,
+            accounts: vec![InstructionAccount {
+                pubkey: account,
+                is_signer: true,
+                is_writable: true,
+            }],
+            data: vec![],
+        };
+        let ix2_b = InstructionData {
+            program_id,
+            accounts: vec![InstructionAccount {
+                pubkey: account,
+                is_signer: false,
+                is_writable: false,
+            }],
+            data: vec![],
+        };
+        let op4 = create_test_operation(vec![ix2_a, ix2_b], predecessor);
+
+        let hash3 = op3.hash_instructions(salt);
+        let hash4 = op4.hash_instructions(salt);
+
+        assert_ne!(hash3, hash4);
     }
 }
