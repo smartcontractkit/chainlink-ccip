@@ -134,10 +134,33 @@ pub mod ramps {
 
     #[cfg(test)]
     pub mod tests {
+        use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
+        use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{utils::Exponential, SolanaTokenAmount};
+        use crate::{ExtraArgsInput, SolanaTokenAmount, TimestampedPackedU224};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
+
+        impl UnpackedDoubleU224 {
+            pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
+                let mut value = [0u8; 28];
+                value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
+                value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                TimestampedPackedU224 { value, timestamp }
+            }
+        }
+
+        fn as_u8_28(single: U256) -> [u8; 28] {
+            single.to_be_bytes()[4..32].try_into().unwrap()
+        }
+
+        impl TimestampedPackedU224 {
+            pub fn from_single(timestamp: i64, single: U256) -> Self {
+                let mut value = [0u8; 28];
+                value.clone_from_slice(&single.to_be_bytes()[4..32]);
+                Self { value, timestamp }
+            }
+        }
 
         #[test]
         fn message_not_validated_for_disabled_destination_chain() {
@@ -229,8 +252,8 @@ pub mod ramps {
                 receiver,
                 data: vec![],
                 token_amounts: vec![],
-                fee_token: Pubkey::default(),
-                extra_args: crate::ExtraArgsInput {
+                fee_token: native_mint::ID,
+                extra_args: ExtraArgsInput {
                     gas_limit: None,
                     allow_out_of_order_execution: None,
                 },
@@ -239,51 +262,60 @@ pub mod ramps {
         }
 
         pub fn sample_billing_config() -> BillingTokenConfig {
-            let mut value = [0; 28];
-            value.clone_from_slice(&3u32.e(18).to_be_bytes()[4..]);
+            // All values are derived from inspecting the Ethereum Mainnet -> Avalanche lane as of Jan 9 2025,
+            // using USDC as transfer token and LINK as fee token wherever applicable (these are not important,
+            // they were used to retrieve correctly dimensioned values)
+
+            let arbitrary_timestamp = 100;
+            let usd_per_token = TimestampedPackedU224 {
+                timestamp: arbitrary_timestamp,
+                value: as_u8_28(U256::new(19816680000000000000)),
+            };
+
             BillingTokenConfig {
                 enabled: true,
                 mint: native_mint::ID,
-                usd_per_token: crate::TimestampedPackedU224 {
-                    value,
-                    timestamp: 100,
-                },
-                premium_multiplier_wei_per_eth: 1,
+                usd_per_token,
+                premium_multiplier_wei_per_eth: 900000000000000000,
             }
         }
 
         pub fn sample_dest_chain() -> DestChain {
-            let mut value = [0; 28];
-            // L1 gas price
-            value[0..14].clone_from_slice(&1u32.e(18).to_be_bytes()[18..]);
-            // L2 gas price
-            value[14..].clone_from_slice(&U256::new(22u128).to_be_bytes()[18..]);
+            // All values are derived from inspecting the Ethereum Mainnet -> Avalanche lane as of Jan 9 2025,
+            // using USDC as transfer token and LINK as fee token wherever applicable (these are not important,
+            // they were used to retrieve correctly dimensioned values)
+            let arbitrary_timestamp = 100;
+            let usd_per_unit_gas = TryInto::<UnpackedDoubleU224>::try_into(PackedPrice {
+                execution_gas_price: Usd18Decimals(U256::new(921441088750)),
+                // L1 dest chain so there's no DA price by default
+                data_availability_gas_price: Usd18Decimals(U256::new(0)),
+            })
+            .unwrap()
+            .pack(arbitrary_timestamp);
+
             DestChain {
                 version: 1,
                 chain_selector: 1,
                 state: crate::DestChainState {
                     sequence_number: 0,
-                    usd_per_unit_gas: crate::TimestampedPackedU224 {
-                        value,
-                        timestamp: 100,
-                    },
+                    usd_per_unit_gas,
                 },
                 config: crate::DestChainConfig {
                     is_enabled: true,
-                    max_number_of_tokens_per_msg: 5,
-                    max_data_bytes: 200,
-                    max_per_msg_gas_limit: 0,
-                    dest_gas_overhead: 1,
-                    dest_gas_per_payload_byte: 0,
+                    max_number_of_tokens_per_msg: 1,
+                    max_data_bytes: 30000,
+                    max_per_msg_gas_limit: 3000000,
+                    dest_gas_overhead: 300000,
+                    dest_gas_per_payload_byte: 16,
                     dest_data_availability_overhead_gas: 0,
-                    dest_gas_per_data_availability_byte: 1,
-                    dest_data_availability_multiplier_bps: 1,
-                    default_token_fee_usdcents: 100,
-                    default_token_dest_gas_overhead: 0,
-                    default_tx_gas_limit: 0,
-                    gas_multiplier_wei_per_eth: 1,
-                    network_fee_usdcents: 100,
-                    gas_price_staleness_threshold: 10,
+                    dest_gas_per_data_availability_byte: 16,
+                    dest_data_availability_multiplier_bps: 0,
+                    default_token_fee_usdcents: 50,
+                    default_token_dest_gas_overhead: 90000,
+                    default_tx_gas_limit: 200000,
+                    gas_multiplier_wei_per_eth: 1100000000000000000,
+                    network_fee_usdcents: 50,
+                    gas_price_staleness_threshold: 90000,
                     enforce_out_of_order: false,
                     chain_family_selector: CHAIN_FAMILY_SELECTOR_EVM.to_be_bytes(),
                 },

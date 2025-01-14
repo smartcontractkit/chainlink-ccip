@@ -58,3 +58,8 @@ type NoopMetrics struct{}
 func (n NoopMetrics) TrackChainFeeObservation(Observation) {}
 
 func (n NoopMetrics) TrackChainFeeOutcome(Outcome) {}
+
+func (o Observation) IsEmpty() bool {
+	return len(o.FeeComponents) == 0 && len(o.NativeTokenPrices) == 0 && len(o.ChainFeeUpdates) == 0 &&
+		len(o.FChain) == 0 && o.TimestampNow.IsZero()
+}
