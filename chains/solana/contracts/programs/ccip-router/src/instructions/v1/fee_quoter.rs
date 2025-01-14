@@ -343,7 +343,7 @@ pub fn wrap_native_sol<'info>(
 }
 
 pub fn transfer_fee<'info>(
-    fee: SolanaTokenAmount,
+    fee: &SolanaTokenAmount,
     token_program: AccountInfo<'info>,
     transfer: token_interface::TransferChecked<'info>,
     decimals: u8,
