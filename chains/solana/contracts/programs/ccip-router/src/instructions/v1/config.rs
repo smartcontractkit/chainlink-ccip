@@ -42,6 +42,15 @@ pub fn is_on_ramp_configured(config: &SourceChainConfig, on_ramp: &[u8]) -> bool
     valid_on_ramps.unwrap().contains(&on_ramp_bytes)
 }
 
+fn trim_leading_zeros(input: &[u8]) -> &[u8] {
+    let start = input
+        .iter()
+        .position(|&byte| byte != 0)
+        .unwrap_or(input.len());
+    &input[start..]
+}
+
+
 #[cfg(test)]
 mod tests {
     use crate::CcipRouterError;
@@ -285,5 +294,24 @@ mod tests {
                 case.given_on_ramp
             );
         }
+    }
+
+    #[test]
+    fn test_trim_leading_zeros() {
+        let input = vec![0, 0, 0, 1, 2, 3];
+        let expected_output = &[1, 2, 3];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![1, 2, 3];
+        let expected_output = &[1, 2, 3];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![0, 0, 0];
+        let expected_output: &[u8] = &[];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
+
+        let input = vec![];
+        let expected_output: &[u8] = &[];
+        assert_eq!(trim_leading_zeros(&input), expected_output);
     }
 }

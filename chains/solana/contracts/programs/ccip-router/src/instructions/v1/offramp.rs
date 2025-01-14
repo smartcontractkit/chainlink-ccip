@@ -679,8 +679,7 @@ fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
-    let trimmed_on_ramp_address = trim_leading_zeros(&msg.on_ramp_address);
-    let on_ramp_address_size = [trimmed_on_ramp_address.len() as u8];
+    let on_ramp_address_size = [msg.on_ramp_address.len() as u8];
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -703,7 +702,7 @@ fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size,
-        trimmed_on_ramp_address,
+        &msg.on_ramp_address,
         // message header
         &msg.header.message_id,
         &msg.receiver.to_bytes(),
@@ -722,14 +721,6 @@ fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
     ]);
 
     result.to_bytes()
-}
-
-fn trim_leading_zeros(input: &[u8]) -> &[u8] {
-    let start = input
-        .iter()
-        .position(|&byte| byte != 0)
-        .unwrap_or(input.len());
-    &input[start..]
 }
 
 mod execution_state {
@@ -905,24 +896,5 @@ mod tests {
             "fb47aed864f6e050f05ad851fdc0015c2e946f05e25093d150884cfb995834d0",
             hex::encode(hash_result)
         );
-    }
-
-    #[test]
-    fn test_trim_leading_zeros() {
-        let input = vec![0, 0, 0, 1, 2, 3];
-        let expected_output = &[1, 2, 3];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
-
-        let input = vec![1, 2, 3];
-        let expected_output = &[1, 2, 3];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
-
-        let input = vec![0, 0, 0];
-        let expected_output: &[u8] = &[];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
-
-        let input = vec![];
-        let expected_output: &[u8] = &[];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
     }
 }

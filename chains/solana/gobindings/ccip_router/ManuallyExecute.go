@@ -20,7 +20,6 @@ import (
 //
 // * `ctx` - The context containing the accounts required for the execution.
 // * `execution_report` - The execution report containing the message and proofs.
-// * `on_ramp_address` - The address of the on-ramp program to send the message from
 type ManuallyExecute struct {
 	ExecutionReport *ExecutionReportSingleChain
 
