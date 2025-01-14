@@ -134,13 +134,33 @@ pub mod ramps {
 
     #[cfg(test)]
     pub mod tests {
+        use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
+        use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{
-            utils::Usd18Decimals, v1::fee_quoter::PackedPrice, ExtraArgsInput, SolanaTokenAmount,
-            UnpackedDoubleU224,
-        };
+        use crate::{ExtraArgsInput, SolanaTokenAmount, TimestampedPackedU224};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
+
+        impl UnpackedDoubleU224 {
+            pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
+                let mut value = [0u8; 28];
+                value[14..].clone_from_slice(&self.high.to_be_bytes()[2..16]);
+                value[..14].clone_from_slice(&self.low.to_be_bytes()[2..16]);
+                TimestampedPackedU224 { value, timestamp }
+            }
+        }
+
+        fn as_u8_28(single: U256) -> [u8; 28] {
+            single.to_be_bytes()[4..32].try_into().unwrap()
+        }
+
+        impl TimestampedPackedU224 {
+            pub fn from_single(timestamp: i64, single: U256) -> Self {
+                let mut value = [0u8; 28];
+                value.clone_from_slice(&single.to_be_bytes()[4..32]);
+                Self { value, timestamp }
+            }
+        }
 
         #[test]
         fn message_not_validated_for_disabled_destination_chain() {
@@ -247,10 +267,10 @@ pub mod ramps {
             // they were used to retrieve correctly dimensioned values)
 
             let arbitrary_timestamp = 100;
-            let usd_per_token = crate::TimestampedPackedU224::from_single(
-                arbitrary_timestamp,
-                U256::new(19816680000000000000),
-            );
+            let usd_per_token = TimestampedPackedU224 {
+                timestamp: arbitrary_timestamp,
+                value: as_u8_28(U256::new(19816680000000000000)),
+            };
 
             BillingTokenConfig {
                 enabled: true,
