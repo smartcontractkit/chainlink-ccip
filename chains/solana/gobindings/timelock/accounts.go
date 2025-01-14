@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	TimelockId                    [32]uint8
 	Owner                         ag_solanago.PublicKey
 	ProposedOwner                 ag_solanago.PublicKey
 	ProposerRoleAccessController  ag_solanago.PublicKey
@@ -24,6 +25,11 @@ var ConfigDiscriminator = [8]byte{155, 12, 170, 224, 30, 250, 204, 130}
 func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Write account discriminator:
 	err = encoder.WriteBytes(ConfigDiscriminator[:], false)
+	if err != nil {
+		return err
+	}
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
 	if err != nil {
 		return err
 	}
@@ -83,6 +89,11 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 				"[155 12 170 224 30 250 204 130]",
 				fmt.Sprint(discriminator[:]))
 		}
+	}
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
 	}
 	// Deserialize `Owner`:
 	err = decoder.Decode(&obj.Owner)

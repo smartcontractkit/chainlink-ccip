@@ -4,7 +4,7 @@ use std::mem;
 
 use arrayvec::arrayvec;
 
-use crate::constants::MAX_SELECTORS;
+use crate::constants::{MAX_SELECTORS, TIMELOCK_ID_PADDED};
 use crate::error::TimelockError;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, PartialEq)]
@@ -19,6 +19,8 @@ pub enum Role {
 #[account]
 #[derive(InitSpace)]
 pub struct Config {
+    pub timelock_id: [u8; TIMELOCK_ID_PADDED],
+
     pub owner: Pubkey,
     pub proposed_owner: Pubkey,
 

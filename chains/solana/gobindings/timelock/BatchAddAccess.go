@@ -12,7 +12,8 @@ import (
 
 // BatchAddAccess is the `batchAddAccess` instruction.
 type BatchAddAccess struct {
-	Role *Role
+	TimelockId *[32]uint8
+	Role       *Role
 
 	// [0] = [] config
 	//
@@ -30,6 +31,12 @@ func NewBatchAddAccessInstructionBuilder() *BatchAddAccess {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *BatchAddAccess) SetTimelockId(timelockId [32]uint8) *BatchAddAccess {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetRole sets the "role" parameter.
@@ -102,6 +109,9 @@ func (inst BatchAddAccess) ValidateAndBuild() (*Instruction, error) {
 func (inst *BatchAddAccess) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Role == nil {
 			return errors.New("Role parameter is not set")
 		}
@@ -134,8 +144,9 @@ func (inst *BatchAddAccess) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=1]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param("Role", *inst.Role))
+					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("TimelockId", *inst.TimelockId))
+						paramsBranch.Child(ag_format.Param("      Role", *inst.Role))
 					})
 
 					// Accounts of the instruction:
@@ -150,6 +161,11 @@ func (inst *BatchAddAccess) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj BatchAddAccess) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Role` param:
 	err = encoder.Encode(obj.Role)
 	if err != nil {
@@ -158,6 +174,11 @@ func (obj BatchAddAccess) MarshalWithEncoder(encoder *ag_binary.Encoder) (err er
 	return nil
 }
 func (obj *BatchAddAccess) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Role`:
 	err = decoder.Decode(&obj.Role)
 	if err != nil {
@@ -169,6 +190,7 @@ func (obj *BatchAddAccess) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 // NewBatchAddAccessInstruction declares a new BatchAddAccess instruction with the provided parameters and accounts.
 func NewBatchAddAccessInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	role Role,
 	// Accounts:
 	config ag_solanago.PublicKey,
@@ -176,6 +198,7 @@ func NewBatchAddAccessInstruction(
 	roleAccessController ag_solanago.PublicKey,
 	authority ag_solanago.PublicKey) *BatchAddAccess {
 	return NewBatchAddAccessInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetRole(role).
 		SetConfigAccount(config).
 		SetAccessControllerProgramAccount(accessControllerProgram).

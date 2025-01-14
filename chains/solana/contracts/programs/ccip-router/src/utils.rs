@@ -58,7 +58,7 @@ impl SolanaTokenAmount {
     pub fn amount(token: Pubkey, value: Usd18Decimals, price: Usd18Decimals) -> Result<Self> {
         Ok(Self {
             token,
-            amount: ((value.0 * 1u32.e(18)) / price.0)
+            amount: (value.0 / price.0)
                 .try_into()
                 .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
         })

@@ -39,13 +39,13 @@ func TestMcmSetConfig(t *testing.T) {
 	solanaGoClient := testutils.DeployAllPrograms(t, testutils.PathToAnchorConfig, admin)
 
 	// mcm name
-	testMsigName := config.TestMsigNamePaddedBuffer
+	testMsigID := config.TestMsigID
 
 	// test mcm pdas
-	multisigConfigPDA := mcms.McmConfigAddress(testMsigName)
-	rootMetadataPDA := mcms.RootMetadataAddress(testMsigName)
-	expiringRootAndOpCountPDA := mcms.ExpiringRootAndOpCountAddress(testMsigName)
-	configSignersPDA := mcms.McmConfigSignersAddress(testMsigName)
+	multisigConfigPDA := mcms.GetConfigPDA(testMsigID)
+	rootMetadataPDA := mcms.GetRootMetadataPDA(testMsigID)
+	expiringRootAndOpCountPDA := mcms.GetExpiringRootAndOpCountPDA(testMsigID)
+	configSignersPDA := mcms.GetConfigSignersPDA(testMsigID)
 
 	t.Run("setup:funding", func(t *testing.T) {
 		testutils.FundAccounts(ctx, []solana.PrivateKey{admin, anotherAdmin, user}, solanaGoClient, t)
@@ -67,7 +67,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		ix, err := mcm.NewInitializeInstruction(
 			config.TestChainID,
-			testMsigName,
+			testMsigID,
 			multisigConfigPDA,
 			admin.PublicKey(),
 			solana.SystemProgramID,
@@ -91,7 +91,7 @@ func TestMcmSetConfig(t *testing.T) {
 	t.Run("mcm:ownership", func(t *testing.T) {
 		// Fail to transfer ownership when not owner
 		instruction, err := mcm.NewTransferOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			anotherAdmin.PublicKey(),
 			multisigConfigPDA,
 			user.PublicKey(),
@@ -102,7 +102,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		// successfully transfer ownership
 		instruction, err = mcm.NewTransferOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			anotherAdmin.PublicKey(),
 			multisigConfigPDA,
 			admin.PublicKey(),
@@ -113,7 +113,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		// Fail to accept ownership when not proposed_owner
 		instruction, err = mcm.NewAcceptOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			multisigConfigPDA,
 			user.PublicKey(),
 		).ValidateAndBuild()
@@ -124,7 +124,7 @@ func TestMcmSetConfig(t *testing.T) {
 		// Successfully accept ownership
 		// anotherAdmin becomes owner for remaining tests
 		instruction, err = mcm.NewAcceptOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			multisigConfigPDA,
 			anotherAdmin.PublicKey(),
 		).ValidateAndBuild()
@@ -134,7 +134,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		// Current owner cannot propose self
 		instruction, err = mcm.NewTransferOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			anotherAdmin.PublicKey(),
 			multisigConfigPDA,
 			anotherAdmin.PublicKey(),
@@ -154,7 +154,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		// get it back
 		instruction, err = mcm.NewTransferOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			admin.PublicKey(),
 			multisigConfigPDA,
 			anotherAdmin.PublicKey(),
@@ -164,7 +164,7 @@ func TestMcmSetConfig(t *testing.T) {
 		require.NotNil(t, result)
 
 		instruction, err = mcm.NewAcceptOwnershipInstruction(
-			testMsigName,
+			testMsigID,
 			multisigConfigPDA,
 			admin.PublicKey(),
 		).ValidateAndBuild()
@@ -196,7 +196,7 @@ func TestMcmSetConfig(t *testing.T) {
 		groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
 		mcmConfig, err := mcms.NewValidMcmConfig(
-			testMsigName,
+			testMsigID,
 			signerPrivateKeys,
 			signerGroups,
 			groupQuorums,
@@ -208,7 +208,7 @@ func TestMcmSetConfig(t *testing.T) {
 		signerAddresses := mcmConfig.SignerAddresses
 
 		t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
-			preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+			preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigID, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 			require.NoError(t, pierr)
 
 			for _, ix := range preloadIxs {
@@ -230,7 +230,7 @@ func TestMcmSetConfig(t *testing.T) {
 		t.Run("mcm:set_config:admin authorization", func(t *testing.T) {
 			t.Run("fail:set_config from unauthorized user", func(t *testing.T) {
 				ix, err := mcm.NewSetConfigInstruction(
-					mcmConfig.MultisigName,
+					mcmConfig.MultisigID,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
@@ -251,7 +251,7 @@ func TestMcmSetConfig(t *testing.T) {
 			t.Run("success:set_config from admin", func(t *testing.T) {
 				// set config
 				ix, err := mcm.NewSetConfigInstruction(
-					mcmConfig.MultisigName,
+					mcmConfig.MultisigID,
 					mcmConfig.SignerGroups,
 					mcmConfig.GroupQuorums,
 					mcmConfig.GroupParents,
@@ -323,7 +323,7 @@ func TestMcmSetConfig(t *testing.T) {
 		groupParents := []uint8{0, 0, 0, 2, 0, 0, 0, 0, 0, 0}
 
 		mcmConfig, err := mcms.NewValidMcmConfig(
-			testMsigName,
+			testMsigID,
 			signerPrivateKeys,
 			signerGroups,
 			groupQuorums,
@@ -337,12 +337,10 @@ func TestMcmSetConfig(t *testing.T) {
 		t.Run("mcm:set_config: preload signers on PDA", func(t *testing.T) {
 			// ConfigSignersPDA should be closed before reinitializing
 			testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA, config.DefaultCommitment)
-
-			parsedTotalSigners, err := mcms.SafeToUint8(len(signerAddresses))
-			require.NoError(t, err)
-
+			//nolint:gosec
+			parsedTotalSigners := uint8(len(signerAddresses))
 			initSignersIx, err := mcm.NewInitSignersInstruction(
-				testMsigName,
+				testMsigID,
 				parsedTotalSigners,
 				multisigConfigPDA,
 				configSignersPDA,
@@ -353,7 +351,7 @@ func TestMcmSetConfig(t *testing.T) {
 			require.NoError(t, err)
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSignersIx}, admin, config.DefaultCommitment)
 
-			appendSignersIxs, err := mcms.AppendSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+			appendSignersIxs, err := mcms.GetAppendSignersIxs(signerAddresses, testMsigID, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 			require.NoError(t, err)
 
 			// partially register signers
@@ -363,7 +361,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 			// clear signers(this closes the account)
 			clearIx, err := mcm.NewClearSignersInstruction(
-				testMsigName,
+				testMsigID,
 				multisigConfigPDA,
 				configSignersPDA,
 				admin.PublicKey(),
@@ -374,7 +372,7 @@ func TestMcmSetConfig(t *testing.T) {
 			testutils.AssertClosedAccount(ctx, t, solanaGoClient, configSignersPDA, config.DefaultCommitment)
 
 			// preload signers again
-			preloadIxs, pierr := mcms.McmPreloadSignersIxs(signerAddresses, testMsigName, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+			preloadIxs, pierr := mcms.GetPreloadSignersIxs(signerAddresses, testMsigID, multisigConfigPDA, configSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 			require.NoError(t, pierr)
 
 			for _, ix := range preloadIxs {
@@ -395,7 +393,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 		t.Run("success:set_config", func(t *testing.T) {
 			ix, err := mcm.NewSetConfigInstruction(
-				testMsigName,
+				testMsigID,
 				mcmConfig.SignerGroups,
 				mcmConfig.GroupQuorums,
 				mcmConfig.GroupParents,
@@ -519,14 +517,14 @@ func TestMcmSetConfig(t *testing.T) {
 				t.Parallel()
 
 				// use different msig accounts per test
-				failTestMsigName, err := mcms.PadString32(fmt.Sprintf("fail_test_%d", i))
+				failTestMsigID, err := mcms.PadString32(fmt.Sprintf("fail_test_%d", i))
 				require.NoError(t, err)
 
 				// test scope mcm pdas
-				failMultisigConfigPDA := mcms.McmConfigAddress(failTestMsigName)
-				failRootMetadataPDA := mcms.RootMetadataAddress(failTestMsigName)
-				failExpiringRootAndOpCountPDA := mcms.ExpiringRootAndOpCountAddress(failTestMsigName)
-				failConfigSignersPDA := mcms.McmConfigSignersAddress(failTestMsigName)
+				failMultisigConfigPDA := mcms.GetConfigPDA(failTestMsigID)
+				failRootMetadataPDA := mcms.GetRootMetadataPDA(failTestMsigID)
+				failExpiringRootAndOpCountPDA := mcms.GetExpiringRootAndOpCountPDA(failTestMsigID)
+				failConfigSignersPDA := mcms.GetConfigSignersPDA(failTestMsigID)
 
 				t.Run(fmt.Sprintf("msig initialization:%s", tt.name), func(t *testing.T) {
 					// get program data account
@@ -545,7 +543,7 @@ func TestMcmSetConfig(t *testing.T) {
 					// initialize msig
 					ix, initIxErr := mcm.NewInitializeInstruction(
 						config.TestChainID,
-						failTestMsigName,
+						failTestMsigID,
 						failMultisigConfigPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
@@ -559,7 +557,7 @@ func TestMcmSetConfig(t *testing.T) {
 				})
 
 				cfg, err := mcms.NewValidMcmConfig(
-					failTestMsigName,
+					failTestMsigID,
 					config.SignerPrivateKeys,
 					config.SignerGroups,
 					config.GroupQuorums,
@@ -572,11 +570,10 @@ func TestMcmSetConfig(t *testing.T) {
 					if tt.skipPreloadSigners {
 						return
 					}
-					parsedTotalSigners, parsingErr := mcms.SafeToUint8(len(cfg.SignerAddresses))
-					require.NoError(t, parsingErr)
-
+					//nolint:gosec
+					parsedTotalSigners := uint8(len(cfg.SignerAddresses))
 					initSignersIx, initSignersErr := mcm.NewInitSignersInstruction(
-						failTestMsigName,
+						failTestMsigID,
 						parsedTotalSigners,
 						failMultisigConfigPDA,
 						failConfigSignersPDA,
@@ -587,7 +584,7 @@ func TestMcmSetConfig(t *testing.T) {
 					require.NoError(t, initSignersErr)
 					testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initSignersIx}, admin, config.DefaultCommitment)
 
-					appendSignersIxs, appendSignersIxsErr := mcms.AppendSignersIxs(cfg.SignerAddresses, failTestMsigName, failMultisigConfigPDA, failConfigSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
+					appendSignersIxs, appendSignersIxsErr := mcms.GetAppendSignersIxs(cfg.SignerAddresses, failTestMsigID, failMultisigConfigPDA, failConfigSignersPDA, admin.PublicKey(), config.MaxAppendSignerBatchSize)
 					require.NoError(t, appendSignersIxsErr)
 					for _, ix := range appendSignersIxs {
 						testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, admin, config.DefaultCommitment)
@@ -595,7 +592,7 @@ func TestMcmSetConfig(t *testing.T) {
 
 					if !tt.skipFinalizeSigners {
 						finalizeSignersIx, finSignersIxErr := mcm.NewFinalizeSignersInstruction(
-							failTestMsigName,
+							failTestMsigID,
 							failMultisigConfigPDA,
 							failConfigSignersPDA,
 							admin.PublicKey(),
@@ -621,7 +618,7 @@ func TestMcmSetConfig(t *testing.T) {
 				tt.modifyConfig(cfg)
 
 				ix, err := mcm.NewSetConfigInstruction(
-					cfg.MultisigName,
+					cfg.MultisigID,
 					cfg.SignerGroups,
 					cfg.GroupQuorums,
 					cfg.GroupParents,
@@ -725,14 +722,14 @@ func TestMcmSetConfig(t *testing.T) {
 				t.Parallel()
 
 				// use different msig accounts per test
-				failTestMsigName, err := mcms.PadString32(fmt.Sprintf("fail_preupload_signer_test_%d", i))
+				failTestMsigID, err := mcms.PadString32(fmt.Sprintf("fail_preupload_signer_test_%d", i))
 				require.NoError(t, err)
 
 				// test scope mcm pdas
-				failMultisigConfigPDA := mcms.McmConfigAddress(failTestMsigName)
-				failRootMetadataPDA := mcms.RootMetadataAddress(failTestMsigName)
-				failExpiringRootAndOpCountPDA := mcms.ExpiringRootAndOpCountAddress(failTestMsigName)
-				failConfigSignersPDA := mcms.McmConfigSignersAddress(failTestMsigName)
+				failMultisigConfigPDA := mcms.GetConfigPDA(failTestMsigID)
+				failRootMetadataPDA := mcms.GetRootMetadataPDA(failTestMsigID)
+				failExpiringRootAndOpCountPDA := mcms.GetExpiringRootAndOpCountPDA(failTestMsigID)
+				failConfigSignersPDA := mcms.GetConfigSignersPDA(failTestMsigID)
 
 				t.Run(fmt.Sprintf("msig initialization:%s", tt.name), func(t *testing.T) {
 					// get program data account
@@ -751,7 +748,7 @@ func TestMcmSetConfig(t *testing.T) {
 					// initialize msig
 					ix, initIxErr := mcm.NewInitializeInstruction(
 						config.TestChainID,
-						failTestMsigName,
+						failTestMsigID,
 						failMultisigConfigPDA,
 						admin.PublicKey(),
 						solana.SystemProgramID,
@@ -765,7 +762,7 @@ func TestMcmSetConfig(t *testing.T) {
 				})
 
 				cfg, err := mcms.NewValidMcmConfig(
-					failTestMsigName,
+					failTestMsigID,
 					config.SignerPrivateKeys,
 					config.SignerGroups,
 					config.GroupQuorums,
@@ -781,10 +778,11 @@ func TestMcmSetConfig(t *testing.T) {
 
 				if !tt.skipInitSigners {
 					actualLength := len(cfg.SignerAddresses)
-					totalSigners, _ := mcms.SafeToUint8(actualLength + tt.totalSignersOffset) // offset for the test
+					//nolint:gosec
+					totalSigners := uint8(actualLength + tt.totalSignersOffset) // offset for the test
 
 					initSignersIx, _ := mcm.NewInitSignersInstruction(
-						failTestMsigName,
+						failTestMsigID,
 						totalSigners,
 						failMultisigConfigPDA,
 						failConfigSignersPDA,
@@ -797,9 +795,9 @@ func TestMcmSetConfig(t *testing.T) {
 					})
 				}
 
-				appendIxs, _ := mcms.AppendSignersIxs(
+				appendIxs, _ := mcms.GetAppendSignersIxs(
 					cfg.SignerAddresses,
-					failTestMsigName,
+					failTestMsigID,
 					failMultisigConfigPDA,
 					failConfigSignersPDA,
 					admin.PublicKey(),
@@ -813,7 +811,7 @@ func TestMcmSetConfig(t *testing.T) {
 				}
 
 				finalizeIx, _ := mcm.NewFinalizeSignersInstruction(
-					failTestMsigName,
+					failTestMsigID,
 					failMultisigConfigPDA,
 					failConfigSignersPDA,
 					admin.PublicKey(),

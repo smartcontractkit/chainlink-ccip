@@ -4,23 +4,20 @@ use anchor_spl::token::spl_token::native_mint;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use solana_program::sysvar::instructions;
 
-use crate::ocr3base::Ocr3Report;
 use crate::program::CcipRouter;
 use crate::state::{CommitReport, Config, ExternalExecutionConfig, Nonce};
 use crate::{
     BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    ExecutionReportSingleChain, GlobalState, ReportContext, Solana2AnyMessage, SourceChain,
+    ExecutionReportSingleChain, GlobalState, Solana2AnyMessage, SourceChain,
 };
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8;
 
 // track state versions
 pub const MAX_CONFIG_V: u8 = 1;
-pub const MAX_CHAINSTATE_V: u8 = 1;
-pub const MAX_NONCE_V: u8 = 1;
-pub const MAX_COMMITREPORT_V: u8 = 1;
-pub const MAX_TOKEN_REGISTRY_V: u8 = 1;
-pub const MAX_TOKEN_AND_CHAIN_CONFIG_V: u8 = 1;
+const MAX_CHAINSTATE_V: u8 = 1;
+const MAX_NONCE_V: u8 = 1;
+const MAX_COMMITREPORT_V: u8 = 1;
 
 // valid_version validates that the passed in version is not 0 (uninitialized)
 // and it is within the expected maximum supported version bounds
@@ -78,23 +75,6 @@ pub struct GasPriceUpdate {
     pub usd_per_unit_gas: [u8; 28], // EVM uses u224, 1e18 USD per smallest unit (e.g. wei) of destination chain gas
 }
 
-impl Ocr3Report for CommitInput {
-    fn hash(&self, ctx: &ReportContext) -> [u8; 32] {
-        use anchor_lang::solana_program::hash;
-        let mut buffer: Vec<u8> = Vec::new();
-        self.serialize(&mut buffer).unwrap();
-        let report_len = self.len() as u16; // u16 > max tx size, u8 may have overflow
-        hash::hashv(&[&report_len.to_le_bytes(), &buffer, &ctx.as_bytes()]).to_bytes()
-    }
-
-    fn len(&self) -> usize {
-        4 + (32 + 28) * self.price_updates.token_price_updates.len() + // token_price_updates
-        4 + (8 + 28) * self.price_updates.gas_price_updates.len() + // gas_price_updates
-        self.merkle_root.len()
-        // + 4 + 65 * self.rmn_signatures.len()
-    }
-}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 // Struct to hold a merkle root and an interval for a source chain
 pub struct MerkleRoot {
@@ -106,7 +86,7 @@ pub struct MerkleRoot {
 }
 
 impl MerkleRoot {
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         8  + // source chain selector
         4 + self.on_ramp_address.len() + // on ramp address
         8 + // min msg nr
@@ -605,7 +585,7 @@ pub struct CcipSend<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(report_context: ReportContext, report: CommitInput)]
+#[instruction(_report_context_byte_words: [[u8; 32]; 3], report: CommitInput)]
 pub struct CommitReportContext<'info> {
     #[account(
         seeds = [CONFIG_SEED],

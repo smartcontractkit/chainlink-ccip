@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/timelock"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/accesscontroller"
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
-	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/mcms"
 	timelockutil "github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/timelock"
 )
 
@@ -52,7 +51,7 @@ func TestTimelockRBAC(t *testing.T) {
 
 	t.Run("setup:init access controllers", func(t *testing.T) {
 		for _, data := range roleMap {
-			initAccIxs, ierr := timelockutil.InitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
+			initAccIxs, ierr := timelockutil.GetInitAccessControllersIxs(ctx, data.AccessController.PublicKey(), admin, solanaGoClient)
 			require.NoError(t, ierr)
 
 			testutils.SendAndConfirm(ctx, t, solanaGoClient, initAccIxs, admin, config.DefaultCommitment, common.AddSigners(data.AccessController))
@@ -80,8 +79,9 @@ func TestTimelockRBAC(t *testing.T) {
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 		initTimelockIx, ierr := timelock.NewInitializeInstruction(
+			config.TestTimelockID,
 			config.MinDelay,
-			config.TimelockConfigPDA,
+			timelockutil.GetConfigPDA(config.TestTimelockID),
 			anotherAdmin.PublicKey(),
 			solana.SystemProgramID,
 			config.TimelockProgram,
@@ -98,7 +98,7 @@ func TestTimelockRBAC(t *testing.T) {
 		require.NotNil(t, result)
 	})
 
-	t.Run("setup:init timelock program", func(t *testing.T) {
+	t.Run("setup:initialize timelock instance", func(t *testing.T) {
 		// get program data account
 		data, accErr := solanaGoClient.GetAccountInfoWithOpts(ctx, config.TimelockProgram, &rpc.GetAccountInfoOpts{
 			Commitment: config.DefaultCommitment,
@@ -113,8 +113,9 @@ func TestTimelockRBAC(t *testing.T) {
 		require.NoError(t, bin.UnmarshalBorsh(&programData, data.Bytes()))
 
 		initTimelockIx, ierr := timelock.NewInitializeInstruction(
+			config.TestTimelockID,
 			config.MinDelay,
-			config.TimelockConfigPDA,
+			timelockutil.GetConfigPDA(config.TestTimelockID),
 			admin.PublicKey(),
 			solana.SystemProgramID,
 			config.TimelockProgram,
@@ -130,7 +131,7 @@ func TestTimelockRBAC(t *testing.T) {
 		testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{initTimelockIx}, admin, config.DefaultCommitment)
 
 		var configAccount timelock.Config
-		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+		err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 		if err != nil {
 			require.NoError(t, err, "failed to get account info")
 		}
@@ -146,8 +147,9 @@ func TestTimelockRBAC(t *testing.T) {
 	t.Run("timelock:ownership", func(t *testing.T) {
 		t.Run("fail to transfer ownership when not owner", func(t *testing.T) {
 			instruction, ierr := timelock.NewTransferOwnershipInstruction(
+				config.TestTimelockID,
 				anotherAdmin.PublicKey(),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -157,8 +159,9 @@ func TestTimelockRBAC(t *testing.T) {
 
 		t.Run("Current owner cannot propose self", func(t *testing.T) {
 			instruction, ierr := timelock.NewTransferOwnershipInstruction(
+				config.TestTimelockID,
 				admin.PublicKey(),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -168,8 +171,9 @@ func TestTimelockRBAC(t *testing.T) {
 
 		t.Run("successfully transfer ownership", func(t *testing.T) {
 			instruction, ierr := timelock.NewTransferOwnershipInstruction(
+				config.TestTimelockID,
 				anotherAdmin.PublicKey(),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -179,7 +183,8 @@ func TestTimelockRBAC(t *testing.T) {
 
 		t.Run("Fail to accept ownership when not proposed_owner", func(t *testing.T) {
 			instruction, ierr := timelock.NewAcceptOwnershipInstruction(
-				config.TimelockConfigPDA,
+				config.TestTimelockID,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				user.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -189,7 +194,8 @@ func TestTimelockRBAC(t *testing.T) {
 
 		t.Run("anotherAdmin becomes owner", func(t *testing.T) {
 			instruction, ierr := timelock.NewAcceptOwnershipInstruction(
-				config.TimelockConfigPDA,
+				config.TestTimelockID,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				anotherAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -198,7 +204,7 @@ func TestTimelockRBAC(t *testing.T) {
 
 			// Validate proposed set to 0-address after accepting ownership
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -209,8 +215,9 @@ func TestTimelockRBAC(t *testing.T) {
 		// get it back
 		t.Run("retrieve back ownership to admin", func(t *testing.T) {
 			tix, ierr := timelock.NewTransferOwnershipInstruction(
+				config.TestTimelockID,
 				admin.PublicKey(),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				anotherAdmin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -218,7 +225,8 @@ func TestTimelockRBAC(t *testing.T) {
 			require.NotNil(t, result)
 
 			aix, aerr := timelock.NewAcceptOwnershipInstruction(
-				config.TimelockConfigPDA,
+				config.TestTimelockID,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				admin.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, aerr)
@@ -226,7 +234,7 @@ func TestTimelockRBAC(t *testing.T) {
 			require.NotNil(t, result)
 
 			var configAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &configAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &configAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
@@ -242,7 +250,7 @@ func TestTimelockRBAC(t *testing.T) {
 			for _, account := range data.Accounts {
 				addresses = append(addresses, account.PublicKey())
 			}
-			batchAddAccessIxs, baerr := timelockutil.BatchAddAccessIxs(ctx, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
+			batchAddAccessIxs, baerr := timelockutil.GetBatchAddAccessIxs(ctx, config.TestTimelockID, data.AccessController.PublicKey(), role, addresses, admin, config.BatchAddAccessChunkSize, solanaGoClient)
 			require.NoError(t, baerr)
 
 			for _, ix := range batchAddAccessIxs {
@@ -258,32 +266,34 @@ func TestTimelockRBAC(t *testing.T) {
 	})
 
 	t.Run("rbac: schedule and cancel a timelock operation", func(t *testing.T) {
-		salt, serr := mcms.SimpleSalt()
+		salt, serr := timelockutil.SimpleSalt()
 		require.NoError(t, serr)
 		nonExecutableOp := timelockutil.Operation{
+			TimelockID:  config.TestTimelockID,
 			Predecessor: config.TimelockEmptyOpID,
 			Salt:        salt,
 			Delay:       uint64(1),
 		}
 
-		ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
+		ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
 		nonExecutableOp.AddInstruction(ix, []solana.PublicKey{})
 
 		t.Run("rbac: when try to schedule from non proposer role, it fails", func(t *testing.T) {
 			nonProposer := roleMap[timelock.Executor_Role].RandomPick()
 			ac := roleMap[timelock.Proposer_Role].AccessController
 
-			ixs, prierr := timelockutil.PreloadOperationIxs(nonExecutableOp, nonProposer.PublicKey())
+			ixs, prierr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp, nonProposer.PublicKey())
 			require.NoError(t, prierr)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, nonProposer, config.DefaultCommitment)
 			}
 
 			ix, scerr := timelock.NewScheduleBatchInstruction(
+				config.TestTimelockID,
 				nonExecutableOp.OperationID(),
 				nonExecutableOp.Delay,
 				nonExecutableOp.OperationPDA(),
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				ac.PublicKey(),
 				nonProposer.PublicKey(),
 			).ValidateAndBuild()
@@ -309,10 +319,11 @@ func TestTimelockRBAC(t *testing.T) {
 				require.False(t, found, "Account %s should not be in the AccessList", proposer.PublicKey())
 
 				ix, scerr := timelock.NewScheduleBatchInstruction(
+					config.TestTimelockID,
 					nonExecutableOp.OperationID(),
 					nonExecutableOp.Delay,
 					nonExecutableOp.OperationPDA(),
-					config.TimelockConfigPDA,
+					timelockutil.GetConfigPDA(config.TestTimelockID),
 					ac.PublicKey(),
 					proposer.PublicKey(),
 				).ValidateAndBuild()
@@ -332,27 +343,29 @@ func TestTimelockRBAC(t *testing.T) {
 			require.NoError(t, ferr)
 			require.True(t, found, "Account %s should be in the AccessList", proposer.PublicKey())
 
-			salt, serr := mcms.SimpleSalt()
+			salt, serr := timelockutil.SimpleSalt()
 			require.NoError(t, serr)
 			nonExecutableOp2 := timelockutil.Operation{
+				TimelockID:  config.TestTimelockID,
 				Predecessor: config.TimelockEmptyOpID,
 				Salt:        salt,
 				Delay:       uint64(1),
 			}
-			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), config.TimelockSignerPDA).Build()
+			ix := system.NewTransferInstruction(1*solana.LAMPORTS_PER_SOL, admin.PublicKey(), timelockutil.GetSignerPDA(config.TestTimelockID)).Build()
 			nonExecutableOp2.AddInstruction(ix, []solana.PublicKey{})
 
-			ixs, prerr := timelockutil.PreloadOperationIxs(nonExecutableOp2, proposer.PublicKey())
+			ixs, prerr := timelockutil.GetPreloadOperationIxs(config.TestTimelockID, nonExecutableOp2, proposer.PublicKey())
 			require.NoError(t, prerr)
 			for _, ix := range ixs {
 				testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{ix}, proposer, config.DefaultCommitment)
 			}
 
 			sbix, sberr := timelock.NewScheduleBatchInstruction(
+				config.TestTimelockID,
 				nonExecutableOp2.OperationID(),
 				nonExecutableOp2.Delay,
 				nonExecutableOp2.OperationPDA(), // formerly uploaded
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				ac.PublicKey(),
 				proposer.PublicKey(),
 			).ValidateAndBuild()
@@ -401,9 +414,10 @@ func TestTimelockRBAC(t *testing.T) {
 					ac := roleMap[timelock.Proposer_Role].AccessController
 
 					ix, cerr := timelock.NewCancelInstruction(
+						config.TestTimelockID,
 						nonExecutableOp2.OperationID(),
 						nonExecutableOp2.OperationPDA(),
-						config.TimelockConfigPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockID),
 						ac.PublicKey(),
 						signer.PublicKey(),
 					).ValidateAndBuild()
@@ -419,9 +433,10 @@ func TestTimelockRBAC(t *testing.T) {
 					ac := roleMap[timelock.Canceller_Role].AccessController
 
 					ix, cerr := timelock.NewCancelInstruction(
+						config.TestTimelockID,
 						nonExecutableOp2.OperationID(),
 						nonExecutableOp2.OperationPDA(),
-						config.TimelockConfigPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockID),
 						ac.PublicKey(),
 						signer.PublicKey(),
 					).ValidateAndBuild()
@@ -436,9 +451,10 @@ func TestTimelockRBAC(t *testing.T) {
 					ac := roleMap[timelock.Canceller_Role].AccessController
 
 					ix, cerr := timelock.NewCancelInstruction(
+						config.TestTimelockID,
 						nonExecutableOp2.OperationID(),
 						nonExecutableOp2.OperationPDA(),
-						config.TimelockConfigPDA,
+						timelockutil.GetConfigPDA(config.TestTimelockID),
 						ac.PublicKey(),
 						signer.PublicKey(),
 					).ValidateAndBuild()
@@ -471,8 +487,9 @@ func TestTimelockRBAC(t *testing.T) {
 			signer := roleMap[timelock.Proposer_Role].RandomPick()
 
 			ix, ierr := timelock.NewUpdateDelayInstruction(
+				config.TestTimelockID,
 				newMinDelay,
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				signer.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, ierr)
@@ -485,14 +502,15 @@ func TestTimelockRBAC(t *testing.T) {
 			signer := admin
 
 			var oldConfigAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &oldConfigAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &oldConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}
 
 			ix, err := timelock.NewUpdateDelayInstruction(
+				config.TestTimelockID,
 				newMinDelay,
-				config.TimelockConfigPDA,
+				timelockutil.GetConfigPDA(config.TestTimelockID),
 				signer.PublicKey(),
 			).ValidateAndBuild()
 			require.NoError(t, err)
@@ -511,7 +529,7 @@ func TestTimelockRBAC(t *testing.T) {
 			require.Equal(t, newMinDelay, event.NewDuration)
 
 			var newConfigAccount timelock.Config
-			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.TimelockConfigPDA, config.DefaultCommitment, &newConfigAccount)
+			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, timelockutil.GetConfigPDA(config.TestTimelockID), config.DefaultCommitment, &newConfigAccount)
 			if err != nil {
 				require.NoError(t, err, "failed to get account info")
 			}

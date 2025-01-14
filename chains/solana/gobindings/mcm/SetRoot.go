@@ -12,7 +12,7 @@ import (
 
 // SetRoot is the `setRoot` instruction.
 type SetRoot struct {
-	MultisigName  *[32]uint8
+	MultisigId    *[32]uint8
 	Root          *[32]uint8
 	ValidUntil    *uint32
 	Metadata      *RootMetadataInput
@@ -42,9 +42,9 @@ func NewSetRootInstructionBuilder() *SetRoot {
 	return nd
 }
 
-// SetMultisigName sets the "multisigName" parameter.
-func (inst *SetRoot) SetMultisigName(multisigName [32]uint8) *SetRoot {
-	inst.MultisigName = &multisigName
+// SetMultisigId sets the "multisigId" parameter.
+func (inst *SetRoot) SetMultisigId(multisigId [32]uint8) *SetRoot {
+	inst.MultisigId = &multisigId
 	return inst
 }
 
@@ -169,8 +169,8 @@ func (inst SetRoot) ValidateAndBuild() (*Instruction, error) {
 func (inst *SetRoot) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
-		if inst.MultisigName == nil {
-			return errors.New("MultisigName parameter is not set")
+		if inst.MultisigId == nil {
+			return errors.New("MultisigId parameter is not set")
 		}
 		if inst.Root == nil {
 			return errors.New("Root parameter is not set")
@@ -223,7 +223,7 @@ func (inst *SetRoot) EncodeToTree(parent ag_treeout.Branches) {
 
 					// Parameters of the instruction:
 					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
-						paramsBranch.Child(ag_format.Param(" MultisigName", *inst.MultisigName))
+						paramsBranch.Child(ag_format.Param("   MultisigId", *inst.MultisigId))
 						paramsBranch.Child(ag_format.Param("         Root", *inst.Root))
 						paramsBranch.Child(ag_format.Param("   ValidUntil", *inst.ValidUntil))
 						paramsBranch.Child(ag_format.Param("     Metadata", *inst.Metadata))
@@ -245,8 +245,8 @@ func (inst *SetRoot) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj SetRoot) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MultisigName` param:
-	err = encoder.Encode(obj.MultisigName)
+	// Serialize `MultisigId` param:
+	err = encoder.Encode(obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -273,8 +273,8 @@ func (obj SetRoot) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	return nil
 }
 func (obj *SetRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MultisigName`:
-	err = decoder.Decode(&obj.MultisigName)
+	// Deserialize `MultisigId`:
+	err = decoder.Decode(&obj.MultisigId)
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func (obj *SetRoot) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 // NewSetRootInstruction declares a new SetRoot instruction with the provided parameters and accounts.
 func NewSetRootInstruction(
 	// Parameters:
-	multisigName [32]uint8,
+	multisigId [32]uint8,
 	root [32]uint8,
 	validUntil uint32,
 	metadata RootMetadataInput,
@@ -318,7 +318,7 @@ func NewSetRootInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *SetRoot {
 	return NewSetRootInstructionBuilder().
-		SetMultisigName(multisigName).
+		SetMultisigId(multisigId).
 		SetRoot(root).
 		SetValidUntil(validUntil).
 		SetMetadata(metadata).

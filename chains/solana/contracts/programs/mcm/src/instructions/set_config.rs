@@ -10,7 +10,7 @@ use crate::state::root::*;
 /// Set the configuration for the multisig instance after validating the input
 pub fn set_config(
     ctx: Context<SetConfig>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED], // for pda derivation
+    _multisig_id: [u8; MULTISIG_ID_PADDED], // for pda derivation
     signer_groups: Vec<u8>,
     group_quorums: [u8; NUM_GROUPS],
     group_parents: [u8; NUM_GROUPS],
@@ -155,7 +155,7 @@ pub fn set_config(
 
 pub fn init_signers(
     ctx: Context<InitSigners>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     total_signers: u8,
 ) -> Result<()> {
     require!(
@@ -171,7 +171,7 @@ pub fn init_signers(
 
 pub fn append_signers(
     ctx: Context<AppendSigners>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
     signers_batch: Vec<[u8; 20]>,
 ) -> Result<()> {
     let config_signers = &mut ctx.accounts.config_signers;
@@ -203,7 +203,7 @@ pub fn append_signers(
 
 pub fn clear_signers(
     _ctx: Context<ClearSigners>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
 ) -> Result<()> {
     // NOTE: ctx.accounts.config_signers is closed to be able to re-initialized,
     // also allow finalized config_signers to be cleared
@@ -212,7 +212,7 @@ pub fn clear_signers(
 
 pub fn finalize_signers(
     ctx: Context<FinalizeSigners>,
-    _multisig_name: [u8; MULTISIG_NAME_PADDED],
+    _multisig_id: [u8; MULTISIG_ID_PADDED],
 ) -> Result<()> {
     let config_signers = &mut ctx.accounts.config_signers;
 
@@ -227,11 +227,11 @@ pub fn finalize_signers(
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct SetConfig<'info> {
     #[account(
         mut,
-        seeds = [CONFIG_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SEED, multisig_id.as_ref()],
         bump,
         realloc = ANCHOR_DISCRIMINATOR + MultisigConfig::space_with_signers(
             config_signers.signer_addresses.len()
@@ -243,17 +243,17 @@ pub struct SetConfig<'info> {
 
     #[account(
         mut,
-        seeds = [CONFIG_SIGNERS_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SIGNERS_SEED, multisig_id.as_ref()],
         bump,
         constraint = config_signers.is_finalized @ McmError::SignersNotFinalized,
         close = authority // close after config set
     )]
     pub config_signers: Account<'info, ConfigSigners>, // preloaded signers account
 
-    #[account(mut, seeds = [ROOT_METADATA_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [ROOT_METADATA_SEED, multisig_id.as_ref()], bump)]
     pub root_metadata: Account<'info, RootMetadata>,
 
-    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_name.as_ref()], bump)]
+    #[account(mut, seeds = [EXPIRING_ROOT_AND_OP_COUNT_SEED, multisig_id.as_ref()], bump)]
     pub expiring_root_and_op_count: Account<'info, ExpiringRootAndOpCount>,
 
     #[account(mut, address = multisig_config.owner @ AuthError::Unauthorized)]
@@ -263,16 +263,16 @@ pub struct SetConfig<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED], total_signers: u8)]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED], total_signers: u8)]
 pub struct InitSigners<'info> {
-    #[account(seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub multisig_config: Account<'info, MultisigConfig>,
 
     #[account(
         init,
         payer = authority,
         space = ConfigSigners::space(total_signers as usize),
-        seeds = [CONFIG_SIGNERS_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SIGNERS_SEED, multisig_id.as_ref()],
         bump
     )]
     pub config_signers: Account<'info, ConfigSigners>,
@@ -284,14 +284,14 @@ pub struct InitSigners<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct AppendSigners<'info> {
-    #[account(seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub multisig_config: Account<'info, MultisigConfig>,
 
     #[account(
         mut,
-        seeds = [CONFIG_SIGNERS_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SIGNERS_SEED, multisig_id.as_ref()],
         bump,
         constraint = !config_signers.is_finalized @ McmError::SignersAlreadyFinalized
     )]
@@ -302,14 +302,14 @@ pub struct AppendSigners<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct ClearSigners<'info> {
-    #[account(seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub multisig_config: Account<'info, MultisigConfig>,
 
     #[account(
         mut,
-        seeds = [CONFIG_SIGNERS_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SIGNERS_SEED, multisig_id.as_ref()],
         bump,
         close = authority // close so that it can be re-initialized
     )]
@@ -320,14 +320,14 @@ pub struct ClearSigners<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(multisig_name: [u8; MULTISIG_NAME_PADDED])]
+#[instruction(multisig_id: [u8; MULTISIG_ID_PADDED])]
 pub struct FinalizeSigners<'info> {
-    #[account(seeds = [CONFIG_SEED, multisig_name.as_ref()], bump)]
+    #[account(seeds = [CONFIG_SEED, multisig_id.as_ref()], bump)]
     pub multisig_config: Account<'info, MultisigConfig>,
 
     #[account(
         mut,
-        seeds = [CONFIG_SIGNERS_SEED, multisig_name.as_ref()],
+        seeds = [CONFIG_SIGNERS_SEED, multisig_id.as_ref()],
         bump,
         constraint = !config_signers.is_finalized @ McmError::SignersAlreadyFinalized
     )]

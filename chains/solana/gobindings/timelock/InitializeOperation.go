@@ -12,6 +12,7 @@ import (
 
 // InitializeOperation is the `initializeOperation` instruction.
 type InitializeOperation struct {
+	TimelockId       *[32]uint8
 	Id               *[32]uint8
 	Predecessor      *[32]uint8
 	Salt             *[32]uint8
@@ -33,6 +34,12 @@ func NewInitializeOperationInstructionBuilder() *InitializeOperation {
 		AccountMetaSlice: make(ag_solanago.AccountMetaSlice, 4),
 	}
 	return nd
+}
+
+// SetTimelockId sets the "timelockId" parameter.
+func (inst *InitializeOperation) SetTimelockId(timelockId [32]uint8) *InitializeOperation {
+	inst.TimelockId = &timelockId
+	return inst
 }
 
 // SetId sets the "id" parameter.
@@ -123,6 +130,9 @@ func (inst InitializeOperation) ValidateAndBuild() (*Instruction, error) {
 func (inst *InitializeOperation) Validate() error {
 	// Check whether all (required) parameters are set:
 	{
+		if inst.TimelockId == nil {
+			return errors.New("TimelockId parameter is not set")
+		}
 		if inst.Id == nil {
 			return errors.New("Id parameter is not set")
 		}
@@ -164,7 +174,8 @@ func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=4]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=5]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+						paramsBranch.Child(ag_format.Param("      TimelockId", *inst.TimelockId))
 						paramsBranch.Child(ag_format.Param("              Id", *inst.Id))
 						paramsBranch.Child(ag_format.Param("     Predecessor", *inst.Predecessor))
 						paramsBranch.Child(ag_format.Param("            Salt", *inst.Salt))
@@ -183,6 +194,11 @@ func (inst *InitializeOperation) EncodeToTree(parent ag_treeout.Branches) {
 }
 
 func (obj InitializeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `TimelockId` param:
+	err = encoder.Encode(obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Serialize `Id` param:
 	err = encoder.Encode(obj.Id)
 	if err != nil {
@@ -206,6 +222,11 @@ func (obj InitializeOperation) MarshalWithEncoder(encoder *ag_binary.Encoder) (e
 	return nil
 }
 func (obj *InitializeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `TimelockId`:
+	err = decoder.Decode(&obj.TimelockId)
+	if err != nil {
+		return err
+	}
 	// Deserialize `Id`:
 	err = decoder.Decode(&obj.Id)
 	if err != nil {
@@ -232,6 +253,7 @@ func (obj *InitializeOperation) UnmarshalWithDecoder(decoder *ag_binary.Decoder)
 // NewInitializeOperationInstruction declares a new InitializeOperation instruction with the provided parameters and accounts.
 func NewInitializeOperationInstruction(
 	// Parameters:
+	timelockId [32]uint8,
 	id [32]uint8,
 	predecessor [32]uint8,
 	salt [32]uint8,
@@ -242,6 +264,7 @@ func NewInitializeOperationInstruction(
 	authority ag_solanago.PublicKey,
 	systemProgram ag_solanago.PublicKey) *InitializeOperation {
 	return NewInitializeOperationInstructionBuilder().
+		SetTimelockId(timelockId).
 		SetId(id).
 		SetPredecessor(predecessor).
 		SetSalt(salt).
