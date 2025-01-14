@@ -247,9 +247,11 @@ func (p *Plugin) getMessagesObservation(
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
-		p.lggr.Errorw("unable to complete token data processing", "err", err1)
+		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
 
+	// validating before continuing with heavy operations afterwards like truncation and costly messages
+	// all messages should have a token data observation even if it's empty
 	if validateTokenDataObservations(messageObs, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
