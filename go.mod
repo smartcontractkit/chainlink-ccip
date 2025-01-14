@@ -4,6 +4,7 @@ go 1.23.3
 
 require (
 	github.com/deckarep/golang-set/v2 v2.6.0
+	github.com/mr-tron/base58 v1.2.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.20.0
 	github.com/prometheus/client_model v0.6.1
@@ -35,7 +36,6 @@ require (
 	github.com/invopop/jsonschema v0.12.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
