@@ -22,7 +22,7 @@ const (
 	// initialObservationRequest + observationRequestWithOtherSourcesAfterTimeout + reportSignatureRequest
 	maxNumOfMsgsPerRound = 3
 
-	rateScale       = 1.2
+	rateScale       = 2
 	capacityScale   = 5
 	minMsgLimitRate = 1.0
 
@@ -78,10 +78,6 @@ func messagesLimit(roundInterval time.Duration) ragep2p.TokenBucketParams {
 		rate = minMsgLimitRate
 	}
 
-	if rate > capacity {
-		rate = capacity
-	}
-
 	return ragep2p.TokenBucketParams{
 		Rate:     rate,
 		Capacity: uint32(capacity),
@@ -94,10 +90,6 @@ func bytesLimit(roundInterval time.Duration) ragep2p.TokenBucketParams {
 
 	rate := (float64(maxSumLenInboundPerRound) / roundIntervalSecF64) * rateScale
 	capacity := uint32(maxSumLenInboundPerRound * capacityScale)
-
-	if rate > float64(capacity) {
-		rate = float64(capacity)
-	}
 
 	return ragep2p.TokenBucketParams{
 		Rate:     rate,

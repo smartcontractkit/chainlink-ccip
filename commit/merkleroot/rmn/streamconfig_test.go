@@ -16,10 +16,10 @@ func Test_messagesLimit(t *testing.T) {
 		wantRate      float64
 		wantCapacity  uint32
 	}{
-		{roundInterval: 50 * time.Millisecond, wantRate: 15, wantCapacity: 15},
-		{roundInterval: 100 * time.Millisecond, wantRate: 15, wantCapacity: 15},
-		{roundInterval: time.Second, wantRate: 3.6, wantCapacity: 15},
-		{roundInterval: 3 * time.Second, wantRate: 1.2, wantCapacity: 15},
+		{roundInterval: 50 * time.Millisecond, wantRate: 120, wantCapacity: 15},
+		{roundInterval: 100 * time.Millisecond, wantRate: 60, wantCapacity: 15},
+		{roundInterval: time.Second, wantRate: 6, wantCapacity: 15},
+		{roundInterval: 3 * time.Second, wantRate: 2, wantCapacity: 15},
 		{roundInterval: 10 * time.Second, wantRate: minMsgLimitRate, wantCapacity: 15},
 		{roundInterval: 60 * time.Second, wantRate: minMsgLimitRate, wantCapacity: 15},
 		{roundInterval: 120 * time.Second, wantRate: minMsgLimitRate, wantCapacity: 15},
@@ -44,13 +44,13 @@ func Test_bytesLimit(t *testing.T) {
 		wantRate      float64
 		wantCapacity  uint32
 	}{
-		{roundInterval: 50 * time.Millisecond, wantRate: 269765, wantCapacity: 269765},
-		{roundInterval: 100 * time.Millisecond, wantRate: 269765, wantCapacity: 269765},
-		{roundInterval: time.Second, wantRate: 64743.6, wantCapacity: 269765},
-		{roundInterval: 3 * time.Second, wantRate: 21581.2, wantCapacity: 269765},
-		{roundInterval: 10 * time.Second, wantRate: 6474.36, wantCapacity: 269765},
-		{roundInterval: 60 * time.Second, wantRate: 1079.06, wantCapacity: 269765},
-		{roundInterval: 120 * time.Second, wantRate: 539.53, wantCapacity: 269765},
+		{roundInterval: 50 * time.Millisecond, wantRate: 2158120, wantCapacity: 269765},
+		{roundInterval: 100 * time.Millisecond, wantRate: 1079060, wantCapacity: 269765},
+		{roundInterval: time.Second, wantRate: 107906, wantCapacity: 269765},
+		{roundInterval: 3 * time.Second, wantRate: 35968.667, wantCapacity: 269765},
+		{roundInterval: 10 * time.Second, wantRate: 10790.6, wantCapacity: 269765},
+		{roundInterval: 60 * time.Second, wantRate: 1798.433, wantCapacity: 269765},
+		{roundInterval: 120 * time.Second, wantRate: 899.217, wantCapacity: 269765},
 	}
 
 	for _, tc := range testCases {
