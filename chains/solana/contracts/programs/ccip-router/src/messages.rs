@@ -36,22 +36,18 @@ pub struct ExecutionReportSingleChain {
     pub token_indexes: Vec<u8>, // outside of message because this is not available during commit stage
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]
-pub struct SolanaAccountMeta {
-    pub pubkey: Pubkey,
-    pub is_writable: bool,
-}
-
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct SolanaExtraArgs {
     pub compute_units: u32,
-    pub accounts: Vec<SolanaAccountMeta>,
+    pub is_writable_bitmap: u64,
+    pub accounts: Vec<Pubkey>,
 }
 
 impl SolanaExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
-        + 4 + self.accounts.len() * SolanaAccountMeta::INIT_SPACE // additional accounts
+        + 8 // isWritable bitmap
+        + 4 + self.accounts.len() * 32 // additional accounts
     }
 }
 

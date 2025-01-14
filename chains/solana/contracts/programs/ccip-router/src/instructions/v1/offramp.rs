@@ -11,15 +11,16 @@ use super::pools::{
 };
 
 use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
+use crate::v1::messages::ramps::is_writable;
 use crate::{
     Any2SolanaMessage, Any2SolanaRampMessage, BillingTokenConfigWrapper, CcipRouterError,
     CommitInput, CommitReport, CommitReportAccepted, CommitReportContext, DestChain,
     ExecuteReportContext, ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate,
     GlobalState, MessageExecutionState, OcrPluginType, RampMessageHeader,
-    SkippedAlreadyExecutedMessage, SolanaAccountMeta, SolanaTokenAmount, SourceChain,
-    TimestampedPackedU224, TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated,
-    CCIP_RECEIVE_DISCRIMINATOR, DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED,
-    EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    SkippedAlreadyExecutedMessage, SolanaTokenAmount, SourceChain, TimestampedPackedU224,
+    TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated, CCIP_RECEIVE_DISCRIMINATOR,
+    DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED,
+    FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
 
 pub fn commit<'info>(
@@ -469,7 +470,8 @@ fn internal_execute<'info>(
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             &execution_report.token_indexes,
             execution_report.message.receiver,
-            execution_report.message.extra_args.accounts,
+            &execution_report.message.extra_args.accounts,
+            &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
 
@@ -546,7 +548,8 @@ fn should_execute_messaging(token_indexes: &[u8], remaining_accounts_empty: bool
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
     receiver: Pubkey,
-    source_accounts: Vec<SolanaAccountMeta>,
+    source_accounts: &[Pubkey],
+    source_bitmap: &u64,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
     let end_ind = if token_indexes.is_empty() {
@@ -562,7 +565,7 @@ fn parse_messaging_accounts<'info>(
     let source_msg_accounts = &source_accounts[1..source_accounts.len()];
 
     require!(
-        source_program.pubkey == msg_program.key(),
+        *source_program == msg_program.key(),
         CcipRouterError::InvalidInputs,
     );
 
@@ -587,13 +590,11 @@ fn parse_messaging_accounts<'info>(
             CcipRouterError::InvalidInputs
         );
         for (i, acc) in source_msg_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i + 1];
+            let current_acc = &msg_accounts[i + 1]; // TODO: remove offset by 1 to skip receiver after receiver refactor
+            require!(*acc == current_acc.key(), CcipRouterError::InvalidInputs);
             require!(
-                acc.pubkey == current_acc.key(),
-                CcipRouterError::InvalidInputs
-            );
-            require!(
-                acc.is_writable == current_acc.is_writable,
+                // TODO: remove offset by 1 to skip program after receiver refactor
+                is_writable(source_bitmap, (i + 1) as u8) == current_acc.is_writable,
                 CcipRouterError::InvalidInputs
             );
         }
@@ -683,11 +684,6 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // Extra Args struct
-    let extra_args_compute_units = msg.extra_args.compute_units.to_be_bytes();
-    let extra_args_accounts_len = [msg.extra_args.accounts.len() as u8];
-    let extra_args_accounts = msg.extra_args.accounts.try_to_vec().unwrap();
-
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
     // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
     let result = hash::hashv(&[
@@ -702,9 +698,7 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
         &msg.header.message_id,
         &msg.receiver.to_bytes(),
         &header_sequence_number,
-        &extra_args_compute_units,
-        &extra_args_accounts_len,
-        &extra_args_accounts,
+        msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
         // message
         &sender_size,
@@ -875,11 +869,10 @@ mod tests {
             .to_vec(),
             extra_args: SolanaExtraArgs {
                 compute_units: 1000,
-                accounts: vec![SolanaAccountMeta {
-                    pubkey: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-                        .unwrap(),
-                    is_writable: true,
-                }],
+                is_writable_bitmap: 1,
+                accounts: vec![
+                    Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+                ],
             },
         };
 
@@ -887,7 +880,7 @@ mod tests {
         let hash_result = hash(&message, on_ramp_address);
 
         assert_eq!(
-            "fb47aed864f6e050f05ad851fdc0015c2e946f05e25093d150884cfb995834d0",
+            "1636e87682c7622432edefeccae977d0e64f30251eee1b02e02b7156a58dfebf",
             hex::encode(hash_result)
         );
     }

@@ -132,6 +132,10 @@ pub mod ramps {
         Ok(())
     }
 
+    pub fn is_writable(bitmap: &u64, index: u8) -> bool {
+        index < 64 && (bitmap & 1 << index != 0) // check valid index and that bit at index is 1
+    }
+
     #[cfg(test)]
     pub mod tests {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};

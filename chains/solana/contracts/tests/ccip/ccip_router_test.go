@@ -4708,9 +4708,10 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 				message.Receiver = stubAccountPDA
 				sequenceNumber := message.Header.SequenceNumber
-				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					{Pubkey: config.CcipInvalidReceiverProgram},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
+				message.ExtraArgs.IsWritableBitmap = 0
+				message.ExtraArgs.Accounts = []solana.PublicKey{
+					config.CcipInvalidReceiverProgram,
+					solana.SystemProgramID,
 				}
 
 				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
@@ -5228,16 +5229,17 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 
 				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					{Pubkey: config.CcipReceiverProgram},
-					{Pubkey: config.ReceiverTargetAccountPDA, IsWritable: true},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
-					{Pubkey: config.CcipRouterProgram, IsWritable: false},
-					{Pubkey: config.RouterConfigPDA, IsWritable: false},
-					{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsWritable: true},
-					{Pubkey: config.EvmSourceChainStatePDA, IsWritable: true},
-					{Pubkey: receiverContractEvmPDA, IsWritable: true},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
+				message.ExtraArgs.IsWritableBitmap = 2 + 32 + 64 + 128
+				message.ExtraArgs.Accounts = []solana.PublicKey{
+					config.CcipReceiverProgram,
+					config.ReceiverTargetAccountPDA, // writable (index = 1)
+					solana.SystemProgramID,
+					config.CcipRouterProgram,
+					config.RouterConfigPDA,
+					config.ReceiverExternalExecutionConfigPDA, // writable (index = 5)
+					config.EvmSourceChainStatePDA,             // writable (index = 6)
+					receiverContractEvmPDA,                    // writable (index = 7)
+					solana.SystemProgramID,
 				}
 
 				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
