@@ -34,10 +34,7 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
-	decodedAos, err := decodeAttributedObservations(aos)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode observations: %w", err)
-	}
+	decodedAos := decodeAttributedObservations(p.lggr, aos)
 
 	// discovery processor disabled by setting it to nil.
 	if p.discovery != nil {
@@ -60,6 +57,10 @@ func (p *Plugin) Outcome(
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
 		return ocr3types.Outcome{}, fmt.Errorf("unable to get FChain: %w", err)
+	}
+	_, ok := fChain[p.destChain] // check if the destination chain is in the FChain.
+	if !ok {
+		return ocr3types.Outcome{}, fmt.Errorf("destination chain %d is not in FChain", p.destChain)
 	}
 
 	observation, err := getConsensusObservation(p.lggr, decodedAos, p.destChain, p.reportingCfg.F, fChain)
