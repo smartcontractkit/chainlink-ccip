@@ -1436,7 +1436,9 @@ func (r *ccipChainReader) getFeeQuoterDestChainConfig(
 	)
 
 	if err != nil {
-		return cciptypes.FeeQuoterDestChainConfig{}, fmt.Errorf("get dest chain config for source chain %d: %w", chainSelector, err)
+		return cciptypes.FeeQuoterDestChainConfig{},
+			fmt.Errorf("get dest chain config for source chain %d: %w",
+				chainSelector, err)
 	}
 
 	return destChainConfig, nil
