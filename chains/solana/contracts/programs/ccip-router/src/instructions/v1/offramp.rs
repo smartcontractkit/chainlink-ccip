@@ -395,7 +395,7 @@ fn internal_execute<'info>(
         )?;
         let acc_list = &ctx.remaining_accounts[start..end];
         let accs = validate_and_parse_token_accounts(
-            execution_report.message.receiver,
+            execution_report.message.token_receiver,
             execution_report.message.header.source_chain_selector,
             ctx.program_id.key(),
             acc_list,
@@ -407,7 +407,7 @@ fn internal_execute<'info>(
         // CPI: call lockOrBurn on token pool
         let release_or_mint = ReleaseOrMintInV1 {
             original_sender: execution_report.message.sender.clone(),
-            receiver: execution_report.message.receiver,
+            receiver: execution_report.message.token_receiver,
             amount: token_amount.amount,
             local_token: token_amount.dest_token_address,
             remote_chain_selector: execution_report.message.header.source_chain_selector,
@@ -463,12 +463,12 @@ fn internal_execute<'info>(
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
     if should_execute_messaging(
-        &execution_report.token_indexes,
+        &execution_report.message.logic_receiver,
         ctx.remaining_accounts.is_empty(),
     ) {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             &execution_report.token_indexes,
-            execution_report.message.receiver,
+            execution_report.message.logic_receiver,
             execution_report.message.extra_args.accounts,
             ctx.remaining_accounts,
         )?;
@@ -527,76 +527,57 @@ fn internal_execute<'info>(
     Ok(())
 }
 
-// should_execute_messaging checks if there remaining_accounts that are not being used for token pools
-// case: no tokens, but there are remaining_accounts passed in
-// case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-fn should_execute_messaging(token_indexes: &[u8], remaining_accounts_empty: bool) -> bool {
-    (token_indexes.is_empty() && !remaining_accounts_empty)
-        || (!token_indexes.is_empty() && token_indexes[0] != 0)
+// should_execute_messaging checks if there is at least one account used for messaging (the first subset of accounts)
+// and the logic_receiver is has a value different than zeros
+fn should_execute_messaging(logic_receiver: &Pubkey, remaining_accounts_empty: bool) -> bool {
+    !remaining_accounts_empty && *logic_receiver != Pubkey::default()
 }
 
 /// parse_message_accounts returns all the accounts needed to execute the CPI instruction
 /// It also validates that the accounts sent in the message match the ones sent in the source chain
+/// Precondition: logic_receiver != 0 && remaining_accounts.len() > 0
 ///
 /// # Arguments
 /// * `token_indexes` - start indexes of token pool accounts, used to determine ending index for arbitrary messaging accounts
-/// * `receiver` - receiver address from x-chain message, used to validate `accounts`
-/// * `source_accounts` - arbitrary messaging accounts from the x-chain message, used to validate `accounts`. expected order is: [program, ...additional message accounts]
-/// * `accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [program, receiver, ...additional message accounts]
+/// * `logic_receiver` - receiver address from x-chain message, used to validate `remaining_accounts`
+/// * `extra_args_accounts` - arbitrary messaging accounts from the x-chain message, used to validate `accounts`.
+/// * `remaining_accounts` - accounts passed via `ctx.remaining_accounts`. expected order is: [program, receiver, ...additional message accounts]
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
-    receiver: Pubkey,
-    source_accounts: Vec<SolanaAccountMeta>,
-    accounts: &'info [AccountInfo<'info>],
+    logic_receiver: Pubkey,
+    extra_args_accounts: Vec<SolanaAccountMeta>,
+    remaining_accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
     let end_ind = if token_indexes.is_empty() {
-        accounts.len()
+        remaining_accounts.len()
     } else {
         token_indexes[0] as usize
     };
 
-    let msg_program = &accounts[0];
-    let msg_accounts = &accounts[1..end_ind];
-
-    let source_program = &source_accounts[0];
-    let source_msg_accounts = &source_accounts[1..source_accounts.len()];
+    require!(
+        end_ind <= remaining_accounts.len(),
+        CcipRouterError::InvalidInputs
+    ); // there could be other remaining accounts used for tokens
 
     require!(
-        source_program.pubkey == msg_program.key(),
+        end_ind - 1 == extra_args_accounts.len(), // assert same number of accounts passed from message and transaction
+        CcipRouterError::InvalidInputs
+    );
+
+    let msg_program = &remaining_accounts[0];
+    let msg_accounts = &remaining_accounts[1..end_ind];
+
+    require!(
+        logic_receiver == msg_program.key(),
         CcipRouterError::InvalidInputs,
     );
 
-    require!(
-        msg_accounts[0].key() == receiver,
-        CcipRouterError::InvalidInputs
-    );
-
-    // assert same number of accounts passed from message and transaction (not including program)
-    // source_msg_accounts + 1 to account for separately passed receiver address
-    require!(
-        source_msg_accounts.len() + 1 == msg_accounts.len(),
-        CcipRouterError::InvalidInputs
-    );
-
-    // Validate the addresses of all the accounts match the ones in source chain
-    if msg_accounts.len() > 1 {
-        // Ignore the first account as it's the receiver
-        let accounts_to_validate = &msg_accounts[1..msg_accounts.len()];
+    for (i, acc) in extra_args_accounts.iter().enumerate() {
+        let current_acc = &msg_accounts[i];
         require!(
-            accounts_to_validate.len() == source_msg_accounts.len(),
+            acc.pubkey == current_acc.key() && acc.is_writable == current_acc.is_writable,
             CcipRouterError::InvalidInputs
         );
-        for (i, acc) in source_msg_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i + 1];
-            require!(
-                acc.pubkey == current_acc.key(),
-                CcipRouterError::InvalidInputs
-            );
-            require!(
-                acc.is_writable == current_acc.is_writable,
-                CcipRouterError::InvalidInputs
-            );
-        }
     }
 
     Ok((msg_program, msg_accounts))
@@ -629,7 +610,6 @@ pub fn verify_merkle_root(
     Ok(hashed_leaf)
 }
 
-// TODO: Refactor this to use the same structure as messages: execution_report.validate(..)
 pub fn validate_execution_report<'info>(
     execution_report: &ExecutionReportSingleChain,
     source_chain_state: &Account<'info, SourceChain>,
@@ -700,7 +680,8 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
         on_ramp_address,
         // message header
         &msg.header.message_id,
-        &msg.receiver.to_bytes(),
+        &msg.token_receiver.to_bytes(),
+        &msg.logic_receiver.to_bytes(),
         &header_sequence_number,
         &extra_args_compute_units,
         &extra_args_accounts_len,
@@ -850,7 +831,10 @@ mod tests {
                 0, 0, 0, 0,
             ]
             .to_vec(),
-            receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+            token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
+                .unwrap(),
+            logic_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
+                .unwrap(),
             data: vec![4, 5, 6],
             header: RampMessageHeader {
                 message_id: [
@@ -875,11 +859,7 @@ mod tests {
             .to_vec(),
             extra_args: SolanaExtraArgs {
                 compute_units: 1000,
-                accounts: vec![SolanaAccountMeta {
-                    pubkey: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-                        .unwrap(),
-                    is_writable: true,
-                }],
+                accounts: vec![],
             },
         };
 
@@ -887,7 +867,7 @@ mod tests {
         let hash_result = hash(&message, on_ramp_address);
 
         assert_eq!(
-            "fb47aed864f6e050f05ad851fdc0015c2e946f05e25093d150884cfb995834d0",
+            "60bb7073f7528617d8df11743241a24942c15deed3ad90cdd44a92bd097a6a80",
             hex::encode(hash_result)
         );
     }

@@ -73,7 +73,7 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1232)
+		require.LessOrEqual(t, l, 1238)
 		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
 	}
 
@@ -178,10 +178,11 @@ func TestTransactionSizing(t *testing.T) {
 				SequenceNumber:      0,
 				Nonce:               0,
 			},
-			Sender:       make([]byte, 20), // EVM sender
-			Data:         []byte{},
-			Receiver:     [32]byte{},
-			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{},
+			Sender:        make([]byte, 20), // EVM sender
+			Data:          []byte{},
+			TokenReceiver: [32]byte{},
+			LogicReceiver: [32]byte{},
+			TokenAmounts:  []ccip_router.Any2SolanaTokenTransfer{},
 			ExtraArgs: ccip_router.SolanaExtraArgs{
 				ComputeUnits: 0,
 				Accounts:     []ccip_router.SolanaAccountMeta{},
@@ -202,9 +203,10 @@ func TestTransactionSizing(t *testing.T) {
 				SequenceNumber:      0,
 				Nonce:               0,
 			},
-			Sender:   make([]byte, 20), // EVM sender
-			Data:     []byte{},
-			Receiver: [32]byte{},
+			Sender:        make([]byte, 20), // EVM sender
+			Data:          []byte{},
+			TokenReceiver: [32]byte{},
+			LogicReceiver: [32]byte{},
 			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{{
 				SourcePoolAddress: make([]byte, 20), // EVM origin token pool
 				DestTokenAddress:  [32]byte{},

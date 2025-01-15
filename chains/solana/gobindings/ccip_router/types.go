@@ -695,12 +695,13 @@ func (obj *AnyExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 }
 
 type Any2SolanaRampMessage struct {
-	Header       RampMessageHeader
-	Sender       []byte
-	Data         []byte
-	Receiver     ag_solanago.PublicKey
-	TokenAmounts []Any2SolanaTokenTransfer
-	ExtraArgs    SolanaExtraArgs
+	Header        RampMessageHeader
+	Sender        []byte
+	Data          []byte
+	LogicReceiver ag_solanago.PublicKey
+	TokenReceiver ag_solanago.PublicKey
+	TokenAmounts  []Any2SolanaTokenTransfer
+	ExtraArgs     SolanaExtraArgs
 }
 
 func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -719,8 +720,13 @@ func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	if err != nil {
 		return err
 	}
-	// Serialize `Receiver` param:
-	err = encoder.Encode(obj.Receiver)
+	// Serialize `LogicReceiver` param:
+	err = encoder.Encode(obj.LogicReceiver)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenReceiver` param:
+	err = encoder.Encode(obj.TokenReceiver)
 	if err != nil {
 		return err
 	}
@@ -753,8 +759,13 @@ func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	if err != nil {
 		return err
 	}
-	// Deserialize `Receiver`:
-	err = decoder.Decode(&obj.Receiver)
+	// Deserialize `LogicReceiver`:
+	err = decoder.Decode(&obj.LogicReceiver)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenReceiver`:
+	err = decoder.Decode(&obj.TokenReceiver)
 	if err != nil {
 		return err
 	}

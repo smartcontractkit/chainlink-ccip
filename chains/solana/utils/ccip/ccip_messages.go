@@ -97,13 +97,13 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 			SequenceNumber:      sequenceNumber,
 			Nonce:               0,
 		},
-		Sender:   []byte{1, 2, 3},
-		Data:     []byte{4, 5, 6},
-		Receiver: config.ReceiverExternalExecutionConfigPDA,
+		Sender:        []byte{1, 2, 3},
+		Data:          []byte{4, 5, 6},
+		TokenReceiver: config.ReceiverExternalExecutionConfigPDA,
+		LogicReceiver: config.CcipLogicReceiver,
 		ExtraArgs: ccip_router.SolanaExtraArgs{
 			ComputeUnits: 1000,
 			Accounts: []ccip_router.SolanaAccountMeta{
-				{Pubkey: config.CcipReceiverProgram},
 				{Pubkey: config.ReceiverTargetAccountPDA, IsWritable: true},
 				{Pubkey: solana.SystemProgramID, IsWritable: false},
 			},
@@ -112,10 +112,11 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 	return message
 }
 
-func MakeEvmToSolanaMessage(ccipReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte, error) {
+func MakeEvmToSolanaMessage(tokenReceiver solana.PublicKey, logicReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte, error) {
 	msg := CreateDefaultMessageWith(evmChainSelector, 1)
 	msg.Header.DestChainSelector = solanaChainSelector
-	msg.Receiver = ccipReceiver
+	msg.TokenReceiver = tokenReceiver
+	msg.LogicReceiver = logicReceiver
 	msg.Data = data
 
 	hash, err := HashEvmToSolanaMessage(msg, config.OnRampAddress)
@@ -145,7 +146,10 @@ func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress
 	if _, err := hash.Write(msg.Header.MessageId[:]); err != nil {
 		return nil, err
 	}
-	if _, err := hash.Write(msg.Receiver[:]); err != nil {
+	if _, err := hash.Write(msg.TokenReceiver[:]); err != nil {
+		return nil, err
+	}
+	if _, err := hash.Write(msg.LogicReceiver[:]); err != nil {
 		return nil, err
 	}
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.SequenceNumber); err != nil {

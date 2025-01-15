@@ -94,8 +94,8 @@ func NextSequenceNumber(ctx context.Context, solanaGoClient *rpc.Client, sourceC
 	return num
 }
 
-func MakeEvmToSolanaMessage(t *testing.T, ccipReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte) {
-	msg, hash, err := ccip.MakeEvmToSolanaMessage(ccipReceiver, evmChainSelector, solanaChainSelector, data)
+func MakeEvmToSolanaMessage(t *testing.T, tokenReceiver solana.PublicKey, logicReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SolanaRampMessage, [32]byte) {
+	msg, hash, err := ccip.MakeEvmToSolanaMessage(tokenReceiver, logicReceiver, evmChainSelector, solanaChainSelector, data)
 	require.NoError(t, err)
 	return msg, hash
 }

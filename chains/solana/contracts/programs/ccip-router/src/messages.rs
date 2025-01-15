@@ -84,7 +84,8 @@ impl Any2SolanaRampMessage {
         self.header.len() // header
         + 4 + self.sender.len() // sender
         + 4 + self.data.len() // data
-        + 32 // receiver
+        + 32 // logic receiver
+        + 32 // token receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
     }

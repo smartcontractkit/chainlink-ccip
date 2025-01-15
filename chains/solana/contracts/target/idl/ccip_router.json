@@ -2172,7 +2172,11 @@
             "type": "bytes"
           },
           {
-            "name": "receiver",
+            "name": "logicReceiver",
+            "type": "publicKey"
+          },
+          {
+            "name": "tokenReceiver",
             "type": "publicKey"
           },
           {
