@@ -269,6 +269,7 @@ func decodeAttributedObservations(
 }
 
 func mergeMessageObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) exectypes.MessageObservations {
 	// Create a validator for each chain
@@ -282,7 +283,7 @@ func mergeMessageObservations(
 		for selector, messages := range ao.Observation.Messages {
 			validator, ok := validators[selector]
 			if !ok {
-				// no F was found for this selector
+				lggr.Warnw("no F defined for chain", "chain", selector)
 				continue
 			}
 			// Add reports
@@ -314,6 +315,7 @@ func mergeMessageObservations(
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
 ) exectypes.CommitObservations {
 	// Create a validator for each chain
@@ -328,7 +330,7 @@ func mergeCommitObservations(
 		for selector, commitReports := range ao.Observation.CommitReports {
 			validator, ok := validators[selector]
 			if !ok {
-				// no F was found for this selector
+				lggr.Warnw("no F defined for chain", "chain", selector)
 				continue
 			}
 			// Add reports
@@ -353,6 +355,7 @@ func mergeCommitObservations(
 }
 
 func mergeMessageHashes(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
 ) exectypes.MessageHashes {
@@ -364,7 +367,7 @@ func mergeMessageHashes(
 		for selector, seqMap := range ao.Observation.Hashes {
 			f, ok := fChain[selector]
 			if !ok {
-				// no F was found for this selector
+				lggr.Warnw("no F defined for chain", "chain", selector)
 				continue
 			}
 
@@ -403,9 +406,10 @@ func mergeMessageHashes(
 }
 
 func mergeTokenObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-) (exectypes.TokenDataObservations, error) {
+) exectypes.TokenDataObservations {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
@@ -414,7 +418,8 @@ func mergeTokenObservations(
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
 			if !ok {
-				return exectypes.TokenDataObservations{}, fmt.Errorf("no F defined for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 
 			if _, ok1 := results[selector]; !ok1 {
@@ -443,10 +448,10 @@ func mergeTokenObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 func initResultsAndValidators(
@@ -561,20 +566,18 @@ func getConsensusObservation(
 
 	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)
 
-	mergedCommitObservations := mergeCommitObservations(aos, fChain)
+	mergedCommitObservations := mergeCommitObservations(lggr, aos, fChain)
 
 	lggr.Debugw("merged commit observations", "mergedCommitObservations", mergedCommitObservations)
 
-	mergedMessageObservations := mergeMessageObservations(aos, fChain)
+	mergedMessageObservations := mergeMessageObservations(lggr, aos, fChain)
 	lggr.Debugw("merged message observations", "mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations, err := mergeTokenObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge token data observations: %w", err)
-	}
+	mergedTokenObservations := mergeTokenObservations(lggr, aos, fChain)
+
 	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
 
-	mergedHashes := mergeMessageHashes(aos, fChain)
+	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
 	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
 
 	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])

@@ -6,8 +6,6 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/stretchr/testify/require"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -1147,8 +1145,7 @@ func Test_mergeTokenDataObservation(t *testing.T) {
 				})
 			}
 
-			obs, err := mergeTokenObservations(ao, fChain)
-			require.NoError(t, err)
+			obs := mergeTokenObservations(logger.Test(t), ao, fChain)
 
 			for seqNum, exp := range tc.expected {
 				mtd, ok := obs[chainSelector][seqNum]
