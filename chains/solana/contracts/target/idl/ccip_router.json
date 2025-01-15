@@ -2188,6 +2188,10 @@
             "type": {
               "defined": "SolanaExtraArgs"
             }
+          },
+          {
+            "name": "onRampAddress",
+            "type": "bytes"
           }
         ]
       }
@@ -2503,7 +2507,17 @@
           },
           {
             "name": "onRamp",
-            "type": "bytes"
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    64
+                  ]
+                },
+                2
+              ]
+            }
           }
         ]
       }

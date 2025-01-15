@@ -108,6 +108,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 				{Pubkey: solana.SystemProgramID, IsWritable: false},
 			},
 		},
+		OnRampAddress: config.OnRampAddress,
 	}
 	return message
 }
