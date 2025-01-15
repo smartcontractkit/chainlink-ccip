@@ -10,15 +10,18 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::config::is_on_ramp_configured;
+use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
+use crate::v1::messages::ramps::is_writable;
 use crate::{
     Any2SolanaMessage, Any2SolanaRampMessage, BillingTokenConfigWrapper, CcipRouterError,
     CommitInput, CommitReport, CommitReportAccepted, CommitReportContext, DestChain,
     ExecuteReportContext, ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate,
     GlobalState, MessageExecutionState, OcrPluginType, RampMessageHeader,
-    SkippedAlreadyExecutedMessage, SolanaAccountMeta, SolanaTokenAmount, SourceChain,
-    TimestampedPackedU224, TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated,
-    CCIP_RECEIVE_DISCRIMINATOR, DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED,
-    EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    SkippedAlreadyExecutedMessage, SolanaTokenAmount, SourceChain, TimestampedPackedU224,
+    TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated, CCIP_RECEIVE_DISCRIMINATOR,
+    DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED,
+    FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
 
 pub fn commit<'info>(
@@ -31,6 +34,21 @@ pub fn commit<'info>(
 
     // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
+
+    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
+    let source_chain_state = &mut ctx.accounts.source_chain_state;
+
+    require!(
+        source_chain_state.config.is_enabled,
+        CcipRouterError::UnsupportedSourceChainSelector
+    );
+    require!(
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &report.merkle_root.on_ramp_address
+        ),
+        CcipRouterError::InvalidInputs
+    );
 
     // Check if the report contains price updates
     let empty_token_price_updates = report.price_updates.token_price_updates.is_empty();
@@ -110,14 +128,6 @@ pub fn commit<'info>(
             );
         }
     }
-
-    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
-
-    require!(
-        source_chain_state.config.is_enabled,
-        CcipRouterError::UnsupportedSourceChainSelector
-    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -342,7 +352,13 @@ fn internal_execute<'info>(
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
-    let on_ramp_address = &source_chain_state.config.on_ramp;
+    require!(
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &execution_report.message.on_ramp_address
+        ),
+        CcipRouterError::InvalidInputs
+    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -371,7 +387,7 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
-    let hashed_leaf = verify_merkle_root(&execution_report, on_ramp_address)?;
+    let hashed_leaf = verify_merkle_root(&execution_report)?;
 
     // send tokens any -> SOL
     require!(
@@ -468,7 +484,8 @@ fn internal_execute<'info>(
         let (msg_program, msg_accounts) = parse_messaging_accounts(
             &execution_report.token_indexes,
             execution_report.message.receiver,
-            execution_report.message.extra_args.accounts,
+            &execution_report.message.extra_args.accounts,
+            &execution_report.message.extra_args.is_writable_bitmap,
             ctx.remaining_accounts,
         )?;
 
@@ -545,7 +562,8 @@ fn should_execute_messaging(token_indexes: &[u8], remaining_accounts_empty: bool
 fn parse_messaging_accounts<'info>(
     token_indexes: &[u8],
     receiver: Pubkey,
-    source_accounts: Vec<SolanaAccountMeta>,
+    source_accounts: &[Pubkey],
+    source_bitmap: &u64,
     accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
     let end_ind = if token_indexes.is_empty() {
@@ -561,7 +579,7 @@ fn parse_messaging_accounts<'info>(
     let source_msg_accounts = &source_accounts[1..source_accounts.len()];
 
     require!(
-        source_program.pubkey == msg_program.key(),
+        *source_program == msg_program.key(),
         CcipRouterError::InvalidInputs,
     );
 
@@ -586,13 +604,11 @@ fn parse_messaging_accounts<'info>(
             CcipRouterError::InvalidInputs
         );
         for (i, acc) in source_msg_accounts.iter().enumerate() {
-            let current_acc = &msg_accounts[i + 1];
+            let current_acc = &msg_accounts[i + 1]; // TODO: remove offset by 1 to skip receiver after receiver refactor
+            require!(*acc == current_acc.key(), CcipRouterError::InvalidInputs);
             require!(
-                acc.pubkey == current_acc.key(),
-                CcipRouterError::InvalidInputs
-            );
-            require!(
-                acc.is_writable == current_acc.is_writable,
+                // TODO: remove offset by 1 to skip program after receiver refactor
+                is_writable(source_bitmap, (i + 1) as u8) == current_acc.is_writable,
                 CcipRouterError::InvalidInputs
             );
         }
@@ -614,11 +630,8 @@ fn build_receiver_discriminator_and_data(ramp_message: Any2SolanaMessage) -> Res
     Ok(data)
 }
 
-pub fn verify_merkle_root(
-    execution_report: &ExecutionReportSingleChain,
-    on_ramp_address: &[u8],
-) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message, on_ramp_address);
+pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {
+    let hashed_leaf = hash(&execution_report.message);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
@@ -668,12 +681,12 @@ pub fn validate_execution_report<'info>(
     Ok(())
 }
 
-fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
+fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
     use anchor_lang::solana_program::hash;
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
-    let on_ramp_address_size = [on_ramp_address.len() as u8];
+    let on_ramp_address_size = [msg.on_ramp_address.len() as u8];
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -682,32 +695,29 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // Extra Args struct
-    let extra_args_compute_units = msg.extra_args.compute_units.to_be_bytes();
-    let extra_args_accounts_len = [msg.extra_args.accounts.len() as u8];
-    let extra_args_accounts = msg.extra_args.accounts.try_to_vec().unwrap();
-
-    // TODO: Hash token amounts
-
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
-    // As similar as https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L402
+    // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
     let result = hash::hashv(&[
+        LEAF_DOMAIN_SEPARATOR.as_slice(),
+        // metadata hash
         "Any2SolanaMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size,
-        on_ramp_address,
+        &msg.on_ramp_address,
+        // message header
         &msg.header.message_id,
         &msg.receiver.to_bytes(),
         &header_sequence_number,
-        &extra_args_compute_units,
-        &extra_args_accounts_len,
-        &extra_args_accounts,
+        msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialized
         &header_nonce,
+        // message
         &sender_size,
         &msg.sender,
         &data_size.to_be_bytes(),
         &msg.data,
+        // token transfers
+        msg.token_amounts.try_to_vec().unwrap().as_ref(), // borsh serialized
     ]);
 
     result.to_bytes()
@@ -834,11 +844,13 @@ mod execution_state {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Any2SolanaRampMessage, SolanaExtraArgs};
+    use crate::{Any2SolanaRampMessage, Any2SolanaTokenTransfer, SolanaExtraArgs};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
+        let on_ramp_address = &[1, 2, 3].to_vec();
+
         let message = Any2SolanaRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -857,22 +869,30 @@ mod tests {
                 sequence_number: 89,
                 nonce: 90,
             },
-            token_amounts: [].to_vec(), // TODO: hash token amounts
+            token_amounts: [Any2SolanaTokenTransfer {
+                source_pool_address: vec![0, 1, 2, 3],
+                dest_token_address: Pubkey::try_from(
+                    "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
+                )
+                .unwrap(),
+                dest_gas_amount: 100,
+                extra_data: vec![4, 5, 6],
+                amount: [1; 32],
+            }]
+            .to_vec(),
             extra_args: SolanaExtraArgs {
                 compute_units: 1000,
-                accounts: vec![SolanaAccountMeta {
-                    pubkey: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
-                        .unwrap(),
-                    is_writable: true,
-                }],
+                is_writable_bitmap: 1,
+                accounts: vec![
+                    Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+                ],
             },
+            on_ramp_address: on_ramp_address.clone(),
         };
-
-        let on_ramp_address = &[1, 2, 3].to_vec();
-        let hash_result = hash(&message, on_ramp_address);
+        let hash_result = hash(&message);
 
         assert_eq!(
-            "03da97f96c82237d8a8ab0f68d4f7ba02afe188b4a876f348278fbf2226312ed",
+            "1636e87682c7622432edefeccae977d0e64f30251eee1b02e02b7156a58dfebf",
             hex::encode(hash_result)
         );
     }

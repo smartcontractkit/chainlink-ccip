@@ -117,8 +117,11 @@ func TestCCIPRouter(t *testing.T) {
 		return tokenBillingPda
 	}
 
+	onRampAddress := [64]byte{1, 2, 3}
+	emptyAddress := [64]byte{}
+
 	validSourceChainConfig := ccip_router.SourceChainConfig{
-		OnRamp:    config.OnRampAddress,
+		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
 		IsEnabled: true,
 	}
 	validDestChainConfig := ccip_router.DestChainConfig{
@@ -545,7 +548,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, config.OnRampAddress, sourceChainStateAccount.Config.OnRamp)
+			require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
 			var destChainStateAccount ccip_router.DestChain
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
@@ -557,10 +560,17 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When admin adds another chain selector it's also added on the list", func(t *testing.T) {
 			// Using another chain, solana as an example (which allows Solana -> Solana messages)
 			// Regardless of whether we allow Solana -> Solana in mainnet, it's easy to use for tests here
+
+			// the router is the Solana onramp
+			var paddedCcipRouterProgram [64]byte
+			copy(paddedCcipRouterProgram[:], config.CcipRouterProgram[:])
+
+			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
+
 			instruction, err := ccip_router.NewAddChainSelectorInstruction(
 				config.SolanaChainSelector,
 				ccip_router.SourceChainConfig{
-					OnRamp:    config.CcipRouterProgram[:], // the router is the Solana onramp
+					OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
 					IsEnabled: true,
 				},
 				ccip_router.DestChainConfig{
@@ -584,7 +594,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, config.CcipRouterProgram[:], sourceChainStateAccount.Config.OnRamp)
+			require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
 			var destChainStateAccount ccip_router.DestChain
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SolanaDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
@@ -2087,6 +2097,9 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.SequenceNumber)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.Nonce)
+			hash, err := ccip.HashSolanaToAnyMessage(ccipMessageSentEvent.Message)
+			require.NoError(t, err)
+			require.Equal(t, hash, ccipMessageSentEvent.Message.Header.MessageId[:])
 		})
 
 		t.Run("When sending a CCIP Message with ExtraArgs overrides Emits CCIPMessageSent", func(t *testing.T) {
@@ -4705,9 +4718,10 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 				message.Receiver = stubAccountPDA
 				sequenceNumber := message.Header.SequenceNumber
-				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					{Pubkey: config.CcipInvalidReceiverProgram},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
+				message.ExtraArgs.IsWritableBitmap = 0
+				message.ExtraArgs.Accounts = []solana.PublicKey{
+					config.CcipInvalidReceiverProgram,
+					solana.SystemProgramID,
 				}
 
 				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
@@ -5225,16 +5239,17 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 
 				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					{Pubkey: config.CcipReceiverProgram},
-					{Pubkey: config.ReceiverTargetAccountPDA, IsWritable: true},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
-					{Pubkey: config.CcipRouterProgram, IsWritable: false},
-					{Pubkey: config.RouterConfigPDA, IsWritable: false},
-					{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsWritable: true},
-					{Pubkey: config.EvmSourceChainStatePDA, IsWritable: true},
-					{Pubkey: receiverContractEvmPDA, IsWritable: true},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
+				message.ExtraArgs.IsWritableBitmap = 2 + 32 + 64 + 128
+				message.ExtraArgs.Accounts = []solana.PublicKey{
+					config.CcipReceiverProgram,
+					config.ReceiverTargetAccountPDA, // writable (index = 1)
+					solana.SystemProgramID,
+					config.CcipRouterProgram,
+					config.RouterConfigPDA,
+					config.ReceiverExternalExecutionConfigPDA, // writable (index = 5)
+					config.EvmSourceChainStatePDA,             // writable (index = 6)
+					receiverContractEvmPDA,                    // writable (index = 7)
+					solana.SystemProgramID,
 				}
 
 				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
@@ -5359,7 +5374,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := ccip.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 
