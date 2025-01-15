@@ -1345,8 +1345,10 @@ func (r *ccipChainReader) getOnRampDestChainConfig(
 				&resp,
 			)
 			if err != nil {
-				return fmt.Errorf("get onramp dest chain config, source chain: %d, dest chain: %d: %w",
-					chainSel, r.destChain, err)
+				return fmt.Errorf(
+					"get onramp dest chain config, source chain: %d: %w",
+					chainSel, err,
+				)
 			}
 			mu.Lock()
 			result[chainSel] = resp
