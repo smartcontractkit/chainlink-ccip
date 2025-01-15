@@ -43,7 +43,7 @@ pub fn calculate_token_pool_account_indices(
     Ok((start, end))
 }
 
-pub struct TokenAccounts<'a> {
+pub(super) struct TokenAccounts<'a> {
     pub user_token_account: &'a AccountInfo<'a>,
     pub token_billing_config: &'a AccountInfo<'a>,
     pub pool_chain_config: &'a AccountInfo<'a>,

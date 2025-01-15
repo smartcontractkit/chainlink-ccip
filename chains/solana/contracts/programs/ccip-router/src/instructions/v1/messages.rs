@@ -5,7 +5,7 @@ pub mod pools {
     use anchor_lang::prelude::*;
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct LockOrBurnInV1 {
+    pub(in super::super) struct LockOrBurnInV1 {
         pub receiver: Vec<u8>, //  The recipient of the tokens on the destination chain
         pub remote_chain_selector: u64, // The chain ID of the destination chain
         pub original_sender: Pubkey, // The original sender of the tx on the source chain
@@ -23,7 +23,7 @@ pub mod pools {
     }
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct ReleaseOrMintInV1 {
+    pub(in super::super) struct ReleaseOrMintInV1 {
         pub original_sender: Vec<u8>, //          The original sender of the tx on the source chain
         pub remote_chain_selector: u64, // ─╮ The chain ID of the source chain
         pub receiver: Pubkey, // ───────────╯ The Token Associated Account that will receive the tokens on the destination chain.
@@ -47,13 +47,13 @@ pub mod pools {
     }
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct LockOrBurnOutV1 {
+    pub(in super::super) struct LockOrBurnOutV1 {
         pub dest_token_address: Vec<u8>,
         pub dest_pool_data: Vec<u8>,
     }
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct ReleaseOrMintOutV1 {
+    pub(in super::super) struct ReleaseOrMintOutV1 {
         pub destination_amount: u64, // TODO: u256 on EVM?
     }
 }
@@ -70,7 +70,7 @@ pub mod ramps {
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-    pub struct Any2SolanaMessage {
+    pub(in super::super) struct Any2SolanaMessage {
         pub message_id: [u8; 32],
         pub source_chain_selector: u64,
         pub sender: Vec<u8>,

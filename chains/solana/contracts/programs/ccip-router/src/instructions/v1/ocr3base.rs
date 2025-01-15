@@ -17,7 +17,7 @@ pub const TRANSMIT_MSGDATA_EXTRA_CONSTANT_LENGTH_COMPONENT_FOR_SIGNATURES: u128 
 
 #[zero_copy]
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Default)]
-pub struct ReportContext {
+pub(super) struct ReportContext {
     // byte_words consists of:
     // [0]: ConfigDigest
     // [1]: 24 byte padding, 8 byte sequence number
@@ -232,7 +232,7 @@ fn assign_oracles<const A: usize>(oracles: &mut [[u8; A]], location: &mut [[u8; 
 }
 
 #[error_code]
-pub enum Ocr3Error {
+enum Ocr3Error {
     #[msg("Invalid config: F must be positive")]
     InvalidConfigFMustBePositive,
     #[msg("Invalid config: Too many transmitters")]
