@@ -165,12 +165,3 @@ pub struct ExtraArgsInput {
     pub gas_limit: Option<u128>,
     pub allow_out_of_order_execution: Option<bool>,
 }
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaMessage {
-    pub message_id: [u8; 32],
-    pub source_chain_selector: u64,
-    pub sender: Vec<u8>,
-    pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
-}

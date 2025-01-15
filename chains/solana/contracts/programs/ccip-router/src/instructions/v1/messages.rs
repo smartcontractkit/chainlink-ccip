@@ -63,11 +63,35 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage,
-        CHAIN_FAMILY_SELECTOR_EVM,
+        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage, SolanaTokenAmount,
+        CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
+
+    #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
+    pub struct Any2SolanaMessage {
+        pub message_id: [u8; 32],
+        pub source_chain_selector: u64,
+        pub sender: Vec<u8>,
+        pub data: Vec<u8>,
+        pub token_amounts: Vec<SolanaTokenAmount>,
+    }
+
+    /// Build the instruction data (discriminator + any other data)
+    impl Any2SolanaMessage {
+        pub fn build_receiver_discriminator_and_data(&self) -> Result<Vec<u8>> {
+            let m: std::result::Result<Vec<u8>, std::io::Error> = self.try_to_vec();
+            require!(m.is_ok(), CcipRouterError::InvalidMessage);
+            let message = m.unwrap();
+
+            let mut data = Vec::with_capacity(8);
+            data.extend_from_slice(&CCIP_RECEIVE_DISCRIMINATOR);
+            data.extend_from_slice(&message);
+
+            Ok(data)
+        }
+    }
 
     pub fn validate_solana2any(
         msg: &Solana2AnyMessage,

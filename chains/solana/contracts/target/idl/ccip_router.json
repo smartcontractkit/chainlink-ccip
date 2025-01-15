@@ -1995,6 +1995,43 @@
       }
     },
     {
+      "name": "Any2SolanaMessage",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "messageId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "sourceChainSelector",
+            "type": "u64"
+          },
+          {
+            "name": "sender",
+            "type": "bytes"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "tokenAmounts",
+            "type": {
+              "vec": {
+                "defined": "SolanaTokenAmount"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "ReportContext",
       "type": {
         "kind": "struct",
@@ -2365,43 +2402,6 @@
             "name": "allowOutOfOrderExecution",
             "type": {
               "option": "bool"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "Any2SolanaMessage",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "messageId",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          },
-          {
-            "name": "sourceChainSelector",
-            "type": "u64"
-          },
-          {
-            "name": "sender",
-            "type": "bytes"
-          },
-          {
-            "name": "data",
-            "type": "bytes"
-          },
-          {
-            "name": "tokenAmounts",
-            "type": {
-              "vec": {
-                "defined": "SolanaTokenAmount"
-              }
             }
           }
         ]

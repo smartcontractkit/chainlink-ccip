@@ -430,6 +430,72 @@ func (obj *ReleaseOrMintOutV1) UnmarshalWithDecoder(decoder *ag_binary.Decoder) 
 	return nil
 }
 
+type Any2SolanaMessage struct {
+	MessageId           [32]uint8
+	SourceChainSelector uint64
+	Sender              []byte
+	Data                []byte
+	TokenAmounts        []SolanaTokenAmount
+}
+
+func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
+	// Serialize `MessageId` param:
+	err = encoder.Encode(obj.MessageId)
+	if err != nil {
+		return err
+	}
+	// Serialize `SourceChainSelector` param:
+	err = encoder.Encode(obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Serialize `Sender` param:
+	err = encoder.Encode(obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Serialize `Data` param:
+	err = encoder.Encode(obj.Data)
+	if err != nil {
+		return err
+	}
+	// Serialize `TokenAmounts` param:
+	err = encoder.Encode(obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
+	// Deserialize `MessageId`:
+	err = decoder.Decode(&obj.MessageId)
+	if err != nil {
+		return err
+	}
+	// Deserialize `SourceChainSelector`:
+	err = decoder.Decode(&obj.SourceChainSelector)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Sender`:
+	err = decoder.Decode(&obj.Sender)
+	if err != nil {
+		return err
+	}
+	// Deserialize `Data`:
+	err = decoder.Decode(&obj.Data)
+	if err != nil {
+		return err
+	}
+	// Deserialize `TokenAmounts`:
+	err = decoder.Decode(&obj.TokenAmounts)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type ReportContext struct {
 	ByteWords [3][32]uint8
 }
@@ -1172,72 +1238,6 @@ func (obj *ExtraArgsInput) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err
 				return err
 			}
 		}
-	}
-	return nil
-}
-
-type Any2SolanaMessage struct {
-	MessageId           [32]uint8
-	SourceChainSelector uint64
-	Sender              []byte
-	Data                []byte
-	TokenAmounts        []SolanaTokenAmount
-}
-
-func (obj Any2SolanaMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `MessageId` param:
-	err = encoder.Encode(obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Serialize `SourceChainSelector` param:
-	err = encoder.Encode(obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Serialize `Sender` param:
-	err = encoder.Encode(obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Serialize `Data` param:
-	err = encoder.Encode(obj.Data)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenAmounts` param:
-	err = encoder.Encode(obj.TokenAmounts)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *Any2SolanaMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `MessageId`:
-	err = decoder.Decode(&obj.MessageId)
-	if err != nil {
-		return err
-	}
-	// Deserialize `SourceChainSelector`:
-	err = decoder.Decode(&obj.SourceChainSelector)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Sender`:
-	err = decoder.Decode(&obj.Sender)
-	if err != nil {
-		return err
-	}
-	// Deserialize `Data`:
-	err = decoder.Decode(&obj.Data)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenAmounts`:
-	err = decoder.Decode(&obj.TokenAmounts)
-	if err != nil {
-		return err
 	}
 	return nil
 }
