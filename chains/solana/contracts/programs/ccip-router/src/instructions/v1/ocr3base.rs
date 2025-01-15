@@ -113,12 +113,12 @@ fn clear_transmitters(ocr3_config: &mut Ocr3Config) {
     ocr3_config.transmitters = [[0; 32]; MAX_TRANSMITTERS]
 }
 
-pub trait Ocr3Report {
+pub(super) trait Ocr3Report {
     fn hash(&self, ctx: &ReportContext) -> [u8; 32];
     fn len(&self) -> usize;
 }
 
-pub fn ocr3_transmit<R: Ocr3Report>(
+pub(super) fn ocr3_transmit<R: Ocr3Report>(
     ocr3_config: &Ocr3Config,
     instruction_sysvar: &AccountInfo<'_>,
     transmitter: Pubkey,

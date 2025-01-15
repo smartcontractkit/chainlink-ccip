@@ -57,7 +57,7 @@ pub(super) struct TokenAccounts<'a> {
     pub remaining_accounts: &'a [AccountInfo<'a>],
 }
 
-pub fn validate_and_parse_token_accounts<'info>(
+pub(super) fn validate_and_parse_token_accounts<'info>(
     user: Pubkey,
     chain_selector: u64,
     router: Pubkey,
