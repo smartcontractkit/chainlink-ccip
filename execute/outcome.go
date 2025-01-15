@@ -34,7 +34,10 @@ func (p *Plugin) Outcome(
 		return nil, fmt.Errorf("unable to decode previous outcome: %w", err)
 	}
 
-	decodedAos := decodeAttributedObservations(p.lggr, aos)
+	decodedAos, err := decodeAttributedObservations(aos)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode observations: %w", err)
+	}
 
 	// discovery processor disabled by setting it to nil.
 	if p.discovery != nil {

@@ -616,13 +616,16 @@ func Test_decodeAttributedObservations(t *testing.T) {
 					Observation: []byte("invalid"),
 				},
 			},
-			want:    []plugincommon.AttributedObservation[exectypes.Observation]{},
-			wantErr: assert.NoError,
+			want:    nil,
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := decodeAttributedObservations(logger.Test(t), tt.args)
+			got, err := decodeAttributedObservations(tt.args)
+			if !tt.wantErr(t, err, fmt.Sprintf("decodeAttributedObservations(%v)", tt.args)) {
+				return
+			}
 			assert.Equalf(t, tt.want, got, "decodeAttributedObservations(%v)", tt.args)
 		})
 	}

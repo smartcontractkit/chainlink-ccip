@@ -330,26 +330,18 @@ func TestPlugin_Outcome_DestFChainNotAvailable(t *testing.T) {
 
 func TestPlugin_Outcome_BadObservationEncoding(t *testing.T) {
 	ctx := tests.Context(t)
-	mockHomeChain := reader_mock.NewMockHomeChain(t)
-	expectedFChain := map[cciptypes.ChainSelector]int{
-		0: 1,
-		2: 2,
-	}
-	mockHomeChain.EXPECT().GetFChain().Return(expectedFChain, nil)
-
 	p := &Plugin{
-		lggr:      logger.Test(t),
-		homeChain: mockHomeChain,
+		lggr: logger.Test(t),
 	}
-	outcome, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
+	_, err := p.Outcome(ctx, ocr3types.OutcomeContext{}, nil,
 		[]types.AttributedObservation{
 			{
 				Observation: []byte("not a valid observation"),
 				Observer:    0,
 			},
 		})
-	require.NoError(t, err)
-	require.Len(t, outcome, 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unable to decode observations: invalid character")
 }
 
 func TestPlugin_Outcome_BelowF(t *testing.T) {

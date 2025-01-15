@@ -244,28 +244,20 @@ func filterOutExecutedMessages(
 }
 
 func decodeAttributedObservations(
-	lggr logger.Logger,
 	aos []types.AttributedObservation,
-) []plugincommon.AttributedObservation[exectypes.Observation] {
-	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], 0)
-	for _, ao := range aos {
+) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
+	decoded := make([]plugincommon.AttributedObservation[exectypes.Observation], len(aos))
+	for i, ao := range aos {
 		observation, err := exectypes.DecodeObservation(ao.Observation)
-
 		if err != nil {
-			lggr.Errorw("failed to decode observation",
-				"observer", ao.Observer,
-				"error", err,
-			)
-			continue
+			return nil, err
 		}
-		decoded = append(decoded,
-			plugincommon.AttributedObservation[exectypes.Observation]{
-				Observation: observation,
-				OracleID:    ao.Observer,
-			},
-		)
+		decoded[i] = plugincommon.AttributedObservation[exectypes.Observation]{
+			Observation: observation,
+			OracleID:    ao.Observer,
+		}
 	}
-	return decoded
+	return decoded, nil
 }
 
 func mergeMessageObservations(
