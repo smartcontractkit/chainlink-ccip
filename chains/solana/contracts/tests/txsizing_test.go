@@ -183,8 +183,9 @@ func TestTransactionSizing(t *testing.T) {
 			Receiver:     [32]byte{},
 			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{},
 			ExtraArgs: ccip_router.SolanaExtraArgs{
-				ComputeUnits: 0,
-				Accounts:     []ccip_router.SolanaAccountMeta{},
+				ComputeUnits:     0,
+				IsWritableBitmap: 0,
+				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
@@ -213,8 +214,9 @@ func TestTransactionSizing(t *testing.T) {
 				Amount:            [32]uint8{},
 			}},
 			ExtraArgs: ccip_router.SolanaExtraArgs{
-				ComputeUnits: 0,
-				Accounts:     []ccip_router.SolanaAccountMeta{},
+				ComputeUnits:     0,
+				IsWritableBitmap: 0,
+				Accounts:         []solana.PublicKey{},
 			},
 		},
 		OffchainTokenData: [][]byte{},
