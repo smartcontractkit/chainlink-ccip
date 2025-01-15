@@ -97,6 +97,7 @@ pub fn disable_source_chain_selector(
 
     chain_state.config.is_enabled = false;
 
+    // todo: more specific event type, maybe SourceChainDisabled?
     emit!(SourceChainConfigUpdated {
         source_chain_selector,
         source_chain_config: chain_state.config.clone(),
@@ -113,6 +114,7 @@ pub fn disable_dest_chain_selector(
 
     chain_state.config.is_enabled = false;
 
+    // todo: more specific event type, maybe DestChainDisabled?
     emit!(DestChainConfigUpdated {
         dest_chain_selector,
         dest_chain_config: chain_state.config.clone(),
