@@ -1376,7 +1376,7 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 
 type SourceChainConfig struct {
 	IsEnabled bool
-	OnRamp    []byte
+	OnRamp    [2][64]uint8
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {

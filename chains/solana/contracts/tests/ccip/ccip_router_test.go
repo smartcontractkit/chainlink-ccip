@@ -118,9 +118,10 @@ func TestCCIPRouter(t *testing.T) {
 	}
 
 	onRampAddress := [64]byte{1, 2, 3}
+	emptyAddress := [64]byte{}
 
 	validSourceChainConfig := ccip_router.SourceChainConfig{
-		OnRamp:    onRampAddress[:],
+		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
 		IsEnabled: true,
 	}
 	validDestChainConfig := ccip_router.DestChainConfig{
@@ -547,7 +548,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, config.OnRampAddressPadded[:], sourceChainStateAccount.Config.OnRamp)
+			require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
 			var destChainStateAccount ccip_router.DestChain
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
@@ -564,10 +565,12 @@ func TestCCIPRouter(t *testing.T) {
 			var paddedCcipRouterProgram [64]byte
 			copy(paddedCcipRouterProgram[:], config.CcipRouterProgram[:])
 
+			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
+
 			instruction, err := ccip_router.NewAddChainSelectorInstruction(
 				config.SolanaChainSelector,
 				ccip_router.SourceChainConfig{
-					OnRamp:    paddedCcipRouterProgram[:], // the source on ramp address must be padded, as this value is an array of 64 bytes
+					OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
 					IsEnabled: true,
 				},
 				ccip_router.DestChainConfig{
@@ -591,7 +594,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, paddedCcipRouterProgram[:][:], sourceChainStateAccount.Config.OnRamp)
+			require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
 			var destChainStateAccount ccip_router.DestChain
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SolanaDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)

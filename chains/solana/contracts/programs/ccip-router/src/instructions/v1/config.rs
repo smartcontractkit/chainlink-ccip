@@ -1,177 +1,79 @@
-use anchor_lang::{error::Error, require};
+use crate::SourceChainConfig;
 
-use crate::{CcipRouterError, SourceChainConfig};
+pub fn get_on_ramps(config: &SourceChainConfig) -> Vec<&[u8]> {
+    let first_item = trim_trailing_zeros(&config.on_ramp[0]);
+    let second_item = trim_trailing_zeros(&config.on_ramp[1]);
 
-pub fn is_valid_on_ramp(config: &SourceChainConfig) -> bool {
-    let len = config.on_ramp.len();
+    let mut on_ramps: Vec<&[u8]> = Vec::new();
 
-    len == 0 || len == 64 || len == 128
-}
+    // filter out empty values
+    if !first_item.is_empty() {
+        on_ramps.push(first_item);
+    }
+    if !second_item.is_empty() {
+        on_ramps.push(second_item);
+    }
 
-pub fn get_on_ramps(config: &SourceChainConfig) -> Result<Vec<[u8; 64]>, Error> {
-    require!(is_valid_on_ramp(config), CcipRouterError::InvalidInputs);
-
-    let valid_on_ramps: Vec<[u8; 64]> = match config.on_ramp.len() {
-        0 => Vec::new(),
-        64 => vec![config.on_ramp[0..64]
-            .try_into()
-            .map_err(|_| CcipRouterError::InvalidInputs)?],
-        128 => vec![
-            config.on_ramp[0..64]
-                .try_into()
-                .map_err(|_| CcipRouterError::InvalidInputs)?,
-            config.on_ramp[64..128]
-                .try_into()
-                .map_err(|_| CcipRouterError::InvalidInputs)?,
-        ],
-        _ => return Err(CcipRouterError::InvalidInputs.into()),
-    };
-    Ok(valid_on_ramps)
+    on_ramps
 }
 
 pub fn is_on_ramp_configured(config: &SourceChainConfig, on_ramp: &[u8]) -> bool {
-    let mut on_ramp_bytes = [0u8; 64];
-    let len = on_ramp.len().min(64);
-    on_ramp_bytes[..len].copy_from_slice(&on_ramp[..len]);
-
     let valid_on_ramps = get_on_ramps(config);
-    if valid_on_ramps.is_err() {
-        return false;
-    }
-    valid_on_ramps.unwrap().contains(&on_ramp_bytes)
+
+    valid_on_ramps.contains(&on_ramp)
 }
 
-#[allow(dead_code)]
-fn trim_leading_zeros(input: &[u8]) -> &[u8] {
-    let start = input
+fn trim_trailing_zeros(input: &[u8]) -> &[u8] {
+    let end = input
         .iter()
-        .position(|&byte| byte != 0)
-        .unwrap_or(input.len());
-    &input[start..]
+        .rposition(|&byte| byte != 0)
+        .map_or(0, |pos| pos + 1);
+    &input[..end]
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::CcipRouterError;
 
     use super::*;
 
     #[test]
-    fn test_is_valid_on_ramp() {
-        struct SourceChainTestCase {
-            config: SourceChainConfig,
-            expected: bool,
-        }
-
-        let cases = vec![
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![],
-                    is_enabled: true,
-                },
-                expected: true,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 64],
-                    is_enabled: true,
-                },
-                expected: true,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 128],
-                    is_enabled: true,
-                },
-                expected: true,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 1],
-                    is_enabled: true,
-                },
-                expected: false,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 63],
-                    is_enabled: true,
-                },
-                expected: false,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 65],
-                    is_enabled: true,
-                },
-                expected: false,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 127],
-                    is_enabled: true,
-                },
-                expected: false,
-            },
-            SourceChainTestCase {
-                config: SourceChainConfig {
-                    on_ramp: vec![0; 129],
-                    is_enabled: true,
-                },
-                expected: false,
-            },
-        ];
-
-        for case in cases {
-            let result = is_valid_on_ramp(&case.config);
-            assert_eq!(
-                result,
-                case.expected,
-                "Failed for on_ramp length: {}",
-                case.config.on_ramp.len()
-            );
-        }
-    }
-
-    #[test]
     fn test_get_on_ramps() {
-        struct TestCase {
-            on_ramp: Vec<u8>,
-            expected: Result<Vec<[u8; 64]>, Error>,
+        struct TestCase<'a> {
+            on_ramp: [[u8; 64]; 2],
+            expected: Vec<&'a [u8]>,
         }
+
+        let address_4: [u8; 64] = {
+            let mut array = [0; 64];
+            array[..32].copy_from_slice(&[4; 32]);
+            array[32..].copy_from_slice(&[0; 32]);
+            array
+        };
 
         let cases = vec![
             TestCase {
-                on_ramp: vec![],
-                expected: Ok(Vec::new()),
+                on_ramp: [[0; 64], [0; 64]],
+                expected: vec![],
             },
             TestCase {
-                on_ramp: vec![1; 64],
-                expected: Ok(vec![[1; 64]]),
+                on_ramp: [[1; 64], [0; 64]],
+                expected: vec![&[1; 64]],
             },
             TestCase {
-                on_ramp: [vec![2; 64], vec![3; 64]].concat(),
-                expected: Ok(vec![[2; 64], [3; 64]]),
+                on_ramp: [[0; 64], [1; 64]],
+                expected: vec![&[1; 64]],
             },
             TestCase {
-                on_ramp: vec![3; 1],
-                expected: Err(CcipRouterError::InvalidInputs.into()),
+                on_ramp: [[2; 64], [3; 64]],
+                expected: vec![&[2; 64], &[3; 64]],
             },
             TestCase {
-                on_ramp: vec![4; 63],
-                expected: Err(CcipRouterError::InvalidInputs.into()),
+                on_ramp: [address_4, [0; 64]],
+                expected: vec![&[4; 32]],
             },
             TestCase {
-                on_ramp: vec![5; 65],
-                expected: Err(CcipRouterError::InvalidInputs.into()),
-            },
-            TestCase {
-                on_ramp: vec![6; 127],
-                expected: Err(CcipRouterError::InvalidInputs.into()),
-            },
-            TestCase {
-                on_ramp: vec![7; 129],
-                expected: Err(CcipRouterError::InvalidInputs.into()),
+                on_ramp: [[0; 64], address_4],
+                expected: vec![&[4; 32]],
             },
         ];
 
@@ -182,10 +84,9 @@ mod tests {
             };
             let result = get_on_ramps(&config);
             assert_eq!(
-                result,
-                case.expected,
-                "Failed for on_ramp length: {}",
-                config.on_ramp.len()
+                result, case.expected,
+                "Failed on get_on_ramps for config: {:?}",
+                config.on_ramp
             );
         }
     }
@@ -193,16 +94,29 @@ mod tests {
     #[test]
     fn test_is_on_ramp_configured() {
         struct ConfigTestCase {
-            config_on_ramps: Vec<u8>,
+            config_on_ramps: [[u8; 64]; 2],
             given_on_ramp: Vec<u8>,
             expected: bool,
         }
 
-        let empty_config = vec![];
-        let one_address_config = vec![1; 64];
-        let two_addresses_config = [vec![2; 64], vec![3; 64]].concat();
-        let two_smaller_addresses_config =
-            [vec![4; 32], vec![0; 32], vec![5; 32], vec![0; 32]].concat();
+        let address_4: [u8; 64] = {
+            let mut array = [0; 64];
+            array[..32].copy_from_slice(&[4; 32]);
+            array[32..].copy_from_slice(&[0; 32]);
+            array
+        };
+
+        let address_5: [u8; 64] = {
+            let mut array = [0; 64];
+            array[..32].copy_from_slice(&[5; 32]);
+            array[32..].copy_from_slice(&[0; 32]);
+            array
+        };
+
+        let empty_config = [[0; 64], [0; 64]];
+        let one_address_config = [[1; 64], [0; 64]];
+        let two_addresses_config = [[2; 64], [3; 64]];
+        let two_smaller_addresses_config = [address_4, address_5];
 
         let cases = vec![
             // No address configured
@@ -296,21 +210,26 @@ mod tests {
     }
 
     #[test]
-    fn test_trim_leading_zeros() {
+    fn test_trim_trailing_zeros() {
+        // only right padding is removed
         let input = vec![0, 0, 0, 1, 2, 3];
+        let expected_output = &[0, 0, 0, 1, 2, 3];
+        assert_eq!(trim_trailing_zeros(&input), expected_output);
+
+        let input = vec![1, 2, 3, 0, 0, 0];
         let expected_output = &[1, 2, 3];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
+        assert_eq!(trim_trailing_zeros(&input), expected_output);
 
         let input = vec![1, 2, 3];
         let expected_output = &[1, 2, 3];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
+        assert_eq!(trim_trailing_zeros(&input), expected_output);
 
         let input = vec![0, 0, 0];
         let expected_output: &[u8] = &[];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
+        assert_eq!(trim_trailing_zeros(&input), expected_output);
 
         let input = vec![];
         let expected_output: &[u8] = &[];
-        assert_eq!(trim_leading_zeros(&input), expected_output);
+        assert_eq!(trim_trailing_zeros(&input), expected_output);
     }
 }

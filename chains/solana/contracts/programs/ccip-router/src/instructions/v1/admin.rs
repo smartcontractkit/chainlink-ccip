@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
-use crate::v1::config::is_valid_on_ramp;
 use crate::{
     AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
     DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
@@ -349,9 +348,10 @@ pub fn withdraw_billed_funds(
 
 fn validate_source_chain_config(
     _source_chain_selector: u64,
-    config: &SourceChainConfig,
+    _config: &SourceChainConfig,
 ) -> Result<()> {
-    require!(is_valid_on_ramp(config), CcipRouterError::InvalidInputs);
+    // As of now, the config has very few properties and there is nothing to validate yet.
+    // This is a placeholder to add validations as that config object grows.
     Ok(())
 }
 
