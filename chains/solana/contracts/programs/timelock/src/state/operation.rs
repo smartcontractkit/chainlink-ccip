@@ -40,15 +40,9 @@ impl Operation {
     }
 
     pub fn hash_instructions(&self, salt: [u8; HASH_BYTES]) -> [u8; HASH_BYTES] {
-        let total_size = self
-            .instructions
-            .iter()
-            .map(|ix_data: &InstructionData| {
-                // length prefixes for instruction array + accounts array + data
-                4 + 4 + 4 + ix_data.space()
-            })
-            .sum::<usize>()
-            + HASH_BYTES * 2; // add predecessor and salt
+        let total_size = self.instructions.iter().map(|ix| ix.space()).sum::<usize>()
+            + HASH_BYTES * 2 // predecessor and salt
+            + 4; // instruction array prefix
 
         let mut encoded_data = Vec::with_capacity(total_size);
 
