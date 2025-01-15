@@ -122,8 +122,10 @@ type Message struct {
 	// This is encoded in the destination chain family specific encoding.
 	// i.e if the destination is EVM, this is abi.encode(receiver).
 	Receiver UnknownAddress `json:"receiver"`
-	// ExtraArgs is destination-chain specific extra args, such as the gasLimit for EVM chains.
+	// ExtraArgs is destination-chain specific extra args, such as the gasLimit for EVM chains. This field is encoded in the source chain encoding scheme.
 	ExtraArgs Bytes `json:"extraArgs"`
+	// ExtraArgsDecoded is same as ExtraArgs, just decoded into a named collection of arguments in a generic format, which can be read by any destination chain family.
+	ExtraArgsDecoded map[string]any
 	// FeeToken is the fee token address.
 	// i.e if the source chain is EVM, len(FeeToken) == 20 (i.e, is not abi-encoded).
 	FeeToken UnknownAddress `json:"feeToken"`
