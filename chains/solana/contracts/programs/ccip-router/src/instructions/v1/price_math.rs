@@ -1,9 +1,8 @@
 use std::ops::{Add, AddAssign, Mul};
 
-use anchor_lang::prelude::*;
 use ethnum::U256;
 
-use crate::{CcipRouterError, SolanaTokenAmount};
+use crate::{SolanaTokenAmount, TimestampedPackedU224};
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;
@@ -24,6 +23,10 @@ impl Usd18Decimals {
 
     pub fn from_usd_cents(cents: u32) -> Self {
         Self(U256::new(cents.into()) * 1u32.e(16))
+    }
+
+    pub fn from_token_amount(sta: &SolanaTokenAmount, price: &Usd18Decimals) -> Self {
+        Usd18Decimals(U256::new(sta.amount.into()) * price.0 / 1u32.e(18))
     }
 }
 
@@ -50,17 +53,10 @@ impl Mul<U256> for Usd18Decimals {
     }
 }
 
-impl SolanaTokenAmount {
-    pub fn value(&self, price: &Usd18Decimals) -> Usd18Decimals {
-        Usd18Decimals((U256::new(self.amount.into()) * price.0) / 1u32.e(18))
-    }
-
-    pub fn amount(token: Pubkey, value: Usd18Decimals, price: Usd18Decimals) -> Result<Self> {
-        Ok(Self {
-            token,
-            amount: (value.0 / price.0)
-                .try_into()
-                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
-        })
+impl From<&TimestampedPackedU224> for Usd18Decimals {
+    fn from(tpu: &TimestampedPackedU224) -> Self {
+        let mut u256_buffer = [0u8; 32];
+        u256_buffer[4..32].clone_from_slice(&tpu.value);
+        Usd18Decimals(U256::from_be_bytes(u256_buffer))
     }
 }

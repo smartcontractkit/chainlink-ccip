@@ -2087,6 +2087,9 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, uint64(21), ccipMessageSentEvent.Message.Header.DestChainSelector)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.SequenceNumber)
 			require.Equal(t, uint64(1), ccipMessageSentEvent.Message.Header.Nonce)
+			hash, err := ccip.HashSolanaToAnyMessage(ccipMessageSentEvent.Message)
+			require.NoError(t, err)
+			require.Equal(t, hash, ccipMessageSentEvent.Message.Header.MessageId[:])
 		})
 
 		t.Run("When sending a CCIP Message with ExtraArgs overrides Emits CCIPMessageSent", func(t *testing.T) {
@@ -5359,7 +5362,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SysVarInstructionsPubkey,
 				).ValidateAndBuild()
 				require.NoError(t, err)
-				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment)
+				tx := testutils.SendAndConfirm(ctx, t, solanaGoClient, []solana.Instruction{instruction}, transmitter, config.DefaultCommitment, common.AddComputeUnitLimit(300_000))
 				event := ccip.EventCommitReportAccepted{}
 				require.NoError(t, common.ParseEvent(tx.Meta.LogMessages, "CommitReportAccepted", &event, config.PrintEvents))
 

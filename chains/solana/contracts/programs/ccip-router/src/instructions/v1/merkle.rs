@@ -1,5 +1,6 @@
 use anchor_lang::solana_program::hash;
 
+pub const LEAF_DOMAIN_SEPARATOR: [u8; 32] = [0; 32];
 const MAX_NUM_HASHES: usize = 128; // TODO: Change this to 256 when supporting commit reports with 256 messages
 
 #[derive(Debug)]
