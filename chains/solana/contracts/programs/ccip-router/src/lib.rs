@@ -53,6 +53,7 @@ pub mod ccip_router {
     /// * `default_gas_limit` - The default gas limit for other destination chains.
     /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
         solana_chain_selector: u64,

@@ -649,7 +649,7 @@ pub mod tests {
             })
             .collect();
 
-        let tokens: Vec<_> = tokens.into_iter().map(|t| Some(t)).collect();
+        let tokens: Vec<_> = tokens.into_iter().map(Some).collect();
         let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
 
