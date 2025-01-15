@@ -22,6 +22,8 @@ import (
 
 // Outcome collects the reports from the two phases and constructs the final outcome. Part of the outcome is a fully
 // formed report that will be encoded for final transmission in the reporting phase.
+//
+//nolint:gocyclo
 func (p *Plugin) Outcome(
 	ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation,
 ) (ocr3types.Outcome, error) {
