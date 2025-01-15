@@ -3,6 +3,7 @@ package timelock
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/gagliardetto/solana-go"
 
@@ -92,7 +93,11 @@ func (op *Operation) RemainingAccounts() []*solana.AccountMeta {
 
 // hash the operation and return operation id
 func (op *Operation) OperationID() [32]byte {
-	return hashOperation(op.ToInstructionData(), op.Predecessor, op.Salt)
+	id, err := hashOperation(op.ToInstructionData(), op.Predecessor, op.Salt)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 func (op *Operation) OperationPDA() solana.PublicKey {
@@ -123,32 +128,42 @@ func convertToInstructionData(ix solana.Instruction) (timelock.InstructionData, 
 	}, nil
 }
 
-func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte, salt [32]byte) [32]byte {
+func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte, salt [32]byte) ([32]byte, error) {
 	var encodedData bytes.Buffer
 	// length prefix for instructions
-	binary.Write(&encodedData, binary.LittleEndian, uint32(len(instructions)))
-
-	boolToByte := func(b bool) byte {
-		if b {
-			return 1
-		}
-		return 0
+	//nolint:gosec
+	if err := binary.Write(&encodedData, binary.LittleEndian, uint32(len(instructions))); err != nil {
+		return [32]byte{}, fmt.Errorf("encoding instructions length: %w", err)
 	}
 
 	for _, ix := range instructions {
 		encodedData.Write(ix.ProgramId[:])
 
 		// length prefix for accounts array
-		binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Accounts)))
+		//nolint:gosec
+		if err := binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Accounts))); err != nil {
+			return [32]byte{}, fmt.Errorf("encoding accounts length: %w", err)
+		}
 
 		for _, acc := range ix.Accounts {
 			encodedData.Write(acc.Pubkey[:])
-			encodedData.WriteByte(boolToByte(acc.IsSigner))
-			encodedData.WriteByte(boolToByte(acc.IsWritable))
+			if acc.IsSigner {
+				encodedData.WriteByte(1)
+			} else {
+				encodedData.WriteByte(0)
+			}
+			if acc.IsWritable {
+				encodedData.WriteByte(1)
+			} else {
+				encodedData.WriteByte(0)
+			}
 		}
 
 		// length prefix for instruction data
-		binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Data)))
+		//nolint:gosec
+		if err := binary.Write(&encodedData, binary.LittleEndian, uint32(len(ix.Data))); err != nil {
+			return [32]byte{}, fmt.Errorf("encoding data length: %w", err)
+		}
 		encodedData.Write(ix.Data)
 	}
 
@@ -159,5 +174,5 @@ func hashOperation(instructions []timelock.InstructionData, predecessor [32]byte
 
 	var hash [32]byte
 	copy(hash[:], result)
-	return hash
+	return hash, nil
 }
