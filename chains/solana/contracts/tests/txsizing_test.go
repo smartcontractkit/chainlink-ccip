@@ -109,6 +109,7 @@ func TestTransactionSizing(t *testing.T) {
 			routerTable["billingTokenProgram"],
 			routerTable["billingTokenMint"],
 			routerTable["billingTokenConfig"],
+			mustRandomPubkey(), // link billing config
 			mustRandomPubkey(), // user billing token ATA
 			routerTable["routerBillingTokenATA"],
 			routerTable["routerBillingSigner"],
