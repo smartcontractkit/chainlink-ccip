@@ -57,7 +57,7 @@ pipelines:
     run: |-
       if [ "$PROVIDER" == "kind" ]; then
         run_dependency_pipelines kind-core
-        if [ "ENABLE_MONITORING" == "true" ]; then
+        if [ "$ENABLE_MONITORING" == "true" ]; then
           run_dependency_pipelines kind-monitoring
         fi
       fi
