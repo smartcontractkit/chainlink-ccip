@@ -10,10 +10,11 @@ use super::pools::{
     validate_and_parse_token_accounts, TokenAccounts,
 };
 
+use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
 use crate::{
-    AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
-    ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, Solana2AnyMessage,
-    Solana2AnyRampMessage, Solana2AnyTokenTransfer, SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
+    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, GetFee,
+    Nonce, RampMessageHeader, Solana2AnyMessage, Solana2AnyRampMessage, Solana2AnyTokenTransfer,
+    SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
 };
 
 pub fn get_fee<'info>(
@@ -36,14 +37,14 @@ pub fn get_fee<'info>(
         .iter()
         .zip(message.token_amounts.iter())
         .map(|(a, SolanaTokenAmount { token, .. })| {
-            BillingTokenConfig::validated_try_from(a, *token)
+            validated_try_to::billing_token_config(a, *token)
         })
         .collect::<Result<Vec<_>>>()?;
     let per_chain_per_token_config_accounts = per_chain_per_token_config_accounts
         .iter()
         .zip(message.token_amounts.iter())
         .map(|(a, SolanaTokenAmount { token, .. })| {
-            PerChainPerTokenConfig::validated_try_from(a, *token, dest_chain_selector)
+            validated_try_to::per_chain_per_token_config(a, *token, dest_chain_selector)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -95,13 +96,13 @@ pub fn ccip_send<'info>(
 
     let token_billing_config_accounts = accounts_per_sent_token
         .iter()
-        .map(|accs| BillingTokenConfig::validated_try_from(accs.fee_token_config, accs.mint.key()))
+        .map(|accs| validated_try_to::billing_token_config(accs.fee_token_config, accs.mint.key()))
         .collect::<Result<Vec<_>>>()?;
 
     let per_chain_per_token_config_accounts = accounts_per_sent_token
         .iter()
         .map(|accs| {
-            PerChainPerTokenConfig::validated_try_from(
+            validated_try_to::per_chain_per_token_config(
                 accs.token_billing_config,
                 accs.mint.key(),
                 dest_chain_selector,
@@ -139,7 +140,7 @@ pub fn ccip_send<'info>(
         };
 
         transfer_fee(
-            fee,
+            &fee,
             ctx.accounts.fee_token_program.to_account_info(),
             transfer,
             ctx.accounts.fee_token_mint.decimals,
@@ -181,6 +182,7 @@ pub fn ccip_send<'info>(
         },
         extra_args,
         fee_token: message.fee_token,
+        fee_token_amount: fee.amount,
         token_amounts: vec![Solana2AnyTokenTransfer::default(); token_count],
     };
 
@@ -298,16 +300,6 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
 }
 
 fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
-    // TODO: Modify this hash to be similar to the one in EVM
-    // https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/libraries/Internal.sol#L129
-    // Fixed-size message fields are included in nested hash to reduce stack pressure.
-    // - metadata_hash =  sha256("Solana2AnyMessageHashV1", solana_chain_selector, dest_chain_selector, ccip_router_program_id))
-    // - first_part = sha256(sender, sequence_number, nonce, fee_token, fee_token_amount)
-    // - receiver
-    // - message.data
-    // - token_amounts
-    // - extra_args
-
     use anchor_lang::solana_program::hash;
 
     // Push Data Size to ensure that the hash is unique
@@ -325,18 +317,136 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
         [msg.extra_args.allow_out_of_order_execution as u8];
 
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
+    // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
     let result = hash::hashv(&[
+        LEAF_DOMAIN_SEPARATOR.as_slice(),
+        // metadata
+        "Solana2AnyMessageHashV1".as_bytes(),
+        &header_source_chain_selector,
+        &header_dest_chain_selector,
+        &crate::ID.to_bytes(), // onramp: ccip_router program
+        // message header
         &msg.sender.to_bytes(),
+        &header_sequence_number,
+        &header_nonce,
+        &msg.fee_token.to_bytes(),
+        &msg.fee_token_amount.to_be_bytes(),
+        // messaging
+        &[msg.receiver.len() as u8],
         &msg.receiver,
         &data_size.to_be_bytes(),
         &msg.data,
-        &header_source_chain_selector,
-        &header_dest_chain_selector,
-        &header_sequence_number,
-        &header_nonce,
+        // tokens
+        &msg.token_amounts.try_to_vec().unwrap(),
+        // extra args
         &extra_args_gas_limit,
         &extra_args_allow_out_of_order_execution,
     ]);
 
     result.to_bytes()
+}
+
+/// Methods in this module are used to deserialize AccountInfo into the state structs
+mod validated_try_to {
+    use anchor_lang::prelude::*;
+
+    use crate::{
+        BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, PerChainPerTokenConfig,
+        FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING_SEED,
+    };
+
+    pub fn per_chain_per_token_config<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+        dest_chain_selector: u64,
+    ) -> Result<PerChainPerTokenConfig> {
+        let (expected, _) = Pubkey::find_program_address(
+            &[
+                TOKEN_POOL_BILLING_SEED,
+                dest_chain_selector.to_le_bytes().as_ref(),
+                token.key().as_ref(),
+            ],
+            &crate::ID,
+        );
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<PerChainPerTokenConfig>::try_from(account)?;
+        require_eq!(
+            account.version,
+            1, // the v1 version of the onramp will always be tied to version 1 of the state
+            CcipRouterError::InvalidInputs
+        );
+        Ok(account.into_inner())
+    }
+
+    // Returns Ok(None) when parsing the ZERO address, which is a valid input from users
+    // specifying a token that has no Billing config.
+    pub fn billing_token_config<'info>(
+        account: &'info AccountInfo<'info>,
+        token: Pubkey,
+    ) -> Result<Option<BillingTokenConfig>> {
+        if account.key() == Pubkey::default() {
+            return Ok(None);
+        }
+
+        let (expected, _) =
+            Pubkey::find_program_address(&[FEE_BILLING_TOKEN_CONFIG, token.as_ref()], &crate::ID);
+        require_keys_eq!(account.key(), expected, CcipRouterError::InvalidInputs);
+        let account = Account::<BillingTokenConfigWrapper>::try_from(account)?;
+        require_eq!(
+            account.version,
+            1, // the v1 version of the onramp will always be tied to version 1 of the state
+            CcipRouterError::InvalidInputs
+        );
+        Ok(Some(account.into_inner().config))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds a message and hash it, it's compared with a known hash
+    #[test]
+    fn test_hash() {
+        let message = Solana2AnyRampMessage {
+            header: RampMessageHeader {
+                message_id: [0; 32],
+                source_chain_selector: 10,
+                dest_chain_selector: 20,
+                sequence_number: 30,
+                nonce: 40,
+            },
+            sender: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTa").unwrap(),
+            data: vec![4, 5, 6],
+            receiver: [
+                1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0,
+            ]
+            .to_vec(),
+            extra_args: AnyExtraArgs {
+                gas_limit: 1,
+                allow_out_of_order_execution: true,
+            },
+            fee_token: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
+            fee_token_amount: 50,
+            token_amounts: [Solana2AnyTokenTransfer {
+                source_pool_address: Pubkey::try_from(
+                    "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
+                )
+                .unwrap(),
+                dest_token_address: vec![0, 1, 2, 3],
+                extra_data: vec![4, 5, 6],
+                amount: [1; 32],
+                dest_exec_data: vec![4, 5, 6],
+            }]
+            .to_vec(),
+        };
+
+        let hash_result = hash(&message);
+
+        assert_eq!(
+            "9296d0ab425d1715b7709d1350e9486edc4ea235c47eed096b54bff20d07c692",
+            hex::encode(hash_result)
+        );
+    }
 }

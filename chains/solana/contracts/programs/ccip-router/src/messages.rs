@@ -101,6 +101,7 @@ pub struct Solana2AnyRampMessage {
     pub receiver: Vec<u8>,         // receiver address on the destination chain
     pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
+    pub fee_token_amount: u64,
     pub token_amounts: Vec<Solana2AnyTokenTransfer>,
 }
 

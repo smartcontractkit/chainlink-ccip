@@ -10,6 +10,7 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
 use crate::{
     Any2SolanaMessage, Any2SolanaRampMessage, BillingTokenConfigWrapper, CcipRouterError,
     CommitInput, CommitReport, CommitReportAccepted, CommitReportContext, DestChain,
@@ -361,7 +362,7 @@ fn internal_execute<'info>(
         solana_chain_selector,
     )?;
 
-    let original_state = commit_report.get_state(message_header.sequence_number);
+    let original_state = execution_state::get(commit_report, message_header.sequence_number);
 
     if original_state == MessageExecutionState::Success {
         emit!(SkippedAlreadyExecutedMessage {
@@ -509,7 +510,11 @@ fn internal_execute<'info>(
     }
 
     let new_state = MessageExecutionState::Success;
-    commit_report.set_state(message_header.sequence_number, new_state.to_owned());
+    execution_state::set(
+        commit_report,
+        message_header.sequence_number,
+        new_state.to_owned(),
+    );
 
     emit!(ExecutionStateChanged {
         source_chain_selector: message_header.source_chain_selector,
@@ -683,16 +688,17 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
     let extra_args_accounts_len = [msg.extra_args.accounts.len() as u8];
     let extra_args_accounts = msg.extra_args.accounts.try_to_vec().unwrap();
 
-    // TODO: Hash token amounts
-
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
-    // As similar as https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ccip/offRamp/OffRamp.sol#L402
+    // As similar as https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L111
     let result = hash::hashv(&[
+        LEAF_DOMAIN_SEPARATOR.as_slice(),
+        // metadata hash
         "Any2SolanaMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size,
         on_ramp_address,
+        // message header
         &msg.header.message_id,
         &msg.receiver.to_bytes(),
         &header_sequence_number,
@@ -700,19 +706,140 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
         &extra_args_accounts_len,
         &extra_args_accounts,
         &header_nonce,
+        // message
         &sender_size,
         &msg.sender,
         &data_size.to_be_bytes(),
         &msg.data,
+        // token transfers
+        msg.token_amounts.try_to_vec().unwrap().as_ref(), // borsh serialized
     ]);
 
     result.to_bytes()
 }
 
+mod execution_state {
+    use crate::{CommitReport, MessageExecutionState};
+
+    pub fn set(
+        report: &mut CommitReport,
+        sequence_number: u64,
+        execution_state: MessageExecutionState,
+    ) {
+        let packed = &mut report.execution_states;
+        let dif = sequence_number.checked_sub(report.min_msg_nr);
+        assert!(dif.is_some(), "Sequence number out of bounds");
+        let i = dif.unwrap();
+        assert!(i < 64, "Sequence number out of bounds");
+
+        // Clear the 2 bits at position 'i'
+        *packed &= !(0b11 << (i * 2));
+        // Set the new value in the cleared bits
+        *packed |= (execution_state as u128) << (i * 2);
+    }
+
+    pub fn get(report: &CommitReport, sequence_number: u64) -> MessageExecutionState {
+        let packed = report.execution_states;
+        let dif = sequence_number.checked_sub(report.min_msg_nr);
+        assert!(dif.is_some(), "Sequence number out of bounds");
+        let i = dif.unwrap();
+        assert!(i < 64, "Sequence number out of bounds");
+
+        let mask = 0b11 << (i * 2);
+        let state = (packed & mask) >> (i * 2);
+        MessageExecutionState::try_from(state).unwrap()
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_set_state() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 0,
+                merkle_root: [0; 32],
+                timestamp: 0,
+                min_msg_nr: 0,
+                max_msg_nr: 64,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 0, MessageExecutionState::Success);
+            assert_eq!(get(&commit_report, 0), MessageExecutionState::Success);
+
+            set(&mut commit_report, 1, MessageExecutionState::Failure);
+            assert_eq!(get(&commit_report, 1), MessageExecutionState::Failure);
+
+            set(&mut commit_report, 2, MessageExecutionState::Untouched);
+            assert_eq!(get(&commit_report, 2), MessageExecutionState::Untouched);
+
+            set(&mut commit_report, 3, MessageExecutionState::InProgress);
+            assert_eq!(get(&commit_report, 3), MessageExecutionState::InProgress);
+        }
+
+        #[test]
+        #[should_panic(expected = "Sequence number out of bounds")]
+        fn test_set_state_out_of_bounds() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 65, MessageExecutionState::Success);
+        }
+
+        #[test]
+        fn test_get_state() {
+            let mut commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            set(&mut commit_report, 1501, MessageExecutionState::Success);
+            set(&mut commit_report, 1505, MessageExecutionState::Failure);
+            set(&mut commit_report, 1520, MessageExecutionState::Untouched);
+            set(&mut commit_report, 1523, MessageExecutionState::InProgress);
+
+            assert_eq!(get(&commit_report, 1501), MessageExecutionState::Success);
+            assert_eq!(get(&commit_report, 1505), MessageExecutionState::Failure);
+            assert_eq!(get(&commit_report, 1520), MessageExecutionState::Untouched);
+            assert_eq!(get(&commit_report, 1523), MessageExecutionState::InProgress);
+        }
+
+        #[test]
+        #[should_panic(expected = "Sequence number out of bounds")]
+        fn test_get_state_out_of_bounds() {
+            let commit_report = CommitReport {
+                version: 1,
+                chain_selector: 1,
+                merkle_root: [0; 32],
+                timestamp: 1,
+                min_msg_nr: 1500,
+                max_msg_nr: 1530,
+                execution_states: 0,
+            };
+
+            get(&commit_report, 65);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Any2SolanaRampMessage, SolanaExtraArgs};
+    use crate::{Any2SolanaRampMessage, Any2SolanaTokenTransfer, SolanaExtraArgs};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
@@ -735,7 +862,17 @@ mod tests {
                 sequence_number: 89,
                 nonce: 90,
             },
-            token_amounts: [].to_vec(), // TODO: hash token amounts
+            token_amounts: [Any2SolanaTokenTransfer {
+                source_pool_address: vec![0, 1, 2, 3],
+                dest_token_address: Pubkey::try_from(
+                    "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
+                )
+                .unwrap(),
+                dest_gas_amount: 100,
+                extra_data: vec![4, 5, 6],
+                amount: [1; 32],
+            }]
+            .to_vec(),
             extra_args: SolanaExtraArgs {
                 compute_units: 1000,
                 accounts: vec![SolanaAccountMeta {
@@ -750,7 +887,7 @@ mod tests {
         let hash_result = hash(&message, on_ramp_address);
 
         assert_eq!(
-            "03da97f96c82237d8a8ab0f68d4f7ba02afe188b4a876f348278fbf2226312ed",
+            "fb47aed864f6e050f05ad851fdc0015c2e946f05e25093d150884cfb995834d0",
             hex::encode(hash_result)
         );
     }
