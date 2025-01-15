@@ -68,6 +68,7 @@ pub struct Any2SolanaRampMessage {
     pub receiver: Pubkey,
     pub token_amounts: Vec<Any2SolanaTokenTransfer>,
     pub extra_args: SolanaExtraArgs,
+    pub on_ramp_address: Vec<u8>,
 }
 
 impl Any2SolanaRampMessage {
@@ -80,6 +81,7 @@ impl Any2SolanaRampMessage {
         + 32 // receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
+        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
 }
 

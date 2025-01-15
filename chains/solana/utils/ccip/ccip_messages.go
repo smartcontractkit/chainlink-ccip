@@ -107,6 +107,7 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 				config.CcipReceiverProgram, config.ReceiverTargetAccountPDA, solana.SystemProgramID,
 			},
 		},
+		OnRampAddress: config.OnRampAddress,
 	}
 	return message
 }

@@ -10,6 +10,7 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
+use crate::v1::config::is_on_ramp_configured;
 use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
 use crate::v1::messages::ramps::is_writable;
 use crate::{
@@ -33,6 +34,21 @@ pub fn commit<'info>(
 
     // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
+
+    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
+    let source_chain_state = &mut ctx.accounts.source_chain_state;
+
+    require!(
+        source_chain_state.config.is_enabled,
+        CcipRouterError::UnsupportedSourceChainSelector
+    );
+    require!(
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &report.merkle_root.on_ramp_address
+        ),
+        CcipRouterError::InvalidInputs
+    );
 
     // Check if the report contains price updates
     let empty_token_price_updates = report.price_updates.token_price_updates.is_empty();
@@ -112,14 +128,6 @@ pub fn commit<'info>(
             );
         }
     }
-
-    // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
-    let source_chain_state = &mut ctx.accounts.source_chain_state;
-
-    require!(
-        source_chain_state.config.is_enabled,
-        CcipRouterError::UnsupportedSourceChainSelector
-    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -344,7 +352,13 @@ fn internal_execute<'info>(
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
-    let on_ramp_address = &source_chain_state.config.on_ramp;
+    require!(
+        is_on_ramp_configured(
+            &source_chain_state.config,
+            &execution_report.message.on_ramp_address
+        ),
+        CcipRouterError::InvalidInputs
+    );
 
     // The Commit Report Account stores the information of 1 Commit Report:
     // - Merkle Root
@@ -373,7 +387,7 @@ fn internal_execute<'info>(
         return Ok(());
     }
 
-    let hashed_leaf = verify_merkle_root(&execution_report, on_ramp_address)?;
+    let hashed_leaf = verify_merkle_root(&execution_report)?;
 
     // send tokens any -> SOL
     require!(
@@ -616,11 +630,8 @@ fn build_receiver_discriminator_and_data(ramp_message: Any2SolanaMessage) -> Res
     Ok(data)
 }
 
-pub fn verify_merkle_root(
-    execution_report: &ExecutionReportSingleChain,
-    on_ramp_address: &[u8],
-) -> Result<[u8; 32]> {
-    let hashed_leaf = hash(&execution_report.message, on_ramp_address);
+pub fn verify_merkle_root(execution_report: &ExecutionReportSingleChain) -> Result<[u8; 32]> {
+    let hashed_leaf = hash(&execution_report.message);
     let verified_root: std::result::Result<[u8; 32], MerkleError> =
         calculate_merkle_root(hashed_leaf, execution_report.proofs.clone());
     require!(
@@ -670,12 +681,12 @@ pub fn validate_execution_report<'info>(
     Ok(())
 }
 
-fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
+fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
     use anchor_lang::solana_program::hash;
 
     // Calculate vectors size to ensure that the hash is unique
     let sender_size = [msg.sender.len() as u8];
-    let on_ramp_address_size = [on_ramp_address.len() as u8];
+    let on_ramp_address_size = [msg.on_ramp_address.len() as u8];
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
 
     // RampMessageHeader struct
@@ -693,7 +704,7 @@ fn hash(msg: &Any2SolanaRampMessage, on_ramp_address: &[u8]) -> [u8; 32] {
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size,
-        on_ramp_address,
+        &msg.on_ramp_address,
         // message header
         &msg.header.message_id,
         &msg.receiver.to_bytes(),
@@ -838,6 +849,8 @@ mod tests {
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
+        let on_ramp_address = &[1, 2, 3].to_vec();
+
         let message = Any2SolanaRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -874,10 +887,9 @@ mod tests {
                     Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb").unwrap(),
                 ],
             },
+            on_ramp_address: on_ramp_address.clone(),
         };
-
-        let on_ramp_address = &[1, 2, 3].to_vec();
-        let hash_result = hash(&message, on_ramp_address);
+        let hash_result = hash(&message);
 
         assert_eq!(
             "1636e87682c7622432edefeccae977d0e64f30251eee1b02e02b7156a58dfebf",

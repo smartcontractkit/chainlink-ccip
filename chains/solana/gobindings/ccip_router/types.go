@@ -673,12 +673,13 @@ func (obj *AnyExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err e
 }
 
 type Any2SolanaRampMessage struct {
-	Header       RampMessageHeader
-	Sender       []byte
-	Data         []byte
-	Receiver     ag_solanago.PublicKey
-	TokenAmounts []Any2SolanaTokenTransfer
-	ExtraArgs    SolanaExtraArgs
+	Header        RampMessageHeader
+	Sender        []byte
+	Data          []byte
+	Receiver      ag_solanago.PublicKey
+	TokenAmounts  []Any2SolanaTokenTransfer
+	ExtraArgs     SolanaExtraArgs
+	OnRampAddress []byte
 }
 
 func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -709,6 +710,11 @@ func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
+	if err != nil {
+		return err
+	}
+	// Serialize `OnRampAddress` param:
+	err = encoder.Encode(obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -743,6 +749,11 @@ func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OnRampAddress`:
+	err = decoder.Decode(&obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -1343,7 +1354,7 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 
 type SourceChainConfig struct {
 	IsEnabled bool
-	OnRamp    []byte
+	OnRamp    [2][64]uint8
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
