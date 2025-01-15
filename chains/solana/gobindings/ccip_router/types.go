@@ -595,47 +595,20 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	return nil
 }
 
-type SolanaAccountMeta struct {
-	Pubkey     ag_solanago.PublicKey
-	IsWritable bool
-}
-
-func (obj SolanaAccountMeta) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Pubkey` param:
-	err = encoder.Encode(obj.Pubkey)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsWritable` param:
-	err = encoder.Encode(obj.IsWritable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SolanaAccountMeta) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Pubkey`:
-	err = decoder.Decode(&obj.Pubkey)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsWritable`:
-	err = decoder.Decode(&obj.IsWritable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 type SolanaExtraArgs struct {
-	ComputeUnits uint32
-	Accounts     []SolanaAccountMeta
+	ComputeUnits     uint32
+	IsWritableBitmap uint64
+	Accounts         []ag_solanago.PublicKey
 }
 
 func (obj SolanaExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ComputeUnits` param:
 	err = encoder.Encode(obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsWritableBitmap` param:
+	err = encoder.Encode(obj.IsWritableBitmap)
 	if err != nil {
 		return err
 	}
@@ -650,6 +623,11 @@ func (obj SolanaExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 func (obj *SolanaExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ComputeUnits`:
 	err = decoder.Decode(&obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsWritableBitmap`:
+	err = decoder.Decode(&obj.IsWritableBitmap)
 	if err != nil {
 		return err
 	}

@@ -2101,22 +2101,6 @@
       }
     },
     {
-      "name": "SolanaAccountMeta",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pubkey",
-            "type": "publicKey"
-          },
-          {
-            "name": "isWritable",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
       "name": "SolanaExtraArgs",
       "type": {
         "kind": "struct",
@@ -2126,11 +2110,13 @@
             "type": "u32"
           },
           {
+            "name": "isWritableBitmap",
+            "type": "u64"
+          },
+          {
             "name": "accounts",
             "type": {
-              "vec": {
-                "defined": "SolanaAccountMeta"
-              }
+              "vec": "publicKey"
             }
           }
         ]
