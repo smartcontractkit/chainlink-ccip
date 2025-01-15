@@ -63,7 +63,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana &&\
-          make buils-contracts &&\
+          make build-contracts &&\
           chmod -R 755 ./contracts/target"
 
   rust:
@@ -95,7 +95,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana &&\
-          make buils-contracts &&\
+          make build-contracts &&\
           cd contracts &&\
           cargo check &&\
           cargo clippy -- -D warnings &&\
@@ -144,7 +144,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana &&\
-          make buils-contracts"
+          make build-contracts"
           make go-tests
 
   lint:
@@ -184,7 +184,7 @@ jobs:
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
           cd /solana &&\
-          make buils-contracts"
+          make build-contracts"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3
           ./scripts/anchor-go-gen.sh

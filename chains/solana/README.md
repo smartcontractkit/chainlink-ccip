@@ -18,7 +18,7 @@
 go install github.com/gagliardetto/anchor-go@v0.2.3
 
 # build contracts + IDL
-make buils-contracts
+make build-contracts
 
 # go bindings need to be regenerated if contract changes were made
 ./scripts/anchor-go-gen.sh
