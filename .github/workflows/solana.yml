@@ -74,9 +74,9 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          cd /solana/contracts &&\
-          anchor build &&\
-          chmod -R 755 ./target"
+          cd /solana &&\
+          make buils-contracts &&\
+          chmod -R 755 ./contracts/target"
 
   rust:
     name: rust tests
@@ -108,8 +108,9 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          cd /solana/contracts &&\
-          anchor build &&\
+          cd /solana &&\
+          make buils-contracts &&\
+          cd contracts &&\
           cargo check &&\
           cargo clippy -- -D warnings &&\
           cargo test --workspace"
@@ -158,8 +159,8 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          cd /solana/contracts &&\
-          anchor build"
+          cd /solana &&\
+          make buils-contracts"
           make go-tests
 
   lint:
@@ -200,9 +201,8 @@ jobs:
           set -eoux pipefail &&\
           RUSTUP_HOME=\"/root/.rustup\" &&\
           FORCE_COLOR=1 &&\
-          cd /solana/contracts &&\
-          rm -rf target/idl &&\
-          anchor build"
+          cd /solana &&\
+          make buils-contracts"
 
           go install github.com/gagliardetto/anchor-go@v0.2.3
           ./scripts/anchor-go-gen.sh

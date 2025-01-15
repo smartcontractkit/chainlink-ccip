@@ -53,4 +53,4 @@ build-contracts:
 	cd ./contracts && rm -rf ./target && anchor build && cd -
 
 .PHONY: solana-checks
-solana-checks: clippy anchor-go-gen format gomodtidy lint-go rust-tests go-tests build-contracts
+solana-checks: clippy format anchor-go-gen gomodtidy lint-go rust-tests go-tests

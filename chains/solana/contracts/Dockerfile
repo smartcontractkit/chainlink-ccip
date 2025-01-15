@@ -4,7 +4,7 @@ FROM backpackapp/build:${ANCHOR_CLI}
 
 COPY . /contracts
 
-RUN cd /contracts && anchor build
+RUN make buils-contracts
 
 # only keep downloaded artifacts in /root/.cargo cached
 RUN rm -rf /contracts
