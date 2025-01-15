@@ -6,7 +6,7 @@ use anchor_spl::token_interface;
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
-    self, calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
+    calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
     validate_and_parse_token_accounts, TokenAccounts, CCIP_LOCK_OR_BURN_V1_RET_BYTES,
 };
 
@@ -248,7 +248,7 @@ pub fn ccip_send<'info>(
             let lock_or_burn_out_data = LockOrBurnOutV1::try_from_slice(&return_data)?;
             new_message.token_amounts[i] = token_transfer(
                 lock_or_burn_out_data,
-                current_token_accounts,
+                current_token_accounts.pool_config.key(),
                 token_amount,
                 &dest_chain.config,
                 &per_chain_per_token_config_accounts[i],
@@ -270,7 +270,7 @@ pub fn ccip_send<'info>(
 
 fn token_transfer(
     lock_or_burn_out_data: LockOrBurnOutV1,
-    current_token_accounts: &pools::TokenAccounts<'_>,
+    source_pool_address: Pubkey,
     token_amount: &SolanaTokenAmount,
     dest_chain_config: &DestChainConfig,
     token_config: &PerChainPerTokenConfig,
@@ -298,7 +298,7 @@ fn token_transfer(
         .to_vec();
 
     Ok(Solana2AnyTokenTransfer {
-        source_pool_address: current_token_accounts.pool_config.key(),
+        source_pool_address,
         dest_token_address: lock_or_burn_out_data.dest_token_address,
         extra_data,
         amount: u64_to_le_u256(token_amount.amount), // pool on receiver chain handles decimals
@@ -449,6 +449,10 @@ mod validated_try_to {
 
 #[cfg(test)]
 mod tests {
+    use crate::v1::{
+        fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,
+    };
+
     use super::*;
 
     /// Builds a message and hash it, it's compared with a known hash
@@ -493,6 +497,101 @@ mod tests {
         assert_eq!(
             "9296d0ab425d1715b7709d1350e9486edc4ea235c47eed096b54bff20d07c692",
             hex::encode(hash_result)
+        );
+    }
+
+    #[test]
+    fn token_transfer_with_no_pool_data() {
+        let source_pool_address = Pubkey::new_unique();
+        let lock_or_burn_out_data = LockOrBurnOutV1 {
+            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+            dest_pool_data: vec![],
+        };
+
+        let dest_chain = sample_dest_chain();
+        let (token_billing_config, mut per_chain_per_token_config) = sample_additional_token();
+        let token_amount = &SolanaTokenAmount {
+            token: token_billing_config.mint,
+            amount: 100,
+        };
+
+        let transfer = token_transfer(
+            lock_or_burn_out_data.clone(),
+            source_pool_address,
+            token_amount,
+            &dest_chain.config,
+            &per_chain_per_token_config,
+        )
+        .unwrap();
+
+        let expected_exec_data =
+            ethnum::U256::new(per_chain_per_token_config.billing.dest_gas_overhead.into())
+                .to_be_bytes();
+
+        assert!(transfer.extra_data.is_empty());
+        assert_eq!(transfer.dest_exec_data, expected_exec_data);
+
+        // If we now disable billing overrides, the gas overhead will change
+        per_chain_per_token_config.billing.is_enabled = false;
+        let expected_exec_data =
+            ethnum::U256::new(dest_chain.config.default_token_dest_gas_overhead.into())
+                .to_be_bytes();
+
+        let transfer = token_transfer(
+            lock_or_burn_out_data,
+            source_pool_address,
+            token_amount,
+            &dest_chain.config,
+            &per_chain_per_token_config,
+        )
+        .unwrap();
+        assert!(transfer.extra_data.is_empty());
+        assert_eq!(transfer.dest_exec_data, expected_exec_data);
+    }
+
+    #[test]
+    fn token_transfer_validates_data_length() {
+        let dest_chain = sample_dest_chain();
+        let (token_billing_config, per_chain_per_token_config) = sample_additional_token();
+        let token_amount = &SolanaTokenAmount {
+            token: token_billing_config.mint,
+            amount: 100,
+        };
+
+        let reasonable_size = CCIP_LOCK_OR_BURN_V1_RET_BYTES as usize;
+        let source_pool_address = Pubkey::new_unique();
+        let lock_or_burn_out_data = LockOrBurnOutV1 {
+            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+            dest_pool_data: vec![b'A'; reasonable_size],
+        };
+
+        token_transfer(
+            lock_or_burn_out_data,
+            source_pool_address,
+            token_amount,
+            &dest_chain.config,
+            &per_chain_per_token_config,
+        )
+        .unwrap();
+
+        let unreasonable_size = (CCIP_LOCK_OR_BURN_V1_RET_BYTES
+            .max(per_chain_per_token_config.billing.dest_gas_overhead)
+            + 1) as usize;
+        let lock_or_burn_out_data = LockOrBurnOutV1 {
+            dest_token_address: Pubkey::new_unique().to_bytes().to_vec(),
+            dest_pool_data: vec![b'A'; unreasonable_size],
+        };
+
+        assert_eq!(
+            token_transfer(
+                lock_or_burn_out_data,
+                source_pool_address,
+                token_amount,
+                &dest_chain.config,
+                &per_chain_per_token_config,
+            )
+            .unwrap_err(),
+            CcipRouterError::SourceTokenDataTooLarge.into()
         );
     }
 }

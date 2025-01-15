@@ -104,7 +104,7 @@ pub struct Solana2AnyRampMessage {
     pub token_amounts: Vec<Solana2AnyTokenTransfer>,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
 pub struct Solana2AnyTokenTransfer {
     // The source pool address. This value is trusted as it was obtained through the onRamp. It can be relied
     // upon by the destination pool to validate the source pool.

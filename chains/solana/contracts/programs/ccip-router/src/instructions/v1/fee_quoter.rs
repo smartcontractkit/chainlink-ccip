@@ -357,7 +357,7 @@ pub fn do_billing_transfer<'info>(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
@@ -673,7 +673,7 @@ mod tests {
         );
     }
 
-    fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
+    pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
         let mint = Pubkey::new_unique();
         (
             sample_billing_config(),
