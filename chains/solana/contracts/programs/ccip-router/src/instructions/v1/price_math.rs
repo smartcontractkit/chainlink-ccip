@@ -2,7 +2,8 @@ use std::ops::{Add, AddAssign, Mul};
 
 use ethnum::U256;
 
-use crate::{SolanaTokenAmount, TimestampedPackedU224};
+use crate::messages::SolanaTokenAmount;
+use crate::state::TimestampedPackedU224;
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;

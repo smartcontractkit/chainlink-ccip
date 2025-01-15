@@ -62,10 +62,9 @@ pub mod ramps {
     use anchor_lang::prelude::*;
     use ethnum::U256;
 
-    use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage,
-        CHAIN_FAMILY_SELECTOR_EVM,
-    };
+    use crate::messages::{Solana2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM};
+    use crate::state::{BillingTokenConfig, DestChain};
+    use crate::CcipRouterError;
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
@@ -141,7 +140,8 @@ pub mod ramps {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{ExtraArgsInput, SolanaTokenAmount, TimestampedPackedU224};
+        use crate::messages::{ExtraArgsInput, SolanaTokenAmount};
+        use crate::state::TimestampedPackedU224;
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
 

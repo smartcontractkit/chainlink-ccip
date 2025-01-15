@@ -1,8 +1,11 @@
 use anchor_lang::prelude::*;
 use solana_program::{instruction::Instruction, program::invoke_signed};
 
+use super::config::is_on_ramp_configured;
+use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::merkle::{calculate_merkle_root, MerkleError};
 use super::messages::pools::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
+use super::messages::ramps::is_writable;
 use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
@@ -10,19 +13,25 @@ use super::pools::{
     validate_and_parse_token_accounts, CCIP_POOL_V1_RET_BYTES,
 };
 
-use crate::v1::config::is_on_ramp_configured;
-use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
-use crate::v1::messages::ramps::is_writable;
-use crate::{
-    Any2SolanaMessage, Any2SolanaRampMessage, BillingTokenConfigWrapper, CcipRouterError,
-    CommitInput, CommitReport, CommitReportAccepted, CommitReportContext, DestChain,
-    ExecuteReportContext, ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate,
-    GlobalState, MessageExecutionState, OcrPluginType, RampMessageHeader,
-    SkippedAlreadyExecutedMessage, SolanaTokenAmount, SourceChain, TimestampedPackedU224,
-    TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated, CCIP_RECEIVE_DISCRIMINATOR,
-    DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED,
-    FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+use crate::context::{
+    CommitInput, CommitReportContext, ExecuteReportContext, GasPriceUpdate, OcrPluginType,
+    TokenPriceUpdate, DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED,
+    EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
+use crate::event::{
+    CommitReportAccepted, ExecutionStateChanged, SkippedAlreadyExecutedMessage, UsdPerTokenUpdated,
+    UsdPerUnitGasUpdated,
+};
+use crate::messages::{
+    Any2SolanaMessage, Any2SolanaRampMessage, ExecutionReportSingleChain, RampMessageHeader,
+    SolanaTokenAmount,
+};
+use crate::state::{
+    BillingTokenConfigWrapper, CommitReport, DestChain, GlobalState, MessageExecutionState,
+    SourceChain, TimestampedPackedU224,
+};
+use crate::CcipRouterError;
+use crate::CCIP_RECEIVE_DISCRIMINATOR;
 
 pub fn commit<'info>(
     ctx: Context<'_, '_, 'info, 'info, CommitReportContext<'info>>,
@@ -724,7 +733,7 @@ fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
 }
 
 mod execution_state {
-    use crate::{CommitReport, MessageExecutionState};
+    use crate::state::{CommitReport, MessageExecutionState};
 
     pub fn set(
         report: &mut CommitReport,
@@ -844,7 +853,7 @@ mod execution_state {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Any2SolanaRampMessage, Any2SolanaTokenTransfer, SolanaExtraArgs};
+    use crate::messages::{Any2SolanaRampMessage, Any2SolanaTokenTransfer, SolanaExtraArgs};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]

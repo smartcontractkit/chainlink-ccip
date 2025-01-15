@@ -1,16 +1,23 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
-use crate::{
-    AcceptOwnership, AddBillingTokenConfig, AddChainSelector, BillingTokenConfig, CcipRouterError,
-    DestChainAdded, DestChainConfig, DestChainConfigUpdated, DestChainState, FeeTokenAdded,
-    FeeTokenDisabled, FeeTokenEnabled, FeeTokenRemoved, Ocr3ConfigInfo, OcrPluginType,
-    OwnershipTransferRequested, OwnershipTransferred, RemoveBillingTokenConfig, SetOcrConfig,
-    SetTokenBillingConfig, SourceChainAdded, SourceChainConfig, SourceChainConfigUpdated,
-    SourceChainState, TimestampedPackedU224, TokenBilling, TransferOwnership,
-    UpdateBillingTokenConfig, UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig,
-    UpdateSourceChainSelectorConfig, WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
+use crate::context::{
+    AcceptOwnership, AddBillingTokenConfig, AddChainSelector, OcrPluginType,
+    RemoveBillingTokenConfig, SetOcrConfig, TransferOwnership, UpdateBillingTokenConfig,
+    UpdateConfigCCIPRouter, UpdateDestChainSelectorConfig, UpdateSourceChainSelectorConfig,
+    WithdrawBilledFunds, FEE_BILLING_SIGNER_SEEDS,
 };
+use crate::event::{
+    DestChainAdded, DestChainConfigUpdated, FeeTokenAdded, FeeTokenDisabled, FeeTokenEnabled,
+    FeeTokenRemoved, OwnershipTransferRequested, OwnershipTransferred, SourceChainAdded,
+    SourceChainConfigUpdated,
+};
+use crate::state::{
+    BillingTokenConfig, DestChainConfig, DestChainState, Ocr3ConfigInfo, SourceChainConfig,
+    SourceChainState, TimestampedPackedU224, TokenBilling,
+};
+use crate::token_context::SetTokenBillingConfig;
+use crate::CcipRouterError;
 
 use super::fee_quoter::do_billing_transfer;
 use super::ocr3base::ocr3_set;

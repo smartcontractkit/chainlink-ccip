@@ -5,10 +5,10 @@ use anchor_spl::{token::spl_token::native_mint, token_interface};
 use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
-use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
-    SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
-};
+use crate::context::FEE_BILLING_SIGNER_SEEDS;
+use crate::messages::{Solana2AnyMessage, SolanaTokenAmount};
+use crate::state::{BillingTokenConfig, DestChain, PerChainPerTokenConfig, TimestampedPackedU224};
+use crate::CcipRouterError;
 
 use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
@@ -377,7 +377,7 @@ mod tests {
         program_stubs::{set_syscall_stubs, SyscallStubs},
     };
 
-    use crate::TokenBilling;
+    use crate::state::TokenBilling;
 
     use super::super::messages::ramps::tests::*;
     use super::*;

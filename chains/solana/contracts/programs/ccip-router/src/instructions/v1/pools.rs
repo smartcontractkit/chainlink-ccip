@@ -8,11 +8,13 @@ use solana_program::{
 };
 use solana_program::{program::get_return_data, program_pack::Pack};
 
-use crate::{
-    CcipRouterError, ExternalExecutionConfig, TokenAdminRegistry, CCIP_TOKENPOOL_CONFIG,
-    CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG, TOKEN_ADMIN_REGISTRY_SEED,
-    TOKEN_POOL_BILLING_SEED, TOKEN_POOL_CONFIG_SEED,
+use crate::context::{
+    CCIP_TOKENPOOL_CONFIG, CCIP_TOKENPOOL_SIGNER, FEE_BILLING_TOKEN_CONFIG,
+    TOKEN_ADMIN_REGISTRY_SEED, TOKEN_POOL_BILLING_SEED, TOKEN_POOL_CONFIG_SEED,
 };
+use crate::state::ExternalExecutionConfig;
+use crate::token_context::TokenAdminRegistry;
+use crate::CcipRouterError;
 
 pub const CCIP_POOL_V1_RET_BYTES: usize = 8;
 pub const CCIP_LOCK_OR_BURN_V1_RET_BYTES: u32 = 32;
@@ -352,7 +354,8 @@ mod tests {
     use bytemuck::Zeroable;
     use solana_program::pubkey::Pubkey;
 
-    use crate::TokenAdminRegistry;
+    use crate::token_context::TokenAdminRegistry;
+
     #[test]
     fn set_writable() {
         let mut state = TokenAdminRegistry {

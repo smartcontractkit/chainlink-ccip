@@ -4,18 +4,21 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface;
 
 use super::fee_quoter::{fee_for_msg, transfer_fee, wrap_native_sol};
+use super::merkle::LEAF_DOMAIN_SEPARATOR;
 use super::messages::pools::{LockOrBurnInV1, LockOrBurnOutV1};
 use super::pools::{
     calculate_token_pool_account_indices, interact_with_pool, transfer_token, u64_to_le_u256,
     validate_and_parse_token_accounts, TokenAccounts,
 };
 
-use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
-use crate::{
-    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, ExtraArgsInput, GetFee,
-    Nonce, RampMessageHeader, Solana2AnyMessage, Solana2AnyRampMessage, Solana2AnyTokenTransfer,
-    SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
+use crate::context::{CcipSend, GetFee, EXTERNAL_TOKEN_POOL_SEED};
+use crate::event::CCIPMessageSent;
+use crate::messages::{
+    AnyExtraArgs, ExtraArgsInput, RampMessageHeader, Solana2AnyMessage, Solana2AnyRampMessage,
+    Solana2AnyTokenTransfer, SolanaTokenAmount,
 };
+use crate::state::{Config, Nonce};
+use crate::CcipRouterError;
 
 pub fn get_fee<'info>(
     ctx: Context<'_, '_, 'info, 'info, GetFee>,
@@ -344,10 +347,9 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
 mod validated_try_to {
     use anchor_lang::prelude::*;
 
-    use crate::{
-        BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, PerChainPerTokenConfig,
-        FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING_SEED,
-    };
+    use crate::context::{FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING_SEED};
+    use crate::state::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
+    use crate::CcipRouterError;
 
     pub fn per_chain_per_token_config<'info>(
         account: &'info AccountInfo<'info>,

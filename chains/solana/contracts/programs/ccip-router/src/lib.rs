@@ -11,7 +11,6 @@ mod state;
 use crate::state::*;
 
 mod event;
-use crate::event::*;
 
 mod messages;
 use crate::messages::*;
