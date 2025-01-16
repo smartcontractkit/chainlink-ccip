@@ -28,7 +28,7 @@ pub mod pools {
         pub remote_chain_selector: u64, // ─╮ The chain ID of the source chain
         pub receiver: Pubkey, // ───────────╯ The Token Associated Account that will receive the tokens on the destination chain.
         pub amount: [u8; 32], // LE u256 amount - The amount of tokens to release or mint, denominated in the source token's decimals, pool expected to handle conversation to solana token specifics
-        pub local_token: Pubkey, //            The address of the Token Mint Account on Solana
+        pub local_token: Pubkey, //            The address of the Token Mint Account on SVM
         /// @dev WARNING: sourcePoolAddress should be checked prior to any processing of funds. Make sure it matches the
         /// expected pool address for the given remoteChainSelector.
         pub source_pool_address: Vec<u8>, //       The address bytes of the source pool
@@ -63,14 +63,13 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, Solana2AnyMessage,
-        CHAIN_FAMILY_SELECTOR_EVM,
+        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
 
-    pub fn validate_solana2any(
-        msg: &Solana2AnyMessage,
+    pub fn validate_svm2any(
+        msg: &SVM2AnyMessage,
         dest_chain: &DestChain,
         token_config: &BillingTokenConfig,
     ) -> Result<()> {
@@ -97,7 +96,7 @@ pub mod ramps {
     }
 
     fn validate_dest_family_address(
-        msg: &Solana2AnyMessage,
+        msg: &SVM2AnyMessage,
         chain_family_selector: [u8; 4],
     ) -> Result<()> {
         const PRECOMPILE_SPACE: u32 = 1024;
@@ -141,7 +140,7 @@ pub mod ramps {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{ExtraArgsInput, SolanaTokenAmount, TimestampedPackedU224};
+        use crate::{ExtraArgsInput, SVMTokenAmount, TimestampedPackedU224};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
 
@@ -172,8 +171,7 @@ pub mod ramps {
             chain.config.is_enabled = false;
 
             assert_eq!(
-                validate_solana2any(&sample_message(), &chain, &sample_billing_config())
-                    .unwrap_err(),
+                validate_svm2any(&sample_message(), &chain, &sample_billing_config()).unwrap_err(),
                 CcipRouterError::DestinationChainDisabled.into()
             );
         }
@@ -184,7 +182,7 @@ pub mod ramps {
             billing_config.enabled = false;
 
             assert_eq!(
-                validate_solana2any(&sample_message(), &sample_dest_chain(), &billing_config)
+                validate_svm2any(&sample_message(), &sample_dest_chain(), &billing_config)
                     .unwrap_err(),
                 CcipRouterError::FeeTokenDisabled.into()
             );
@@ -196,7 +194,7 @@ pub mod ramps {
             let mut message = sample_message();
             message.data = vec![0; dest_chain.config.max_data_bytes as usize + 1];
             assert_eq!(
-                validate_solana2any(&message, &sample_dest_chain(), &sample_billing_config())
+                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
                 CcipRouterError::MessageTooLarge.into()
             );
@@ -220,7 +218,7 @@ pub mod ramps {
             for address in invalid_addresses {
                 message.receiver = address;
                 assert_eq!(
-                    validate_solana2any(&message, &sample_dest_chain(), &sample_billing_config())
+                    validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                         .unwrap_err(),
                     CcipRouterError::InvalidEVMAddress.into()
                 );
@@ -232,27 +230,27 @@ pub mod ramps {
             let dest_chain = sample_dest_chain();
             let mut message = sample_message();
             message.token_amounts = vec![
-                SolanaTokenAmount {
+                SVMTokenAmount {
                     token: Pubkey::new_unique(),
                     amount: 1
                 };
                 dest_chain.config.max_number_of_tokens_per_msg as usize + 1
             ];
             assert_eq!(
-                validate_solana2any(&message, &sample_dest_chain(), &sample_billing_config())
+                validate_svm2any(&message, &sample_dest_chain(), &sample_billing_config())
                     .unwrap_err(),
                 CcipRouterError::UnsupportedNumberOfTokens.into()
             );
         }
 
-        pub fn sample_message() -> Solana2AnyMessage {
+        pub fn sample_message() -> SVM2AnyMessage {
             let mut receiver = vec![0u8; 32];
 
             // Arbitrary value that pushes the address to the right EVM range
             // (above precompile space, under u160::max)
             receiver[20] = 0xA;
 
-            Solana2AnyMessage {
+            SVM2AnyMessage {
                 receiver,
                 data: vec![],
                 token_amounts: vec![],

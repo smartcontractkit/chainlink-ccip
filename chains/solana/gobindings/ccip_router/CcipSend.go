@@ -26,7 +26,7 @@ import (
 // * `message` - The message to be sent. The size limit of data is 256 bytes.
 type CcipSend struct {
 	DestChainSelector *uint64
-	Message           *Solana2AnyMessage
+	Message           *SVM2AnyMessage
 	TokenIndexes      *[]byte
 
 	// [0] = [] config
@@ -74,7 +74,7 @@ func (inst *CcipSend) SetDestChainSelector(destChainSelector uint64) *CcipSend {
 }
 
 // SetMessage sets the "message" parameter.
-func (inst *CcipSend) SetMessage(message Solana2AnyMessage) *CcipSend {
+func (inst *CcipSend) SetMessage(message SVM2AnyMessage) *CcipSend {
 	inst.Message = &message
 	return inst
 }
@@ -384,7 +384,7 @@ func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error
 func NewCcipSendInstruction(
 	// Parameters:
 	destChainSelector uint64,
-	message Solana2AnyMessage,
+	message SVM2AnyMessage,
 	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,

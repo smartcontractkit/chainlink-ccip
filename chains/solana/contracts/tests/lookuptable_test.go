@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/utils/common"
 )
 
-func TestSolanaLookupTables(t *testing.T) {
+func TestSVMLookupTables(t *testing.T) {
 	t.Parallel()
 
 	ctx := tests.Context(t)
