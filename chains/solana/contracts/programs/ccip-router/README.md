@@ -1,6 +1,6 @@
-# CCIP Router implementation in Solana
+# CCIP Router implementation in SVM
 
-Collapsed Router + OnRamp + OffRamp Contracts Implementation for CCIP in Solana.
+Collapsed Router + OnRamp + OffRamp Contracts Implementation for CCIP in SVM.
 
 ## Messages
 
@@ -8,24 +8,24 @@ Collapsed Router + OnRamp + OffRamp Contracts Implementation for CCIP in Solana.
 
 `initialize`
 
-1. Initialize the Config PDA with the Solana Chain Selector, the Default Extra Args and the Supported Destination Chain Selectors and the Sequence Number with 0.
+1. Initialize the Config PDA with the SVM Chain Selector, the Default Extra Args and the Supported Destination Chain Selectors and the Sequence Number with 0.
 
 #### Initialization Accounts
 
-1. `PDA("config", program_id)`: **Init**, it is used to store the default configuration for Extra Args, the Solana Chain Selector and the supported list of Destination Chain Selectors.
+1. `PDA("config", program_id)`: **Init**, it is used to store the default configuration for Extra Args, the SVM Chain Selector and the supported list of Destination Chain Selectors.
 1. `signer`: The sender of the message.
 
 ### Update Config
 
-`add_chain_selector`, `remove_chain_selector`, `update_solana_chain_selector`, `update_default_gas_limit` & `update_default_allow_out_of_order_execution`
+`add_chain_selector`, `remove_chain_selector`, `update_svm_chain_selector`, `update_default_gas_limit` & `update_default_allow_out_of_order_execution`
 
-1. Update the Config PDA with the Solana Chain Selector.
+1. Update the Config PDA with the SVM Chain Selector.
 1. Update the Config PDA with the Default Extra Args.
 1. Init/Close the Chain State PDA with the Supported Destination Chain Selectors (add/remove).
 
 #### Update Config Accounts
 
-1. `PDA("config", program_id)`: **Mut**, it is used to store the default configuration for Extra Args, the Solana Chain Selector and the supported list of Destination Chain Selectors.
+1. `PDA("config", program_id)`: **Mut**, it is used to store the default configuration for Extra Args, the SVM Chain Selector and the supported list of Destination Chain Selectors.
 1. `PDA("chain_state", chain_selector, program_id)`: **Init/Close**, it stores the latest sequence number per destination chain [only for `add_chain_selector` & `remove_chain_selector`].
 1. `signer`: The sender of the message.
 
@@ -39,7 +39,7 @@ Collapsed Router + OnRamp + OffRamp Contracts Implementation for CCIP in Solana.
 
 #### Send Message Accounts
 
-1. `PDA("config", program_id)`: **Read only**, it is used to read the default configuration for Extra Args, the Solana Chain Selector and the supported list of Destination Chain Selectors.
+1. `PDA("config", program_id)`: **Read only**, it is used to read the default configuration for Extra Args, the SVM Chain Selector and the supported list of Destination Chain Selectors.
 1. `PDA("chain_state", chain_selector, program_id)`: **Mut**, increases the latest sequence number per destination chain.
 1. `signer`: The sender of the message.
 
@@ -110,7 +110,7 @@ Collapsed Router + OnRamp + OffRamp Contracts Implementation for CCIP in Solana.
   cargo test
   ```
 
-- The Anchor Tests are in the `tests` folder, written in Typescript and use the `@project-serum/solana-web3` library. The tests are run in a local network, so the tests are fast and don't require any real Solana network. To run them, use the command
+- The Anchor Tests are in the `tests` folder, written in Typescript and use the `@project-serum/solana-web3` library. The tests are run in a local network, so the tests are fast and don't require any real SVM network. To run them, use the command
 
   ```bash
   anchor test
