@@ -1,3 +1,5 @@
+use std::convert::Into;
+
 use anchor_lang::prelude::*;
 
 pub const CHAIN_FAMILY_SELECTOR_EVM: u32 = 0x2812d52c;
@@ -93,8 +95,9 @@ pub struct SVM2AnyRampMessage {
     pub receiver: Vec<u8>,         // receiver address on the destination chain
     pub extra_args: AnyExtraArgs, // destination-chain specific extra args, such as the gasLimit for EVM chains
     pub fee_token: Pubkey,
-    pub fee_token_amount: u64,
     pub token_amounts: Vec<SVM2AnyTokenTransfer>,
+    pub fee_token_amount: CrossChainAmount,
+    pub fee_value_juels: CrossChainAmount,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
@@ -109,7 +112,7 @@ pub struct SVM2AnyTokenTransfer {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     pub extra_data: Vec<u8>,
-    pub amount: [u8; 32], // LE encoded u256 -  cross-chain token amount is always u256
+    pub amount: CrossChainAmount, // LE encoded u256 -  cross-chain token amount is always u256
     // Destination chain data used to execute the token transfer on the destination chain. For an EVM destination, it
     // consists of the amount of gas available for the releaseOrMint and transfer calls made by the offRamp.
     pub dest_exec_data: Vec<u8>,
@@ -126,7 +129,7 @@ pub struct Any2SVMTokenTransfer {
     // CCIP_LOCK_OR_BURN_V1_RET_BYTES bytes. If more data is required, the TokenTransferFeeConfig.destBytesOverhead
     // has to be set for the specific token.
     pub extra_data: Vec<u8>,
-    pub amount: [u8; 32], // LE encoded u256, any cross-chain token amounts are u256
+    pub amount: CrossChainAmount,
 }
 
 impl Any2SVMTokenTransfer {
@@ -158,4 +161,27 @@ pub struct SVMTokenAmount {
 pub struct ExtraArgsInput {
     pub gas_limit: Option<u128>,
     pub allow_out_of_order_execution: Option<bool>,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Default, Debug)]
+pub struct CrossChainAmount {
+    le_bytes: [u8; 32],
+}
+
+impl CrossChainAmount {
+    pub const ZERO: Self = Self {
+        le_bytes: [0u8; 32],
+    };
+
+    pub fn to_bytes(self) -> [u8; 32] {
+        self.le_bytes
+    }
+}
+
+impl<T: Into<ethnum::U256>> From<T> for CrossChainAmount {
+    fn from(value: T) -> Self {
+        Self {
+            le_bytes: value.into().to_le_bytes(),
+        }
+    }
 }
