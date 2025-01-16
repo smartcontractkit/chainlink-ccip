@@ -117,8 +117,11 @@ func TestCCIPRouter(t *testing.T) {
 		return tokenBillingPda
 	}
 
+	onRampAddress := [64]byte{1, 2, 3}
+	emptyAddress := [64]byte{}
+
 	validSourceChainConfig := ccip_router.SourceChainConfig{
-		OnRamp:    config.OnRampAddress,
+		OnRamp:    [2][64]byte{onRampAddress, emptyAddress},
 		IsEnabled: true,
 	}
 	validDestChainConfig := ccip_router.DestChainConfig{
@@ -545,7 +548,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, config.OnRampAddress, sourceChainStateAccount.Config.OnRamp)
+			require.Equal(t, [2][64]byte{config.OnRampAddressPadded, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
 			var destChainStateAccount ccip_router.DestChain
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.EvmDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
@@ -557,10 +560,17 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("When admin adds another chain selector it's also added on the list", func(t *testing.T) {
 			// Using another chain, solana as an example (which allows Solana -> Solana messages)
 			// Regardless of whether we allow Solana -> Solana in mainnet, it's easy to use for tests here
+
+			// the router is the Solana onramp
+			var paddedCcipRouterProgram [64]byte
+			copy(paddedCcipRouterProgram[:], config.CcipRouterProgram[:])
+
+			onRampConfig := [2][64]byte{paddedCcipRouterProgram, emptyAddress}
+
 			instruction, err := ccip_router.NewAddChainSelectorInstruction(
 				config.SolanaChainSelector,
 				ccip_router.SourceChainConfig{
-					OnRamp:    config.CcipRouterProgram[:], // the router is the Solana onramp
+					OnRamp:    onRampConfig, // the source on ramp address must be padded, as this value is an array of 64 bytes
 					IsEnabled: true,
 				},
 				ccip_router.DestChainConfig{
@@ -584,7 +594,7 @@ func TestCCIPRouter(t *testing.T) {
 			require.NoError(t, err, "failed to get account info")
 			require.Equal(t, uint64(1), sourceChainStateAccount.State.MinSeqNr)
 			require.Equal(t, true, sourceChainStateAccount.Config.IsEnabled)
-			require.Equal(t, config.CcipRouterProgram[:], sourceChainStateAccount.Config.OnRamp)
+			require.Equal(t, [2][64]byte{paddedCcipRouterProgram, emptyAddress}, sourceChainStateAccount.Config.OnRamp)
 
 			var destChainStateAccount ccip_router.DestChain
 			err = common.GetAccountDataBorshInto(ctx, solanaGoClient, config.SolanaDestChainStatePDA, config.DefaultCommitment, &destChainStateAccount)
@@ -2010,6 +2020,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2043,6 +2054,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2109,6 +2121,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2170,6 +2183,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2232,6 +2246,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2293,6 +2308,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2351,6 +2367,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2384,6 +2401,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2416,6 +2434,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2464,6 +2483,7 @@ func TestCCIPRouter(t *testing.T) {
 												Receiver: validReceiverAddress[:],
 												Data:     []byte{4, 5, 6},
 											},
+											[]byte{},
 											config.RouterConfigPDA,
 											destinationChainStatePDA,
 											nonceEvmPDA,
@@ -2506,6 +2526,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				anotherUserNonceEVMPDA,
@@ -2539,6 +2560,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				anotherUserNonceEVMPDA,
@@ -2603,7 +2625,6 @@ func TestCCIPRouter(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				TokenIndexes: []byte{0}, // starting indices for accounts
 			}
 
 			userTokenAccount, ok := token0.User[user.PublicKey()]
@@ -2612,6 +2633,7 @@ func TestCCIPRouter(t *testing.T) {
 			base := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{0}, // starting indices for accounts
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2684,7 +2706,6 @@ func TestCCIPRouter(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				TokenIndexes: []byte{0}, // starting indices for accounts
 			}
 
 			userTokenAccount, ok := token0.User[user.PublicKey()]
@@ -2778,6 +2799,7 @@ func TestCCIPRouter(t *testing.T) {
 					tx := ccip_router.NewCcipSendInstruction(
 						destinationChainSelector,
 						message,
+						[]byte{0}, // starting indices for accounts
 						config.RouterConfigPDA,
 						destinationChainStatePDA,
 						nonceEvmPDA,
@@ -2840,6 +2862,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_router.NewCcipSendInstruction(
 						destinationChainSelector,
 						message,
+						[]byte{},
 						config.RouterConfigPDA,
 						destinationChainStatePDA,
 						nonceEvmPDA,
@@ -2881,6 +2904,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				config.EvmChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				config.EvmDestChainStatePDA,
 				noncePDA,
@@ -2933,6 +2957,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				config.EvmChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				config.EvmDestChainStatePDA,
 				nonceEvmPDA,
@@ -4220,6 +4245,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4307,6 +4333,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4396,6 +4423,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					unsupportedSourceChainStatePDA,
 					rootPDA,
@@ -4467,6 +4495,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4505,6 +4534,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4549,6 +4579,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4627,6 +4658,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport1,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4659,6 +4691,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw = ccip_router.NewExecuteInstruction(
 					executionReport2,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4709,8 +4742,10 @@ func TestCCIPRouter(t *testing.T) {
 				message.TokenReceiver = stubAccountPDA
 				message.LogicReceiver = config.CcipInvalidReceiverProgram
 				sequenceNumber := message.Header.SequenceNumber
+				message.ExtraArgs.IsWritableBitmap = 0
 				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
+					config.CcipInvalidReceiverProgram,
+					solana.SystemProgramID,
 				}
 
 				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
@@ -4756,6 +4791,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4832,6 +4868,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4911,11 +4948,11 @@ func TestCCIPRouter(t *testing.T) {
 					OffchainTokenData:   [][]byte{{}},
 					Root:                root,
 					Proofs:              [][32]uint8{},
-					TokenIndexes:        []uint8{4},
 				}
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{4},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4972,6 +5009,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				raw := ccip_router.NewManuallyExecuteInstruction(
 					executionReport,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5048,6 +5086,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5082,6 +5121,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5125,6 +5165,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5175,6 +5216,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5228,16 +5270,17 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 
 				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					{Pubkey: config.CcipLogicReceiver},
-					{Pubkey: config.ReceiverTargetAccountPDA, IsWritable: true},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
-					{Pubkey: config.CcipRouterProgram, IsWritable: false},
-					{Pubkey: config.RouterConfigPDA, IsWritable: false},
-					{Pubkey: config.ReceiverExternalExecutionConfigPDA, IsWritable: true},
-					{Pubkey: config.EvmSourceChainStatePDA, IsWritable: true},
-					{Pubkey: receiverContractEvmPDA, IsWritable: true},
-					{Pubkey: solana.SystemProgramID, IsWritable: false},
+				message.ExtraArgs.IsWritableBitmap = 2 + 32 + 64 + 128
+				message.ExtraArgs.Accounts = []solana.PublicKey{
+					config.CcipLogicReceiver,
+					config.ReceiverTargetAccountPDA, // writable (index = 1)
+					solana.SystemProgramID,
+					config.CcipRouterProgram,
+					config.RouterConfigPDA,
+					config.ReceiverExternalExecutionConfigPDA, // writable (index = 5)
+					config.EvmSourceChainStatePDA,             // writable (index = 6)
+					receiverContractEvmPDA,                    // writable (index = 7)
+					solana.SystemProgramID,
 				}
 
 				hash, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
@@ -5283,6 +5326,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5374,11 +5418,11 @@ func TestCCIPRouter(t *testing.T) {
 					OffchainTokenData:   [][]byte{{}},
 					Root:                root,
 					Proofs:              [][32]uint8{},
-					TokenIndexes:        []uint8{0}, // only token transfer message
 				}
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5407,6 +5451,7 @@ func TestCCIPRouter(t *testing.T) {
 				// NOTE: expects re-execution time to be instantaneous
 				rawManual := ccip_router.NewManuallyExecuteInstruction(
 					executionReport,
+					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,

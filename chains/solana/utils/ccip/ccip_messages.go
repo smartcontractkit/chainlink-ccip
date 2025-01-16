@@ -102,12 +102,13 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 		TokenReceiver: config.ReceiverExternalExecutionConfigPDA,
 		LogicReceiver: config.CcipLogicReceiver,
 		ExtraArgs: ccip_router.SolanaExtraArgs{
-			ComputeUnits: 1000,
-			Accounts: []ccip_router.SolanaAccountMeta{
-				{Pubkey: config.ReceiverTargetAccountPDA, IsWritable: true},
-				{Pubkey: solana.SystemProgramID, IsWritable: false},
+			ComputeUnits:     1000,
+			IsWritableBitmap: 2, // bitmap[1] == 1
+			Accounts: []solana.PublicKey{
+				config.ReceiverTargetAccountPDA, solana.SystemProgramID,
 			},
 		},
+		OnRampAddress: config.OnRampAddress,
 	}
 	return message
 }
@@ -155,18 +156,11 @@ func HashEvmToSolanaMessage(msg ccip_router.Any2SolanaRampMessage, onRampAddress
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.SequenceNumber); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(hash, binary.BigEndian, msg.ExtraArgs.ComputeUnits); err != nil {
-		return nil, err
-	}
-	// Push accounts size
-	if _, err := hash.Write([]byte{uint8(len(msg.ExtraArgs.Accounts))}); err != nil { //nolint:gosec
-		return nil, err
-	}
-	accountsBytes, borshErr := bin.MarshalBorsh(msg.ExtraArgs.Accounts)
+	extraArgsBytes, borshErr := bin.MarshalBorsh(msg.ExtraArgs)
 	if borshErr != nil {
 		return nil, borshErr
 	}
-	if _, err := hash.Write(accountsBytes); err != nil {
+	if _, err := hash.Write(extraArgsBytes); err != nil {
 		return nil, err
 	}
 	if err := binary.Write(hash, binary.BigEndian, msg.Header.Nonce); err != nil {
@@ -269,21 +263,18 @@ func HashSolanaToAnyMessage(msg ccip_router.Solana2AnyRampMessage) ([]byte, erro
 	if _, err := hash.Write(msg.Data); err != nil {
 		return nil, err
 	}
-	tokenAmountsBytes, err := bin.MarshalBorsh(msg.TokenAmounts)
-	if err != nil {
-		return nil, err
+	tokenAmountsBytes, borshErr := bin.MarshalBorsh(msg.TokenAmounts)
+	if borshErr != nil {
+		return nil, borshErr
 	}
 	if _, err := hash.Write(tokenAmountsBytes); err != nil {
 		return nil, err
 	}
-	if _, err := hash.Write(msg.ExtraArgs.GasLimit.Bytes()); err != nil {
+	extraArgsBytes, err := bin.MarshalBorsh(msg.ExtraArgs)
+	if err != nil {
 		return nil, err
 	}
-	allowOutOfOrderExecution := uint8(0)
-	if msg.ExtraArgs.AllowOutOfOrderExecution {
-		allowOutOfOrderExecution = 1
-	}
-	if _, err := hash.Write([]byte{allowOutOfOrderExecution}); err != nil {
+	if _, err := hash.Write(extraArgsBytes); err != nil {
 		return nil, err
 	}
 

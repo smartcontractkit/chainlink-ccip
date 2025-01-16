@@ -63,6 +63,7 @@ pub fn ccip_send<'info>(
     ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
     dest_chain_selector: u64,
     message: Solana2AnyMessage,
+    token_indexes: Vec<u8>,
 ) -> Result<()> {
     // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
@@ -78,11 +79,8 @@ pub fn ccip_send<'info>(
         );
 
         // Calculate the indexes for the additional accounts of the current token index `i`
-        let (start, end) = calculate_token_pool_account_indices(
-            i,
-            &message.token_indexes,
-            ctx.remaining_accounts.len(),
-        )?;
+        let (start, end) =
+            calculate_token_pool_account_indices(i, &token_indexes, ctx.remaining_accounts.len())?;
 
         let current_token_accounts = validate_and_parse_token_accounts(
             ctx.accounts.authority.key(),
@@ -165,7 +163,7 @@ pub fn ccip_send<'info>(
 
     let token_count = message.token_amounts.len();
     require!(
-        message.token_indexes.len() == token_count,
+        token_indexes.len() == token_count,
         CcipRouterError::InvalidInputs,
     );
 
@@ -311,11 +309,6 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // Extra Args struct
-    let extra_args_gas_limit = msg.extra_args.gas_limit.to_be_bytes();
-    let extra_args_allow_out_of_order_execution =
-        [msg.extra_args.allow_out_of_order_execution as u8];
-
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
     // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
     let result = hash::hashv(&[
@@ -339,8 +332,7 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
         // tokens
         &msg.token_amounts.try_to_vec().unwrap(),
         // extra args
-        &extra_args_gas_limit,
-        &extra_args_allow_out_of_order_execution,
+        msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialize
     ]);
 
     result.to_bytes()
@@ -445,7 +437,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "9296d0ab425d1715b7709d1350e9486edc4ea235c47eed096b54bff20d07c692",
+            "557e0080a3616647be8f376859d4c991778a21859e266ab3c92edfa04655f5dc",
             hex::encode(hash_result)
         );
     }

@@ -1224,6 +1224,10 @@
           "type": {
             "defined": "Solana2AnyMessage"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1408,6 +1412,10 @@
               3
             ]
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1473,6 +1481,10 @@
           "type": {
             "defined": "ExecutionReportSingleChain"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     }
@@ -2092,26 +2104,6 @@
                 ]
               }
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
-          }
-        ]
-      }
-    },
-    {
-      "name": "SolanaAccountMeta",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pubkey",
-            "type": "publicKey"
-          },
-          {
-            "name": "isWritable",
-            "type": "bool"
           }
         ]
       }
@@ -2126,11 +2118,13 @@
             "type": "u32"
           },
           {
+            "name": "isWritableBitmap",
+            "type": "u64"
+          },
+          {
             "name": "accounts",
             "type": {
-              "vec": {
-                "defined": "SolanaAccountMeta"
-              }
+              "vec": "publicKey"
             }
           }
         ]
@@ -2192,6 +2186,10 @@
             "type": {
               "defined": "SolanaExtraArgs"
             }
+          },
+          {
+            "name": "onRampAddress",
+            "type": "bytes"
           }
         ]
       }
@@ -2340,10 +2338,6 @@
             "type": {
               "defined": "ExtraArgsInput"
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
@@ -2507,7 +2501,17 @@
           },
           {
             "name": "onRamp",
-            "type": "bytes"
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    64
+                  ]
+                },
+                2
+              ]
+            }
           }
         ]
       }

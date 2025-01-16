@@ -37,8 +37,9 @@ func TestMessageHashing(t *testing.T) {
 				Nonce:               90,
 			},
 			ExtraArgs: ccip_router.SolanaExtraArgs{
-				ComputeUnits: 1000,
-				Accounts:     []ccip_router.SolanaAccountMeta{},
+				ComputeUnits:     1000,
+				IsWritableBitmap: 1,
+				Accounts:         []solana.PublicKey{},
 			},
 			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{
 				{
@@ -86,6 +87,6 @@ func TestMessageHashing(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Equal(t, "9296d0ab425d1715b7709d1350e9486edc4ea235c47eed096b54bff20d07c692", hex.EncodeToString(h))
+		require.Equal(t, "557e0080a3616647be8f376859d4c991778a21859e266ab3c92edfa04655f5dc", hex.EncodeToString(h))
 	})
 }

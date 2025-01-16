@@ -524,7 +524,6 @@ type ExecutionReportSingleChain struct {
 	OffchainTokenData   [][]byte
 	Root                [32]uint8
 	Proofs              [][32]uint8
-	TokenIndexes        []byte
 }
 
 func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -550,11 +549,6 @@ func (obj ExecutionReportSingleChain) MarshalWithEncoder(encoder *ag_binary.Enco
 	}
 	// Serialize `Proofs` param:
 	err = encoder.Encode(obj.Proofs)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
 	if err != nil {
 		return err
 	}
@@ -587,55 +581,23 @@ func (obj *ExecutionReportSingleChain) UnmarshalWithDecoder(decoder *ag_binary.D
 	if err != nil {
 		return err
 	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-type SolanaAccountMeta struct {
-	Pubkey     ag_solanago.PublicKey
-	IsWritable bool
-}
-
-func (obj SolanaAccountMeta) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
-	// Serialize `Pubkey` param:
-	err = encoder.Encode(obj.Pubkey)
-	if err != nil {
-		return err
-	}
-	// Serialize `IsWritable` param:
-	err = encoder.Encode(obj.IsWritable)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (obj *SolanaAccountMeta) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
-	// Deserialize `Pubkey`:
-	err = decoder.Decode(&obj.Pubkey)
-	if err != nil {
-		return err
-	}
-	// Deserialize `IsWritable`:
-	err = decoder.Decode(&obj.IsWritable)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 type SolanaExtraArgs struct {
-	ComputeUnits uint32
-	Accounts     []SolanaAccountMeta
+	ComputeUnits     uint32
+	IsWritableBitmap uint64
+	Accounts         []ag_solanago.PublicKey
 }
 
 func (obj SolanaExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	// Serialize `ComputeUnits` param:
 	err = encoder.Encode(obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Serialize `IsWritableBitmap` param:
+	err = encoder.Encode(obj.IsWritableBitmap)
 	if err != nil {
 		return err
 	}
@@ -650,6 +612,11 @@ func (obj SolanaExtraArgs) MarshalWithEncoder(encoder *ag_binary.Encoder) (err e
 func (obj *SolanaExtraArgs) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
 	// Deserialize `ComputeUnits`:
 	err = decoder.Decode(&obj.ComputeUnits)
+	if err != nil {
+		return err
+	}
+	// Deserialize `IsWritableBitmap`:
+	err = decoder.Decode(&obj.IsWritableBitmap)
 	if err != nil {
 		return err
 	}
@@ -698,10 +665,17 @@ type Any2SolanaRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
+<<<<<<< HEAD
 	LogicReceiver ag_solanago.PublicKey
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SolanaTokenTransfer
 	ExtraArgs     SolanaExtraArgs
+=======
+	Receiver      ag_solanago.PublicKey
+	TokenAmounts  []Any2SolanaTokenTransfer
+	ExtraArgs     SolanaExtraArgs
+	OnRampAddress []byte
+>>>>>>> main
 }
 
 func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -737,6 +711,11 @@ func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) 
 	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
+	if err != nil {
+		return err
+	}
+	// Serialize `OnRampAddress` param:
+	err = encoder.Encode(obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -776,6 +755,11 @@ func (obj *Any2SolanaRampMessage) UnmarshalWithDecoder(decoder *ag_binary.Decode
 	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
+	if err != nil {
+		return err
+	}
+	// Deserialize `OnRampAddress`:
+	err = decoder.Decode(&obj.OnRampAddress)
 	if err != nil {
 		return err
 	}
@@ -1019,7 +1003,6 @@ type Solana2AnyMessage struct {
 	TokenAmounts []SolanaTokenAmount
 	FeeToken     ag_solanago.PublicKey
 	ExtraArgs    ExtraArgsInput
-	TokenIndexes []byte
 }
 
 func (obj Solana2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
@@ -1045,11 +1028,6 @@ func (obj Solana2AnyMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err
 	}
 	// Serialize `ExtraArgs` param:
 	err = encoder.Encode(obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Serialize `TokenIndexes` param:
-	err = encoder.Encode(obj.TokenIndexes)
 	if err != nil {
 		return err
 	}
@@ -1079,11 +1057,6 @@ func (obj *Solana2AnyMessage) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (
 	}
 	// Deserialize `ExtraArgs`:
 	err = decoder.Decode(&obj.ExtraArgs)
-	if err != nil {
-		return err
-	}
-	// Deserialize `TokenIndexes`:
-	err = decoder.Decode(&obj.TokenIndexes)
 	if err != nil {
 		return err
 	}
@@ -1376,7 +1349,7 @@ func (obj *Ocr3Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err err
 
 type SourceChainConfig struct {
 	IsEnabled bool
-	OnRamp    []byte
+	OnRamp    [2][64]uint8
 }
 
 func (obj SourceChainConfig) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
