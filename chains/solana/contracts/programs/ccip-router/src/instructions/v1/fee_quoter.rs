@@ -6,11 +6,11 @@ use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
 use crate::{
-    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
-    SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
+    BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, SVM2AnyMessage,
+    SVMTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
 };
 
-use super::messages::ramps::validate_solana2any;
+use super::messages::ramps::validate_svm2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
 use super::price_math::{Exponential, Usd18Decimals};
 
@@ -32,12 +32,12 @@ pub const ANY_2_EVM_MESSAGE_FIXED_BYTES_PER_TOKEN: U256 = U256::new(32 * ((2 * 3
 
 pub fn fee_for_msg(
     _dest_chain_selector: u64,
-    message: &Solana2AnyMessage,
+    message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     fee_token_config: &BillingTokenConfig,
     additional_token_configs: &[Option<BillingTokenConfig>],
     additional_token_configs_for_dest_chain: &[PerChainPerTokenConfig],
-) -> Result<SolanaTokenAmount> {
+) -> Result<SVMTokenAmount> {
     let fee_token = if message.fee_token == Pubkey::default() {
         native_mint::ID // Wrapped SOL
     } else {
@@ -51,7 +51,7 @@ pub fn fee_for_msg(
         additional_token_configs_for_dest_chain.len() == message.token_amounts.len(),
         CcipRouterError::InvalidInputsMissingTokenConfig
     );
-    validate_solana2any(message, dest_chain, fee_token_config)?;
+    validate_svm2any(message, dest_chain, fee_token_config)?;
 
     let fee_token_price = get_validated_token_price(fee_token_config)?;
     let PackedPrice {
@@ -98,7 +98,7 @@ pub fn fee_for_msg(
         .try_into()
         .map_err(|_| CcipRouterError::InvalidTokenPrice)?;
 
-    Ok(SolanaTokenAmount {
+    Ok(SVMTokenAmount {
         token: fee_token,
         amount: fee_token_amount,
     })
@@ -106,7 +106,7 @@ pub fn fee_for_msg(
 
 fn data_availability_cost(
     data_availability_gas_price: Usd18Decimals,
-    message: &Solana2AnyMessage,
+    message: &SVM2AnyMessage,
     token_transfer_bytes_overhead: U256,
     dest_chain: &DestChain,
 ) -> Usd18Decimals {
@@ -149,7 +149,7 @@ impl AddAssign for NetworkFee {
 }
 
 fn network_fee(
-    message: &Solana2AnyMessage,
+    message: &SVM2AnyMessage,
     dest_chain: &DestChain,
     token_configs: &[Option<BillingTokenConfig>],
     token_configs_for_dest_chain: &[PerChainPerTokenConfig],
@@ -181,7 +181,7 @@ fn network_fee(
 
 fn token_network_fees(
     billing_config: &Option<BillingTokenConfig>,
-    token_amount: &SolanaTokenAmount,
+    token_amount: &SVMTokenAmount,
     config_for_dest_chain: &PerChainPerTokenConfig,
 ) -> Result<NetworkFee> {
     let bps_fee = match billing_config {
@@ -343,7 +343,7 @@ pub fn wrap_native_sol<'info>(
 }
 
 pub fn transfer_fee<'info>(
-    fee: &SolanaTokenAmount,
+    fee: &SVMTokenAmount,
     token_program: AccountInfo<'info>,
     transfer: token_interface::TransferChecked<'info>,
     decimals: u8,
@@ -396,7 +396,7 @@ mod tests {
     // NOTE: This test is unique in that the return value of `fee_for_msg` has been
     // directly validated against a `getFee` query in the Ethereum mainnet -> Avalanche Fuji
     // lane, using the same configuration. This ensures that at least on a simple execution
-    // path, the Solana fee quoter behaves identically to the EVM implementation. Further
+    // path, the SVM fee quoter behaves identically to the EVM implementation. Further
     // tests after this one simply observe the impact of modifying certain parameters on the
     // output.
     fn retrieving_fee_from_valid_message() {
@@ -411,7 +411,7 @@ mod tests {
                 &[]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 48282184443231661
             }
@@ -433,7 +433,7 @@ mod tests {
                 &[]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the network fee component of the sum
                 amount: 298071755652939846
@@ -444,7 +444,7 @@ mod tests {
     #[test]
     fn network_fee_for_an_unsupported_token_fails() {
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: Pubkey::new_unique(),
             amount: 1,
         }];
@@ -480,7 +480,7 @@ mod tests {
         per_chain_per_token.billing.max_fee_usdcents = 0;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: per_chain_per_token.mint,
             amount: 1,
         }];
@@ -495,7 +495,7 @@ mod tests {
                 &[per_chain_per_token]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 52885511932309044,
             }
@@ -515,7 +515,7 @@ mod tests {
         another_per_chain_per_token_config.billing.max_fee_usdcents = 1600;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: another_token_config.mint,
             amount: 1,
         }];
@@ -530,7 +530,7 @@ mod tests {
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the min_fee
                 amount: 398110981980079407
@@ -553,7 +553,7 @@ mod tests {
         another_per_chain_per_token_config.billing.deci_bps = 10000;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: another_token_config.mint,
             amount: 15_000_000_000_000_000,
         }];
@@ -568,7 +568,7 @@ mod tests {
                 &[another_per_chain_per_token_config.clone()]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 36130696584140229
             }
@@ -587,7 +587,7 @@ mod tests {
                 &[another_per_chain_per_token_config]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Slight increase in price
                 amount: 37480696584140229
@@ -608,7 +608,7 @@ mod tests {
         another_per_chain_per_token_config.billing.deci_bps = 10000;
 
         let mut message = sample_message();
-        message.token_amounts = vec![SolanaTokenAmount {
+        message.token_amounts = vec![SVMTokenAmount {
             token: another_per_chain_per_token_config.mint,
             amount: 15_000_000_000_000_000,
         }];
@@ -623,7 +623,7 @@ mod tests {
                 &[another_per_chain_per_token_config.clone()]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 35234859440885153
             }
@@ -642,7 +642,7 @@ mod tests {
                 &[another_per_chain_per_token_config.clone()]
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 amount: 35234859440885153
             }
@@ -657,7 +657,7 @@ mod tests {
         let mut message = sample_message();
         message.token_amounts = tokens
             .iter()
-            .map(|t| SolanaTokenAmount {
+            .map(|t| SVMTokenAmount {
                 token: t.mint,
                 amount: 1,
             })
@@ -679,7 +679,7 @@ mod tests {
                 &per_chains
             )
             .unwrap(),
-            SolanaTokenAmount {
+            SVMTokenAmount {
                 token: native_mint::ID,
                 // Increases proportionally to the number of tokens
                 amount: 153233232867589323

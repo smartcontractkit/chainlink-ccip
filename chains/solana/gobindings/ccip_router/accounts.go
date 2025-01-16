@@ -12,7 +12,7 @@ type Config struct {
 	Version                         uint8
 	DefaultAllowOutOfOrderExecution uint8
 	Padding0                        [6]uint8
-	SolanaChainSelector             uint64
+	SvmChainSelector                uint64
 	DefaultGasLimit                 ag_binary.Uint128
 	Padding1                        [8]uint8
 	Owner                           ag_solanago.PublicKey
@@ -46,8 +46,8 @@ func (obj Config) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
-	// Serialize `SolanaChainSelector` param:
-	err = encoder.Encode(obj.SolanaChainSelector)
+	// Serialize `SvmChainSelector` param:
+	err = encoder.Encode(obj.SvmChainSelector)
 	if err != nil {
 		return err
 	}
@@ -123,8 +123,8 @@ func (obj *Config) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) 
 	if err != nil {
 		return err
 	}
-	// Deserialize `SolanaChainSelector`:
-	err = decoder.Decode(&obj.SolanaChainSelector)
+	// Deserialize `SvmChainSelector`:
+	err = decoder.Decode(&obj.SvmChainSelector)
 	if err != nil {
 		return err
 	}
