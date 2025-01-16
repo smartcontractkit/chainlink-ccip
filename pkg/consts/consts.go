@@ -29,9 +29,8 @@ const (
 	MethodNameOffRampGetAllSourceChainConfigs = "OffRampGetAllSourceChainConfigs"
 	MethodNameOffRampGetDynamicConfig         = "OffRampGetDynamicConfig"
 	MethodNameOffRampGetStaticConfig          = "OffRampGetStaticConfig"
-	MethodNameOffRampGetDestChainConfig       = "OffRampGetDestChainConfig"
+	MethodNameOffRampLatestConfigDetails      = "OffRampLatestConfigDetails"
 	MethodNameGetLatestPriceSequenceNumber    = "GetLatestPriceSequenceNumber"
-	MethodNameIsBlessed                       = "IsBlessed"
 	MethodNameGetMerkleRoot                   = "GetMerkleRoot"
 	MethodNameGetExecutionState               = "GetExecutionState"
 
@@ -50,7 +49,6 @@ const (
 	MethodNameGetPremiumMultiplierWeiPerEth = "GetPremiumMultiplierWeiPerEth"
 	MethodNameGetTokenTransferFeeConfig     = "GetTokenTransferFeeConfig"
 	MethodNameProcessMessageArgs            = "ProcessMessageArgs"
-	MethodNameProcessPoolReturnData         = "ProcessPoolReturnData"
 	MethodNameGetValidatedTokenPrice        = "GetValidatedTokenPrice"
 	MethodNameGetFeeTokens                  = "GetFeeTokens"
 

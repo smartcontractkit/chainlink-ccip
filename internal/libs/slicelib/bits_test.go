@@ -46,7 +46,6 @@ func TestBoolsToBitFlags(t *testing.T) {
 		},
 	}
 	for i, tc := range tt {
-		tc := tc
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 			a := BoolsToBitFlags(tc.flags)

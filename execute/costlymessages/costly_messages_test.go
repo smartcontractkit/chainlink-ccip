@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readerpkg_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -36,12 +36,22 @@ func mustMakeBytes(s string) ccipocr3.Bytes32 {
 func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 	tests := []struct {
 		name         string
+		notEnabled   bool
 		messageIDs   []ccipocr3.Bytes32
 		messageFees  map[ccipocr3.Bytes32]plugintypes.USD18
 		messageCosts map[ccipocr3.Bytes32]plugintypes.USD18
 		want         []ccipocr3.Bytes32
 		wantErr      assert.ErrorAssertionFunc
 	}{
+		{
+			name:         "disabled observer returns empty slice",
+			notEnabled:   true,
+			messageIDs:   []ccipocr3.Bytes32{b1, b2, b3},
+			messageFees:  map[ccipocr3.Bytes32]plugintypes.USD18{},
+			messageCosts: map[ccipocr3.Bytes32]plugintypes.USD18{},
+			want:         []ccipocr3.Bytes32{},
+			wantErr:      assert.NoError,
+		},
 		{
 			name:         "empty",
 			messageIDs:   []ccipocr3.Bytes32{},
@@ -95,7 +105,7 @@ func TestCCIPCostlyMessageObserver_Observe(t *testing.T) {
 			execCostCalculator := NewStaticMessageExecCostUSD18Calculator(tt.messageCosts)
 			observer := &observer{
 				lggr:               logger.Test(t),
-				enabled:            true,
+				enabled:            !tt.notEnabled,
 				feeCalculator:      feeCalculator,
 				execCostCalculator: execCostCalculator,
 			}
@@ -305,6 +315,21 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 		want                map[ccipocr3.Bytes32]plugintypes.USD18
 		wantErr             bool
 	}{
+		{
+			name:                "empty messages slice results in error",
+			messages:            []ccipocr3.Message{},
+			messageGases:        []uint64{},
+			executionFee:        new(big.Int).Mul(big.NewInt(20), new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)),
+			dataAvailabilityFee: big.NewInt(0),
+			feeComponentsError:  nil,
+			daGasConfig: ccipocr3.DataAvailabilityGasConfig{
+				DestDataAvailabilityOverheadGas:   1,
+				DestGasPerDataAvailabilityByte:    1,
+				DestDataAvailabilityMultiplierBps: 1,
+			},
+			want:    nil,
+			wantErr: true,
+		},
 		{
 			name: "happy path, no DA cost",
 			messages: []ccipocr3.Message{
@@ -518,17 +543,19 @@ func TestCCIPMessageExecCostUSD18Calculator_MessageExecCostUSD18(t *testing.T) {
 				ExecutionFee:        tt.executionFee,
 				DataAvailabilityFee: tt.dataAvailabilityFee,
 			}
-			mockReader.EXPECT().GetDestChainFeeComponents(ctx).Return(feeComponents, tt.feeComponentsError)
-			mockReader.EXPECT().GetWrappedNativeTokenPriceUSD(
-				ctx,
-				[]ccipocr3.ChainSelector{destChainSelector},
-			).Return(
-				map[ccipocr3.ChainSelector]ccipocr3.BigInt{
-					destChainSelector: nativeTokenPrice,
-				},
-			).Maybe()
-			if !tt.wantErr {
-				mockReader.EXPECT().GetMedianDataAvailabilityGasConfig(ctx).Return(tt.daGasConfig, nil)
+			if len(tt.messages) > 0 {
+				mockReader.EXPECT().GetDestChainFeeComponents(ctx).Return(feeComponents, tt.feeComponentsError)
+				mockReader.EXPECT().GetWrappedNativeTokenPriceUSD(
+					ctx,
+					[]ccipocr3.ChainSelector{destChainSelector},
+				).Return(
+					map[ccipocr3.ChainSelector]ccipocr3.BigInt{
+						destChainSelector: nativeTokenPrice,
+					},
+				).Maybe()
+				if !tt.wantErr {
+					mockReader.EXPECT().GetMedianDataAvailabilityGasConfig(ctx).Return(tt.daGasConfig, nil)
+				}
 			}
 
 			ep := gasmock.NewMockEstimateProvider(t)

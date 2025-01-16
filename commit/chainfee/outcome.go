@@ -3,6 +3,7 @@ package chainfee
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sort"
 	"time"
 
@@ -16,9 +17,9 @@ import (
 )
 
 func (p *processor) Outcome(
-	ctx context.Context,
-	prevOutcome Outcome,
-	query Query,
+	_ context.Context,
+	_ Outcome,
+	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
 	consensusObs, err := p.getConsensusObservation(aos)
@@ -49,11 +50,12 @@ func (p *processor) Outcome(
 		// 1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 		usdPerFeeToken, ok := consensusObs.NativeTokenPrices[chain]
 		if !ok {
-			p.lggr.Warnw("missing native token price for chain",
+			p.lggr.Warnw("missing native token price for chain, chain fee will not be updated",
 				"chain", chain,
 			)
 			continue
 		}
+		p.lggr.Debugw("USD per fee token", "chain", chain, "usdPerFeeToken", usdPerFeeToken)
 
 		// Example with Wei as the lowest denominator and Eth as the Fee token
 		// usdPerEthToken = Xe18USD18
@@ -79,13 +81,10 @@ func (p *processor) Outcome(
 		return gasPrices[i].ChainSel < gasPrices[j].ChainSel
 	})
 
-	p.lggr.Infow("Gas Prices Outcome",
-		"gasPrices", gasPrices,
-	)
-
-	return Outcome{
-		GasPrices: gasPrices,
-	}, nil
+	p.lggr.Infow("Gas Prices Outcome", "gasPrices", gasPrices)
+	out := Outcome{GasPrices: gasPrices}
+	p.metricsReporter.TrackChainFeeOutcome(out)
+	return out, nil
 }
 
 func (p *processor) getConsensusObservation(
@@ -116,7 +115,7 @@ func (p *processor) getConsensusObservation(
 		"ChainFeeUpdates",
 		aggObs.ChainFeeUpdates,
 		consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(fDestChain)),
-		ChainFeeUpdateAggregator,
+		chainFeeUpdateAggregator,
 	)
 
 	twoFChainPlus1 := consensus.MakeMultiThreshold(fChains, consensus.TwoFPlus1)
@@ -215,11 +214,19 @@ func (p *processor) getGasPricesToUpdate(
 	feeInfo := p.cfg.FeeInfo
 
 	for chain, currentChainFee := range currentChainUSDFees {
-		packedFee := cciptypes.NewBigInt(currentChainFee.ToPackedFee())
+		packedFee := cciptypes.NewBigInt(FeeComponentsToPackedFee(currentChainFee))
 		lastUpdate, exists := latestUpdates[chain]
-		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
 		// If the chain is not in the fee quoter updates or is stale, then we should update it
-		if !exists || obsTimestamp.After(nextUpdateTime) {
+		if !exists {
+			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
+				ChainSel: chain,
+				GasPrice: packedFee,
+			})
+			continue
+		}
+
+		nextUpdateTime := lastUpdate.Timestamp.Add(p.cfg.RemoteGasPriceBatchWriteFrequency.Duration())
+		if obsTimestamp.After(nextUpdateTime) {
 			gasPrices = append(gasPrices, cciptypes.GasPriceChain{
 				ChainSel: chain,
 				GasPrice: packedFee,
@@ -257,4 +264,42 @@ func (p *processor) getGasPricesToUpdate(
 	}
 
 	return gasPrices
+}
+
+// chainFeeUpdateAggregator aggregates a slice of ChainFeeUpdates into a single Update
+// by taking the median of each price component and the timestamps
+func chainFeeUpdateAggregator(updates []Update) Update {
+	execFeeUSDs := make([]*big.Int, len(updates))
+	dataAvFeeUSDs := make([]*big.Int, len(updates))
+	timestamps := make([]time.Time, len(updates))
+	for i := range updates {
+		execFeeUSDs[i] = updates[i].ChainFee.ExecutionFeePriceUSD
+		dataAvFeeUSDs[i] = updates[i].ChainFee.DataAvFeePriceUSD
+		timestamps[i] = updates[i].Timestamp
+	}
+	medianExecFeeUSD := consensus.Median(execFeeUSDs, func(a, b *big.Int) bool {
+		return a.Cmp(b) == -1
+	})
+	medianDataAvFeeUSD := consensus.Median(dataAvFeeUSDs, func(a, b *big.Int) bool {
+		return a.Cmp(b) == -1
+	})
+
+	return Update{
+		ChainFee: ComponentsUSDPrices{
+			ExecutionFeePriceUSD: medianExecFeeUSD,
+			DataAvFeePriceUSD:    medianDataAvFeeUSD,
+		},
+		Timestamp: consensus.TimestampsMedian(timestamps),
+	}
+}
+
+// FeeComponentsToPackedFee is a Bitwise operation:
+// (dataAvFeeUSD << 112) | executionFeeUSD
+//
+// https://github.com/smartcontractkit/chainlink/blob/60e8b1181dd74b66903cf5b9a8427557b85357ec/contracts/src/v0.8/ccip/FeeQuoter.sol#L498
+//
+//nolint:lll
+func FeeComponentsToPackedFee(c ComponentsUSDPrices) *big.Int {
+	daShifted := new(big.Int).Lsh(c.DataAvFeePriceUSD, 112)
+	return new(big.Int).Or(daShifted, c.ExecutionFeePriceUSD)
 }

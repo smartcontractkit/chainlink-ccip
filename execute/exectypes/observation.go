@@ -1,8 +1,10 @@
 package exectypes
 
 import (
+	"context"
 	"encoding/json"
 
+	"github.com/smartcontractkit/chainlink-ccip/execute/internal"
 	dt "github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/discovery/discoverytypes"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -14,6 +16,10 @@ type CommitObservations map[cciptypes.ChainSelector][]CommitData
 // and sequence number.
 type MessageObservations map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Message
 
+type MessageHashes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]cciptypes.Bytes32
+
+type EncodedMsgAndTokenDataSizes map[cciptypes.ChainSelector]map[cciptypes.SeqNum]int
+
 // Flatten nested maps into a slice of messages.
 func (mo MessageObservations) Flatten() []cciptypes.Message {
 	var results []cciptypes.Message
@@ -23,6 +29,34 @@ func (mo MessageObservations) Flatten() []cciptypes.Message {
 		}
 	}
 	return results
+}
+
+func GetHashes(ctx context.Context, mo MessageObservations, hasher cciptypes.MessageHasher) (MessageHashes, error) {
+	hashes := make(MessageHashes)
+	for chain, msgs := range mo {
+		hashes[chain] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+		for seq, msg := range msgs {
+			hash, err := hasher.Hash(ctx, msg)
+			if err != nil {
+				return nil, err
+			}
+			hashes[chain][seq] = hash
+		}
+	}
+	return hashes, nil
+}
+
+// GetEncodedMsgAndTokenDataSizes calculates the encoded sizes of messages and their token data counterpart.
+func GetEncodedMsgAndTokenDataSizes(mo MessageObservations, tds TokenDataObservations) EncodedMsgAndTokenDataSizes {
+	sizes := make(EncodedMsgAndTokenDataSizes)
+	for chain, msgs := range mo {
+		sizes[chain] = make(map[cciptypes.SeqNum]int)
+		for seq, msg := range msgs {
+			td := tds[chain][seq]
+			sizes[chain][seq] = internal.EncodedSize(msg) + internal.EncodedSize(td)
+		}
+	}
+	return sizes
 }
 
 // NonceObservations contain the latest nonce for senders in the previously observed messages.
@@ -55,12 +89,12 @@ type Observation struct {
 	// NextCommits. With the previous outcome, and these messsages, we can build the
 	// execute report.
 	Messages MessageObservations `json:"messages"`
-
+	Hashes   MessageHashes       `json:"messageHashes"`
 	// TokenData are determined during the second phase of execute.
 	// It contains the token data for the messages identified in the same stage as Messages
 	TokenData TokenDataObservations `json:"tokenDataObservations"`
 
-	// CostlyMessages are determined during the third phase of execute.
+	// CostlyMessages are determined during the GetMessages state of execute.
 	// It contains the message IDs of messages that cost more to execute than their source fees. These messages will not
 	// be executed in the current round, but may be executed in future rounds (e.g. if gas prices decrease or if
 	// these messages' fees are boosted high enough).
@@ -74,6 +108,14 @@ type Observation struct {
 	Contracts dt.Observation `json:"contracts"`
 }
 
+func (co CommitObservations) Flatten() []CommitData {
+	var results []CommitData
+	for _, reports := range co {
+		results = append(results, reports...)
+	}
+	return results
+}
+
 // NewObservation constructs an Observation object.
 func NewObservation(
 	commitReports CommitObservations,
@@ -82,6 +124,7 @@ func NewObservation(
 	tokenData TokenDataObservations,
 	nonces NonceObservations,
 	contracts dt.Observation,
+	hashes MessageHashes,
 ) Observation {
 	return Observation{
 		CommitReports:  commitReports,
@@ -90,6 +133,7 @@ func NewObservation(
 		TokenData:      tokenData,
 		Nonces:         nonces,
 		Contracts:      contracts,
+		Hashes:         hashes,
 	}
 }
 

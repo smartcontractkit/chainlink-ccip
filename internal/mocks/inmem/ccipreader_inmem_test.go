@@ -85,7 +85,6 @@ func TestInMemoryCCIPReader_CommitReportsGTETimestamp(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := InMemoryCCIPReader{
@@ -211,7 +210,6 @@ func TestInMemoryCCIPReader_ExecutedMessageRanges(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := InMemoryCCIPReader{
@@ -313,7 +311,6 @@ func TestInMemoryCCIPReader_MsgsBetweenSeqNums(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := InMemoryCCIPReader{

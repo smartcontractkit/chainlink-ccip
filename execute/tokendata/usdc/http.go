@@ -63,7 +63,7 @@ type httpClient struct {
 }
 
 var (
-	clientInstances = make(map[string]*httpClient)
+	clientInstances = make(map[string]HTTPClient)
 	mutex           sync.Mutex
 )
 
@@ -90,7 +90,7 @@ func GetHTTPClient(
 		return nil, err
 	}
 
-	clientInstances[api] = client.(*httpClient)
+	clientInstances[api] = client
 	return client, nil
 }
 
@@ -105,13 +105,14 @@ func newHTTPClient(
 		return nil, err
 	}
 
-	return &httpClient{
+	client := &httpClient{
 		lggr:       lggr,
 		apiURL:     u,
 		apiTimeout: apiTimeout,
 		rate:       rate.NewLimiter(rate.Every(apiInterval), 1),
 		coolDownMu: &sync.RWMutex{},
-	}, nil
+	}
+	return newObservedHTTPClient(client, lggr), nil
 }
 
 type attestationStatus string
@@ -243,8 +244,14 @@ func (h *httpClient) parsePayload(res *http.Response) (cciptypes.Bytes, error) {
 func (h *httpClient) setCoolDownPeriod(headers http.Header) {
 	coolDownDuration := defaultCoolDownDuration
 	if retryAfterHeader, exists := headers["Retry-After"]; exists && len(retryAfterHeader) > 0 {
-		if retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64); errParseInt == nil {
+		retryAfterSec, errParseInt := strconv.ParseInt(retryAfterHeader[0], 10, 64)
+		if errParseInt == nil {
 			coolDownDuration = time.Duration(retryAfterSec) * time.Second
+		} else {
+			parsedTime, err := time.Parse(time.RFC1123, retryAfterHeader[0])
+			if err == nil {
+				coolDownDuration = time.Until(parsedTime)
+			}
 		}
 	}
 

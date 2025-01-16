@@ -20,10 +20,9 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/merklemulti"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -97,7 +96,6 @@ func TestMustMakeBytes(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			if tt.willPanic {
@@ -234,9 +232,19 @@ func makeTestCommitReport(
 		msg := makeMessage(
 			cciptypes.ChainSelector(srcChain),
 			cciptypes.SeqNum(i+firstSeqNum),
-			uint64(i)+1)
+			uint64(i)+1,
+		)
 		msg.Sender = sender
 		messages = append(messages, msg)
+	}
+
+	var hashes []cciptypes.Bytes32
+	for i := 0; i < len(messages); i++ {
+		hash, err := hasher.Hash(context.Background(), messages[i])
+		if err != nil {
+			panic(fmt.Sprintf("unable to hash message: %s", err))
+		}
+		hashes = append(hashes, hash)
 	}
 
 	messageTokenData := make([]exectypes.MessageTokenData, numMessages)
@@ -258,6 +266,7 @@ func makeTestCommitReport(
 		Timestamp:           time.UnixMilli(timestamp),
 		BlockNum:            uint64(block),
 		Messages:            messages,
+		Hashes:              hashes,
 		ExecutedMessages:    executed,
 		MessageTokenData:    messageTokenData,
 	}
@@ -265,7 +274,7 @@ func makeTestCommitReport(
 	// calculate merkle root
 	root := rootOverride
 	if root.IsEmpty() {
-		tree, err := ConstructMerkleTree(context.Background(), hasher, commitReport, logger.Nop())
+		tree, err := ConstructMerkleTree(commitReport, logger.Nop())
 		if err != nil {
 			panic(fmt.Sprintf("unable to construct merkle tree: %s", err))
 		}
@@ -358,6 +367,10 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 							},
 						},
 					},
+					Hashes: []cciptypes.Bytes32{
+						{0x1},
+						{0x2},
+					},
 				},
 			},
 		},
@@ -377,25 +390,8 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 							},
 						},
 					},
-				},
-				hasher: badHasher{},
-			},
-		},
-		{
-			name:    "bad hasher",
-			wantErr: "unable to hash message (1234567, 100): bad hasher",
-			args: args{
-				report: exectypes.CommitData{
-					MessageTokenData:    make([]exectypes.MessageTokenData, 1),
-					SourceChain:         1234567,
-					SequenceNumberRange: cciptypes.NewSeqNumRange(cciptypes.SeqNum(100), cciptypes.SeqNum(100)),
-					Messages: []cciptypes.Message{
-						{
-							Header: cciptypes.RampMessageHeader{
-								SourceChainSelector: 1234567,
-								SequenceNumber:      cciptypes.SeqNum(100),
-							},
-						},
+					Hashes: []cciptypes.Bytes32{
+						{0x1},
 					},
 				},
 				hasher: badHasher{},
@@ -403,26 +399,16 @@ func Test_buildSingleChainReport_Errors(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Select hasher mock.
-			var resolvedHasher cciptypes.MessageHasher
-			if tt.args.hasher != nil {
-				resolvedHasher = tt.args.hasher
-			} else {
-				resolvedHasher = mocks.NewMessageHasher()
-			}
-
-			ctx := context.Background()
 			msgs := make(map[int]struct{})
 			for i := 0; i < len(tt.args.report.Messages); i++ {
 				msgs[i] = struct{}{}
 			}
 
 			test := func(readyMessages map[int]struct{}) {
-				_, err := buildSingleChainReportHelper(ctx, lggr, resolvedHasher, tt.args.report, readyMessages)
+				_, err := buildSingleChainReportHelper(lggr, tt.args.report, readyMessages)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)
 			}
@@ -480,7 +466,7 @@ func Test_Builder_Build(t *testing.T) {
 		{
 			name: "half report",
 			args: args{
-				maxReportSize: 2654,
+				maxReportSize: 2854,
 				maxGasLimit:   10000000,
 				nonces:        defaultNonces,
 				reports: []exectypes.CommitData{
@@ -740,7 +726,6 @@ func Test_Builder_Build(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.Background()
@@ -756,10 +741,10 @@ func Test_Builder_Build(t *testing.T) {
 				hasher,
 				codec,
 				ep,
-				tt.args.nonces,
 				1,
-				tt.args.maxReportSize,
-				tt.args.maxGasLimit,
+				WithMaxReportSizeBytes(tt.args.maxReportSize),
+				WithMaxGas(tt.args.maxGasLimit),
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
 			)
 
 			var updatedMessages []exectypes.CommitData
@@ -815,7 +800,7 @@ func (bc badCodec) Decode(ctx context.Context, bytes []byte) (cciptypes.ExecuteP
 func Test_execReportBuilder_verifyReport(t *testing.T) {
 	type fields struct {
 		encoder            cciptypes.ExecutePluginCodec
-		estimateProvider   gas.EstimateProvider
+		estimateProvider   cciptypes.EstimateProvider
 		maxReportSizeBytes uint64
 		maxGas             uint64
 		accumulated        validationMetadata
@@ -862,7 +847,7 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 			fields: fields{
 				maxReportSizeBytes: 10000,
 				maxGas:             1000000,
-				estimateProvider: func() gas.EstimateProvider {
+				estimateProvider: func() cciptypes.EstimateProvider {
 					// values taken from evm.EstimateProvider
 					mockep := gasmock.NewMockEstimateProvider(t)
 					mockep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(119920)).Times(4)
@@ -933,7 +918,6 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -954,14 +938,17 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 				ep = mockep
 			}
 
-			b := &execReportBuilder{
-				lggr:               lggr,
-				encoder:            resolvedEncoder,
-				estimateProvider:   ep,
-				maxReportSizeBytes: tt.fields.maxReportSizeBytes,
-				maxGas:             tt.fields.maxGas,
-				accumulated:        tt.fields.accumulated,
-			}
+			b := newBuilderInternal(
+				lggr,
+				nil,
+				resolvedEncoder,
+				ep,
+				1,
+				WithMaxReportSizeBytes(tt.fields.maxReportSizeBytes),
+				WithMaxGas(tt.fields.maxGas),
+			)
+			b.accumulated = tt.fields.accumulated
+
 			isValid, metadata, err := b.verifyReport(context.Background(), tt.args.execReport)
 			if tt.expectedError != "" {
 				assert.Contains(t, err.Error(), tt.expectedError)
@@ -983,9 +970,6 @@ func Test_execReportBuilder_verifyReport(t *testing.T) {
 }
 
 func Test_execReportBuilder_checkMessage(t *testing.T) {
-	type fields struct {
-		accumulated validationMetadata
-	}
 	type args struct {
 		idx        int
 		nonces     map[cciptypes.ChainSelector]map[string]uint64
@@ -993,7 +977,6 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 	}
 	tests := []struct {
 		name             string
-		fields           fields
 		args             args
 		expectedData     exectypes.CommitData
 		expectedStatus   messageStatus
@@ -1165,9 +1148,24 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			},
 			expectedStatus: InvalidNonce,
 		},
+		{
+			name: "pseudo deleted",
+			args: args{
+				idx: 0,
+				execReport: exectypes.CommitData{
+					SourceChain: 1,
+					Messages: []cciptypes.Message{
+						{}, // pseudodeleted
+					},
+					MessageTokenData: []exectypes.MessageTokenData{
+						{TokenData: []exectypes.TokenData{{Ready: true, Data: []byte{}}}},
+					},
+				},
+			},
+			expectedStatus: PseudoDeleted,
+		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			lggr, logs := logger.TestObserved(t, zapcore.DebugLevel)
@@ -1176,12 +1174,14 @@ func Test_execReportBuilder_checkMessage(t *testing.T) {
 			ep.EXPECT().CalculateMessageMaxGas(mock.Anything).Return(uint64(0)).Maybe()
 			ep.EXPECT().CalculateMerkleTreeGas(mock.Anything).Return(uint64(0)).Maybe()
 
-			b := &execReportBuilder{
-				lggr:             lggr,
-				estimateProvider: ep,
-				accumulated:      tt.fields.accumulated,
-				sendersNonce:     tt.args.nonces,
-			}
+			b := newBuilderInternal(
+				lggr,
+				nil,
+				nil,
+				nil,
+				1,
+				WithExtraMessageCheck(CheckNonces(tt.args.nonces)),
+			)
 			data, status, err := b.checkMessage(context.Background(), tt.args.idx, tt.args.execReport)
 			if tt.expectedError != "" {
 				assert.Contains(t, err.Error(), tt.expectedError)

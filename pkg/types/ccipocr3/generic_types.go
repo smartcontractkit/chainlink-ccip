@@ -20,14 +20,14 @@ func NewTokenPrice(tokenID UnknownEncodedAddress, price *big.Int) TokenPrice {
 }
 
 type GasPriceChain struct {
-	GasPrice BigInt        `json:"gasPrice"`
 	ChainSel ChainSelector `json:"chainSel"`
+	GasPrice BigInt        `json:"gasPrice"`
 }
 
 func NewGasPriceChain(gasPrice *big.Int, chainSel ChainSelector) GasPriceChain {
 	return GasPriceChain{
-		GasPrice: NewBigInt(gasPrice),
 		ChainSel: chainSel,
+		GasPrice: NewBigInt(gasPrice),
 	}
 }
 
@@ -95,6 +95,10 @@ func (s SeqNumRange) String() string {
 	return fmt.Sprintf("[%d -> %d]", s[0], s[1])
 }
 
+func (s SeqNumRange) Length() int {
+	return int(s.End() - s.Start() + 1)
+}
+
 type ChainSelector uint64
 
 func (c ChainSelector) String() string {
@@ -131,9 +135,15 @@ type Message struct {
 	TokenAmounts []RampTokenAmount `json:"tokenAmounts"`
 }
 
-func (c Message) String() string {
-	js, _ := json.Marshal(c)
+func (m Message) String() string {
+	js, _ := json.Marshal(m)
 	return string(js)
+}
+
+// IsEmpty returns true if the message is empty. Can't use == Message{} without using reflect.DeepEqual.
+func (m Message) IsEmpty() bool {
+	return m.Header.MessageID == Bytes32{} && m.Header.SourceChainSelector == 0 &&
+		m.Header.DestChainSelector == 0 && m.Header.SequenceNumber == 0 && m.Header.Nonce == 0
 }
 
 // RampMessageHeader is the family-agnostic header for OnRamp and OffRamp messages.

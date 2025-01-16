@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	commontypes "github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
@@ -25,7 +23,8 @@ type PriceReader interface {
 	//	1 ETH = 2,000 USD per full token, each full token is 1e18 units -> 2000 * 1e18 * 1e18 / 1e18 = 2_000e18
 	//	1 LINK = 5.00 USD per full token, each full token is 1e18 units -> 5 * 1e18 * 1e18 / 1e18 = 5e18
 	// The order of the returned prices corresponds to the order of the provided tokens.
-	GetFeedPricesUSD(ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress) ([]*big.Int, error)
+	GetFeedPricesUSD(ctx context.Context,
+		tokens []ccipocr3.UnknownEncodedAddress) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error)
 
 	// GetFeeQuoterTokenUpdates returns the latest token prices from the FeeQuoter on the specified chain
 	GetFeeQuoterTokenUpdates(
@@ -70,6 +69,12 @@ type LatestRoundData struct {
 	UpdatedAt       *big.Int
 	AnsweredInRound *big.Int
 }
+
+// ContractTokenMap maps contracts to their token indices
+type ContractTokenMap map[commontypes.BoundContract][]ccipocr3.UnknownEncodedAddress
+
+// Number of batch operations performed (getLatestRoundData and getDecimals)
+const priceReaderOperationCount = 2
 
 func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	ctx context.Context,
@@ -142,101 +147,154 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	return updateMap, nil
 }
 
+// GetFeedPricesUSD gets USD prices for multiple tokens using batch requests
 func (pr *priceReader) GetFeedPricesUSD(
-	ctx context.Context, tokens []ccipocr3.UnknownEncodedAddress,
-) ([]*big.Int, error) {
-	prices := make([]*big.Int, len(tokens))
+	ctx context.Context,
+	tokens []ccipocr3.UnknownEncodedAddress,
+) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error) {
+	prices := make(map[ccipocr3.UnknownEncodedAddress]*big.Int, len(tokens))
 	if pr.feedChainReader() == nil {
 		pr.lggr.Debug("node does not support feed chain")
 		return prices, nil
 	}
-	eg := new(errgroup.Group)
-	for idx, token := range tokens {
-		idx := idx
-		token := token
-		eg.Go(func() error {
-			boundContract := commontypes.BoundContract{
-				Address: string(pr.tokenInfo[token].AggregatorAddress),
-				Name:    consts.ContractNamePriceAggregator,
-			}
-			rawTokenPrice, err := pr.getRawTokenPriceE18Normalized(ctx, token, boundContract, pr.feedChainReader())
-			if err != nil {
-				return fmt.Errorf("token price for %s: %w", token, err)
-			}
-			tokenInfo, ok := pr.tokenInfo[token]
-			if !ok {
-				return fmt.Errorf("get tokenInfo for %s: %w", token, err)
-			}
 
-			prices[idx] = calculateUsdPer1e18TokenAmount(rawTokenPrice, tokenInfo.Decimals)
-			return nil
-		})
+	// Create batch request grouped by contract
+	batchRequest, contractTokenMap, err := pr.prepareBatchRequest(tokens)
+	if err != nil {
+		return nil, fmt.Errorf("prepare batch request: %w", err)
 	}
 
-	if err := eg.Wait(); err != nil {
-		return nil, fmt.Errorf("failed to get all token prices successfully: %w", err)
+	// Execute batch request
+	results, err := pr.feedChainReader().BatchGetLatestValues(ctx, batchRequest)
+	if err != nil {
+		return nil, fmt.Errorf("batch request failed: %w", err)
 	}
 
-	for _, price := range prices {
-		if price == nil {
-			return nil, fmt.Errorf("failed to get all token prices successfully, some prices are nil")
+	// Process results by contract
+	for boundContract, tokens := range contractTokenMap {
+		contractResults, ok := results[boundContract]
+		if !ok || len(contractResults) != priceReaderOperationCount {
+			pr.lggr.Errorf("invalid results for contract %s", boundContract.Address)
+			continue
+		}
+
+		// Get price data
+		latestRoundData, err := pr.getPriceData(contractResults[0], boundContract)
+		if err != nil {
+			pr.lggr.Errorw("calling getPriceData", err)
+			continue
+		}
+
+		// Get decimals
+		decimals, err := pr.getDecimals(contractResults[1], boundContract)
+		if err != nil {
+			pr.lggr.Errorw("calling getPriceData", err)
+			continue
+		}
+
+		// Normalize price for this contract
+		normalizedContractPrice := pr.normalizePrice(latestRoundData.Answer, *decimals)
+
+		// Apply the normalized price to all tokens using this contract
+		for _, token := range tokens {
+			tokenInfo := pr.tokenInfo[token]
+			price := calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals)
+			if price == nil {
+				pr.lggr.Errorw("failed to calculate price", "token", token)
+				continue
+			}
+			prices[token] = price
 		}
 	}
 
 	return prices, nil
 }
 
-func (pr *priceReader) getFeedDecimals(
-	ctx context.Context,
-	token ccipocr3.UnknownEncodedAddress,
+func (pr *priceReader) getPriceData(
+	result commontypes.BatchReadResult,
 	boundContract commontypes.BoundContract,
-	feedChainReader contractreader.ContractReaderFacade,
-) (uint8, error) {
-	var decimals uint8
-	if err :=
-		feedChainReader.GetLatestValue(
-			ctx,
-			boundContract.ReadIdentifier(consts.MethodNameGetDecimals),
-			primitives.Unconfirmed,
-			nil,
-			&decimals,
-		); err != nil {
-		return 0, fmt.Errorf("decimals call failed for token %s: %w", token, err)
+) (*LatestRoundData, error) {
+	priceResult, err := result.GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get price for contract %s: %w", boundContract.Address, err)
 	}
+	if priceResult == nil {
+		return nil, fmt.Errorf("priceResult value is nil for contract %s", boundContract.Address)
+	}
+	latestRoundData, ok := priceResult.(*LatestRoundData)
+	if !ok {
+		return nil, fmt.Errorf("invalid price data type for contract %s", boundContract.Address)
+	}
+	return latestRoundData, nil
+}
 
+func (pr *priceReader) getDecimals(
+	result commontypes.BatchReadResult,
+	boundContract commontypes.BoundContract,
+) (*uint8, error) {
+	decimalResult, err := result.GetResult()
+	if err != nil {
+		return nil, fmt.Errorf("get decimals for contract %s: %w", boundContract.Address, err)
+	}
+	if decimalResult == nil {
+		return nil, fmt.Errorf("decimalResult value is nil for contract %s", boundContract.Address)
+	}
+	decimals, ok := decimalResult.(*uint8)
+	if !ok {
+		return nil, fmt.Errorf("invalid decimals data type for contract %s", boundContract.Address)
+	}
 	return decimals, nil
 }
 
-func (pr *priceReader) getRawTokenPriceE18Normalized(
-	ctx context.Context,
-	token ccipocr3.UnknownEncodedAddress,
-	boundContract commontypes.BoundContract,
-	feedChainReader contractreader.ContractReaderFacade,
-) (*big.Int, error) {
-	var latestRoundData LatestRoundData
-	identifier := boundContract.ReadIdentifier(consts.MethodNameGetLatestRoundData)
-	if err :=
-		feedChainReader.GetLatestValue(
-			ctx,
-			identifier,
-			primitives.Unconfirmed,
-			nil,
-			&latestRoundData,
-		); err != nil {
-		return nil, fmt.Errorf("latestRoundData call failed for token %s: %w", token, err)
+// prepareBatchRequest creates a batch request grouped by contract and returns the mapping of contracts to token indices
+func (pr *priceReader) prepareBatchRequest(
+	tokens []ccipocr3.UnknownEncodedAddress,
+) (commontypes.BatchGetLatestValuesRequest, ContractTokenMap, error) {
+	batchRequest := make(commontypes.BatchGetLatestValuesRequest)
+	contractTokenMap := make(ContractTokenMap)
+
+	for _, token := range tokens {
+		tokenInfo, ok := pr.tokenInfo[token]
+		if !ok {
+			return nil, nil, fmt.Errorf("get tokenInfo for %s: missing token info", token)
+		}
+
+		boundContract := commontypes.BoundContract{
+			Address: string(tokenInfo.AggregatorAddress),
+			Name:    consts.ContractNamePriceAggregator,
+		}
+
+		// Initialize contract batch if it doesn't exist
+		if _, exists := batchRequest[boundContract]; !exists {
+			batchRequest[boundContract] = make(commontypes.ContractBatch, priceReaderOperationCount)
+			batchRequest[boundContract][0] = commontypes.BatchRead{
+				ReadName:  consts.MethodNameGetLatestRoundData,
+				Params:    nil,
+				ReturnVal: &LatestRoundData{},
+			}
+			batchRequest[boundContract][1] = commontypes.BatchRead{
+				ReadName:  consts.MethodNameGetDecimals,
+				Params:    nil,
+				ReturnVal: new(uint8),
+			}
+		}
+
+		// Track which tokens use this contract
+		contractTokenMap[boundContract] = append(contractTokenMap[boundContract], token)
 	}
 
-	decimals, err1 := pr.getFeedDecimals(ctx, token, boundContract, feedChainReader)
-	if err1 != nil {
-		return nil, fmt.Errorf("failed to get decimals for token %s: %w", token, err1)
-	}
-	answer := latestRoundData.Answer
+	return batchRequest, contractTokenMap, nil
+}
+
+func (pr *priceReader) normalizePrice(price *big.Int, decimals uint8) *big.Int {
+	answer := new(big.Int).Set(price)
 	if decimals < 18 {
-		answer.Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals)), nil))
-	} else if decimals > 18 {
-		answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
+		return answer.Mul(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(18-int64(decimals)), nil))
 	}
-	return answer, nil
+	if decimals > 18 {
+		return answer.Div(answer, big.NewInt(0).Exp(big.NewInt(10), big.NewInt(int64(decimals)-18), nil))
+	}
+	return answer
 }
 
 func (pr *priceReader) feedChainReader() contractreader.ContractReaderFacade {

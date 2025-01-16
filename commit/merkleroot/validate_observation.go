@@ -1,9 +1,7 @@
 package merkleroot
 
 import (
-	"context"
 	"fmt"
-	"sort"
 
 	mapset "github.com/deckarep/golang-set/v2"
 
@@ -12,11 +10,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func (w *Processor) ValidateObservation(
+func (p *Processor) ValidateObservation(
 	_ Outcome,
 	q Query,
 	ao plugincommon.AttributedObservation[Observation]) error {
@@ -26,15 +23,15 @@ func (w *Processor) ValidateObservation(
 	}
 
 	obs := ao.Observation
-	if err := validateFChain(obs.FChain); err != nil {
+	if err := plugincommon.ValidateFChain(obs.FChain); err != nil {
 		return fmt.Errorf("validate FChain: %w", err)
 	}
-	observerSupportedChains, err := w.chainSupport.SupportedChains(ao.OracleID)
+	observerSupportedChains, err := p.chainSupport.SupportedChains(ao.OracleID)
 	if err != nil {
 		return fmt.Errorf("get supported chains: %w", err)
 	}
 
-	supportsDestChain, err := w.chainSupport.SupportsDestChain(ao.OracleID)
+	supportsDestChain, err := p.chainSupport.SupportsDestChain(ao.OracleID)
 	if err != nil {
 		return fmt.Errorf("call to supportsDestChain failed: %w", err)
 	}
@@ -52,7 +49,7 @@ func (w *Processor) ValidateObservation(
 	}
 
 	if err := validateRMNRemoteConfig(ao.OracleID, supportsDestChain, obs.RMNRemoteConfig); err != nil {
-		w.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
+		p.lggr.Errorw("validate RMNRemoteConfig failed", "err", err, "cfg", obs.RMNRemoteConfig)
 		return fmt.Errorf("validate RMNRemoteConfig: %w", err)
 	}
 
@@ -156,7 +153,7 @@ func validateRMNRemoteConfig(
 		return fmt.Errorf("empty RmnReportVersion")
 	}
 
-	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.F+1 {
+	if uint64(len(rmnRemoteConfig.Signers)) < rmnRemoteConfig.FSign+1 {
 		return fmt.Errorf("not enough signers to cover F+1 threshold")
 	}
 
@@ -174,67 +171,6 @@ func validateRMNRemoteConfig(
 			return fmt.Errorf("duplicate NodeIndex %d", signer.NodeIndex)
 		}
 		seenNodeIndexes.Add(signer.NodeIndex)
-	}
-
-	return nil
-}
-
-func validateFChain(fChain map[cciptypes.ChainSelector]int) error {
-	for chainSelector, f := range fChain {
-		if f <= 0 {
-			return fmt.Errorf("fChain for chain %d is not positive: %d", chainSelector, f)
-		}
-	}
-
-	return nil
-}
-
-// ValidateMerkleRootsState validates the proposed merkle roots against the current on-chain state.
-// This function is not-pure as it reads from the chain by making one network/reader call.
-func ValidateMerkleRootsState(
-	ctx context.Context,
-	proposedMerkleRoots []cciptypes.MerkleRootChain,
-	reader reader.CCIPReader,
-) error {
-	if len(proposedMerkleRoots) == 0 {
-		return nil
-	}
-
-	chainSet := mapset.NewSet[cciptypes.ChainSelector]()
-	newNextOnRampSeqNums := make(map[cciptypes.ChainSelector]cciptypes.SeqNum)
-
-	for _, r := range proposedMerkleRoots {
-		if chainSet.Contains(r.ChainSel) {
-			return fmt.Errorf("duplicate chain %d", r.ChainSel)
-		}
-		chainSet.Add(r.ChainSel)
-		newNextOnRampSeqNums[r.ChainSel] = r.SeqNumsRange.Start()
-	}
-
-	chainSlice := chainSet.ToSlice()
-	sort.Slice(chainSlice, func(i, j int) bool { return chainSlice[i] < chainSlice[j] })
-
-	offRampExpNextSeqNums, err := reader.NextSeqNum(ctx, chainSlice)
-	if err != nil {
-		return fmt.Errorf("get next sequence numbers: %w", err)
-	}
-
-	if len(offRampExpNextSeqNums) != len(chainSlice) {
-		return fmt.Errorf("critical reader error: seq nums length mismatch")
-	}
-
-	for i, offRampExpNextSeqNum := range offRampExpNextSeqNums {
-		chain := chainSlice[i]
-
-		newNextOnRampSeqNum, ok := newNextOnRampSeqNums[chain]
-		if !ok {
-			return fmt.Errorf("critical unexpected error: newOnRampSeqNum not found")
-		}
-
-		if newNextOnRampSeqNum != offRampExpNextSeqNum {
-			return fmt.Errorf("unexpected seq nums offRampNext=%d newOnRampNext=%d",
-				offRampExpNextSeqNum, newNextOnRampSeqNum)
-		}
 	}
 
 	return nil

@@ -6,8 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"golang.org/x/exp/maps"
-
 	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
@@ -37,6 +35,48 @@ func validateObserverReadingEligibility(
 
 		if !supportedChains.Contains(chainSel) {
 			return fmt.Errorf("observer not allowed to read from chain %d", chainSel)
+		}
+	}
+
+	return nil
+}
+
+func validateTokenDataObservations(
+	observedMsgs exectypes.MessageObservations,
+	tokenData exectypes.TokenDataObservations,
+) error {
+
+	if len(observedMsgs) != len(tokenData) {
+		return fmt.Errorf("unexpected number of token data observations: expected %d, got %d",
+			len(observedMsgs), len(tokenData))
+	}
+
+	for chain, msgs := range observedMsgs {
+		for seq, msg := range msgs {
+			if _, ok := tokenData[chain][seq]; !ok {
+				return fmt.Errorf("token data not found for message %s", msg)
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateHashesExist checks if the hashes exist for all the messages in the observation.
+func validateHashesExist(
+	observedMsgs exectypes.MessageObservations,
+	hashes exectypes.MessageHashes,
+) error {
+	if len(observedMsgs) != len(hashes) {
+		return fmt.Errorf("malformed observation, unexpected number of message hashes: expected %d, got %d",
+			len(observedMsgs), len(hashes))
+	}
+
+	for chain, msgs := range observedMsgs {
+		for seq, msg := range msgs {
+			if _, ok := hashes[chain][seq]; !ok {
+				return fmt.Errorf("hash not found for message %s", msg)
+			}
 		}
 	}
 
@@ -123,6 +163,7 @@ func groupByChainSelector(
 			commitReportCache[singleReport.ChainSel] = append(commitReportCache[singleReport.ChainSel],
 				exectypes.CommitData{
 					SourceChain:         singleReport.ChainSel,
+					OnRampAddress:       singleReport.OnRampAddress,
 					Timestamp:           report.Timestamp,
 					BlockNum:            report.BlockNum,
 					MerkleRoot:          singleReport.MerkleRoot,
@@ -202,121 +243,6 @@ func filterOutExecutedMessages(
 	return filtered, nil
 }
 
-// truncateObservation truncates the observation to fit within the given maxSize after encoding.
-// It removes data from the observation in the following order:
-// For each chain, remove commit reports one by one, if the encoded observation is still too large,
-// remove the entire chain.
-// Keep repeating this process until the encoded observation fits within the maxSize or there's only
-// one chain with one report left
-// Note: This function doesn't split one report into multiple parts.
-func truncateObservation(
-	obs exectypes.Observation,
-	maxSize int,
-) (exectypes.Observation, error) {
-	observation := obs
-	encodedObs, err := observation.Encode()
-	if err != nil {
-		return exectypes.Observation{}, err
-	}
-
-	chains := maps.Keys(observation.CommitReports)
-	sort.Slice(chains, func(i, j int) bool {
-		return chains[i] < chains[j]
-	})
-
-	// If the encoded observation is too large, start filtering data.
-	for len(encodedObs) > maxSize {
-		for _, chain := range chains {
-			if len(observation.CommitReports[chain]) > 1 {
-				observation = truncateLastCommit(observation, chain)
-			} else {
-				observation = truncateChain(observation, chain)
-			}
-			chains = maps.Keys(observation.CommitReports)
-			break
-		}
-
-		// Truncated all chains.
-		if len(observation.CommitReports) == 0 {
-			return exectypes.Observation{}, fmt.Errorf("no more data to truncate")
-		}
-		encodedObs, err = observation.Encode()
-		if err != nil {
-			return exectypes.Observation{}, nil
-		}
-	}
-	return observation, nil
-}
-
-// truncateLastCommit removes the last commit from the observation.
-// errors if there are no commits to truncate.
-func truncateLastCommit(
-	obs exectypes.Observation,
-	chain cciptypes.ChainSelector,
-) exectypes.Observation {
-	observation := obs
-	commits := observation.CommitReports[chain]
-	if len(commits) == 0 {
-		return observation
-	}
-	lastCommit := commits[len(commits)-1]
-	// Remove the last commit from the list.
-	commits = commits[:len(commits)-1]
-	observation.CommitReports[chain] = commits
-	for seqNum, msg := range observation.Messages[chain] {
-		if lastCommit.SequenceNumberRange.Contains(seqNum) {
-			// Remove the message from the observation.
-			delete(observation.Messages[chain], seqNum)
-			// Remove the token data from the observation.
-			delete(observation.TokenData[chain], seqNum)
-			// Remove costly messages
-			for i, costlyMessage := range observation.CostlyMessages {
-				if costlyMessage == msg.Header.MessageID {
-					observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
-				}
-			}
-			// Leaving Nonces untouched
-		}
-	}
-
-	return observation
-}
-
-// truncateChain removes all data related to the given chain from the observation.
-// returns true if the chain was found and truncated, false otherwise.
-func truncateChain(
-	obs exectypes.Observation,
-	chain cciptypes.ChainSelector,
-) exectypes.Observation {
-	observation := obs
-	if _, ok := observation.CommitReports[chain]; !ok {
-		return observation
-	}
-	messageIDs := make(map[cciptypes.Bytes32]struct{})
-	// To remove costly message IDs we need to iterate over all messages and find the ones that belong to the chain.
-	for _, seqNumMap := range observation.Messages {
-		for _, message := range seqNumMap {
-			messageIDs[message.Header.MessageID] = struct{}{}
-		}
-	}
-
-	deleteCostlyMessages := func() {
-		for i, costlyMessage := range observation.CostlyMessages {
-			if _, ok := messageIDs[costlyMessage]; ok {
-				observation.CostlyMessages = append(observation.CostlyMessages[:i], observation.CostlyMessages[i+1:]...)
-			}
-		}
-	}
-
-	delete(observation.CommitReports, chain)
-	delete(observation.Messages, chain)
-	delete(observation.TokenData, chain)
-	delete(observation.Nonces, chain)
-	deleteCostlyMessages()
-
-	return observation
-}
-
 func decodeAttributedObservations(
 	aos []types.AttributedObservation,
 ) ([]plugincommon.AttributedObservation[exectypes.Observation], error) {
@@ -335,8 +261,9 @@ func decodeAttributedObservations(
 }
 
 func mergeMessageObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
-) (exectypes.MessageObservations, error) {
+) exectypes.MessageObservations {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[cciptypes.Message])
 	for selector, f := range fChain {
@@ -348,7 +275,8 @@ func mergeMessageObservations(
 		for selector, messages := range ao.Observation.Messages {
 			validator, ok := validators[selector]
 			if !ok {
-				return exectypes.MessageObservations{}, fmt.Errorf("no validator for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 			// Add reports
 			for _, msg := range messages {
@@ -370,17 +298,18 @@ func mergeMessageObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 // mergeCommitObservations merges all observations which reach the fChain threshold into a single result.
 // Any observations, or subsets of observations, which do not reach the threshold are ignored.
 func mergeCommitObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation], fChain map[cciptypes.ChainSelector]int,
-) (exectypes.CommitObservations, error) {
+) exectypes.CommitObservations {
 	// Create a validator for each chain
 	validators := make(map[cciptypes.ChainSelector]consensus.MinObservation[exectypes.CommitData])
 	for selector, f := range fChain {
@@ -393,7 +322,8 @@ func mergeCommitObservations(
 		for selector, commitReports := range ao.Observation.CommitReports {
 			validator, ok := validators[selector]
 			if !ok {
-				return exectypes.CommitObservations{}, fmt.Errorf("no validator for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 			// Add reports
 			for _, commitReport := range commitReports {
@@ -410,16 +340,68 @@ func mergeCommitObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
+}
+
+func mergeMessageHashes(
+	lggr logger.Logger,
+	aos []plugincommon.AttributedObservation[exectypes.Observation],
+	fChain map[cciptypes.ChainSelector]int,
+) exectypes.MessageHashes {
+	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
+	validators := make(map[cciptypes.ChainSelector]map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
+	results := make(exectypes.MessageHashes)
+
+	for _, ao := range aos {
+		for selector, seqMap := range ao.Observation.Hashes {
+			f, ok := fChain[selector]
+			if !ok {
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
+			}
+
+			if _, ok1 := results[selector]; !ok1 {
+				results[selector] = make(map[cciptypes.SeqNum]cciptypes.Bytes32)
+			}
+
+			if _, ok1 := validators[selector]; !ok1 {
+				validators[selector] = make(map[cciptypes.SeqNum]consensus.MinObservation[cciptypes.Bytes32])
+			}
+
+			for seqNr, hash := range seqMap {
+				if _, ok := validators[selector][seqNr]; !ok {
+					validators[selector][seqNr] =
+						consensus.NewMinObservation[cciptypes.Bytes32](consensus.FPlus1(f), nil)
+				}
+				validators[selector][seqNr].Add(hash)
+			}
+
+		}
+	}
+
+	for selector, seqNrs := range validators {
+		for seqNum, validator := range seqNrs {
+			if hashes := validator.GetValid(); len(hashes) == 1 {
+				results[selector][seqNum] = hashes[0]
+			}
+		}
+	}
+
+	if len(results) == 0 {
+		return nil
+	}
+
+	return results
 }
 
 func mergeTokenObservations(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[exectypes.Observation],
 	fChain map[cciptypes.ChainSelector]int,
-) (exectypes.TokenDataObservations, error) {
+) exectypes.TokenDataObservations {
 	// Single message can transfer multiple tokens, so we need to find consensus on the token level.
 	validators := make(map[cciptypes.ChainSelector]map[reader.MessageTokenID]consensus.MinObservation[exectypes.TokenData])
 	results := make(exectypes.TokenDataObservations)
@@ -428,7 +410,8 @@ func mergeTokenObservations(
 		for selector, seqMap := range ao.Observation.TokenData {
 			f, ok := fChain[selector]
 			if !ok {
-				return exectypes.TokenDataObservations{}, fmt.Errorf("no F defined for chain %d", selector)
+				lggr.Warnw("no F defined for chain", "chain", selector)
+				continue
 			}
 
 			if _, ok1 := results[selector]; !ok1 {
@@ -457,10 +440,10 @@ func mergeTokenObservations(
 	}
 
 	if len(results) == 0 {
-		return nil, nil
+		return nil
 	}
 
-	return results, nil
+	return results
 }
 
 func initResultsAndValidators(
@@ -575,23 +558,19 @@ func getConsensusObservation(
 
 	lggr.Debugw("getConsensusObservation decoded observations", "aos", aos)
 
-	mergedCommitObservations, err := mergeCommitObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge commit report observations: %w", err)
-	}
+	mergedCommitObservations := mergeCommitObservations(lggr, aos, fChain)
+
 	lggr.Debugw("merged commit observations", "mergedCommitObservations", mergedCommitObservations)
 
-	mergedMessageObservations, err := mergeMessageObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge message observations: %w", err)
-	}
+	mergedMessageObservations := mergeMessageObservations(lggr, aos, fChain)
 	lggr.Debugw("merged message observations", "mergedMessageObservations", mergedMessageObservations)
 
-	mergedTokenObservations, err := mergeTokenObservations(aos, fChain)
-	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to merge token data observations: %w", err)
-	}
+	mergedTokenObservations := mergeTokenObservations(lggr, aos, fChain)
+
 	lggr.Debugw("merged token data observations", "mergedTokenObservations", mergedTokenObservations)
+
+	mergedHashes := mergeMessageHashes(lggr, aos, fChain)
+	lggr.Debugw("merged message hashes", "mergedHashes", mergedHashes)
 
 	mergedCostlyMessages := mergeCostlyMessages(aos, fChain[destChainSelector])
 	lggr.Debugw("merged costly messages", "mergedCostlyMessages", mergedCostlyMessages)
@@ -607,6 +586,7 @@ func getConsensusObservation(
 		mergedTokenObservations,
 		mergedNonceObservations,
 		dt.Observation{},
+		mergedHashes,
 	)
 
 	return observation, nil

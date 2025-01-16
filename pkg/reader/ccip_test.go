@@ -44,6 +44,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -59,7 +60,12 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	) {
 		sourceChain := params.(map[string]any)["sourceChainSelector"].(cciptypes.ChainSelector)
 		v := returnVal.(*sourceChainConfig)
-		v.OnRamp = []byte(fmt.Sprintf("onramp-%d", sourceChain))
+
+		fromString, err := cciptypes.NewBytesFromString(fmt.Sprintf(
+			"0x%d000000000000000000000000000000000000000", sourceChain),
+		)
+		require.NoError(t, err)
+		v.OnRamp = cciptypes.UnknownAddress(fromString)
 		v.IsEnabled = true
 	}).Return(nil)
 
@@ -86,8 +92,8 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 	cfgs, err := ccipReader.getOffRampSourceChainsConfig(ctx, []cciptypes.ChainSelector{chainA, chainB})
 	assert.NoError(t, err)
 	assert.Len(t, cfgs, 2)
-	assert.Equal(t, []byte("onramp-1"), cfgs[chainA].OnRamp)
-	assert.Equal(t, []byte("onramp-2"), cfgs[chainB].OnRamp)
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", cfgs[chainA].OnRamp.String())
+	assert.Equal(t, "0x2000000000000000000000000000000000000000", cfgs[chainB].OnRamp.String())
 }
 
 func TestCCIPChainReader_GetContractAddress(t *testing.T) {
@@ -505,7 +511,6 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round1(t *testing.T) {
 		lggr:            lggr,
 	}
 
-	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 
@@ -633,99 +638,9 @@ func TestCCIPChainReader_DiscoverContracts_HappyPath_Round2(t *testing.T) {
 		lggr:            logger.Test(t),
 	}
 
-	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
 	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, expectedContractAddresses, contractAddresses)
-}
-
-// TODO: Remove this test when allChains is implemented.
-// This test checks that onramps are not discovered if there are only dest readers available.
-func TestCCIPChainReader_DiscoverContracts_HappyPath_OnlySupportDest(t *testing.T) {
-	ctx := tests.Context(t)
-	destChain := cciptypes.ChainSelector(1)
-	sourceChain := [2]cciptypes.ChainSelector{2, 3}
-	onramps := [2][]byte{{0x1}, {0x2}}
-	destNonceMgr := []byte{0x3}
-	destRMNRemote := []byte{0x4}
-	destFeeQuoter := []byte{0x5}
-	destRouter := []byte{0x6}
-
-	var expectedContractAddresses ContractAddresses
-	for i := range onramps {
-		expectedContractAddresses = expectedContractAddresses.Append(
-			consts.ContractNameOnRamp, sourceChain[i], onramps[i])
-	}
-	// All dest chain contracts should be discovered, they do not require source chain support.
-	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRouter, destChain, destRouter)
-	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameFeeQuoter, destChain, destFeeQuoter)
-	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameRMNRemote, destChain, destRMNRemote)
-	expectedContractAddresses = expectedContractAddresses.Append(consts.ContractNameNonceManager, destChain, destNonceMgr)
-
-	destExtended := reader_mocks.NewMockExtended(t)
-
-	// mock the call to get the nonce manager
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetStaticConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampStaticChainConfig)
-		v.NonceManager = destNonceMgr
-		v.RmnRemote = destRMNRemote
-	}))
-	// mock the call to get the fee quoter
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetDynamicConfig,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*offRampDynamicChainConfig)
-		v.FeeQuoter = destFeeQuoter
-	}))
-	destExtended.EXPECT().ExtendedGetLatestValue(
-		mock.Anything,
-		consts.ContractNameOffRamp,
-		consts.MethodNameOffRampGetAllSourceChainConfigs,
-		primitives.Unconfirmed,
-		map[string]any{},
-		mock.Anything,
-	).Return(nil).Run(withReturnValueOverridden(func(returnVal interface{}) {
-		v := returnVal.(*selectorsAndConfigs)
-		v.Selectors = []uint64{uint64(sourceChain[0]), uint64(sourceChain[1])}
-		v.SourceChainConfigs = []sourceChainConfig{
-			{
-				OnRamp:    onramps[0],
-				Router:    destRouter,
-				IsEnabled: true,
-			},
-			{
-				OnRamp:    onramps[1],
-				Router:    destRouter,
-				IsEnabled: true,
-			},
-		}
-	}))
-
-	// create the reader
-	ccipChainReader := &ccipChainReader{
-		destChain: destChain,
-		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
-			destChain: destExtended,
-		},
-		lggr: logger.Test(t),
-	}
-
-	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
-	contractAddresses, err := ccipChainReader.DiscoverContracts(ctx)
-	require.NoError(t, err)
 	require.Equal(t, expectedContractAddresses, contractAddresses)
 }
 
@@ -763,7 +678,6 @@ func TestCCIPChainReader_DiscoverContracts_GetAllSourceChainConfig_Errors(t *tes
 		lggr: logger.Test(t),
 	}
 
-	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
 	_, err := ccipChainReader.DiscoverContracts(ctx)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
@@ -810,7 +724,6 @@ func TestCCIPChainReader_DiscoverContracts_GetOfframpStaticConfig_Errors(t *test
 		lggr: logger.Test(t),
 	}
 
-	// TODO: allChains should be initialized to "append(onramps, destChain)" when that feature is implemented.
 	_, err := ccipChainReader.DiscoverContracts(ctx)
 	require.Error(t, err)
 	require.ErrorIs(t, err, getLatestValueErr)
@@ -837,6 +750,7 @@ func withReturnValueOverridden(mapper func(returnVal interface{})) func(ctx cont
 func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -882,6 +796,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 	tokenAddr := []byte{0x3, 0x4}
 	destCR := reader_mocks.NewMockContractReaderFacade(t)
 	destCR.EXPECT().Bind(mock.Anything, mock.Anything).Return(nil)
+	destCR.EXPECT().HealthReport().Return(nil)
 	destCR.EXPECT().GetLatestValue(
 		mock.Anything,
 		mock.Anything,
@@ -1312,4 +1227,78 @@ func Test_getCurseInfoFromCursedSubjects(t *testing.T) {
 			assert.Equal(t, tc.expCurseInfo, *curseInfo)
 		})
 	}
+}
+
+func TestCCIPChainReader_Nonces(t *testing.T) {
+	addr1 := "0x1234567890123456789012345678901234567890"
+	addr2 := "0x2234567890123456789012345678901234567890"
+	nonceManagerAddr := "0x3234567890123456789012345678901234567890"
+
+	destReader := reader_mocks.NewMockExtended(t)
+
+	// Mock Bind call
+	destReader.EXPECT().Bind(
+		mock.Anything,
+		[]types.BoundContract{{
+			Name:    consts.ContractNameNonceManager,
+			Address: nonceManagerAddr,
+		}},
+	).Return(nil)
+
+	// Setup expected responses
+	nonce1, nonce2 := uint64(5), uint64(10)
+
+	result1 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
+	result1.SetResult(&nonce1, nil)
+
+	result2 := &types.BatchReadResult{ReadName: consts.MethodNameGetInboundNonce}
+	result2.SetResult(&nonce2, nil)
+
+	responses := types.BatchGetLatestValuesResult{
+		types.BoundContract{
+			Name:    consts.ContractNameNonceManager,
+			Address: nonceManagerAddr,
+		}: []types.BatchReadResult{*result1, *result2},
+	}
+	destReader.EXPECT().ExtendedBatchGetLatestValues(
+		mock.Anything,
+		mock.MatchedBy(func(req contractreader.ExtendedBatchGetLatestValuesRequest) bool {
+			batch := req[consts.ContractNameNonceManager]
+			return len(batch) == 2 &&
+				batch[0].ReadName == consts.MethodNameGetInboundNonce &&
+				batch[1].ReadName == consts.MethodNameGetInboundNonce
+		}),
+	).Return(responses, nil)
+
+	ccipReader := &ccipChainReader{
+		lggr: logger.Test(t),
+		contractReaders: map[cciptypes.ChainSelector]contractreader.Extended{
+			chainB: destReader,
+		},
+		destChain: chainB,
+	}
+
+	// Bind the contract first
+	err := ccipReader.contractReaders[chainB].Bind(
+		context.Background(),
+		[]types.BoundContract{{
+			Name:    consts.ContractNameNonceManager,
+			Address: nonceManagerAddr,
+		}},
+	)
+	require.NoError(t, err)
+
+	// Call Nonces
+	nonces, err := ccipReader.Nonces(
+		context.Background(),
+		chainA,
+		chainB,
+		[]string{addr1, addr2},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]uint64{
+		addr1: 5,
+		addr2: 10,
+	}, nonces)
 }

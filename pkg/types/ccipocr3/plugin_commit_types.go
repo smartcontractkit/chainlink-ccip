@@ -17,8 +17,8 @@ import "bytes"
 // RMNSignatures, if RMN is configured for some lanes involved in the commitment.
 // A report with RMN signatures but without merkle roots is invalid.
 type CommitPluginReport struct {
-	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
 	PriceUpdates PriceUpdates      `json:"priceUpdates"`
+	MerkleRoots  []MerkleRootChain `json:"merkleRoots"`
 
 	// RMNSignatures are the ECDSA signatures from the RMN signing nodes on the RMNReport structure.
 	// For more details see the contract here: https://github.com/smartcontractkit/chainlink/blob/7ba0f37134a618375542079ff1805fe2224d7916/contracts/src/v0.8/ccip/interfaces/IRMNV2.sol#L8-L12
@@ -38,10 +38,10 @@ func (r CommitPluginReport) IsEmpty() bool {
 //
 //nolint:lll // it's a url
 type MerkleRootChain struct {
-	ChainSel      ChainSelector `json:"chain"`
-	OnRampAddress Bytes         `json:"onRampAddress"`
-	SeqNumsRange  SeqNumRange   `json:"seqNumsRange"`
-	MerkleRoot    Bytes32       `json:"merkleRoot"`
+	ChainSel      ChainSelector  `json:"chain"`
+	OnRampAddress UnknownAddress `json:"onRampAddress"`
+	SeqNumsRange  SeqNumRange    `json:"seqNumsRange"`
+	MerkleRoot    Bytes32        `json:"merkleRoot"`
 }
 
 func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
@@ -49,20 +49,6 @@ func (m MerkleRootChain) Equals(other MerkleRootChain) bool {
 		bytes.Equal(m.OnRampAddress, other.OnRampAddress) &&
 		m.SeqNumsRange == other.SeqNumsRange &&
 		m.MerkleRoot == other.MerkleRoot
-}
-
-func NewMerkleRootChain(
-	chainSel ChainSelector,
-	onRampAddress Bytes,
-	seqNumsRange SeqNumRange,
-	merkleRoot Bytes32,
-) MerkleRootChain {
-	return MerkleRootChain{
-		ChainSel:      chainSel,
-		OnRampAddress: onRampAddress,
-		SeqNumsRange:  seqNumsRange,
-		MerkleRoot:    merkleRoot,
-	}
 }
 
 type PriceUpdates struct {

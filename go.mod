@@ -3,9 +3,13 @@ module github.com/smartcontractkit/chainlink-ccip
 go 1.23.3
 
 require (
+	github.com/charmbracelet/lipgloss v1.0.0
 	github.com/deckarep/golang-set/v2 v2.6.0
-	github.com/smartcontractkit/chain-selectors v1.0.23
-	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241127162636-07aa781ee1f4
+	github.com/patrickmn/go-cache v2.1.0+incompatible
+	github.com/prometheus/client_golang v1.20.0
+	github.com/prometheus/client_model v0.6.1
+	github.com/smartcontractkit/chain-selectors v1.0.34
+	github.com/smartcontractkit/chainlink-common v0.3.1-0.20241212163958-6a43e61b9d49
 	github.com/smartcontractkit/libocr v0.0.0-20241007185508-adbe57025f12
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
@@ -23,7 +27,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/ethereum/go-ethereum v1.13.8 // indirect
@@ -33,6 +36,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/holiman/uint256 v1.2.4 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -43,8 +47,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.20.0 // indirect
-	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.59.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

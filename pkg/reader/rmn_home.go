@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -37,9 +38,9 @@ type RMNHome interface {
 	GetRMNNodesInfo(configDigest cciptypes.Bytes32) ([]rmntypes.HomeNodeInfo, error)
 	// IsRMNHomeConfigDigestSet checks if the configDigest is set in the RMNHome contract
 	IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32) bool
-	// GetF gets the F value for each source chain in the given configDigest.
+	// GetFObserve gets the F value for each source chain in the given configDigest.
 	// Maximum number of faulty observers; F+1 observers required to agree on an observation for a source chain.
-	GetF(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
+	GetFObserve(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error)
 	// GetOffChainConfig gets the offchain config for the given configDigest
 	GetOffChainConfig(configDigest cciptypes.Bytes32) (cciptypes.Bytes, error)
 	// GetAllConfigDigests gets the active and candidate RMNHomeConfigs
@@ -194,7 +195,7 @@ func (r *rmnHomePoller) IsRMNHomeConfigDigestSet(configDigest cciptypes.Bytes32)
 	return ok
 }
 
-func (r *rmnHomePoller) GetF(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error) {
+func (r *rmnHomePoller) GetFObserve(configDigest cciptypes.Bytes32) (map[cciptypes.ChainSelector]int, error) {
 	r.mutex.RLock()
 	defer r.mutex.RUnlock()
 	_, ok := r.rmnHomeState.rmnHomeConfig[configDigest]
@@ -223,11 +224,17 @@ func (r *rmnHomePoller) GetAllConfigDigests() (
 }
 
 func (r *rmnHomePoller) Close() error {
-	return r.sync.StopOnce(r.Name(), func() error {
+	err := r.sync.StopOnce(r.Name(), func() error {
 		defer r.wg.Wait()
 		close(r.stopCh)
 		return nil
 	})
+
+	if errors.Is(err, services.ErrAlreadyStopped) {
+		return nil
+	}
+
+	return err
 }
 
 func (r *rmnHomePoller) Ready() error {
@@ -297,7 +304,7 @@ func convertOnChainConfigToRMNHomeChainConfig(
 		homeFMap := make(map[cciptypes.ChainSelector]int)
 
 		for _, chain := range versionedConfig.DynamicConfig.SourceChains {
-			homeFMap[chain.ChainSelector] = int(chain.F)
+			homeFMap[chain.ChainSelector] = int(chain.FObserve)
 			for j := 0; j < len(nodes); j++ {
 				isObserver, err := IsNodeObserver(chain, j, len(nodes))
 				if err != nil {
@@ -381,7 +388,7 @@ type Node struct {
 // SourceChain mirrors RMNHome.sol's SourceChain struct
 type SourceChain struct {
 	ChainSelector       cciptypes.ChainSelector `json:"chainSelector"`
-	F                   uint64                  `json:"f"` // previously: MinObservers
+	FObserve            uint64                  `json:"fObserve"` // previously: MinObservers / F
 	ObserverNodesBitmap *big.Int                `json:"observerNodesBitmap"`
 }
 

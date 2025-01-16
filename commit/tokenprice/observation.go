@@ -32,12 +32,14 @@ func (p *processor) Observation(
 		"timestampNow", now,
 	)
 
-	return Observation{
+	obs := Observation{
 		FeedTokenPrices:       feedTokenPrices,
 		FeeQuoterTokenUpdates: feeQuoterUpdates,
 		FChain:                fChain,
 		Timestamp:             now,
-	}, nil
+	}
+	p.metricsReporter.TrackTokenPricesObservation(obs)
+	return obs, nil
 }
 
 func (p *processor) ObserveFChain() map[cciptypes.ChainSelector]int {
@@ -78,15 +80,11 @@ func (p *processor) ObserveFeedTokenPrices(ctx context.Context) []cciptypes.Toke
 		return []cciptypes.TokenPrice{}
 	}
 
-	// If we couldn't fetch all prices log and return only the ones we could fetch
-	if len(tokenPrices) != len(tokensToQuery) {
-		p.lggr.Errorw("token prices length mismatch", "got", tokenPrices, "want", tokensToQuery)
-		return []cciptypes.TokenPrice{}
-	}
-
 	tokenPricesUSD := make([]cciptypes.TokenPrice, 0, len(tokenPrices))
-	for i, token := range tokensToQuery {
-		tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[i]))
+	for _, token := range tokensToQuery {
+		if tokenPrices[token] != nil {
+			tokenPricesUSD = append(tokenPricesUSD, cciptypes.NewTokenPrice(token, tokenPrices[token]))
+		}
 	}
 
 	return tokenPricesUSD

@@ -2,7 +2,6 @@ package execute
 
 import (
 	"context"
-	crand "crypto/rand"
 	"encoding/binary"
 	"math/big"
 	"net/http"
@@ -16,19 +15,17 @@ import (
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	ocrtypes "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
 	commonconfig "github.com/smartcontractkit/chainlink-common/pkg/config"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
-	"github.com/smartcontractkit/chainlink-common/pkg/types/query/primitives"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	"github.com/smartcontractkit/chainlink-ccip/chainconfig"
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
 	"github.com/smartcontractkit/chainlink-ccip/execute/exectypes"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/report"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/slicelib"
@@ -38,8 +35,8 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/mocks/inmem"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/execute/internal_/gas"
 	readermock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
+	gasmock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
@@ -51,6 +48,7 @@ import (
 type IntTest struct {
 	t *testing.T
 
+	lggr  logger.Logger
 	donID uint32
 
 	srcSelector cciptypes.ChainSelector
@@ -65,7 +63,7 @@ type IntTest struct {
 	execCostCalculator  *costlymessages.StaticMessageExecCostUSD18Calculator
 }
 
-func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
+func SetupSimpleTest(t *testing.T, lggr logger.Logger, srcSelector, dstSelector cciptypes.ChainSelector) *IntTest {
 	donID := uint32(1)
 
 	msgHasher := mocks.NewMessageHasher()
@@ -79,6 +77,7 @@ func SetupSimpleTest(t *testing.T, srcSelector, dstSelector cciptypes.ChainSelec
 
 	return &IntTest{
 		t:                   t,
+		lggr:                lggr,
 		donID:               donID,
 		msgHasher:           msgHasher,
 		srcSelector:         srcSelector,
@@ -94,7 +93,11 @@ func (it *IntTest) WithMessages(
 	crBlockNumber uint64,
 	crTimestamp time.Time,
 	numReports int) {
-	mapped := slicelib.Map(messages, func(m inmem.MessagesWithMetadata) cciptypes.Message { return m.Message })
+	mapped := slicelib.Map(messages,
+		func(m inmem.MessagesWithMetadata) cciptypes.Message {
+			return m.Message
+		},
+	)
 	totalMessages := len(mapped)
 	messagesPerReport := totalMessages / numReports
 
@@ -105,16 +108,25 @@ func (it *IntTest) WithMessages(
 			endIndex = totalMessages // Ensure the last report includes any remaining messages
 		}
 
+		msgs := mapped[startIndex:endIndex]
+		hashes := make([]cciptypes.Bytes32, len(msgs))
+		for i, m := range msgs {
+			hash, err := it.msgHasher.Hash(context.Background(), m)
+			require.NoError(it.t, err, "failed to hash message")
+			hashes[i] = hash
+		}
 		reportData := exectypes.CommitData{
 			SourceChain: it.srcSelector,
 			SequenceNumberRange: cciptypes.NewSeqNumRange(
 				mapped[startIndex].Header.SequenceNumber,
 				mapped[endIndex-1].Header.SequenceNumber,
 			),
-			Messages: mapped[startIndex:endIndex],
+			Messages:         msgs,
+			Hashes:           hashes,
+			MessageTokenData: make([]exectypes.MessageTokenData, len(msgs)),
 		}
 
-		tree, err := report.ConstructMerkleTree(tests.Context(it.t), it.msgHasher, reportData, logger.Test(it.t))
+		tree, err := report.ConstructMerkleTree(reportData, logger.Test(it.t))
 		require.NoError(it.t, err, "failed to construct merkle tree")
 
 		it.ccipReader.Reports = append(it.ccipReader.Reports, plugintypes2.CommitPluginReportWithMeta{
@@ -144,7 +156,7 @@ func (it *IntTest) WithCustomFeeBoosting(
 	messageCost map[cciptypes.Bytes32]plugintypes.USD18,
 ) {
 	it.feeCalculator = costlymessages.NewCCIPMessageFeeUSD18Calculator(
-		logger.Test(it.t),
+		it.lggr,
 		it.ccipReader,
 		relativeBoostPerWaitHour,
 		now,
@@ -224,14 +236,14 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 		},
 	}
 
-	homeChain := setupHomeChainPoller(it.t, it.donID, logger.Test(it.t), chainConfigInfos)
+	homeChain := setupHomeChainPoller(it.t, it.lggr, chainConfigInfos)
 	ctx := tests.Context(it.t)
 	err := homeChain.Start(ctx)
 	require.NoError(it.t, err, "failed to start home chain poller")
 
 	tkObs, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		logger.Test(it.t),
+		it.lggr,
 		it.dstSelector,
 		it.tokenObserverConfig,
 		testhelpers.TokenDataEncoderInstance,
@@ -254,7 +266,7 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 	}
 
 	costlyMessageObserver := costlymessages.NewObserver(
-		logger.Test(it.t),
+		it.lggr,
 		true,
 		feeCalculator,
 		execCostCalculator,
@@ -266,9 +278,9 @@ func (it *IntTest) Start() *testhelpers.OCR3Runner[[]byte] {
 
 	oracleIDToP2pID := testhelpers.CreateOracleIDToP2pID(1, 2, 3)
 	nodesSetup := []nodeSetup{
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1),
-		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 1, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 2, 1, [32]byte{0xde, 0xad}),
+		it.newNode(cfg, homeChain, ep, tkObs, costlyMessageObserver, oracleIDToP2pID, 3, 1, [32]byte{0xde, 0xad}),
 	}
 
 	require.NoError(it.t, homeChain.Close())
@@ -299,21 +311,22 @@ func (it *IntTest) UpdateExecutionCost(id cciptypes.Bytes32, val int64) {
 func (it *IntTest) newNode(
 	cfg pluginconfig.ExecuteOffchainConfig,
 	homeChain reader.HomeChain,
-	ep gas.EstimateProvider,
+	ep cciptypes.EstimateProvider,
 	tokenDataObserver tokendata.TokenDataObserver,
 	costlyMessageObserver costlymessages.Observer,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
 	id int,
 	N int,
+	configDigest [32]byte,
 ) nodeSetup {
 	reportCodec := mocks.NewExecutePluginJSONReportCodec()
-	b := make([]byte, 32)
-	_, _ = crand.Read(b)
 	rCfg := ocr3types.ReportingPluginConfig{
 		N:            N,
 		OracleID:     commontypes.OracleID(id),
-		ConfigDigest: ocrtypes.ConfigDigest(b),
+		ConfigDigest: configDigest,
 	}
+
+	it.ccipReader.ConfigDigest = configDigest
 
 	node1 := NewPlugin(
 		it.donID,
@@ -327,8 +340,9 @@ func (it *IntTest) newNode(
 		homeChain,
 		tokenDataObserver,
 		ep,
-		logger.Test(it.t),
+		it.lggr,
 		costlyMessageObserver,
+		&metrics.Noop{},
 	)
 
 	return nodeSetup{
@@ -420,7 +434,7 @@ func withTokens(tokenAmounts ...cciptypes.RampTokenAmount) msgOption {
 	}
 }
 
-func makeMsg(
+func makeMsgWithMetadata(
 	seqNum cciptypes.SeqNum,
 	src, dest cciptypes.ChainSelector,
 	executed bool,
@@ -454,7 +468,6 @@ type nodeSetup struct {
 
 func setupHomeChainPoller(
 	t *testing.T,
-	donID plugintypes.DonID,
 	lggr logger.Logger,
 	chainConfigInfos []reader.ChainConfigInfo,
 ) reader.HomeChain {
@@ -483,26 +496,6 @@ func setupHomeChainPoller(
 				*arg = []reader.ChainConfigInfo{} // return empty for other pages
 			}
 		}).Return(nil)
-
-	homeChainReader.EXPECT().
-		GetLatestValue(mock.Anything, types.BoundContract{
-			Address: ccipConfigAddress,
-			Name:    consts.ContractNameCCIPConfig,
-		}.ReadIdentifier(consts.MethodNameGetOCRConfig), primitives.Unconfirmed, map[string]any{
-			"donId":      donID,
-			"pluginType": consts.PluginTypeExecute,
-		}, mock.Anything).
-		Run(
-			func(
-				ctx context.Context,
-				readIdentifier string,
-				confidenceLevel primitives.ConfidenceLevel,
-				params,
-				returnVal interface{},
-			) {
-				*returnVal.(*reader.ActiveAndCandidate) = reader.ActiveAndCandidate{}
-			}).
-		Return(nil)
 
 	homeChain := reader.NewHomeChainConfigPoller(
 		homeChainReader,

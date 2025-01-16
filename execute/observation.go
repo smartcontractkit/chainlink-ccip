@@ -78,6 +78,7 @@ func (p *Plugin) Observation(
 		return nil, err
 	}
 
+	p.observer.TrackObservation(observation, state)
 	p.lggr.Infow("execute plugin got observation", "observation", observation)
 
 	return observation.Encode()
@@ -169,7 +170,9 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 }
 
 func readAllMessages(
-	ctx context.Context, ccipReader reader.CCIPReader, commitObs exectypes.CommitObservations,
+	ctx context.Context,
+	ccipReader reader.CCIPReader,
+	commitObs exectypes.CommitObservations,
 ) (exectypes.MessageObservations, error) {
 	messageObs := make(exectypes.MessageObservations)
 
@@ -206,7 +209,10 @@ func (p *Plugin) getMessagesObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	if len(previousOutcome.PendingCommitReports) == 0 {
+	// Phase 2: Get messages and determine which messages are too costly to execute.
+	//          These messages will not be executed in the current round, but may be executed in future rounds
+	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
+	if len(previousOutcome.CommitReports) == 0 {
 		p.lggr.Debug("TODO: No reports to execute. This is expected after a cold start.")
 		// No reports to execute.
 		// This is expected after a cold start.
@@ -214,7 +220,7 @@ func (p *Plugin) getMessagesObservation(
 	}
 
 	// group reports by chain selector.
-	commitReportCache := regroup(previousOutcome.PendingCommitReports)
+	commitReportCache := regroup(previousOutcome.CommitReports)
 
 	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
 	if err != nil {
@@ -230,19 +236,30 @@ func (p *Plugin) getMessagesObservation(
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
+	if validateTokenDataObservations(messageObs, tkData) != nil {
+		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
+	}
 
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
 	}
 
+	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
+	if err != nil {
+		return exectypes.Observation{}, fmt.Errorf("unable to get message hashes: %w", err)
+	}
+
 	observation.CommitReports = commitReportCache
 	observation.Messages = messageObs
+	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
+	//observation.MessageAndTokenDataEncodedSizes = exectypes.GetEncodedMsgAndTokenDataSizes(messageObs, tkData)
 
 	// Make sure encoded observation fits within the maximum observation size.
-	observation, err = truncateObservation(observation, maxObservationLength)
+	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
+	observation, err = p.observationOptimizer.TruncateObservation(observation)
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to truncate observation: %w", err)
 	}
@@ -255,10 +272,6 @@ func (p *Plugin) getFilterObservation(
 	previousOutcome exectypes.Outcome,
 	observation exectypes.Observation,
 ) (exectypes.Observation, error) {
-	// Phase 2: Filter messages and determine which messages are too costly to execute.
-	//          This phase also determines which messages are too costly to execute.
-	//          These messages will not be executed in the current round, but may be executed in future rounds
-	//          (e.g. if gas prices decrease or if these messages' fees are boosted high enough).
 	supportsDest, err := p.supportsDestChain()
 	if err != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to determine if the destination chain is supported: %w", err)
@@ -270,7 +283,7 @@ func (p *Plugin) getFilterObservation(
 
 	// Collect unique senders.
 	nonceRequestArgs := make(map[cciptypes.ChainSelector]map[string]struct{})
-	for _, commitReport := range previousOutcome.PendingCommitReports {
+	for _, commitReport := range previousOutcome.CommitReports {
 		if _, ok := nonceRequestArgs[commitReport.SourceChain]; !ok {
 			nonceRequestArgs[commitReport.SourceChain] = make(map[string]struct{})
 		}

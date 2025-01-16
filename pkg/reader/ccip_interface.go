@@ -108,13 +108,14 @@ type CCIPReader interface {
 	// NextSeqNum reads the destination chain.
 	// Returns the next expected sequence number for each one of the provided chains.
 	// TODO: if destination was a parameter, this could be a capability reused across plugin instances.
-	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (seqNum []cciptypes.SeqNum, err error)
+	NextSeqNum(ctx context.Context, chains []cciptypes.ChainSelector) (
+		seqNum map[cciptypes.ChainSelector]cciptypes.SeqNum, err error)
 
 	// GetContractAddress returns the contract address that is registered for the provided contract name and chain.
 	GetContractAddress(contractName string, chain cciptypes.ChainSelector) ([]byte, error)
 
 	// Nonces fetches all nonces for the provided selector/address pairs. Addresses are a string encoded raw address,
-	// it must be encoding according to the destination chain requirements with typeconv.AddressBytesToString.
+	// it must be encoding according to the source chain requirements with typeconv.AddressBytesToString.
 	Nonces(
 		ctx context.Context,
 		source, dest cciptypes.ChainSelector,
@@ -171,4 +172,11 @@ type CCIPReader interface {
 
 	// GetMedianDataAvailabilityGasConfig returns the median of the DataAvailabilityGasConfig values from all FeeQuoters
 	GetMedianDataAvailabilityGasConfig(ctx context.Context) (cciptypes.DataAvailabilityGasConfig, error)
+
+	// GetLatestPriceSeqNr returns the latest price sequence number for the destination chain.
+	// Not to confuse with the sequence number of the messages. This is the OCR sequence number.
+	GetLatestPriceSeqNr(ctx context.Context) (uint64, error)
+
+	// GetOffRampConfigDigest returns the offramp config digest for the provided plugin type.
+	GetOffRampConfigDigest(ctx context.Context, pluginType uint8) ([32]byte, error)
 }

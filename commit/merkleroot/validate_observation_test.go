@@ -1,18 +1,15 @@
 package merkleroot
 
 import (
-	"fmt"
 	"testing"
 
 	mapset "github.com/deckarep/golang-set/v2"
-	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
-	reader_mock "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -179,7 +176,7 @@ func Test_validateObservedOffRampMaxSeqNums(t *testing.T) {
 }
 
 func Test_validateRMNRemoteConfig(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		name              string
 		observer          commontypes.OracleID
 		supportsDestChain bool
@@ -198,7 +195,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -215,7 +212,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -233,7 +230,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -251,7 +248,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -267,7 +264,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 				Signers: []types.RemoteSignerInfo{
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1}, // <----
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -285,7 +282,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{},
 			},
@@ -303,7 +300,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 1}, // <---------
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -321,7 +318,7 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 					{OnchainPublicKey: []byte{0, 0, 2}, NodeIndex: 1},
 					{OnchainPublicKey: []byte{0, 0, 3}, NodeIndex: 2},
 				},
-				F:                1,
+				FSign:            1,
 				ConfigVersion:    1,
 				RmnReportVersion: cciptypes.Bytes32{0, 0, 0, 1},
 			},
@@ -329,128 +326,10 @@ func Test_validateRMNRemoteConfig(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateRMNRemoteConfig(tt.observer, tt.supportsDestChain, tt.rmnRemoteConfig)
 			if tt.expectedError {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func Test_validateFChain(t *testing.T) {
-	testCases := []struct {
-		name   string
-		fChain map[cciptypes.ChainSelector]int
-		expErr bool
-	}{
-		{
-			name: "FChain contains negative values",
-			fChain: map[cciptypes.ChainSelector]int{
-				1: 11,
-				2: -4,
-			},
-			expErr: true,
-		},
-		{
-			name: "FChain valid",
-			fChain: map[cciptypes.ChainSelector]int{
-				12: 6,
-				7:  9,
-			},
-			expErr: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := validateFChain(tc.fChain)
-
-			if tc.expErr {
-				assert.Error(t, err)
-				return
-			}
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func Test_validateMerkleRootsState(t *testing.T) {
-	testCases := []struct {
-		name                 string
-		onRampNextSeqNum     []plugintypes.SeqNumChain
-		offRampExpNextSeqNum []cciptypes.SeqNum
-		readerErr            error
-		expErr               bool
-	}{
-		{
-			name: "happy path",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
-			expErr:               false,
-		},
-		{
-			name: "one root is stale",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 201}, // <- 200 is already on chain
-			expErr:               true,
-		},
-		{
-			name: "one root has gap",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 101), // <- onchain 99 but we submit 101 instead of 100
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
-			expErr:               true,
-		},
-		{
-			name: "reader returned wrong number of seq nums",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200, 300},
-			expErr:               true,
-		},
-		{
-			name: "reader error",
-			onRampNextSeqNum: []plugintypes.SeqNumChain{
-				plugintypes.NewSeqNumChain(10, 100),
-				plugintypes.NewSeqNumChain(20, 200),
-			},
-			offRampExpNextSeqNum: []cciptypes.SeqNum{100, 200},
-			readerErr:            fmt.Errorf("reader error"),
-			expErr:               true,
-		},
-	}
-
-	ctx := tests.Context(t)
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			reader := reader_mock.NewMockCCIPReader(t)
-			rep := cciptypes.CommitPluginReport{}
-			chains := make([]cciptypes.ChainSelector, 0, len(tc.onRampNextSeqNum))
-			for _, snc := range tc.onRampNextSeqNum {
-				rep.MerkleRoots = append(rep.MerkleRoots, cciptypes.MerkleRootChain{
-					ChainSel:     snc.ChainSel,
-					SeqNumsRange: cciptypes.NewSeqNumRange(snc.SeqNum, snc.SeqNum+10),
-				})
-				chains = append(chains, snc.ChainSel)
-			}
-			reader.EXPECT().NextSeqNum(ctx, chains).Return(tc.offRampExpNextSeqNum, tc.readerErr)
-
-			err := ValidateMerkleRootsState(ctx, rep.MerkleRoots, reader)
-			if tc.expErr {
 				assert.Error(t, err)
 				return
 			}

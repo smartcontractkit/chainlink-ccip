@@ -331,6 +331,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 			},
 		},
 		{
@@ -346,6 +348,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  defaultEvmDefaultMaxMerkleTreeSize,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 			},
 		},
 		{
@@ -356,6 +360,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				NewMsgScanBatchSize:                500,
 				MaxReportTransmissionCheckAttempts: 10,
 				MaxMerkleTreeSize:                  1000,
+				TransmissionDelayMultiplier:        20,
+				InflightPriceCheckRetries:          5,
 			},
 			expected: CommitOffchainConfig{
 				RMNEnabled:                         true,
@@ -365,6 +371,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  1000,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        20,
+				InflightPriceCheckRetries:          5,
 			},
 		},
 		{
@@ -382,6 +390,8 @@ func TestCommitOffchainConfig_ApplyDefaults(t *testing.T) {
 				MaxMerkleTreeSize:                  500,
 				RemoteGasPriceBatchWriteFrequency:  *commonconfig.MustNewDuration(defaultRemoteGasPriceBatchWriteFrequency),
 				SignObservationPrefix:              defaultSignObservationPrefix,
+				TransmissionDelayMultiplier:        defaultTransmissionDelayMultiplier,
+				InflightPriceCheckRetries:          defaultInflightPriceCheckRetries,
 			},
 		},
 	}
