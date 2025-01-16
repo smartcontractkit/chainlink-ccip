@@ -38,16 +38,17 @@ var initCmd = &cobra.Command{
 		if !viper.GetBool("CRIB_CI_ENV") {
 			// DEVSPACE_NAMESPACE and PROVIDER are the only parameters that can be set interactively so
 			// the CLI flow doesn't require an extra step
-			for key, defaultValue := range map[string]string{"DEVSPACE_NAMESPACE": "", "PROVIDER": "aws"} {
-				if viper.GetString(key) == "" {
-					userWasPrompted = true
-					userInput, err := utils.PromptForInput(key, defaultValue)
-					if err != nil {
-						logger.Error("failed to prompt for input", slog.Any("error", err))
-						os.Exit(1)
-					}
-					viper.Set(key, userInput)
-				}
+			if viper.GetString("PROVIDER") == "" {
+				userWasPrompted = true
+				viper.Set("PROVIDER", utils.PresentPrompt("Please enter a value for PROVIDER", supportedProviders))
+			}
+
+			if userWasPrompted && viper.GetString("PROVIDER") == "kind" {
+				logger.Info("Setting DEVSPACE_NAMESPACE to crib-local for kind provider")
+				viper.Set("DEVSPACE_NAMESPACE", "crib-local")
+			} else if viper.GetString("DEVSPACE_NAMESPACE") == "" {
+				userWasPrompted = true
+				viper.Set("DEVSPACE_NAMESPACE", utils.PresentPrompt("Please enter a value for DEVSPACE_NAMESPACE (has to be prefixed with crib-): ", []string{}))
 			}
 		} else {
 			// CI environment, PROVIDER is always "aws"
