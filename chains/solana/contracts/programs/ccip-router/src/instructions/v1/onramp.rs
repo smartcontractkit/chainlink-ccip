@@ -119,7 +119,8 @@ pub fn ccip_send<'info>(
         &per_chain_per_token_config_accounts,
     )?;
 
-    let link_fee = fee.convert(
+    let link_fee = convert(
+        &fee,
         &ctx.accounts.fee_token_config.config,
         &ctx.accounts.link_token_config.config,
     )?;
@@ -386,23 +387,22 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     result.to_bytes()
 }
 
-impl SolanaTokenAmount {
-    pub fn convert(
-        &self,
-        source_config: &BillingTokenConfig,
-        target_config: &BillingTokenConfig,
-    ) -> Result<SolanaTokenAmount> {
-        assert!(source_config.mint == self.token);
-        let source_price = get_validated_token_price(source_config)?;
-        let target_price = get_validated_token_price(target_config)?;
+// Converts a token amount to one denominated in another token (e.g. from WSOL to LINK)
+pub fn convert(
+    source_token_amount: &SolanaTokenAmount,
+    source_config: &BillingTokenConfig,
+    target_config: &BillingTokenConfig,
+) -> Result<SolanaTokenAmount> {
+    assert!(source_config.mint == source_token_amount.token);
+    let source_price = get_validated_token_price(source_config)?;
+    let target_price = get_validated_token_price(target_config)?;
 
-        Ok(SolanaTokenAmount {
-            token: target_config.mint,
-            amount: ((source_price * self.amount).0 / target_price.0)
-                .try_into()
-                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
-        })
-    }
+    Ok(SolanaTokenAmount {
+        token: target_config.mint,
+        amount: ((source_price * source_token_amount.amount).0 / target_price.0)
+            .try_into()
+            .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+    })
 }
 
 /// Methods in this module are used to deserialize AccountInfo into the state structs
