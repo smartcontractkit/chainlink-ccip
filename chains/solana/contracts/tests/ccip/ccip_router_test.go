@@ -128,10 +128,11 @@ func TestCCIPRouter(t *testing.T) {
 		IsEnabled: true,
 
 		// minimal valid config
-		DefaultTxGasLimit:       200000,
-		MaxPerMsgGasLimit:       3000000,
-		MaxDataBytes:            30000,
-		MaxNumberOfTokensPerMsg: 5,
+		DefaultTxGasLimit:           200000,
+		MaxPerMsgGasLimit:           3000000,
+		MaxDataBytes:                30000,
+		MaxNumberOfTokensPerMsg:     5,
+		DefaultTokenDestGasOverhead: 50000,
 		// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
 		ChainFamilySelector: [4]uint8{40, 18, 213, 44},
 
@@ -338,6 +339,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("Is initialized", func(t *testing.T) {
 			invalidSolanaChainSelector := uint64(17)
 			defaultGasLimit := bin.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
 			allowOutOfOrderExecution := true
 
 			// get program data account
@@ -358,7 +360,13 @@ func TestCCIPRouter(t *testing.T) {
 				defaultGasLimit,
 				allowOutOfOrderExecution,
 				config.EnableExecutionAfter,
-				anotherUser.PublicKey(), // fee aggregator address, will be changed in later test
+				// fee aggregator address, will be changed in later test
+				anotherUser.PublicKey(),
+				// We use token2022 as the LINK address, which will be used as a base
+				// for fees. It could be any other token mint address, but we use this
+				// one for simplicity.
+				token2022.mint,
+				defaultMaxFeeJuelsPerMsg,
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
 				admin.PublicKey(),
@@ -2029,6 +2037,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2063,6 +2072,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2130,6 +2140,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2192,6 +2203,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2255,6 +2267,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2317,6 +2330,7 @@ func TestCCIPRouter(t *testing.T) {
 				token2022.program,
 				token2022.mint,
 				token2022.billingConfigPDA,
+				token2022.billingConfigPDA,
 				token2022.userATA,
 				token2022.billingATA,
 				config.BillingSignerPDA,
@@ -2376,6 +2390,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2410,6 +2425,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2443,6 +2459,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2492,6 +2509,7 @@ func TestCCIPRouter(t *testing.T) {
 											program,
 											mint,
 											billingConfigPDA,
+											token2022.billingConfigPDA,
 											userATA,
 											billingATA,
 											config.BillingSignerPDA,
@@ -2535,6 +2553,7 @@ func TestCCIPRouter(t *testing.T) {
 				token2022.program,
 				token2022.mint,
 				token2022.billingConfigPDA,
+				token2022.billingConfigPDA,
 				token2022.userATA, // token account of a different user
 				token2022.billingATA,
 				config.BillingSignerPDA,
@@ -2568,6 +2587,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				token2022.program,
 				token2022.mint,
+				token2022.billingConfigPDA,
 				token2022.billingConfigPDA,
 				token2022.anotherUserATA,
 				token2022.billingATA,
@@ -2642,6 +2662,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2671,7 +2692,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
 			require.Equal(t, 0, len(ta.ExtraData))
 			require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount)
-			require.Equal(t, 0, len(ta.DestExecData))
+			require.Equal(t, 32, len(ta.DestExecData))
+			expectedDestExecData := make([]byte, 32)
+			// Token0 billing had DestGasOverhead set to 100 during setup
+			binary.BigEndian.PutUint64(expectedDestExecData[24:], 100)
+			require.Equal(t, expectedDestExecData, ta.DestExecData)
 
 			// check pool event
 			poolEvent := tokens.EventBurnLock{}
@@ -2808,6 +2833,7 @@ func TestCCIPRouter(t *testing.T) {
 						wsol.program,
 						wsol.mint,
 						wsol.billingConfigPDA,
+						token2022.billingConfigPDA,
 						wsol.userATA,
 						wsol.billingATA,
 						config.BillingSignerPDA,
@@ -2871,6 +2897,7 @@ func TestCCIPRouter(t *testing.T) {
 						token.program,
 						token.mint,
 						token.billingConfigPDA,
+						token2022.billingConfigPDA,
 						token.userATA,
 						token.billingATA,
 						config.BillingSignerPDA,
@@ -2912,6 +2939,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				token2022.program,
 				token2022.mint,
+				token2022.billingConfigPDA,
 				token2022.billingConfigPDA,
 				token2022.tokenlessUserATA,
 				token2022.billingATA,
@@ -2966,6 +2994,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				zeroPubkey, // no user token account, because paying with native SOL
 				wsol.billingATA,
 				config.BillingSignerPDA,
