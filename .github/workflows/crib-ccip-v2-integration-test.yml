@@ -25,7 +25,7 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
       - name: Deploy and validate CRIB Environment for CCIP v2
-        uses: smartcontractkit/.github/actions/crib-deploy-environment@e818ad7a43c514b59a6c8d96ee8427dc82dd9c9f # crib-deploy-environment@8.2.0
+        uses: smartcontractkit/.github/actions/crib-deploy-environment@265e28cc322771651688493303785323e3482b15 # crib-deploy-environment@8.2.1
         id: deploy-crib
         with:
           aws-region: ${{ secrets.AWS_REGION }}
