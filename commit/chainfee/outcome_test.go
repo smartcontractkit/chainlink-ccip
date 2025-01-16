@@ -81,7 +81,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	// 3 oracles, same observations, will pass destChain 2f+1 for chain selector 1
 	aos := sameObs(3, obsNeedUpdate)
 
-	consensusObs, err := p.getConsensusObservation(aos)
+	consensusObs, err := p.getConsensusObservation(lggr, aos)
 	require.NoError(t, err)
 	assert.Equal(t, fChains[1], consensusObs.FChain[1])
 	assert.Equal(t, fChains[2], consensusObs.FChain[2])
@@ -98,7 +98,7 @@ func TestGetConsensusObservation(t *testing.T) {
 	// 5 oracles, same observations, will pass destChain 2f+1 for both chain selectors
 	aos = sameObs(5, obsNeedUpdate)
 
-	consensusObs, err = p.getConsensusObservation(aos)
+	consensusObs, err = p.getConsensusObservation(lggr, aos)
 	require.NoError(t, err)
 	assert.Equal(t, fChains[1], consensusObs.FChain[1])
 	assert.Equal(t, fChains[2], consensusObs.FChain[2])

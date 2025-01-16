@@ -198,6 +198,7 @@ pub fn execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
     report_context_byte_words: [[u8; 32]; 3],
+    token_indexes: &[u8],
 ) -> Result<()> {
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
     // limit borrowing of ctx
@@ -214,12 +215,13 @@ pub fn execute<'info>(
         )?;
     }
 
-    internal_execute(ctx, execution_report)
+    internal_execute(ctx, execution_report, token_indexes)
 }
 
 pub fn manually_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
+    token_indexes: &[u8],
 ) -> Result<()> {
     // limit borrowing of ctx
     {
@@ -234,7 +236,7 @@ pub fn manually_execute<'info>(
             CcipRouterError::ManualExecutionNotAllowed
         );
     }
-    internal_execute(ctx, execution_report)
+    internal_execute(ctx, execution_report, token_indexes)
 }
 
 /////////////
@@ -343,6 +345,7 @@ fn update_chain_state_gas_price(
 fn internal_execute<'info>(
     ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
     execution_report: ExecutionReportSingleChain,
+    token_indexes: &[u8],
 ) -> Result<()> {
     // TODO: Limit send size data to 256
 
@@ -391,23 +394,19 @@ fn internal_execute<'info>(
 
     // send tokens any -> SOL
     require!(
-        execution_report.token_indexes.len() == execution_report.message.token_amounts.len()
-            && execution_report.token_indexes.len() == execution_report.offchain_token_data.len(),
+        token_indexes.len() == execution_report.message.token_amounts.len()
+            && token_indexes.len() == execution_report.offchain_token_data.len(),
         CcipRouterError::InvalidInputs,
     );
     let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-    let mut token_amounts =
-        vec![SolanaTokenAmount::default(); execution_report.token_indexes.len()];
+    let mut token_amounts = vec![SolanaTokenAmount::default(); token_indexes.len()];
 
     // handle tokens
     // note: indexes are used instead of counts in case more accounts need to be passed in remaining_accounts before token accounts
     // token_indexes = [2, 4] where remaining_accounts is [custom_account, custom_account, token1_account1, token1_account2, token2_account1, token2_account2] for example
     for (i, token_amount) in execution_report.message.token_amounts.iter().enumerate() {
-        let (start, end) = calculate_token_pool_account_indices(
-            i,
-            &execution_report.token_indexes,
-            ctx.remaining_accounts.len(),
-        )?;
+        let (start, end) =
+            calculate_token_pool_account_indices(i, token_indexes, ctx.remaining_accounts.len())?;
         let acc_list = &ctx.remaining_accounts[start..end];
         let accs = validate_and_parse_token_accounts(
             execution_report.message.receiver,
@@ -477,12 +476,9 @@ fn internal_execute<'info>(
     // handle CPI call if there are extra accounts
     // case: no tokens, but there are remaining_accounts passed in
     // case: tokens, but the first token has a non-zero index (indicating extra accounts before token accounts)
-    if should_execute_messaging(
-        &execution_report.token_indexes,
-        ctx.remaining_accounts.is_empty(),
-    ) {
+    if should_execute_messaging(token_indexes, ctx.remaining_accounts.is_empty()) {
         let (msg_program, msg_accounts) = parse_messaging_accounts(
-            &execution_report.token_indexes,
+            token_indexes,
             execution_report.message.receiver,
             &execution_report.message.extra_args.accounts,
             &execution_report.message.extra_args.is_writable_bitmap,

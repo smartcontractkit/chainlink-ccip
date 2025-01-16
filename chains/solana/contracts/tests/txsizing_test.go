@@ -84,7 +84,6 @@ func TestTransactionSizing(t *testing.T) {
 		TokenAmounts: []ccip_router.SolanaTokenAmount{}, // no tokens
 		FeeToken:     [32]byte{},                        // solana fee token
 		ExtraArgs:    ccip_router.ExtraArgsInput{},      // default options
-		TokenIndexes: []byte{},                          // no tokens
 	}
 	sendSingleMinimalToken := ccip_router.Solana2AnyMessage{
 		Receiver: make([]byte, 20),
@@ -93,14 +92,14 @@ func TestTransactionSizing(t *testing.T) {
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
-		FeeToken:     [32]byte{},
-		ExtraArgs:    ccip_router.ExtraArgsInput{}, // default options
-		TokenIndexes: []byte{0},                    // one token
+		FeeToken:  [32]byte{},
+		ExtraArgs: ccip_router.ExtraArgsInput{}, // default options
 	}
-	ixCcipSend := func(msg ccip_router.Solana2AnyMessage, addAccounts solana.PublicKeySlice) solana.Instruction {
+	ixCcipSend := func(msg ccip_router.Solana2AnyMessage, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewCcipSendInstruction(
 			1,
 			msg,
+			tokenIndexes,
 			routerTable["routerConfig"],
 			routerTable["destChainConfig"],
 			mustRandomPubkey(), // user nonce PDA
@@ -191,7 +190,6 @@ func TestTransactionSizing(t *testing.T) {
 		OffchainTokenData: [][]byte{},
 		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
-		TokenIndexes:      []byte{},
 	}
 	executeSingleToken := ccip_router.ExecutionReportSingleChain{
 		SourceChainSelector: 0,
@@ -222,13 +220,13 @@ func TestTransactionSizing(t *testing.T) {
 		OffchainTokenData: [][]byte{},
 		Root:              [32]uint8{},
 		Proofs:            [][32]uint8{}, // single message merkle root (added roots consume 32 bytes)
-		TokenIndexes:      []byte{0},
 	}
 
-	ixExecute := func(report ccip_router.ExecutionReportSingleChain, addAccounts solana.PublicKeySlice) solana.Instruction {
+	ixExecute := func(report ccip_router.ExecutionReportSingleChain, tokenIndexes []byte, addAccounts solana.PublicKeySlice) solana.Instruction {
 		base := ccip_router.NewExecuteInstruction(
 			report,
 			[3][32]byte{}, // report context
+			tokenIndexes,
 			routerTable["routerConfig"],
 			routerTable["originChainConfig"],
 			mustRandomPubkey(), // commit report PDA
@@ -255,14 +253,14 @@ func TestTransactionSizing(t *testing.T) {
 	}{
 		{
 			"ccipSend:noToken",
-			ixCcipSend(sendNoTokens, nil),
+			ixCcipSend(sendNoTokens, []byte{}, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
 		},
 		{
 			"ccipSend:singleToken",
-			ixCcipSend(sendSingleMinimalToken, append([]solana.PublicKey{
+			ixCcipSend(sendSingleMinimalToken, []byte{0}, append([]solana.PublicKey{
 				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config
@@ -291,14 +289,14 @@ func TestTransactionSizing(t *testing.T) {
 		},
 		{
 			"execute:noToken",
-			ixExecute(executeEmpty, nil),
+			ixExecute(executeEmpty, []byte{}, nil),
 			map[solana.PublicKey]solana.PublicKeySlice{
 				mustRandomPubkey(): maps.Values(routerTable),
 			},
 		},
 		{
 			"execute:singleToken",
-			ixExecute(executeSingleToken, append([]solana.PublicKey{
+			ixExecute(executeSingleToken, []byte{0}, append([]solana.PublicKey{
 				mustRandomPubkey(), // user ATA
 				mustRandomPubkey(), // token billing config
 				mustRandomPubkey(), // token pool chain config
