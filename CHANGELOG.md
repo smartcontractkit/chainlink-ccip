@@ -1,5 +1,17 @@
 # @chainlink/crib
 
+## 2.1.0
+
+### Minor Changes
+
+- [#352](https://github.com/smartcontractkit/crib/pull/352) [`e8e4f75`](https://github.com/smartcontractkit/crib/commit/e8e4f754cc5142e50136ca345a643222faa6a266) Thanks [@scheibinger](https://github.com/scheibinger)! - Configure ccip-v2-scripts dependency to use ADDITIONAL_CHAINS_COUNT property for additional chains.
+
+- [#356](https://github.com/smartcontractkit/crib/pull/356) [`e1affa7`](https://github.com/smartcontractkit/crib/commit/e1affa79dffc908aa1d6b3cb3e3586aee6439d8d) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - chainlink product now deploys pre-built image as default instead of building from `CHAINLINK_CODE_DIR`
+
+- [#358](https://github.com/smartcontractkit/crib/pull/358) [`8efd8a2`](https://github.com/smartcontractkit/crib/commit/8efd8a2be8eb20e246a53aef9093fc19aaa3bdf0) Thanks [@rafaelfelix](https://github.com/rafaelfelix)! - Improved initial CRIB setup user prompt logic (PROVIDER is asked first w/ valid options presented, if `kind` is used `DEVSPACE_NAMESPACE` gets automatically set to `crib-local`)
+
+- [#350](https://github.com/smartcontractkit/crib/pull/350) [`fdbddec`](https://github.com/smartcontractkit/crib/commit/fdbddec023f02fccf53df239cc0ac63c5d0b5b96) Thanks [@scheibinger](https://github.com/scheibinger)! - Update donut and geth dependencies to deploy variable number of geth chains. In donut add option to pass image URI and sha from .env file.
+
 ## 2.0.0
 
 ### Major Changes
