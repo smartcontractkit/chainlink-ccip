@@ -254,12 +254,6 @@ func (p *Plugin) Observation(
 		return nil, fmt.Errorf("decode query: %w", err)
 	}
 
-	lggr = logger.With(
-		lggr,
-		"prevOutcome", prevOutcome,
-		"decodedQuery", decodedQ,
-	)
-
 	merkleRootObs, err := p.merkleRootProcessor.Observation(ctx, prevOutcome.MerkleRootOutcome, decodedQ.MerkleRootQuery)
 	if err != nil {
 		lggr.Errorw("get merkle root processor observation",
