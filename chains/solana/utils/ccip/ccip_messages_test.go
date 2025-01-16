@@ -27,7 +27,7 @@ func TestMessageHashing(t *testing.T) {
 		h, err := HashEvmToSolanaMessage(ccip_router.Any2SolanaRampMessage{
 			Sender:        sender,
 			TokenReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
-			LogicReceiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
+			LogicReceiver: solana.MustPublicKeyFromBase58("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"),
 			Data:          []byte{4, 5, 6},
 			Header: ccip_router.RampMessageHeader{
 				MessageId:           [32]uint8{8, 5, 3},
@@ -39,7 +39,9 @@ func TestMessageHashing(t *testing.T) {
 			ExtraArgs: ccip_router.SolanaExtraArgs{
 				ComputeUnits:     1000,
 				IsWritableBitmap: 1,
-				Accounts:         []solana.PublicKey{},
+				Accounts: []solana.PublicKey{
+					solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
+				},
 			},
 			TokenAmounts: []ccip_router.Any2SolanaTokenTransfer{
 				{
@@ -53,7 +55,7 @@ func TestMessageHashing(t *testing.T) {
 		}, config.OnRampAddress)
 
 		require.NoError(t, err)
-		require.Equal(t, "60bb7073f7528617d8df11743241a24942c15deed3ad90cdd44a92bd097a6a80", hex.EncodeToString(h))
+		require.Equal(t, "46931be172374199bbf69f7138e18360a744bc5cf1159ffeacf43aaa53d427db", hex.EncodeToString(h))
 	})
 
 	t.Run("SolanaToEvm", func(t *testing.T) {

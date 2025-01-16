@@ -4743,8 +4743,7 @@ func TestCCIPRouter(t *testing.T) {
 				message.LogicReceiver = config.CcipInvalidReceiverProgram
 				sequenceNumber := message.Header.SequenceNumber
 				message.ExtraArgs.IsWritableBitmap = 0
-				message.ExtraArgs.Accounts = []ccip_router.SolanaAccountMeta{
-					config.CcipInvalidReceiverProgram,
+				message.ExtraArgs.Accounts = []solana.PublicKey{
 					solana.SystemProgramID,
 				}
 

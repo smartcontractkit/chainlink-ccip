@@ -665,17 +665,11 @@ type Any2SolanaRampMessage struct {
 	Header        RampMessageHeader
 	Sender        []byte
 	Data          []byte
-<<<<<<< HEAD
 	LogicReceiver ag_solanago.PublicKey
 	TokenReceiver ag_solanago.PublicKey
 	TokenAmounts  []Any2SolanaTokenTransfer
 	ExtraArgs     SolanaExtraArgs
-=======
-	Receiver      ag_solanago.PublicKey
-	TokenAmounts  []Any2SolanaTokenTransfer
-	ExtraArgs     SolanaExtraArgs
 	OnRampAddress []byte
->>>>>>> main
 }
 
 func (obj Any2SolanaRampMessage) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {

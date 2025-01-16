@@ -587,14 +587,14 @@ fn parse_messaging_accounts<'info>(
         logic_receiver == msg_program.key(),
         CcipRouterError::InvalidInputs,
     );
+    require!(
+        msg_accounts.len() == extra_args_accounts.len(),
+        CcipRouterError::InvalidInputs
+    );
 
-    for (i, acc) in extra_args_accounts.iter().enumerate() {
-        let current_acc = &msg_accounts[i];
-        require!(
-            acc.pubkey == current_acc.key() && acc.is_writable == current_acc.is_writable,
-            CcipRouterError::InvalidInputs
-        );
-        for (i, acc) in source_msg_accounts.iter().enumerate() {
+    // Validate the addresses of all the accounts match the ones in source chain
+    if msg_accounts.len() > 1 {
+        for (i, acc) in extra_args_accounts.iter().enumerate() {
             let current_acc = &msg_accounts[i];
             require!(*acc == current_acc.key(), CcipRouterError::InvalidInputs);
             require!(
@@ -849,7 +849,7 @@ mod tests {
             .to_vec(),
             token_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
                 .unwrap(),
-            logic_receiver: Pubkey::try_from("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb")
+            logic_receiver: Pubkey::try_from("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8")
                 .unwrap(),
             data: vec![4, 5, 6],
             header: RampMessageHeader {
@@ -876,14 +876,16 @@ mod tests {
             extra_args: SolanaExtraArgs {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
-                accounts: vec![],
+                accounts: vec![
+                    Pubkey::try_from("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH").unwrap(),
+                ],
             },
             on_ramp_address: on_ramp_address.clone(),
         };
         let hash_result = hash(&message);
 
         assert_eq!(
-            "60bb7073f7528617d8df11743241a24942c15deed3ad90cdd44a92bd097a6a80",
+            "46931be172374199bbf69f7138e18360a744bc5cf1159ffeacf43aaa53d427db",
             hex::encode(hash_result)
         );
     }
