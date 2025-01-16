@@ -1,6 +1,8 @@
 package logutil
 
 import (
+	"context"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -90,4 +92,67 @@ func TestLogCopy(t *testing.T) {
 	require.Equal(t, hook.Len(), 2)
 	require.Len(t, hook.All()[1].Context, len(expected))
 	require.Equal(t, expected, hook.All()[1].ContextMap())
+}
+
+func Test_GetSeqNr(t *testing.T) {
+	ctx := context.TODO()
+	seqNr := rand.Uint64()
+
+	// Add sequence number to context
+	ctxWithSeqNr := ctxWithOCRSeqNr(ctx, seqNr)
+
+	// Retrieve sequence number from context
+	retrievedSeqNr := GetSeqNr(ctxWithSeqNr)
+
+	require.Equal(t, seqNr, retrievedSeqNr, "The sequence number should match the one set in the context")
+
+	// Retrieve sequence number from context without sequence number
+	retrievedSeqNr = GetSeqNr(ctx)
+	require.Equal(t, uint64(0), retrievedSeqNr)
+}
+
+func Test_WithContextValues(t *testing.T) {
+	ctx := context.TODO()
+	seqNr := rand.Uint64()
+
+	// Add sequence number to context
+	ctxWithSeqNr := ctxWithOCRSeqNr(ctx, seqNr)
+
+	lggr, observed := logger.TestObserved(t, zapcore.InfoLevel)
+	lggr = WithContextValues(ctxWithSeqNr, lggr)
+
+	lggr.Info("Test message")
+
+	seqNrLogs := observed.FilterField(
+		zapcore.Field{
+			Key:     ocrSeqNrLoggerKey,
+			Type:    zapcore.Uint64Type,
+			Integer: int64(seqNr),
+		},
+	)
+	require.Len(t, seqNrLogs.All(), 1)
+}
+
+func Test_WithOCRSeqNr(t *testing.T) {
+	ctx := context.TODO()
+	seqNr := rand.Uint64()
+
+	lggr, observed := logger.TestObserved(t, zapcore.InfoLevel)
+
+	newCtx, newLggr := WithOCRSeqNr(ctx, lggr, seqNr)
+
+	// Check if the context has the correct sequence number
+	retrievedSeqNr := GetSeqNr(newCtx)
+	require.Equal(t, seqNr, retrievedSeqNr, "The sequence number should match the one set in the context")
+
+	// Check if the logger has the correct sequence number in its fields
+	newLggr.Info("Test message")
+	seqNrLogs := observed.FilterField(
+		zapcore.Field{
+			Key:     ocrSeqNrLoggerKey,
+			Type:    zapcore.Uint64Type,
+			Integer: int64(seqNr),
+		},
+	)
+	require.Len(t, seqNrLogs.All(), 1)
 }
