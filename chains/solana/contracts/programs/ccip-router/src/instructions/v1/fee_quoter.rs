@@ -12,6 +12,7 @@ use crate::{
 
 use super::messages::ramps::validate_svm2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+use super::price_math::get_validated_token_price;
 use super::price_math::{Exponential, Usd18Decimals};
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
@@ -299,21 +300,6 @@ fn get_validated_gas_price(dest_chain: &DestChain) -> Result<PackedPrice> {
     Ok(price)
 }
 
-fn get_validated_token_price(token_config: &BillingTokenConfig) -> Result<Usd18Decimals> {
-    let timestamp = token_config.usd_per_token.timestamp;
-    let price: Usd18Decimals = (&token_config.usd_per_token).into();
-
-    // NOTE: There's no validation done with respect to token price staleness since data feeds are not
-    // supported in solana. Only the existence of `any` timestamp is checked, to ensure the price
-    // was set at least once.
-    require!(
-        price.0 != 0 && timestamp != 0,
-        CcipRouterError::InvalidTokenPrice
-    );
-
-    Ok(price)
-}
-
 pub fn wrap_native_sol<'info>(
     token_program: &AccountInfo<'info>,
     from: &mut Signer<'info>,
@@ -371,7 +357,7 @@ pub fn do_billing_transfer<'info>(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use solana_program::{
         entrypoint::SUCCESS,
         program_stubs::{set_syscall_stubs, SyscallStubs},
@@ -663,7 +649,7 @@ mod tests {
             })
             .collect();
 
-        let tokens: Vec<_> = tokens.into_iter().map(|t| Some(t)).collect();
+        let tokens: Vec<_> = tokens.into_iter().map(Some).collect();
         let per_chains: Vec<_> = per_chains.into_iter().collect();
         set_syscall_stubs(Box::new(TestStubs));
 
@@ -687,7 +673,7 @@ mod tests {
         );
     }
 
-    fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
+    pub fn sample_additional_token() -> (BillingTokenConfig, PerChainPerTokenConfig) {
         let mint = Pubkey::new_unique();
         (
             sample_billing_config(),

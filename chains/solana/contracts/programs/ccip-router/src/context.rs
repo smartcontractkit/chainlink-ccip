@@ -525,6 +525,12 @@ pub struct CcipSend<'info> {
     )]
     pub fee_token_config: Account<'info, BillingTokenConfigWrapper>, // pass pre-2022 wSOL config if using native SOL
 
+    #[account(
+        seeds = [FEE_BILLING_TOKEN_CONFIG, config.load()?.link_token_mint.key().as_ref()],
+        bump,
+    )]
+    pub link_token_config: Account<'info, BillingTokenConfigWrapper>,
+
     /// CHECK this is the associated token account for the user paying the fee.
     /// If paying with native SOL, this must be the zero address.
     #[account(

@@ -97,7 +97,7 @@ pub struct SVM2AnyRampMessage {
     pub token_amounts: Vec<SVM2AnyTokenTransfer>,
 }
 
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, Default)]
+#[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
 pub struct SVM2AnyTokenTransfer {
     // The source pool address. This value is trusted as it was obtained through the onRamp. It can be relied
     // upon by the destination pool to validate the source pool.
