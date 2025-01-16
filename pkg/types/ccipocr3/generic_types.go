@@ -129,7 +129,7 @@ type Message struct {
 	// ExtraArgsDecoded is same as ExtraArgs,
 	// just decoded into a named collection of arguments in a generic format,
 	// which can be read by any destination chain family.
-	ExtraArgsDecoded map[string]any
+	ExtraArgsDecoded map[string]any `json:"extraArgsDecoded,omitempty"`
 	// FeeToken is the fee token address.
 	// i.e if the source chain is EVM, len(FeeToken) == 20 (i.e, is not abi-encoded).
 	FeeToken UnknownAddress `json:"feeToken"`
