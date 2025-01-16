@@ -166,7 +166,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		logutil.WithContext(lggr, "CCIPReader"),
+		logutil.WithComponent(lggr, "CCIPReader"),
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -176,7 +176,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		logutil.WithContext(lggr, "TokenDataObserver"),
+		logutil.WithComponent(lggr, "TokenDataObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
@@ -187,7 +187,7 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		logutil.WithContext(lggr, "CostlyMessages"),
+		logutil.WithComponent(lggr, "CostlyMessages"),
 		true,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,

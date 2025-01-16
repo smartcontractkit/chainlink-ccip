@@ -98,6 +98,14 @@
         {
           "name": "feeAggregator",
           "type": "publicKey"
+        },
+        {
+          "name": "linkTokenMint",
+          "type": "publicKey"
+        },
+        {
+          "name": "maxFeeJuelsPerMsg",
+          "type": "u128"
         }
       ]
     },
@@ -1190,6 +1198,11 @@
           "isSigner": false
         },
         {
+          "name": "linkTokenConfig",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
           "name": "feeTokenUserAssociatedAccount",
           "isMut": false,
           "isSigner": false,
@@ -1224,6 +1237,10 @@
           "type": {
             "defined": "Solana2AnyMessage"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1408,6 +1425,10 @@
               3
             ]
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1473,6 +1494,10 @@
           "type": {
             "defined": "ExecutionReportSingleChain"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     }
@@ -1548,6 +1573,14 @@
                 2
               ]
             }
+          },
+          {
+            "name": "maxFeeJuelsPerMsg",
+            "type": "u128"
+          },
+          {
+            "name": "linkTokenMint",
+            "type": "publicKey"
           },
           {
             "name": "feeAggregator",
@@ -2092,10 +2125,6 @@
                 ]
               }
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
@@ -2326,10 +2355,6 @@
             "type": {
               "defined": "ExtraArgsInput"
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
@@ -2886,6 +2911,12 @@
           },
           {
             "name": "InvalidInputsMissingTokenConfig"
+          },
+          {
+            "name": "MessageFeeTooHigh"
+          },
+          {
+            "name": "SourceTokenDataTooLarge"
           }
         ]
       }

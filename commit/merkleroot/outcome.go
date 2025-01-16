@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -27,41 +28,44 @@ import (
 // - builds a report
 // - checks for the transmission of a previous report
 func (p *Processor) Outcome(
-	_ context.Context,
+	ctx context.Context,
 	prevOutcome Outcome,
 	query Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
 	tStart := time.Now()
 
-	outcome, nextState, err := p.getOutcome(prevOutcome, query, aos)
+	outcome, nextState, err := p.getOutcome(lggr, prevOutcome, query, aos)
 	if err != nil {
-		p.lggr.Errorw("outcome failed with error", "err", err)
+		lggr.Errorw("outcome failed with error", "err", err)
 		return Outcome{}, err
 	}
 
 	p.metricsReporter.TrackMerkleOutcome(outcome, nextState.String())
-	p.lggr.Infow("Sending Outcome",
+	lggr.Infow("Sending Outcome",
 		"outcome", outcome, "nextState", nextState, "outcomeDuration", time.Since(tStart))
 	return outcome, nil
 }
 
 func (p *Processor) getOutcome(
+	lggr logger.Logger,
 	previousOutcome Outcome,
 	q Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, processorState, error) {
 	nextState := previousOutcome.nextState()
 
-	consObservation, err := getConsensusObservation(p.lggr, p.reportingCfg.F, p.destChain, aos)
+	consObservation, err := getConsensusObservation(lggr, p.reportingCfg.F, p.destChain, aos)
 	if err != nil {
-		p.lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
+		lggr.Warnw("Get consensus observation failed, empty outcome", "err", err)
 		return Outcome{}, nextState, nil
 	}
 
 	switch nextState {
 	case selectingRangesForReport:
-		return reportRangesOutcome(q, p.lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
+		return reportRangesOutcome(q, lggr, consObservation, p.offchainCfg.MaxMerkleTreeSize, p.destChain),
 			nextState,
 			nil
 	case buildingReport:
@@ -72,12 +76,12 @@ func (p *Processor) getOutcome(
 		}
 
 		merkleRootsOutcome, err := buildMerkleRootsOutcome(
-			q, p.offchainCfg.RMNEnabled, p.lggr, consObservation, previousOutcome)
+			q, p.offchainCfg.RMNEnabled, lggr, consObservation, previousOutcome)
 
 		return merkleRootsOutcome, nextState, err
 	case waitingForReportTransmission:
 		return checkForReportTransmission(
-			p.lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
+			lggr, p.offchainCfg.MaxReportTransmissionCheckAttempts, previousOutcome, consObservation), nextState, nil
 	default:
 		return Outcome{}, nextState, fmt.Errorf("unexpected next state in Outcome: %v", nextState)
 	}

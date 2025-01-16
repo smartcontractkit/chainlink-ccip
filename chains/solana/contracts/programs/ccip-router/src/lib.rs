@@ -53,6 +53,7 @@ pub mod ccip_router {
     /// * `default_gas_limit` - The default gas limit for other destination chains.
     /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
+    #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
         solana_chain_selector: u64,
@@ -60,6 +61,8 @@ pub mod ccip_router {
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
         fee_aggregator: Pubkey,
+        link_token_mint: Pubkey,
+        max_fee_juels_per_msg: u128,
     ) -> Result<()> {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
@@ -67,6 +70,8 @@ pub mod ccip_router {
         config.solana_chain_selector = solana_chain_selector;
         config.default_gas_limit = default_gas_limit;
         config.enable_manual_execution_after = enable_execution_after;
+        config.link_token_mint = link_token_mint;
+        config.max_fee_juels_per_msg = max_fee_juels_per_msg;
 
         if default_allow_out_of_order_execution {
             config.default_allow_out_of_order_execution = 1;
@@ -504,8 +509,9 @@ pub mod ccip_router {
         ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::onramp::ccip_send(ctx, dest_chain_selector, message)
+        v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 
     /// OFF RAMP FLOW
@@ -566,8 +572,14 @@ pub mod ccip_router {
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
         report_context_byte_words: [[u8; 32]; 3],
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::execute(ctx, execution_report, report_context_byte_words)
+        v1::offramp::execute(
+            ctx,
+            execution_report,
+            report_context_byte_words,
+            &token_indexes,
+        )
     }
 
     /// Manually executes a report to the router.
@@ -583,8 +595,9 @@ pub mod ccip_router {
     pub fn manually_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::manually_execute(ctx, execution_report)
+        v1::offramp::manually_execute(ctx, execution_report, &token_indexes)
     }
 }
 
@@ -664,4 +677,8 @@ pub enum CcipRouterError {
     UnsupportedToken,
     #[msg("Inputs are missing token configuration")]
     InvalidInputsMissingTokenConfig,
+    #[msg("Message fee is too high")]
+    MessageFeeTooHigh,
+    #[msg("Source token data is too large")]
+    SourceTokenDataTooLarge,
 }
