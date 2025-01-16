@@ -167,7 +167,7 @@ func (r *ccipChainReader) CommitReportsGTETimestamp(
 				cciptypes.ChainSelector(mr.SourceChainSelector),
 			)
 			if err != nil {
-				r.lggr.Errorw("failed to get onRamp address", "err", err, "chain", mr.SourceChainSelector)
+				r.lggr.Errorw("get onRamp address for selector %d: %w", mr.SourceChainSelector, err)
 				continue
 			}
 			merkleRoots = append(merkleRoots, cciptypes.MerkleRootChain{
@@ -397,7 +397,8 @@ func (r *ccipChainReader) GetExpectedNextSequenceNumber(
 		&expectedNextSequenceNumber,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get expected next sequence number from onramp: %w", err)
+		return 0, fmt.Errorf("failed to get expected next sequence number from onramp, source chain: %d, dest chain: %d: %w",
+			sourceChainSelector, destChainSelector, err)
 	}
 
 	return cciptypes.SeqNum(expectedNextSequenceNumber), nil
@@ -573,7 +574,6 @@ func (r *ccipChainReader) GetWrappedNativeTokenPriceUSD(
 			primitives.Unconfirmed,
 			nil,
 			&nativeTokenAddress)
-
 		if err != nil {
 			r.lggr.Warnw("failed to get native token address", "chain", chain, "err", err)
 			continue
@@ -1019,7 +1019,6 @@ func (r *ccipChainReader) getFeeQuoterTokenPriceUSD(ctx context.Context, tokenAd
 		},
 		&timestampedPrice,
 	)
-
 	if err != nil {
 		return cciptypes.BigInt{}, fmt.Errorf("failed to get token price, addr: %v, err: %w", tokenAddr, err)
 	}
@@ -1094,7 +1093,8 @@ func (r *ccipChainReader) getOffRampSourceChainsConfig(
 				&resp,
 			)
 			if err != nil {
-				return fmt.Errorf("failed to get source chain config: %w", err)
+				return fmt.Errorf("failed to get source chain config for source chain %d: %w",
+					chainSel, err)
 			}
 
 			enabled, err := resp.check()
@@ -1147,7 +1147,8 @@ func (r *ccipChainReader) getAllOffRampSourceChainsConfig(
 		&resp,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get source chain configs: %w", err)
+		return nil, fmt.Errorf("failed to get source chain configs for source chain %d: %w",
+			chain, err)
 	}
 
 	if len(resp.SourceChainConfigs) != len(resp.Selectors) {
@@ -1427,7 +1428,9 @@ func (r *ccipChainReader) getFeeQuoterDestChainConfig(
 	)
 
 	if err != nil {
-		return cciptypes.FeeQuoterDestChainConfig{}, fmt.Errorf("failed to get dest chain config: %w", err)
+		return cciptypes.FeeQuoterDestChainConfig{},
+			fmt.Errorf("get dest chain config for source chain %d: %w",
+				chainSelector, err)
 	}
 
 	return destChainConfig, nil
@@ -1475,6 +1478,7 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 	if err := validateExtendedReaderExistence(r.contractReaders, r.destChain); err != nil {
 		return 0, fmt.Errorf("validate dest=%d extended reader existence: %w", r.destChain, err)
 	}
+
 	var latestSeqNr uint64
 	err := r.contractReaders[r.destChain].ExtendedGetLatestValue(
 		ctx,
@@ -1484,7 +1488,6 @@ func (r *ccipChainReader) GetLatestPriceSeqNr(ctx context.Context) (uint64, erro
 		map[string]any{},
 		&latestSeqNr,
 	)
-
 	if err != nil {
 		return 0, fmt.Errorf("get latest price sequence number: %w", err)
 	}
@@ -1525,7 +1528,6 @@ func (r *ccipChainReader) GetOffRampConfigDigest(ctx context.Context, pluginType
 		},
 		&resp,
 	)
-
 	if err != nil {
 		return [32]byte{}, fmt.Errorf("get latest config digest: %w", err)
 	}

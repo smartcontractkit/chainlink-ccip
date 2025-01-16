@@ -311,11 +311,6 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // Extra Args struct
-    let extra_args_gas_limit = msg.extra_args.gas_limit.to_be_bytes();
-    let extra_args_allow_out_of_order_execution =
-        [msg.extra_args.allow_out_of_order_execution as u8];
-
     // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
     // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
     let result = hash::hashv(&[
@@ -339,8 +334,7 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
         // tokens
         &msg.token_amounts.try_to_vec().unwrap(),
         // extra args
-        &extra_args_gas_limit,
-        &extra_args_allow_out_of_order_execution,
+        msg.extra_args.try_to_vec().unwrap().as_ref(), // borsh serialize
     ]);
 
     result.to_bytes()
@@ -445,7 +439,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "9296d0ab425d1715b7709d1350e9486edc4ea235c47eed096b54bff20d07c692",
+            "557e0080a3616647be8f376859d4c991778a21859e266ab3c92edfa04655f5dc",
             hex::encode(hash_result)
         );
     }

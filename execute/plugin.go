@@ -37,11 +37,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
 
-const (
-	// transmissionDelayMultiplier is used to calculate the transmission delay for each oracle.
-	transmissionDelayMultiplier = 3 * time.Second
-)
-
 // Plugin implements the main ocr3 plugin logic.
 type Plugin struct {
 	donID        plugintypes.DonID
@@ -314,7 +309,7 @@ func (p *Plugin) Reports(
 	transmissionSchedule, err := plugincommon.GetTransmissionSchedule(
 		p.chainSupport,
 		maps.Keys(p.oracleIDToP2pID),
-		transmissionDelayMultiplier,
+		p.offchainCfg.TransmissionDelayMultiplier,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get transmission schedule: %w", err)
