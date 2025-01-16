@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
 
-use crate::{
-    context::MerkleRoot, DestChainConfig, MessageExecutionState, PriceUpdates, SVM2AnyRampMessage,
-    SourceChainConfig, TokenBilling,
-};
+use crate::{context::MerkleRoot, PriceUpdates, SVM2AnyRampMessage};
+
+use ccip_state::{DestChainConfig, MessageExecutionState, SourceChainConfig, TokenBilling};
 
 #[event]
 pub struct CCIPMessageSent {

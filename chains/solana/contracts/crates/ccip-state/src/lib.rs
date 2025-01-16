@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+declare_id!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8"); // TODO
+
 // zero_copy is used to prevent hitting stack/heap memory limits
 #[account(zero_copy)]
 #[derive(InitSpace, AnchorSerialize, AnchorDeserialize)]

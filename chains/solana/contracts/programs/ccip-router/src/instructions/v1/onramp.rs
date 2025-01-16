@@ -13,11 +13,11 @@ use super::pools::{
 use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
 use crate::v1::price_math::get_validated_token_price;
 use crate::{
-    AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
-    DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
-    SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
+    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, ExtraArgsInput, GetFee,
+    RampMessageHeader, SVM2AnyMessage, SVM2AnyRampMessage, SVM2AnyTokenTransfer, SVMTokenAmount,
     EXTERNAL_TOKEN_POOL_SEED,
 };
+use ccip_state::{BillingTokenConfig, Config, DestChainConfig, Nonce, PerChainPerTokenConfig};
 
 pub fn get_fee<'info>(
     ctx: Context<'_, '_, 'info, 'info, GetFee>,
@@ -407,10 +407,8 @@ pub fn convert(
 mod validated_try_to {
     use anchor_lang::prelude::*;
 
-    use crate::{
-        BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, PerChainPerTokenConfig,
-        FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING_SEED,
-    };
+    use crate::{CcipRouterError, FEE_BILLING_TOKEN_CONFIG, TOKEN_POOL_BILLING_SEED};
+    use ccip_state::{BillingTokenConfig, BillingTokenConfigWrapper, PerChainPerTokenConfig};
 
     pub fn per_chain_per_token_config<'info>(
         account: &'info AccountInfo<'info>,

@@ -3,7 +3,8 @@ use std::ops::{Add, AddAssign, Mul};
 
 use ethnum::U256;
 
-use crate::{BillingTokenConfig, CcipRouterError, SVMTokenAmount, TimestampedPackedU224};
+use crate::{CcipRouterError, SVMTokenAmount};
+use ccip_state::{BillingTokenConfig, TimestampedPackedU224};
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;

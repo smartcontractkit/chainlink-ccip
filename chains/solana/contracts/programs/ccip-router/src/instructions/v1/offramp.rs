@@ -13,13 +13,15 @@ use super::pools::{
 };
 
 use crate::{
-    Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
-    CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
-    ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
-    SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
-    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
+    Any2SVMRampMessage, CcipRouterError, CommitInput, CommitReportAccepted, CommitReportContext,
+    ExecuteReportContext, ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate,
+    OcrPluginType, RampMessageHeader, SVMTokenAmount, SkippedAlreadyExecutedMessage,
+    TokenPriceUpdate, UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
     EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+};
+use ccip_state::{
+    BillingTokenConfigWrapper, CommitReport, DestChain, GlobalState, MessageExecutionState,
+    SourceChain, TimestampedPackedU224,
 };
 
 pub fn commit<'info>(
@@ -705,7 +707,7 @@ fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
 }
 
 mod execution_state {
-    use crate::{CommitReport, MessageExecutionState};
+    use ccip_state::{CommitReport, MessageExecutionState};
 
     pub fn set(
         report: &mut CommitReport,

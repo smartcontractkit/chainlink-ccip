@@ -7,9 +7,6 @@ use crate::context::*;
 mod token_context;
 use crate::token_context::*;
 
-mod state;
-use crate::state::*;
-
 mod event;
 use crate::event::*;
 
@@ -20,6 +17,8 @@ use crate::messages::*;
 
 mod instructions;
 use crate::instructions::*;
+
+use ccip_state::*;
 
 // Anchor discriminators for CPI calls
 const CCIP_RECEIVE_DISCRIMINATOR: [u8; 8] = [0x0b, 0xf4, 0x09, 0xf9, 0x2c, 0x53, 0x2f, 0xf5]; // ccip_receive

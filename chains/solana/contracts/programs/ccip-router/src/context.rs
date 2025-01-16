@@ -5,10 +5,10 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use solana_program::sysvar::instructions;
 
 use crate::program::CcipRouter;
-use crate::state::{CommitReport, Config, ExternalExecutionConfig, Nonce};
-use crate::{
-    BillingTokenConfig, BillingTokenConfigWrapper, CcipRouterError, DestChain,
-    ExecutionReportSingleChain, GlobalState, SVM2AnyMessage, SourceChain,
+use crate::{CcipRouterError, ExecutionReportSingleChain, SVM2AnyMessage};
+use ccip_state::{
+    BillingTokenConfig, BillingTokenConfigWrapper, CommitReport, Config, DestChain,
+    ExternalExecutionConfig, GlobalState, Nonce, SourceChain,
 };
 
 pub const ANCHOR_DISCRIMINATOR: usize = 8;

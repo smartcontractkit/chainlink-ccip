@@ -201,6 +201,7 @@ dependencies = [
  "anchor-derive-accounts",
  "anchor-derive-serde",
  "anchor-derive-space",
+ "anchor-syn",
  "arrayref",
  "base64 0.13.1",
  "bincode",
@@ -674,9 +675,18 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "bytemuck",
+ "ccip_state",
  "ethnum",
  "hex",
  "solana-program",
+]
+
+[[package]]
+name = "ccip_state"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "bytemuck",
 ]
 
 [[package]]

@@ -3,7 +3,7 @@ use anchor_lang::solana_program::sysvar;
 use anchor_lang::solana_program::{keccak, secp256k1_recover::*};
 
 use crate::ocr3base::{ConfigSet, Ocr3Error, Transmitted};
-use crate::state::{Ocr3Config, Ocr3ConfigInfo};
+use ccip_state::{Ocr3Config, Ocr3ConfigInfo};
 
 #[constant]
 pub const MAX_ORACLES: usize = 16; // can set a maximum of 16 transmitters + 16 signers simultaneously in a single set config tx

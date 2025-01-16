@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
+use ccip_state::{Config, PerChainPerTokenConfig};
 
 use crate::context::*;
-use crate::state::*;
 use crate::CcipRouterError;
 
 use anchor_spl::token_interface::Mint;

@@ -63,11 +63,12 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, SVMTokenAmount,
-        CCIP_RECEIVE_DISCRIMINATOR, CHAIN_FAMILY_SELECTOR_EVM,
+        CcipRouterError, SVM2AnyMessage, SVMTokenAmount, CCIP_RECEIVE_DISCRIMINATOR,
+        CHAIN_FAMILY_SELECTOR_EVM,
     };
+    use ccip_state::{BillingTokenConfig, DestChain};
 
-    const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
+    const U160_MAX: U256 = U256::from_words(std::u32::MAX as u128, std::u128::MAX);
 
     #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
     pub(in super::super) struct Any2SVMMessage {
@@ -165,9 +166,10 @@ pub mod ramps {
         use super::super::super::fee_quoter::{PackedPrice, UnpackedDoubleU224};
         use super::super::super::price_math::Usd18Decimals;
         use super::*;
-        use crate::{ExtraArgsInput, SVMTokenAmount, TimestampedPackedU224};
+        use crate::{ExtraArgsInput, SVMTokenAmount};
         use anchor_lang::solana_program::pubkey::Pubkey;
         use anchor_spl::token::spl_token::native_mint;
+        use ccip_state::{DestChainConfig, DestChainState, TimestampedPackedU224};
 
         impl UnpackedDoubleU224 {
             pub fn pack(self, timestamp: i64) -> TimestampedPackedU224 {
@@ -180,14 +182,6 @@ pub mod ramps {
 
         fn as_u8_28(single: U256) -> [u8; 28] {
             single.to_be_bytes()[4..32].try_into().unwrap()
-        }
-
-        impl TimestampedPackedU224 {
-            pub fn from_single(timestamp: i64, single: U256) -> Self {
-                let mut value = [0u8; 28];
-                value.clone_from_slice(&single.to_be_bytes()[4..32]);
-                Self { value, timestamp }
-            }
         }
 
         #[test]
@@ -322,11 +316,11 @@ pub mod ramps {
             DestChain {
                 version: 1,
                 chain_selector: 1,
-                state: crate::DestChainState {
+                state: DestChainState {
                     sequence_number: 0,
                     usd_per_unit_gas,
                 },
-                config: crate::DestChainConfig {
+                config: DestChainConfig {
                     is_enabled: true,
                     max_number_of_tokens_per_msg: 1,
                     max_data_bytes: 30000,

@@ -21,6 +21,7 @@ anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
 anchor-spl = "0.29.0"
 bytemuck = "1.7"
 ethnum = "1.5"
+ccip_state = { path = "../../crates/ccip-state" }
 
 [dev-dependencies]
 hex = "0.4.3"
