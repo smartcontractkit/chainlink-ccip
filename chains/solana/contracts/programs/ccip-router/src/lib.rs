@@ -504,8 +504,9 @@ pub mod ccip_router {
         ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
         dest_chain_selector: u64,
         message: Solana2AnyMessage,
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::onramp::ccip_send(ctx, dest_chain_selector, message)
+        v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
     }
 
     /// OFF RAMP FLOW
@@ -566,8 +567,14 @@ pub mod ccip_router {
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
         report_context_byte_words: [[u8; 32]; 3],
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::execute(ctx, execution_report, report_context_byte_words)
+        v1::offramp::execute(
+            ctx,
+            execution_report,
+            report_context_byte_words,
+            &token_indexes,
+        )
     }
 
     /// Manually executes a report to the router.
@@ -583,8 +590,9 @@ pub mod ccip_router {
     pub fn manually_execute<'info>(
         ctx: Context<'_, '_, 'info, 'info, ExecuteReportContext<'info>>,
         execution_report: ExecutionReportSingleChain,
+        token_indexes: Vec<u8>,
     ) -> Result<()> {
-        v1::offramp::manually_execute(ctx, execution_report)
+        v1::offramp::manually_execute(ctx, execution_report, &token_indexes)
     }
 }
 

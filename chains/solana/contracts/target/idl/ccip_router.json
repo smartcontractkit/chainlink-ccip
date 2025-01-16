@@ -1224,6 +1224,10 @@
           "type": {
             "defined": "Solana2AnyMessage"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1408,6 +1412,10 @@
               3
             ]
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     },
@@ -1473,6 +1481,10 @@
           "type": {
             "defined": "ExecutionReportSingleChain"
           }
+        },
+        {
+          "name": "tokenIndexes",
+          "type": "bytes"
         }
       ]
     }
@@ -2092,10 +2104,6 @@
                 ]
               }
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
@@ -2326,10 +2334,6 @@
             "type": {
               "defined": "ExtraArgsInput"
             }
-          },
-          {
-            "name": "tokenIndexes",
-            "type": "bytes"
           }
         ]
       }
