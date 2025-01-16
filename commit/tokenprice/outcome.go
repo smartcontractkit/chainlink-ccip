@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"github.com/smartcontractkit/chainlink-ccip/internal/libs/mathslib"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon/consensus"
@@ -14,6 +16,7 @@ import (
 
 // getConsensusObservation Combine the list of observations into a single consensus observation
 func (p *processor) getConsensusObservation(
+	lggr logger.Logger,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (ConsensusObservation, error) {
 	aggObs := aggregateObservations(aos)
@@ -21,7 +24,7 @@ func (p *processor) getConsensusObservation(
 	// consensus on the fChain map uses the role DON F value
 	// because all nodes can observe the home chain.
 	donThresh := consensus.MakeConstantThreshold[cciptypes.ChainSelector](consensus.TwoFPlus1(p.fRoleDON))
-	fChains := consensus.GetConsensusMap(p.lggr, "fChain", aggObs.FChain, donThresh)
+	fChains := consensus.GetConsensusMap(lggr, "fChain", aggObs.FChain, donThresh)
 
 	fDestChain, exists := fChains[p.destChain]
 	if !exists {
@@ -36,7 +39,7 @@ func (p *processor) getConsensusObservation(
 	}
 
 	feedPricesConsensus := consensus.GetConsensusMapAggregator(
-		p.lggr,
+		lggr,
 		"FeedTokenPrices",
 		aggObs.FeedTokenPrices,
 		consensus.MakeConstantThreshold[cciptypes.UnknownEncodedAddress](consensus.TwoFPlus1(fFeedChain)),
@@ -46,7 +49,7 @@ func (p *processor) getConsensusObservation(
 	)
 
 	feeQuoterUpdatesConsensus := consensus.GetConsensusMapAggregator(
-		p.lggr,
+		lggr,
 		"FeeQuoterUpdates",
 		aggObs.FeeQuoterTokenUpdates,
 		consensus.MakeConstantThreshold[cciptypes.UnknownEncodedAddress](consensus.TwoFPlus1(fDestChain)),
@@ -71,6 +74,7 @@ func (p *processor) getConsensusObservation(
 // 1. if time passed since the last update is greater than the stale threshold
 // 2. if deviation between the fee quoter and feed exceeds token's configured threshold
 func (p *processor) selectTokensForUpdate(
+	lggr logger.Logger,
 	obs ConsensusObservation,
 ) []cciptypes.TokenPrice {
 	var tokenPrices []cciptypes.TokenPrice
@@ -90,7 +94,7 @@ func (p *processor) selectTokensForUpdate(
 
 		ti, ok := tokenInfo[token]
 		if !ok {
-			p.lggr.Warnf("could not find token info for token %s", token)
+			lggr.Warnf("could not find token info for token %s", token)
 			continue
 		}
 
