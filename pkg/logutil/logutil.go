@@ -8,6 +8,26 @@ import (
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 )
 
+// Type to use as context keys, regular string type can't be used.
+type contextKey string
+
+const (
+	// Standardized logger field keys.
+	// These should be sufficiently different from the ephemeral log
+	// keys that are added inline to log calls, in order to avoid
+	// collisions.
+	ocrSeqNrLoggerKey     = "ocrSeqNr"
+	componentLoggerKey    = "component"
+	pluginLoggerKey       = "plugin"
+	oracleIDLoggerKey     = "oracleID"
+	donIDLoggerKey        = "donID"
+	configDigestLoggerKey = "configDigest"
+
+	// ocrSeqNrKey refers to the OCR sequence number.
+	// Linter complains if this is a plain "string" type.
+	ocrSeqNrKey = contextKey(ocrSeqNrLoggerKey)
+)
+
 // WithComponent returns a logger with the component log field set.
 // Components can be any object that uses a logger.
 // Do not call multiple times.
@@ -32,25 +52,6 @@ func WithPluginConstants(
 		configDigestLoggerKey, configDigest,
 	)
 }
-
-type ContextKey string
-
-const (
-	// Standardized logger field keys.
-	// These should be sufficiently different from the ephemeral log
-	// keys that are added inline to log calls, in order to avoid
-	// collisions.
-	ocrSeqNrLoggerKey     = "ocrSeqNr"
-	componentLoggerKey    = "component"
-	pluginLoggerKey       = "plugin"
-	oracleIDLoggerKey     = "oracleID"
-	donIDLoggerKey        = "donID"
-	configDigestLoggerKey = "configDigest"
-
-	// ocrSeqNrKey refers to the OCR sequence number.
-	// Linter complains if this is a plain "string" type.
-	ocrSeqNrKey = ContextKey(ocrSeqNrLoggerKey)
-)
 
 // WithOCRSeqNr returns a context.Context and logger with the OCR sequence number set
 // in both the context and the logger fields.
