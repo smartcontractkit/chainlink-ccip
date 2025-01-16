@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -17,34 +16,37 @@ import (
 
 type processor struct {
 	oracleID         commontypes.OracleID
-	lggr             cc.Logger
+	lggr             logger.Logger
 	offChainCfg      pluginconfig.CommitOffchainConfig
 	destChain        cciptypes.ChainSelector
 	chainSupport     plugincommon.ChainSupport
 	tokenPriceReader pkgreader.PriceReader
 	homeChain        reader.HomeChain
+	metricsReporter  MetricsReporter
 	fRoleDON         int
 }
 
 func NewProcessor(
 	oracleID commontypes.OracleID,
-	lggr cc.Logger,
+	lggr logger.Logger,
 	offChainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	chainSupport plugincommon.ChainSupport,
 	tokenPriceReader pkgreader.PriceReader,
 	homeChain reader.HomeChain,
 	fRoleDON int,
+	metricsReporter MetricsReporter,
 ) plugincommon.PluginProcessor[Query, Observation, Outcome] {
 	return &processor{
 		oracleID:         oracleID,
-		lggr:             logger.NewProcessorLogWrapper(lggr, "TokenPrice"),
+		lggr:             lggr,
 		offChainCfg:      offChainCfg,
 		destChain:        destChain,
 		chainSupport:     chainSupport,
 		tokenPriceReader: tokenPriceReader,
 		homeChain:        homeChain,
 		fRoleDON:         fRoleDON,
+		metricsReporter:  metricsReporter,
 	}
 }
 
@@ -75,9 +77,10 @@ func (p *processor) Outcome(
 		"outcome token prices",
 		"tokenPrices", tokenPriceOutcome,
 	)
-	return Outcome{
-		TokenPrices: tokenPriceOutcome,
-	}, nil
+
+	out := Outcome{TokenPrices: tokenPriceOutcome}
+	p.metricsReporter.TrackTokenPricesOutcome(out)
+	return out, nil
 }
 
 func (p *processor) Close() error {

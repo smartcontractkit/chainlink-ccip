@@ -1,17 +1,16 @@
 package merkleroot
 
 import (
-	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	libocrtypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/services"
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -26,7 +25,7 @@ type Processor struct {
 	oracleIDToP2pID        map[commontypes.OracleID]libocrtypes.PeerID
 	offchainCfg            pluginconfig.CommitOffchainConfig
 	destChain              cciptypes.ChainSelector
-	lggr                   cc.Logger
+	lggr                   logger.Logger
 	observer               Observer
 	ccipReader             readerpkg.CCIPReader
 	reportingCfg           ocr3types.ReportingPluginConfig
@@ -35,13 +34,14 @@ type Processor struct {
 	rmnControllerCfgDigest cciptypes.Bytes32
 	rmnCrypto              cciptypes.RMNCrypto
 	rmnHomeReader          readerpkg.RMNHome
+	metricsReporter        MetricsReporter
 }
 
 // NewProcessor creates a new Processor
 func NewProcessor(
 	oracleID commontypes.OracleID,
 	oracleIDToP2pID map[commontypes.OracleID]libocrtypes.PeerID,
-	lggr cc.Logger,
+	lggr logger.Logger,
 	offchainCfg pluginconfig.CommitOffchainConfig,
 	destChain cciptypes.ChainSelector,
 	homeChain reader.HomeChain,
@@ -52,28 +52,29 @@ func NewProcessor(
 	rmnController rmn.Controller,
 	rmnCrypto cciptypes.RMNCrypto,
 	rmnHomeReader readerpkg.RMNHome,
+	metricsReporter MetricsReporter,
 ) *Processor {
-	observer := observerImpl{
-		lggr,
-		homeChain,
-		oracleID,
-		chainSupport,
-		ccipReader,
-		msgHasher,
-	}
 	return &Processor{
 		oracleID:        oracleID,
 		oracleIDToP2pID: oracleIDToP2pID,
 		offchainCfg:     offchainCfg,
 		destChain:       destChain,
-		lggr:            logger.NewProcessorLogWrapper(lggr, "MerkleRoot"),
-		observer:        observer,
+		lggr:            lggr,
+		observer: newObserverImpl(
+			lggr,
+			homeChain,
+			oracleID,
+			chainSupport,
+			ccipReader,
+			msgHasher,
+		),
 		ccipReader:      ccipReader,
 		reportingCfg:    reportingCfg,
 		chainSupport:    chainSupport,
 		rmnController:   rmnController,
 		rmnCrypto:       rmnCrypto,
 		rmnHomeReader:   rmnHomeReader,
+		metricsReporter: metricsReporter,
 	}
 }
 

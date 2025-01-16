@@ -7,21 +7,23 @@ import (
 
 	"google.golang.org/grpc"
 
+	sel "github.com/smartcontractkit/chain-selectors"
+
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
 	ragep2ptypes "github.com/smartcontractkit/libocr/ragep2p/types"
 
-	cc "github.com/smartcontractkit/chainlink-common/pkg/logger"
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 	"github.com/smartcontractkit/chainlink-common/pkg/types/core"
 
 	"github.com/smartcontractkit/chainlink-ccip/execute/costlymessages"
-	"github.com/smartcontractkit/chainlink-ccip/execute/internal/gas"
+	"github.com/smartcontractkit/chainlink-ccip/execute/metrics"
 	"github.com/smartcontractkit/chainlink-ccip/execute/tokendata"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
-	"github.com/smartcontractkit/chainlink-ccip/pkg/logger"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -53,7 +55,8 @@ const (
 	// maxReportLength is set to an estimate of a maximum report size.
 	// This can be tuned over time, it may be more efficient to have
 	// smaller reports.
-	maxReportLength = 1024 * 1024 // allowing large reports for now
+
+	maxReportLength = ocr3types.MaxMaxReportLength // allowing large reports for now
 
 	// maxReportCount controls how many OCR3 reports can be returned. Note that
 	// the actual exec report type (ExecutePluginReport) may contain multiple
@@ -88,27 +91,27 @@ func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (cor
 
 // PluginFactory implements common ReportingPluginFactory and is used for (re-)initializing commit plugin instances.
 type PluginFactory struct {
-	baseLggr         cc.Logger
+	baseLggr         logger.Logger
 	donID            plugintypes.DonID
 	ocrConfig        reader.OCR3ConfigWithMeta
 	execCodec        cciptypes.ExecutePluginCodec
 	msgHasher        cciptypes.MessageHasher
 	homeChainReader  reader.HomeChain
-	estimateProvider gas.EstimateProvider
+	estimateProvider cciptypes.EstimateProvider
 	tokenDataEncoder cciptypes.TokenDataEncoder
 	contractReaders  map[cciptypes.ChainSelector]types.ContractReader
 	chainWriters     map[cciptypes.ChainSelector]types.ContractWriter
 }
 
 func NewPluginFactory(
-	lggr cc.Logger,
+	lggr logger.Logger,
 	donID plugintypes.DonID,
 	ocrConfig reader.OCR3ConfigWithMeta,
 	execCodec cciptypes.ExecutePluginCodec,
 	msgHasher cciptypes.MessageHasher,
 	homeChainReader reader.HomeChain,
 	tokenDataEncoder cciptypes.TokenDataEncoder,
-	estimateProvider gas.EstimateProvider,
+	estimateProvider cciptypes.EstimateProvider,
 	contractReaders map[cciptypes.ChainSelector]types.ContractReader,
 	chainWriters map[cciptypes.ChainSelector]types.ContractWriter,
 ) *PluginFactory {
@@ -129,7 +132,7 @@ func NewPluginFactory(
 func (p PluginFactory) NewReportingPlugin(
 	ctx context.Context, config ocr3types.ReportingPluginConfig,
 ) (ocr3types.ReportingPlugin[[]byte], ocr3types.ReportingPluginInfo, error) {
-	lggr := logger.NewPluginLogWrapper(p.baseLggr, "Execute", p.donID, config.OracleID)
+	lggr := logutil.WithPluginConstants(p.baseLggr, "Execute", p.donID, config.OracleID, config.ConfigDigest)
 
 	offchainConfig, err := pluginconfig.DecodeExecuteOffchainConfig(config.OffchainConfig)
 	if err != nil {
@@ -145,15 +148,22 @@ func (p PluginFactory) NewReportingPlugin(
 		oracleIDToP2PID[commontypes.OracleID(oracleID)] = node.P2pID
 	}
 
-	// map types to the facade.
+	// Map contract readers to ContractReaderFacade:
+	// - Extended reader adds finality violation and contract binding management.
+	// - Observed reader adds metric reporting.
 	readers := make(map[cciptypes.ChainSelector]contractreader.ContractReaderFacade)
 	for chain, cr := range p.contractReaders {
-		readers[chain] = cr
+		chainID, err1 := sel.GetChainIDFromSelector(uint64(chain))
+		if err1 != nil {
+			return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to get chain id from selector: %w", err1)
+		}
+		readers[chain] = contractreader.NewExtendedContractReader(
+			contractreader.NewObserverReader(cr, lggr, chainID))
 	}
 
 	ccipReader := readerpkg.NewCCIPChainReader(
 		ctx,
-		lggr,
+		logutil.WithContext(lggr, "CCIPReader"),
 		readers,
 		p.chainWriters,
 		p.ocrConfig.Config.ChainSelector,
@@ -162,7 +172,7 @@ func (p PluginFactory) NewReportingPlugin(
 
 	tokenDataObserver, err := tokendata.NewConfigBasedCompositeObservers(
 		ctx,
-		logger.Named(lggr, "BaseCompositeObserver"),
+		logutil.WithContext(lggr, "TokenDataObserver"),
 		p.ocrConfig.Config.ChainSelector,
 		offchainConfig.TokenDataObservers,
 		p.tokenDataEncoder,
@@ -173,12 +183,17 @@ func (p PluginFactory) NewReportingPlugin(
 	}
 
 	costlyMessageObserver := costlymessages.NewObserverWithDefaults(
-		lggr,
+		logutil.WithContext(lggr, "CostlyMessages"),
 		true,
 		ccipReader,
 		offchainConfig.RelativeBoostPerWaitHour,
 		p.estimateProvider,
 	)
+
+	metricsReporter, err := metrics.NewPromReporter(lggr, p.ocrConfig.Config.ChainSelector)
+	if err != nil {
+		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to create metrics reporter: %w", err)
+	}
 
 	return NewPlugin(
 			p.donID,
@@ -192,8 +207,9 @@ func (p PluginFactory) NewReportingPlugin(
 			p.homeChainReader,
 			tokenDataObserver,
 			p.estimateProvider,
-			p.baseLggr,
+			lggr,
 			costlyMessageObserver,
+			metricsReporter,
 		), ocr3types.ReportingPluginInfo{
 			Name: "CCIPRoleExecute",
 			Limits: ocr3types.ReportingPluginLimits{
