@@ -1,7 +1,7 @@
 [package]
 name = "timelock"
 version = "0.0.1-dev"
-description = "Solana implementation of RBAC Timelock"
+description = "SVM implementation of RBAC Timelock"
 edition = "2021"
 
 [lib]

@@ -26,7 +26,7 @@ pub mod ccip_receiver {
     /// You can send as many accounts as you need, specifying if mutable or not.
     /// But none of them could be an init, realloc or close.
     /// In this case, it increments the counter value by 1 and logs the parsed message.
-    pub fn ccip_receive(ctx: Context<SetData>, message: Any2SolanaMessage) -> Result<()> {
+    pub fn ccip_receive(ctx: Context<SetData>, message: Any2SVMMessage) -> Result<()> {
         msg!("Called `ccip_receive` with message {:?}", message);
 
         let counter = &mut ctx.accounts.counter;
@@ -158,16 +158,16 @@ pub struct ExternalExecutionConfig {}
 const CCIP_ROUTER: Pubkey = pubkey!("C8WSPj3yyus1YN3yNB6YA5zStYtbjQWtpmKadmvyUXq8");
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize)]
-pub struct Any2SolanaMessage {
+pub struct Any2SVMMessage {
     pub message_id: [u8; 32],
     pub source_chain_selector: u64,
     pub sender: Vec<u8>,
     pub data: Vec<u8>,
-    pub token_amounts: Vec<SolanaTokenAmount>,
+    pub token_amounts: Vec<SVMTokenAmount>,
 }
 
 #[derive(Debug, Clone, AnchorSerialize, AnchorDeserialize, Default)]
-pub struct SolanaTokenAmount {
+pub struct SVMTokenAmount {
     pub token: Pubkey,
     pub amount: u64, // solana local token amount
 }

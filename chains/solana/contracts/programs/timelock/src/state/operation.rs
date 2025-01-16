@@ -78,7 +78,7 @@ impl Space for Operation {
     const INIT_SPACE: usize = 8 + 32 + 32 + 32 + 4 + 1 + 32 + 4;
 }
 
-// The native Solana's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
+// The native SVM's Instruction type from solana_program doesn't implement the AnchorSerialize trait.
 // This is a wrapper that provides serialization capabilities while maintaining the same functionality
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Default, Debug)]
 pub struct InstructionData {

@@ -15,7 +15,7 @@ import (
 //
 // The method name needs to be commit with Anchor encoding.
 //
-// This function is called by the OffChain when committing one Report to the Solana Router.
+// This function is called by the OffChain when committing one Report to the SVM Router.
 // In this Flow only one report is sent, the Commit Report. This is different as EVM does,
 // this is because here all the chain state is stored in one account per Merkle Tree Root.
 // So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.
