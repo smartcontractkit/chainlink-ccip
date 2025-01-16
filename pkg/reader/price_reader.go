@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/consts"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/contractreader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	"github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
 )
@@ -81,16 +82,17 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	tokens []ccipocr3.UnknownEncodedAddress,
 	chain ccipocr3.ChainSelector,
 ) (map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig, error) {
+	lggr := logutil.WithContextValues(ctx, pr.lggr)
 	updates := make([]plugintypes.TimestampedUnixBig, len(tokens))
 	updateMap := make(map[ccipocr3.UnknownEncodedAddress]plugintypes.TimestampedBig)
 
 	feeQuoterAddress, err := pr.ccipReader.GetContractAddress(consts.ContractNameFeeQuoter, chain)
 	if err != nil {
-		pr.lggr.Debugw("failed to get fee quoter address.", "chain", chain, "err", err)
+		lggr.Debugw("failed to get fee quoter address.", "chain", chain, "err", err)
 		return updateMap, nil
 	}
 
-	pr.lggr.Infow("getting fee quoter token updates",
+	lggr.Infow("getting fee quoter token updates",
 		"tokens", tokens,
 		"chain", chain,
 		"feeQuoterAddress", typeconv.AddressBytesToString(feeQuoterAddress, uint64(chain)),
@@ -100,7 +102,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	for _, token := range tokens {
 		byteToken, err := typeconv.AddressStringToBytes(string(token), uint64(chain))
 		if err != nil {
-			pr.lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
+			lggr.Warnw("failed to convert token address to bytes", "token", token, "err", err)
 			continue
 		}
 
@@ -114,7 +116,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 
 	cr, ok := pr.chainReaders[chain]
 	if !ok {
-		pr.lggr.Warnw("contract reader not found", "chain", chain)
+		lggr.Warnw("contract reader not found", "chain", chain)
 		return nil, nil
 	}
 	// MethodNameFeeQuoterGetTokenPrices returns an empty update with
@@ -135,7 +137,7 @@ func (pr *priceReader) GetFeeQuoterTokenUpdates(
 	for i, token := range tokens {
 		// token not available on fee quoter
 		if updates[i].Timestamp == 0 || updates[i].Value == nil || updates[i].Value.Cmp(big.NewInt(0)) == 0 {
-			pr.lggr.Debugw("empty fee quoter update found",
+			lggr.Debugw("empty fee quoter update found",
 				"chain", chain,
 				"token", token,
 			)
@@ -152,9 +154,10 @@ func (pr *priceReader) GetFeedPricesUSD(
 	ctx context.Context,
 	tokens []ccipocr3.UnknownEncodedAddress,
 ) (map[ccipocr3.UnknownEncodedAddress]*big.Int, error) {
+	lggr := logutil.WithContextValues(ctx, pr.lggr)
 	prices := make(map[ccipocr3.UnknownEncodedAddress]*big.Int, len(tokens))
 	if pr.feedChainReader() == nil {
-		pr.lggr.Debug("node does not support feed chain")
+		lggr.Debug("node does not support feed chain")
 		return prices, nil
 	}
 
@@ -174,21 +177,21 @@ func (pr *priceReader) GetFeedPricesUSD(
 	for boundContract, tokens := range contractTokenMap {
 		contractResults, ok := results[boundContract]
 		if !ok || len(contractResults) != priceReaderOperationCount {
-			pr.lggr.Errorf("invalid results for contract %s", boundContract.Address)
+			lggr.Errorf("invalid results for contract %s", boundContract.Address)
 			continue
 		}
 
 		// Get price data
 		latestRoundData, err := pr.getPriceData(contractResults[0], boundContract)
 		if err != nil {
-			pr.lggr.Errorw("calling getPriceData", err)
+			lggr.Errorw("calling getPriceData", err)
 			continue
 		}
 
 		// Get decimals
 		decimals, err := pr.getDecimals(contractResults[1], boundContract)
 		if err != nil {
-			pr.lggr.Errorw("calling getPriceData", err)
+			lggr.Errorw("calling getPriceData", err)
 			continue
 		}
 
@@ -200,7 +203,7 @@ func (pr *priceReader) GetFeedPricesUSD(
 			tokenInfo := pr.tokenInfo[token]
 			price := calculateUsdPer1e18TokenAmount(normalizedContractPrice, tokenInfo.Decimals)
 			if price == nil {
-				pr.lggr.Errorw("failed to calculate price", "token", token)
+				lggr.Errorw("failed to calculate price", "token", token)
 				continue
 			}
 			prices[token] = price
