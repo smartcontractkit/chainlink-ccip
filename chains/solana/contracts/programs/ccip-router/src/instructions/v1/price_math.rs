@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Mul};
 
 use ethnum::U256;
 
-use crate::{BillingTokenConfig, CcipRouterError, SolanaTokenAmount, TimestampedPackedU224};
+use crate::{BillingTokenConfig, CcipRouterError, SVMTokenAmount, TimestampedPackedU224};
 
 pub trait Exponential {
     fn e(self, exponent: u8) -> U256;
@@ -43,7 +43,7 @@ impl Usd18Decimals {
         Self(U256::new(cents.into()) * 1u32.e(16))
     }
 
-    pub fn from_token_amount(sta: &SolanaTokenAmount, price: &Usd18Decimals) -> Self {
+    pub fn from_token_amount(sta: &SVMTokenAmount, price: &Usd18Decimals) -> Self {
         Usd18Decimals(U256::new(sta.amount.into()) * price.0 / 1u32.e(18))
     }
 }

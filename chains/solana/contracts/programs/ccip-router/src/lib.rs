@@ -51,14 +51,14 @@ pub mod ccip_router {
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for initialization.
-    /// * `solana_chain_selector` - The chain selector for Solana.
+    /// * `svm_chain_selector` - The chain selector for SVM.
     /// * `default_gas_limit` - The default gas limit for other destination chains.
     /// * `default_allow_out_of_order_execution` - Whether out-of-order execution is allowed by default for other destination chains.
     /// * `enable_execution_after` - The minimum amount of time required between a message has been committed and can be manually executed.
     #[allow(clippy::too_many_arguments)]
     pub fn initialize(
         ctx: Context<InitializeCCIPRouter>,
-        solana_chain_selector: u64,
+        svm_chain_selector: u64,
         default_gas_limit: u128,
         default_allow_out_of_order_execution: bool,
         enable_execution_after: i64,
@@ -69,7 +69,7 @@ pub mod ccip_router {
         let mut config = ctx.accounts.config.load_init()?;
         require!(config.version == 0, CcipRouterError::InvalidInputs); // assert uninitialized state - AccountLoader doesn't work with constraint
         config.version = 1;
-        config.solana_chain_selector = solana_chain_selector;
+        config.svm_chain_selector = svm_chain_selector;
         config.default_gas_limit = default_gas_limit;
         config.enable_manual_execution_after = enable_execution_after;
         config.link_token_mint = link_token_mint;
@@ -224,19 +224,19 @@ pub mod ccip_router {
         v1::admin::update_dest_chain_config(ctx, dest_chain_selector, dest_chain_config)
     }
 
-    /// Updates the Solana chain selector in the router configuration.
+    /// Updates the SVM chain selector in the router configuration.
     ///
     /// This method should only be used if there was an error with the initial configuration or if the solana chain selector changes.
     ///
     /// # Arguments
     ///
     /// * `ctx` - The context containing the accounts required for updating the configuration.
-    /// * `new_chain_selector` - The new chain selector for Solana.
-    pub fn update_solana_chain_selector(
+    /// * `new_chain_selector` - The new chain selector for SVM.
+    pub fn update_svm_chain_selector(
         ctx: Context<UpdateConfigCCIPRouter>,
         new_chain_selector: u64,
     ) -> Result<()> {
-        v1::admin::update_solana_chain_selector(ctx, new_chain_selector)
+        v1::admin::update_svm_chain_selector(ctx, new_chain_selector)
     }
 
     /// Updates the default gas limit in the router configuration.
@@ -274,7 +274,7 @@ pub mod ccip_router {
 
     /// Updates the minimum amount of time required between a message being committed and when it can be manually executed.
     ///
-    /// This is part of the OffRamp Configuration for Solana.
+    /// This is part of the OffRamp Configuration for SVM.
     /// The Admin is the only one able to update this config.
     ///
     /// # Arguments
@@ -472,7 +472,7 @@ pub mod ccip_router {
     pub fn get_fee<'info>(
         ctx: Context<'_, '_, 'info, 'info, GetFee>,
         dest_chain_selector: u64,
-        message: Solana2AnyMessage,
+        message: SVM2AnyMessage,
     ) -> Result<u64> {
         v1::onramp::get_fee(ctx, dest_chain_selector, message)
     }
@@ -510,7 +510,7 @@ pub mod ccip_router {
     pub fn ccip_send<'info>(
         ctx: Context<'_, '_, 'info, 'info, CcipSend<'info>>,
         dest_chain_selector: u64,
-        message: Solana2AnyMessage,
+        message: SVM2AnyMessage,
         token_indexes: Vec<u8>,
     ) -> Result<()> {
         v1::onramp::ccip_send(ctx, dest_chain_selector, message, token_indexes)
@@ -521,7 +521,7 @@ pub mod ccip_router {
     ///
     /// The method name needs to be commit with Anchor encoding.
     ///
-    /// This function is called by the OffChain when committing one Report to the Solana Router.
+    /// This function is called by the OffChain when committing one Report to the SVM Router.
     /// In this Flow only one report is sent, the Commit Report. This is different as EVM does,
     /// this is because here all the chain state is stored in one account per Merkle Tree Root.
     /// So, to avoid having to send a dynamic size array of accounts, in this message only one Commit Report Account is sent.
@@ -553,7 +553,7 @@ pub mod ccip_router {
     ///
     /// The method name needs to be execute with Anchor encoding.
     ///
-    /// This function is called by the OffChain when executing one Report to the Solana Router.
+    /// This function is called by the OffChain when executing one Report to the SVM Router.
     /// In this Flow only one message is sent, the Execution Report. This is different as EVM does,
     /// this is because there is no try/catch mechanism to allow batch execution.
     /// This message validates that the Merkle Tree Proof of the given message is correct and is stored in the Commit Report Account.

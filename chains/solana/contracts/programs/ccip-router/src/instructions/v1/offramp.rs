@@ -4,7 +4,7 @@ use solana_program::{instruction::Instruction, program::invoke_signed};
 use super::config::is_on_ramp_configured;
 use super::merkle::{calculate_merkle_root, MerkleError, LEAF_DOMAIN_SEPARATOR};
 use super::messages::pools::{ReleaseOrMintInV1, ReleaseOrMintOutV1};
-use super::messages::ramps::{is_writable, Any2SolanaMessage};
+use super::messages::ramps::{is_writable, Any2SVMMessage};
 use super::ocr3base::{ocr3_transmit, ReportContext};
 use super::ocr3impl::{Ocr3ReportForCommit, Ocr3ReportForExecutionReportSingleChain};
 use super::pools::{
@@ -13,13 +13,13 @@ use super::pools::{
 };
 
 use crate::{
-    Any2SolanaRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
+    Any2SVMRampMessage, BillingTokenConfigWrapper, CcipRouterError, CommitInput, CommitReport,
     CommitReportAccepted, CommitReportContext, DestChain, ExecuteReportContext,
     ExecutionReportSingleChain, ExecutionStateChanged, GasPriceUpdate, GlobalState,
-    MessageExecutionState, OcrPluginType, RampMessageHeader, SkippedAlreadyExecutedMessage,
-    SolanaTokenAmount, SourceChain, TimestampedPackedU224, TokenPriceUpdate, UsdPerTokenUpdated,
-    UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED, EXTERNAL_EXECUTION_CONFIG_SEED,
-    EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
+    MessageExecutionState, OcrPluginType, RampMessageHeader, SVMTokenAmount,
+    SkippedAlreadyExecutedMessage, SourceChain, TimestampedPackedU224, TokenPriceUpdate,
+    UsdPerTokenUpdated, UsdPerUnitGasUpdated, DEST_CHAIN_STATE_SEED,
+    EXTERNAL_EXECUTION_CONFIG_SEED, EXTERNAL_TOKEN_POOL_SEED, FEE_BILLING_TOKEN_CONFIG, STATE_SEED,
 };
 
 pub fn commit<'info>(
@@ -30,7 +30,7 @@ pub fn commit<'info>(
 ) -> Result<()> {
     let report_context = ReportContext::from_byte_words(report_context_byte_words);
 
-    // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
+    // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
@@ -347,9 +347,9 @@ fn internal_execute<'info>(
 ) -> Result<()> {
     // TODO: Limit send size data to 256
 
-    // The Config Account stores the default values for the Router, the Solana Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
+    // The Config Account stores the default values for the Router, the SVM Chain Selector, the Default Gas Limit and the Default Allow Out Of Order Execution and Admin Ownership
     let config = ctx.accounts.config.load()?;
-    let solana_chain_selector = config.solana_chain_selector;
+    let svm_chain_selector = config.svm_chain_selector;
 
     // The Config and State for the Source Chain, containing if it is enabled, the on ramp address and the min sequence number expected for future messages
     let source_chain_state = &ctx.accounts.source_chain_state;
@@ -375,7 +375,7 @@ fn internal_execute<'info>(
         source_chain_state,
         commit_report,
         &message_header,
-        solana_chain_selector,
+        svm_chain_selector,
     )?;
 
     let original_state = execution_state::get(commit_report, message_header.sequence_number);
@@ -397,7 +397,7 @@ fn internal_execute<'info>(
         CcipRouterError::InvalidInputs,
     );
     let seeds = &[EXTERNAL_TOKEN_POOL_SEED, &[ctx.bumps.token_pools_signer]];
-    let mut token_amounts = vec![SolanaTokenAmount::default(); token_indexes.len()];
+    let mut token_amounts = vec![SVMTokenAmount::default(); token_indexes.len()];
 
     // handle tokens
     // note: indexes are used instead of counts in case more accounts need to be passed in remaining_accounts before token accounts
@@ -451,7 +451,7 @@ fn internal_execute<'info>(
             CcipRouterError::OfframpInvalidDataLength
         );
 
-        token_amounts[i] = SolanaTokenAmount {
+        token_amounts[i] = SVMTokenAmount {
             token: accs.mint.key(),
             amount: ReleaseOrMintOutV1::try_from_slice(&return_data)?.destination_amount,
         };
@@ -463,7 +463,7 @@ fn internal_execute<'info>(
         );
     }
 
-    let message = Any2SolanaMessage {
+    let message = Any2SVMMessage {
         message_id: execution_report.message.header.message_id,
         source_chain_selector: execution_report.source_chain_selector,
         sender: execution_report.message.sender,
@@ -530,7 +530,7 @@ fn internal_execute<'info>(
         source_chain_selector: message_header.source_chain_selector,
         sequence_number: message_header.sequence_number,
         message_id: message_header.message_id, // Unique identifier for the message, generated with the source chain's encoding scheme
-        message_hash: hashed_leaf,             // Hash of the message using Solana encoding
+        message_hash: hashed_leaf,             // Hash of the message using SVM encoding
         state: new_state,
     });
 
@@ -628,7 +628,7 @@ pub fn validate_execution_report<'info>(
     source_chain_state: &Account<'info, SourceChain>,
     commit_report: &Account<'info, CommitReport>,
     message_header: &RampMessageHeader,
-    solana_chain_selector: u64,
+    svm_chain_selector: u64,
 ) -> Result<()> {
     require!(
         execution_report.message.header.nonce == 0,
@@ -651,7 +651,7 @@ pub fn validate_execution_report<'info>(
         CcipRouterError::UnsupportedSourceChainSelector
     );
     require!(
-        message_header.dest_chain_selector == solana_chain_selector,
+        message_header.dest_chain_selector == svm_chain_selector,
         CcipRouterError::UnsupportedDestinationChainSelector
     );
     require!(
@@ -662,7 +662,7 @@ pub fn validate_execution_report<'info>(
     Ok(())
 }
 
-fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
+fn hash(msg: &Any2SVMRampMessage) -> [u8; 32] {
     use anchor_lang::solana_program::hash;
 
     // Calculate vectors size to ensure that the hash is unique
@@ -681,7 +681,7 @@ fn hash(msg: &Any2SolanaRampMessage) -> [u8; 32] {
     let result = hash::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
         // metadata hash
-        "Any2SolanaMessageHashV1".as_bytes(),
+        "Any2SVMMessageHashV1".as_bytes(),
         &header_source_chain_selector,
         &header_dest_chain_selector,
         &on_ramp_address_size,
@@ -825,14 +825,14 @@ mod execution_state {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Any2SolanaRampMessage, Any2SolanaTokenTransfer, SolanaExtraArgs};
+    use crate::{Any2SVMRampMessage, Any2SVMTokenTransfer, SVMExtraArgs};
 
     /// Builds a message and hash it, it's compared with a known hash
     #[test]
     fn test_hash() {
         let on_ramp_address = &[1, 2, 3].to_vec();
 
-        let message = Any2SolanaRampMessage {
+        let message = Any2SVMRampMessage {
             sender: [
                 1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0,
@@ -850,7 +850,7 @@ mod tests {
                 sequence_number: 89,
                 nonce: 90,
             },
-            token_amounts: [Any2SolanaTokenTransfer {
+            token_amounts: [Any2SVMTokenTransfer {
                 source_pool_address: vec![0, 1, 2, 3],
                 dest_token_address: Pubkey::try_from(
                     "DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTc",
@@ -861,7 +861,7 @@ mod tests {
                 amount: [1; 32],
             }]
             .to_vec(),
-            extra_args: SolanaExtraArgs {
+            extra_args: SVMExtraArgs {
                 compute_units: 1000,
                 is_writable_bitmap: 1,
                 accounts: vec![
@@ -873,7 +873,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "1636e87682c7622432edefeccae977d0e64f30251eee1b02e02b7156a58dfebf",
+            "60f412fe7c28ae6981b694f92677276f767a98e0314b9a31a3c38366223e7e52",
             hex::encode(hash_result)
         );
     }
