@@ -212,7 +212,7 @@ profiles:
                 image:
                   repository: ${DEVSPACE_IMAGE}
                   tag: ${DEVSPACE_IMAGE_TAG}
-                  pullPolicy: IfNotPresent
+                  pullPolicy: Always
   # overrides
   - name: overrides
     patches:
