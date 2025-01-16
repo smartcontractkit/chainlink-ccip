@@ -35,6 +35,7 @@ import (
 type Execute struct {
 	ExecutionReport        *ExecutionReportSingleChain
 	ReportContextByteWords *[3][32]uint8
+	TokenIndexes           *[]byte
 
 	// [0] = [] config
 	//
@@ -71,6 +72,12 @@ func (inst *Execute) SetExecutionReport(executionReport ExecutionReportSingleCha
 // SetReportContextByteWords sets the "reportContextByteWords" parameter.
 func (inst *Execute) SetReportContextByteWords(reportContextByteWords [3][32]uint8) *Execute {
 	inst.ReportContextByteWords = &reportContextByteWords
+	return inst
+}
+
+// SetTokenIndexes sets the "tokenIndexes" parameter.
+func (inst *Execute) SetTokenIndexes(tokenIndexes []byte) *Execute {
+	inst.TokenIndexes = &tokenIndexes
 	return inst
 }
 
@@ -188,6 +195,9 @@ func (inst *Execute) Validate() error {
 		if inst.ReportContextByteWords == nil {
 			return errors.New("ReportContextByteWords parameter is not set")
 		}
+		if inst.TokenIndexes == nil {
+			return errors.New("TokenIndexes parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -229,9 +239,10 @@ func (inst *Execute) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("       ExecutionReport", *inst.ExecutionReport))
 						paramsBranch.Child(ag_format.Param("ReportContextByteWords", *inst.ReportContextByteWords))
+						paramsBranch.Child(ag_format.Param("          TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -260,6 +271,11 @@ func (obj Execute) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `TokenIndexes` param:
+	err = encoder.Encode(obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -273,6 +289,11 @@ func (obj *Execute) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error)
 	if err != nil {
 		return err
 	}
+	// Deserialize `TokenIndexes`:
+	err = decoder.Decode(&obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -281,6 +302,7 @@ func NewExecuteInstruction(
 	// Parameters:
 	executionReport ExecutionReportSingleChain,
 	reportContextByteWords [3][32]uint8,
+	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	sourceChainState ag_solanago.PublicKey,
@@ -293,6 +315,7 @@ func NewExecuteInstruction(
 	return NewExecuteInstructionBuilder().
 		SetExecutionReport(executionReport).
 		SetReportContextByteWords(reportContextByteWords).
+		SetTokenIndexes(tokenIndexes).
 		SetConfigAccount(config).
 		SetSourceChainStateAccount(sourceChainState).
 		SetCommitReportAccount(commitReport).

@@ -31,9 +31,6 @@ pub struct ExecutionReportSingleChain {
     pub offchain_token_data: Vec<Vec<u8>>, // https://github.com/smartcontractkit/chainlink/blob/885baff9479e935e0fc34d9f52214a32c158eac5/contracts/src/v0.8/ccip/libraries/Internal.sol#L72
     pub root: [u8; 32],
     pub proofs: Vec<[u8; 32]>,
-
-    // NOT HASHED
-    pub token_indexes: Vec<u8>, // outside of message because this is not available during commit stage
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
@@ -149,9 +146,6 @@ pub struct Solana2AnyMessage {
     pub token_amounts: Vec<SolanaTokenAmount>,
     pub fee_token: Pubkey, // pass zero address if native SOL
     pub extra_args: ExtraArgsInput,
-
-    // solana specific parameter for mapping tokens to set of accounts
-    pub token_indexes: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
