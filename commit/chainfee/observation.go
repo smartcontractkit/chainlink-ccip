@@ -12,9 +12,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-common/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
@@ -30,6 +32,8 @@ func (p *processor) Observation(
 	_ Outcome,
 	_ Query,
 ) (Observation, error) {
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
 	supportedChains, err := p.chainSupport.SupportedChains(p.oracleID)
 	if err != nil {
 		return Observation{}, err
@@ -37,7 +41,7 @@ func (p *processor) Observation(
 
 	supportedChains.Remove(p.destChain)
 	if supportedChains.Cardinality() == 0 {
-		p.lggr.Info("no supported chains other than dest chain to observe")
+		lggr.Info("no supported chains other than dest chain to observe")
 		return Observation{}, nil
 	}
 
@@ -77,10 +81,10 @@ func (p *processor) Observation(
 		return Observation{}, fmt.Errorf("unexpected error: %w", err)
 	}
 
-	fChain := p.observeFChain()
+	fChain := p.observeFChain(lggr)
 	now := time.Now().UTC()
 
-	p.lggr.Infow("observed fee components",
+	lggr.Infow("observed fee components",
 		"supportedChains", supportedChainsSlice,
 		"feeComponents", feeComponents,
 		"nativeTokenPrices", nativeTokenPrices,
@@ -93,7 +97,7 @@ func (p *processor) Observation(
 	uniqueChains = uniqueChains.Intersect(mapset.NewSet(maps.Keys(nativeTokenPrices)...))
 
 	if len(uniqueChains.ToSlice()) == 0 {
-		p.lggr.Info("observations don't have any unique chains")
+		lggr.Info("observations don't have any unique chains")
 		return Observation{}, nil
 	}
 
@@ -123,10 +127,10 @@ func filterMapByUniqueChains[T comparable](
 	return filtered
 }
 
-func (p *processor) observeFChain() map[cciptypes.ChainSelector]int {
+func (p *processor) observeFChain(lggr logger.Logger) map[cciptypes.ChainSelector]int {
 	fChain, err := p.homeChain.GetFChain()
 	if err != nil {
-		p.lggr.Errorw("call to GetFChain failed", "err", err)
+		lggr.Errorw("call to GetFChain failed", "err", err)
 		return map[cciptypes.ChainSelector]int{}
 	}
 	return fChain

@@ -21,6 +21,8 @@ pub struct Config {
     // TODO: token pool global config
 
     // TODO: billing global configs'
+    pub max_fee_juels_per_msg: u128,
+    pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 
@@ -66,8 +68,10 @@ pub struct GlobalState {
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
 pub struct SourceChainConfig {
     pub is_enabled: bool, // Flag whether the source chain is enabled or not
-    #[max_len(64)]
-    pub on_ramp: Vec<u8>, // OnRamp address on the source chain
+    // OnRamp addresses supported from the source chain, each of them has a 64 byte address. So this can hold 2 addresses.
+    // If only one address is configured, then the space for the second address must be zeroed.
+    // Each address must be right padded with zeros if it is less than 64 bytes.
+    pub on_ramp: [[u8; 64]; 2],
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace, Debug)]
@@ -228,6 +232,7 @@ impl TryFrom<u128> for MessageExecutionState {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
     use std::convert::TryFrom;
 
