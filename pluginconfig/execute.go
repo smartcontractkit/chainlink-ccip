@@ -51,6 +51,9 @@ func (e *ExecuteOffchainConfig) applyDefaults() {
 	if e.TransmissionDelayMultiplier == 0 {
 		e.TransmissionDelayMultiplier = defaultTransmissionDelayMultiplier
 	}
+	if e.RelativeBoostPerWaitHour == 0 {
+		e.RelativeBoostPerWaitHour = defaultRelativeBoostPerWaitHour
+	}
 }
 
 func (e *ExecuteOffchainConfig) Validate() error {

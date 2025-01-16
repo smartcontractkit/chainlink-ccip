@@ -139,7 +139,7 @@ func (p PluginFactory) NewReportingPlugin(
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to decode exec offchain config: %w", err)
 	}
 
-	if err = offchainConfig.Validate(); err != nil {
+	if err = offchainConfig.ApplyDefaultsAndValidate(); err != nil {
 		return nil, ocr3types.ReportingPluginInfo{}, fmt.Errorf("failed to validate exec offchain config: %w", err)
 	}
 
