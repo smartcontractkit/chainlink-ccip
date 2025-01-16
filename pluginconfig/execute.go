@@ -77,6 +77,9 @@ func (e *ExecuteOffchainConfig) Validate() error {
 		return errors.New("MessageVisibilityInterval not set")
 	}
 
+	if e.RelativeBoostPerWaitHour > 1 || e.RelativeBoostPerWaitHour < 0 {
+		return errors.New("RelativeBoostPerWaitHour must be <= 1 and >= 0")
+	}
 	set := make(map[string]struct{})
 	for _, ob := range e.TokenDataObservers {
 		if err := ob.Validate(); err != nil {

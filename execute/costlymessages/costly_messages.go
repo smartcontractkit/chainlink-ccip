@@ -303,10 +303,7 @@ func (c *CCIPMessageFeeUSD18Calculator) MessageFeeUSD18(
 
 	messageFees := make(map[cciptypes.Bytes32]plugintypes.USD18)
 	for _, msg := range messages {
-		feeUSD18 := new(big.Int).Div(
-			new(big.Int).Mul(linkPriceUSD.Int, msg.FeeValueJuels.Int),
-			new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
-		)
+		feeUSD18 := mathslib.CalculateUsdPerUnitGas(msg.FeeValueJuels.Int, linkPriceUSD.Int)
 		timestamp, ok := messageTimeStamps[msg.Header.MessageID]
 		if !ok {
 			// If a timestamp is missing we can't do fee boosting, but we still record the fee. In the worst case, the
