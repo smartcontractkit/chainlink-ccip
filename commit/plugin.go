@@ -86,7 +86,7 @@ func NewPlugin(
 	}
 
 	chainSupport := plugincommon.NewChainSupport(
-		logutil.WithContext(lggr, "ChainSupport"),
+		logutil.WithComponent(lggr, "ChainSupport"),
 		homeChain,
 		oracleIDToP2pID,
 		reportingCfg.OracleID,
@@ -94,7 +94,7 @@ func NewPlugin(
 	)
 
 	rmnController := rmn.NewController(
-		logutil.WithContext(lggr, "RMNController"),
+		logutil.WithComponent(lggr, "RMNController"),
 		rmnCrypto,
 		offchainCfg.SignObservationPrefix,
 		rmnPeerClient,
@@ -106,7 +106,7 @@ func NewPlugin(
 	merkleRootProcessor := merkleroot.NewProcessor(
 		reportingCfg.OracleID,
 		oracleIDToP2pID,
-		logutil.WithContext(lggr, "MerkleRoot"),
+		logutil.WithComponent(lggr, "MerkleRoot"),
 		offchainCfg,
 		destChain,
 		homeChain,
@@ -122,7 +122,7 @@ func NewPlugin(
 
 	tokenPriceProcessor := tokenprice.NewProcessor(
 		reportingCfg.OracleID,
-		logutil.WithContext(lggr, "TokenPrice"),
+		logutil.WithComponent(lggr, "TokenPrice"),
 		offchainCfg,
 		destChain,
 		chainSupport,
@@ -133,7 +133,7 @@ func NewPlugin(
 	)
 
 	discoveryProcessor := discovery.NewContractDiscoveryProcessor(
-		logutil.WithContext(lggr, "Discovery"),
+		logutil.WithComponent(lggr, "Discovery"),
 		&ccipReader,
 		homeChain,
 		destChain,
@@ -142,7 +142,7 @@ func NewPlugin(
 	)
 
 	chainFeeProcessr := chainfee.NewProcessor(
-		logutil.WithContext(lggr, "ChainFee"),
+		logutil.WithComponent(lggr, "ChainFee"),
 		reportingCfg.OracleID,
 		destChain,
 		homeChain,
@@ -157,7 +157,7 @@ func NewPlugin(
 		donID:               donID,
 		oracleID:            reportingCfg.OracleID,
 		oracleIDToP2PID:     oracleIDToP2pID,
-		lggr:                logutil.WithContext(lggr, "Plugin"),
+		lggr:                logutil.WithComponent(lggr, "Plugin"),
 		offchainCfg:         offchainCfg,
 		tokenPricesReader:   tokenPricesReader,
 		ccipReader:          ccipReader,
