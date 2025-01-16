@@ -344,7 +344,7 @@ fn bump_nonce(nonce_counter_account: &mut Account<Nonce>, extra_args: AnyExtraAr
 }
 
 fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
-    use anchor_lang::solana_program::hash;
+    use anchor_lang::solana_program::keccak;
 
     // Push Data Size to ensure that the hash is unique
     let data_size = msg.data.len() as u16; // u16 > maximum transaction size, u8 may have overflow
@@ -355,9 +355,8 @@ fn hash(msg: &SVM2AnyRampMessage) -> [u8; 32] {
     let header_sequence_number = msg.header.sequence_number.to_be_bytes();
     let header_nonce = msg.header.nonce.to_be_bytes();
 
-    // NOTE: calling hash::hashv is orders of magnitude cheaper than using Hasher::hashv
     // similar to: https://github.com/smartcontractkit/chainlink/blob/d1a9f8be2f222ea30bdf7182aaa6428bfa605cf7/contracts/src/v0.8/ccip/libraries/Internal.sol#L134
-    let result = hash::hashv(&[
+    let result = keccak::hashv(&[
         LEAF_DOMAIN_SEPARATOR.as_slice(),
         // metadata
         "SVM2AnyMessageHashV1".as_bytes(),
@@ -506,7 +505,7 @@ mod tests {
         let hash_result = hash(&message);
 
         assert_eq!(
-            "df0890c0fb144ce4dee6556f2cd41382676f75e7292b61eca658b1d122a36f58",
+            "0b7c4cd9dba8b90737e734bced7bb9ea43d9e5bab22ceb2c962ab9b04e2798af",
             hex::encode(hash_result)
         );
     }
