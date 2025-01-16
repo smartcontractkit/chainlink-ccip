@@ -80,6 +80,6 @@ func main() {
 
 		renderData(data)
 		// TODO: render data.
-		//fmt.Println(data)
+		fmt.Println(data)
 	}
 }

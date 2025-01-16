@@ -113,14 +113,14 @@ type Data struct {
 	Timestamp      time.Time `json:"ts"`
 	Level          string    `json:"level"`
 	Caller         string    `json:"caller"`
-	SequenceNumber int
-	Plugin         string `json:"plugin"`
-	Context        string `json:"context"`
-	OracleID       int    `json:"oracleID"`
-	DONID          int    `json:"donID"`
-	Message        string `json:"msg"`
-	Version        string `json:"version"`
-	ConfigDigest   string `json:"configDigest"`
+	SequenceNumber int       `json:"ocrSeqNr"`
+	Plugin         string    `json:"plugin"`
+	Component      string    `json:"component"`
+	OracleID       int       `json:"oracleID"`
+	DONID          int       `json:"donID"`
+	Message        string    `json:"msg"`
+	Version        string    `json:"version"`
+	ConfigDigest   string    `json:"configDigest"`
 
 	// Additional detail space, can be unique to each filter.
 	// i.e. an error message, observer details, number of messages, etc
