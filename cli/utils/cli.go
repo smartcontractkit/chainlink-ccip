@@ -71,29 +71,18 @@ func ListFiles(dirPath string) ([]string, error) {
 	return f.Readdirnames(-1)
 }
 
-func PromptForInput(key string, defaultValue string) (string, error) {
-	userInput := ""
-	prompt := fmt.Sprintf("Please enter a value for %s", key)
-	if defaultValue != "" {
-		prompt = fmt.Sprintf("%s (default is '%s')", prompt, defaultValue)
-	}
-	prompt = fmt.Sprintf("%s: ", prompt)
-	fmt.Print(prompt)
-	_, err := fmt.Scanln(&userInput)
-	userInput = strings.Trim(userInput, " ")
-	if userInput == "" {
-		return defaultValue, nil
-	}
-	return userInput, err
-}
-
 // PresentPrompt presents a prompt to the user with possible choices and waits for valid input
+// if choices is empty, the user can enter any value
 func PresentPrompt(prompt string, choices []string) string {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
 		// Display the prompt and valid choices
-		fmt.Printf("%s (%s): ", prompt, strings.Join(choices, "/"))
+		userPrompt := prompt
+		if len(choices) > 0 {
+			userPrompt = fmt.Sprintf("%s (%s): ", prompt, strings.Join(choices, "/"))
+		}
+		fmt.Print(userPrompt)
 
 		// Read the user's input
 		input, err := reader.ReadString('\n')
@@ -104,6 +93,10 @@ func PresentPrompt(prompt string, choices []string) string {
 
 		// Clean up the input (remove newline and extra spaces)
 		input = strings.TrimSpace(input)
+
+		if len(choices) == 0 {
+			return input
+		}
 
 		// Check if the input is one of the valid choices
 		for _, choice := range choices {

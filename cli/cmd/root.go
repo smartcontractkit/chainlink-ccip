@@ -146,7 +146,7 @@ func initConfig(isChildOfDevspaceCmd bool) {
 
 	// offer the user to use the predefined .env file from .env.example
 	validChoices := []string{"yes", "y", "no", "n"}
-	userChoice := utils.PresentPrompt("CRIB deployment requires several environment variables. Since you don’t have a custom '.env' file set up, would you like to use the predefined '.env' file instead? (yes/no): ", validChoices)
+	userChoice := utils.PresentPrompt("CRIB deployment requires several environment variables. Since you don’t have a custom '.env' file set up, would you like to use the predefined '.env' file instead?", validChoices)
 	if userChoice == "yes" || userChoice == "y" {
 		err := utils.CopyFile(".env.example", ".env")
 		if err != nil {
