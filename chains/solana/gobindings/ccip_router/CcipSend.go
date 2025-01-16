@@ -27,6 +27,7 @@ import (
 type CcipSend struct {
 	DestChainSelector *uint64
 	Message           *Solana2AnyMessage
+	TokenIndexes      *[]byte
 
 	// [0] = [] config
 	//
@@ -75,6 +76,12 @@ func (inst *CcipSend) SetDestChainSelector(destChainSelector uint64) *CcipSend {
 // SetMessage sets the "message" parameter.
 func (inst *CcipSend) SetMessage(message Solana2AnyMessage) *CcipSend {
 	inst.Message = &message
+	return inst
+}
+
+// SetTokenIndexes sets the "tokenIndexes" parameter.
+func (inst *CcipSend) SetTokenIndexes(tokenIndexes []byte) *CcipSend {
+	inst.TokenIndexes = &tokenIndexes
 	return inst
 }
 
@@ -251,6 +258,9 @@ func (inst *CcipSend) Validate() error {
 		if inst.Message == nil {
 			return errors.New("Message parameter is not set")
 		}
+		if inst.TokenIndexes == nil {
+			return errors.New("TokenIndexes parameter is not set")
+		}
 	}
 
 	// Check whether all (required) accounts are set:
@@ -307,9 +317,10 @@ func (inst *CcipSend) EncodeToTree(parent ag_treeout.Branches) {
 				ParentFunc(func(instructionBranch ag_treeout.Branches) {
 
 					// Parameters of the instruction:
-					instructionBranch.Child("Params[len=2]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
+					instructionBranch.Child("Params[len=3]").ParentFunc(func(paramsBranch ag_treeout.Branches) {
 						paramsBranch.Child(ag_format.Param("DestChainSelector", *inst.DestChainSelector))
 						paramsBranch.Child(ag_format.Param("          Message", *inst.Message))
+						paramsBranch.Child(ag_format.Param("     TokenIndexes", *inst.TokenIndexes))
 					})
 
 					// Accounts of the instruction:
@@ -343,6 +354,11 @@ func (obj CcipSend) MarshalWithEncoder(encoder *ag_binary.Encoder) (err error) {
 	if err != nil {
 		return err
 	}
+	// Serialize `TokenIndexes` param:
+	err = encoder.Encode(obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error) {
@@ -356,6 +372,11 @@ func (obj *CcipSend) UnmarshalWithDecoder(decoder *ag_binary.Decoder) (err error
 	if err != nil {
 		return err
 	}
+	// Deserialize `TokenIndexes`:
+	err = decoder.Decode(&obj.TokenIndexes)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -364,6 +385,7 @@ func NewCcipSendInstruction(
 	// Parameters:
 	destChainSelector uint64,
 	message Solana2AnyMessage,
+	tokenIndexes []byte,
 	// Accounts:
 	config ag_solanago.PublicKey,
 	destChainState ag_solanago.PublicKey,
@@ -381,6 +403,7 @@ func NewCcipSendInstruction(
 	return NewCcipSendInstructionBuilder().
 		SetDestChainSelector(destChainSelector).
 		SetMessage(message).
+		SetTokenIndexes(tokenIndexes).
 		SetConfigAccount(config).
 		SetDestChainStateAccount(destChainState).
 		SetNonceAccount(nonce).

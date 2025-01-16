@@ -31,27 +31,20 @@ pub struct ExecutionReportSingleChain {
     pub offchain_token_data: Vec<Vec<u8>>, // https://github.com/smartcontractkit/chainlink/blob/885baff9479e935e0fc34d9f52214a32c158eac5/contracts/src/v0.8/ccip/libraries/Internal.sol#L72
     pub root: [u8; 32],
     pub proofs: Vec<[u8; 32]>,
-
-    // NOT HASHED
-    pub token_indexes: Vec<u8>, // outside of message because this is not available during commit stage
-}
-
-#[derive(Clone, AnchorSerialize, AnchorDeserialize, InitSpace)]
-pub struct SolanaAccountMeta {
-    pub pubkey: Pubkey,
-    pub is_writable: bool,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize)]
 pub struct SolanaExtraArgs {
     pub compute_units: u32,
-    pub accounts: Vec<SolanaAccountMeta>,
+    pub is_writable_bitmap: u64,
+    pub accounts: Vec<Pubkey>,
 }
 
 impl SolanaExtraArgs {
     pub fn len(&self) -> usize {
         4 // compute units
-        + 4 + self.accounts.len() * SolanaAccountMeta::INIT_SPACE // additional accounts
+        + 8 // isWritable bitmap
+        + 4 + self.accounts.len() * 32 // additional accounts
     }
 }
 
@@ -72,6 +65,7 @@ pub struct Any2SolanaRampMessage {
     pub receiver: Pubkey,
     pub token_amounts: Vec<Any2SolanaTokenTransfer>,
     pub extra_args: SolanaExtraArgs,
+    pub on_ramp_address: Vec<u8>,
 }
 
 impl Any2SolanaRampMessage {
@@ -84,6 +78,7 @@ impl Any2SolanaRampMessage {
         + 32 // receiver
         + 4 + token_len // token_amount
         + self.extra_args.len() // extra_args
+        + 4 + self.on_ramp_address.len() // on_ramp_address
     }
 }
 
@@ -151,9 +146,6 @@ pub struct Solana2AnyMessage {
     pub token_amounts: Vec<SolanaTokenAmount>,
     pub fee_token: Pubkey, // pass zero address if native SOL
     pub extra_args: ExtraArgsInput,
-
-    // solana specific parameter for mapping tokens to set of accounts
-    pub token_indexes: Vec<u8>,
 }
 
 #[derive(Clone, AnchorSerialize, AnchorDeserialize, Default, Debug, PartialEq, Eq)]
