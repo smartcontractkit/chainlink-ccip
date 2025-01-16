@@ -21,6 +21,8 @@ pub struct Config {
     // TODO: token pool global config
 
     // TODO: billing global configs'
+    pub max_fee_juels_per_msg: u128,
+    pub link_token_mint: Pubkey,
     pub fee_aggregator: Pubkey, // Allowed address to withdraw billed fees to (will use ATAs derived from it)
 }
 

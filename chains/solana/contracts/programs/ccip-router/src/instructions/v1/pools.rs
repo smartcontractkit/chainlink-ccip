@@ -401,19 +401,19 @@ pub mod token_admin_registry_writable {
                 ],
             };
 
-            assert_eq!(is(state, 0), false);
-            assert_eq!(is(state, 128), false);
-            assert_eq!(is(state, 255), false);
+            assert!(!is(state, 0));
+            assert!(!is(state, 128));
+            assert!(!is(state, 255));
 
             assert_eq!(state.writable_indexes[0].count_ones(), 3);
             assert_eq!(state.writable_indexes[1].count_ones(), 3);
 
-            assert_eq!(is(state, 7), true);
-            assert_eq!(is(state, 2), true);
-            assert_eq!(is(state, 4), true);
-            assert_eq!(is(state, 128 + 8), true);
-            assert_eq!(is(state, 128 + 56), true);
-            assert_eq!(is(state, 128 + 100), true);
+            assert!(is(state, 7));
+            assert!(is(state, 2));
+            assert!(is(state, 4));
+            assert!(is(state, 128 + 8));
+            assert!(is(state, 128 + 56));
+            assert!(is(state, 128 + 100));
         }
     }
 }

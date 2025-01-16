@@ -41,6 +41,6 @@ impl Ocr3Report for Ocr3ReportForExecutionReportSingleChain<'_> {
       + 4 + offchain_token_data_len// offchain_token_data
       + 32 // root
       + 4 + self.0.proofs.len() * 32 // count + proofs
-      + 4 + self.0.token_indexes.len() // token_indexes
+      + 4 + self.0.message.token_amounts.len() // token_indexes (not part of report but part of tx size validation)
     }
 }

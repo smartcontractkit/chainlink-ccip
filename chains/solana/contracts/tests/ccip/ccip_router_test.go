@@ -128,10 +128,11 @@ func TestCCIPRouter(t *testing.T) {
 		IsEnabled: true,
 
 		// minimal valid config
-		DefaultTxGasLimit:       200000,
-		MaxPerMsgGasLimit:       3000000,
-		MaxDataBytes:            30000,
-		MaxNumberOfTokensPerMsg: 5,
+		DefaultTxGasLimit:           200000,
+		MaxPerMsgGasLimit:           3000000,
+		MaxDataBytes:                30000,
+		MaxNumberOfTokensPerMsg:     5,
+		DefaultTokenDestGasOverhead: 50000,
 		// bytes4(keccak256("CCIP ChainFamilySelector EVM"))
 		ChainFamilySelector: [4]uint8{40, 18, 213, 44},
 
@@ -338,6 +339,7 @@ func TestCCIPRouter(t *testing.T) {
 		t.Run("Is initialized", func(t *testing.T) {
 			invalidSolanaChainSelector := uint64(17)
 			defaultGasLimit := bin.Uint128{Lo: 3000, Hi: 0, Endianness: nil}
+			defaultMaxFeeJuelsPerMsg := bin.Uint128{Lo: 300000000, Hi: 0, Endianness: nil}
 			allowOutOfOrderExecution := true
 
 			// get program data account
@@ -358,7 +360,13 @@ func TestCCIPRouter(t *testing.T) {
 				defaultGasLimit,
 				allowOutOfOrderExecution,
 				config.EnableExecutionAfter,
-				anotherUser.PublicKey(), // fee aggregator address, will be changed in later test
+				// fee aggregator address, will be changed in later test
+				anotherUser.PublicKey(),
+				// We use token2022 as the LINK address, which will be used as a base
+				// for fees. It could be any other token mint address, but we use this
+				// one for simplicity.
+				token2022.mint,
+				defaultMaxFeeJuelsPerMsg,
 				config.RouterConfigPDA,
 				config.RouterStatePDA,
 				admin.PublicKey(),
@@ -2020,6 +2028,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2028,6 +2037,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2053,6 +2063,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2061,6 +2072,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2119,6 +2131,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2127,6 +2140,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2180,6 +2194,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2188,6 +2203,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2242,6 +2258,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2250,6 +2267,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2303,6 +2321,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2310,6 +2329,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				token2022.program,
 				token2022.mint,
+				token2022.billingConfigPDA,
 				token2022.billingConfigPDA,
 				token2022.userATA,
 				token2022.billingATA,
@@ -2361,6 +2381,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2369,6 +2390,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2394,6 +2416,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2402,6 +2425,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2426,6 +2450,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2434,6 +2459,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2474,6 +2500,7 @@ func TestCCIPRouter(t *testing.T) {
 												Receiver: validReceiverAddress[:],
 												Data:     []byte{4, 5, 6},
 											},
+											[]byte{},
 											config.RouterConfigPDA,
 											destinationChainStatePDA,
 											nonceEvmPDA,
@@ -2482,6 +2509,7 @@ func TestCCIPRouter(t *testing.T) {
 											program,
 											mint,
 											billingConfigPDA,
+											token2022.billingConfigPDA,
 											userATA,
 											billingATA,
 											config.BillingSignerPDA,
@@ -2516,6 +2544,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				anotherUserNonceEVMPDA,
@@ -2523,6 +2552,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				token2022.program,
 				token2022.mint,
+				token2022.billingConfigPDA,
 				token2022.billingConfigPDA,
 				token2022.userATA, // token account of a different user
 				token2022.billingATA,
@@ -2549,6 +2579,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				anotherUserNonceEVMPDA,
@@ -2556,6 +2587,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				token2022.program,
 				token2022.mint,
+				token2022.billingConfigPDA,
 				token2022.billingConfigPDA,
 				token2022.anotherUserATA,
 				token2022.billingATA,
@@ -2613,7 +2645,6 @@ func TestCCIPRouter(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				TokenIndexes: []byte{0}, // starting indices for accounts
 			}
 
 			userTokenAccount, ok := token0.User[user.PublicKey()]
@@ -2622,6 +2653,7 @@ func TestCCIPRouter(t *testing.T) {
 			base := ccip_router.NewCcipSendInstruction(
 				destinationChainSelector,
 				message,
+				[]byte{0}, // starting indices for accounts
 				config.RouterConfigPDA,
 				destinationChainStatePDA,
 				nonceEvmPDA,
@@ -2630,6 +2662,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				wsol.userATA,
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -2659,7 +2692,11 @@ func TestCCIPRouter(t *testing.T) {
 			require.Equal(t, []byte{1, 2, 3}, ta.DestTokenAddress)
 			require.Equal(t, 0, len(ta.ExtraData))
 			require.Equal(t, tokens.ToLittleEndianU256(1), ta.Amount)
-			require.Equal(t, 0, len(ta.DestExecData))
+			require.Equal(t, 32, len(ta.DestExecData))
+			expectedDestExecData := make([]byte, 32)
+			// Token0 billing had DestGasOverhead set to 100 during setup
+			binary.BigEndian.PutUint64(expectedDestExecData[24:], 100)
+			require.Equal(t, expectedDestExecData, ta.DestExecData)
 
 			// check pool event
 			poolEvent := tokens.EventBurnLock{}
@@ -2694,7 +2731,6 @@ func TestCCIPRouter(t *testing.T) {
 						Amount: 1,
 					},
 				},
-				TokenIndexes: []byte{0}, // starting indices for accounts
 			}
 
 			userTokenAccount, ok := token0.User[user.PublicKey()]
@@ -2788,6 +2824,7 @@ func TestCCIPRouter(t *testing.T) {
 					tx := ccip_router.NewCcipSendInstruction(
 						destinationChainSelector,
 						message,
+						[]byte{0}, // starting indices for accounts
 						config.RouterConfigPDA,
 						destinationChainStatePDA,
 						nonceEvmPDA,
@@ -2796,6 +2833,7 @@ func TestCCIPRouter(t *testing.T) {
 						wsol.program,
 						wsol.mint,
 						wsol.billingConfigPDA,
+						token2022.billingConfigPDA,
 						wsol.userATA,
 						wsol.billingATA,
 						config.BillingSignerPDA,
@@ -2850,6 +2888,7 @@ func TestCCIPRouter(t *testing.T) {
 					raw := ccip_router.NewCcipSendInstruction(
 						destinationChainSelector,
 						message,
+						[]byte{},
 						config.RouterConfigPDA,
 						destinationChainStatePDA,
 						nonceEvmPDA,
@@ -2858,6 +2897,7 @@ func TestCCIPRouter(t *testing.T) {
 						token.program,
 						token.mint,
 						token.billingConfigPDA,
+						token2022.billingConfigPDA,
 						token.userATA,
 						token.billingATA,
 						config.BillingSignerPDA,
@@ -2891,6 +2931,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				config.EvmChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				config.EvmDestChainStatePDA,
 				noncePDA,
@@ -2898,6 +2939,7 @@ func TestCCIPRouter(t *testing.T) {
 				solana.SystemProgramID,
 				token2022.program,
 				token2022.mint,
+				token2022.billingConfigPDA,
 				token2022.billingConfigPDA,
 				token2022.tokenlessUserATA,
 				token2022.billingATA,
@@ -2943,6 +2985,7 @@ func TestCCIPRouter(t *testing.T) {
 			raw := ccip_router.NewCcipSendInstruction(
 				config.EvmChainSelector,
 				message,
+				[]byte{},
 				config.RouterConfigPDA,
 				config.EvmDestChainStatePDA,
 				nonceEvmPDA,
@@ -2951,6 +2994,7 @@ func TestCCIPRouter(t *testing.T) {
 				wsol.program,
 				wsol.mint,
 				wsol.billingConfigPDA,
+				token2022.billingConfigPDA,
 				zeroPubkey, // no user token account, because paying with native SOL
 				wsol.billingATA,
 				config.BillingSignerPDA,
@@ -4230,6 +4274,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4317,6 +4362,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4406,6 +4452,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					unsupportedSourceChainStatePDA,
 					rootPDA,
@@ -4477,6 +4524,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4515,6 +4563,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4559,6 +4608,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4637,6 +4687,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport1,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4669,6 +4720,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw = ccip_router.NewExecuteInstruction(
 					executionReport2,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4767,6 +4819,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4843,6 +4896,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4922,11 +4976,11 @@ func TestCCIPRouter(t *testing.T) {
 					OffchainTokenData:   [][]byte{{}},
 					Root:                root,
 					Proofs:              [][32]uint8{},
-					TokenIndexes:        []uint8{4},
 				}
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{4},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -4983,6 +5037,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				raw := ccip_router.NewManuallyExecuteInstruction(
 					executionReport,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5059,6 +5114,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5093,6 +5149,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5136,6 +5193,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5186,6 +5244,7 @@ func TestCCIPRouter(t *testing.T) {
 
 						raw := ccip_router.NewManuallyExecuteInstruction(
 							executionReport,
+							[]byte{},
 							config.RouterConfigPDA,
 							config.EvmSourceChainStatePDA,
 							rootPDA,
@@ -5295,6 +5354,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{},
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5386,11 +5446,11 @@ func TestCCIPRouter(t *testing.T) {
 					OffchainTokenData:   [][]byte{{}},
 					Root:                root,
 					Proofs:              [][32]uint8{},
-					TokenIndexes:        []uint8{0}, // only token transfer message
 				}
 				raw := ccip_router.NewExecuteInstruction(
 					executionReport,
 					reportContext,
+					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,
@@ -5419,6 +5479,7 @@ func TestCCIPRouter(t *testing.T) {
 				// NOTE: expects re-execution time to be instantaneous
 				rawManual := ccip_router.NewManuallyExecuteInstruction(
 					executionReport,
+					[]byte{0}, // only token transfer message
 					config.RouterConfigPDA,
 					config.EvmSourceChainStatePDA,
 					rootPDA,

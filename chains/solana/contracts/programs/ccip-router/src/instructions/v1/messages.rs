@@ -285,7 +285,6 @@ pub mod ramps {
                     gas_limit: None,
                     allow_out_of_order_execution: None,
                 },
-                token_indexes: vec![],
             }
         }
 
