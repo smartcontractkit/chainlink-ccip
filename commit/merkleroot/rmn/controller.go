@@ -30,6 +30,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/rmnpb"
 	rmntypes "github.com/smartcontractkit/chainlink-ccip/commit/merkleroot/rmn/types"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	readerpkg "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
@@ -151,6 +152,8 @@ func (c *controller) ComputeReportSignatures(
 	updateRequests []*rmnpb.FixedDestLaneUpdateRequest,
 	rmnRemoteCfg rmntypes.RemoteConfig,
 ) (*ReportSignatures, error) {
+	lggr := logutil.WithContextValues(ctx, c.lggr)
+
 	rmnNodes, err := c.rmnHomeReader.GetRMNNodesInfo(rmnRemoteCfg.ConfigDigest)
 	if err != nil {
 		return nil, fmt.Errorf("get rmn nodes info: %w", err)
@@ -161,8 +164,8 @@ func (c *controller) ComputeReportSignatures(
 		rmnNodeInfo[node.ID] = node
 	}
 
-	c.lggr.Infow("got RMN nodes info", "nodes", rmnNodeInfo)
-	c.lggr.Infow("requested updates", "updates", updateRequests)
+	lggr.Infow("got RMN nodes info", "nodes", rmnNodeInfo)
+	lggr.Infow("requested updates", "updates", updateRequests)
 
 	updatesPerChain, err := populateUpdatesPerChain(updateRequests, rmnNodes)
 	if err != nil {
@@ -181,7 +184,7 @@ func (c *controller) ComputeReportSignatures(
 		}
 
 		if consensus.LtFPlusOne(homeChainF, l.RmnNodes.Cardinality()) {
-			c.lggr.Warnw("chain skipped, not enough RMN nodes to support it",
+			lggr.Warnw("chain skipped, not enough RMN nodes to support it",
 				"chain", chain,
 				"homeF", homeFMap[cciptypes.ChainSelector(chain)],
 				"nodes", l.RmnNodes.ToSlice(),
@@ -197,6 +200,7 @@ func (c *controller) ComputeReportSignatures(
 	tStart := time.Now()
 	rmnSignedObservations, err := c.getRmnSignedObservations(
 		ctx,
+		lggr,
 		destChain,
 		updatesPerChain,
 		rmnRemoteCfg.ConfigDigest,
@@ -205,7 +209,7 @@ func (c *controller) ComputeReportSignatures(
 	if err != nil {
 		return nil, fmt.Errorf("get rmn signed observations: %w", err)
 	}
-	c.lggr.Infow("received RMN signed observations",
+	lggr.Infow("received RMN signed observations",
 		"requestedUpdates", updatesPerChain,
 		"signedObservations", rmnSignedObservations,
 		"duration", time.Since(tStart),
@@ -214,6 +218,7 @@ func (c *controller) ComputeReportSignatures(
 	tStart = time.Now()
 	rmnReportSignatures, err := c.getRmnReportSignatures(
 		ctx,
+		lggr,
 		destChain,
 		rmnSignedObservations,
 		updatesPerChain,
@@ -222,7 +227,7 @@ func (c *controller) ComputeReportSignatures(
 	if err != nil {
 		return nil, fmt.Errorf("get rmn report signatures: %w", err)
 	}
-	c.lggr.Infow("received RMN report signatures",
+	lggr.Infow("received RMN report signatures",
 		"signedObservations", rmnSignedObservations,
 		"reportSignatures", rmnReportSignatures,
 		"duration", time.Since(tStart),
@@ -277,6 +282,7 @@ func (c *controller) Close() error {
 // getRmnSignedObservations guarantees to return at least F+1 signed observations for each source chain.
 func (c *controller) getRmnSignedObservations(
 	ctx context.Context,
+	lggr logger.Logger,
 	destChain *rmnpb.LaneDest,
 	updateRequestsPerChain map[uint64]updateRequestWithMeta,
 	configDigest cciptypes.Bytes32,
@@ -319,17 +325,17 @@ func (c *controller) getRmnSignedObservations(
 		}
 	}
 
-	requestIDs := c.sendObservationRequests(destChain, requestsPerNode, rmnNodeInfo)
+	requestIDs := c.sendObservationRequests(lggr, destChain, requestsPerNode, rmnNodeInfo)
 
 	signedObservations, err := c.listenForRmnObservationResponses(
-		ctx, destChain, requestIDs, updateRequestsPerChain, requestedNodes, configDigest, homeFMap, rmnNodeInfo)
+		ctx, lggr, destChain, requestIDs, updateRequestsPerChain, requestedNodes, configDigest, homeFMap, rmnNodeInfo)
 	if err != nil {
 		return nil, fmt.Errorf("listen for rmn observation responses: %w", err)
 	}
 
 	// Sanity check that we got enough signed observations for every source chain.
 	// In practice this should never happen, an error must have been received earlier.
-	if !gotSufficientObservationResponses(c.lggr, updateRequestsPerChain, signedObservations, homeFMap) {
+	if !gotSufficientObservationResponses(lggr, updateRequestsPerChain, signedObservations, homeFMap) {
 		return nil, fmt.Errorf("not enough signed observations after sanity check")
 	}
 
@@ -339,6 +345,7 @@ func (c *controller) getRmnSignedObservations(
 // sendObservationRequests sends observation requests to the RMN nodes.
 // If a specific request fails, it is logged and not included in the returned requestIDs mapping.
 func (c *controller) sendObservationRequests(
+	lggr logger.Logger,
 	destChain *rmnpb.LaneDest,
 	requestsPerNode map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
@@ -365,7 +372,7 @@ func (c *controller) sendObservationRequests(
 		}
 
 		req := &rmnpb.Request{
-			RequestId: newRequestID(c.lggr),
+			RequestId: newRequestID(lggr),
 			Request: &rmnpb.Request_ObservationRequest{
 				ObservationRequest: &rmnpb.ObservationRequest{
 					LaneDest:                    destChain,
@@ -376,11 +383,11 @@ func (c *controller) sendObservationRequests(
 
 		rmnNode, exists := rmnNodeInfo[nodeID]
 		if !exists {
-			c.lggr.Errorw("rmn node info not found skipped", "node", nodeID)
+			lggr.Errorw("rmn node info not found skipped", "node", nodeID)
 			continue
 		}
 
-		lggr := logger.With(c.lggr, "node", nodeID, "requestID", req.RequestId)
+		lggr := logger.With(lggr, "node", nodeID, "requestID", req.RequestId)
 		lggr.Infow("sending observation request", "laneUpdateRequests", requests)
 		if err := c.marshalAndSend(req, rmnNode); err != nil {
 			lggr.Errorw("failed to send observation request", "err", err)
@@ -400,6 +407,7 @@ func (c *controller) sendObservationRequests(
 //nolint:gocyclo // todo
 func (c *controller) listenForRmnObservationResponses(
 	ctx context.Context,
+	lggr logger.Logger,
 	destChain *rmnpb.LaneDest,
 	requestIDs mapset.Set[uint64],
 	lursPerChain map[uint64]updateRequestWithMeta,
@@ -408,7 +416,7 @@ func (c *controller) listenForRmnObservationResponses(
 	homeFMap map[cciptypes.ChainSelector]int,
 	rmnNodeInfo map[rmntypes.NodeID]rmntypes.HomeNodeInfo,
 ) ([]rmnSignedObservationWithMeta, error) {
-	c.lggr.Infow("listening for RMN observation responses", "requestIDs", requestIDs.String())
+	lggr.Infow("listening for RMN observation responses", "requestIDs", requestIDs.String())
 
 	finishedRequestIDs := mapset.NewSet[uint64]()
 	rmnObservationResponses := make([]rmnSignedObservationWithMeta, 0)
@@ -422,7 +430,7 @@ func (c *controller) listenForRmnObservationResponses(
 		case resp := <-c.peerClient.Recv():
 			parsedResp, err := c.parseResponse(&resp, requestIDs, finishedRequestIDs)
 			if err != nil {
-				c.lggr.Debugw("skipping an unexpected RMN response", "err", err)
+				lggr.Debugw("skipping an unexpected RMN response", "err", err)
 				continue
 			}
 
@@ -436,7 +444,7 @@ func (c *controller) listenForRmnObservationResponses(
 				configDigest,
 			)
 			if err != nil {
-				c.lggr.Warnw("skipping an invalid RMN observation response", "err", err)
+				lggr.Warnw("skipping an invalid RMN observation response", "err", err)
 				initialObservationRequestTimer.Reset(0) // immediately schedule the additional requests
 			} else {
 				rmnObservationResponses = append(rmnObservationResponses, rmnSignedObservationWithMeta{
@@ -446,18 +454,18 @@ func (c *controller) listenForRmnObservationResponses(
 			}
 
 			allChainsHaveEnoughResponses := gotSufficientObservationResponses(
-				c.lggr,
+				lggr,
 				lursPerChain,
 				rmnObservationResponses,
 				homeFMap)
 			if allChainsHaveEnoughResponses {
-				c.lggr.Infof("all chains have enough observation responses with matching roots")
+				lggr.Info("all chains have enough observation responses with matching roots")
 				return rmnObservationResponses, nil
 			}
 
 			// We got all the responses we were waiting for, but they are not sufficient for all chains.
 			if timerExpired && finishedRequestIDs.Equal(requestIDs) {
-				c.lggr.Warnw("observation requests were finished, but results are not sufficient")
+				lggr.Warn("observation requests were finished, but results are not sufficient")
 				return rmnObservationResponses, ErrInsufficientObservationResponses
 			}
 		case <-initialObservationRequestTimer.C:
@@ -466,7 +474,7 @@ func (c *controller) listenForRmnObservationResponses(
 			}
 			timerExpired = true
 
-			c.lggr.Warn("sending additional RMN observation requests")
+			lggr.Warn("sending additional RMN observation requests")
 			requestsPerNode := make(map[rmntypes.NodeID][]*rmnpb.FixedDestLaneUpdateRequest)
 			for sourceChain, updateReq := range lursPerChain {
 				for _, nodeID := range randomShuffle(updateReq.RmnNodes.ToSlice()) {
@@ -477,7 +485,7 @@ func (c *controller) listenForRmnObservationResponses(
 					requestsPerNode[nodeID] = append(requestsPerNode[nodeID], updateReq.Data)
 				}
 			}
-			newRequestIDs := c.sendObservationRequests(destChain, requestsPerNode, rmnNodeInfo)
+			newRequestIDs := c.sendObservationRequests(lggr, destChain, requestsPerNode, rmnNodeInfo)
 			requestIDs = requestIDs.Union(newRequestIDs)
 		case <-ctx.Done():
 			return nil, ErrTimeout
@@ -604,6 +612,7 @@ func (c *controller) validateSignedObservationResponse(
 
 func (c *controller) getRmnReportSignatures(
 	ctx context.Context,
+	lggr logger.Logger,
 	destChain *rmnpb.LaneDest,
 	rmnSignedObservations []rmnSignedObservationWithMeta,
 	updatesPerChain map[uint64]updateRequestWithMeta,
@@ -688,6 +697,7 @@ func (c *controller) getRmnReportSignatures(
 	remoteF := int(rmnRemoteCfg.FSign)
 	signers := rmnRemoteCfg.Signers
 	requestIDs, signersRequested, err := c.sendReportSignatureRequest(
+		lggr,
 		reportSigReq,
 		signers,
 		remoteF,
@@ -698,6 +708,7 @@ func (c *controller) getRmnReportSignatures(
 
 	ecdsaSignatures, err := c.listenForRmnReportSignatures(
 		ctx,
+		lggr,
 		requestIDs,
 		rmnReport,
 		reportSigReq,
@@ -795,6 +806,7 @@ func selectRoots(
 // sendReportSignatureRequest sends the report signature request to #remoteF+1 random RMN nodes.
 // If not enough requests were sent, it returns an error.
 func (c *controller) sendReportSignatureRequest(
+	lggr logger.Logger,
 	reportSigReq *rmnpb.ReportSignatureRequest,
 	remoteSigners []rmntypes.RemoteSignerInfo,
 	remoteF int,
@@ -811,23 +823,23 @@ func (c *controller) sendReportSignatureRequest(
 		}
 
 		req := &rmnpb.Request{
-			RequestId: newRequestID(c.lggr),
+			RequestId: newRequestID(lggr),
 			Request: &rmnpb.Request_ReportSignatureRequest{
 				ReportSignatureRequest: reportSigReq,
 			},
 		}
 
-		c.lggr.Infow("sending report signature request", "node", node.NodeIndex, "requestID", req.RequestId)
+		lggr.Infow("sending report signature request", "node", node.NodeIndex, "requestID", req.RequestId)
 
 		rmnNode, exists := rmnNodeInfo[rmntypes.NodeID(node.NodeIndex)]
 		if !exists {
-			c.lggr.Errorw("rmn node info not found skipped", "node", node.NodeIndex)
+			lggr.Errorw("rmn node info not found skipped", "node", node.NodeIndex)
 			continue
 		}
 
 		err := c.marshalAndSend(req, rmnNode)
 		if err != nil {
-			c.lggr.Warnw("failed to send report signature request", "node", node.NodeIndex, "err", err)
+			lggr.Warnw("failed to send report signature request", "node", node.NodeIndex, "err", err)
 			continue
 		}
 
@@ -851,6 +863,7 @@ type reportSigWithSignerAddress struct {
 //nolint:gocyclo // todo
 func (c *controller) listenForRmnReportSignatures(
 	ctx context.Context,
+	lggr logger.Logger,
 	requestIDs mapset.Set[uint64],
 	rmnReport cciptypes.RMNReport,
 	reportSigReq *rmnpb.ReportSignatureRequest,
@@ -865,34 +878,34 @@ func (c *controller) listenForRmnReportSignatures(
 	reportSigs := make([]reportSigWithSignerAddress, 0)
 	finishedRequests := mapset.NewSet[uint64]()
 	requestIDs = requestIDs.Clone()
-	c.lggr.Infof("waiting for report signatures, requestIDs: %s", requestIDs.String())
+	lggr.Infof("waiting for report signatures, requestIDs: %s", requestIDs.String())
 
 	for {
 		select {
 		case resp := <-c.peerClient.Recv():
 			responseTyp, err := c.parseResponse(&resp, requestIDs, finishedRequests)
 			if err != nil {
-				c.lggr.Infow("failed to parse RMN signature response", "err", err)
+				lggr.Infow("failed to parse RMN signature response", "err", err)
 				continue
 			}
 			finishedRequests.Add(responseTyp.RequestId)
 
 			reportSig, err := c.validateReportSigResponse(ctx, responseTyp, resp.RMNNodeID, signers, rmnReport)
 			if err != nil {
-				c.lggr.Warnw("skipping an invalid RMN report signature response", "err", err)
+				lggr.Warnw("skipping an invalid RMN report signature response", "err", err)
 				tReportsInitialRequest.Reset(0) // schedule additional requests if any
 			} else {
-				c.lggr.Infow("received valid report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
+				lggr.Infow("received valid report signature", "node", resp.RMNNodeID, "requestID", responseTyp.RequestId)
 				reportSigs = append(reportSigs, *reportSig)
 			}
 
 			if consensus.GteFPlusOne(remoteF, len(reportSigs)) {
-				c.lggr.Infof("got enough RMN report signatures")
+				lggr.Infof("got enough RMN report signatures")
 				return sortAndParseReportSigs(reportSigs), nil
 			}
 
 			if timerExpired && finishedRequests.Equal(requestIDs) {
-				c.lggr.Warn("report signature requests were finished, but results are not sufficient")
+				lggr.Warn("report signature requests were finished, but results are not sufficient")
 				return nil, ErrInsufficientSignatureResponses
 			}
 		case <-tReportsInitialRequest.C:
@@ -901,7 +914,7 @@ func (c *controller) listenForRmnReportSignatures(
 			}
 			timerExpired = true
 
-			c.lggr.Warnw("sending additional RMN signature requests")
+			lggr.Warnw("sending additional RMN signature requests")
 
 			for _, node := range randomShuffle(signers) {
 				nodeIndex := node.NodeIndex
@@ -909,7 +922,7 @@ func (c *controller) listenForRmnReportSignatures(
 					continue
 				}
 				req := &rmnpb.Request{
-					RequestId: newRequestID(c.lggr),
+					RequestId: newRequestID(lggr),
 					Request: &rmnpb.Request_ReportSignatureRequest{
 						ReportSignatureRequest: reportSigReq,
 					},
@@ -917,13 +930,13 @@ func (c *controller) listenForRmnReportSignatures(
 
 				rmnNode, exists := rmnNodeInfo[rmntypes.NodeID(nodeIndex)]
 				if !exists {
-					c.lggr.Errorw("rmn node info not found skipped", "node", nodeIndex)
+					lggr.Errorw("rmn node info not found skipped", "node", nodeIndex)
 					continue
 				}
 
-				c.lggr.Infow("sending report signature request", "node", nodeIndex, "requestID", req.RequestId)
+				lggr.Infow("sending report signature request", "node", nodeIndex, "requestID", req.RequestId)
 				if err := c.marshalAndSend(req, rmnNode); err != nil {
-					c.lggr.Errorw("failed to send report signature request", "node", nodeIndex, "err", err)
+					lggr.Errorw("failed to send report signature request", "node", nodeIndex, "err", err)
 					continue
 				}
 				requestIDs.Add(req.RequestId)
@@ -1036,6 +1049,7 @@ func (c *controller) marshalAndSend(req *rmnpb.Request, rmnNode rmntypes.HomeNod
 		return fmt.Errorf("proto marshal RMN request: %w", err)
 	}
 
+	// TODO: include ctx in the func call to pass thru OCR seqNr.
 	if err := c.peerClient.Send(rmnNode, reqBytes); err != nil {
 		return fmt.Errorf("send rmn request: %w", err)
 	}
