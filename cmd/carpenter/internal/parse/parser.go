@@ -63,13 +63,33 @@ func RegisterDataFilter(name string, df DataFilter) {
 	})
 }
 
-func ParseLine(line string) (map[string]interface{}, error) {
-	var obj map[string]interface{}
-	line = strings.TrimSpace(line)
-	if len(line) == 0 {
-		return nil, nil
+// sanitizeString removes any unwanted characters from the string which may
+// be included by CI.
+func sanitizeString(s string) string {
+	if len(s) > 0 && s[0] != '{' {
+		// Look for embedded tab
+		idx := strings.LastIndex(s, `\t`)
+		if idx != -1 {
+			s = s[idx+2:]
+			// Look for newline
+			idx = strings.Index(s, `\n`)
+			if idx != -1 {
+				s = s[:idx]
+			}
+		}
 	}
 
+	if len(s) > 0 && s[0] != '{' {
+		return ""
+	}
+
+	s = strings.ReplaceAll(s, "\\", "")
+	s = strings.TrimSpace(s)
+	return s
+}
+
+func ParseLine(line string) (map[string]interface{}, error) {
+	var obj map[string]interface{}
 	dec := json.NewDecoder(strings.NewReader(line))
 	err := dec.Decode(&obj)
 	if err != nil {
@@ -80,6 +100,12 @@ func ParseLine(line string) (map[string]interface{}, error) {
 }
 
 func Filter(line string) (*Data, error) {
+	line = sanitizeString(line)
+
+	if len(line) == 0 {
+		return nil, nil
+	}
+
 	object, err := ParseLine(line)
 	if err != nil {
 		return nil, fmt.Errorf("ParseLine: %w", err)
@@ -88,6 +114,11 @@ func Filter(line string) (*Data, error) {
 	var data Data
 	if err := json.Unmarshal([]byte(line), &data); err != nil {
 		return nil, fmt.Errorf("unparsable line: %w", err)
+	}
+
+	// This isn't ours.
+	if (data == Data{}) {
+		return nil, nil
 	}
 
 	for _, f := range filters {
