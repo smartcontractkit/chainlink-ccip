@@ -542,8 +542,9 @@ fn internal_execute<'info>(
     Ok(())
 }
 
-// should_execute_messaging checks if there is at least one account used for messaging (the first subset of accounts)
-// and the logic_receiver is has a value different than zeros
+// should_execute_messaging checks if:
+// 1. There is at least one account used for messaging (the first subset of accounts). This is because the first account is the program id to do the CPI
+// 2. AND the logic_receiver has a value different than zeros
 fn should_execute_messaging(logic_receiver: &Pubkey, remaining_accounts_empty: bool) -> bool {
     !remaining_accounts_empty && *logic_receiver != Pubkey::default()
 }
