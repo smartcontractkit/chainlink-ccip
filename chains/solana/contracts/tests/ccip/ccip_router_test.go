@@ -3423,7 +3423,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				for i, testcase := range priceUpdatesCases {
 					t.Run(testcase.Name, func(t *testing.T) {
-						_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
+						_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, uint8(i)})
 						rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 						require.NoError(t, err)
 
@@ -3527,7 +3527,7 @@ func TestCCIPRouter(t *testing.T) {
 					sourceChainSelector := uint64(34)
 					sourceChainStatePDA, err := ccip.GetSourceChainStatePDA(sourceChainSelector)
 					require.NoError(t, err)
-					_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, sourceChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(sourceChainSelector, root)
 					require.NoError(t, err)
 
@@ -3564,7 +3564,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid interval it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3601,7 +3601,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an interval size bigger than supported it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3675,7 +3675,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with a repeated merkle root, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3, 1}) // repeated root
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3713,7 +3713,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				t.Run("When committing a report with an invalid min interval, it fails", func(t *testing.T) {
 					t.Parallel()
-					_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3811,7 +3811,7 @@ func TestCCIPRouter(t *testing.T) {
 						// TODO right now I'm allowing sending too many remaining_accounts, but if we want to be restrictive with that we can add a test here
 					}
 
-					_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
+					_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{1, 2, 3})
 					rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 					require.NoError(t, err)
 
@@ -3878,7 +3878,7 @@ func TestCCIPRouter(t *testing.T) {
 			})
 
 			t.Run("When committing a report with the exact next interval, it succeeds", func(t *testing.T) {
-				_, root := testutils.MakeEvmToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
+				_, root := testutils.MakeAnyToSVMMessage(t, config.CcipReceiverProgram, config.EvmChainSelector, config.SVMChainSelector, []byte{4, 5, 6})
 				rootPDA, err := ccip.GetCommitReportPDA(config.EvmChainSelector, root)
 				require.NoError(t, err)
 
@@ -4452,7 +4452,7 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 				message.Header.DestChainSelector = 89 // invalid dest chain selector
 				sequenceNumber := message.Header.SequenceNumber
-				hash, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -4563,7 +4563,7 @@ func TestCCIPRouter(t *testing.T) {
 				sourceChainSelector := config.EvmChainSelector
 
 				message := ccip.CreateDefaultMessageWith(sourceChainSelector, executedSequenceNumber) // already executed seq number
-				hash, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -4614,7 +4614,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				message1, hash1 := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashEvmToSVMMessage(message2, config.OnRampAddress)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1[:], hash2[:]}))
@@ -4747,7 +4747,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 				}
 
-				hash, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -4821,7 +4821,7 @@ func TestCCIPRouter(t *testing.T) {
 				sourceChainSelector := config.EvmChainSelector
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 				message.Data = []byte{} // empty message data
-				hash, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -4905,7 +4905,7 @@ func TestCCIPRouter(t *testing.T) {
 					DestTokenAddress:  token0.Mint.PublicKey(),
 					Amount:            tokens.ToLittleEndianU256(1),
 				}}
-				rootBytes, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 
 				root := [32]byte(rootBytes)
@@ -5035,11 +5035,11 @@ func TestCCIPRouter(t *testing.T) {
 				transmitter := getTransmitter()
 
 				message1, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
-				hash1, err := ccip.HashEvmToSVMMessage(message1, config.OnRampAddress)
+				hash1, err := ccip.HashAnyToSVMMessage(message1, config.OnRampAddress)
 				require.NoError(t, err)
 
 				message2 := ccip.CreateDefaultMessageWith(config.EvmChainSelector, message1.Header.SequenceNumber+1)
-				hash2, err := ccip.HashEvmToSVMMessage(message2, config.OnRampAddress)
+				hash2, err := ccip.HashAnyToSVMMessage(message2, config.OnRampAddress)
 				require.NoError(t, err)
 
 				root := [32]byte(ccip.MerkleFrom([][]byte{hash1, hash2}))
@@ -5282,7 +5282,7 @@ func TestCCIPRouter(t *testing.T) {
 					solana.SystemProgramID,
 				}
 
-				hash, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				hash, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 				root := [32]byte(hash)
 
@@ -5375,7 +5375,7 @@ func TestCCIPRouter(t *testing.T) {
 					Amount:            tokens.ToLittleEndianU256(1),
 				}}
 				message.Receiver = receiver.PublicKey()
-				rootBytes, err := ccip.HashEvmToSVMMessage(message, config.OnRampAddress)
+				rootBytes, err := ccip.HashAnyToSVMMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 
 				root := [32]byte(rootBytes)

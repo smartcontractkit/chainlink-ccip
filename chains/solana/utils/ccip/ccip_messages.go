@@ -74,7 +74,7 @@ func CreateNextMessage(ctx context.Context, solanaGoClient *rpc.Client) (ccip_ro
 	}
 	msg := CreateDefaultMessageWith(config.EvmChainSelector, nextSeq)
 
-	hash, err := HashEvmToSVMMessage(msg, config.OnRampAddress)
+	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress)
 	return msg, [32]byte(hash), err
 }
 
@@ -112,18 +112,18 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 	return message
 }
 
-func MakeEvmToSVMMessage(ccipReceiver solana.PublicKey, evmChainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte, error) {
-	msg := CreateDefaultMessageWith(evmChainSelector, 1)
+func MakeAnyToSVMMessage(ccipReceiver solana.PublicKey, chainSelector uint64, solanaChainSelector uint64, data []byte) (ccip_router.Any2SVMRampMessage, [32]byte, error) {
+	msg := CreateDefaultMessageWith(chainSelector, 1)
 	msg.Header.DestChainSelector = solanaChainSelector
 	msg.Receiver = ccipReceiver
 	msg.Data = data
 
-	hash, err := HashEvmToSVMMessage(msg, config.OnRampAddress)
+	hash, err := HashAnyToSVMMessage(msg, config.OnRampAddress)
 	msg.Header.MessageId = [32]byte(hash)
 	return msg, msg.Header.MessageId, err
 }
 
-func HashEvmToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byte) ([]byte, error) {
+func HashAnyToSVMMessage(msg ccip_router.Any2SVMRampMessage, onRampAddress []byte) ([]byte, error) {
 	hash := sha256.New()
 
 	hash.Write(leafDomainSeparator[:])

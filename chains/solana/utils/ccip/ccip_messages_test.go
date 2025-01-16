@@ -22,9 +22,9 @@ func TestMessageHashing(t *testing.T) {
 		tokenAmount[i] = 1
 	}
 
-	t.Run("EvmToSVM", func(t *testing.T) {
+	t.Run("AnyToSVM", func(t *testing.T) {
 		t.Parallel()
-		h, err := HashEvmToSVMMessage(ccip_router.Any2SVMRampMessage{
+		h, err := HashAnyToSVMMessage(ccip_router.Any2SVMRampMessage{
 			Sender:   sender,
 			Receiver: solana.MustPublicKeyFromBase58("DS2tt4BX7YwCw7yrDNwbAdnYrxjeCPeGJbHmZEYC8RTb"),
 			Data:     []byte{4, 5, 6},
@@ -57,7 +57,7 @@ func TestMessageHashing(t *testing.T) {
 		require.Equal(t, "60f412fe7c28ae6981b694f92677276f767a98e0314b9a31a3c38366223e7e52", hex.EncodeToString(h))
 	})
 
-	t.Run("SVMToEvm", func(t *testing.T) {
+	t.Run("SVMToAny", func(t *testing.T) {
 		t.Parallel()
 
 		h, err := HashSVMToAnyMessage(ccip_router.SVM2AnyRampMessage{
