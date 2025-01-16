@@ -117,14 +117,14 @@ func (o *observer) Observe(
 		if !ok {
 			return nil, fmt.Errorf("missing fee for message %s", msg.Header.MessageID)
 		}
-		if err := validateNonNegative(fee); err != nil {
+		if err := validatePositive(fee); err != nil {
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
 		execCost, ok := execCosts[msg.Header.MessageID]
 		if !ok {
 			return nil, fmt.Errorf("missing exec cost for message %s", msg.Header.MessageID)
 		}
-		if err := validateNonNegative(execCost); err != nil {
+		if err := validatePositive(execCost); err != nil {
 			return nil, fmt.Errorf("invalid fee for message %s: %w", msg.Header.MessageID, err)
 		}
 		if fee.Cmp(execCost) < 0 {
@@ -137,7 +137,7 @@ func (o *observer) Observe(
 	return costlyMessages, nil
 }
 
-func validateNonNegative(fee *big.Int) error {
+func validatePositive(fee *big.Int) error {
 	if fee == nil {
 		return fmt.Errorf("fee is nil")
 	}
