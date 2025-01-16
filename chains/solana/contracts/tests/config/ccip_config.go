@@ -32,13 +32,13 @@ var (
 	DestChainConfigPrefix    = []byte("destination_billing_config")
 
 	SVMChainSelector uint64 = 15
-	EvmChainSelector    uint64 = 21
-	EvmChainLE                 = common.Uint64ToLE(EvmChainSelector)
+	EvmChainSelector uint64 = 21
+	EvmChainLE              = common.Uint64ToLE(EvmChainSelector)
 
 	SVMSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
 	SVMDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, SVMChainSelector)}, CcipRouterProgram)
-	EvmSourceChainStatePDA, _, _    = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
-	EvmDestChainStatePDA, _, _      = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	EvmSourceChainStatePDA, _, _ = solana.FindProgramAddress([][]byte{[]byte("source_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
+	EvmDestChainStatePDA, _, _   = solana.FindProgramAddress([][]byte{[]byte("dest_chain_state"), binary.LittleEndian.AppendUint64([]byte{}, EvmChainSelector)}, CcipRouterProgram)
 
 	OnRampAddress        = []byte{1, 2, 3}
 	OnRampAddressPadded  = [64]byte{1, 2, 3}

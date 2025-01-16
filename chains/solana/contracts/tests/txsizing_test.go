@@ -82,8 +82,8 @@ func TestTransactionSizing(t *testing.T) {
 		Receiver:     make([]byte, 20), // EVM address
 		Data:         []byte{},
 		TokenAmounts: []ccip_router.SVMTokenAmount{}, // no tokens
-		FeeToken:     [32]byte{},                        // solana fee token
-		ExtraArgs:    ccip_router.ExtraArgsInput{},      // default options
+		FeeToken:     [32]byte{},                     // solana fee token
+		ExtraArgs:    ccip_router.ExtraArgsInput{},   // default options
 	}
 	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),

@@ -63,8 +63,7 @@ pub mod ramps {
     use ethnum::U256;
 
     use crate::{
-        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage,
-        CHAIN_FAMILY_SELECTOR_EVM,
+        BillingTokenConfig, CcipRouterError, DestChain, SVM2AnyMessage, CHAIN_FAMILY_SELECTOR_EVM,
     };
 
     const U160_MAX: U256 = U256::from_words(u32::MAX as u128, u128::MAX);
@@ -172,8 +171,7 @@ pub mod ramps {
             chain.config.is_enabled = false;
 
             assert_eq!(
-                validate_svm2any(&sample_message(), &chain, &sample_billing_config())
-                    .unwrap_err(),
+                validate_svm2any(&sample_message(), &chain, &sample_billing_config()).unwrap_err(),
                 CcipRouterError::DestinationChainDisabled.into()
             );
         }
