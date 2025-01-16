@@ -4,7 +4,6 @@
 pub mod admin;
 pub mod offramp;
 pub mod onramp;
-pub mod price_math;
 pub mod token_admin_registry;
 
 /////////////////////
@@ -16,3 +15,4 @@ mod messages;
 mod ocr3base;
 mod ocr3impl;
 mod pools;
+mod price_math;

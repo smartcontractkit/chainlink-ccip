@@ -11,10 +11,12 @@ use super::pools::{
 };
 
 use crate::v1::merkle::LEAF_DOMAIN_SEPARATOR;
+use crate::v1::price_math::get_validated_token_price;
 use crate::{
-    AnyExtraArgs, CCIPMessageSent, CcipRouterError, CcipSend, Config, DestChainConfig,
-    ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader, Solana2AnyMessage,
-    Solana2AnyRampMessage, Solana2AnyTokenTransfer, SolanaTokenAmount, EXTERNAL_TOKEN_POOL_SEED,
+    AnyExtraArgs, BillingTokenConfig, CCIPMessageSent, CcipRouterError, CcipSend, Config,
+    DestChainConfig, ExtraArgsInput, GetFee, Nonce, PerChainPerTokenConfig, RampMessageHeader,
+    Solana2AnyMessage, Solana2AnyRampMessage, Solana2AnyTokenTransfer, SolanaTokenAmount,
+    EXTERNAL_TOKEN_POOL_SEED,
 };
 
 pub fn get_fee<'info>(
@@ -392,6 +394,25 @@ fn hash(msg: &Solana2AnyRampMessage) -> [u8; 32] {
     result.to_bytes()
 }
 
+impl SolanaTokenAmount {
+    pub fn convert(
+        &self,
+        source_config: &BillingTokenConfig,
+        target_config: &BillingTokenConfig,
+    ) -> Result<SolanaTokenAmount> {
+        assert!(source_config.mint == self.token);
+        let source_price = get_validated_token_price(source_config)?;
+        let target_price = get_validated_token_price(target_config)?;
+
+        Ok(SolanaTokenAmount {
+            token: target_config.mint,
+            amount: ((source_price * self.amount).0 / target_price.0)
+                .try_into()
+                .map_err(|_| CcipRouterError::InvalidTokenPrice)?,
+        })
+    }
+}
+
 /// Methods in this module are used to deserialize AccountInfo into the state structs
 mod validated_try_to {
     use anchor_lang::prelude::*;
@@ -449,7 +470,7 @@ mod validated_try_to {
 
 #[cfg(test)]
 mod tests {
-    use crate::v1::{
+    use super::super::{
         fee_quoter::tests::sample_additional_token, messages::ramps::tests::sample_dest_chain,
     };
 

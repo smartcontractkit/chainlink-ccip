@@ -5,7 +5,6 @@ use anchor_spl::{token::spl_token::native_mint, token_interface};
 use ethnum::U256;
 use solana_program::{program::invoke_signed, system_instruction};
 
-use crate::v1::price_math::get_validated_token_price;
 use crate::{
     BillingTokenConfig, CcipRouterError, DestChain, PerChainPerTokenConfig, Solana2AnyMessage,
     SolanaTokenAmount, TimestampedPackedU224, FEE_BILLING_SIGNER_SEEDS,
@@ -13,6 +12,7 @@ use crate::{
 
 use super::messages::ramps::validate_solana2any;
 use super::pools::CCIP_LOCK_OR_BURN_V1_RET_BYTES;
+use super::price_math::get_validated_token_price;
 use super::price_math::{Exponential, Usd18Decimals};
 
 /// Any2EVMRampMessage struct has 10 fields, including 3 variable unnested arrays (data, receiver and tokenAmounts).
