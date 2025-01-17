@@ -401,18 +401,18 @@ mod tests {
             ],
         };
 
-        assert_eq!(state.is_writable(0), false);
-        assert_eq!(state.is_writable(128), false);
-        assert_eq!(state.is_writable(255), false);
+        assert!(!state.is_writable(0));
+        assert!(!state.is_writable(128));
+        assert!(!state.is_writable(255));
 
         assert_eq!(state.writable_indexes[0].count_ones(), 3);
         assert_eq!(state.writable_indexes[1].count_ones(), 3);
 
-        assert_eq!(state.is_writable(7), true);
-        assert_eq!(state.is_writable(2), true);
-        assert_eq!(state.is_writable(4), true);
-        assert_eq!(state.is_writable(128 + 8), true);
-        assert_eq!(state.is_writable(128 + 56), true);
-        assert_eq!(state.is_writable(128 + 100), true);
+        assert!(state.is_writable(7));
+        assert!(state.is_writable(2));
+        assert!(state.is_writable(4));
+        assert!(state.is_writable(128 + 8));
+        assert!(state.is_writable(128 + 56));
+        assert!(state.is_writable(128 + 100));
     }
 }

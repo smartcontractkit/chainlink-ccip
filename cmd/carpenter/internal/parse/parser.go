@@ -160,8 +160,7 @@ func ParseLine(line, logType string) (*Data, error) {
 		var data Data
 
 		// some fields in the mixed log need to be manually populated in the Data struct
-		const customLayout = "2006-01-02T15:04:05.000-0700"
-		parsedTs, err := time.Parse(customLayout, obj["timestamp"])
+		parsedTs, err := parseCustomLayout(obj["timestamp"])
 		if err != nil {
 			return nil, fmt.Errorf("could not parse timestamp: %w", err)
 		}
@@ -245,4 +244,9 @@ type Data struct {
 
 func (d Data) IsEmpty() bool {
 	return false // TODO: implement
+}
+
+func parseCustomLayout(s string) (time.Time, error) {
+	const customLayout = "2006-01-02T15:04:05.000-0700"
+	return time.Parse(customLayout, s)
 }

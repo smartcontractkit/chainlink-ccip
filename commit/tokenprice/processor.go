@@ -9,6 +9,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugincommon"
 	"github.com/smartcontractkit/chainlink-ccip/internal/reader"
+	"github.com/smartcontractkit/chainlink-ccip/pkg/logutil"
 	pkgreader "github.com/smartcontractkit/chainlink-ccip/pkg/reader"
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 	"github.com/smartcontractkit/chainlink-ccip/pluginconfig"
@@ -60,20 +61,22 @@ func (p *processor) Outcome(
 	_ Query,
 	aos []plugincommon.AttributedObservation[Observation],
 ) (Outcome, error) {
-	p.lggr.Infow("processing token price outcome")
+	lggr := logutil.WithContextValues(ctx, p.lggr)
+
+	lggr.Infow("processing token price outcome")
 	// If set to zero, no prices will be reported (i.e keystone feeds would be active).
 	if p.offChainCfg.TokenPriceBatchWriteFrequency.Duration() == 0 {
-		p.lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
+		lggr.Debugw("TokenPriceBatchWriteFrequency is set to zero, no prices will be reported")
 		return Outcome{}, nil
 	}
 
-	consensusObservation, err := p.getConsensusObservation(aos)
+	consensusObservation, err := p.getConsensusObservation(lggr, aos)
 	if err != nil {
 		return Outcome{}, fmt.Errorf("get consensus observation: %w", err)
 	}
 
-	tokenPriceOutcome := p.selectTokensForUpdate(consensusObservation)
-	p.lggr.Infow(
+	tokenPriceOutcome := p.selectTokensForUpdate(lggr, consensusObservation)
+	lggr.Infow(
 		"outcome token prices",
 		"tokenPrices", tokenPriceOutcome,
 	)

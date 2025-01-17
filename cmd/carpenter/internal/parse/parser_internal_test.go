@@ -1,11 +1,14 @@
 package parse
 
-import "testing"
+import (
+	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
+)
+
+//nolint:lll // long test data
 func Test_sanitizeString(t *testing.T) {
-	type args struct {
-		s string
-	}
 	tests := []struct {
 		name  string
 		lines []string
@@ -59,4 +62,55 @@ func TestSanitize(t *testing.T) {
 	line := `logger.go:146: 2025-01-17T13:59:55.521+0200	INFO	CCIPCommitPlugin.evm.1337.3379446385462418246.0x075f98f19ef9873523cde0267ab8b0253904363e	commit/plugin.go:482	closing commit plugin	{"version": "unset@unset", "plugin": "Commit", "oracleID": 1, "donID": 2, "configDigest": "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291", "component": "Plugin"}`
 	sanitized := sanitizeString(line, LogTypeMixed)
 	t.Log("sanitized line:", sanitized)
+}
+
+func mustParseCustomLayout(t *testing.T, str string) time.Time {
+	tm, err := parseCustomLayout(str)
+	require.NoError(t, err)
+	return tm
+}
+
+func Test_ParseLine_Mixed(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		expected *Data
+	}{
+		{
+			name: "mixed log",
+			line: `logger.go:146: 2025-01-17T13:59:55.521+0200	INFO	CCIPCommitPlugin.evm.1337.3379446385462418246.0x075f98f19ef9873523cde0267ab8b0253904363e	commit/plugin.go:482	closing commit plugin	{"version": "unset@unset", "plugin": "Commit", "oracleID": 1, "donID": 2, "configDigest": "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291", "component": "Plugin"}`,
+			expected: &Data{
+				LoggerName:     "CCIPCommitPlugin.evm.1337.3379446385462418246.0x075f98f19ef9873523cde0267ab8b0253904363e",
+				Level:          "INFO",
+				Timestamp:      mustParseCustomLayout(t, "2025-01-17T13:59:55.521+0200"),
+				Caller:         "commit/plugin.go:482",
+				SequenceNumber: 0,
+				Component:      "Plugin",
+				DONID:          2,
+				OracleID:       1,
+				Message:        "closing commit plugin",
+				Version:        "unset@unset",
+				ConfigDigest:   "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291",
+				Plugin:         "Commit",
+				RawLoggerFields: map[string]any{
+					"version":      "unset@unset",
+					"plugin":       "Commit",
+					"oracleID":     float64(1),
+					"donID":        float64(2),
+					"configDigest": "000a7d1df8632e2b3479350dcca1ee46eeec889dc37eb2ab094e63a1820ba291",
+					"component":    "Plugin",
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := ParseLine(tc.line, LogTypeMixed)
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, tc.expected, result)
+		})
+	}
 }

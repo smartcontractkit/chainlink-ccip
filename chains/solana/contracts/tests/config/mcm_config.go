@@ -15,7 +15,7 @@ var (
 	// Note: This is an arbitrary value used only for localnet testing
 	// Value (0x4808e31713a26612) derived from keccak256("solana:localnet")
 	//
-	// Note: CCIP chain-selector uses genesis hash of each Solana network
+	// Note: CCIP chain-selector uses genesis hash of each SVM network
 	// (mainnet-beta, devnet, testnet) to determine their chain IDs.
 	// See: chain-selector specification
 	TestChainID             uint64 = 5190648258797659666

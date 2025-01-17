@@ -94,10 +94,10 @@ func NewPlugin(
 		homeChain:             homeChain,
 		tokenDataObserver:     tokenDataObserver,
 		estimateProvider:      estimateProvider,
-		lggr:                  logutil.WithContext(lggr, "Plugin"),
+		lggr:                  logutil.WithComponent(lggr, "Plugin"),
 		costlyMessageObserver: costlyMessageObserver,
 		discovery: discovery.NewContractDiscoveryProcessor(
-			logutil.WithContext(lggr, "Discovery"),
+			logutil.WithComponent(lggr, "Discovery"),
 			&ccipReader,
 			homeChain,
 			destChain,
@@ -105,7 +105,7 @@ func NewPlugin(
 			oracleIDToP2pID,
 		),
 		chainSupport: plugincommon.NewChainSupport(
-			logutil.WithContext(lggr, "ChainSupport"),
+			logutil.WithComponent(lggr, "ChainSupport"),
 			homeChain,
 			oracleIDToP2pID,
 			reportingCfg.OracleID,
@@ -246,7 +246,9 @@ func selectReport(
 		// The builder may attach metadata to the commit report.
 		commitReports[i], err = builder.Add(ctx, commitReport)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to add report to builder: %w", err)
+			pendingReports++
+			lggr.Errorw("unable to add report to builder", "err", err)
+			continue
 		}
 
 		selectedReports = append(selectedReports, commitReports[i])
