@@ -3,8 +3,9 @@ package execute
 import (
 	"errors"
 	"fmt"
-	mapset "github.com/deckarep/golang-set/v2"
 	"sort"
+
+	mapset "github.com/deckarep/golang-set/v2"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
 

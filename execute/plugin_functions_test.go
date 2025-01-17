@@ -2,9 +2,10 @@ package execute
 
 import (
 	"fmt"
+	"testing"
+
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/stretchr/testify/assert"
-	"testing"
 
 	"github.com/smartcontractkit/libocr/commontypes"
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"

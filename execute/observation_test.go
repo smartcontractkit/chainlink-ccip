@@ -232,9 +232,9 @@ func Test_readAllMessages(t *testing.T) {
 				},
 			},
 			expectedTimestamps: map[cciptypes.Bytes32]time.Time{
-				cciptypes.Bytes32{0x01}: timestamp,
-				cciptypes.Bytes32{0x02}: timestamp,
-				cciptypes.Bytes32{0x03}: timestamp,
+				{0x01}: timestamp,
+				{0x02}: timestamp,
+				{0x03}: timestamp,
 			},
 			expectedError: false,
 		},
