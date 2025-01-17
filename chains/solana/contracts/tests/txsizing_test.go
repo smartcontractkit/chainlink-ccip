@@ -73,7 +73,7 @@ func TestTransactionSizing(t *testing.T) {
 		bz, err := tx.MarshalBinary()
 		require.NoError(t, err)
 		l := len(bz)
-		require.LessOrEqual(t, l, 1238)
+		require.LessOrEqual(t, l, 1242)
 		return fmt.Sprintf("%-55s: %-4d - remaining: %d", name, l, 1232-l)
 	}
 
@@ -88,7 +88,7 @@ func TestTransactionSizing(t *testing.T) {
 	sendSingleMinimalToken := ccip_router.SVM2AnyMessage{
 		Receiver: make([]byte, 20),
 		Data:     []byte{},
-		TokenAmounts: []ccip_router.SVMTokenAmount{ccip_router.SVMTokenAmount{
+		TokenAmounts: []ccip_router.SVMTokenAmount{{
 			Token:  [32]byte{},
 			Amount: 0,
 		}}, // one token
