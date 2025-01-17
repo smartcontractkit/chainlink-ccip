@@ -250,7 +250,7 @@ func (p *Plugin) getMessagesObservation(
 
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
-		p.lggr.Errorw("unable to observe costly messages", "err", err)
+		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages: %w", err)
 	}
 
 	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
