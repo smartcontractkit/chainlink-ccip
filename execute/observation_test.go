@@ -16,128 +16,6 @@ import (
 	cciptypes "github.com/smartcontractkit/chainlink-ccip/pkg/types/ccipocr3"
 )
 
-func Test_filterCommitReports(t *testing.T) {
-	tests := []struct {
-		name       string
-		msgObs     exectypes.MessageObservations
-		commitObs  exectypes.CommitObservations
-		want       exectypes.CommitObservations
-		wantedMsgs exectypes.MessageObservations
-	}{
-		{
-			name:   "no messages",
-			msgObs: exectypes.MessageObservations{},
-			commitObs: exectypes.CommitObservations{
-				1: []exectypes.CommitData{
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 10),
-					},
-				},
-			},
-			want:       exectypes.CommitObservations{},
-			wantedMsgs: exectypes.MessageObservations{},
-		},
-		{
-			name: "missing messages",
-			msgObs: exectypes.MessageObservations{
-				1: {
-					1: cciptypes.Message{},
-					2: cciptypes.Message{},
-				},
-			},
-			commitObs: exectypes.CommitObservations{
-				1: []exectypes.CommitData{
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
-					},
-				},
-			},
-			want:       exectypes.CommitObservations{},
-			wantedMsgs: exectypes.MessageObservations{},
-		},
-		{
-			name: "valid messages",
-			msgObs: exectypes.MessageObservations{
-				1: {
-					1: cciptypes.Message{},
-					2: cciptypes.Message{},
-					3: cciptypes.Message{},
-				},
-			},
-			commitObs: exectypes.CommitObservations{
-				1: []exectypes.CommitData{
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
-					},
-				},
-			},
-			want: exectypes.CommitObservations{
-				1: []exectypes.CommitData{
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
-					},
-				},
-			},
-			wantedMsgs: exectypes.MessageObservations{
-				1: {
-					1: cciptypes.Message{},
-					2: cciptypes.Message{},
-					3: cciptypes.Message{},
-				},
-			},
-		},
-		{
-			name: "mixed valid and invalid messages",
-			msgObs: exectypes.MessageObservations{
-				1: {
-					1: cciptypes.Message{},
-					2: cciptypes.Message{},
-					3: cciptypes.Message{},
-					4: cciptypes.Message{},
-				},
-			},
-			commitObs: exectypes.CommitObservations{
-				1: []exectypes.CommitData{
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
-					},
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(4, 5),
-					},
-				},
-			},
-			want: exectypes.CommitObservations{
-				1: []exectypes.CommitData{
-					{
-						SourceChain:         1,
-						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
-					},
-				},
-			},
-			wantedMsgs: exectypes.MessageObservations{
-				1: {
-					1: cciptypes.Message{},
-					2: cciptypes.Message{},
-					3: cciptypes.Message{},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, got := intersectCommitReportsAndMessages(tt.msgObs, tt.commitObs)
-			require.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func Test_getMessagesObservation(t *testing.T) {
 	ctx := context.Background()
 
@@ -212,7 +90,7 @@ func Test_getMessagesObservation(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "multiple commit reports with one missing messages",
+			name: "multiple commit reports with missing messages",
 			previousOutcome: exectypes.Outcome{
 				CommitReports: []exectypes.CommitData{
 					{
@@ -220,8 +98,14 @@ func Test_getMessagesObservation(t *testing.T) {
 						SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
 					},
 					{
-						SourceChain:         1,
+						SourceChain: 1,
+						// test sets this up with missing messages
 						SequenceNumberRange: cciptypes.NewSeqNumRange(6, 10),
+					},
+					{
+						SourceChain: 1,
+						// test sets this up with missing messages
+						SequenceNumberRange: cciptypes.NewSeqNumRange(11, 12),
 					},
 				},
 			},
@@ -232,21 +116,29 @@ func Test_getMessagesObservation(t *testing.T) {
 							SourceChain:         1,
 							SequenceNumberRange: cciptypes.NewSeqNumRange(1, 3),
 						},
+						{
+							SourceChain:         1,
+							SequenceNumberRange: cciptypes.NewSeqNumRange(11, 12),
+						},
 					},
 				},
 				Messages: exectypes.MessageObservations{
 					1: {
-						1: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
-						2: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
-						3: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+						1:  cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 1}},
+						2:  cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 2}},
+						3:  cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
+						11: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 11}},
+						12: cciptypes.Message{Header: cciptypes.RampMessageHeader{SequenceNumber: 12}},
 					},
 				},
 				CostlyMessages: []cciptypes.Bytes32{},
 				TokenData: exectypes.TokenDataObservations{
 					1: {
-						1: exectypes.NewMessageTokenData(),
-						2: exectypes.NewMessageTokenData(),
-						3: exectypes.NewMessageTokenData(),
+						1:  exectypes.NewMessageTokenData(),
+						2:  exectypes.NewMessageTokenData(),
+						3:  exectypes.NewMessageTokenData(),
+						11: exectypes.NewMessageTokenData(),
+						12: exectypes.NewMessageTokenData(),
 					},
 				},
 			},
@@ -264,10 +156,16 @@ func Test_getMessagesObservation(t *testing.T) {
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 3}},
 			}, nil).Maybe()
 
-			// missing message 5 and 6
+			// missing message from 7 to 10
 			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
 				cciptypes.NewSeqNumRange(6, 10)).Return([]cciptypes.Message{
 				{Header: cciptypes.RampMessageHeader{SequenceNumber: 6}},
+			}, nil).Maybe()
+
+			ccipReader.On("MsgsBetweenSeqNums", ctx, cciptypes.ChainSelector(1),
+				cciptypes.NewSeqNumRange(11, 12)).Return([]cciptypes.Message{
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 11}},
+				{Header: cciptypes.RampMessageHeader{SequenceNumber: 12}},
 			}, nil).Maybe()
 
 			observation := exectypes.Observation{}
