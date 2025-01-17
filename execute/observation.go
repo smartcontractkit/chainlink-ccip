@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
+
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
@@ -171,37 +173,46 @@ func regroup(commitData []exectypes.CommitData) exectypes.CommitObservations {
 
 func readAllMessages(
 	ctx context.Context,
+	lggr logger.Logger,
 	ccipReader reader.CCIPReader,
-	commitObs exectypes.CommitObservations,
-) (exectypes.MessageObservations, error) {
+	commitData []exectypes.CommitData,
+) (exectypes.MessageObservations, exectypes.CommitObservations, map[cciptypes.Bytes32]time.Time) {
 	messageObs := make(exectypes.MessageObservations)
+	availableReports := make(exectypes.CommitObservations)
+	messageTimestamps := make(map[cciptypes.Bytes32]time.Time)
+
+	commitObs := regroup(commitData)
 
 	for srcChain, reports := range commitObs {
 		if len(reports) == 0 {
 			continue
 		}
 
-		ranges, err := computeRanges(reports)
-		if err != nil {
-			return exectypes.MessageObservations{}, err
-		}
-
+		messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
 		// Read messages for each range.
-		for _, seqRange := range ranges {
-			// TODO: check if srcChain is supported.
-			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, seqRange)
-			if err != nil {
-				return exectypes.MessageObservations{}, err
+		for _, report := range reports {
+			msgs, err := ccipReader.MsgsBetweenSeqNums(ctx, srcChain, report.SequenceNumberRange)
+			if err != nil || len(msgs) != report.SequenceNumberRange.Length() {
+				lggr.Errorw("unable to read all messages for report",
+					"srcChain", srcChain,
+					"seqRange", report.SequenceNumberRange,
+					"merkleRoot", report.MerkleRoot,
+					"err", err,
+				)
+				continue
 			}
 			for _, msg := range msgs {
-				if _, ok := messageObs[srcChain]; !ok {
-					messageObs[srcChain] = make(map[cciptypes.SeqNum]cciptypes.Message)
-				}
 				messageObs[srcChain][msg.Header.SequenceNumber] = msg
+				messageTimestamps[msg.Header.MessageID] = report.Timestamp
 			}
+			availableReports[srcChain] = append(availableReports[srcChain], report)
+		}
+		// Remove empty chains.
+		if len(messageObs[srcChain]) == 0 {
+			delete(messageObs, srcChain)
 		}
 	}
-	return messageObs, nil
+	return messageObs, availableReports, messageTimestamps
 }
 
 func (p *Plugin) getMessagesObservation(
@@ -219,30 +230,27 @@ func (p *Plugin) getMessagesObservation(
 		return observation, nil
 	}
 
-	// group reports by chain selector.
-	commitReportCache := regroup(previousOutcome.CommitReports)
-
-	messageObs, err := readAllMessages(ctx, p.ccipReader, commitReportCache)
-	if err != nil {
-		return exectypes.Observation{}, err
-	}
-
-	messageTimestamps, err := getMessageTimestampMap(commitReportCache, messageObs)
-	if err != nil {
-		return exectypes.Observation{}, err
-	}
+	messageObs, commitReportCache, messageTimestamps := readAllMessages(
+		ctx,
+		p.lggr,
+		p.ccipReader,
+		previousOutcome.CommitReports,
+	)
 
 	tkData, err1 := p.tokenDataObserver.Observe(ctx, messageObs)
 	if err1 != nil {
 		return exectypes.Observation{}, fmt.Errorf("unable to process token data %w", err1)
 	}
+
+	// validating before continuing with heavy operations afterwards like truncation and costly messages
+	// all messages should have a token data observation even if it's empty
 	if validateTokenDataObservations(messageObs, tkData) != nil {
 		return exectypes.Observation{}, fmt.Errorf("invalid token data observations")
 	}
 
 	costlyMessages, err := p.costlyMessageObserver.Observe(ctx, messageObs.Flatten(), messageTimestamps)
 	if err != nil {
-		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messageObs %w", err)
+		return exectypes.Observation{}, fmt.Errorf("unable to observe costly messages: %w", err)
 	}
 
 	hashes, err := exectypes.GetHashes(ctx, messageObs, p.msgHasher)
@@ -255,7 +263,6 @@ func (p *Plugin) getMessagesObservation(
 	observation.Hashes = hashes
 	observation.CostlyMessages = costlyMessages
 	observation.TokenData = tkData
-	//observation.MessageAndTokenDataEncodedSizes = exectypes.GetEncodedMsgAndTokenDataSizes(messageObs, tkData)
 
 	// Make sure encoded observation fits within the maximum observation size.
 	//observation, err = truncateObservation(observation, maxObservationLength, p.emptyEncodedSizes)
@@ -301,7 +308,8 @@ func (p *Plugin) getFilterObservation(
 		addrs := maps.Keys(addrSet)
 		nonces, err := p.ccipReader.Nonces(ctx, srcChain, p.destChain, addrs)
 		if err != nil {
-			return exectypes.Observation{}, fmt.Errorf("unable to get nonces: %w", err)
+			p.lggr.Errorw("unable to get nonces", "err", err)
+			continue
 		}
 		nonceObservations[srcChain] = nonces
 	}
