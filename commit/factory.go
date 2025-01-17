@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
-
 	sel "github.com/smartcontractkit/chain-selectors"
 
 	"github.com/smartcontractkit/libocr/commontypes"
@@ -66,31 +64,6 @@ const (
 	// maxReportCount is set to 1 because the commit plugin only generates one report per round.
 	maxReportCount = 1
 )
-
-// PluginFactoryConstructor implements common OCR3ReportingPluginClient and is used for initializing a plugin factory
-// and a validation service.
-type PluginFactoryConstructor struct{}
-
-func NewPluginFactoryConstructor() *PluginFactoryConstructor {
-	return &PluginFactoryConstructor{}
-}
-func (p PluginFactoryConstructor) NewReportingPluginFactory(
-	ctx context.Context,
-	config core.ReportingPluginServiceConfig,
-	grpcProvider grpc.ClientConnInterface,
-	pipelineRunner core.PipelineRunnerService,
-	telemetry core.TelemetryService,
-	errorLog core.ErrorLog,
-	capRegistry core.CapabilitiesRegistry,
-	keyValueStore core.KeyValueStore,
-	relayerSet core.RelayerSet,
-) (core.OCR3ReportingPluginFactory, error) {
-	return nil, errors.New("this functionality should not be used")
-}
-
-func (p PluginFactoryConstructor) NewValidationService(ctx context.Context) (core.ValidationService, error) {
-	return nil, errors.New("this functionality should not be used")
-}
 
 type PluginFactory struct {
 	baseLggr          logger.Logger
@@ -301,5 +274,4 @@ func (p PluginFactory) HealthReport() map[string]error {
 }
 
 // Interface compatibility checks.
-var _ core.OCR3ReportingPluginClient = &PluginFactoryConstructor{}
 var _ core.OCR3ReportingPluginFactory = &PluginFactory{}
