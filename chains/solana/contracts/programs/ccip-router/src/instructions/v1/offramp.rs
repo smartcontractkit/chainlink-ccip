@@ -565,31 +565,26 @@ fn parse_messaging_accounts<'info>(
     source_bitmap: &u64,
     remaining_accounts: &'info [AccountInfo<'info>],
 ) -> Result<(&'info AccountInfo<'info>, &'info [AccountInfo<'info>])> {
-    let end_ind = if token_indexes.is_empty() {
+    let end_index = if token_indexes.is_empty() {
         remaining_accounts.len()
     } else {
         token_indexes[0] as usize
     };
 
     require!(
-        end_ind <= remaining_accounts.len(),
+        1 <= end_index && end_index <= remaining_accounts.len(), // program id and message accounts need to fit in remaining accounts
         CcipRouterError::InvalidInputs
     ); // there could be other remaining accounts used for tokens
 
-    require!(
-        end_ind - 1 == extra_args_accounts.len(), // assert same number of accounts passed from message and transaction
-        CcipRouterError::InvalidInputs
-    );
-
     let msg_program = &remaining_accounts[0];
-    let msg_accounts = &remaining_accounts[1..end_ind];
+    let msg_accounts = &remaining_accounts[1..end_index];
 
     require!(
         logic_receiver == msg_program.key(),
         CcipRouterError::InvalidInputs,
     );
     require!(
-        msg_accounts.len() == extra_args_accounts.len(),
+        msg_accounts.len() == extra_args_accounts.len(), // assert same number of accounts passed from message and transaction
         CcipRouterError::InvalidInputs
     );
 

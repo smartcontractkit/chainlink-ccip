@@ -99,3 +99,16 @@ func MakeEvmToSolanaMessage(t *testing.T, tokenReceiver solana.PublicKey, logicR
 	require.NoError(t, err)
 	return msg, hash
 }
+
+// GenerateBitMapForIndexes generates a bitmap for the given indexes.
+
+func GenerateBitMapForIndexes(indexes []int) uint64 {
+
+	var bitmap uint64
+
+	for _, index := range indexes {
+		bitmap |= 1 << index
+	}
+
+	return bitmap
+}

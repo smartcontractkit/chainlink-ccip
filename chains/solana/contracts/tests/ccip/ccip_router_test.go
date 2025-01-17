@@ -4744,6 +4744,7 @@ func TestCCIPRouter(t *testing.T) {
 				sequenceNumber := message.Header.SequenceNumber
 				message.ExtraArgs.IsWritableBitmap = 0
 				message.ExtraArgs.Accounts = []solana.PublicKey{
+					stubAccountPDA,
 					solana.SystemProgramID,
 				}
 
@@ -4803,7 +4804,7 @@ func TestCCIPRouter(t *testing.T) {
 				raw.AccountMetaSlice = append(
 					raw.AccountMetaSlice,
 					solana.NewAccountMeta(config.CcipInvalidReceiverProgram, false, false),
-					solana.NewAccountMeta(stubAccountPDA, true, false),
+					solana.NewAccountMeta(stubAccountPDA, false, false),
 					solana.NewAccountMeta(solana.SystemProgramID, false, false),
 				)
 
@@ -4900,6 +4901,7 @@ func TestCCIPRouter(t *testing.T) {
 
 				sourceChainSelector := config.EvmChainSelector
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
+				message.TokenReceiver = config.ReceiverExternalExecutionConfigPDA
 				message.TokenAmounts = []ccip_router.Any2SolanaTokenTransfer{{
 					SourcePoolAddress: []byte{1, 2, 3},
 					DestTokenAddress:  token0.Mint.PublicKey(),
@@ -5269,10 +5271,10 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 
 				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.IsWritableBitmap = 2 + 32 + 64 + 128
+				message.ExtraArgs.IsWritableBitmap = testutils.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
 				message.ExtraArgs.Accounts = []solana.PublicKey{
-					config.CcipLogicReceiver,
-					config.ReceiverTargetAccountPDA, // writable (index = 1)
+					config.ReceiverExternalExecutionConfigPDA, // writable (index = 0)
+					config.ReceiverTargetAccountPDA,           // writable (index = 1)
 					solana.SystemProgramID,
 					config.CcipRouterProgram,
 					config.RouterConfigPDA,
@@ -5375,6 +5377,7 @@ func TestCCIPRouter(t *testing.T) {
 					Amount:            tokens.ToLittleEndianU256(1),
 				}}
 				message.TokenReceiver = receiver.PublicKey()
+				message.LogicReceiver = solana.PublicKey{} // no logic receiver
 				rootBytes, err := ccip.HashEvmToSolanaMessage(message, config.OnRampAddress)
 				require.NoError(t, err)
 
