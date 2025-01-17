@@ -38,7 +38,7 @@ func TestMessageHashing(t *testing.T) {
 			},
 			ExtraArgs: ccip_router.SVMExtraArgs{
 				ComputeUnits:     1000,
-				IsWritableBitmap: 1,
+				IsWritableBitmap: GenerateBitMapForIndexes([]int{0}),
 				Accounts: []solana.PublicKey{
 					solana.MustPublicKeyFromBase58("CtEVnHsQzhTNWav8skikiV2oF6Xx7r7uGGa8eCDQtTjH"),
 				},

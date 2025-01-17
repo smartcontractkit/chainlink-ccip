@@ -102,10 +102,10 @@ func CreateDefaultMessageWith(sourceChainSelector uint64, sequenceNumber uint64)
 		LogicReceiver: config.CcipLogicReceiver,
 		ExtraArgs: ccip_router.SVMExtraArgs{
 			ComputeUnits:     1000,
-			IsWritableBitmap: 3, // [true, true, false]
+			IsWritableBitmap: GenerateBitMapForIndexes([]int{0, 1}),
 			Accounts: []solana.PublicKey{
-				config.ReceiverExternalExecutionConfigPDA,
-				config.ReceiverTargetAccountPDA,
+				config.ReceiverExternalExecutionConfigPDA, // writable (index 0)
+				config.ReceiverTargetAccountPDA,           // writable (index 1)
 				solana.SystemProgramID,
 			},
 		},
@@ -280,4 +280,16 @@ func HashSVMToAnyMessage(msg ccip_router.SVM2AnyRampMessage) ([]byte, error) {
 	}
 
 	return hash.Sum(nil), nil
+}
+
+// GenerateBitMapForIndexes generates a bitmap for the given indexes.
+
+func GenerateBitMapForIndexes(indexes []int) uint64 {
+	var bitmap uint64
+
+	for _, index := range indexes {
+		bitmap |= 1 << index
+	}
+
+	return bitmap
 }

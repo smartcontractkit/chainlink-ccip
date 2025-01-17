@@ -5300,7 +5300,7 @@ func TestCCIPRouter(t *testing.T) {
 				message, _ := testutils.CreateNextMessage(ctx, solanaGoClient, t)
 
 				// To make the message go through the validations we need to specify all additional accounts used when executing the CPI
-				message.ExtraArgs.IsWritableBitmap = testutils.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
+				message.ExtraArgs.IsWritableBitmap = ccip.GenerateBitMapForIndexes([]int{0, 1, 5, 6, 7})
 				message.ExtraArgs.Accounts = []solana.PublicKey{
 					config.ReceiverExternalExecutionConfigPDA, // writable (index = 0)
 					config.ReceiverTargetAccountPDA,           // writable (index = 1)
