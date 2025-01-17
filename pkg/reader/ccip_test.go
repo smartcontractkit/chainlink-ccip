@@ -10,6 +10,7 @@ import (
 	"time"
 
 	mapset "github.com/deckarep/golang-set/v2"
+	"github.com/smartcontractkit/chainlink-ccip/mocks/pkg/types/ccipocr3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,6 @@ import (
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 
 	typeconv "github.com/smartcontractkit/chainlink-ccip/internal/libs/typeconv"
-	internal_mocks "github.com/smartcontractkit/chainlink-ccip/internal/mocks"
 	"github.com/smartcontractkit/chainlink-ccip/internal/plugintypes"
 	writer_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/chainlink_common"
 	reader_mocks "github.com/smartcontractkit/chainlink-ccip/mocks/pkg/contractreader"
@@ -79,7 +79,7 @@ func TestCCIPChainReader_getSourceChainsConfig(t *testing.T) {
 			chainB: sourceCRs[chainB],
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
-		internal_mocks.NewMockExtraDataCodec(),
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainA].Bind(
@@ -790,7 +790,7 @@ func TestCCIPChainReader_getDestFeeQuoterStaticConfig(t *testing.T) {
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
-		internal_mocks.NewMockExtraDataCodec(),
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -838,7 +838,7 @@ func TestCCIPChainReader_getFeeQuoterTokenPriceUSD(t *testing.T) {
 		map[cciptypes.ChainSelector]contractreader.ContractReaderFacade{
 			chainC: destCR,
 		}, nil, chainC, offrampAddress,
-		internal_mocks.NewMockExtraDataCodec(),
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(
@@ -871,7 +871,7 @@ func TestCCIPFeeComponents_HappyPath(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
-		internal_mocks.NewMockExtraDataCodec(),
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	ctx := context.Background()
@@ -900,7 +900,7 @@ func TestCCIPFeeComponents_NotFoundErrors(t *testing.T) {
 		contractWriters,
 		chainC,
 		[]byte{0x3},
-		internal_mocks.NewMockExtraDataCodec(),
+		ccipocr3.NewMockExtraDataCodec(t),
 	)
 
 	ctx := context.Background()
@@ -950,7 +950,7 @@ func TestCCIPChainReader_LinkPriceUSD(t *testing.T) {
 		nil,
 		chainC,
 		string(offrampAddress),
-		internal_mocks.NewMockExtraDataCodec(),
+		ccipocr3.NewMockExtraDataCodec(t),
 	}
 
 	require.NoError(t, ccipReader.contractReaders[chainC].Bind(

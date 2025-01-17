@@ -30,6 +30,7 @@ packages:
         interfaces:
             ExecutePluginCodec:
             EstimateProvider:
+            ExtraDataCodec:
     github.com/smartcontractkit/chainlink-common/pkg/types:
             interfaces:
                 ContractWriter:
